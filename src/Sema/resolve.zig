@@ -40,6 +40,10 @@ pub const Net = struct { discipline: []const u8, dir: Inst.Direction, vector: bo
 const Ooc = struct { discipline: []const u8, file: Zcu.File.Index, src: Inst.Ref };
 const Oocs = std.AutoHashMapUnmanaged(Zcu.NetKey, Ooc);
 
+/// The deepest instruction nesting `netsNamed` follows (the parser caps
+/// source nesting far below it).
+const named_depth_max = 1 << 12;
+
 /// A §7.7.2 statement's answer: its `resolveto` discipline, or `exclude`.
 const Resolution = struct { result: []const u8, exclude: bool };
 
@@ -141,6 +145,56 @@ pub fn internalName(vir: *const Vir, f: Inst.Index) []const u8 {
 
 // ---- private ----
 
+/// §3.6.2.4 the nets module `module`'s digital behavioral code names: every
+/// net or undeclared name a continuous assignment or an `initial` or
+/// `always` process reads or writes.
+fn behavioralNets(s: *Sema, module: Zcu.Decl) Allocator.Error!std.AutoHashMapUnmanaged(String, void) {
+    const zcu = s.zcu;
+    const vir = zcu.fileVir(module.file);
+    var out: std.AutoHashMapUnmanaged(String, void) = .empty;
+    if (zcu.declRow(module).kind == .primitive) return out;
+    const m = payloadOf(vir, Inst.Module, zcu.declRow(module).inst);
+    for (vir.body(m.body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .assign, .initial, .always => try netsNamed(s, vir, i, &out, 0),
+        else => {}, // else: analog and structural items are not digital behavior
+    };
+    return out;
+}
+
+/// Adds to `out` every net and undeclared name instruction `i` reaches
+/// through its operands and bodies.
+fn netsNamed(s: *Sema, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapUnmanaged(String, void), depth: u32) Allocator.Error!void {
+    assert(depth < named_depth_max);
+    const tag = vir.instructions.items(.tag)[@backingInt(i)];
+    const data = vir.instructions.items(.data)[@backingInt(i)];
+    switch (Inst.dataKind(tag)) {
+        .decl_tok => switch (vir.instructions.items(.tag)[@backingInt(data.decl_tok.decl)]) {
+            .net => try out.put(s.arena, try s.zcu.intern_pool.getString(s.gpa, vir.string(payloadOf(vir, Inst.Net, data.decl_tok.decl).name)), {}),
+            .io => try out.put(s.arena, try s.zcu.intern_pool.getString(s.gpa, vir.string(payloadOf(vir, Inst.Io, data.decl_tok.decl).name)), {}),
+            else => {}, // else: a variable, parameter or scope is no net
+        },
+        .str_tok => if (tag == .str_ref) try out.put(s.arena, try s.zcu.intern_pool.getString(s.gpa, vir.string(data.str_tok.start)), {}),
+        .un_node => if (data.un_node.operand.toIndex()) |o| try netsNamed(s, vir, o, out, depth + 1),
+        .pl_node => switch (tag) {
+            inline else => |t| if (Inst.Payload(t) != void) try namesIn(s, vir, Inst.Payload(t), vir.extraData(Inst.Payload(t), data.pl_node.payload_index), out, depth + 1),
+        },
+        .int, .float, .str => {},
+    }
+}
+
+/// `netsNamed` over a payload's operands and bodies, field by field.
+fn namesIn(s: *Sema, vir: *const Vir, comptime T: type, v: T, out: *std.AutoHashMapUnmanaged(String, void), depth: u32) Allocator.Error!void {
+    if (T == Inst.Ref) {
+        if (v.toIndex()) |o| try netsNamed(s, vir, o, out, depth);
+    } else if (T == Vir.Body) {
+        for (vir.body(v)) |o| try netsNamed(s, vir, o, out, depth);
+    } else if (@typeInfo(T) == .@"struct" and @hasDecl(T, "Elem")) {
+        if (T.Elem == Inst.Ref or @typeInfo(T.Elem) == .@"struct") for (vir.list(T.Elem, v)) |e| try namesIn(s, vir, T.Elem, e, out, depth);
+    } else if (@typeInfo(T) == .@"struct" and @typeInfo(T).@"struct".layout == .@"extern") {
+        inline for (@typeInfo(T).@"struct".field_names) |f| try namesIn(s, vir, @FieldType(T, f), @field(v, f), out, depth);
+    }
+}
+
 /// Annex F.2.1 step 3 every out-of-context discipline declaration
 /// (`electrical u.w;`, `magnetic $root.top.u.q;`) by the instance and net
 /// it names: §3.10's precedence order 1, over the net's own declaration.
@@ -207,6 +261,10 @@ fn resolveInstance(s: *Sema, kids: []const std.ArrayList(Instance.Index), ooc: *
     }
     var cands: std.AutoArrayHashMapUnmanaged(String, std.ArrayList([]const u8)) = .empty;
     const vir = zcu.fileVir(module.file);
+    // §3.6.2.4: a net with no discipline that digital behavioral code uses
+    // is discrete: its discrete child segments resolve it, and with none it
+    // is natureless (`discipline.behavioral`).
+    const digital = try behavioralNets(s, module);
     for (kids[@backingInt(i)].items) |c| {
         const run_ = zcu.instances.items(.ports)[@backingInt(c)];
         const cmod = zcu.instances.items(.module)[@backingInt(c)];
@@ -221,6 +279,20 @@ fn resolveInstance(s: *Sema, kids: []const std.ArrayList(Instance.Index), ooc: *
             if (!gop.found_existing) gop.value_ptr.* = .empty;
             try gop.value_ptr.append(s.arena, zcu.intern_pool.stringToSlice(lower));
         }
+    }
+    var dit = digital.keyIterator();
+    while (dit.next()) |n| {
+        if (decls.get(n.*)) |d| if (d.discipline.len != 0) continue;
+        if (ooc.contains(.{ .instance = i, .net = n.* })) continue;
+        const gop = try cands.getOrPut(s.arena, n.*);
+        if (!gop.found_existing) gop.value_ptr.* = .empty;
+        var kept: usize = 0;
+        for (gop.value_ptr.items) |d| if (try discipline.domainOf(s, d) == .discrete) {
+            gop.value_ptr.items[kept] = d;
+            kept += 1;
+        };
+        gop.value_ptr.shrinkRetainingCapacity(kept);
+        if (kept == 0) try gop.value_ptr.append(s.arena, discipline.behavioral);
     }
     for (cands.keys(), cands.values()) |sig, list| {
         const d = try merge(s, i, list.items) orelse continue;

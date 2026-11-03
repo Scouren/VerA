@@ -339,3 +339,15 @@ test "Annex F.2.1 step 3 an out-of-context declaration overrides a net's discipl
     try expectCodes(prelude ++ "module top; leaf u(n); rot u.p; endmodule", .{}, &.{.E0375});
     try expectCodes(prelude ++ "module top; leaf u(n); rot $root.top.u.p; endmodule", .{}, &.{.E0375});
 }
+
+test "§3.6.2.4 an undeclared net digital behavioral code drives is discrete, so its analog port gets a bridge" {
+    try expectTree(
+        \\nature V; access = V; endnature
+        \\discipline el; potential V; enddiscipline
+        \\discipline dd; domain discrete; enddiscipline
+        \\connectmodule d2a(c, e); input c; output e; dd c; el e; endmodule
+        \\module load(p); input p; el p; endmodule
+        \\module top; reg s; assign w = s; load l(w); endmodule
+        \\connectrules r; connect d2a; endconnectrules
+    , .{}, "top top\ntop.l load\ntop.w__d2a__el d2a\n");
+}

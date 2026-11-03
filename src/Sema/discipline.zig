@@ -4,7 +4,7 @@
 //! Cites: VAMS-2023 §3.6.1.1, §3.6.1.2, §3.6.2.2, §3.6.2.6, §3.11.1.
 //!
 //! Contents:
-//! - `pub const Domain`
+//! - `pub const Domain`, `pub const behavioral`
 //! - `pub fn domainOf(s: *Sema, name: []const u8) Allocator.Error!?Domain`
 //! - `pub fn compatible(s: *Sema, a: []const u8, b: []const u8) Allocator.Error!bool`
 
@@ -22,6 +22,11 @@ const payloadOf = walk.payloadOf;
 /// §3.6.2.2 a discipline's domain.
 pub const Domain = enum { continuous, discrete };
 
+/// §3.6.2.4 the discipline of an undeclared net digital behavioral code
+/// uses: discrete and natureless, so compatible with every discrete one
+/// (§3.11.1). A `$` name, so no declaration can take it.
+pub const behavioral = "$behavioral";
+
 const ItemKind = @FieldType(Inst.DisciplineItem, "kind");
 
 /// The derived-nature chain `baseNature` follows at most.
@@ -35,6 +40,7 @@ const Found = struct { vir: *const Vir, decl: Inst.Discipline };
 /// continuous"). Null for no discipline of the name, and for a domainless
 /// one (no domain, no nature).
 pub fn domainOf(s: *Sema, name: []const u8) Allocator.Error!?Domain {
+    if (std.mem.eql(u8, name, behavioral)) return .discrete;
     const d = try lookup(s, name) orelse return null;
     var natures = false;
     for (d.vir.list(Inst.DisciplineItem, d.decl.items)) |it| switch (it.kind) {

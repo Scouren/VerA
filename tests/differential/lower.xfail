@@ -99,7 +99,7 @@ verilog-a/ch03_data_types/discipline_binds_undeclared_nature_rejected.va codes: 
 verilog-a/ch03_data_types/discipline_duplicate_user_attribute_rejected.va codes: old E0343, new {}
 verilog-a/ch03_data_types/discipline_nonconstant_user_attribute_rejected.va codes: old E0340, new {}
 verilog-a/ch03_data_types/domainless_discipline.va tables row 3: old `contrib flow direct br0 p link`, new `contrib flow direct br0 p gnd`
-verilog-a/ch03_data_types/domainless_net_behavioral.va the old side refused, the new side lowered
+verilog-a/ch03_data_types/domainless_net_behavioral.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-a/ch03_data_types/duplicate_access_name.va codes: old E0335, new {}
 verilog-a/ch03_data_types/duplicate_discipline_name.va codes: old E0342, new {}
 verilog-a/ch03_data_types/duplicate_nature_name.va codes: old E0342, new {}
@@ -248,7 +248,7 @@ verilog-a/ch04_expressions/laplace_zd_dc_gain.va codes: old {}, new E0505 (E0505
 verilog-a/ch04_expressions/last_crossing_direction_rejected.va codes: old E0516, new {}
 verilog-a/ch04_expressions/last_crossing_directions.va codes: old {}, new E0514 (E0514: `last_crossing`)
 verilog-a/ch04_expressions/limexp_not_a_constant_expression_rejected.va the old side refused, the new side lowered
-verilog-a/ch04_expressions/noise_generator_without_branch_rejected.va tables row 1: old `contrib flow direct br0 p gnd`, new `node 1 gnd_node net`
+verilog-a/ch04_expressions/noise_generator_without_branch_rejected.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-a/ch04_expressions/noise_source_inside_array_pattern_argument.va codes: old {}, new E0512 (E0512: `pattern` is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_parameter_part_select.va codes: old {}, new E0512 (E0512: `slice` is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_part_select_out_of_range_rejected.va codes: old E0310, new E0512 (E0512: `slice` is not lowered by Sema yet)
@@ -351,7 +351,7 @@ verilog-a/ch05_analog_behavior/port_branch_own_port_inside_instance_rejected.va 
 verilog-a/ch05_analog_behavior/probe_both_quantities_invalid.va codes: old E0423, new {}
 verilog-a/ch05_analog_behavior/reactive_sum_under_a_factor.va codes: old {}, new E0512 (E0512: a reactive term of this shape is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/reject_5_5_1_parameter_V_hides_access_function.va codes: old {}, new E0512 (E0512: `a call of a name that is no function` is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/reject_5_5_1_probe_of_discrete_net.va the old side refused, the new side lowered
+verilog-a/ch05_analog_behavior/reject_5_5_1_probe_of_discrete_net.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-a/ch05_analog_behavior/reject_5_5_1_unnamed_branch_mixed_disciplines.va codes: old {}, new E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/reject_charge_site_lte_parameter.va codes: old E0523, new {}
 verilog-a/ch05_analog_behavior/reject_vera_timepoint_contribution.va codes: old E0530, new {}
@@ -500,9 +500,7 @@ verilog-a/ch06_hierarchy/vector_port_matching_net_width.va codes: old {}, new E0
 verilog-a/ch06_hierarchy/vector_port_past_256_unknowns.va codes: old {}, new E0426,E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch06_hierarchy/vector_port_scalar_net_width_mismatch_rejected.va codes: old E0925, new {}
 verilog-a/ch06_hierarchy/vector_ports.va codes: old E0350, new {}
-verilog-a/ch08_scheduling/absdelta_d2a_discards_pending.va tables row 1: old `param clamp integer = 0`, new `contrib potential direct br0 p gnd`
 verilog-a/ch08_scheduling/continuous_variable_interpolation_host.va tables row 3: old `held x`, new `held held`
-verilog-a/ch08_scheduling/digital_assignment_unsupported.va codes: old E0438, new {}
 verilog-a/ch09_system_tasks/abs.va contribution 0 resist: old 3.3637570688444276e0, new 1.3637570688444276e0
 verilog-a/ch09_system_tasks/aliasparam_mfactor.va tables row 2: old `param m real = 1e0`, new `contrib flow direct br0 p n`
 verilog-a/ch09_system_tasks/analog_decimal_is_auto_sized.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
@@ -680,11 +678,9 @@ verilog-a/ch10_directives/unconnected_drive_spares_an_unconnected_inout.va table
 verilog-a/combined/file_and_display_side_effects.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/combined/file_display_diagnostics.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/exhaustive/idtmod.va codes: old {}, new E0514 (E0514: `idtmod`)
-verilog-ams/annex_a_syntax/digital_statements_in_initial.va tables row 1: old `param f integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/annex_a_syntax/mintypmax_constant_takes_typical.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
 verilog-ams/annex_a_syntax/net_and_variable_types.va codes: old E0316, new {}
 verilog-ams/annex_a_syntax/output_variable_port_written.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
-verilog-ams/annex_a_syntax/reject_A_6_1_assign_to_variable.va codes: old E0438, new {}
 verilog-ams/annex_a_syntax/root_anchored_paths.va tables row 2: old `node 2 u.q net`, new `node 2 $root.root_anchored_paths.u.q net`
 verilog-ams/annex_a_syntax/specify_block_unsupported.va tables row 3: old `param tplh real local = 1.5e0`, new `contrib flow direct br0 p n`
 verilog-ams/annex_a_syntax/specify_path_delay_mintypmax_list.va tables row 4: old `param u.tr integer local = 2`, new `node 4 u.c net`
@@ -692,16 +688,14 @@ verilog-ams/annex_a_syntax/specify_path_delays_design_runs.va tables row 8: old 
 verilog-ams/annex_a_syntax/specify_paths_design_runs.va tables row 8: old `param u.tr integer local = 2`, new `node 8 u.a net`
 verilog-ams/annex_a_syntax/specparam_declaration_unsupported.va tables row 2: old `param tdr real local = 1.5e0`, new `contrib flow direct br0 p n`
 verilog-ams/annex_a_syntax/specparam_module_item_value.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
-verilog-ams/annex_a_syntax/specparam_range_and_select.va tables row 1: old `param code integer local = 10`, new `contrib flow direct br0 p gnd`
+verilog-ams/annex_a_syntax/specparam_range_and_select.va tables row 1: old `param code integer local = 10`, new `param b1 integer = 0`
 verilog-ams/annex_a_syntax/task_declaration_enabled_from_initial.va tables row 1: old `param level integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/annex_a_syntax/timing_checks_design_runs.va tables row 4: old `param u.tSU integer local = 10`, new `node 4 u.clk net`
 verilog-ams/annex_c_analog_subset/casex_accepted.va codes: old {}, new E0512 (E0512: `casex`/`casez` in an analog body)
 verilog-ams/annex_c_analog_subset/casez_accepted.va codes: old {}, new E0512 (E0512: `casex`/`casez` in an analog body)
-verilog-ams/annex_c_analog_subset/continuous_assign_accepted.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
-verilog-ams/annex_c_analog_subset/real_value_inout_port_accepted.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
-verilog-ams/annex_c_analog_subset/real_value_output_port_accepted.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
+verilog-ams/annex_c_analog_subset/real_value_inout_port_accepted.va tables row 1: old `param w real = 0e0`, new `node 1 u.p net`
+verilog-ams/annex_c_analog_subset/real_value_output_port_accepted.va tables row 1: old `param w real = 0e0`, new `node 1 u.p net`
 verilog-ams/annex_c_analog_subset/real_value_port_accepted.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
-verilog-ams/annex_c_analog_subset/wreal_accepted.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/annex_c_analog_subset/xz_in_the_mixed_signal_context.va codes: old {}, new E0130,E0369 (E0130: the analog backend cannot execute this four-state or wide literal)
 verilog-ams/annex_f_resolution/conflicting_declarations.va the old side refused, the new side lowered
 verilog-ams/annex_f_resolution/continuous_domain_wins.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
@@ -713,44 +707,29 @@ verilog-ams/annex_f_resolution/digital_behavioral_net_is_digital.va codes: old {
 verilog-ams/annex_f_resolution/net_read_by_digital_code_resolves_digital.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/annex_f_resolution/out_of_context_declaration_detail.va tables row 2: old `contrib flow direct br0 a b`, new `node 2 ca.p net`
 verilog-ams/annex_f_resolution/out_of_context_declaration.va tables row 2: old `contrib flow direct br0 a b`, new `node 2 ca.p net`
-verilog-ams/annex_g_change_history/forever_is_a_digital_loop.va tables row 2: old `param ticks integer = 0`, new `contrib flow direct br0 p n`
 verilog-ams/ch01_intro/reject_1_2_contribution_from_always_block.va codes: old E0435, new {}
-verilog-ams/ch02_lexical/attributes_on_module_items.va codes: old {}, new E0315,E0322 (E0315: a net or branch is not a value; read it through an access function)
-verilog-ams/ch02_lexical/digital_delay_notation.va tables row 1: old `param code integer = 0`, new `contrib flow direct br0 p gnd`
+verilog-ams/ch02_lexical/attributes_on_module_items.va tables row 2: old `param gw integer = 0`, new `param q integer = 0`
 verilog-ams/ch02_lexical/operating_point_report_attributes.va tables row 3: old `param m real = 1e0`, new `contrib flow direct br0 p n`
 verilog-ams/ch02_lexical/unsized_xz_extends_to_expression_size.va tables row 1: old `param x32 integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch02_lexical/xz_digit_width_and_padding.va codes: old {}, new E0130,E0369 (E0130: the analog backend cannot execute this four-state or wide literal)
 verilog-ams/ch03_data_types/digital_primitive_on_mixed_net_rejected.va codes: old E0960, new {}
 verilog-ams/ch03_data_types/digital_primitive_on_mixed_net_with_default_discipline.va tables row 4: old `node 4 p__ch03_and_bridge__logic.d net`, new `contrib flow direct br0 p n`
-verilog-ams/ch03_data_types/discrete_disciplines_compatible.va tables row 2: old `param seen integer = 0`, new `contrib potential direct br0 out gnd`
 verilog-ams/ch03_data_types/discrete_domain_with_natures.va codes: old E0339, new {}
 verilog-ams/ch03_data_types/ground_non_continuous.va codes: old E0344, new {}
 verilog-ams/ch03_data_types/mixed_port_with_connect_statement.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch03_data_types/nodeset_non_continuous.va codes: old E0366, new {}
 verilog-ams/ch03_data_types/reject_vera_scratch_analog_initial.va codes: old E0536, new {}
-verilog-ams/ch03_data_types/wand_interconnect_resolves_wired_and.va tables row 2: old `param r.seen integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch03_data_types/wire_without_discipline_in_analog_rejected.va the old side refused, the new side lowered
-verilog-ams/ch03_data_types/wire_without_discipline_is_discrete.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
-verilog-ams/ch03_data_types/wreal_net_undriven_zero_and_driven.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
+verilog-ams/ch03_data_types/wire_without_discipline_in_analog_rejected.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch03_data_types/wreal_wire_port_merge.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch04_expressions/function_called_outside_analog_rejected.va codes: old E0430, new {}
 verilog-ams/ch04_expressions/operator_in_always_rejected.va codes: old E0422, new {}
 verilog-ams/ch04_expressions/operator_in_initial.va codes: old E0422, new {}
 verilog-ams/ch04_expressions/revert_ops.va tables row 34: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-ams/ch04_expressions/table_4_1_every_operator.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
-verilog-ams/ch05_analog_behavior/absdelta_direction_change.va tables row 1: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch05_analog_behavior/absdelta_dynamic_controls.va tables row 2: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch05_analog_behavior/absdelta_enable_transitions.va tables row 1: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch05_analog_behavior/absdelta_interpolated_events.va tables row 2: old `param n integer = 0`, new `contrib potential direct br0 vo gnd`
-verilog-ams/ch05_analog_behavior/absdelta_samples_analog_changes.va tables row 2: old `param tracked real = 0e0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch05_analog_behavior/absdelta_self_disable.va tables row 1: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch05_analog_behavior/absdelta_time_tol_below_precision.va tables row 1: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch05_analog_behavior/absdelta_time_tol_filters.va tables row 1: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch05_analog_behavior/absdelta_without_delta_rejected.va codes: old E0517, new {}
 verilog-ams/ch05_analog_behavior/analog_initial_digital_access_rejected.va codes: old E0431, new {}
 verilog-ams/ch05_analog_behavior/analog_initial_event_rejected.va codes: old E0702, new {}
 verilog-ams/ch05_analog_behavior/array_assignment_from_packed_vector_rejected.va codes: old E0429, new E0313 (E0313: an assignment to a name that is not a variable)
-verilog-ams/ch05_analog_behavior/cross_expr_tol_and_time_tol_both_hold.va tables row 1: old `param n_dig integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch05_analog_behavior/final_step_in_digital_context_rejected.va codes: old E0708, new {}
 verilog-ams/ch05_analog_behavior/initial_step_in_digital_context_rejected.va codes: old E0708, new {}
 verilog-ams/ch05_analog_behavior/node_alias_reevaluated_when_a_parameter_changes.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
@@ -762,9 +741,8 @@ verilog-ams/ch05_analog_behavior/timer_body_effect_controls.va tables row 12: ol
 verilog-ams/ch05_analog_behavior/timer_body_precomputed_controls.va tables row 12: old `held visits`, new `held stamp`
 verilog-ams/ch05_analog_behavior/timer_body_reg_controls.va codes: old E0316, new {}
 verilog-ams/ch06_hierarchy/connect_insertion_follows_paramset_selection.va codes: old {}, new E0512 (E0512: an access of a name with no node)
-verilog-ams/ch06_hierarchy/digital_port_expression_actual.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
+verilog-ams/ch06_hierarchy/digital_port_expression_actual.va codes: old {}, new E0315,E0512 (E0512: an access of a name with no node)
 verilog-ams/ch06_hierarchy/generate_block_event_declaration.va tables row 1: old `param hits integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch06_hierarchy/generate_block_gate.va tables row 2: old `param yr integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch06_hierarchy/genvar_set_to_x_rejected.va codes: old E0486, new {}
 verilog-ams/ch06_hierarchy/net_variable_same_name_rejected.va codes: old E0362, new {}
 verilog-ams/ch06_hierarchy/paramset_outer_defparam_connect_array.va codes: old {}, new E0512 (E0512: an access of a name with no node)
@@ -773,21 +751,10 @@ verilog-ams/ch07_mixed_signal/a2d_case_equality_over_x_and_z.va codes: old {}, n
 verilog-ams/ch07_mixed_signal/a2d_case_statement_four_state_labels.va codes: old {}, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
 verilog-ams/ch07_mixed_signal/a2d_example_undriven_dnet_equality_rejected.va codes: old E0130, new E0130,E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch07_mixed_signal/a2d_example_undriven_dnet_reads_z.va codes: old {}, new E0130,E0315,E0369 (E0315: a net or branch is not a value; read it through an access function)
-verilog-ams/ch07_mixed_signal/a2d_tick_quantization.va tables row 2: old `param tick_lo integer = 0`, new `contrib potential direct br0 vo gnd`
-verilog-ams/ch07_mixed_signal/absdelta_interpolated_a2d.va tables row 2: old `param n integer = 0`, new `contrib potential direct br0 vo gnd`
-verilog-ams/ch07_mixed_signal/absdelta_runtime_default_tolerances.va tables row 1: old `param absent integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch07_mixed_signal/absdelta_runtime_disable_in_body.va tables row 1: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch07_mixed_signal/absdelta_runtime_dynamic_controls.va tables row 2: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch07_mixed_signal/absdelta_runtime_enable.va tables row 1: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch07_mixed_signal/absdelta_runtime_reversal.va tables row 1: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch07_mixed_signal/absdelta_runtime_time_precision.va tables row 1: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch07_mixed_signal/absdelta_runtime_time_tol.va tables row 1: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch07_mixed_signal/absdelta_samples_an_analog_signal.va tables row 2: old `param tracked real = 0e0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch07_mixed_signal/analog_event_variable_drives_continuous_assign.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
-verilog-ams/ch07_mixed_signal/analog_event_variable_drives_wreal_assign.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
+verilog-ams/ch07_mixed_signal/analog_event_variable_drives_continuous_assign.va tables row 5: old `held $assigned.level`, new `limit_slots 0`
+verilog-ams/ch07_mixed_signal/analog_event_variable_drives_wreal_assign.va tables row 5: old `held $assigned.level`, new `limit_slots 0`
 verilog-ams/ch07_mixed_signal/analog_function_from_digital_rejected.va codes: old E0430, new {}
 verilog-ams/ch07_mixed_signal/analog_net_written_from_a_digital_process_rejected.va codes: old E0435, new {}
-verilog-ams/ch07_mixed_signal/analog_probe_in_a_digital_expression.va tables row 2: old `param out real = 0e0`, new `contrib potential direct br0 aout gnd`
 verilog-ams/ch07_mixed_signal/analog_signal_is_never_segmented.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/auto_insertion_figure_7_6_basic_merged.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/auto_insertion_figure_7_6_case2_detail_merged.va codes: old {}, new E0512 (E0512: an access of a name with no node)
@@ -798,11 +765,9 @@ verilog-ams/ch07_mixed_signal/basic_resolution_continuous_beats_discrete.va code
 verilog-ams/ch07_mixed_signal/both_contexts_assignment_rejected.va codes: old E0432, new {}
 verilog-ams/ch07_mixed_signal/both_contexts_output_actual_rejected.va codes: old E0432, new {}
 verilog-ams/ch07_mixed_signal/both_halves_of_the_bridge_execute.va codes: old {}, new E0512 (E0512: an access of a name with no node)
-verilog-ams/ch07_mixed_signal/changed_analog_assignment_fires.va tables row 1: old `param n integer = 0`, new `contrib potential direct br0 out gnd`
-verilog-ams/ch07_mixed_signal/child_always_block_in_a_mixed_design.va tables row 2: old `param u.clk integer = 0`, new `contrib potential direct br0 p n`
+verilog-ams/ch07_mixed_signal/changed_analog_assignment_fires.va tables row 5: old `held $assigned.smpl`, new `limit_slots 0`
 verilog-ams/ch07_mixed_signal/child_wrong_flow_rejected.va codes: old {}, new E0408 (E0408: )
 verilog-ams/ch07_mixed_signal/child_wrong_potential_rejected.va codes: old {}, new E0408 (E0408: )
-verilog-ams/ch07_mixed_signal/closely_spaced_crossings.va tables row 2: old `param a_dig integer = 0`, new `contrib potential direct br0 vo gnd`
 verilog-ams/ch07_mixed_signal/comparator_dac_feedback.va codes: old {}, new E0706 (E0706: )
 verilog-ams/ch07_mixed_signal/conflicting_discipline_declaration_rejected.va the old side refused, the new side lowered
 verilog-ams/ch07_mixed_signal/connect_insertion_generate_block_port.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
@@ -814,20 +779,11 @@ verilog-ams/ch07_mixed_signal/connect_insertion_upper_from_ooc_below.va codes: o
 verilog-ams/ch07_mixed_signal/connect_module_manually_inserted.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch07_mixed_signal/connect_plain_discipline_override.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/connect_rule_parameter_is_applied.va codes: old {}, new E0512 (E0512: an access of a name with no node)
-verilog-ams/ch07_mixed_signal/continuous_net_continuously_assigned_rejected.va codes: old E0435, new {}
 verilog-ams/ch07_mixed_signal/continuous_net_resolution_modes_agree.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
-verilog-ams/ch07_mixed_signal/continuous_variable_read_from_digital.va tables row 2: old `param rx real = 0e0`, new `contrib potential direct br0 aout gnd`
+verilog-ams/ch07_mixed_signal/continuous_variable_read_from_digital.va tables row 6: old `held x`, new `held h`
 verilog-ams/ch07_mixed_signal/contribution_under_a_digital_event_rejected.va codes: old E0406, new E0704 (E0704: )
 verilog-ams/ch07_mixed_signal/cross_direction_in_digital_event_control_rejected.va codes: old E0517, new {}
-verilog-ams/ch07_mixed_signal/cross_enable_and_dir_disable_the_event.va tables row 2: old `param n_on integer = 0`, new `contrib potential direct br0 vo gnd`
-verilog-ams/ch07_mixed_signal/cross_event_in_a_digital_always.va tables row 2: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch07_mixed_signal/cross_time_tol_below_time_resolution.va tables row 1: old `param n integer = 0`, new `contrib potential direct br0 vo gnd`
-verilog-ams/ch07_mixed_signal/dc_time_zero_settle.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
-verilog-ams/ch07_mixed_signal/ddiscrete_net_continuously_assigned.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch07_mixed_signal/digital_function_in_cross_arguments_rejected.va codes: old E0436, new {}
-verilog-ams/ch07_mixed_signal/digital_primary_uses_the_last_tick.va tables row 1: old `param code integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch07_mixed_signal/digital_tick_is_the_timescale_precision.va tables row 1: old `param code integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch07_mixed_signal/digital_value_has_zero_derivative.va tables row 3: old `param r integer = 0`, new `contrib potential direct br0 n gnd`
 verilog-ams/ch07_mixed_signal/direction_override_redirects_a_bridge.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/discipline_and_direction_overrides.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/discipline_resolution_basic_figure_7_3.va codes: old {}, new E0512 (E0512: an access of a name with no node)
@@ -849,26 +805,18 @@ verilog-ams/ch07_mixed_signal/event_bounds_absdelta_negative_expr_tol_rejected.v
 verilog-ams/ch07_mixed_signal/event_bounds_absdelta_negative_time_tol_rejected.va codes: old E0517, new {}
 verilog-ams/ch07_mixed_signal/event_bounds_absdelta_noninteger_enable_rejected.va codes: old E0517, new {}
 verilog-ams/ch07_mixed_signal/event_bounds_cross_expr_tol_without_time_tol_rejected.va codes: old E0517, new {}
-verilog-ams/ch07_mixed_signal/event_bounds_mixed_legal.va tables row 2: old `param n_both integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch07_mixed_signal/explicit_d2a_per_delta_cycle.va codes: old {}, new E0706 (E0706: )
 verilog-ams/ch07_mixed_signal/explicit_d2a_reads_post_active.va codes: old {}, new E0704 (E0704: )
 verilog-ams/ch07_mixed_signal/figure_7_2_resolveto_two_levels.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-ams/ch07_mixed_signal/free_variable_in_digital_event_control_rejected.va codes: old E0484, new {}
-verilog-ams/ch07_mixed_signal/functions_called_from_their_own_context.va tables row 1: old `param dsq integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch07_mixed_signal/gate_connect_bridge_drives_gate_input.va tables row 2: old `node 2 a__b5_gbd_a2d__ddiscrete.cm net`, new `contrib flow direct br0 a gnd`
+verilog-ams/ch07_mixed_signal/gate_connect_bridge_drives_gate_input.va tables row 2: old `node 2 a__b5_gbd_a2d__ddiscrete.cm net`, new `param yr integer = 0`
 verilog-ams/ch07_mixed_signal/gate_generated_connect_name_defparam.va the old side lowered, the new side refused
-verilog-ams/ch07_mixed_signal/gate_ordered_terminals.va tables row 2: old `param yr integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch07_mixed_signal/glitch_absorbed_at_one_tick.va codes: old {}, new E0706 (E0706: )
 verilog-ams/ch07_mixed_signal/guarded_d2a_holds.va codes: old {}, new E0704 (E0704: )
-verilog-ams/ch07_mixed_signal/implicit_d2a_bus.va tables row 2: old `param val integer = 0`, new `contrib potential direct br0 vo gnd`
 verilog-ams/ch07_mixed_signal/incompatible_disciplines_rejected.va the old side refused, the new side lowered
 verilog-ams/ch07_mixed_signal/inf_contribution.va codes: old E0424, new {}
-verilog-ams/ch07_mixed_signal/initial_untimed_process_runs.va tables row 1: old `param state integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch07_mixed_signal/inserted_at_upper_connection_level.va codes: old {}, new E0512 (E0512: an access of a name with no node)
-verilog-ams/ch07_mixed_signal/kcl_node_solved_at_every_mixed_point.va tables row 1: old `param b integer = 0`, new `contrib flow direct br0 a gnd`
-verilog-ams/ch07_mixed_signal/last_tick_is_a_floor_on_a_long_run.va tables row 1: old `param code integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch07_mixed_signal/local_discipline_accessors_across_hierarchy.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
-verilog-ams/ch07_mixed_signal/macro_process_runs_after_nba.va tables row 1: old `param q integer = 0`, new `contrib potential direct br0 vo gnd`
 verilog-ams/ch07_mixed_signal/merged_generated_name_defparam.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/merged_groups_per_connect_module.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/merged_is_the_default_one_instance.va codes: old {}, new E0512 (E0512: an access of a name with no node)
@@ -876,14 +824,11 @@ verilog-ams/ch07_mixed_signal/mixed_event_parameters_defaults.va tables row 3: o
 verilog-ams/ch07_mixed_signal/mixed_event_parameters_instance.va tables row 3: old `param u.threshold real local = 6.000000000000001e-1`, new `param u.threshold unspecified local = 6.000000000000001e-1`
 verilog-ams/ch07_mixed_signal/mixed_event_parameters_override.va tables row 3: old `param threshold real = 3.75e-1`, new `param threshold unspecified = 3.75e-1`
 verilog-ams/ch07_mixed_signal/mixed_event_parameters_sweep.va tables row 3: old `param threshold real = 3.75e-1`, new `param threshold unspecified = 3.75e-1`
-verilog-ams/ch07_mixed_signal/mixed_long_net_names.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
-verilog-ams/ch07_mixed_signal/mixed_top_with_an_analog_child.va tables row 2: old `param q integer = 0`, new `contrib potential direct br0 a b`
-verilog-ams/ch07_mixed_signal/named_event_from_analog_reaches_digital.va tables row 1: old `param hits integer = 0`, new `contrib flow direct br0 p gnd`
+verilog-ams/ch07_mixed_signal/mixed_top_with_an_analog_child.va tables row 3: old `contrib flow direct br0 a b`, new `contrib potential direct br0 a b`
 verilog-ams/ch07_mixed_signal/named_event_from_digital_reaches_analog.va tables row 1: old `param __d2a0 integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch07_mixed_signal/nan_contribution_rejected.va codes: old E0424, new {}
 verilog-ams/ch07_mixed_signal/neg_inf_contribution_rejected.va codes: old E0424, new {}
 verilog-ams/ch07_mixed_signal/node_abstol_vector_ports.va tables row 5: old `contrib flow direct br0 a[0] gnd`, new `node 5 vector_binding.p net`
-verilog-ams/ch07_mixed_signal/onebit_dac_reads_a_discrete_wire.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch07_mixed_signal/posedge_in_an_analog_event_control.va codes: old {}, new E0704 (E0704: )
 verilog-ams/ch07_mixed_signal/prim_connect_enable_gate.va the old side lowered, the new side refused
 verilog-ams/ch07_mixed_signal/prim_connect_gate_array.va the old side lowered, the new side refused
@@ -898,18 +843,13 @@ verilog-ams/ch07_mixed_signal/receiver_count_reports_ordinary_receivers.va codes
 verilog-ams/ch07_mixed_signal/receiver_default_bypass.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/receiver_reads_loaded_analog_state.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/receiver_value_set_by_connectmodule.va codes: old {}, new E0512 (E0512: an access of a name with no node)
-verilog-ams/ch07_mixed_signal/rejected_trials_deliver_once.va tables row 2: old `param kick integer = 0`, new `contrib potential direct br0 vo gnd`
 verilog-ams/ch07_mixed_signal/reject_vera_scratch_digital_variable.va codes: old E0537, new {}
 verilog-ams/ch07_mixed_signal/resolution_precedes_insertion.va codes: old {}, new E0512 (E0512: an access of a name with no node)
-verilog-ams/ch07_mixed_signal/same_value_analog_assignment_fires.va tables row 1: old `param n integer = 0`, new `contrib potential direct br0 out gnd`
+verilog-ams/ch07_mixed_signal/same_value_analog_assignment_fires.va tables row 5: old `held $assigned.smpl`, new `limit_slots 0`
 verilog-ams/ch07_mixed_signal/split_generated_names_defparam.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/split_one_instance_per_port.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/split_segments_keep_own_state.va codes: old {}, new E0315,E0512 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch07_mixed_signal/supply_sensitive_bridge_via_connect_rule.va codes: old {}, new E0315,E0512 (E0315: a net or branch is not a value; read it through an access function)
-verilog-ams/ch07_mixed_signal/timer_runtime_body_period.va tables row 1: old `param period real = 0e0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch07_mixed_signal/timer_runtime_controls.va tables row 1: old `param start real = 0e0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch07_mixed_signal/timer_runtime_drift.va tables row 1: old `param hits integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch07_mixed_signal/timer_runtime_enable.va tables row 1: old `param en integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch07_mixed_signal/unassigned_variable_reads_in_both_contexts.va tables row 1: old `param seen real = 0e0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch07_mixed_signal/undeclared_interconnect_resolves_continuous.va tables row 2: old `node 2 mid net`, new `node 2 u1.b net`
 verilog-ams/ch07_mixed_signal/unit_delay_tick_alignment.va codes: old {}, new E0706 (E0706: )
@@ -927,25 +867,15 @@ verilog-ams/ch07_mixed_signal/xz_four_state_input_compared.va codes: old {}, new
 verilog-ams/ch07_mixed_signal/xz_ordinary_equality_rejected.va codes: old E0130, new E0130,E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch07_mixed_signal/z_case_inequality_compared.va codes: old {}, new E0130,E0369 (E0130: the analog backend cannot execute this four-state or wide literal)
 verilog-ams/ch07_mixed_signal/zero_delay_d2a_roundtrip.va codes: old {}, new E0706 (E0706: )
-verilog-ams/ch07_mixed_signal/zero_delay_settles_before_the_macro_process.va tables row 1: old `param d integer = 0`, new `contrib potential direct br0 out gnd`
 verilog-ams/ch08_scheduling/a2d_event_on_a_probe_rejected.va codes: old E0484, new {}
-verilog-ams/ch08_scheduling/absdelta_d2a_discards_pending.va tables row 1: old `param clamp integer = 0`, new `contrib potential direct br0 p gnd`
-verilog-ams/ch08_scheduling/analog_initial_before_digital_initial.va tables row 1: old `param copy real = 0e0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch08_scheduling/blocking_assignment_delay.va tables row 1: old `param y integer = 0`, new `contrib flow direct br0 p gnd`
+verilog-ams/ch08_scheduling/analog_initial_before_digital_initial.va tables row 4: old `held av`, new `limit_slots 0`
 verilog-ams/ch08_scheduling/blocking_assignment_to_a_net_rejected.va codes: old E0482, new {}
-verilog-ams/ch08_scheduling/continuous_assignment_to_a_variable_rejected.va codes: old E0438, new {}
 verilog-ams/ch08_scheduling/continuous_variable_interpolation_host.va tables row 3: old `held x`, new `held held`
 verilog-ams/ch08_scheduling/default_discipline_primitive_bridge.va tables row 4: old `node 4 high__default_primitive_d2a__logic.d net`, new `contrib flow direct br0 high gnd`
 verilog-ams/ch08_scheduling/delayed_blocking_assignment_target_at_resume.va codes: old {}, new E0512 (E0512: a bit or part select of a scalar is not lowered by Sema yet)
-verilog-ams/ch08_scheduling/macro_process_one_solve_for_coincident_events.va tables row 1: old `param q1 integer = 0`, new `contrib potential direct br0 vo gnd`
-verilog-ams/ch08_scheduling/monitor_after_macro_process.va tables row 1: old `param q integer = 0`, new `contrib potential direct br0 vo gnd`
 verilog-ams/ch08_scheduling/nonblocking_assignment_to_a_net_rejected.va codes: old E0482, new {}
-verilog-ams/ch08_scheduling/one_solve_consumes_simultaneous_d2a.va tables row 1: old `param a integer = 0`, new `contrib potential direct br0 vo gnd`
-verilog-ams/ch08_scheduling/procedural_assign_deassign_semantics.va tables row 1: old `param target integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch08_scheduling/procedural_assign_to_a_net_rejected.va codes: old E0482, new {}
-verilog-ams/ch08_scheduling/procedural_continuous_semantics.va tables row 1: old `param target integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch08_scheduling/strobe_after_macro_process.va tables row 1: old `param q integer = 0`, new `contrib potential direct br0 vo gnd`
-verilog-ams/ch08_scheduling/switch_network_resolved_as_a_whole.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
+verilog-ams/ch08_scheduling/switch_network_resolved_as_a_whole.va tables row 2: old `param b integer = 0`, new `param c integer = 0`
 verilog-ams/ch08_scheduling/switch_primitive_accepted.va tables row 2: old `node 2 a__ch8_sw_bridge__logic.d net`, new `contrib flow direct br0 a b`
 verilog-ams/ch08_scheduling/switch_terminal_is_a_variable_rejected.va codes: old E0483, new {}
 verilog-ams/ch09_system_tasks/alias_incompatible_discipline_returns_zero.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
@@ -962,6 +892,7 @@ verilog-ams/ch09_system_tasks/driver_strength_next_strength_type.va codes: old {
 verilog-ams/ch09_system_tasks/error_in_analog_initial_stops_after_initialization.va tables row 8: old `display $fatal`, new `display $strobe`
 verilog-ams/ch09_system_tasks/fdebug_writes_in_rejected_iterations.va tables row 5: old `held s`, new `limit_slots 0`
 verilog-ams/ch09_system_tasks/file_descriptor_shared_across_contexts.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-ams/ch09_system_tasks/ieee_1364_system_functions_in_both_contexts.va tables row 2: old `contrib flow direct br0 p n`, new `param from_digital integer = 0`
 verilog-ams/ch09_system_tasks/input_position_restore_failure.va tables row 5: old `held sample`, new `limit_slots 0`
 verilog-ams/ch09_system_tasks/kernel_control_in_digital_context_rejected.va codes: old E0484,E0821, new {}
 verilog-ams/ch09_system_tasks/node_alias_bit_select_rejected.va codes: old E0812, new E0512 (E0512: a bit or part select of a scalar is not lowered by Sema yet)
@@ -974,7 +905,6 @@ verilog-ams/ch09_system_tasks/node_alias_port_reference_rejected.va codes: old E
 verilog-ams/ch09_system_tasks/node_alias_resolves.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch09_system_tasks/node_alias_status_is_integer.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch09_system_tasks/node_alias_whole_vector_reference.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
-verilog-ams/ch09_system_tasks/pla_array_in_digital_context.va tables row 1: old `param yand integer = 0`, new `contrib potential direct br0 out gnd`
 verilog-ams/ch09_system_tasks/port_alias_resolves.va codes: old {}, new E0315,E0508 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch09_system_tasks/port_alias_to_a_net_returns_zero.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch09_system_tasks/receiver_segregation_ignored_without_driver_value.va codes: old {}, new E0512 (E0512: an access of a name with no node)
@@ -983,10 +913,9 @@ verilog-ams/ch09_system_tasks/r_format_in_the_digital_context.va codes: old {}, 
 verilog-ams/ch09_system_tasks/r_format_in_the_digital_context_without_argument_rejected.va codes: old E0810, new {}
 verilog-ams/ch09_system_tasks/rng_constant_distribution_stream.va tables row 3: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-ams/ch09_system_tasks/severity_task_digital_context_rejected.va codes: old E0821, new {}
-verilog-ams/ch09_system_tasks/stochastic_queue_in_digital_context.va tables row 1: old `param bad integer = 0`, new `contrib potential direct br0 out gnd`
+verilog-ams/ch09_system_tasks/stochastic_queue_in_digital_context.va tables row 8: old `held st`, new `limit_slots 0`
 verilog-ams/ch09_system_tasks/stop_in_analog_initial_rejected.va codes: old E0807, new {}
 verilog-ams/ch09_system_tasks/strobe_writes_once_per_accepted_solution.va tables row 6: old `display $fopen`, new `display $fstrobe`
-verilog-ams/ch09_system_tasks/timescale_tasks_in_digital_context.va tables row 1: old `param ps_ok integer = 0`, new `contrib potential direct br0 out gnd`
 verilog-ams/ch09_system_tasks/ungetc_cancelled_by_fseek_and_gap_reads_zero.va tables row 6: old `display $fopen`, new `(none)`
 verilog-ams/ch10_directives/default_discipline_reset_leaves_no_default.va the old side refused, the new side lowered
 verilog-ams/ch10_directives/default_discipline_two_qualifiers.va the old side lowered, the new side refused

@@ -39,6 +39,7 @@ const syscall = @import("syscall.zig");
 const contrib = @import("contrib.zig");
 const held = @import("held.zig");
 const param = @import("param.zig");
+const discrete = @import("discrete.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Device = Air.Device;
@@ -63,11 +64,13 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     try units(s);
     if (s.units.items.len == 0) return finish(s, &.{});
     try contrib.loadDisciplines(s);
+    for (s.units.items) |*u| try discrete.mark(s, u);
     try ports(s, &s.units.items[0]);
     s.device.num_ports = @intCast(s.device.nodes.len);
     for (s.units.items) |*u| try nets(s, u);
     for (s.units.items[1..]) |*u| try bindChildPorts(s, u);
     for (s.units.items) |*u| try param.declare(s, u);
+    for (s.units.items) |*u| try discrete.declare(s, u);
     for (s.units.items) |*u| try branches(s, u);
     for (s.units.items) |*u| try held.mark(s, u);
     for (s.units.items) |*u| try variables(s, u);
@@ -414,6 +417,7 @@ fn nets(s: *Sema, unit: *Unit) Allocator.Error!void {
         if (tag != .net and tag != .io) continue;
         const first = canonical(vir, i);
         if (unit.binds.contains(first) or child_ports.contains(first)) continue;
+        if (std.mem.findScalar(Inst.Index, unit.discrete.items, first) != null) continue;
         if (tag == .io and tags[@backingInt(first)] == .io and !hasNet(unit, first)) continue;
         try declareNet(s, unit, first);
     }

@@ -11,13 +11,9 @@ verilog/03_lexical_conventions/case_item_statement_attribute.v lowering: a case 
 verilog/03_lexical_conventions/delay_then_unsized_constant.v lowering: an intra-assignment timing control
 verilog/03_lexical_conventions/examples.v lowering: a case statement
 verilog/04_data_types/array_17_dimensions.v lowering: a continuous assignment to a net array element
-verilog/04_data_types/capacitive_network_figure_4_2.v lowering: a gate instance
-verilog/04_data_types/charge_strength_declaration.v lowering: a gate instance
-verilog/04_data_types/implicit_nets.v lowering: a gate instance
 verilog/04_data_types/localparam_from_parameter.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/04_data_types/name_spaces.v lowering: an lvalue form
 verilog/04_data_types/native_real_arrays.v lowering: an intra-assignment timing control
-verilog/04_data_types/net_takes_driver_value.v lowering: a gate instance
 verilog/04_data_types/parameter_types_and_ranges.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/04_data_types/parameter_widths.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/04_data_types/parameter_width.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
@@ -26,7 +22,6 @@ verilog/04_data_types/specparam_module_body_delay.v lowering: an untyped integra
 verilog/04_data_types/time_parameter_is_unsigned_64.v lowering: a name declared by `param` that has no slot
 verilog/04_data_types/type_net_array.v lowering: a continuous assignment to a net array element
 verilog/04_data_types/untyped_parameter_width.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
-verilog/04_data_types/value_set.v lowering: a gate instance
 verilog/04_data_types/vector_ranges.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/05_expressions/concatenation.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
 verilog/05_expressions/conditional_real_x.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
@@ -39,67 +34,12 @@ verilog/05_expressions/operand_forms.v lowering: an untyped integral parameter (
 verilog/06_assignments/native_select_assignment_effects.v lowering: an intra-assignment timing control
 verilog/06_assignments/net_array_element_selects.v lowering: a continuous assignment to a net array element
 verilog/06_assignments/select_bus.v lowering: a port with a net declaration assignment
-verilog/07_gate_switch_level/bidirectional.v lowering: a gate instance
-verilog/07_gate_switch_level/charge_strength_sharing.v lowering: a gate instance
-verilog/07_gate_switch_level/every_primitive.v lowering: a gate instance
-verilog/07_gate_switch_level/figure_combinations.v lowering: a gate instance
-verilog/07_gate_switch_level/gate_delays.v lowering: a gate instance
 verilog/07_gate_switch_level/gate_identifier_delay.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
-verilog/07_gate_switch_level/gate_multibit_input_lsb.v lowering: a gate instance
-verilog/07_gate_switch_level/gates_enable.v lowering: a gate instance
-verilog/07_gate_switch_level/gates_ninput.v lowering: a gate instance
-verilog/07_gate_switch_level/gates_noutput.v lowering: a gate instance
-verilog/07_gate_switch_level/gates_one_input.v lowering: a gate instance
-verilog/07_gate_switch_level/gate_variable_delay.v lowering: a gate instance
-verilog/07_gate_switch_level/instance_list_shared_spec.v lowering: a gate instance
-verilog/07_gate_switch_level/mos_data_undriven_supply.v lowering: a gate instance
-verilog/07_gate_switch_level/mos_instance_array.v lowering: a gate instance
-verilog/07_gate_switch_level/optional_instance_name.v lowering: a gate instance
-verilog/07_gate_switch_level/primitive_ambiguous_same_polarity.v lowering: a gate instance
-verilog/07_gate_switch_level/primitive_array_broadcast.v lowering: a gate instance
-verilog/07_gate_switch_level/primitive_pull_ignored_polarity.v lowering: a gate instance
-verilog/07_gate_switch_level/primitive_three_delay_unknown.v lowering: a gate instance
-verilog/07_gate_switch_level/primitive_tran_both_directions.v lowering: a gate instance
-verilog/07_gate_switch_level/pull_gate_bit_select.v lowering: a gate instance
-verilog/07_gate_switch_level/pull_gate_instance_array.v lowering: a gate instance
-verilog/07_gate_switch_level/resistive_reduction_table.v lowering: a gate instance
-verilog/07_gate_switch_level/strength_levels.v lowering: a gate instance
-verilog/07_gate_switch_level/strength_reduction.v lowering: a gate instance
-verilog/07_gate_switch_level/supply_reduced_to_strong.v lowering: a gate instance
-verilog/07_gate_switch_level/switch_bits_strength_delay.v lowering: a gate instance
-verilog/07_gate_switch_level/switch_cmos.v lowering: a gate instance
-verilog/07_gate_switch_level/switch_mos.v lowering: a gate instance
-verilog/07_gate_switch_level/switch_strength_change.v lowering: a gate instance
-verilog/07_gate_switch_level/switch_supply_zero.v lowering: a gate instance
-verilog/07_gate_switch_level/tran_from_supply_undriven.v lowering: a gate instance
-verilog/07_gate_switch_level/tranif0_rtranif0_weak_reduction.v lowering: a gate instance
-verilog/07_gate_switch_level/tran_instance_array.v lowering: a gate instance
-verilog/07_gate_switch_level/tran_strength_display.v lowering: a gate instance
-verilog/07_gate_switch_level/two_named_arrays.v lowering: a gate instance
-verilog/07_gate_switch_level/unordered_delay_triples.v lowering: a gate instance
-verilog/07_gate_switch_level/wired_ambiguous_strength.v lowering: a gate instance
-verilog/08_udp/definition_placement.v lowering: a UDP instance
-verilog/08_udp/header_forms.v lowering: a UDP instance
-verilog/08_udp/initial_values.v lowering: a UDP instance
-verilog/08_udp/input_minimums.v lowering: a UDP instance
-verilog/08_udp/instance_array.v lowering: a UDP instance
-verilog/08_udp/instances.v lowering: a UDP instance
-verilog/08_udp/jk_edge_ff.v lowering: a UDP instance
-verilog/08_udp/multiplexer.v lowering: a UDP instance
-verilog/08_udp/output_bit_select.v lowering: a UDP instance
-verilog/08_udp/output_reg_initializer.v lowering: a UDP instance
-verilog/08_udp/overlapping_entries_agree.v lowering: a UDP instance
-verilog/08_udp/sequential_64_inputs.v lowering: a UDP instance
-verilog/08_udp/sequential_hold_agrees.v lowering: a UDP instance
-verilog/08_udp/table_symbols.v lowering: a UDP instance
-verilog/08_udp/two_delays.v lowering: a UDP instance
-verilog/08_udp/udp_65_inputs.v lowering: a UDP instance
-verilog/08_udp/udp_comb.v lowering: a UDP instance
-verilog/08_udp/udp_dff.v lowering: a UDP instance
-verilog/08_udp/udp_header_order.v lowering: a UDP instance
-verilog/08_udp/udp_initial_instance_delay.v lowering: a UDP instance
-verilog/08_udp/udp_latch.v lowering: a UDP instance
-verilog/08_udp/udp_potential_edges_dominance.v lowering: a UDP instance
+verilog/07_gate_switch_level/mos_data_undriven_supply.v lowering: a %l or %v conversion
+verilog/07_gate_switch_level/pull_gate_bit_select.v lowering: an inout port joined to a select, a concatenation or a net of another width
+verilog/07_gate_switch_level/tran_from_supply_undriven.v lowering: a %l or %v conversion
+verilog/07_gate_switch_level/tran_strength_display.v lowering: a %l or %v conversion
+verilog/07_gate_switch_level/unordered_delay_triples.v lowering: a fork-join block
 verilog/09_behavioral_modeling/assignment_assign_deassign.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/assignment_force_release.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/blocking_order_and_target.v lowering: a fork-join block
@@ -117,7 +57,7 @@ verilog/09_behavioral_modeling/event_array_native_selection.v lowering: a trigge
 verilog/09_behavioral_modeling/event_arrays.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/09_behavioral_modeling/event_array.v lowering: a fork-join block
 verilog/09_behavioral_modeling/expression_event.v lowering: an event control on an expression or a select
-verilog/09_behavioral_modeling/force_immediate.v lowering: a gate instance
+verilog/09_behavioral_modeling/force_immediate.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/force_net_selects.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/force_wire_array_element.v lowering: a continuous assignment to a net array element
 verilog/09_behavioral_modeling/fork_join_is_concurrent.v lowering: a fork-join block
@@ -179,8 +119,6 @@ verilog/11_scheduling/procedural_continuous_tracks_sources.v lowering: a procedu
 verilog/11_scheduling/sched_blocking_target_return.v lowering: an intra-assignment timing control
 verilog/11_scheduling/sched_fork_arm_chain_order.v lowering: a fork-join block
 verilog/11_scheduling/sched_fork_arm_wake_order.v lowering: a fork-join block
-verilog/11_scheduling/switch_x_gate.v lowering: a gate instance
-verilog/11_scheduling/terminal_and_port_connections.v lowering: a gate instance
 verilog/12_hierarchy/defparam_absolute_inside_array_element.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/12_hierarchy/defparam_before_generate.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/12_hierarchy/defparam_inside_generate_block.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
@@ -250,17 +188,17 @@ verilog/14_specify_blocks/ifnone.v lowering: a specify block
 verilog/14_specify_blocks/mintypmax_path_delays.v lowering: a specify block
 verilog/14_specify_blocks/module_paths.v lowering: a specify block
 verilog/14_specify_blocks/negative_pulse_showcancelled.v lowering: a specify block
-verilog/14_specify_blocks/path_and_distributed_delays.v lowering: a gate instance
+verilog/14_specify_blocks/path_and_distributed_delays.v lowering: a specify block
 verilog/14_specify_blocks/path_delay_values.v lowering: a specify block
 verilog/14_specify_blocks/polarity.v lowering: a specify block
 verilog/14_specify_blocks/pulse_default_limits.v lowering: a specify block
 verilog/14_specify_blocks/pulse_error_window_styles.v lowering: a specify block
 verilog/14_specify_blocks/pulse_path_specific_limits.v lowering: a specify block
 verilog/14_specify_blocks/sdf_pulse_limits_override_specparam.v lowering: a specify block
-verilog/14_specify_blocks/specify_path_bit_drivers.v lowering: a gate instance
+verilog/14_specify_blocks/specify_path_bit_drivers.v lowering: a specify block
 verilog/14_specify_blocks/specify_path_delay_one.v lowering: a specify block
 verilog/14_specify_blocks/specify_timing_checks_named_by_w0251.v lowering: a specify block
-verilog/14_specify_blocks/state_dependent_paths.v lowering: a gate instance
+verilog/14_specify_blocks/state_dependent_paths.v lowering: a specify block
 verilog/14_specify_blocks/x_transition_delays.v lowering: a specify block
 verilog/15_timing_checks/conditions.v lowering: a specify block
 verilog/15_timing_checks/fullskew_checks_both_orders.v lowering: a specify block
@@ -412,7 +350,6 @@ verilog/18_vcd/version_names_dumpfile_literal.v lowering: the system task `$dump
 verilog/18_vcd/version_names_dumpfile_variable.v lowering: the system task `$dumpfile`
 verilog/19_compiler_directives/ams_keywords_are_identifiers.v lowering: a string variable
 verilog/19_compiler_directives/no_timescale_is_1s_1s.v lowering: the system task `$printtimescale`
-verilog/19_compiler_directives/text_macros.v lowering: a gate instance
 verilog/19_compiler_directives/unconnected_drive_pull_meets_the_strength_model.v lowering: a hierarchical name
 verilog/A_formal_syntax/b_A_1_1_incdir.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/A_formal_syntax/b_A_1_1_library_text.v a library map or list (`//@ libmap`, `//@ liblist`)
@@ -428,19 +365,9 @@ verilog/A_formal_syntax/b_A_2_4_pathpulse_error_limit.v lowering: a specify bloc
 verilog/A_formal_syntax/b_A_2_4_pathpulse_mintypmax.v lowering: a specify block
 verilog/A_formal_syntax/b_A_2_5_ranges.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/A_formal_syntax/b_A_2_8_event_and_parameter_items.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
-verilog/A_formal_syntax/b_A_3_1_gate_instantiations.v lowering: a gate instance
-verilog/A_formal_syntax/b_A_3_1_pass_enable_delay.v lowering: a gate instance
-verilog/A_formal_syntax/b_A_3_2_primitive_strengths.v lowering: a gate instance
-verilog/A_formal_syntax/b_A_3_3_bit_select_terminals.v lowering: a gate instance
-verilog/A_formal_syntax/b_A_3_3_primitive_terminals.v lowering: a gate instance
-verilog/A_formal_syntax/b_A_3_4_gate_and_switch_types.v lowering: a gate instance
 verilog/A_formal_syntax/b_A_4_1_module_instantiation.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/A_formal_syntax/b_A_4_2_case_generate.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/A_formal_syntax/b_A_4_2_generate_constructs.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
-verilog/A_formal_syntax/b_A_5_1_udp_declarations.v lowering: a UDP instance
-verilog/A_formal_syntax/b_A_5_3_udp_body.v lowering: a UDP instance
-verilog/A_formal_syntax/b_A_5_4_udp_instance_array.v lowering: a UDP instance
-verilog/A_formal_syntax/b_A_5_4_udp_instances.v lowering: a UDP instance
 verilog/A_formal_syntax/b_A_6_2_procedural_assignments.v lowering: an intra-assignment timing control
 verilog/A_formal_syntax/b_A_6_2_repeat_intra_assignment.v lowering: an intra-assignment timing control
 verilog/A_formal_syntax/b_A_6_3_named_block_declarations.v lowering: a fork-join block
@@ -460,11 +387,9 @@ verilog/A_formal_syntax/b_A_8_3_expressions.v lowering: an untyped integral para
 verilog/A_formal_syntax/b_A_8_4_primaries.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/A_formal_syntax/b_A_8_6_operators.v lowering: a specify block
 verilog/A_formal_syntax/b_A_9_3_indexed_hierarchical_name.v lowering: a hierarchical name
-verilog/A_formal_syntax/b_A_source_text.v lowering: a UDP instance
 verilog/A_formal_syntax/grammar_nullable_statement.v lowering: a case statement
 verilog/A_formal_syntax/grammar_parameter_header.v lowering: a name declared by `param` that has no slot
 verilog-ams/digital/digital_delay_notation.v lowering: an intra-assignment timing control
-verilog-ams/digital/digital_delay_primitive_notation.v lowering: a gate instance
 verilog-ams/digital/realtobits_bitstoreal_bridge.v lowering: a wreal net
 verilog-ams/digital/vams_digital_abstime_math.v lowering: the system function `$abstime`
 verilog-ams/digital/wreal_event_on_change.v lowering: a wreal net

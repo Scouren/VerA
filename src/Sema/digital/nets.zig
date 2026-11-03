@@ -19,6 +19,8 @@
 //! - `pub fn drivenNet(l: *Lower, f: u32, target: Inst.Ref, s: [2]std_sim.net.Strength) Error!u32`
 //! - `pub fn compileDrivers(l: *Lower) Error!void`
 //! - `pub fn finish(l: *Lower, p: *Program) Error!void`
+//! - `pub fn sink(l: *Lower, r: Inst.Ref) Error!Sink`
+//! - `pub fn delayOf(l: *Lower, d: Delay3, rows: *[3]u32) Error!net.Delay`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -48,6 +50,10 @@ pub const NetRow = struct {
     decay: u64 = Program.Net.no_decay,
     /// Its drivers (`drivers` rows, in driver order), set once all exist.
     drivers: Program.List = .empty,
+    /// §7.11 a MOS switch's data terminal: its signal is kept current.
+    strength_read: bool = false,
+    /// §7.6 the pass switches with it as a terminal (`trans` rows).
+    trans: Program.List = .empty,
 };
 
 /// One driver of a net, compiled after the walk: what it asserts, in
@@ -67,8 +73,17 @@ pub const Wire = struct {
         expr: struct { value: Inst.Ref, slice: bool = false, lo: u32 = 0, total: u32 = 0 },
         /// §6.5.7.1 a port window (`Program.Driver.Source.bridge`).
         bridge: struct { src: u32, src_lo: u32, dst_lo: u32, width: u32, ext: u32 = 0, sign_at: ?u32 = null },
-        /// §19.9 a pull of an unconnected input.
+        /// §19.9 a pull of an unconnected input, or a §7.8 pull source.
         pull: Bit,
+        /// A.3.1 a gate: its input expressions, read one bit each (bit
+        /// `lane` of an instance array's vector terminal), and its output bit.
+        gate: struct { kind: net.GateKind, ins: []const Inst.Ref, lane: ?u32, out_bit: ?u32 },
+        /// §7.6 a MOS switch: its data and gate expressions, the net the data
+        /// names (`none` for any other expression), the lane and output bit.
+        mos: struct { data: Inst.Ref, gate: Inst.Ref, data_net: u32, n_type: bool, resistive: bool, lane: ?u32, out_bit: ?u32 },
+        /// §8 a UDP instance: table `udp` (a `Program.udps` row), its input
+        /// expressions, the lane and output bit, its time-0 state.
+        udp: struct { udp: u32, ins: []const Inst.Ref, sequential: bool, lane: ?u32, out_bit: ?u32, state: Bit },
     };
 };
 
@@ -182,6 +197,7 @@ pub fn drivenNet(l: *Lower, f: u32, target: Inst.Ref, s: [2]net.Strength) Error!
 /// at time 0 in driver order.
 pub fn compileDrivers(l: *Lower) Error!void {
     const out = try l.a.alloc(Program.Driver, l.wires.items.len);
+    var udp_bits: std.ArrayList(Bit) = .empty;
     for (l.wires.items, out, 0..) |w, *d, k| {
         l.frame = w.frame;
         const scope = l.frames.items[w.frame].scope;
@@ -199,6 +215,32 @@ pub fn compileDrivers(l: *Lower) Error!void {
                 break :blk .{ .bridge = .{ .src = b.src, .src_lo = b.src_lo, .dst_lo = b.dst_lo, .width = b.width, .ext = b.ext, .sign_at = b.sign_at } };
             },
             .pull => |bit| .{ .pull = bit },
+            .gate => |g| blk: {
+                const rows = try l.a.alloc(u32, g.ins.len);
+                for (g.ins, rows) |x, *row| {
+                    row.* = try expr.self_(l, x, 1);
+                    try expr.reads(l, x, &sensitivity);
+                }
+                break :blk .{ .gate = .{ .kind = g.kind, .ins = try l.b.listOf(rows), .lane = g.lane, .out_bit = g.out_bit } };
+            },
+            .mos => |m| blk: {
+                const data = try expr.self_(l, m.data, 1);
+                const gate = try expr.self_(l, m.gate, 1);
+                try expr.reads(l, m.data, &sensitivity);
+                try expr.reads(l, m.gate, &sensitivity);
+                break :blk .{ .mos = .{ .data = data, .gate = gate, .data_net = m.data_net, .n_type = m.n_type, .resistive = m.resistive, .lane = m.lane, .out_bit = m.out_bit } };
+            },
+            .udp => |u| blk: {
+                const rows = try l.a.alloc(u32, u.ins.len);
+                for (u.ins, rows) |x, *row| {
+                    row.* = try expr.self_(l, x, 1);
+                    try expr.reads(l, x, &sensitivity);
+                }
+                // §8.6 the inputs it last saw: none yet.
+                const prev: Program.List = .{ .start = @intCast(udp_bits.items.len), .len = @intCast(u.ins.len) };
+                try udp_bits.appendNTimes(l.a, .x, u.ins.len);
+                break :blk .{ .udp = .{ .udp = u.udp, .ins = try l.b.listOf(rows), .sequential = u.sequential, .lane = u.lane, .out_bit = u.out_bit, .state = u.state, .started = false, .prev = prev } };
+            },
         };
         var rows: [3]u32 = .{ none, none, none };
         const dl = try delayOf(l, w.delay, &rows);
@@ -219,6 +261,7 @@ pub fn compileDrivers(l: *Lower) Error!void {
         try l.driver_pcs.append(l.a, pc);
     }
     l.b.p.drivers = out;
+    l.b.p.udp_bits = udp_bits.items;
     // Per net its drivers, in driver order.
     const runs = try l.a.alloc(std.ArrayList(u32), l.nets.items.len);
     @memset(runs, .empty);
@@ -238,6 +281,8 @@ pub fn finish(l: *Lower, p: *Program) Error!void {
     for (drivers) |*d| {
         d.init = @intCast(init.items.len);
         const v = try std_sim.logic.filled(l.a, d.width, false, .x);
+        // §8.5 a UDP's output starts at its state (x for a combinational one).
+        if (d.source == .udp) std_sim.logic.setBit(v, d.source.udp.out_bit orelse 0, d.source.udp.state);
         try init.appendSlice(l.a, v.values());
         try init.appendSlice(l.a, v.unknowns());
     }
@@ -291,6 +336,8 @@ pub fn finish(l: *Lower, p: *Program) Error!void {
             .delay = n.delay,
             .decay = n.decay,
             .signal = sig_at,
+            .strength_read = n.strength_read,
+            .trans = n.trans,
             .resolved = at,
             .cold = n.delay.present or n.decay != Program.Net.no_decay,
         };
@@ -306,11 +353,43 @@ pub fn finish(l: *Lower, p: *Program) Error!void {
     p.slot_net = slot_net;
 }
 
-// ---- private ----
+/// The net bits lvalue operand `r` names: a whole net (or net array
+/// element), or a constant bit- or part-select of a vector net.
+pub fn sink(l: *Lower, r: Inst.Ref) Error!Sink {
+    const vir = l.virOf(l.frame);
+    const i = r.toIndex() orelse return l.refuse("an omitted net lvalue");
+    switch (Lower.tag(vir, i)) {
+        .decl_ref, .str_ref => {
+            const n = (try expr.nameOf(l, r)) orelse return l.refuse("a continuous assignment to a hierarchical net");
+            if (n.kind != .net) return l.refuse("a continuous assignment to a variable");
+            if (n.dims.len != 0) return l.refuse("a continuous assignment to a whole net array");
+            return .{ .net = n.net, .lo = 0, .width = l.nets.items[n.net].width };
+        },
+        .elem, .slice, .slice_up, .slice_down => {
+            const s = try place.selectOf(l, i);
+            if (s.name.kind != .net) return l.refuse("a continuous assignment to a variable");
+            if (s.name.dims.len != 0) return l.refuse("a continuous assignment to a net array element");
+            const first: i64 = switch (s.mode) {
+                .const_part => s.first,
+                .bit, .up, .down => blk: {
+                    const idx = try l.intOf(l.frame, s.index);
+                    const n = s.name;
+                    const ascending = n.msb >= n.lsb;
+                    const p = if (ascending) idx -| n.lsb else n.lsb -| idx;
+                    break :blk if (s.mode == .bit) p else if (ascending == (s.mode == .up)) p else p -| (s.count - 1);
+                },
+            };
+            const w = l.nets.items[s.name.net].width;
+            if (first < 0 or first + s.count > w) return l.refuse("§12.3.9.2 a select outside its net");
+            return .{ .net = s.name.net, .lo = @intCast(first), .width = s.count };
+        },
+        else => return l.refuse("a continuous assignment to an expression"),
+    }
+}
 
 /// A delay's constant ticks (`present`), or its rows read when it
 /// schedules (`rows`, with `present` and zero ticks).
-fn delayOf(l: *Lower, d: Delay3, rows: *[3]u32) Error!net.Delay {
+pub fn delayOf(l: *Lower, d: Delay3, rows: *[3]u32) Error!net.Delay {
     if (d.values[0] == .none) return .{};
     const f = d.frame;
     var constant = true;
@@ -342,6 +421,8 @@ fn delayOf(l: *Lower, d: Delay3, rows: *[3]u32) Error!net.Delay {
     out.off = if (d.values[2] != .none) ticks[2] else @min(out.rise, out.fall);
     return out;
 }
+
+// ---- private ----
 
 /// The bits of each driver no operand value can make other than z are z
 /// from the start (iverilog's reading): each driver's value is computed
@@ -418,40 +499,6 @@ fn concatLeaves(l: *Lower, r: Inst.Ref, out: *std.ArrayList(Inst.Ref)) Error!voi
     const i = r.toIndex() orelse return l.refuse("an omitted net lvalue");
     if (Lower.tag(vir, i) != .concat) return out.append(l.a, r);
     for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |x| try concatLeaves(l, x, out);
-}
-
-/// The net bits lvalue operand `r` names: a whole net (or net array
-/// element), or a constant bit- or part-select of a vector net.
-fn sink(l: *Lower, r: Inst.Ref) Error!Sink {
-    const vir = l.virOf(l.frame);
-    const i = r.toIndex() orelse return l.refuse("an omitted net lvalue");
-    switch (Lower.tag(vir, i)) {
-        .decl_ref, .str_ref => {
-            const n = (try expr.nameOf(l, r)) orelse return l.refuse("a continuous assignment to a hierarchical net");
-            if (n.kind != .net) return l.refuse("a continuous assignment to a variable");
-            if (n.dims.len != 0) return l.refuse("a continuous assignment to a whole net array");
-            return .{ .net = n.net, .lo = 0, .width = l.nets.items[n.net].width };
-        },
-        .elem, .slice, .slice_up, .slice_down => {
-            const s = try place.selectOf(l, i);
-            if (s.name.kind != .net) return l.refuse("a continuous assignment to a variable");
-            if (s.name.dims.len != 0) return l.refuse("a continuous assignment to a net array element");
-            const first: i64 = switch (s.mode) {
-                .const_part => s.first,
-                .bit, .up, .down => blk: {
-                    const idx = try l.intOf(l.frame, s.index);
-                    const n = s.name;
-                    const ascending = n.msb >= n.lsb;
-                    const p = if (ascending) idx -| n.lsb else n.lsb -| idx;
-                    break :blk if (s.mode == .bit) p else if (ascending == (s.mode == .up)) p else p -| (s.count - 1);
-                },
-            };
-            const w = l.nets.items[s.name.net].width;
-            if (first < 0 or first + s.count > w) return l.refuse("§12.3.9.2 a select outside its net");
-            return .{ .net = s.name.net, .lo = @intCast(first), .width = s.count };
-        },
-        else => return l.refuse("a continuous assignment to an expression"),
-    }
 }
 
 /// §12.3.9.2 a port (or anonymous net) `src` of `width` bits driving the

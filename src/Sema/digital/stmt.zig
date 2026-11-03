@@ -22,6 +22,7 @@ const task = @import("task.zig");
 const decl = @import("decl.zig");
 const nets = @import("nets.zig");
 const sub = @import("sub.zig");
+const gates = @import("gates.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -43,6 +44,7 @@ pub fn compileAll(l: *Lower) Error!void {
     var early: std.ArrayList(u32) = .empty;
     var queued: std.ArrayList(u32) = .empty;
     try nets.compileDrivers(l);
+    try gates.compileTrans(l);
     try sub.compileBodies(l);
     const order = try processOrder(l);
     for (order) |s| {
@@ -55,11 +57,16 @@ pub fn compileAll(l: *Lower) Error!void {
     }
     for (early.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
     for (l.driver_pcs.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
+    var switches: usize = 0;
+    for (l.trans.items) |t| if (t.pc != none) {
+        try l.b.starts.append(l.a, .{ .pc = t.pc });
+        switches += 1;
+    };
     for (queued.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
     try fanout(l);
     try sub.finish(l);
     l.b.p.counters = l.repeats + l.joins;
-    assert(l.b.starts.items.len == early.items.len + l.driver_pcs.items.len + queued.items.len);
+    assert(l.b.starts.items.len == early.items.len + l.driver_pcs.items.len + switches + queued.items.len);
 }
 
 /// Appends statement `i`'s instructions, compiled in `Lower.frame`.
@@ -386,22 +393,26 @@ fn operands(l: *Lower, vir: *const Vir, i: Inst.Index, used: *std.AutoHashMapUnm
     }
 }
 
-/// §6.1 per slot, the continuous drivers' pcs that read it.
+/// §6.1/§7.6 per slot, the pcs of the continuous drivers and controlled
+/// pass switches that read it, drivers first.
 fn fanout(l: *Lower) Error!void {
     const n = l.b.p.slots.len;
+    var readers: std.ArrayList(struct { pc: u32, sensitivity: Program.List }) = .empty;
+    for (l.b.p.drivers, l.driver_pcs.items) |d, at| try readers.append(l.a, .{ .pc = at, .sensitivity = d.sensitivity });
+    for (l.trans.items) |t| if (t.pc != none) try readers.append(l.a, .{ .pc = t.pc, .sensitivity = t.sensitivity });
     const start = try l.a.alloc(u32, n + 1);
     @memset(start, 0);
-    const drivers = l.b.p.drivers;
-    for (drivers) |d| for (l.b.extra.items[d.sensitivity.start..][0..d.sensitivity.len]) |slot| {
+    for (readers.items) |r| for (l.b.extra.items[r.sensitivity.start..][0..r.sensitivity.len]) |slot| {
         start[slot + 1] += 1;
     };
     for (1..n + 1) |k| start[k] += start[k - 1];
     const fill = try l.a.dupe(u32, start[0..n]);
     const fan = try l.a.alloc(u32, start[n]);
-    for (drivers, l.driver_pcs.items) |d, pc_at| for (l.b.extra.items[d.sensitivity.start..][0..d.sensitivity.len]) |slot| {
-        fan[fill[slot]] = pc_at;
+    for (readers.items) |r| for (l.b.extra.items[r.sensitivity.start..][0..r.sensitivity.len]) |slot| {
+        fan[fill[slot]] = r.pc;
         fill[slot] += 1;
     };
+    assert(std.mem.eql(u32, fill, start[1..]));
     l.b.p.fan_start = start;
     l.b.p.fan = fan;
 }

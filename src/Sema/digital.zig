@@ -31,6 +31,7 @@ const decl = @import("digital/decl.zig");
 const stmt = @import("digital/stmt.zig");
 const nets = @import("digital/nets.zig");
 const sub = @import("digital/sub.zig");
+const gates = @import("digital/gates.zig");
 const Program = std_sim.Program;
 const Builder = std_sim.Builder;
 const Vir = vams.Vir;
@@ -175,6 +176,11 @@ pub const Lower = struct {
     wires: std.ArrayList(nets.Wire) = .empty,
     slot_net: std.AutoHashMapUnmanaged(u32, u32) = .empty,
     driver_pcs: std.ArrayList(u32) = .empty,
+    /// §7.6 the pass switches.
+    trans: std.ArrayList(gates.TranRow) = .empty,
+    /// §8 the UDP tables (`Program.udps`), one per primitive instantiated.
+    udps: std.ArrayList([]const std_sim.net.UdpRow) = .empty,
+    udp_tables: std.AutoHashMapUnmanaged(Zcu.Decl, u32) = .empty,
     /// §10 the tasks and functions, in declaration order (`Program.subs`).
     subs: std.ArrayList(sub.Row) = .empty,
     /// §4.5 the implicit nets, by their instance frame and name.

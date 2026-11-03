@@ -31,6 +31,7 @@ const digital = @import("../digital.zig");
 const nets = @import("nets.zig");
 const ports = @import("ports.zig");
 const sub = @import("sub.zig");
+const gates = @import("gates.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Name = digital.Name;
@@ -488,19 +489,19 @@ fn declOf(vir: *const Vir, r: Inst.Ref) ?Inst.Index {
 }
 
 /// A module instance (each element of an array of them): where the child
-/// `Zcu` made is placed in the scope tree. Gates and UDP instances are
-/// refused for now.
+/// `Zcu` made is placed in the scope tree; a gate or UDP instance is
+/// lowered in place (`gates.zig`).
 fn childInstance(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8) Error!void {
     const l = w.l;
     const vir = l.virOf(f);
     const in = Lower.payload(vir, Inst.Instance, i);
     switch (in.flags.kind) {
-        .gate => return l.refuse("a gate instance"),
-        .udp => return l.refuse("a UDP instance"),
-        .module => {},
+        .gate => return gates.instance(l, f, i),
+        .udp, .module => {},
     }
     const target = try l.zcu.intern_pool.getString(l.a, vir.string(in.target));
-    if (l.zcu.modules.get(target)) |d| if (l.zcu.declRow(d).kind == .primitive) return l.refuse("a UDP instance");
+    if (l.zcu.modules.get(target)) |d| if (l.zcu.declRow(d).kind == .primitive) return gates.udp(l, f, i, d);
+    if (in.flags.kind == .udp) return l.refuse("a UDP instance of no primitive");
     const name = vir.string(in.name);
     const at = l.srcOffset(f, i);
     if (in.range.len == 0) return place(w, f, scope, prefix, name, null, at);

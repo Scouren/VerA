@@ -118,8 +118,11 @@ Binding on every change, in every project.
 - Nothing collects a cache. Keep a byte budget per cache and delete old
   entries only while no build runs (the `long-term-garbage-collection`
   skill); a warm cache is kept, never wiped by routine.
-- Gate on the exit code: `cmd | tail` swallows it, so use
-  `exit "${PIPESTATUS[0]}"`.
+- Gate on the command's own exit code: `cmd > log 2>&1; echo $?`, then read
+  the log. A pipe reports its last stage (`cmd | tail` is `tail`'s 0), and
+  `${PIPESTATUS[0]}` recovers it in bash only: zsh spells it
+  `${pipestatus[1]}` and leaves the bash name empty, so `exit
+  "${PIPESTATUS[0]}"` exits 0 there.
 
 ### Maintaining
 
@@ -158,7 +161,7 @@ Binding on every change, in every project.
   oracle's own accuracy (ngspice at `reltol=1e-3` is not a `1e-6` oracle).
 - Nondeterminism is fixed at its order, never in the test: two runs of the
   same command write the same bytes.
-- Gate on the exit code. `zig build test 2>&1 | tail` swallows it.
+- Gate on the exit code, as the method's Builds rule says: `zig build test 2>&1 | tail` swallows it.
 
 ## Maintaining
 

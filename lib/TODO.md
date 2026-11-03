@@ -450,7 +450,7 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
   `std.fmt.float` renderer is deleted. The same alignment fixed `%r`: the host printed `2.2k` and
   `%.2r` of 999.996 as `1000.00` where the device prints `2.2K` and `1.00K`. Spliced device text is
   byte-identical (the file's device-text half is unchanged). `zig build test-printf` runs the oracle alone.
-  Needs: an issue number for the changelog line.
+  Issue #132.
 - [ ] Step 0, bug 2 (deferred to step 11): the per-call arena in `rt/logic/operators.zig:392`.
   Replacing it with `wide_kernels.zwL` touches 4-state X, divide-by-zero and §5.1.5's power table;
   it needs a differential oracle against `Integer.Literal` and a benchmark (AGENTS.md: a speed
@@ -495,7 +495,7 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
   - in progress: AstGen + Vir (`astgen.md`), the Air passes (`air-passes.md`), SPICE (`spice.md`).
   - next: Zcu + Sema (after Vir), codegen, Compilation; then the switch-over and the old
     pipeline's deletion.
-- [ ] Changelog: two lines drafted (formatC, `--jobs`); they need their issues filed (`gh auth login`).
+- [x] Changelog: formatC (#132) and `--jobs` (#133), issues filed.
 
 Notes from this session:
 - The shared `.zig-cache` had 10,349 manifests in `h/` whose `o/` outputs were deleted on

@@ -7,11 +7,9 @@
 verilog/03_lexical_conventions/ams_lexical_escaped_hierarchy.v lowering: an instance the elaboration did not make
 verilog/03_lexical_conventions/block_statement_attribute.v lowering: a fork-join block
 verilog/03_lexical_conventions/case_item_statement_attribute.v lowering: a case statement
-verilog/03_lexical_conventions/delay_then_unsized_constant.v lowering: an intra-assignment timing control
 verilog/03_lexical_conventions/examples.v lowering: a case statement
 verilog/04_data_types/array_17_dimensions.v lowering: a continuous assignment to a net array element
 verilog/04_data_types/name_spaces.v lowering: an lvalue form
-verilog/04_data_types/native_real_arrays.v lowering: an intra-assignment timing control
 verilog/04_data_types/parameter_width.v lowering: an untyped parameter a defparam sets
 verilog/04_data_types/port_list_parameter_defparam.v lowering: a name declared by `param` that has no slot
 verilog/04_data_types/time_parameter_is_unsigned_64.v lowering: a name declared by `param` that has no slot
@@ -20,9 +18,7 @@ verilog/05_expressions/concatenation.v lowering: a constant expression Sema/eval
 verilog/05_expressions/conditional_real_x.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/05_expressions/constant_operands.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/05_expressions/constant_select_and_function.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
-verilog/05_expressions/native_array_selects.v lowering: an intra-assignment timing control
 verilog/05_expressions/native_wide_index_edges.v lowering: a range past 2^32 bits
-verilog/06_assignments/native_select_assignment_effects.v lowering: an intra-assignment timing control
 verilog/06_assignments/net_array_element_selects.v lowering: a continuous assignment to a net array element
 verilog/06_assignments/select_bus.v lowering: a port with a net declaration assignment
 verilog/07_gate_switch_level/pull_gate_bit_select.v lowering: an inout port joined to a select, a concatenation or a net of another width
@@ -49,10 +45,6 @@ verilog/09_behavioral_modeling/force_immediate.v lowering: a procedural continuo
 verilog/09_behavioral_modeling/force_net_selects.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/force_wire_array_element.v lowering: a continuous assignment to a net array element
 verilog/09_behavioral_modeling/fork_join_is_concurrent.v lowering: a fork-join block
-verilog/09_behavioral_modeling/intra_assign_delay.v lowering: an intra-assignment timing control
-verilog/09_behavioral_modeling/intra_assignment_delay_blocking.v lowering: an intra-assignment timing control
-verilog/09_behavioral_modeling/intra_assignment_delay_nonblocking.v lowering: an intra-assignment timing control
-verilog/09_behavioral_modeling/intra_assignment_event_blocking.v lowering: an intra-assignment timing control
 verilog/09_behavioral_modeling/loop_rules.v lowering: a disable statement
 verilog/09_behavioral_modeling/named_block_reg.v lowering: a fork-join block
 verilog/09_behavioral_modeling/named_block_variables.v lowering: a disable statement
@@ -61,21 +53,9 @@ verilog/09_behavioral_modeling/native_concat_targets.v lowering: a procedural co
 verilog/09_behavioral_modeling/native_force_many_selects_of_one_net.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/native_force_net_selects.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/native_real_events.v lowering: an event control on an expression or a select
-verilog/09_behavioral_modeling/native_real_scalar_nba.v lowering: an intra-assignment timing control
 verilog/09_behavioral_modeling/native_select_events.v lowering: an event control on an expression or a select
-verilog/09_behavioral_modeling/native_select_timing.v lowering: an intra-assignment timing control
 verilog/09_behavioral_modeling/native_wide_event_indices.v lowering: a trigger of an event array element or a hierarchical event
-verilog/09_behavioral_modeling/nba_event_control_region.v lowering: an intra-assignment timing control
-verilog/09_behavioral_modeling/nba_event_control_update_region.v lowering: an intra-assignment timing control
-verilog/09_behavioral_modeling/nba_index_snapshot.v lowering: an intra-assignment timing control
-verilog/09_behavioral_modeling/nba_pending_updates.v lowering: an intra-assignment timing control
-verilog/09_behavioral_modeling/nba_same_time_updates.v lowering: an intra-assignment timing control
-verilog/09_behavioral_modeling/nonblocking_event_control.v lowering: an intra-assignment timing control
-verilog/09_behavioral_modeling/nonblocking_scheduling.v lowering: an intra-assignment timing control
 verilog/09_behavioral_modeling/parallel_block_timing.v lowering: a fork-join block
-verilog/09_behavioral_modeling/repeat_count_any_width.v lowering: an intra-assignment timing control
-verilog/09_behavioral_modeling/repeat_event_control.v lowering: an intra-assignment timing control
-verilog/09_behavioral_modeling/repeat_unsigned_64bit_count.v lowering: an intra-assignment timing control
 verilog/09_behavioral_modeling/sched_implicit_event_exclusion.v lowering: the slots `@*` reads in `event_wait`
 verilog/09_behavioral_modeling/sched_implicit_lhs_index.v transcript differs at byte 19 (old 21 bytes, new 21): old "first=7/0\nsecond=7/7\n" new "first=7/0\nsecond=7/0\n"
 verilog/09_behavioral_modeling/select_edge_glitch.v lowering: an event control on an expression or a select
@@ -88,7 +68,7 @@ verilog/10_tasks_functions/constant_function_named_block.v lowering: a parameter
 verilog/10_tasks_functions/constant_function_parameters.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/10_tasks_functions/constant_function_system_task_ignored.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/10_tasks_functions/disable_ancestor_block.v lowering: a disable statement
-verilog/10_tasks_functions/disable_ancestor_task.v lowering: an intra-assignment timing control
+verilog/10_tasks_functions/disable_ancestor_task.v lowering: a disable statement
 verilog/10_tasks_functions/disable_block_in_function.v lowering: a disable statement
 verilog/10_tasks_functions/disable_named_block.v lowering: a disable statement
 verilog/10_tasks_functions/disable_recursive_task.v lowering: a disable statement
@@ -101,7 +81,6 @@ verilog/10_tasks_functions/static_task_item_hierarchical.v lowering: a hierarchi
 verilog/10_tasks_functions/task_recursive_timed_automatic.v lowering: a timed task that enables itself
 verilog/10_tasks_functions/timed_subroutine_parameters.v lowering: a timed task that enables itself
 verilog/11_scheduling/procedural_continuous_tracks_sources.v lowering: a procedural continuous assignment
-verilog/11_scheduling/sched_blocking_target_return.v lowering: an intra-assignment timing control
 verilog/11_scheduling/sched_fork_arm_chain_order.v lowering: a fork-join block
 verilog/11_scheduling/sched_fork_arm_wake_order.v lowering: a fork-join block
 verilog/12_hierarchy/defparam_absolute_inside_array_element.v lowering: an untyped parameter a defparam sets
@@ -232,8 +211,7 @@ verilog/A_formal_syntax/b_A_2_3_declaration_lists.v lowering: an untyped paramet
 verilog/A_formal_syntax/b_A_2_4_declaration_assignments.v lowering: an untyped parameter a defparam sets
 verilog/A_formal_syntax/b_A_2_4_pathpulse_error_limit.v lowering: a specify block
 verilog/A_formal_syntax/b_A_2_4_pathpulse_mintypmax.v lowering: a specify block
-verilog/A_formal_syntax/b_A_6_2_procedural_assignments.v lowering: an intra-assignment timing control
-verilog/A_formal_syntax/b_A_6_2_repeat_intra_assignment.v lowering: an intra-assignment timing control
+verilog/A_formal_syntax/b_A_6_2_procedural_assignments.v lowering: a procedural continuous assignment
 verilog/A_formal_syntax/b_A_6_3_named_block_declarations.v lowering: a fork-join block
 verilog/A_formal_syntax/b_A_6_4_statements.v lowering: a case statement
 verilog/A_formal_syntax/b_A_6_5_timing_controls.v lowering: a disable statement
@@ -253,7 +231,7 @@ verilog/A_formal_syntax/b_A_8_6_operators.v lowering: a specify block
 verilog/A_formal_syntax/b_A_9_3_indexed_hierarchical_name.v lowering: a hierarchical name
 verilog/A_formal_syntax/grammar_nullable_statement.v lowering: a case statement
 verilog/A_formal_syntax/grammar_parameter_header.v lowering: a name declared by `param` that has no slot
-verilog-ams/digital/digital_delay_notation.v lowering: an intra-assignment timing control
+verilog-ams/digital/digital_delay_notation.v lowering: a hierarchical name
 verilog-ams/digital/realtobits_bitstoreal_bridge.v lowering: a wreal net
 verilog-ams/digital/vams_digital_abstime_math.v lowering: the system function `$abstime`
 verilog-ams/digital/wreal_event_on_change.v lowering: a wreal net

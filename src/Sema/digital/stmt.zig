@@ -67,6 +67,7 @@ pub fn compileAll(l: *Lower) Error!void {
     try fanout(l);
     try sub.finish(l);
     l.b.p.counters = l.repeats + l.joins;
+    l.b.p.holds = l.holds;
     assert(l.b.starts.items.len == early.items.len + l.driver_pcs.items.len + switches + queued.items.len);
 }
 
@@ -155,7 +156,7 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
         },
         .call_sys => try task.task(l, i),
         .call => try sub.enable(l, i, depth),
-        .store_timed, .store_nb_timed => return l.refuse("an intra-assignment timing control"),
+        .store_timed, .store_nb_timed => try timedStore(l, i, depth),
         .case => return l.refuse("a case statement"),
         .proc_assign, .force, .deassign, .release => return l.refuse("a procedural continuous assignment"),
         .disable => return l.refuse("a disable statement"),
@@ -194,6 +195,96 @@ fn patch(l: *Lower, at: u32, target: u32) void {
         .jump => l.b.setInst(at, .jump, target, 0),
         else => unreachable, // else: only a branch or jump is patched
     }
+}
+
+/// §8.5.3.3/§8.5.3.4 an assignment with an intra-assignment timing control,
+/// as lib/sim/digital compiles it: its value sampled into a hold cell now,
+/// then by its control: a blocking `#d` or plain `@e` suspends in the
+/// `sample` itself, a nonblocking `#d` schedules the update and falls
+/// through, and an `@*`, a `repeat (n) @e` or any nonblocking event control
+/// waits after the sample (a nonblocking one in a process of its own) and
+/// then deposits the held value.
+fn timedStore(l: *Lower, i: Inst.Index, depth: u32) Error!void {
+    const vir = l.virOf(l.frame);
+    const scope = l.frames.items[l.frame].scope;
+    const t = Lower.payload(vir, Inst.Timed, i);
+    const nb = Lower.tag(vir, i) == .store_nb_timed;
+    const ti = t.timing.toIndex() orelse return l.refuse("an intra-assignment timing control of nothing");
+    var delay: Inst.Ref = .none;
+    var event: Inst.Ref = .none;
+    var count: Inst.Ref = .none;
+    switch (Lower.tag(vir, ti)) {
+        .delay_ctl => delay = vir.instructions.items(.data)[@backingInt(ti)].un_node.operand,
+        .event_ctl => event = vir.instructions.items(.data)[@backingInt(ti)].un_node.operand,
+        .repeat_ctl => {
+            const b = Lower.payload(vir, Inst.Bin, ti);
+            count = b.lhs;
+            event = b.rhs;
+            if (event.toIndex()) |e| if (Lower.tag(vir, e) == .event_ctl) {
+                event = vir.instructions.items(.data)[@backingInt(e)].un_node.operand;
+            };
+        },
+        else => return l.refuse("an intra-assignment timing control of another form"),
+    }
+    const is_delay = delay != .none;
+    const parks_only = !is_delay and (nb or count != .none or event == .none);
+    const hold = l.holds;
+    l.holds += 1;
+    var sm: Program.Sample = .{ .hold = hold, .value = try expr.evalFor(l, t.rhs, try place.targetType(l, t.lhs)), .mode = .park, .place = 0, .timing = 0, .terms = .empty };
+    if (!parks_only) {
+        if (nb) {
+            sm.place = try place.place(l, t.lhs);
+            sm.mode = .nba_delay;
+            sm.timing = try expr.selfOrReal(l, delay);
+        } else if (is_delay) {
+            sm.mode = .delay;
+            sm.timing = try expr.selfOrReal(l, delay);
+        } else {
+            sm.mode = .event;
+            var terms: std.ArrayList(u32) = .empty;
+            try place.terms(l, event, &terms);
+            sm.terms = try l.b.listOf(terms.items);
+        }
+    }
+    _ = try l.b.inst(.sample, try l.b.extraOf(sm), 0, scope);
+    if (nb and is_delay) return;
+    if (!parks_only) {
+        _ = try l.b.inst(.deposit, hold, try place.place(l, t.lhs), scope);
+        return;
+    }
+    // A nonblocking one waits in a process of its own, run nested now.
+    var skip: u32 = none;
+    if (nb) {
+        _ = try l.b.inst(.spawn, pc(l) + 2, 1, scope);
+        skip = try l.b.inst(.jump, 0, 0, scope);
+    }
+    if (count != .none) {
+        const counter = counterCell(l, .repeat);
+        const start = try l.b.inst(.repeat_start, try expr.self_(l, count, 0), 0, scope);
+        const body_pc = pc(l);
+        try waitIntra(l, event, t.rhs);
+        _ = try l.b.inst(.repeat_next, counter, body_pc, scope);
+        l.b.setInst(start, .repeat_start, l.b.p.insts.items(.data)[start].a, try l.b.extraOf(Program.Repeat{ .counter = counter, .end = pc(l) }));
+    } else try waitIntra(l, event, t.rhs);
+    _ = try l.b.inst(if (nb) .deposit_nb else .deposit, hold, try place.place(l, t.lhs), scope);
+    if (nb) {
+        _ = try l.b.inst(.stop, 0, 0, scope);
+        patch(l, skip, pc(l));
+    }
+    assert(depth < depth_max);
+}
+
+/// An intra-assignment event control's wait: on `event`, or for `@*` on
+/// every slot the assigned value reads.
+fn waitIntra(l: *Lower, event: Inst.Ref, value: Inst.Ref) Error!void {
+    const scope = l.frames.items[l.frame].scope;
+    var terms: std.ArrayList(u32) = .empty;
+    if (event == .none) {
+        var slots: std.ArrayList(u32) = .empty;
+        try expr.reads(l, value, &slots);
+        for (slots.items) |s| try terms.appendSlice(l.a, &.{ s, @backingInt(Program.Edge.any), 0, 0, none });
+    } else try place.terms(l, event, &terms);
+    _ = try l.b.inst(.wait_event, try l.b.extraOf(.{ .l = try l.b.listOf(terms.items) }), 0, scope);
 }
 
 /// A repeat or fork-join counter cell.

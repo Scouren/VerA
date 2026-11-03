@@ -172,6 +172,9 @@ pub const Lower = struct {
     /// Repeat and fork-join counters handed out so far.
     repeats: u32 = 0,
     joins: u32 = 0,
+    /// §8.5.3.3 the hold cells handed out so far, one per intra-assignment
+    /// timing control.
+    holds: u32 = 0,
     /// The nets, their drivers (compiled after the walk), per slot its
     /// net, and each driver's `.continuous` pc.
     nets: std.ArrayList(nets.NetRow) = .empty,

@@ -15,6 +15,10 @@
 //! - Each oracle goes red on a planted bug first: a Float that calls every
 //!   value finite and every root `.optimized`, one whose intervals are a
 //!   point, one that calls every domain violated.
+//! - Legalize, by a metamorphic pair: each program and its `.pure` and
+//!   `.speculate` conversions give the same bits (any NaN equals any NaN)
+//!   or the same error at every sample. Planted: a conversion whose
+//!   selects swap their arms.
 //! A failure passes only when a line of `air_passes.xfail` names its oracle
 //! and kind; a line that never fires fails the run.
 //! Cites: VAMS-2023 §4.2.12, §4.3.1, §4.3.2, §5.8.
@@ -33,6 +37,7 @@ const interp = Air.interp;
 const Inst = Air.Inst;
 const Value = interp.Value;
 const Float = Air.Float;
+const Legalize = Air.Legalize;
 const Interval = Air.Interval;
 
 const programs = 10_000;
@@ -69,6 +74,9 @@ const Stats = struct {
 
 /// What a planted bug claims instead of `Float`'s answer.
 const Plant = enum { none, all_finite, all_optimized, point_iv, all_violated };
+
+/// The metamorphic sweep's totals.
+const Pair = struct { programs: u64 = 0, compared: u64 = 0, pure: u64 = 0, speculate: u64 = 0, differ: u64 = 0, printed: u32 = 0 };
 
 /// One run's observer: holds every value against the claims.
 const Watch = struct {
@@ -333,6 +341,71 @@ fn gate(oracle: []const u8, kind: []const u8, failures: u64) !void {
     try std.testing.expect(listed == (failures != 0));
 }
 
+/// Runs every program and its two conversions at `n_points` samples and
+/// counts the samples where they differ. `plant` swaps the arms of every
+/// select a conversion made.
+fn legalizeSweep(gpa: Allocator, plant: bool, n_programs: u32, n_points: u32) !Pair {
+    var prng: std.Random.DefaultPrng = .init(seed ^ 0x1E6A);
+    const r = prng.random();
+    var s: Pair = .{};
+    var ip = try InternPool.init(gpa);
+    defer ip.deinit(gpa);
+    var run_arena: std.heap.ArenaAllocator = .init(gpa);
+    defer run_arena.deinit();
+    for (0..n_programs) |_| {
+        var p = try gen.generate(gpa, &ip, r);
+        defer p.deinit(gpa);
+        var pure = try Legalize.run(gpa, p.air, &ip, .{ .mode = .pure });
+        defer pure.deinit(gpa);
+        var spec = try Legalize.run(gpa, pure.air, &ip, .{ .mode = .speculate });
+        defer spec.deinit(gpa);
+        if (plant) for ([_]Air{ pure.air, spec.air }) |out| {
+            for (out.instructions.items(.tag)[p.air.instructions.len..], out.instructions.items(.data)[p.air.instructions.len..]) |tag, data| {
+                if (tag != .select) continue;
+                const words = @constCast(out.extra[data.pl_op.payload..][0..2]);
+                std.mem.swap(u32, &words[0], &words[1]);
+            }
+        };
+        s.programs += 1;
+        s.pure += pure.converted;
+        s.speculate += spec.converted;
+        var args: [gen.params_n]Value = undefined;
+        var probes: [gen.probes_n]f64 = undefined;
+        for (0..n_points) |_| {
+            gen.sample(&p, r, &args, &probes);
+            const in: interp.Inputs = .{ .args = &args, .probes = &probes, .loop_cap = loop_cap };
+            _ = run_arena.reset(.retain_capacity);
+            const want = interp.run(run_arena.allocator(), p.air, &ip, in);
+            for ([_]Air{ pure.air, spec.air }) |out| {
+                s.compared += 1;
+                const got = interp.run(run_arena.allocator(), out, &ip, in);
+                if (sameBits(want, got)) continue;
+                s.differ += 1;
+                if (s.printed >= examples_max) continue;
+                s.printed += 1;
+                std.debug.print("air_passes legalize: {any} became {any}; args {any} probes {any}\n", .{ want, got, args, probes });
+                var aw: std.Io.Writer.Allocating = .init(gpa);
+                defer aw.deinit();
+                Air.print.write(p.air, &ip, &aw.writer) catch {};
+                aw.writer.writeAll("--- converted ---\n") catch {};
+                Air.print.write(out, &ip, &aw.writer) catch {};
+                std.debug.print("{s}\n", .{aw.written()});
+            }
+        }
+    }
+    return s;
+}
+
+fn sameBits(a: interp.Error!Value, b: interp.Error!Value) bool {
+    const x = a catch |e| return if (b) |_| false else |f| e == f;
+    const y = b catch return false;
+    return switch (x) {
+        .real => |u| y == .real and (@as(u64, @bitCast(u)) == @as(u64, @bitCast(y.real)) or (math.isNan(u) and math.isNan(y.real))),
+        .int => |n| y == .int and n == y.int,
+        .array => false,
+    };
+}
+
 fn report(name: []const u8, s: Stats) void {
     std.debug.print("air_passes {s}: {d} programs ({d} rated .optimized), {d} runs, {d} dropped (rule 3), failures: interval {d}, finite {d}, slice {d}, violation {d}\n", .{ name, s.programs, s.optimized, s.runs, s.dropped, s.failed.get(.interval), s.failed.get(.finite), s.failed.get(.slice), s.failed.get(.violation) });
 }
@@ -359,4 +432,16 @@ test "Float: sound on generated programs (falsification)" {
     const s = try sweep(gpa, .none, programs, points);
     report("Float", s);
     for (std.enums.values(Kind)) |k| try gate("float", @tagName(k), s.failed.get(k));
+}
+
+test "Legalize: the planted arm swap goes red" {
+    const s = try legalizeSweep(std.testing.allocator, true, planted_programs, planted_points);
+    std.debug.print("air_passes planted legalize swap: {d} programs, {d} compared, {d} differ\n", .{ s.programs, s.compared, s.differ });
+    try std.testing.expect(s.differ != 0);
+}
+
+test "Legalize: interp before and after agree bit for bit (metamorphic)" {
+    const s = try legalizeSweep(std.testing.allocator, false, programs, points);
+    std.debug.print("air_passes Legalize: {d} programs, {d} conversions pure, {d} speculate, {d} samples compared, {d} differ\n", .{ s.programs, s.pure, s.speculate, s.compared, s.differ });
+    try gate("legalize", "bits", s.differ);
 }

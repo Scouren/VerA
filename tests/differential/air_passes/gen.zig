@@ -158,7 +158,7 @@ const Gen = struct {
         defer for (&arms) |*a| a.deinit(g.gpa);
         for (&arms, 0..) |*arm, side| {
             const mark = .{ g.reals.items.len, g.ints.items.len };
-            if (side == 0) try g.reals.append(g.gpa, try g.un(arm, guarded_ops[g.r.uintLessThan(usize, guarded_ops.len)], x));
+            if (side == 0 and g.r.boolean()) try g.reals.append(g.gpa, try g.un(arm, guarded_ops[g.r.uintLessThan(usize, guarded_ops.len)], x));
             try g.statements(arm, depth + 1);
             const out = try g.real();
             g.reals.shrinkRetainingCapacity(mark[0]);

@@ -259,7 +259,7 @@ pub fn binary(tag: Tag, x: Abstract, y: Abstract) Abstract {
     const f = x.finite and y.finite;
     const out = binaryRaw(tag, x.iv, y.iv, f, x.finite);
     if (out.finite) assert(f);
-    if (out.iv.nonzero) assert(x.iv.nonzero and y.iv.nonzero); // only a hull keeps the hole
+    if (out.iv.nonzero) assert(x.iv.nonzero or y.iv.nonzero); // only a hull (or an empty operand) keeps the hole
     return out;
 }
 

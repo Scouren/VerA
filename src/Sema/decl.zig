@@ -24,6 +24,7 @@
 //! - `pub fn rowInstance(i: Zcu.Instance.Index) Device.Instance`
 //! - `pub fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String`
 //! - `pub fn addHeld(s: *Sema, name: []const u8, bind: Sema.Bind) Allocator.Error!void`
+//! - `pub fn checkRedeclared(s: *Sema, unit: *const Unit, i: Inst.Index) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -214,6 +215,19 @@ pub fn typeIndex(ty: Sema.Ty) InternPool.Index {
 pub fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String {
     const at = vir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index;
     return @fromBackingInt(vir.extra[at]);
+}
+
+/// §6.8 "one identifier declares one item in a scope": a variable whose
+/// name a variable, parameter or net declared first is E0362 (a port's
+/// direction then its type is one item).
+pub fn checkRedeclared(s: *Sema, unit: *const Unit, i: Inst.Index) Allocator.Error!void {
+    const vir = unit.vir;
+    const first = canonical(vir, i);
+    if (first == i) return;
+    switch (vir.instructions.items(.tag)[@backingInt(first)]) {
+        .variable, .param, .net => try s.fail(.E0362, unit.file, i.toRef(), "`{s}`", .{vir.string(nameOf(vir, i))}),
+        else => {}, // else: a port's direction, or a formal
+    }
 }
 
 /// A §5.10 held row named `name` for a variable's (or array's) slots.
@@ -571,6 +585,7 @@ fn variables(s: *Sema, unit: *Unit) Allocator.Error!void {
         if (vir.instructions.items(.tag)[@backingInt(i)] != .variable) continue;
         const v = payloadOf(vir, Inst.Variable, i);
         const first = canonical(vir, i);
+        try checkRedeclared(s, unit, i);
         if (unit.binds.contains(first)) continue;
         const ty = tyOf(v.flags.storage);
         if (v.dims.len != 0) try declareArray(s, unit, first, v.dims, ty) else try unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = try addAlloc(s, ty), .ty = ty } });

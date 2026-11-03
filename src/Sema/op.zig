@@ -52,6 +52,7 @@ pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
         try s.fail(.E0505, file, src, "`{t}()` needs {d} argument(s), got {d}", .{ tag, min, args.len });
         return expr.poison;
     }
+    try checkBounds(s, b, tag, args, src);
     const coef = switch (tag) {
         .laplace_zd, .laplace_zp, .laplace_nd, .laplace_np, .zi_zd, .zi_zp, .zi_nd, .zi_np => true,
         else => false, // else: no coefficient vector
@@ -299,6 +300,47 @@ fn stampOpRow(s: *Sema, b: *Block, n: Node.Index, f: Ref, q: Ref, q_neg: bool) A
     const site = try decl.addAlloc(s, .real);
     _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(site), .rhs = q } } });
     try s.device.charge_sites.append(s.gpa, .{ .contrib = row, .sign = if (q_neg) -1.0 else 1.0, .slot = site });
+}
+
+/// §4.5.5-§4.5.10 the control arguments' bounds, judged when they fold
+/// (E0516): A.8.2 types them `analog_expression`, so one over parameters
+/// may fold and one over the solve may not.
+fn checkBounds(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!void {
+    const Bound = enum { positive, non_negative, negative };
+    const Rule = struct { i: usize, arg: []const u8, want: Bound };
+    const rules: []const Rule = switch (tag) {
+        .idtmod => &.{.{ .i = 2, .arg = "modulus", .want = .positive }},
+        .absdelay => &.{.{ .i = 1, .arg = "td", .want = .positive }},
+        .transition => &.{
+            .{ .i = 1, .arg = "td", .want = .non_negative },
+            .{ .i = 2, .arg = "rise_time", .want = .non_negative },
+            .{ .i = 3, .arg = "fall_time", .want = .non_negative },
+            .{ .i = 4, .arg = "time_tol", .want = .non_negative },
+        },
+        // On the written arguments, before §4.5.9's default negates the first.
+        .slew => &.{
+            .{ .i = 1, .arg = "max_pos_slew_rate", .want = .positive },
+            .{ .i = 2, .arg = "max_neg_slew_rate", .want = .negative },
+        },
+        else => &.{}, // else: no bounded control argument
+    };
+    for (rules) |r| {
+        if (r.i >= args.len or args[r.i] == .none) continue;
+        const c = (try decl.foldRef(s, b.unit, args[r.i])) orelse continue;
+        if (c == .str) continue;
+        const v = c.asReal();
+        const holds = switch (r.want) {
+            .positive => v > 0,
+            .non_negative => v >= 0,
+            .negative => v < 0,
+        };
+        if (!holds) try s.fail(.E0516, b.unit.file, src, "`{t}()` argument `{s}` shall be {t}, got {d}", .{ tag, r.arg, r.want, v });
+    }
+    // §4.5.10 the direction indicator is +1, -1 or 0.
+    if (tag == .last_crossing and args.len > 1 and args[1] != .none) if (try decl.foldRef(s, b.unit, args[1])) |c| {
+        const v = c.asReal();
+        if (c != .str and (v != @round(v) or @abs(v) > 1)) try s.fail(.E0516, b.unit.file, src, "`last_crossing()` direction indicator shall be +1, -1 or 0, got {d}", .{v});
+    };
 }
 
 /// Whether `r` depends on a solver unknown or a path latch.

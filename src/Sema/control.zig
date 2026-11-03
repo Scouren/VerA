@@ -267,11 +267,18 @@ fn eventArgs(s: *Sema, b: *Block, tag: vams.SysFn.Tag, args: []const Inst.Ref, s
                 if (c != .str and c.asReal() != @round(c.asReal())) try s.fail(.E0517, file, src, "`cross()` direction shall evaluate to an integer, got {d}", .{c.asReal()});
             };
             const first: usize = if (tag == .cross) 2 else 1;
+            var tol_given = false;
             for (first..@max(first, @min(first + 2, args.len))) |k| {
                 if (args[k] == .none) continue;
+                tol_given = true;
                 const c = (try decl.foldRef(s, b.unit, args[k])) orelse continue;
                 if (c != .str and c.asReal() < 0) try s.fail(.E0517, file, src, "`{t}()` tolerance shall be non-negative, got {d}", .{ tag, c.asReal() });
             }
+            // "If either or both tolerances are defined, then the direction
+            // shall also be defined"; "If expr_tol is specified, time_tol shall
+            // also be specified" (§5.10.3.1).
+            if (tag == .cross and tol_given and (args.len < 2 or args[1] == .none)) try s.fail(.E0517, file, src, "a tolerance is given but the direction slot is empty", .{});
+            if (tag == .cross and args.len > 3 and args[3] != .none and args[2] == .none) try s.fail(.E0517, file, src, "`cross()` expr_tol is given but the time_tol slot is empty", .{});
         },
         else => {}, // else: no bound to check
     }
@@ -372,6 +379,7 @@ fn local(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!void {
     const vir = b.unit.vir;
     const v = decl.payloadOf(vir, Inst.Variable, i);
     const first = decl.canonical(vir, i);
+    try decl.checkRedeclared(s, b.unit, i);
     if (b.unit.binds.contains(first)) return;
     if (v.dims.len != 0) return decl.declareArray(s, b.unit, first, v.dims, decl.tyOf(v.flags.storage));
     const ty = decl.tyOf(v.flags.storage);

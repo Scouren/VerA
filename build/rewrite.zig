@@ -31,7 +31,7 @@ pub fn add(g: Graph) void {
     const diffs = [_]Diff{
         .{ .step = "diff-parse", .root = "tests/differential/parse.zig", .what = "vams tokenizer/Ast/Parse against lib/frontend's lexer and parser on every fixture", .imports = &.{ "vams", "frontend", "diag", "base" } },
         .{ .step = "diff-pp", .root = "tests/differential/preprocess.zig", .what = "vams Preprocessor against lib/frontend's preprocessor on every fixture", .imports = &.{ "vams", "frontend", "diag" } },
-        .{ .step = "diff-diag", .root = "tests/differential/diag.zig", .what = "vams Diag against lib/diag: the catalogue, rendering, JSON and --explain", .imports = &.{ "vams", "diag" } },
+        .{ .step = "diff-diag", .root = "tests/differential/diag.zig", .what = "vams Diag against lib/diag: the catalogue, rendering, JSON and --explain", .imports = &.{ "vams", "diag", "vera", "frontend" } },
         .{ .step = "diff-air", .root = "tests/differential/air.zig", .what = "Air's interpreter against src/ir's opcode folds", .imports = &.{ "air", "intern_pool", "ir", "kernels" } },
     };
     for (diffs) |d| {

@@ -41,9 +41,27 @@
           lib,
           stdenv,
           makeWrapper,
+          fetchFromGitHub,
+          linkFarm,
           zig,
           zigJobs ? 2,
         }:
+        let
+          # build.zig.zon's dependencies, by the package hash it names, for
+          # `zig build --system`: the sandbox has no network, and Zig fetches
+          # nothing it is handed. Moves with build.zig.zon's pin.
+          zigDeps = linkFarm "vera-zig-deps" [
+            {
+              name = "gompute-2.0.0-YJVc1oQ-BwB2JI0_gqttr3Mox-1fvn4D3rL5bdaDZbfB";
+              path = fetchFromGitHub {
+                owner = "OmarSiwy";
+                repo = "Gompute";
+                rev = "70b722dbccfc1c2e294ac5e4245344667f0dcb7d"; # v2.0.0
+                hash = "sha256-IY1zCqFGEHfTNxi2wyp8e1e8XYv0/I2ALXHkcCoX110=";
+              };
+            }
+          ];
+        in
         stdenv.mkDerivation {
           pname = "vera";
           version = "${treeVersion}-unstable-${builtins.substring 0 8 (self.lastModifiedDate or "19700101")}";
@@ -72,7 +90,7 @@
             # from, so native means static musl there: libvera-vpi.a then
             # loads a design with std's ElfDynLib, which applies no
             # relocations, and every analog VPI app segfaulted. Name glibc.
-            zig build install -j${toString zigJobs} -Doptimize=ReleaseFast -Dcpu=baseline ${lib.optionalString stdenv.hostPlatform.isLinux "-Dtarget=${stdenv.hostPlatform.parsed.cpu.name}-linux-gnu"} --prefix "$out"
+            zig build install --system ${zigDeps} -j${toString zigJobs} -Doptimize=ReleaseFast -Dcpu=baseline ${lib.optionalString stdenv.hostPlatform.isLinux "-Dtarget=${stdenv.hostPlatform.parsed.cpu.name}-linux-gnu"} --prefix "$out"
             ${wrapZig zig}
           '';
           meta = {

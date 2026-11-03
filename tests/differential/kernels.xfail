@@ -1,0 +1,26 @@
+# diff-kernels' known differences: `<name> <max ulps | any> <reason>`.
+# A name is a std_kernels function (or a gm function, for the math swap)
+# whose answer differs from the old one; `any` is a difference that is not
+# a number of ulps (NaN against a number, a sign, a text). Each line says
+# which side the f128 reference sides with. A line whose name agrees fails
+# the run: remove it. Every difference below is the gm -> Gompute 2.0.0
+# swap (lib/TODO.md §11.8); every other port is bit-identical.
+#
+# Not here because they agree bit for bit: exp, log, pow (scalar and the
+# 4-lane vector forms), sin, cos, tan, tanh, expm1, log1p, asinh, acosh,
+# atanh, and atan/atan2, which stay musl's (std's scalar body): Gompute's
+# atan is std's vector body, @mulAdd (not fma-free), 1.235 ulp and +0 at -0.
+#
+# Gompute against gm (`math.zig`), judged by the f128 reference:
+cosh 1 Gompute's softCosh, not std's cosh64; 8276/100676 differ; f128 sides with Gompute (old max 1.146, new max 0.964 ulp, new closer 8197 times, old 79)
+sinh 1 Gompute's softSinh near overflow (|x| ~ 710); 5/100676 differ; f128 sides with Gompute (old max 0.871, new max 0.654 ulp, new closer 3 of 5)
+log10 1 Gompute's log10 (log's hi/lo pair times 1/ln10), not musl's e_log10; 2/100676 differ; f128 sides with Gompute (old max 0.505, new max 0.496 ulp); still exact at every power of ten (math.zig's test)
+# The kernels over them (the old text and lib/kernels called gm or std.math):
+math.zDevSinh 1 = sinh
+math.zDevCosh 1 = cosh
+math.zLog10 1 = log10 (the value; its lane is unchanged)
+math.zLog10D 1 = log10
+fold.math.cosh 1 = cosh
+fold.math.log 1 = log10 (VAMS `log` is base 10)
+ac.Ac.sinh 2 = sinh's value, and cosh in its lanes (each lane is a product with cosh)
+ac.Ac.cosh 2 = cosh's value, and sinh in its lanes

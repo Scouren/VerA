@@ -194,8 +194,12 @@ pub fn resolve(s: *State, a: Allocator, net: u32) Error!void {
             floating += 1;
         }
         acc = acc.combine(net_.netPull(n.kind));
-        moved = moved or (n.strength_read and !std.meta.eql(s.signals[n.signal + at], acc));
-        s.signals[n.signal + at] = acc;
+        // A net's signal is kept only where something reads it (a MOS
+        // switch's data, `%v`): `Net.strength_read`.
+        if (n.strength_read) {
+            moved = moved or !std.meta.eql(s.signals[n.signal + at], acc);
+            s.signals[n.signal + at] = acc;
+        }
         logic.setBit(resolved, at, acc.collapse());
     }
     if (n.kind == .trireg) try chargeState(s, net, floating == width);

@@ -699,7 +699,8 @@ paths: []const Path = &.{},
 /// Per slot, the net it is (`none` for a variable's).
 slot_net: []const u32 = &.{},
 trans: []const Tran = &.{},
-/// Every net bit's §7.10 signal at time 0 (`Net.signal`).
+/// The §7.10 signal at time 0 of every bit of the nets whose signal is
+/// read (`Net.strength_read`) or switch-joined (`Net.signal`).
 signal_init: []const net.Signal = &.{},
 /// Every net's resolved value at time 0, `words(width)` per plane.
 resolved_init: []const u64 = &.{},

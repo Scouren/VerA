@@ -296,6 +296,7 @@ fn joinCards(scratch: Allocator, lines: []const Card) Allocator.Error![]const Ca
 }
 
 test {
+    _ = @import("spice/tests.zig");
     _ = card;
     _ = emit;
     _ = @import("spice/expr.zig");

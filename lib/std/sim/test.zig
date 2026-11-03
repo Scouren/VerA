@@ -85,7 +85,7 @@ test "§9.7.2 a posedge waiter resumes on 0 -> 1 only, after the writer's step" 
     const bit = Ty.int(1, false);
     const c = try b.slot(bit, &.{1}, &.{1});
     const place = try b.extraOf(Program.Place{ .kind = .slot, .a = c });
-    const terms = try b.listOf(&.{ c, @backingInt(Program.Edge.posedge), 0, 0 });
+    const terms = try b.listOf(&.{ c, @backingInt(Program.Edge.posedge), 0, 0, std.math.maxInt(u32) });
     _ = try b.inst(.wait_event, try b.extraOf(.{ .l = terms }), 0, 0); // pc 0
     const now = try b.expr(.time, Ty.int(64, false), 0, 0);
     _ = try b.inst(.task, try show(&b, "t=", now, 'd'), 0, 0); // pc 1

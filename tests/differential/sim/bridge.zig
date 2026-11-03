@@ -176,7 +176,7 @@ fn inst(l: *Lower, ins: compile.Instruction, pc: u32, repeats: u32) E!void {
         },
         .wait_slots => |slots| {
             var terms: std.ArrayList(u32) = .empty;
-            for (r.program.wordsOf(slots)) |s| try terms.appendSlice(l.a, &.{ s, @backingInt(Program.Edge.any), 0, 0 });
+            for (r.program.wordsOf(slots)) |s| try terms.appendSlice(l.a, &.{ s, @backingInt(Program.Edge.any), 0, 0, std.math.maxInt(u32) });
             _ = try b.inst(.wait_event, try b.extraOf(.{ .l = try b.listOf(terms.items) }), 0, scope);
         },
         .wait_level => |s| _ = try b.inst(.wait_level, try l.selfOrReal(s.cond), try b.extraOf(.{ .l = try b.listOf(r.program.wordsOf(s.slots)) }), scope),
@@ -210,7 +210,7 @@ fn inst(l: *Lower, ins: compile.Instruction, pc: u32, repeats: u32) E!void {
         },
         .trigger => |t| switch (t) {
             .slot => |slot| _ = try b.inst(.trigger, slot, 0, scope),
-            .indexed => return l.refuse("a trigger of an event array element"),
+            .indexed => |e| _ = try b.inst(.trigger_elem, try l.elem(e), 0, scope),
         },
         .continuous => |at| _ = try b.inst(.continuous, at, 0, scope),
         .fork => |f| {

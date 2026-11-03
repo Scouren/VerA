@@ -110,6 +110,8 @@ pub const Term = struct {
     width: u32 = 0,
     v: u64 = 0,
     x: u64 = 0,
+    /// `Program.Term.select`.
+    select: u32 = std.math.maxInt(u32),
 };
 
 /// A module path source's last transition: when, and its low word before
@@ -430,7 +432,7 @@ pub fn park(s: *State, pc: u32) Error!u32 {
 /// remembers its bits now.
 pub fn watch(s: *State, id: u32, t: Program.Term) Error!void {
     assert(s.susps.items[id].alive);
-    var term: Term = .{ .susp = id, .gen = s.susps.items[id].gen, .edge = t.edge, .lo = t.lo, .width = t.width };
+    var term: Term = .{ .susp = id, .gen = s.susps.items[id].gen, .edge = t.edge, .lo = t.lo, .width = t.width, .select = t.select };
     if (t.width != 0) {
         const now = termBits(s, t.slot, t.lo, t.width);
         term.v = now[0];
@@ -546,7 +548,10 @@ fn wake(s: *State, slot: u32, before: Bit, after: Bit) Error!void {
         assert(keep <= i);
         const su = &s.susps.items[t.susp];
         if (su.gen != t.gen) continue;
-        const hit = if (t.width == 0) matches(t.edge, before, after) else selectChanged(s, &list.items[i], slot);
+        const hit = if (t.width != 0) selectChanged(s, &list.items[i], slot) else matches(t.edge, before, after) and try selected(s, t, slot);
+        // The select's evaluation can satisfy another term of this
+        // suspension (an index function's write).
+        if (su.gen != t.gen) continue;
         if (!hit) {
             list.items[keep] = list.items[i];
             keep += 1;
@@ -557,6 +562,15 @@ fn wake(s: *State, slot: u32, before: Bit, after: Bit) Error!void {
         _ = try enqueue(s, .{ .run = pc }, null, false);
     }
     list.shrinkRetainingCapacity(keep);
+}
+
+/// §9.7.3 an event array term wakes only when its index names `slot` now.
+fn selected(s: *State, t: Term, slot: u32) Error!bool {
+    if (t.select == std.math.maxInt(u32)) return true;
+    var tmp: std.heap.ArenaAllocator = .init(s.arena);
+    defer tmp.deinit();
+    const at = try eval.address(s, tmp.allocator(), s.p.extraData(Program.Elem, t.select));
+    return at != null and at.? == slot;
 }
 
 /// §9.7.2 Table 9-1: `any` is every change (the caller proved one).

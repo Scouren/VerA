@@ -5,13 +5,8 @@
 verilog-ams/digital/vams_digital_abstime_math.v bridge: the real system function $abstime
 verilog/05_expressions/native_select_boundaries.v bridge: a vector bound past i32
 verilog/05_expressions/native_wide_index_edges.v bridge: a vector bound past i32
-verilog/09_behavioral_modeling/event_array.v bridge: a trigger of an event array element
 verilog/09_behavioral_modeling/event_array_automatic.v bridge: a timed task activation
-verilog/09_behavioral_modeling/event_array_native_automatic.v bridge: an event array select term
-verilog/09_behavioral_modeling/event_array_native_effects.v bridge: a trigger of an event array element
-verilog/09_behavioral_modeling/event_array_native_selection.v bridge: a trigger of an event array element
-verilog/09_behavioral_modeling/event_arrays.v bridge: an event array select term
-verilog/09_behavioral_modeling/native_wide_event_indices.v bridge: a trigger of an event array element
+verilog/09_behavioral_modeling/event_array_native_selection.v bridge: §9.7.7 repeat event control
 verilog/09_behavioral_modeling/repeat_count_any_width.v bridge: §9.7.7 repeat event control
 verilog/09_behavioral_modeling/repeat_event_control.v bridge: §9.7.7 repeat event control
 verilog/09_behavioral_modeling/repeat_unsigned_64bit_count.v bridge: §9.7.7 repeat event control

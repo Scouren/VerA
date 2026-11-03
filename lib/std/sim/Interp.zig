@@ -200,6 +200,10 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                 try s.trigger(d.a);
                 pc += 1;
             },
+            .trigger_elem => {
+                if (try eval.address(s, a, p.extraData(Program.Elem, d.a))) |slot| try s.trigger(slot);
+                pc += 1;
+            },
             .continuous => return resolve.continuous(s, a, d.a, pc),
             .fork => {
                 const f = p.extraData(Program.Fork, d.a);
@@ -333,9 +337,9 @@ fn delayOf(s: *State, a: Allocator, e: u32, pc: u32) Error!u64 {
 
 fn watchAll(s: *State, id: u32, terms: Program.List) Error!void {
     const words = s.p.list(terms);
-    assert(words.len % 4 == 0);
+    assert(words.len % Program.Term.words == 0);
     var k: usize = 0;
-    while (k < words.len) : (k += 4) try s.watch(id, s.p.extraData(Program.Term, terms.start + @as(u32, @intCast(k))));
+    while (k < words.len) : (k += Program.Term.words) try s.watch(id, s.p.extraData(Program.Term, terms.start + @as(u32, @intCast(k))));
 }
 
 /// §9.5: the first arm with a label matching the scrutinee; else the fallback.

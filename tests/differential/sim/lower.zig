@@ -20,6 +20,7 @@
 //! - `Lower.terms(l: *Lower, e: ExprId, out: *std.ArrayList(u32)) E!void`
 //! - `Lower.call(l: *Lower, idx: u32, args: []const ExprId) E!u32`
 //! - `Lower.tyOf(l: *Lower, ty: Type) E!Ty`
+//! - `Lower.elem(l: *Lower, e: ExprId) E!u32`
 //! - `Lower.queueCall(l: *Lower, op: Program.QueueOp, args: []const ExprId, outs: []const bool) E!u32`
 //! - `pub const E`
 
@@ -246,17 +247,25 @@ pub const Lower = struct {
             else => .any, // else: a name, or an expression with a hidden slot
         };
         const watched = if (edge == .any) e else ex.lhs(e);
+        const none = std.math.maxInt(u32);
         if (ex.tag(watched) == .index) {
             const c = r.chainBase(watched);
             const base = try l.slotOf(c.base);
-            if (r.decls.events.contains(base)) return l.refuse("an event array select term");
+            if (r.decls.events.contains(base)) {
+                // §9.7.3: every element, each waking only when the index
+                // names it at the occurrence.
+                const arr = r.decls.arrays.get(base).?;
+                const el = try l.elem(watched);
+                for (0..arr.count) |k| try out.appendSlice(l.a, &.{ base + @as(u32, @intCast(k)), @backingInt(Program.Edge.any), 0, 0, el });
+                return;
+            }
         }
         if (compile.selectTerm(r, watched) catch return l.refuse("a select term the old engine refuses")) |sel| {
-            return out.appendSlice(l.a, &.{ sel.slot, @backingInt(edge), sel.first, sel.count });
+            return out.appendSlice(l.a, &.{ sel.slot, @backingInt(edge), sel.first, sel.count, none });
         }
         if (r.routines.auto_terms.contains(.{ .scope = r.scope, .e = watched })) return l.refuse("an automatic expression term");
         const slot = r.termSlot(watched) catch return l.refuse("a term the old engine refuses");
-        try out.appendSlice(l.a, &.{ slot, @backingInt(edge), 0, 0 });
+        try out.appendSlice(l.a, &.{ slot, @backingInt(edge), 0, 0, none });
     }
 
     /// `evaluate.evalReal(e)` as a real row.
@@ -394,7 +403,7 @@ pub const Lower = struct {
     }
 
     /// The `Program.Elem` of array element reference `e`, in `extra`.
-    fn elem(l: *Lower, e: ExprId) E!u32 {
+    pub fn elem(l: *Lower, e: ExprId) E!u32 {
         const r = l.r;
         const ex = &r.file.exprs;
         const c = r.chainBase(e);

@@ -12,7 +12,7 @@
 //! - `pub const Ref = enum(u32)`, `pub const Slot = struct`
 //! - `pub const Inst = struct` (`Inst.Tag`, `Inst.Data`)
 //! - `pub const Expr = struct` (`Expr.Tag`, `Expr.Data`)
-//! - `pub const Edge = enum(u2)`, `pub const Term = struct`
+//! - `pub const Edge = enum(u2)`, `pub const Term = struct` (`Term.words`)
 //! - `pub const Place = struct` (`Place.Kind`)
 //! - `pub const Piece = struct` (`Piece.Kind`), `pub const Show = struct`, `pub const Radix`
 //! - `pub const Scope = struct`, `pub const Time = struct`, `pub const Block = struct`
@@ -127,6 +127,9 @@ pub const Inst = struct {
         wait_level,
         /// §5.10.4 `-> e`: slot `a`.
         trigger,
+        /// §5.10.4 `-> e[i]`: the element `Elem` `a` (in `extra`) names now;
+        /// none for an x/z or out-of-range index.
+        trigger_elem,
         /// §6.1 driver `a` (a `drivers` row) evaluates, drives its net (at
         /// once or after its delay), and is armed on its operands.
         continuous,
@@ -320,11 +323,19 @@ pub const Edge = enum(u2) { any, posedge, negedge };
 
 /// One term of an event control: slot `slot` changing with `edge`; with a
 /// nonzero `width`, only bits [lo, lo + width) of it (a constant select).
+/// Stored in `extra` as `Term.words` words.
 pub const Term = struct {
     slot: u32,
     edge: Edge,
     lo: u32 = 0,
     width: u32 = 0,
+    /// §9.7.3 an event array element's occurrence wakes the term only
+    /// when this `Elem` (in `extra`) names `slot` at that moment; `none`
+    /// for any other term.
+    select: u32 = std.math.maxInt(u32),
+
+    /// The words one term takes in `extra`.
+    pub const words = 5;
 };
 
 /// An assignment's target, at its index in `extra`.

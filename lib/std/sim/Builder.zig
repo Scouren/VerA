@@ -111,6 +111,7 @@ pub fn extraOf(b: *Builder, value: anytype) Error!u32 {
         switch (F) {
             u32 => try b.extra.append(b.arena, x),
             i32 => try b.extra.append(b.arena, @bitCast(x)),
+            i64 => try b.extra.appendSlice(b.arena, &.{ @truncate(@as(u64, @bitCast(x))), @truncate(@as(u64, @bitCast(x)) >> 32) }),
             Program.Ty => try b.extra.append(b.arena, @bitCast(x)),
             bool => try b.extra.append(b.arena, @intFromBool(x)),
             Program.List => try b.extra.appendSlice(b.arena, &.{ x.start, x.len }),

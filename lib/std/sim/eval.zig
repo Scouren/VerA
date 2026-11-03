@@ -313,17 +313,19 @@ pub fn read(s: *const State, a: Allocator, slot: u32) Error!Literal {
 /// index. Every index is evaluated before an out-of-range one decides.
 pub fn address(s: *State, a: Allocator, el: Program.Elem) Error!?u32 {
     const dims = s.p.list(el.dims);
-    assert(dims.len % 3 == 0);
+    const n = Program.Elem.dim_words;
+    assert(dims.len % n == 0);
     var at: u64 = 0;
     var stride: u64 = 1;
     var inside = true;
     // Row-major: the last dimension is the innermost.
-    var k = dims.len / 3;
+    var k = dims.len / n;
     while (k != 0) {
         k -= 1;
-        const idx = indexOf(try eval(s, a, dims[3 * k])) orelse return null;
-        const low: i64 = @as(i32, @bitCast(dims[3 * k + 1]));
-        const high: i64 = @as(i32, @bitCast(dims[3 * k + 2]));
+        const d = dims[n * k ..][0..n];
+        const idx = indexOf(try eval(s, a, d[0])) orelse return null;
+        const low: i64 = @bitCast(@as(u64, d[1]) | @as(u64, d[2]) << 32);
+        const high: i64 = @bitCast(@as(u64, d[3]) | @as(u64, d[4]) << 32);
         if (idx < low or idx > high) inside = false;
         if (inside) at += stride * @as(u64, @intCast(idx - low));
         stride *= @as(u64, @intCast(high - low + 1));
@@ -472,7 +474,7 @@ fn selection(s: *State, a: Allocator, sl: Program.Select) Error!?Sel {
 
 /// Storage position of declared index `i` of a `[msb:lsb]` vector.
 fn position(sl: Program.Select, i: i64) i64 {
-    return if (sl.msb >= sl.lsb) i -| sl.lsb else @as(i64, sl.lsb) -| i;
+    return if (sl.msb >= sl.lsb) i -| sl.lsb else sl.lsb -| i;
 }
 
 fn readSelect(s: *State, a: Allocator, sl: Program.Select) Error!Literal {

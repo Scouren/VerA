@@ -410,17 +410,16 @@ pub const Lower = struct {
         const c = r.chainBase(e);
         const base = try l.slotOf(c.base);
         const arr = r.decls.arrays.get(base).?;
-        const dims = try l.a.alloc(u32, 3 * c.depth);
+        const n = Program.Elem.dim_words;
+        const dims = try l.a.alloc(u32, n * c.depth);
         var x = e;
         var k = c.depth;
         while (k != 0) : (x = ex.lhs(x)) {
             k -= 1;
             const span: digital.Span = if (k == 0) .{ .low = arr.low, .high = arr.high } else arr.rest[k - 1];
-            const low = std.math.cast(i32, span.low) orelse return l.refuse("an array bound past i32");
-            const high = std.math.cast(i32, span.high) orelse return l.refuse("an array bound past i32");
-            dims[3 * k] = try l.self_(ex.rhs(x), 0);
-            dims[3 * k + 1] = @bitCast(low);
-            dims[3 * k + 2] = @bitCast(high);
+            const low: u64 = @bitCast(@as(i64, span.low));
+            const high: u64 = @bitCast(@as(i64, span.high));
+            dims[n * k ..][0..n].* = .{ try l.self_(ex.rhs(x), 0), @truncate(low), @truncate(low >> 32), @truncate(high), @truncate(high >> 32) };
         }
         return l.b.extraOf(Program.Elem{ .base = base, .count = arr.count, .dims = try l.b.listOf(dims) });
     }
@@ -432,8 +431,8 @@ pub const Lower = struct {
         const v = ex.lhs(e);
         const base = r.baseSlot(v) catch return l.refuse("a select base the old engine refuses");
         const range = r.vecRange(base);
-        const msb = std.math.cast(i32, range.msb) orelse return l.refuse("a vector bound past i32");
-        const lsb = std.math.cast(i32, range.lsb) orelse return l.refuse("a vector bound past i32");
+        const msb: i64 = range.msb;
+        const lsb: i64 = range.lsb;
         const el: u32 = if (ex.tag(v) == .index) try l.elem(v) else std.math.maxInt(u32);
         const rg = ex.rhs(e);
         var sel: Program.Select = .{ .slot = base, .elem = el, .msb = msb, .lsb = lsb, .mode = .bit, .index = 0, .count = 1, .first = 0 };
@@ -441,7 +440,7 @@ pub const Lower = struct {
             .range => {
                 const ps = r.typing.part_selects.get(.{ .spec = r.specOf(r.scope), .e = e }) orelse return l.refuse("an unfolded part-select");
                 sel.mode = .const_part;
-                sel.first = std.math.cast(i32, range.position(ps.lsb)) orelse return l.refuse("a part-select position past i32");
+                sel.first = std.math.cast(i64, range.position(ps.lsb)) orelse return l.refuse("a part-select position past i64");
                 sel.count = std.math.cast(u32, @abs(ps.msb - ps.lsb) + 1) orelse return l.refuse("a part-select past u32");
             },
             .indexed_range => {
@@ -518,8 +517,8 @@ pub const Lower = struct {
                 const arr = if (ex.tag(target) == .ident) r.decls.arrays.get(try l.slotOf(target)) else null;
                 if (arr) |m| {
                     fr.base = try l.slotOf(target);
-                    fr.low = std.math.cast(i32, m.low) orelse return l.refuse("an array bound past i32");
-                    fr.high = std.math.cast(i32, m.high) orelse return l.refuse("an array bound past i32");
+                    fr.low = m.low;
+                    fr.high = m.high;
                     if (args.len > 2 and args[2] != .none) fr.start = try l.self_(args[2], 0);
                     if (args.len > 3) fr.count = try l.self_(args[3], 0);
                 } else {

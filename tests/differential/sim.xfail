@@ -2,10 +2,7 @@
 # line, its path under tests/conformance/tests and why it is not compared yet.
 # Every line is a construct the bridge (tests/differential/sim/bridge.zig) does
 # not express yet; a listed fixture that agrees fails the run until its line goes.
-verilog/05_expressions/native_select_boundaries.v bridge: a vector bound past i32
-verilog/05_expressions/native_wide_index_edges.v bridge: a vector bound past i32
 verilog/09_behavioral_modeling/event_array_automatic.v bridge: a timed task activation
 verilog/10_tasks_functions/recursive_task_fork_join.v bridge: a timed task activation
 verilog/10_tasks_functions/task_recursive_timed_automatic.v bridge: a timed task activation
 verilog/10_tasks_functions/timed_subroutine_parameters.v bridge: a timed task activation
-verilog/17_system_tasks/native_binary_file_targets.v bridge: an array bound past i32

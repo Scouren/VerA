@@ -18,7 +18,7 @@
 //! - `pub const Scope = struct`, `pub const Time = struct`, `pub const Block = struct`
 //! - `pub const Start = struct`, `pub const Case = struct`, `pub const Arm = struct`
 //! - `pub const List = struct`, `List.empty`
-//! - `pub const Math = enum(u8)`, `pub const Elem = struct`, `pub const Select = struct` (`Select.Mode`)
+//! - `pub const Math = enum(u8)`, `pub const Elem = struct` (`Elem.dim_words`), `pub const Select = struct` (`Select.Mode`)
 //! - `pub const Piece.none_width`
 //! - `pub const Repeat = struct`, `pub const Fork = struct`, `pub const Sample = struct` (`Sample.Mode`)
 //! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const SWrite = struct`, `pub const Random = struct`, `pub const Dist = enum(u32)`, `pub const FileCall = struct`, `pub const PlaCall = struct`, `pub const PlaLogic = enum(u32)`, `pub const QueueCall = struct`, `pub const QueueOp = enum(u32)`, `pub const ScanCall = struct`, `pub const Fread = struct`, `pub const FileOp = enum(u32)`, `pub const FShow = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
@@ -354,11 +354,14 @@ pub const Place = struct {
 
 /// §3.9 an element reference: the array's first slot, how many slots it
 /// has, and per dimension (outermost first) the index row and its declared
-/// span, at `dims` in `extra` as triples (index, low, high) of i32 bits.
+/// span, at `dims` in `extra` as `dim_words` words: the index row, then low
+/// and high as i64 bits (low word first).
 pub const Elem = struct {
     base: u32,
     count: u32,
     dims: List,
+
+    pub const dim_words = 5;
 };
 
 /// §5.2.1 a select of a vector held in a slot (`elem == none`: slot `slot`)
@@ -367,8 +370,8 @@ pub const Select = struct {
     slot: u32,
     elem: u32,
     /// The vector's declared `[msb:lsb]`.
-    msb: i32,
-    lsb: i32,
+    msb: i64,
+    lsb: i64,
     /// How the selected position is computed: `const_part` reads `first`,
     /// `bit` the index row `index`, `up`/`down` the base row `index`.
     mode: Mode,
@@ -376,7 +379,7 @@ pub const Select = struct {
     /// The bit count selected, and for `const_part` the position of its
     /// least significant bit in storage.
     count: u32,
-    first: i32,
+    first: i64,
 
     pub const Mode = enum(u32) { const_part, bit, up, down };
 };
@@ -531,8 +534,8 @@ pub const ReadMem = struct {
     name: List,
     name_row: u32,
     base: u32,
-    low: i32,
-    high: i32,
+    low: i64,
+    high: i64,
     start: u32,
     finish: u32,
 };
@@ -623,7 +626,7 @@ pub const ScanCall = struct { src: u32, format: u32, outs: List, module: List, s
 /// type `ty`, whose value now is row `prior`), or (`base` not `none`) a
 /// memory's elements `base..` over declared [low, high] from row `start`
 /// for at most row `count` words (`none`: the defaults).
-pub const Fread = struct { fd: u32, place: u32, ty: Ty, prior: u32, base: u32, low: i32, high: i32, start: u32, count: u32 };
+pub const Fread = struct { fd: u32, place: u32, ty: Ty, prior: u32, base: u32, low: i64, high: i64, start: u32, count: u32 };
 
 /// §17.5 one PLA task: its logic and form (`plane`: §17.5.4's plane
 /// format, else array), the personality memory's first element slot and
@@ -923,6 +926,10 @@ pub fn extraData(p: *const Program, comptime T: type, at: u32) T {
         switch (F) {
             u32 => @field(out, name) = p.extra[i],
             i32 => @field(out, name) = @bitCast(p.extra[i]),
+            i64 => {
+                @field(out, name) = @bitCast(@as(u64, p.extra[i]) | @as(u64, p.extra[i + 1]) << 32);
+                i += 1;
+            },
             Ty => @field(out, name) = @bitCast(p.extra[i]),
             bool => @field(out, name) = p.extra[i] != 0,
             List => {

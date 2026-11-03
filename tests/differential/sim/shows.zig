@@ -65,8 +65,8 @@ pub fn task(l: *Lower, t: Task, args: []const ExprId, tok: u32, pc: u32) E!u32 {
                 .name = if (named) try l.b.string(r.file.str(ex.strOf(args[0]))) else .empty,
                 .name_row = if (named) none else try l.self_(args[0], 0),
                 .base = base,
-                .low = std.math.cast(i32, arr.low) orelse return l.refuse("an array bound past i32"),
-                .high = std.math.cast(i32, arr.high) orelse return l.refuse("an array bound past i32"),
+                .low = arr.low,
+                .high = arr.high,
                 .start = if (args.len >= 3) try l.self_(args[2], 0) else none,
                 .finish = if (args.len == 4) try l.self_(args[3], 0) else none,
             });

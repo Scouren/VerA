@@ -333,6 +333,61 @@ test "findStop agrees with the scalar loop at every tail boundary" {
     }
 }
 
+test "isIdentStart admits exactly §2.8's letters, `_`, and `$`" {
+    for (0..256) |c| {
+        const b: u8 = @intCast(c);
+        const want = (b >= 'a' and b <= 'z') or (b >= 'A' and b <= 'Z') or b == '_' or b == '$';
+        try std.testing.expectEqual(want, isIdentStart(b));
+    }
+}
+
+test "Rest reads identifiers and escaped identifiers where the lexer splits them" {
+    var r: Rest = .{ .s = "  a$1_ \\b-c d" };
+    try std.testing.expectEqualStrings("a$1_", r.ident().?);
+    try std.testing.expect(r.ident() == null);
+    try std.testing.expectEqualStrings("b-c", r.escapedIdent().?);
+    try std.testing.expect(r.escapedIdent() == null);
+    try std.testing.expectEqualStrings("d", r.ident().?);
+    try std.testing.expect(r.peek() == null);
+}
+
+test "stripComments: every kept byte maps back to itself, and stripping twice changes nothing" {
+    // Oracle: the raw text itself, through the marks (`toSourceOffset`), and
+    // idempotence: a stripped text holds no comment.
+    const Preprocessor = @import("../Preprocessor.zig");
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const opts: Preprocessor.Options = .{};
+    const answers: std.StringHashMapUnmanaged(?[]const u8) = .empty;
+    var pp: Pass = .{ .arena = arena_state.allocator(), .opts = &opts, .answers = &answers };
+    _ = try pp.addFile("<source>", "");
+    // By hand: `ab/*c*/d` runs in lockstep with the raw text from 7 at 3.
+    const s = try stripComments(&pp, "ab/*c*/d");
+    try std.testing.expectEqualStrings("ab d", s.text);
+    try std.testing.expectEqualSlices(StripMark, &.{.{ .out = 3, .src = 7 }}, s.marks);
+    // Then every short text over the bytes the stripper branches on.
+    var prng: std.Random.DefaultPrng = .init(0xc0ffee);
+    const rand = prng.random();
+    const alphabet = "a /*\n\"\\";
+    var buf: [48]u8 = undefined;
+    for (0..4000) |_| {
+        const raw = buf[0..rand.uintAtMost(usize, buf.len)];
+        for (raw) |*b| b.* = alphabet[rand.uintLessThan(usize, alphabet.len)];
+        const got = stripComments(&pp, raw) catch |e| switch (e) {
+            error.PreprocessFailed => continue, // E0102, an unclosed `/*`
+            else => return e,
+        };
+        try std.testing.expectEqual(std.mem.countScalar(u8, raw, '\n'), std.mem.countScalar(u8, got.text, '\n'));
+        for (got.text, 0..) |c, k| {
+            if (c == ' ' or c == '\n') continue;
+            try std.testing.expectEqual(c, raw[Preprocessor.toSourceOffset(got.marks, @intCast(k))]);
+        }
+        const again = try stripComments(&pp, got.text);
+        try std.testing.expectEqualStrings(got.text, again.text);
+        try std.testing.expectEqual(@as(usize, 0), again.marks.len);
+    }
+}
+
 test "stringStop ends at the closing quote, an unescaped newline, or the end" {
     // Oracle: §2.7, a literal closes at its quote and cannot span a line.
     try std.testing.expectEqual(@as(usize, 3), stringStop("\"ab\"x", 0));

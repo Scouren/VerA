@@ -358,6 +358,7 @@ fn markAtOrBefore(offset: u32, m: StripMark) bool {
 }
 
 test {
+    _ = @import("Preprocessor/tests.zig");
     _ = @import("Preprocessor/scan.zig");
     _ = @import("Preprocessor/handlers.zig");
     _ = protect;

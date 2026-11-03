@@ -253,7 +253,11 @@ pub const Env = struct {
     /// `string`) and range (IEEE 1364-2005 §12.2: truncated to its width,
     /// signed only when declared so); an untyped parameter keeps its value's
     /// type.
-    fn coerce(env: *Env, decl: Inst.Param, c: Const) Allocator.Error!?Const {
+    fn coerce(env: *Env, decl: Inst.Param, value: Const) Allocator.Error!?Const {
+        // §2.7 a string given to a numeric parameter is its characters'
+        // integer, eight bits each.
+        const numeric = decl.range.len != 0 or (decl.flags.storage != .none and decl.flags.storage != .string);
+        const c: Const = if (value == .str and numeric) .{ .int = fold.strToInt(value.str, 64) } else value;
         const typed: Const = switch (decl.flags.storage) {
             .real, .realtime => .{ .real = c.asReal() },
             .integer => .{ .int = fold.wrap32(c.asIntExact() orelse return null) },

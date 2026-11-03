@@ -286,3 +286,17 @@ test "§7.8.4 a mixed port no statement bridges is E0927; one two statements mat
         \\connectrules r; connect a2d; connect b2d; endconnectrules
     , .{}, &.{.E0922});
 }
+
+test "§2.7 a string given to a ranged parameter is its characters' integer" {
+    try expectTree(
+        \\module kid; endmodule
+        \\module top; parameter [15:0] s = "hi"; if (s == 16'h6869) kid k(); endmodule
+    , .{}, "top top\ntop.genblk1.k kid\n");
+}
+
+test "IEEE 1364-2005 §12.8.1 a defparam of the module's own parameter is in force before the generate scheme reads it" {
+    try expectTree(
+        \\module kid; endmodule
+        \\module top; parameter n = 1; if (n == 2) kid k(); defparam n = 2; endmodule
+    , .{}, "top top\ntop.genblk1.k kid\n");
+}

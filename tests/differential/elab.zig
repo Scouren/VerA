@@ -13,12 +13,20 @@
 //!   the instance scopes of `sim.digital.elaborate`'s `Run.hier`, every root,
 //!   compared as sorted sets: its scope ids follow its declaration pass, not
 //!   the depth-first order);
+//! - parameters (`.v`): every instance's module-level parameter the old
+//!   digital route holds as a known value of at most 64 bits (its slot in
+//!   `Run.values`, by `Run.hier.names`) equals the new instance's folded
+//!   integer in that many low bits; a real or unfoldable one is not compared;
 //! - determinism: elaborating a fixture twice gives the same tree and codes.
 //! A fixture the old front end refuses (preprocess, parse, the §3.7 and
 //! §8.1.1 rules) or the new parser refuses is skipped and counted; a `.v`
 //! the old digital route refuses is compared on nothing and counted.
-//! Not yet compared (elab.md checks 2-4): folded parameter values, net
-//! disciplines and connect-module inserts.
+//! Not compared (elab.md checks 2-4): an analog instance's parameter values
+//! (the old flatten keeps them as unfolded expressions; `Lowered.params`
+//! needs lowering), net disciplines (the old `signal_disciplines` and
+//! `port_disciplines` are flat-name views of segments, not one row per
+//! hierarchical net) and connect-module inserts (whose bridges the tree
+//! check already compares by path and module).
 //! No LRM clause: this checks VerA's rewrite against VerA.
 //!
 //! Contents: tests only.
@@ -41,6 +49,7 @@ const elab_codes = [_][]const u8{ "E0235", "E0237", "E0239", "E0247", "E0337", "
 const Tally = struct {
     compared: u32 = 0,
     trees: u32 = 0,
+    params: u32 = 0,
     skipped_old: u32 = 0,
     skipped_new: u32 = 0,
     digital_refused: u32 = 0,
@@ -51,11 +60,16 @@ const Tally = struct {
 
 /// What one fixture gave: skipped, or a verdict (null when every check
 /// agrees, else the first disagreement) and whether a tree was compared.
-const Outcome = union(enum) { old_refused, new_refused, verdict: struct { why: ?[]const u8, tree: bool, digital_refused: bool = false } };
+const Outcome = union(enum) { old_refused, new_refused, verdict: struct { why: ?[]const u8, tree: bool, digital_refused: bool = false, params: u32 = 0 } };
 
 /// One side's answer: the tree as `path module` lines, the codes as a
 /// sorted, deduplicated list; `tree` is null when that side has none.
-const Side = struct { tree: ?[]const []const u8, codes: []const []const u8 };
+/// `params`: `path.name` to a known integer's low `width` bits.
+const Side = struct { tree: ?[]const []const u8, codes: []const []const u8, params: std.StringHashMapUnmanaged(Bits) = .empty };
+
+/// A parameter's value as compared: its low `width` bits (`width` 64 on the
+/// new side, which folds to an `i64`).
+const Bits = struct { bits: u64, width: u32 };
 
 // ---- private ----
 
@@ -102,6 +116,7 @@ fn runAll() !void {
         };
         tally.compared += 1;
         tally.trees += @intFromBool(v.tree);
+        tally.params += v.params;
         tally.digital_refused += @intFromBool(v.digital_refused);
         const listed = xfail.get(rel) != null;
         if (listed) try seen.put(arena, rel, {});
@@ -122,7 +137,7 @@ fn runAll() !void {
         tally.failed += 1;
         try out.writer.print("STALE {s}: elab.xfail names a fixture that was not compared\n", .{k.*});
     };
-    std.debug.print("{s}diff-elab: {d} fixtures compared ({d} trees), {d} agree, {d} listed in elab.xfail, {d} skipped (old front end refused), {d} skipped (new parser refused), {d} .v the old digital route refused, {d} failures\n", .{ out.written(), tally.compared, tally.trees, tally.agreed, tally.xfailed, tally.skipped_old, tally.skipped_new, tally.digital_refused, tally.failed });
+    std.debug.print("{s}diff-elab: {d} fixtures compared ({d} trees, {d} digital parameters), {d} agree, {d} listed in elab.xfail, {d} skipped (old front end refused), {d} skipped (new parser refused), {d} .v the old digital route refused, {d} failures\n", .{ out.written(), tally.compared, tally.trees, tally.params, tally.agreed, tally.xfailed, tally.skipped_old, tally.skipped_new, tally.digital_refused, tally.failed });
     if (tally.failed != 0) return error.DiffElabFailed;
 }
 
@@ -180,6 +195,8 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8) !Outcome {
         return .{ .verdict = .{ .why = "determinism: two elaborations differ", .tree = false, .digital_refused = refused } };
     if (!digital and !sameLines(old.codes, new.codes))
         return .{ .verdict = .{ .why = try arena.print("codes: old {s}, new {s}", .{ try join(arena, old.codes), try join(arena, new.codes) }), .tree = false } };
+    var compared: u32 = 0;
+    if (try paramsDiffer(arena, &old.params, &new.params, &compared)) |why| return .{ .verdict = .{ .why = why, .tree = false } };
     const want = old.tree orelse return .{ .verdict = .{ .why = null, .tree = false, .digital_refused = refused } };
     var got = new.tree.?;
     if (digital) {
@@ -187,7 +204,7 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8) !Outcome {
         std.mem.sort([]const u8, sorted, {}, lessThan);
         got = sorted;
     }
-    return .{ .verdict = .{ .why = try treeDiffer(arena, want, got), .tree = true } };
+    return .{ .verdict = .{ .why = try treeDiffer(arena, want, got), .tree = true, .params = compared } };
 }
 
 /// The old analog route up to `elab.elaborate`, as `Compilation/analyze.zig`
@@ -273,7 +290,51 @@ fn oldDigital(arena: std.mem.Allocator, source: []const u8, path: []const u8, in
         try tree.append(arena, try arena.print("{s} {s}", .{ try std.mem.join(arena, ".", segs.items), module }));
     }
     std.mem.sort([]const u8, tree.items, {}, lessThan);
-    return .{ .tree = tree.items, .codes = &.{} };
+    var params: std.StringHashMapUnmanaged(Bits) = .empty;
+    var it = r.hier.names.iterator();
+    while (it.next()) |e| {
+        const slot = e.value_ptr.*;
+        if (!r.decls.params.contains(slot)) continue;
+        const scope = e.key_ptr.scope;
+        if (scope >= scopes.len or scopes[scope].lexical) continue;
+        const v = r.values[slot];
+        if (v.width == 0 or v.width > 64 or v.hasUnknown()) continue;
+        const name = try std.fmt.allocPrint(arena, "{s}.{s}", .{ try scopePath(arena, &r, scope), r.file.str(e.key_ptr.str) });
+        try params.put(arena, name, .{ .bits = v.values()[0], .width = v.width });
+    }
+    return .{ .tree = tree.items, .codes = &.{}, .params = params };
+}
+
+/// An instance scope's path, its root's module name first.
+fn scopePath(arena: std.mem.Allocator, r: *const sim.digital.Run, s: usize) ![]const u8 {
+    const scopes = r.hier.scopes.items;
+    var segs: std.ArrayList([]const u8) = .empty;
+    var at = s;
+    for (0..scopes.len + 1) |_| {
+        const row = scopes[at];
+        const name = r.file.str(row.name);
+        try segs.append(arena, if (row.index) |k| try arena.print("{s}[{d}]", .{ name, k }) else name);
+        if (row.parent == at) break;
+        at = row.parent;
+    }
+    std.mem.reverse([]const u8, segs.items);
+    return std.mem.join(arena, ".", segs.items);
+}
+
+/// The first parameter both sides fold whose low bits differ, or null.
+fn paramsDiffer(arena: std.mem.Allocator, old: *const std.StringHashMapUnmanaged(Bits), new: *const std.StringHashMapUnmanaged(Bits), compared: *u32) !?[]const u8 {
+    var names: std.ArrayList([]const u8) = .empty;
+    var it = old.keyIterator();
+    while (it.next()) |k| if (new.contains(k.*)) try names.append(arena, k.*);
+    std.mem.sort([]const u8, names.items, {}, lessThan);
+    compared.* = @intCast(names.items.len);
+    for (names.items) |n| {
+        const o = old.get(n).?;
+        const v = new.get(n).?;
+        const mask: u64 = if (o.width >= 64) std.math.maxInt(u64) else (@as(u64, 1) << @intCast(o.width)) - 1;
+        if (o.bits & mask != v.bits & mask) return try arena.print("parameter `{s}`: old {d}'h{x}, new {d}", .{ n, o.width, o.bits & mask, @as(i64, @bitCast(v.bits)) });
+    }
+    return null;
 }
 
 /// The new side: parse, AstGen, elaborate. Null when the new parser
@@ -296,13 +357,32 @@ fn newSide(arena: std.mem.Allocator, path: []const u8, text: [:0]const u8, digit
         const d = zcu.instances.items(.module)[k];
         try lines.append(arena, try arena.print("{f} {s}", .{ zcu.fmtPath(@fromBackingInt(@intCast(k))), zcu.fileVir(d.file).string(zcu.declRow(d).name) }));
     }
+    var params: std.StringHashMapUnmanaged(Bits) = .empty;
+    for (0..zcu.instances.len) |k| {
+        const d = zcu.instances.items(.module)[k];
+        const mvir = zcu.fileVir(d.file);
+        const row = zcu.declRow(d);
+        if (row.kind == .primitive) continue;
+        const m = mvir.extraData(vams.Vir.Inst.Module, mvir.instructions.items(.data)[@backingInt(row.inst)].pl_node.payload_index);
+        const elems = zcu.intern_pool.indexToKey(zcu.instances.items(.params)[k]).aggregate.elems;
+        var at: usize = 0;
+        for ([_]vams.Vir.Body{ m.params, m.body }) |b| for (mvir.body(b)) |i| {
+            if (mvir.instructions.items(.tag)[@backingInt(i)] != .param) continue;
+            defer at += 1;
+            const p = mvir.extraData(vams.Vir.Inst.Param, mvir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index);
+            const key = zcu.intern_pool.indexToKey(elems[at]);
+            if (key != .int or key.int.storage != .small) continue;
+            const name = try arena.print("{f}.{s}", .{ zcu.fmtPath(@fromBackingInt(@intCast(k))), mvir.string(p.name) });
+            try params.put(arena, name, .{ .bits = @bitCast(key.int.storage.small), .width = 64 });
+        };
+    }
     var codes: std.ArrayList([]const u8) = .empty;
     for (zcu.failed.items(.code)) |c| try codes.append(arena, @tagName(c));
     for (vir.diag.messages()) |m| {
         const name = @tagName(vir.diag.message(m).tag.code);
         for (elab_codes) |c| if (std.mem.eql(u8, c, name)) try codes.append(arena, name);
     }
-    return .{ .tree = lines.items, .codes = try setOf(arena, codes.items) };
+    return .{ .tree = lines.items, .codes = try setOf(arena, codes.items), .params = params };
 }
 
 fn setOf(arena: std.mem.Allocator, codes: []const []const u8) ![]const []const u8 {

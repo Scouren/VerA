@@ -1,0 +1,472 @@
+# diff-sim's known differences (tests/differential/sim.zig): one fixture per
+# line, its path under tests/conformance/tests and why it is not compared yet.
+# Every line is a construct the bridge (tests/differential/sim/bridge.zig) does
+# not express yet; a listed fixture that agrees fails the run until its line goes.
+verilog-ams/digital/digital_delay_primitive_notation.v bridge: a net with switches, a delay or module paths
+verilog-ams/digital/realtobits_bitstoreal_bridge.v bridge: a net type other than wire/tri
+verilog-ams/digital/std_1364_ams_keywords_are_identifiers.v bridge: `//@` runner lines (more files, a library map)
+verilog-ams/digital/vams_digital_abstime_math.v bridge: a real system function
+verilog-ams/digital/wreal_event_on_change.v bridge: a net type other than wire/tri
+verilog-ams/digital/wreal_port_round_trip.v bridge: a net type other than wire/tri
+verilog-ams/digital/wreal_single_driver_tracks.v bridge: a net type other than wire/tri
+verilog-ams/digital/wreal_undriven_zero.v bridge: a net type other than wire/tri
+verilog-ams/digital/wreal_wire_port_resolves_wreal.v bridge: a net type other than wire/tri
+verilog/03_lexical_conventions/attribute_positions.v bridge: a §7 gate
+verilog/03_lexical_conventions/examples.v bridge: a function call
+verilog/03_lexical_conventions/subroutine_statement_attribute.v bridge: a function call
+verilog/04_data_types/capacitive_network_figure_4_2.v bridge: a §7.6 MOS switch
+verilog/04_data_types/charge_strength_declaration.v bridge: a §7 gate
+verilog/04_data_types/implicit_nets.v bridge: a §7 gate
+verilog/04_data_types/name_spaces.v bridge: a port bridge driver
+verilog/04_data_types/native_real_arrays.v bridge: a real function call
+verilog/04_data_types/net_declaration_drive_strength.v bridge: a net with more than one driver
+verilog/04_data_types/net_takes_driver_value.v bridge: a §7 gate
+verilog/04_data_types/net_x_before_delayed_driver.v bridge: a delayed continuous assignment
+verilog/04_data_types/specparam_module_body_delay.v bridge: a delayed continuous assignment
+verilog/04_data_types/type_net_array.v bridge: a §7 gate
+verilog/04_data_types/type_net_resolution_tables.v bridge: a net with more than one driver
+verilog/04_data_types/type_uwire_single_driver.v bridge: a net type other than wire/tri
+verilog/04_data_types/uwire_per_bit_drivers.v bridge: a port bridge driver
+verilog/04_data_types/value_set.v bridge: a §7 gate
+verilog/05_expressions/memory_index_out_of_range_x.v bridge: $swrite/$sformat
+verilog/05_expressions/native_real_conditionals.v bridge: a real function call
+verilog/05_expressions/native_select_boundaries.v bridge: a vector bound past i32
+verilog/05_expressions/native_wide_index_edges.v bridge: a vector bound past i32
+verilog/05_expressions/operand_forms.v bridge: a function call
+verilog/06_assignments/adder_concatenation_lhs.v bridge: a port bridge driver
+verilog/06_assignments/assign_delay_inertial.v bridge: a delayed continuous assignment
+verilog/06_assignments/assign_delay_rise_fall.v bridge: a delayed continuous assignment
+verilog/06_assignments/assign_delay_single.v bridge: a delayed continuous assignment
+verilog/06_assignments/assign_delay_turnoff.v bridge: a delayed continuous assignment
+verilog/06_assignments/assign_drive_strength.v bridge: a net with more than one driver
+verilog/06_assignments/assign_variable_delay.v bridge: a delayed continuous assignment
+verilog/06_assignments/assign_variable_rise_fall_delay.v bridge: a delayed continuous assignment
+verilog/06_assignments/assignment_pending_same_value.v bridge: a delayed continuous assignment
+verilog/06_assignments/assignment_vector_delay.v bridge: a delayed continuous assignment
+verilog/06_assignments/assignment_vector_delay_unknown.v bridge: a delayed continuous assignment
+verilog/06_assignments/decl_assign_delay_is_one_drivers.v bridge: a delayed continuous assignment
+verilog/06_assignments/hier_delay.v bridge: a delayed continuous assignment
+verilog/06_assignments/indexed_part_select_lhs.v bridge: a port bridge driver
+verilog/06_assignments/native_select_assignment_effects.v bridge: a function call
+verilog/06_assignments/net_array_element_selects.v bridge: a port bridge driver
+verilog/06_assignments/net_decl_assign_delay.v bridge: a delayed continuous assignment
+verilog/06_assignments/net_delay.v bridge: a net with switches, a delay or module paths
+verilog/06_assignments/net_variable_delay.v bridge: a delayed continuous assignment
+verilog/06_assignments/one_bit_range_delay.v bridge: a delayed continuous assignment
+verilog/06_assignments/part_select_drive_strengths.v bridge: a port bridge driver
+verilog/06_assignments/select_bus.v bridge: a port bridge driver
+verilog/06_assignments/table_6_1_select_and_concatenation_lhs.v bridge: a port bridge driver
+verilog/06_assignments/variable_holds_value.v bridge: a task or function call
+verilog/06_assignments/vector_net_delay.v bridge: a delayed continuous assignment
+verilog/07_gate_switch_level/ambiguous_strength_range.v bridge: a net with more than one driver
+verilog/07_gate_switch_level/bidirectional.v bridge: a §7 gate
+verilog/07_gate_switch_level/charge_strength_sharing.v bridge: a §7.6 MOS switch
+verilog/07_gate_switch_level/drive_strength_dominance.v bridge: a net with more than one driver
+verilog/07_gate_switch_level/every_primitive.v bridge: a net with switches, a delay or module paths
+verilog/07_gate_switch_level/figure_combinations.v bridge: a net with more than one driver
+verilog/07_gate_switch_level/gate_delays.v bridge: a §7 gate
+verilog/07_gate_switch_level/gate_identifier_delay.v bridge: a §7 gate
+verilog/07_gate_switch_level/gate_multibit_input_lsb.v bridge: a port bridge driver
+verilog/07_gate_switch_level/gate_variable_delay.v bridge: a §7 gate
+verilog/07_gate_switch_level/gates_enable.v bridge: a §7 gate
+verilog/07_gate_switch_level/gates_ninput.v bridge: a §7 gate
+verilog/07_gate_switch_level/gates_noutput.v bridge: a §7 gate
+verilog/07_gate_switch_level/gates_one_input.v bridge: a §7 gate
+verilog/07_gate_switch_level/highz_half_strength.v bridge: a net with more than one driver
+verilog/07_gate_switch_level/instance_list_shared_spec.v bridge: a net with more than one driver
+verilog/07_gate_switch_level/mos_data_undriven_supply.v bridge: a §7.6 MOS switch
+verilog/07_gate_switch_level/mos_instance_array.v bridge: a port bridge driver
+verilog/07_gate_switch_level/optional_instance_name.v bridge: a §7 gate
+verilog/07_gate_switch_level/primitive_ambiguous_same_polarity.v bridge: a net with more than one driver
+verilog/07_gate_switch_level/primitive_array_broadcast.v bridge: a §7 gate
+verilog/07_gate_switch_level/primitive_pull_ignored_polarity.v bridge: a §7.7 pull
+verilog/07_gate_switch_level/primitive_three_delay_unknown.v bridge: a §7 gate
+verilog/07_gate_switch_level/primitive_tran_both_directions.v bridge: a net with switches, a delay or module paths
+verilog/07_gate_switch_level/pull_gate_bit_select.v bridge: a port bridge driver
+verilog/07_gate_switch_level/pull_gate_instance_array.v bridge: a §7.7 pull
+verilog/07_gate_switch_level/resistive_reduction_table.v bridge: a net with more than one driver
+verilog/07_gate_switch_level/strength_levels.v bridge: a net with more than one driver
+verilog/07_gate_switch_level/strength_reduction.v bridge: a §7 gate
+verilog/07_gate_switch_level/supply_net_strength.v bridge: a net type other than wire/tri
+verilog/07_gate_switch_level/supply_reduced_to_strong.v bridge: a net with more than one driver
+verilog/07_gate_switch_level/switch_bits_strength_delay.v bridge: a net with switches, a delay or module paths
+verilog/07_gate_switch_level/switch_cmos.v bridge: a §7.6 MOS switch
+verilog/07_gate_switch_level/switch_mos.v bridge: a §7.6 MOS switch
+verilog/07_gate_switch_level/switch_strength_change.v bridge: a §7 gate
+verilog/07_gate_switch_level/switch_supply_zero.v bridge: a §7.6 MOS switch
+verilog/07_gate_switch_level/three_drivers_strength_removal.v bridge: a net with more than one driver
+verilog/07_gate_switch_level/tran_from_supply_undriven.v bridge: %v
+verilog/07_gate_switch_level/tran_instance_array.v bridge: a port bridge driver
+verilog/07_gate_switch_level/tran_strength_display.v bridge: a net with switches, a delay or module paths
+verilog/07_gate_switch_level/tranif0_rtranif0_weak_reduction.v bridge: a net with switches, a delay or module paths
+verilog/07_gate_switch_level/tri0_tri1_pull_strength.v bridge: a net type other than wire/tri
+verilog/07_gate_switch_level/trireg_capacitive_hold.v bridge: a net type other than wire/tri
+verilog/07_gate_switch_level/trireg_charge_decay.v bridge: a net type other than wire/tri
+verilog/07_gate_switch_level/two_named_arrays.v bridge: a §7 gate
+verilog/07_gate_switch_level/unordered_delay_triples.v bridge: a net with switches, a delay or module paths
+verilog/07_gate_switch_level/wired_ambiguous_strength.v bridge: a net type other than wire/tri
+verilog/07_gate_switch_level/wired_equal_strength_table.v bridge: a net type other than wire/tri
+verilog/07_gate_switch_level/wired_logic_under_strength.v bridge: a net type other than wire/tri
+verilog/07_gate_switch_level/wired_unequal_strength.v bridge: a net type other than wire/tri
+verilog/08_udp/definition_placement.v bridge: a §8 UDP
+verilog/08_udp/header_forms.v bridge: a §8 UDP
+verilog/08_udp/initial_values.v bridge: a §8 UDP
+verilog/08_udp/input_minimums.v bridge: a §8 UDP
+verilog/08_udp/instance_array.v bridge: a §8 UDP
+verilog/08_udp/instances.v bridge: a §8 UDP
+verilog/08_udp/jk_edge_ff.v bridge: a §8 UDP
+verilog/08_udp/multiplexer.v bridge: a §8 UDP
+verilog/08_udp/output_bit_select.v bridge: a §8 UDP
+verilog/08_udp/output_reg_initializer.v bridge: a §8 UDP
+verilog/08_udp/overlapping_entries_agree.v bridge: a §8 UDP
+verilog/08_udp/sequential_64_inputs.v bridge: a §8 UDP
+verilog/08_udp/sequential_hold_agrees.v bridge: a §8 UDP
+verilog/08_udp/table_symbols.v bridge: a §8 UDP
+verilog/08_udp/two_delays.v bridge: a §8 UDP
+verilog/08_udp/udp_65_inputs.v bridge: a §8 UDP
+verilog/08_udp/udp_comb.v bridge: a §8 UDP
+verilog/08_udp/udp_dff.v bridge: a §8 UDP
+verilog/08_udp/udp_header_order.v bridge: a §8 UDP
+verilog/08_udp/udp_initial_instance_delay.v bridge: a §8 UDP
+verilog/08_udp/udp_latch.v bridge: a §8 UDP
+verilog/08_udp/udp_potential_edges_dominance.v bridge: a §8 UDP
+verilog/09_behavioral_modeling/assignment_assign_deassign.v bridge: §9.3 assign/force
+verilog/09_behavioral_modeling/assignment_force_release.v bridge: §9.3 assign/force
+verilog/09_behavioral_modeling/case_linear_search.v bridge: a function call
+verilog/09_behavioral_modeling/concatenation_targets.v bridge: §9.3 assign/force
+verilog/09_behavioral_modeling/constant_case_expression.v bridge: a task or function call
+verilog/09_behavioral_modeling/event_array.v bridge: a trigger of an event array element
+verilog/09_behavioral_modeling/event_array_automatic.v bridge: a timed task activation
+verilog/09_behavioral_modeling/event_array_native_automatic.v bridge: an event array select term
+verilog/09_behavioral_modeling/event_array_native_effects.v bridge: a trigger of an event array element
+verilog/09_behavioral_modeling/event_array_native_selection.v bridge: a trigger of an event array element
+verilog/09_behavioral_modeling/event_arrays.v bridge: an event array select term
+verilog/09_behavioral_modeling/force_immediate.v bridge: a §7 gate
+verilog/09_behavioral_modeling/force_net_selects.v bridge: §9.3 assign/force
+verilog/09_behavioral_modeling/force_wire_array_element.v bridge: §9.3 assign/force
+verilog/09_behavioral_modeling/if_else_if_chain.v bridge: a function call
+verilog/09_behavioral_modeling/native_concat_targets.v bridge: §9.3 assign/force
+verilog/09_behavioral_modeling/native_force_many_selects_of_one_net.v bridge: §9.3 assign/force
+verilog/09_behavioral_modeling/native_force_net_selects.v bridge: §9.3 assign/force
+verilog/09_behavioral_modeling/native_select_timing.v bridge: a function call
+verilog/09_behavioral_modeling/native_wide_event_indices.v bridge: a trigger of an event array element
+verilog/09_behavioral_modeling/nba_event_control_region.v bridge: a process of its own (PLA or event-controlled NBA)
+verilog/09_behavioral_modeling/nba_event_control_update_region.v bridge: a process of its own (PLA or event-controlled NBA)
+verilog/09_behavioral_modeling/nonblocking_event_control.v bridge: a process of its own (PLA or event-controlled NBA)
+verilog/09_behavioral_modeling/real_parameter_delay.v bridge: a delayed continuous assignment
+verilog/09_behavioral_modeling/repeat_count_any_width.v bridge: §9.7.7 repeat event control
+verilog/09_behavioral_modeling/repeat_event_control.v bridge: §9.7.7 repeat event control
+verilog/09_behavioral_modeling/repeat_unsigned_64bit_count.v bridge: §9.7.7 repeat event control
+verilog/10_tasks_functions/automatic_subroutine_parameters.v bridge: a function call
+verilog/10_tasks_functions/constant_function_clogb2.v bridge: a function call
+verilog/10_tasks_functions/constant_function_named_block.v bridge: a function call
+verilog/10_tasks_functions/constant_function_parameters.v bridge: a function call
+verilog/10_tasks_functions/disable_ancestor_task.v bridge: a disable of a task
+verilog/10_tasks_functions/disable_block_in_function.v bridge: a function call
+verilog/10_tasks_functions/disable_recursive_task.v bridge: a disable of a task
+verilog/10_tasks_functions/disable_sibling_task.v bridge: a disable of a task
+verilog/10_tasks_functions/factorial.v bridge: a function call
+verilog/10_tasks_functions/function_automatic_recursion.v bridge: a function call
+verilog/10_tasks_functions/function_call_operand.v bridge: a function call
+verilog/10_tasks_functions/function_declaration_forms.v bridge: a function call
+verilog/10_tasks_functions/function_return_variable.v bridge: a function call
+verilog/10_tasks_functions/function_return_width_is_the_boundary.v bridge: a function call
+verilog/10_tasks_functions/native_real_subroutines.v bridge: a real function call
+verilog/10_tasks_functions/nonansi_function_port_typed_later.v bridge: a function call
+verilog/10_tasks_functions/nonansi_task_output_reg_port.v bridge: a task or function call
+verilog/10_tasks_functions/nonansi_task_port_completion.v bridge: `//@` runner lines (more files, a library map)
+verilog/10_tasks_functions/nonansi_task_real_port.v bridge: a task or function call
+verilog/10_tasks_functions/real_function_return.v bridge: a real function call
+verilog/10_tasks_functions/recursion_past_1024.v bridge: a function call
+verilog/10_tasks_functions/recursive_task_copyback.v bridge: a task or function call
+verilog/10_tasks_functions/recursive_task_fork_join.v bridge: a timed task activation
+verilog/10_tasks_functions/static_task_item_hierarchical.v bridge: a task or function call
+verilog/10_tasks_functions/task_argument_passing.v bridge: a task or function call
+verilog/10_tasks_functions/task_concurrent_storage.v bridge: a task copy-out
+verilog/10_tasks_functions/task_copy_timing.v bridge: a task copy-out
+verilog/10_tasks_functions/task_declaration_forms.v bridge: a task or function call
+verilog/10_tasks_functions/task_function_distinctions.v bridge: a task copy-out
+verilog/10_tasks_functions/task_output_lifetime.v bridge: a task or function call
+verilog/10_tasks_functions/task_recursive_timed_automatic.v bridge: a timed task activation
+verilog/10_tasks_functions/task_static_lifetime.v bridge: a task or function call
+verilog/10_tasks_functions/task_storage_per_instance.v bridge: a task or function call
+verilog/10_tasks_functions/timed_subroutine_parameters.v bridge: a timed task activation
+verilog/11_scheduling/procedural_continuous_tracks_sources.v bridge: §9.3 assign/force
+verilog/11_scheduling/sched_task_copy_timing.v bridge: a task copy-out
+verilog/11_scheduling/switch_x_gate.v bridge: a net with switches, a delay or module paths
+verilog/11_scheduling/terminal_and_port_connections.v bridge: a §7 gate
+verilog/12_hierarchy/defparam_last_wins.v bridge: a port bridge driver
+verilog/12_hierarchy/direct_nesting_and_recursion.v bridge: a §7 gate
+verilog/12_hierarchy/ffnand_instances.v bridge: a §7 gate
+verilog/12_hierarchy/function_in_generate_block.v bridge: a function call
+verilog/12_hierarchy/generate_region_optional.v bridge: a port bridge driver
+verilog/12_hierarchy/gray2bin_continuous_assign.v bridge: a port bridge driver
+verilog/12_hierarchy/hierarchy_explicit_port_concat.v bridge: a port bridge driver
+verilog/12_hierarchy/inout_net_expressions.v bridge: a net with switches, a delay or module paths
+verilog/12_hierarchy/instance_array_concat_port.v bridge: a port bridge driver
+verilog/12_hierarchy/instance_array_constant_port.v bridge: a port bridge driver
+verilog/12_hierarchy/instance_array_width_product.v bridge: a driver of part of a net
+verilog/12_hierarchy/internal_type_cells.v bridge: a net type other than wire/tri
+verilog/12_hierarchy/net_type_warning.v bridge: a net type other than wire/tri
+verilog/12_hierarchy/null_port_combinations.v bridge: a port bridge driver
+verilog/12_hierarchy/output_reg_inherits_port_sign.v bridge: a port bridge driver
+verilog/12_hierarchy/port_ansi_output_reg.v bridge: a port bridge driver
+verilog/12_hierarchy/port_concat_matching_width.v bridge: a port bridge driver
+verilog/12_hierarchy/port_driver_resolution.v bridge: a net with more than one driver
+verilog/12_hierarchy/port_input_width_extends.v bridge: `//@` runner lines (more files, a library map)
+verilog/12_hierarchy/port_output_width_truncates.v bridge: `//@` runner lines (more files, a library map)
+verilog/12_hierarchy/port_signed_inheritance.v bridge: a port bridge driver
+verilog/12_hierarchy/real_through_bits.v bridge: a port bridge driver
+verilog/12_hierarchy/select_and_concatenation_ports.v bridge: a net with switches, a delay or module paths
+verilog/12_hierarchy/select_sinks.v bridge: a port bridge driver
+verilog/12_hierarchy/select_warning.v bridge: a port bridge driver
+verilog/12_hierarchy/structural_sinks_and_expression_sources.v bridge: a port bridge driver
+verilog/12_hierarchy/two_top_level_modules.v bridge: a port bridge driver
+verilog/12_hierarchy/variable_port_select_sinks.v bridge: a port bridge driver
+verilog/13_configuration/cfg1_default_liblist.v bridge: `//@` runner lines (more files, a library map)
+verilog/13_configuration/cfg2_gate_first.v bridge: `//@` runner lines (more files, a library map)
+verilog/13_configuration/cfg3_cell_use.v bridge: `//@` runner lines (more files, a library map)
+verilog/13_configuration/cfg4_instance_liblist.v bridge: `//@` runner lines (more files, a library map)
+verilog/13_configuration/cfg6_hierarchical.v bridge: `//@` runner lines (more files, a library map)
+verilog/13_configuration/command_line_search_order.v bridge: `//@` runner lines (more files, a library map)
+verilog/13_configuration/config_overrides_command_line.v bridge: `//@` runner lines (more files, a library map)
+verilog/13_configuration/default_search_order.v bridge: `//@` runner lines (more files, a library map)
+verilog/13_configuration/include_map.v bridge: `//@` runner lines (more files, a library map)
+verilog/13_configuration/parent_library_by_map.v bridge: `//@` runner lines (more files, a library map)
+verilog/13_configuration/resolution_order.v bridge: `//@` runner lines (more files, a library map)
+verilog/14_specify_blocks/delay_selection.v bridge: a net with switches, a delay or module paths
+verilog/14_specify_blocks/edge_sensitive_paths.v bridge: a port bridge driver
+verilog/14_specify_blocks/edge_state_dependent_paths.v bridge: a port bridge driver
+verilog/14_specify_blocks/full_parallel_paths.v bridge: a net with switches, a delay or module paths
+verilog/14_specify_blocks/ifnone.v bridge: a net with switches, a delay or module paths
+verilog/14_specify_blocks/mintypmax_path_delays.v bridge: a net with switches, a delay or module paths
+verilog/14_specify_blocks/module_paths.v bridge: a port bridge driver
+verilog/14_specify_blocks/negative_pulse_showcancelled.v bridge: a net with switches, a delay or module paths
+verilog/14_specify_blocks/path_and_distributed_delays.v bridge: a §7 gate
+verilog/14_specify_blocks/path_delay_values.v bridge: a net with switches, a delay or module paths
+verilog/14_specify_blocks/polarity.v bridge: a net with switches, a delay or module paths
+verilog/14_specify_blocks/pulse_default_limits.v bridge: a net with switches, a delay or module paths
+verilog/14_specify_blocks/pulse_error_window_styles.v bridge: a net with switches, a delay or module paths
+verilog/14_specify_blocks/pulse_path_specific_limits.v bridge: a net with switches, a delay or module paths
+verilog/14_specify_blocks/sdf_pulse_limits_override_specparam.v bridge: a net with switches, a delay or module paths
+verilog/14_specify_blocks/specify_path_bit_drivers.v bridge: a port bridge driver
+verilog/14_specify_blocks/specify_path_delay_one.v bridge: a net with switches, a delay or module paths
+verilog/14_specify_blocks/specify_timing_checks_named_by_w0251.v bridge: §15 timing checks
+verilog/14_specify_blocks/state_dependent_paths.v bridge: a §7 gate
+verilog/14_specify_blocks/x_transition_delays.v bridge: a net with switches, a delay or module paths
+verilog/15_timing_checks/conditions.v bridge: §15 timing checks
+verilog/15_timing_checks/fullskew_checks_both_orders.v bridge: §15 timing checks
+verilog/15_timing_checks/hold.v bridge: §15 timing checks
+verilog/15_timing_checks/negative_timing_disabled_copies_signals.v bridge: §15 timing checks
+verilog/15_timing_checks/nochange_high_window.v bridge: §15 timing checks
+verilog/15_timing_checks/notifier.v bridge: §15 timing checks
+verilog/15_timing_checks/period.v bridge: §15 timing checks
+verilog/15_timing_checks/recovery.v bridge: §15 timing checks
+verilog/15_timing_checks/recrem.v bridge: §15 timing checks
+verilog/15_timing_checks/removal.v bridge: §15 timing checks
+verilog/15_timing_checks/setup.v bridge: §15 timing checks
+verilog/15_timing_checks/setuphold.v bridge: §15 timing checks
+verilog/15_timing_checks/setuphold_delayed_args.v bridge: §15 timing checks
+verilog/15_timing_checks/setuphold_timecheck_condition.v bridge: §15 timing checks
+verilog/15_timing_checks/setuphold_timestamp_condition.v bridge: §15 timing checks
+verilog/15_timing_checks/skew_late_data_notifies.v bridge: §15 timing checks
+verilog/15_timing_checks/skew_waits_for_data_event.v bridge: §15 timing checks
+verilog/15_timing_checks/timeskew_missing_event_and_rearm.v bridge: §15 timing checks
+verilog/15_timing_checks/timeskew_remain_active.v bridge: §15 timing checks
+verilog/15_timing_checks/timing_check_forms.v bridge: §15 timing checks
+verilog/15_timing_checks/vector.v bridge: §15 timing checks
+verilog/15_timing_checks/width.v bridge: §15 timing checks
+verilog/16_sdf/sdf_absolute_path_delay.v bridge: a net with switches, a delay or module paths
+verilog/16_sdf/sdf_interconnect_delay.v bridge: a system function
+verilog/16_sdf/sdf_label_reevaluates_path.v bridge: a net with switches, a delay or module paths
+verilog/16_sdf/sdf_min_typ_max_selection.v bridge: a net with switches, a delay or module paths
+verilog/16_sdf/sdf_multiple_files_scoped.v bridge: a net with switches, a delay or module paths
+verilog/16_sdf/sdf_ordered_increment.v bridge: a net with switches, a delay or module paths
+verilog/16_sdf/sdf_timing_check_limit.v bridge: §15 timing checks
+verilog/17_system_tasks/append_writes_at_end.v bridge: a system function
+verilog/17_system_tasks/closed_channel_not_written.v bridge: a system function
+verilog/17_system_tasks/conversions.v bridge: a port bridge driver
+verilog/17_system_tasks/dist_nonpositive_warning.v bridge: a system function
+verilog/17_system_tasks/dist_reference.v bridge: a system function
+verilog/17_system_tasks/ferror.v bridge: a system function
+verilog/17_system_tasks/fflush.v bridge: a system function
+verilog/17_system_tasks/fgets.v bridge: a system function
+verilog/17_system_tasks/file_read_position.v bridge: a system function
+verilog/17_system_tasks/fmonitor.v bridge: a system function
+verilog/17_system_tasks/fopen_write_append_mcd.v bridge: a system function
+verilog/17_system_tasks/fread.v bridge: a system function
+verilog/17_system_tasks/fscanf.v bridge: a system function
+verilog/17_system_tasks/fscanf_unformatted_u.v bridge: a system function
+verilog/17_system_tasks/fstrobe.v bridge: a system function
+verilog/17_system_tasks/itor_real_argument_converts.v bridge: $itor of a real
+verilog/17_system_tasks/logic_planes.v bridge: a §17.5 PLA task
+verilog/17_system_tasks/native_binary_file_targets.v bridge: a system function
+verilog/17_system_tasks/native_file_input_targets.v bridge: a system function
+verilog/17_system_tasks/native_file_scan_targets.v bridge: a system function
+verilog/17_system_tasks/native_nested_scan_destinations.v bridge: a system function
+verilog/17_system_tasks/native_sformat_dynamic.v bridge: $swrite/$sformat
+verilog/17_system_tasks/pla_async_personality.v bridge: a §17.5 PLA task
+verilog/17_system_tasks/pla_plane_ignore.v bridge: a §17.5 PLA task
+verilog/17_system_tasks/pla_plane_x_worst_case.v bridge: a §17.5 PLA task
+verilog/17_system_tasks/pla_sync_array_logic.v bridge: a §17.5 PLA task
+verilog/17_system_tasks/plane_example.v bridge: a §17.5 PLA task
+verilog/17_system_tasks/plusargs_variable_query.v bridge: a system function
+verilog/17_system_tasks/printtimescale_current_scope.v bridge: $printtimescale
+verilog/17_system_tasks/printtimescale_named_module.v bridge: $printtimescale
+verilog/17_system_tasks/printtimescale_names_parameter.v bridge: $printtimescale
+verilog/17_system_tasks/printtimescale_prints_argument.v bridge: $printtimescale
+verilog/17_system_tasks/q_exam.v bridge: a §17.6 queue task
+verilog/17_system_tasks/q_exam_code_runtime.v bridge: a §17.6 queue task
+verilog/17_system_tasks/q_exam_means.v bridge: a §17.6 queue task
+verilog/17_system_tasks/q_exam_peak_length.v bridge: a §17.6 queue task
+verilog/17_system_tasks/q_full.v bridge: a §17.6 queue task
+verilog/17_system_tasks/queue_capacity_stats.v bridge: a §17.6 queue task
+verilog/17_system_tasks/queue_order_payload.v bridge: a §17.6 queue task
+verilog/17_system_tasks/queue_status_boundaries.v bridge: a §17.6 queue task
+verilog/17_system_tasks/random_seed_reference.v bridge: a system function
+verilog/17_system_tasks/read_needs_read_type.v bridge: a system function
+verilog/17_system_tasks/readmem_address_outside_memory.v bridge: $readmem
+verilog/17_system_tasks/readmem_address_outside_task_range.v bridge: $readmem
+verilog/17_system_tasks/readmem_address_range_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_address_restart.v bridge: $readmem
+verilog/17_system_tasks/readmem_address_underscore.v bridge: $readmem
+verilog/17_system_tasks/readmem_address_x_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_address_zero_padding.v bridge: $readmem
+verilog/17_system_tasks/readmem_binary_file_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_count_warning.v bridge: $readmem
+verilog/17_system_tasks/readmem_edge_address_bad_digit_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_edge_address_gap_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_edge_address_overflow_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_edge_after_range_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_edge_underscore_leading_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_edge_underscore_only_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_excess_legal_neighbor.v bridge: $readmem
+verilog/17_system_tasks/readmem_file_name_variable.v bridge: $readmem
+verilog/17_system_tasks/readmem_file_past_4mib.v bridge: a system function
+verilog/17_system_tasks/readmem_invalid_high_binary_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_invalid_high_hex_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_lowest_descending.v bridge: $readmem
+verilog/17_system_tasks/readmem_malformed_base_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_malformed_base_wide_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_malformed_binary_digit_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_malformed_hex_digit_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_malformed_legal_neighbors.v bridge: $readmem
+verilog/17_system_tasks/readmem_malformed_punctuation_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_malformed_width_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_malformed_width_wide_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_overflow_rejected.v bridge: $readmem
+verilog/17_system_tasks/readmem_oversized_legal.v bridge: $readmem
+verilog/17_system_tasks/readmem_question_z.v bridge: $readmem
+verilog/17_system_tasks/readmem_start_address_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_start_formfeed.v bridge: $readmem
+verilog/17_system_tasks/readmem_underscore_legal.v bridge: $readmem
+verilog/17_system_tasks/readmem_unknown_bound_load_terminated.v bridge: $readmem
+verilog/17_system_tasks/readmem_variable_bounds.v bridge: $readmem
+verilog/17_system_tasks/readmem_warn_binary_excess_start.v bridge: $readmem
+verilog/17_system_tasks/readmem_warn_binary_short_start.v bridge: $readmem
+verilog/17_system_tasks/readmem_warn_empty.v bridge: $readmem
+verilog/17_system_tasks/readmem_warn_hex_excess_down.v bridge: $readmem
+verilog/17_system_tasks/readmem_warn_hex_excess_up.v bridge: $readmem
+verilog/17_system_tasks/readmem_warn_hex_short_down.v bridge: $readmem
+verilog/17_system_tasks/readmem_warn_hex_short_up.v bridge: $readmem
+verilog/17_system_tasks/readmemb_range.v bridge: $readmem
+verilog/17_system_tasks/readmemh.v bridge: $readmem
+verilog/17_system_tasks/same_seed_same_value.v bridge: a system function
+verilog/17_system_tasks/seedless_random_starts_at_seed_0.v bridge: a system function
+verilog/17_system_tasks/seek_gap_and_origin.v bridge: a system function
+verilog/17_system_tasks/sformat_excess_argument_warning.v bridge: $swrite/$sformat
+verilog/17_system_tasks/sformat_variable_format.v bridge: $swrite/$sformat
+verilog/17_system_tasks/sscanf_conversions.v bridge: a system function
+verilog/17_system_tasks/sscanf_field_rules.v bridge: a system function
+verilog/17_system_tasks/sscanf_time_scaled.v bridge: a system function
+verilog/17_system_tasks/sscanf_unformatted_z.v bridge: $swrite/$sformat
+verilog/17_system_tasks/sscanf_unknown_input.v bridge: a system function
+verilog/17_system_tasks/strength_format.v bridge: a net with more than one driver
+verilog/17_system_tasks/strength_scalar.v bridge: %v
+verilog/17_system_tasks/string_output.v bridge: $swrite/$sformat
+verilog/17_system_tasks/test_plusargs_absent.v bridge: a system function
+verilog/17_system_tasks/ungetc_pushback_limit.v bridge: a system function
+verilog/17_system_tasks/ungetc_read_routines.v bridge: a system function
+verilog/17_system_tasks/value_plusargs_absent.v bridge: a system function
+verilog/18_vcd/dumplimit_stops_with_comment.v bridge: a §18 VCD task
+verilog/18_vcd/dumpports_control_tasks.v bridge: a task or function call
+verilog/18_vcd/dumpports_node_information.v bridge: a §18.3 EVCD task
+verilog/18_vcd/dumpportslimit_stops_with_comment.v bridge: a §18.3 EVCD task
+verilog/18_vcd/event_marker.v bridge: a §18 VCD task
+verilog/18_vcd/port_value_changes.v bridge: a net with more than one driver
+verilog/18_vcd/real_value_format.v bridge: a §18 VCD task
+verilog/18_vcd/task_function_scopes.v bridge: a task or function call
+verilog/18_vcd/version_names_dumpfile_literal.v bridge: a §18 VCD task
+verilog/18_vcd/version_names_dumpfile_variable.v bridge: a §18 VCD task
+verilog/19_compiler_directives/ams_keywords_are_identifiers.v bridge: `//@` runner lines (more files, a library map)
+verilog/19_compiler_directives/ams_keywords_instance_names.v bridge: `//@` runner lines (more files, a library map)
+verilog/19_compiler_directives/begin_keywords_2001_noconfig.v bridge: `//@` runner lines (more files, a library map)
+verilog/19_compiler_directives/default_nettype_trireg.v bridge: a net type other than wire/tri
+verilog/19_compiler_directives/default_nettype_uwire.v bridge: a net type other than wire/tri
+verilog/19_compiler_directives/implicit_net_types.v bridge: a net with more than one driver
+verilog/19_compiler_directives/macro_text_1800_forms_warn.v bridge: `//@` runner lines (more files, a library map)
+verilog/19_compiler_directives/no_timescale_is_1s_1s.v bridge: $printtimescale
+verilog/19_compiler_directives/resetall_restores_defaults.v bridge: a §7.7 pull
+verilog/19_compiler_directives/text_macros.v bridge: a §7 gate
+verilog/19_compiler_directives/unconnected_drive.v bridge: a §7.7 pull
+verilog/19_compiler_directives/unconnected_drive_operand_next_line.v bridge: a §7.7 pull
+verilog/19_compiler_directives/unconnected_drive_pull_meets_the_strength_model.v bridge: a §7.7 pull
+verilog/28_protected_envelopes/protected_des_base64.v bridge: `//@` runner lines (more files, a library map)
+verilog/28_protected_envelopes/protected_des_uuencode.v bridge: `//@` runner lines (more files, a library map)
+verilog/28_protected_envelopes/protected_eight_nested_envelopes.v bridge: `//@` runner lines (more files, a library map)
+verilog/28_protected_envelopes/protected_md5_digest.v bridge: `//@` runner lines (more files, a library map)
+verilog/28_protected_envelopes/protected_session_key_block.v bridge: `//@` runner lines (more files, a library map)
+verilog/28_protected_envelopes/protected_sha1_digest.v bridge: `//@` runner lines (more files, a library map)
+verilog/A_formal_syntax/b_A_1_1_incdir.v bridge: `//@` runner lines (more files, a library map)
+verilog/A_formal_syntax/b_A_1_1_library_text.v bridge: `//@` runner lines (more files, a library map)
+verilog/A_formal_syntax/b_A_1_3_concat_port.v bridge: a port bridge driver
+verilog/A_formal_syntax/b_A_1_3_part_select_port.v bridge: a port bridge driver
+verilog/A_formal_syntax/b_A_1_4_module_items.v bridge: a §7 gate
+verilog/A_formal_syntax/b_A_2_1_2_port_declarations.v bridge: a port bridge driver
+verilog/A_formal_syntax/b_A_2_1_3_range_then_delay.v bridge: a delayed continuous assignment
+verilog/A_formal_syntax/b_A_2_1_3_type_declarations.v bridge: a net type other than wire/tri
+verilog/A_formal_syntax/b_A_2_2_1_net_and_variable_types.v bridge: a net type other than wire/tri
+verilog/A_formal_syntax/b_A_2_2_2_strengths.v bridge: a net with more than one driver
+verilog/A_formal_syntax/b_A_2_2_3_delays.v bridge: a delayed continuous assignment
+verilog/A_formal_syntax/b_A_2_2_3_mintypmax_delay.v bridge: a delayed continuous assignment
+verilog/A_formal_syntax/b_A_2_3_declaration_lists.v bridge: a port bridge driver
+verilog/A_formal_syntax/b_A_2_4_declaration_assignments.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_2_4_pathpulse_error_limit.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_2_4_pathpulse_mintypmax.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_2_6_function_declarations.v bridge: a function call
+verilog/A_formal_syntax/b_A_2_6_real_functions.v bridge: a real function call
+verilog/A_formal_syntax/b_A_2_7_task_declarations.v bridge: a task or function call
+verilog/A_formal_syntax/b_A_2_8_block_item_declarations.v bridge: a task or function call
+verilog/A_formal_syntax/b_A_2_8_event_and_parameter_items.v bridge: a task or function call
+verilog/A_formal_syntax/b_A_3_1_gate_instantiations.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_3_1_pass_enable_delay.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_3_2_primitive_strengths.v bridge: a net with more than one driver
+verilog/A_formal_syntax/b_A_3_3_bit_select_terminals.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_3_3_primitive_terminals.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_3_4_gate_and_switch_types.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_4_1_instance_array.v bridge: a port bridge driver
+verilog/A_formal_syntax/b_A_5_1_udp_declarations.v bridge: a §8 UDP
+verilog/A_formal_syntax/b_A_5_3_udp_body.v bridge: a §8 UDP
+verilog/A_formal_syntax/b_A_5_4_udp_instance_array.v bridge: a §8 UDP
+verilog/A_formal_syntax/b_A_5_4_udp_instances.v bridge: a net with more than one driver
+verilog/A_formal_syntax/b_A_6_1_continuous_assignments.v bridge: a delayed continuous assignment
+verilog/A_formal_syntax/b_A_6_2_procedural_assignments.v bridge: §9.3 assign/force
+verilog/A_formal_syntax/b_A_6_2_repeat_intra_assignment.v bridge: §9.7.7 repeat event control
+verilog/A_formal_syntax/b_A_6_4_statements.v bridge: §9.3 assign/force
+verilog/A_formal_syntax/b_A_6_5_timing_controls.v bridge: a disable of a task
+verilog/A_formal_syntax/b_A_6_9_hierarchical_task_enable.v bridge: a task or function call
+verilog/A_formal_syntax/b_A_6_9_task_enables.v bridge: a task or function call
+verilog/A_formal_syntax/b_A_7_1_specify_block.v bridge: §15 timing checks
+verilog/A_formal_syntax/b_A_7_2_path_declarations.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_7_3_specify_terminals.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_7_4_mintypmax_path_delay.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_7_4_path_delays.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_7_5_system_timing_checks.v bridge: §15 timing checks
+verilog/A_formal_syntax/b_A_8_1_concatenations.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_8_2_function_calls.v bridge: a function call
+verilog/A_formal_syntax/b_A_8_3_expressions.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_8_4_primaries.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_8_5_concatenated_lvalues.v bridge: a port bridge driver
+verilog/A_formal_syntax/b_A_8_6_operators.v bridge: a net with switches, a delay or module paths
+verilog/A_formal_syntax/b_A_source_text.v bridge: a §8 UDP
+verilog/B_keywords/b_B_keywords.v bridge: `//@` runner lines (more files, a library map)

@@ -96,13 +96,53 @@ pub fn task(l: *Lower, t: Task, args: []const ExprId, tok: u32, pc: u32) E!u32 {
             break :blk l.b.extraOf(Program.Task{ .kind = .show, .a = @intCast(l.b.shows.items.len - 1) });
         },
         .sdf_annotate => l.refuse("$sdf_annotate"),
-        .dump => l.refuse("a §18 VCD task"),
+        .dump => |op| blk: {
+            const vcd = digital.for_emitter.vcd;
+            try catalog(l);
+            const none = @backingInt(Program.Ref.none);
+            var arg: u32 = none;
+            var targets: std.ArrayList(u32) = .empty;
+            var call: Program.List = .empty;
+            switch (op) {
+                .file => if (args.len == 1) {
+                    arg = try l.self_(args[0], 0);
+                    call = try l.b.string(vcd.callText(r.text, r.starts[tok]));
+                },
+                .vars => if (args.len != 0) {
+                    arg = try l.self_(args[0], 0);
+                    for (args[1..]) |e| switch (vcd.target(r, e) catch return l.refuse("a $dumpvars target the old engine refuses")) {
+                        .scope => |sc| try targets.appendSlice(l.a, &.{ 0, sc }),
+                        .slot => |sl| try targets.appendSlice(l.a, &.{ 1, sl }),
+                    };
+                } else for (r.hier.roots) |sc| try targets.appendSlice(l.a, &.{ 0, sc }),
+                .limit => arg = try l.self_(args[0], 0),
+                .off, .on, .all, .flush => {},
+            }
+            const dc = try l.b.extraOf(Program.DumpCall{ .op = std.meta.stringToEnum(Program.DumpOp, @tagName(op)).?, .arg = arg, .call = call, .targets = try l.b.listOf(targets.items) });
+            break :blk l.b.extraOf(Program.Task{ .kind = .dump, .a = dc });
+        },
         .ports => l.refuse("a §18.3 EVCD task"),
         .user => l.refuse("a PLI task"),
     };
 }
 
 // ---- private ----
+
+/// §18.1 the design's dump catalog, written into `Program.vcd` once, from
+/// the old engine's own (`vcd.catalog`).
+fn catalog(l: *Lower) E!void {
+    if (l.b.p.vcd.scopes.len != 0) return;
+    const r = l.r;
+    const b = l.b;
+    const saved = r.scope;
+    defer r.scope = saved;
+    const cat = digital.for_emitter.vcd.catalog(r, l.a, &.{}) catch return l.refuse("a dump catalog the old engine refuses");
+    const scopes = try b.arena.alloc(Program.Vcd.VcdScope, cat.scopes.len);
+    for (cat.scopes, scopes) |sc, *o| o.* = .{ .line = try b.string(sc.line), .parent = sc.parent, .lexical = sc.lexical, .child = sc.child };
+    const vars = try b.arena.alloc(Program.Vcd.Var, cat.vars.len);
+    for (cat.vars, vars) |v, *o| o.* = .{ .slot = v.slot, .width = v.width, .real = v.real, .event = v.event, .head = try b.string(v.head), .tail = try b.string(v.tail) };
+    b.p.vcd = .{ .scopes = scopes, .var_start = try b.arena.dupe(u32, cat.var_start), .vars = vars };
+}
 
 /// The `Program.Show` of `args` (`display.walk`), whose `%m` names the
 /// blocks around `pc`.

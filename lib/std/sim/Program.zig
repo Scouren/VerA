@@ -24,6 +24,7 @@
 //! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const SWrite = struct`, `pub const Random = struct`, `pub const Dist = enum(u32)`, `pub const FileCall = struct`, `pub const FileOp = enum(u32)`, `pub const FShow = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
 //! - `pub const Net = struct` (`Net.no_decay`), `pub const Driver = struct` (`Driver.Source`)
 //! - `pub const Cond = struct` (`Cond.Op`), `pub const CheckEvent = struct`, `pub const Check = struct`
+//! - `pub const Vcd = struct` (`Vcd.VcdScope`, `Vcd.Var`), `pub const DumpCall = struct`, `pub const DumpOp = enum(u32)`
 //! - `pub const Override = struct`, `pub const OverrideEval = struct`, `pub const Tran = struct`, `pub const Path = struct`, `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
 //! - `pub fn words(width: u32) u32`
 //! - `pub fn list(p: *const Program, l: List) []const u32`
@@ -474,6 +475,7 @@ pub const Task = struct {
     kind: Kind,
     /// `.readmem`: a `ReadMem` in `extra`. `.swrite`: a `SWrite`.
     /// `.fshow`, `.fstrobe`: an `FShow`. `.fclose`: the descriptor row.
+    /// `.dump`: a `DumpCall`.
     /// `.show`, `.strobe`: a `Show` index in `shows`. `.monitor`: a
     /// `Monitor` in `extra`. `.timeformat`: a `TimeFormat` in `extra`, or
     /// `none`.
@@ -481,7 +483,7 @@ pub const Task = struct {
     a: u32,
     b: List = .empty,
 
-    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem, swrite, fshow, fstrobe, fclose, fflush };
+    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem, swrite, fshow, fstrobe, fclose, fflush, dump };
 };
 
 /// §17.2.9 a `$readmemb`/`$readmemh` call: the file's name (text, or the
@@ -507,6 +509,28 @@ pub const Override = struct { slot: u32, force: bool, lo: u32, width: u32, start
 /// for the held bits, or read `of` bits wide and sliced from `slice_lo`)
 /// into `slot` or its bits [lo, lo + width).
 pub const OverrideEval = struct { slot: u32, value: u32, force: bool, lo: u32, width: u32, slice_lo: u32, of: u32 };
+
+/// §18.1 what a `$dumpvars` can select: per scope its `$scope` line,
+/// parent, whether it is lexical and whether it is written as a scope of
+/// its own (`child`); its variables `vars[var_start[s]..var_start[s + 1]]`,
+/// each with the `$var` text around its code.
+pub const Vcd = struct {
+    scopes: []const VcdScope = &.{},
+    var_start: []const u32 = &.{},
+    vars: []const Var = &.{},
+
+    pub const VcdScope = struct { line: List, parent: u32, lexical: bool, child: bool };
+    pub const Var = struct { slot: u32, width: u32, real: bool, event: bool, head: List, tail: List };
+};
+
+/// §18.1 one dump task call: which, its argument row (`$dumpfile`'s name,
+/// `$dumpvars`' levels, `$dumplimit`'s size; `none` when absent), the
+/// `$dumpfile` call's text for §18.2.3.8's `$version`, and `$dumpvars`'
+/// targets (pairs: 0 and a scope, or 1 and a slot).
+pub const DumpCall = struct { op: DumpOp, arg: u32, call: List, targets: List };
+
+/// §18.1's tasks.
+pub const DumpOp = enum(u32) { file, vars, off, on, all, limit, flush };
 
 /// §17.9 one `$random`/`$dist_*` call: the distribution, the seed row and
 /// the place its inout seed is written back to (`none` for a seedless
@@ -735,6 +759,7 @@ fan_start: []const u32 = &.{},
 fan: []const u32 = &.{},
 subs: []const Sub = &.{},
 checks: []const Check = &.{},
+vcd: Vcd = .{},
 /// Per slot, the checks its change reaches, each `check * 2 + event`:
 /// `check_codes[check_start[slot]..check_start[slot + 1]]`.
 check_start: []const u32 = &.{},

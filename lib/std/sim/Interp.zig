@@ -27,6 +27,7 @@ const readmem = @import("readmem.zig");
 const holds = @import("holds.zig");
 const files = @import("files.zig");
 const tchk = @import("tchk.zig");
+const vcd = @import("vcd.zig");
 const Error = State.Error;
 const Literal = logic.Literal;
 
@@ -65,6 +66,7 @@ pub fn runUntil(s: *State, limit: u64) Error!Stop {
             },
             .strobe => |show| try display.show(s, a, show, 0),
             .fstrobe => |at| try files.fshow(s, a, at),
+            .vcd_tick => try vcd.tick(s, a),
             .monitor_tick => {
                 s.monitor_pending = false;
                 if (s.monitor_hit) try display.monitorPrint(s, a);
@@ -367,6 +369,7 @@ fn task(s: *State, a: Allocator, at: u32, pc: u32) Error!Flow {
         .fclose => try files.fclose(s, a, t.a),
         // Every write is already in its file.
         .fflush => {},
+        .dump => try vcd.task(s, a, t.a),
         .finish, .stop => {
             const verbose = t.a == @backingInt(Program.Ref.none) or ((try eval.eval(s, a, t.a)).asInt() orelse 1) != 0;
             if (verbose) {

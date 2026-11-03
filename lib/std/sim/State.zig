@@ -40,6 +40,7 @@ const eval = @import("eval.zig");
 const resolve = @import("resolve.zig");
 const hold = @import("holds.zig");
 const tchk = @import("tchk.zig");
+const vcd = @import("vcd.zig");
 const net = @import("net.zig");
 const sched = @import("scheduler.zig");
 const kernels = @import("kernels");
@@ -66,6 +67,8 @@ pub const Pending = union(enum) {
     fstrobe: u32,
     /// §17.1.3 the standing monitor's end-of-step check, one per step.
     monitor_tick,
+    /// §18.1.4 the value change dump's end-of-step section, one per step.
+    vcd_tick,
     /// §6.1.3 driver `drive`'s delayed transition lands.
     drive: u32,
     /// A.2.1.3 a net's own delayed transition lands.
@@ -203,6 +206,9 @@ drv_s1: []net.Strength,
 /// holding process's own (which the hold lets through).
 holds_by_slot: std.AutoHashMapUnmanaged(u32, hold.Layers) = .empty,
 holding: bool = false,
+/// §18 the value change dump, and per slot whether it is dumped.
+dump: vcd.Dump = .{},
+dumped: []bool,
 /// §15 every check's run state, and the violations found.
 checks: []tchk.Run,
 violations: u64 = 0,
@@ -243,6 +249,7 @@ pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!Stat
         .udp_started = try arena.alloc(bool, p.drivers.len),
         .sub_active = try arena.alloc(u32, p.subs.len),
         .checks = try arena.alloc(tchk.Run, p.checks.len),
+        .dumped = try arena.alloc(bool, p.slots.len),
         .tran_state = try arena.alloc(net.TranState, p.trans.len),
         .tran_target = try arena.alloc(net.TranState, p.trans.len),
         .tran_pending = try arena.alloc(?Handle, p.trans.len),
@@ -282,6 +289,7 @@ pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!Stat
     @memset(s.counters, 0);
     @memset(s.holds, .{});
     @memset(s.monitored, false);
+    @memset(s.dumped, false);
     s.time_format = .{ .units = p.finest };
     s.random_seed = p.random_seed;
     for (p.starts) |st| _ = try s.enqueue(.{ .run = st.pc }, null, false);
@@ -339,6 +347,7 @@ pub fn store(s: *State, slot: u32, value: Literal) Error!void {
         s.path_changed[slot] = true;
     }
     if (s.monitored[slot]) try monitorChanged(s, slot);
+    if (s.dumped[slot]) try vcd.changed(s, slot);
     const after = logic.planeBit(v[0], x[0]);
     try wake(s, slot, before, after);
     // §15: a timing check whose event this slot is.
@@ -348,6 +357,7 @@ pub fn store(s: *State, slot: u32, value: Literal) Error!void {
 /// §5.10.4 `-> e`: resume what waits on named event `slot`.
 pub fn trigger(s: *State, slot: u32) Error!void {
     assert(slot < s.p.slots.len);
+    if (s.dumped[slot]) try vcd.fired(s, slot);
     return wake(s, slot, .x, .x);
 }
 
@@ -433,7 +443,7 @@ pub fn stopRange(s: *State, start: u32, end: u32) Error!bool {
             try cancel(s, row.handle);
             hit = true;
         },
-        .write, .strobe, .fstrobe, .monitor_tick, .tchk_expiry, .tchk_event, .drive, .net_update, .decay, .put, .tran_switch => {},
+        .write, .strobe, .fstrobe, .monitor_tick, .vcd_tick, .tchk_expiry, .tchk_event, .drive, .net_update, .decay, .put, .tran_switch => {},
     };
     return hit;
 }

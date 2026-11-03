@@ -9,6 +9,7 @@
 //! - `pub const Stop = enum { idle }`
 //! - `pub fn run(s: *State) Error!void`
 //! - `pub fn runUntil(s: *State, limit: u64) Error!Stop`
+//! - `pub fn delayIn(s: *State, a: Allocator, e: u32, scope: u32) Error!u64`
 //! - `pub fn step(s: *State, start: u32) Error!void`
 
 const std = @import("std");
@@ -19,6 +20,7 @@ const State = @import("State.zig");
 const eval = @import("eval.zig");
 const logic = @import("logic.zig");
 const display = @import("display.zig");
+const resolve = @import("resolve.zig");
 const Error = State.Error;
 const Literal = logic.Literal;
 
@@ -60,10 +62,28 @@ pub fn runUntil(s: *State, limit: u64) Error!Stop {
                 s.monitor_pending = false;
                 if (s.monitor_hit) try display.monitorPrint(s, a);
             },
+            .drive => |at| try resolve.drive(s, a, at),
+            .net_update => |net| try resolve.netUpdate(s, net),
+            .decay => |net| try resolve.decay(s, a, net),
         }
         try s.free_rows.append(s.arena, event.payload);
     }
     return .idle;
+}
+
+/// §9.7.1 delay row `e` in ticks of the design's precision, in the time
+/// scale of `scope`'s module: a real rounds to the module's precision; an
+/// x/z delay is 0.
+pub fn delayIn(s: *State, a: Allocator, e: u32, scope: u32) Error!u64 {
+    const p = s.p;
+    const scale = p.times[p.scopes[scope].time].scale;
+    if (p.exprs.items(.ty)[e].real)
+        return scale.realDelay(try eval.real(s, a, e)) catch |err| s.fail("digital delay cannot be represented: {t}", .{err});
+    const value = try eval.eval(s, a, e);
+    if (value.hasUnknown()) return 0;
+    if (value.width > 64) return s.fail("delay values wider than 64 bits are not implemented", .{});
+    return (if (value.signed) scale.signedDelay(value.asInt().?) else scale.unsignedDelay(value.values()[0])) catch |err|
+        s.fail("digital delay cannot be represented: {t}", .{err});
 }
 
 /// Runs the process at `start` until it suspends, stops or finishes.
@@ -147,12 +167,7 @@ pub fn step(s: *State, start: u32) Error!void {
                 try s.trigger(d.a);
                 pc += 1;
             },
-            .continuous => {
-                const dr = p.extraData(Program.Driver, d.a);
-                try s.store(dr.slot, try eval.eval(s, a, dr.value));
-                s.armed[pc] = true;
-                return;
-            },
+            .continuous => return resolve.continuous(s, a, d.a, pc),
             .fork => {
                 const f = p.extraData(Program.Fork, d.a);
                 const arms = p.list(f.arms);
@@ -224,18 +239,8 @@ fn loopIteration(s: *State) Error!void {
         return s.fail("more than {d} loop iterations and events at time {d}: a loop with no delay keeps simulation time from advancing", .{ s.budget, s.scheduler.now });
 }
 
-/// §9.7.1 a delay row in ticks of the design's precision: a real rounds to
-/// the module's precision; an x/z delay is 0.
 fn delayOf(s: *State, a: Allocator, e: u32, pc: u32) Error!u64 {
-    const p = s.p;
-    const scale = p.times[p.scopes[p.inst_scope[pc]].time].scale;
-    if (p.exprs.items(.ty)[e].real)
-        return scale.realDelay(try eval.real(s, a, e)) catch |err| s.fail("digital delay cannot be represented: {t}", .{err});
-    const value = try eval.eval(s, a, e);
-    if (value.hasUnknown()) return 0;
-    if (value.width > 64) return s.fail("delay values wider than 64 bits are not implemented", .{});
-    return (if (value.signed) scale.signedDelay(value.asInt().?) else scale.unsignedDelay(value.values()[0])) catch |err|
-        s.fail("digital delay cannot be represented: {t}", .{err});
+    return delayIn(s, a, e, s.p.inst_scope[pc]);
 }
 
 fn watchAll(s: *State, id: u32, terms: Program.List) Error!void {

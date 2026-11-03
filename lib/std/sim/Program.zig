@@ -21,7 +21,8 @@
 //! - `pub const Math = enum(u8)`, `pub const Elem = struct`, `pub const Select = struct` (`Select.Mode`)
 //! - `pub const Piece.none_width`
 //! - `pub const Repeat = struct`, `pub const Fork = struct`, `pub const Sample = struct` (`Sample.Mode`)
-//! - `pub const Task = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`, `pub const Driver = struct`
+//! - `pub const Task = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
+//! - `pub const Net = struct` (`Net.no_decay`), `pub const Driver = struct` (`Driver.Source`)
 //! - `pub fn words(width: u32) u32`
 //! - `pub fn list(p: *const Program, l: List) []const u32`
 //! - `pub fn extraData(p: *const Program, comptime T: type, at: u32) T`
@@ -33,6 +34,8 @@ const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const time = @import("time.zig");
+const net = @import("net.zig");
+const Bit = @import("logic.zig").Bit;
 
 /// An expression's or a slot's type (§5.5.1): a width and a signedness, or
 /// §4.8's `real`, a double held as its 64 bits. 30 bits of width: 2^30 - 1
@@ -119,8 +122,8 @@ pub const Inst = struct {
         wait_level,
         /// §5.10.4 `-> e`: slot `a`.
         trigger,
-        /// §6.1 continuous driver `a` (a `Driver` in `extra`) evaluates,
-        /// drives its slot, and is armed on its operands.
+        /// §6.1 driver `a` (a `drivers` row) evaluates, drives its net (at
+        /// once or after its delay), and is armed on its operands.
         continuous,
         /// §9.8.2 `fork`: `a` a `Fork` in `extra`.
         fork,
@@ -455,8 +458,55 @@ pub const TimeFormat = struct { units: u32, precision: u32, suffix: List, width:
 /// whose change reports without a comparison (`loose`).
 pub const Monitor = struct { show: u32, compared: List, slots: List, loose: List };
 
-/// §6.1 a continuous driver of a whole slot: its value row and target slot.
-pub const Driver = struct { slot: u32, value: u32 };
+/// §7.9 one net: its type, its slot, its drivers (a `List` of `drivers`
+/// indices in `extra`), A.2.1.3's `delay3` on the resolved value, and a
+/// `trireg`'s charge strength and §3.8 decay time (`no_decay`: holds forever).
+pub const Net = struct {
+    kind: net.NetKind,
+    charge: net.Strength,
+    slot: u32,
+    drivers: List,
+    delay: net.Delay,
+    decay: u64,
+
+    pub const no_decay = std.math.maxInt(u64);
+};
+
+/// §6.1/§7 one driver of a net: what it asserts (`source`), at A.2.2.2's
+/// strengths, after its A.6.1 delay (`delay`, or the rows `delay_rows` read
+/// when it schedules, `none` when constant). Its value is `width` bits, its
+/// time-0 value at `init` words in `driver_init` (v then x).
+/// ponytail: a tagged union per row, one row per driver; a table per source
+/// kind if a gate-level netlist's millions of drivers make it matter.
+pub const Driver = struct {
+    net: u32,
+    scope: u32,
+    s0: net.Strength,
+    s1: net.Strength,
+    delay: net.Delay,
+    delay_rows: [3]u32,
+    width: u32,
+    init: u32,
+    init_or_z: bool,
+    source: Source,
+
+    pub const Source = union(enum) {
+        /// A.6.1 an expression row, in the net's type; with `slice`, read
+        /// `total` bits wide and bits [lo, lo + width) asserted.
+        expr: struct { value: u32, slice: bool, lo: u32, total: u32 },
+        /// §6.5.7.1 a port window: `width` bits from `src_lo` of slot `src`
+        /// onto `dst_lo`, `ext` more bits copied from bit `sign_at` (or 0).
+        bridge: struct { src: u32, src_lo: u32, dst_lo: u32, width: u32, ext: u32, sign_at: ?u32 },
+        /// A.3.1 a gate: input rows (`List`), the input bit `lane` of a
+        /// vector terminal, and the output bit it drives.
+        gate: struct { kind: net.GateKind, ins: List, lane: ?u32, out_bit: ?u32 },
+        /// §8 a UDP instance: table `udp`, input rows, its time-0 state
+        /// and inputs (`prev`, a run of `udp_bits`).
+        udp: struct { udp: u32, ins: List, sequential: bool, lane: ?u32, out_bit: ?u32, state: Bit, started: bool, prev: List },
+        /// §19.9 a pull of an unconnected input.
+        pull: Bit,
+    };
+};
 
 slots: std.MultiArrayList(Slot) = .empty,
 /// Every slot's value at time 0, `words(width)` words per slot per plane.
@@ -484,6 +534,15 @@ starts: []const Start = &.{},
 /// `fan[fan_start[slot]..fan_start[slot + 1]]`.
 fan_start: []const u32 = &.{},
 fan: []const u32 = &.{},
+nets: []const Net = &.{},
+drivers: []const Driver = &.{},
+/// Every driver's time-0 value, `words(width)` words per plane, v then x.
+driver_init: []const u64 = &.{},
+/// §8 the UDP tables, one per primitive.
+udps: []const []const net.UdpRow = &.{},
+/// §8 the input values each sequential UDP instance last saw, at time 0
+/// (`Driver.Source.udp.prev` names its run).
+udp_bits: []const Bit = &.{},
 /// Cells: repeat counters and fork join counters, by index.
 counters: u32 = 0,
 /// §8.5.3.3 hold cells, one per intra-assignment timing control.

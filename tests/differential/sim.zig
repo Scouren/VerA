@@ -196,8 +196,10 @@ test "diff-sim: the new runtime's transcripts equal lib/sim/digital's on every .
         if (!std.mem.startsWith(u8, why, "bridge:") and !std.mem.startsWith(u8, why, "the old engine")) bridged += 1;
         const reason = xfail.get(rel);
         if (why.len != 0) {
-            if (reason != null) {
+            if (reason) |r| {
                 listed += 1;
+                // Not a failure: the listed reason went stale, say the new one.
+                if (!std.mem.eql(u8, r, why)) std.debug.print("diff-sim: RELIST {s} {s}\n", .{ rel, why });
                 continue;
             }
             bad += 1;

@@ -21,6 +21,8 @@ const Run = digital.Run;
 const compile = digital.for_emitter.compile;
 const Program = std_sim.Program;
 const Builder = std_sim.Builder;
+const net = std_sim.net;
+const logic = std_sim.logic;
 const lower = @import("lower.zig");
 const shows = @import("shows.zig");
 const Lower = lower.Lower;
@@ -69,6 +71,7 @@ fn build(l: *Lower) E!void {
         .end = kv.value_ptr.end,
         .depth = kv.value_ptr.depth,
     });
+    try netlist(l);
     const repeats: u32 = @intCast(r.rows.repeats.items.len);
     b.p.counters = repeats + @as(u32, @intCast(r.rows.joins.items.len));
     b.p.holds = @intCast(r.rows.holds.items.len);
@@ -172,7 +175,7 @@ fn inst(l: *Lower, ins: compile.Instruction, pc: u32, repeats: u32) E!void {
             .slot => |slot| _ = try b.inst(.trigger, slot, 0, scope),
             .indexed => return l.refuse("a trigger of an event array element"),
         },
-        .continuous => |at| _ = try b.inst(.continuous, try driver(l, at), 0, scope),
+        .continuous => |at| _ = try b.inst(.continuous, at, 0, scope),
         .fork => |f| {
             const c = try b.extraOf(Program.Fork{ .arms = try b.listOf(r.program.wordsOf(f.arms)), .join = repeats + f.join, .end = f.end });
             _ = try b.inst(.fork, c, 0, scope);
@@ -190,26 +193,114 @@ fn inst(l: *Lower, ins: compile.Instruction, pc: u32, repeats: u32) E!void {
     }
 }
 
-/// Continuous driver `at` as a `Program.Driver`: only an expression driving
-/// a whole plain net alone, which resolves to its own value (§7.9).
-fn driver(l: *Lower, at: u32) E!u32 {
+/// §7.9 every net and §6.1/§7 every driver, as `Program.nets` and
+/// `Program.drivers`, each driver's time-0 value and state as elaboration
+/// left it.
+fn netlist(l: *Lower) E!void {
     const r = l.r;
-    const d = r.netlist.drivers[at];
-    const x = switch (d.source) {
-        .expr => |x| x,
-        .bridge => return l.refuse("a port bridge driver"),
-        .gate => return l.refuse("a §7 gate"),
-        .udp => return l.refuse("a §8 UDP"),
-        .mos => return l.refuse("a §7.6 MOS switch"),
-        .pull => return l.refuse("a §7.7 pull"),
-    };
-    if (x.slice != null) return l.refuse("a driver of part of a net");
-    if (d.delay.present or r.netlist.driver_delays.contains(at)) return l.refuse("a delayed continuous assignment");
-    const n = r.netlist.nets[d.net];
-    if (n.kind != .wire and n.kind != .tri) return l.refuse("a net type other than wire/tri");
-    if (r.netDrivers(d.net).len != 1) return l.refuse("a net with more than one driver");
-    const cold = r.netCold(n);
-    if (cold.trans.len != 0 or cold.delay.present or cold.paths.len != 0) return l.refuse("a net with switches, a delay or module paths");
-    r.scope = d.scope;
-    return l.b.extraOf(Program.Driver{ .slot = n.slot, .value = try l.evalFor(x.e, r.slotType(n.slot)) });
+    const b = l.b;
+    const nets = try b.arena.alloc(Program.Net, r.netlist.nets.len);
+    for (r.netlist.nets, nets, 0..) |n, *out, k| {
+        const cold = r.netCold(n);
+        if (cold.trans.len != 0) return l.refuse("§7.6 pass switches");
+        if (cold.paths.len != 0) return l.refuse("§14 module paths");
+        out.* = .{
+            .kind = std.meta.stringToEnum(net.NetKind, @tagName(n.kind)).?,
+            .charge = @fromBackingInt(@intCast(@backingInt(n.charge))),
+            .slot = n.slot,
+            .drivers = try b.listOf(r.netDrivers(@intCast(k))),
+            .delay = delay(cold.delay),
+            .decay = cold.decay orelse Program.Net.no_decay,
+        };
+    }
+    var init: std.ArrayList(u64) = .empty;
+    var udp_bits: std.ArrayList(logic.Bit) = .empty;
+    var udps: std.ArrayList([]const net.UdpRow) = .empty;
+    var tables: std.AutoHashMapUnmanaged(usize, u32) = .empty;
+    const drivers = try b.arena.alloc(Program.Driver, r.netlist.drivers.len);
+    const none = @backingInt(Program.Ref.none);
+    for (r.netlist.drivers, drivers, 0..) |d, *out, k| {
+        r.scope = d.scope;
+        const n = r.netlist.nets[d.net];
+        const width = d.current.width;
+        const words = Program.words(width);
+        const at: u32 = @intCast(init.items.len);
+        try init.appendSlice(b.arena, d.current.values()[0..words]);
+        try init.appendSlice(b.arena, d.current.unknowns()[0..words]);
+        var rows: [3]u32 = .{ none, none, none };
+        if (r.netlist.driver_delays.get(@intCast(k))) |d3| {
+            rows[0] = try l.selfOrReal(d3.rise);
+            if (d3.fall != .none) rows[1] = try l.selfOrReal(d3.fall);
+            if (d3.off != .none) rows[2] = try l.selfOrReal(d3.off);
+        }
+        const source: Program.Driver.Source = switch (d.source) {
+            .expr => |x| if (x.slice) |sl|
+                .{ .expr = .{ .value = try l.self_(x.e, sl.total), .slice = true, .lo = sl.lo, .total = sl.total } }
+            else
+                .{ .expr = .{ .value = try l.evalFor(x.e, r.slotType(n.slot)), .slice = false, .lo = 0, .total = 0 } },
+            .bridge => |br| .{ .bridge = .{ .src = br.src, .src_lo = br.src_lo, .dst_lo = br.dst_lo, .width = br.width, .ext = br.ext, .sign_at = br.sign_at } },
+            .gate => |g| .{ .gate = .{ .kind = std.meta.stringToEnum(net.GateKind, @tagName(g.kind)).?, .ins = try inputRows(l, g.ins), .lane = g.lane, .out_bit = g.out_bit } },
+            .udp => |u| blk: {
+                const key = @intFromPtr(u.rows.ptr);
+                const table = tables.get(key) orelse t: {
+                    const copy = try b.arena.alloc(net.UdpRow, u.rows.len);
+                    for (u.rows, copy) |row, *c| {
+                        const syms = try b.arena.alloc(net.UdpSym, row.ins.len);
+                        for (row.ins, syms) |sym, *y| y.* = switch (sym) {
+                            .level => |v| .{ .level = v },
+                            .pair => |v| .{ .pair = v },
+                            .letter => |v| .{ .letter = v },
+                        };
+                        c.* = .{ .ins = syms, .state = row.state, .out = row.out, .edge_at = row.edge_at };
+                    }
+                    try udps.append(b.arena, copy);
+                    const id: u32 = @intCast(udps.items.len - 1);
+                    try tables.put(b.arena, key, id);
+                    break :t id;
+                };
+                const prev_start: u32 = @intCast(udp_bits.items.len);
+                for (u.prev) |bit| try udp_bits.append(b.arena, @fromBackingInt(@intCast(@backingInt(bit))));
+                break :blk .{ .udp = .{
+                    .udp = table,
+                    .ins = try inputRows(l, u.ins),
+                    .sequential = u.sequential,
+                    .lane = u.lane,
+                    .out_bit = u.out_bit,
+                    .state = @fromBackingInt(@intCast(@backingInt(u.state))),
+                    .started = u.started,
+                    .prev = .{ .start = prev_start, .len = @intCast(u.prev.len) },
+                } };
+            },
+            .mos => return l.refuse("a §7.6 MOS switch"),
+            .pull => |bit| .{ .pull = @fromBackingInt(@intCast(@backingInt(bit))) },
+        };
+        out.* = .{
+            .net = d.net,
+            .scope = d.scope,
+            .s0 = @fromBackingInt(@intCast(@backingInt(d.s0))),
+            .s1 = @fromBackingInt(@intCast(@backingInt(d.s1))),
+            .delay = delay(d.delay),
+            .delay_rows = rows,
+            .width = width,
+            .init = at,
+            .init_or_z = d.or_z,
+            .source = source,
+        };
+    }
+    b.p.nets = nets;
+    b.p.drivers = drivers;
+    b.p.driver_init = init.items;
+    b.p.udps = udps.items;
+    b.p.udp_bits = udp_bits.items;
+}
+
+fn delay(d: anytype) net.Delay {
+    return .{ .rise = d.rise, .fall = d.fall, .off = d.off, .present = d.present };
+}
+
+/// A gate's or UDP's input rows: each read one bit wide (`eval(in, 1)`).
+fn inputRows(l: *Lower, exprs: anytype) E!Program.List {
+    var rows: std.ArrayList(u32) = .empty;
+    for (exprs) |e| try rows.append(l.a, try l.self_(e, 1));
+    return l.b.listOf(rows.items);
 }

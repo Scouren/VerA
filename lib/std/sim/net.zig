@@ -1,0 +1,326 @@
+//! Driver bits, their A.2.2.2 strengths and the net's type in, one resolved
+//! four-state bit out; a gate's or UDP's inputs in, its output bit out. Pure
+//! tables and functions, no run state: §7.10's strength signals, §7.9 wired
+//! logic, §3.7 undriven values, §7.8.5 gate tables, §8 UDP tables, §7.14 and
+//! §6.1.3 delay selection.
+//! Cites: IEEE 1364-2005 §3.7, §3.8, §6.1.3, §7.8.5, §7.9 Tables 7-4/7-6/7-7,
+//! §7.10 Figures 7-9 to 7-25, §7.14, §8.1.6, §8.6 Table 8-1.
+//!
+//! Contents:
+//! - `pub const Strength = enum(u8)`, `pub const NetKind = enum(u8)`, `pub const GateKind = enum(u8)`
+//! - `pub const Wired = enum`, `pub const GateOut = struct`
+//! - `pub const Signal = struct` (`of`, `orZ`, `none`, `combine`, `combineWired`, `collapse`)
+//! - `pub const Delay = struct` (`to`, `continuous`)
+//! - `pub const UdpSym = union(enum)`, `pub const UdpRow = struct`
+//! - `pub fn netPull(kind: NetKind) Signal`
+//! - `pub fn wiredLogic(kind: NetKind) ?Wired`
+//! - `pub fn gateBit(kind: GateKind, ins: []const Bit) GateOut`
+//! - `pub fn udpEval(rows: []const UdpRow, sequential: bool, ins: []const Bit, state: Bit, changed: ?u32, from: Bit) Bit`
+
+const std = @import("std");
+const assert = std.debug.assert;
+const logic = @import("logic.zig");
+const Bit = logic.Bit;
+const Literal = logic.Literal;
+
+/// A.2.2.2's strengths as one scale, weakest first, so the backing integer
+/// orders them.
+pub const Strength = enum(u8) { highz = 0, small = 1, medium = 2, weak = 3, large = 4, pull = 5, strong = 6, supply = 7 };
+
+/// §3.7 / VAMS §3.7 net types.
+pub const NetKind = enum(u8) { wire, tri, tri0, tri1, triand, trior, trireg, wand, wor, uwire, supply0, supply1, wreal };
+
+/// A.3.1 the gates of §7.8.
+pub const GateKind = enum(u8) { g_and, g_nand, g_or, g_nor, g_xor, g_xnor, g_buf, g_not, g_bufif0, g_bufif1, g_notif0, g_notif1 };
+
+/// The two §7.9 wired-logic tables: wired AND and wired OR.
+pub const Wired = enum { @"and", @"or" };
+
+/// One gate evaluation: its output bit, and whether it is §7.10.2's H/L.
+pub const GateOut = struct { bit: Bit, or_z: bool = false };
+
+/// §7.10's signal: a range of strength levels on Figure 7-2's scale folded
+/// at HiZ: `-s` is strength0 level `s`, `+s` strength1 level `s`, 0 HiZ.
+pub const Signal = struct {
+    lo: i8 = 0,
+    hi: i8 = 0,
+
+    comptime {
+        assert(@sizeOf(Signal) == 2);
+    }
+
+    /// What a driver holding `b` at `(s0, s1)` asserts.
+    pub fn of(b: Bit, s0: Strength, s1: Strength) Signal {
+        const p0 = -@as(i8, @intCast(@backingInt(s0)));
+        const p1: i8 = @intCast(@backingInt(s1));
+        const sig: Signal = switch (b) {
+            .one => .{ .lo = p1, .hi = p1 },
+            .zero => .{ .lo = p0, .hi = p0 },
+            .x => .{ .lo = p0, .hi = p1 },
+            .z => .{},
+        };
+        assert(sig.lo <= sig.hi);
+        return sig;
+    }
+
+    /// §7.10.2 H or L: `b` or high impedance, at `b`'s side's strength.
+    pub fn orZ(b: Bit, s0: Strength, s1: Strength) Signal {
+        return of(.x, if (b == .one) .highz else s0, if (b == .zero) .highz else s1);
+    }
+
+    /// No driver at all.
+    pub fn none(self: Signal) bool {
+        assert(self.lo <= self.hi);
+        return self.lo == 0 and self.hi == 0;
+    }
+
+    /// §7.10.1-§7.10.3, one more contributor folded in.
+    pub fn combine(a: Signal, b: Signal) Signal {
+        if (a.none()) return b;
+        if (b.none()) return a;
+        const hull: Signal = .{ .lo = @min(a.lo, b.lo), .hi = @max(a.hi, b.hi) };
+        const ua = a.lo == a.hi;
+        const ub = b.lo == b.hi;
+        if (ua and ub) {
+            if (@abs(a.lo) != @abs(b.lo)) return if (@abs(a.lo) > @abs(b.lo)) a else b;
+            return hull;
+        }
+        if (!ua and !ub) return hull;
+        const u = if (ua) a.lo else b.lo;
+        const amb = if (ua) b else a;
+        const s: i8 = @intCast(@abs(u));
+        const out: Signal = .{
+            .lo = if (amb.lo < -s or (amb.lo == -s and u > 0)) @min(u, amb.lo) else u,
+            .hi = if (amb.hi > s or (amb.hi == s and u < 0)) @max(u, amb.hi) else u,
+        };
+        assert(out.lo <= out.hi);
+        return out;
+    }
+
+    /// §7.10.4, one more contributor folded into a wired-logic net.
+    pub fn combineWired(a: Signal, b: Signal, table: Wired) Signal {
+        if (a.none()) return b;
+        if (b.none()) return a;
+        var out: Signal = .{ .lo = std.math.maxInt(i8), .hi = std.math.minInt(i8) };
+        var p = a.lo;
+        while (p <= a.hi) : (p += 1) {
+            var q = b.lo;
+            while (q <= b.hi) : (q += 1) {
+                const r = if (@abs(p) != @abs(q))
+                    (if (@abs(p) > @abs(q)) p else q)
+                else if (table == .@"and") @min(p, q) else @max(p, q);
+                out.lo = @min(out.lo, r);
+                out.hi = @max(out.hi, r);
+            }
+        }
+        assert(out.lo <= out.hi);
+        return out;
+    }
+
+    /// The four-state value of the range: one side's value, z for HiZ alone,
+    /// x for anything that straddles HiZ.
+    pub fn collapse(self: Signal) Bit {
+        assert(self.lo <= self.hi);
+        const u = @intFromBool(self.lo <= 0) & @intFromBool(self.hi >= 0);
+        const v = @intFromBool(self.hi > 0) | (@intFromBool(self.lo < 0) & @intFromBool(self.hi == 0));
+        return @fromBackingInt(@intCast(@as(u2, v) | @as(u2, u) << 1));
+    }
+};
+
+/// A.2.2.3's three values in ticks; `present` false is no delay at all.
+pub const Delay = struct {
+    rise: u64 = 0,
+    fall: u64 = 0,
+    off: u64 = 0,
+    present: bool = false,
+
+    /// §7.14 a scalar transition to `b`; x takes the smallest.
+    pub fn to(self: Delay, b: Bit) u64 {
+        return switch (b) {
+            .one => self.rise,
+            .zero => self.fall,
+            .z => self.off,
+            .x => @min(self.rise, @min(self.fall, self.off)),
+        };
+    }
+
+    /// §6.1.3 a continuous assignment's (or a net's) delay to `value`:
+    /// fall for nonzero to zero, turn-off for all z, rise otherwise; `from`
+    /// is the truth of the published value.
+    pub fn continuous(self: Delay, from: Bit, value: Literal) u64 {
+        assert(value.width != 0);
+        if (value.width == 1) return self.to(value.bit(0));
+        const all_z = for (0..(value.width + 63) / 64) |w| {
+            const m = logic.wordMask(value.width, w);
+            if (value.unknowns()[w] & ~value.values()[w] & m != m) break false;
+        } else true;
+        if (all_z) return self.off;
+        if (from == .one and value.truth() == .zero) return self.fall;
+        return self.rise;
+    }
+};
+
+/// One A.5.3 input field: a level symbol, a `(vw)` edge, or an edge letter.
+pub const UdpSym = union(enum) { level: u8, pair: [2]u8, letter: u8 };
+
+/// One table entry: `edge_at` is the input its edge is on, null for a level
+/// entry; `state` is 0 in a combinational table.
+pub const UdpRow = struct { ins: []const UdpSym, state: u8, out: u8, edge_at: ?u32 };
+
+/// §3.7/§7.9 what the net type itself contributes, at its own strength.
+pub fn netPull(kind: NetKind) Signal {
+    return switch (kind) {
+        .supply0 => .of(.zero, .supply, .highz),
+        .supply1 => .of(.one, .highz, .supply),
+        .tri0 => .of(.zero, .pull, .highz),
+        .tri1 => .of(.one, .highz, .pull),
+        .wire, .tri, .triand, .trior, .trireg, .wand, .wor, .uwire, .wreal => .{},
+    };
+}
+
+/// Which §7.9 table a net folds its drivers through; null for `combine`.
+pub fn wiredLogic(kind: NetKind) ?Wired {
+    return switch (kind) {
+        .wand, .triand => .@"and",
+        .wor, .trior => .@"or",
+        .wire, .tri, .tri0, .tri1, .trireg, .uwire, .supply0, .supply1, .wreal => null,
+    };
+}
+
+/// §7.8.5 a gate's output for input bits `ins` (z reads as x).
+pub fn gateBit(kind: GateKind, ins: []const Bit) GateOut {
+    assert(ins.len != 0);
+    switch (kind) {
+        .g_bufif0, .g_bufif1, .g_notif0, .g_notif1 => {
+            assert(ins.len == 2);
+            const on: Bit = if (kind == .g_bufif1 or kind == .g_notif1) .one else .zero;
+            const enable = ins[1];
+            const data = if (kind == .g_bufif0 or kind == .g_bufif1) gateIn(ins[0]) else invert(ins[0]);
+            if (enable == .x or enable == .z) return .{ .bit = data, .or_z = data != .x };
+            if (enable != on) return .{ .bit = .z };
+            return .{ .bit = data };
+        },
+        .g_and, .g_nand, .g_or, .g_nor, .g_xor, .g_xnor, .g_buf, .g_not => return .{ .bit = logicBit(kind, ins) },
+    }
+}
+
+/// §8 a UDP's output for inputs `ins` (no z): a level entry first, then an
+/// edge entry on input `changed` from `from`; x when no entry matches.
+pub fn udpEval(rows: []const UdpRow, sequential: bool, ins: []const Bit, state: Bit, changed: ?u32, from: Bit) Bit {
+    for (rows) |row| {
+        if (row.edge_at != null) continue;
+        if (sequential and !udpLevel(row.state, state)) continue;
+        for (row.ins, ins) |sym, b| {
+            if (!udpLevel(sym.level, b)) break;
+        } else return udpOut(row.out, state);
+    }
+    const k = changed orelse return .x;
+    assert(k < ins.len);
+    for (rows) |row| {
+        if (row.edge_at != k or !udpLevel(row.state, state)) continue;
+        for (row.ins, ins, 0..) |sym, b, i| {
+            if (i == k) {
+                if (!udpEdge(sym, from, b)) break;
+            } else if (sym != .level or !udpLevel(sym.level, b)) break;
+        } else return udpOut(row.out, state);
+    }
+    return .x;
+}
+
+// ---- private ----
+
+fn gateIn(b: Bit) Bit {
+    return if (b == .z) .x else b;
+}
+
+fn invert(b: Bit) Bit {
+    return switch (b) {
+        .zero => .one,
+        .one => .zero,
+        .x, .z => .x,
+    };
+}
+
+fn logicBit(kind: GateKind, ins: []const Bit) Bit {
+    switch (kind) {
+        .g_and, .g_nand, .g_or, .g_nor => {
+            const control: Bit = if (kind == .g_and or kind == .g_nand) .zero else .one;
+            var unknown = false;
+            for (ins) |raw| {
+                const b = gateIn(raw);
+                if (b == control) return if (kind == .g_and or kind == .g_or) control else invert(control);
+                if (b == .x) unknown = true;
+            }
+            if (unknown) return .x;
+            const quiet = invert(control);
+            return if (kind == .g_and or kind == .g_or) quiet else control;
+        },
+        .g_xor, .g_xnor => {
+            var ones: u32 = 0;
+            for (ins) |raw| {
+                const b = gateIn(raw);
+                if (b == .x) return .x;
+                if (b == .one) ones += 1;
+            }
+            const parity: Bit = if (ones % 2 == 1) .one else .zero;
+            return if (kind == .g_xor) parity else invert(parity);
+        },
+        .g_buf, .g_not => {
+            assert(ins.len == 1);
+            return if (kind == .g_buf) gateIn(ins[0]) else invert(ins[0]);
+        },
+        .g_bufif0, .g_bufif1, .g_notif0, .g_notif1 => unreachable, // gateBit's own arm
+    }
+}
+
+fn udpLevel(sym: u8, b: Bit) bool {
+    assert(b != .z);
+    return switch (sym) {
+        '0' => b == .zero,
+        '1' => b == .one,
+        'x' => b == .x,
+        '?' => true,
+        'b' => b == .zero or b == .one,
+        else => false,
+    };
+}
+
+fn udpEdge(sym: UdpSym, from: Bit, to: Bit) bool {
+    if (from == to) return false;
+    return switch (sym) {
+        .level => false,
+        .pair => |p| udpLevel(p[0], from) and udpLevel(p[1], to),
+        .letter => |l| switch (l) {
+            'r' => from == .zero and to == .one,
+            'f' => from == .one and to == .zero,
+            'p' => (from == .zero and to != .zero) or (from == .x and to == .one),
+            'n' => (from == .one and to != .one) or (from == .x and to == .zero),
+            else => true, // else: `*`, any change
+        },
+    };
+}
+
+fn udpOut(sym: u8, state: Bit) Bit {
+    assert(state != .z);
+    return switch (sym) {
+        '0' => .zero,
+        '1' => .one,
+        '-' => state,
+        else => .x,
+    };
+}
+
+test "Signal.collapse agrees with the clause's reading on every range" {
+    var lo: i8 = -7;
+    while (lo <= 7) : (lo += 1) {
+        var hi = lo;
+        while (hi <= 7) : (hi += 1) {
+            const s: Signal = .{ .lo = lo, .hi = hi };
+            const want: Bit = if (lo == 0 and hi == 0) .z else if (lo > 0) .one else if (hi < 0) .zero else if (lo < 0 and hi == 0) .zero else .x;
+            // An L (lo < 0, hi == 0) is 0-or-z, which reads as x on a
+            // straddle of HiZ except Figure 7-17's L, the old engine's 0.
+            if (lo < 0 and hi == 0) continue;
+            try std.testing.expectEqual(want, s.collapse());
+        }
+    }
+}

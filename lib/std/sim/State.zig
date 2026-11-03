@@ -33,6 +33,7 @@ const Allocator = std.mem.Allocator;
 const Program = @import("Program.zig");
 const logic = @import("logic.zig");
 const eval = @import("eval.zig");
+const resolve = @import("resolve.zig");
 const sched = @import("scheduler.zig");
 const fmt = @import("kernels").fmt;
 const Literal = logic.Literal;
@@ -55,6 +56,12 @@ pub const Pending = union(enum) {
     strobe: u32,
     /// §17.1.3 the standing monitor's end-of-step check, one per step.
     monitor_tick,
+    /// §6.1.3 driver `drive`'s delayed transition lands.
+    drive: u32,
+    /// A.2.1.3 a net's own delayed transition lands.
+    net_update: u32,
+    /// §3.8 a trireg's charge decays to x.
+    decay: u32,
 };
 
 /// One payload row, recycled once its event dispatches or is cancelled.
@@ -124,6 +131,18 @@ budget_time: u64 = 0,
 budget_used: u64 = 0,
 /// The runtime error that ended the run (`fail`).
 failure: ?[]const u8 = null,
+/// §6.1 every driver's value now (`resolve.current`), its §7.10.2 H/L
+/// flag and its transition in flight; per net, its own transition, §3.8
+/// capacitive state and decay countdown; §8 UDP inputs and states.
+drv: []u64,
+drv_or_z: []bool,
+drv_trans: []resolve.Inertial,
+net_trans: []resolve.Inertial,
+capacitive: []bool,
+decay_event: []?Handle,
+udp_bits: []Bit,
+udp_state: []Bit,
+udp_started: []bool,
 /// Per-instruction temporaries, reset before each.
 scratch: std.heap.ArenaAllocator,
 
@@ -146,8 +165,26 @@ pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!Stat
         .counters = try arena.alloc(u64, p.counters),
         .holds = try arena.alloc(Hold, p.holds),
         .monitored = try arena.alloc(bool, p.slots.len),
+        .drv = try arena.dupe(u64, p.driver_init),
+        .drv_or_z = try arena.alloc(bool, p.drivers.len),
+        .drv_trans = try arena.alloc(resolve.Inertial, p.drivers.len),
+        .net_trans = try arena.alloc(resolve.Inertial, p.nets.len),
+        .capacitive = try arena.alloc(bool, p.nets.len),
+        .decay_event = try arena.alloc(?Handle, p.nets.len),
+        .udp_bits = try arena.dupe(Bit, p.udp_bits),
+        .udp_state = try arena.alloc(Bit, p.drivers.len),
+        .udp_started = try arena.alloc(bool, p.drivers.len),
         .scratch = .init(arena),
     };
+    for (p.drivers, s.drv_or_z, s.udp_state, s.udp_started) |d, *oz, *st, *started| {
+        oz.* = d.init_or_z;
+        st.* = if (d.source == .udp) d.source.udp.state else .x;
+        started.* = d.source == .udp and d.source.udp.started;
+    }
+    @memset(s.drv_trans, .{});
+    @memset(s.net_trans, .{});
+    @memset(s.capacitive, false);
+    @memset(s.decay_event, null);
     @memset(s.terms, .empty);
     @memset(s.armed, false);
     @memset(s.counters, 0);
@@ -269,7 +306,7 @@ pub fn stopRange(s: *State, start: u32, end: u32) Error!bool {
             try cancel(s, row.handle);
             hit = true;
         },
-        .write, .strobe, .monitor_tick => {},
+        .write, .strobe, .monitor_tick, .drive, .net_update, .decay => {},
     };
     return hit;
 }

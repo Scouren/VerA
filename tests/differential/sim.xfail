@@ -9,6 +9,3 @@ verilog/10_tasks_functions/recursive_task_fork_join.v bridge: a timed task activ
 verilog/10_tasks_functions/task_recursive_timed_automatic.v bridge: a timed task activation
 verilog/10_tasks_functions/timed_subroutine_parameters.v bridge: a timed task activation
 verilog/17_system_tasks/native_binary_file_targets.v bridge: an array bound past i32
-verilog/17_system_tasks/native_sformat_dynamic.v bridge: a $sformat format held in a variable
-verilog/17_system_tasks/sformat_excess_argument_warning.v bridge: a $sformat format held in a variable
-verilog/17_system_tasks/sformat_variable_format.v bridge: a $sformat format held in a variable

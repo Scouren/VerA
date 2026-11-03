@@ -14,7 +14,7 @@
 //! - `pub const Expr = struct` (`Expr.Tag`, `Expr.Data`)
 //! - `pub const Edge = enum(u2)`, `pub const Term = struct` (`Term.words`)
 //! - `pub const Place = struct` (`Place.Kind`)
-//! - `pub const Piece = struct` (`Piece.Kind`), `pub const Show = struct`, `pub const Radix`
+//! - `pub const Piece = struct` (`Piece.Kind`), `pub const Dynamic = struct`, `pub const Show = struct`, `pub const Radix`
 //! - `pub const Scope = struct`, `pub const Time = struct`, `pub const Block = struct`
 //! - `pub const Start = struct`, `pub const Case = struct`, `pub const Arm = struct`
 //! - `pub const List = struct`, `List.empty`
@@ -418,8 +418,16 @@ pub const Piece = struct {
         /// §17.1.1.5 `%v`: the strength of scalar net `b`, or of argument
         /// `a`'s value at strong strength.
         strength,
+        /// §17.2.3 a `$sformat` format held in a variable: the `Dynamic` at
+        /// `a` in `extra`, read as a format when the task runs.
+        dynamic,
     };
 };
+
+/// §17.2.3 a format row read when the task runs, the argument rows it
+/// takes from (`none`: a null argument), each one's net for `%v` (`none`:
+/// not a net), the pc whose named blocks `%m` names, and `%l`'s text.
+pub const Dynamic = struct { format: u32, args: List, nets: List, pc: u32, lib: List };
 
 /// §9.4.1 the default radix of a display task (`Piece.bare`).
 pub const Radix = enum(u8) { binary = 2, octal = 8, decimal = 10, hex = 16 };

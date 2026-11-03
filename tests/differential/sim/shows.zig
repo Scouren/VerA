@@ -259,7 +259,8 @@ fn show(l: *Lower, args: []const ExprId, sh: display.Show, pc: u32) E!u32 {
 }
 
 /// `show`; `only_first`: §17.2.3's `$sformat`, whose first argument alone
-/// is a format (a variable one is not bridged), with no argument left over.
+/// is a format (`dynamic` when held in a variable), with no argument left
+/// over.
 fn showOf(l: *Lower, args: []const ExprId, sh: display.Show, pc: u32, only_first: bool) E!u32 {
     const r = l.r;
     const ex = &r.file.exprs;
@@ -268,7 +269,10 @@ fn showOf(l: *Lower, args: []const ExprId, sh: display.Show, pc: u32, only_first
     while (arg < args.len) : (arg += 1) {
         const e = args[arg];
         if (only_first and arg != 0) return l.refuse("a $sformat argument its format leaves over");
-        if (only_first and ex.tag(e) != .str_literal) return l.refuse("a $sformat format held in a variable");
+        if (only_first and ex.tag(e) != .str_literal) {
+            try pieces.append(l.a, try dynamic(l, args, pc));
+            break;
+        }
         if (e == .none) {
             try pieces.append(l.a, try add(l, .{ .kind = .space }));
             continue;
@@ -338,6 +342,35 @@ fn showOf(l: *Lower, args: []const ExprId, sh: display.Show, pc: u32, only_first
     const list = try l.b.listOf(pieces.items);
     try l.b.shows.append(l.b.arena, .{ .pieces = list, .radix = @fromBackingInt(@intCast(@backingInt(sh.radix))), .newline = sh.newline, .scope = r.scope });
     return @intCast(l.b.shows.items.len - 1);
+}
+
+/// §17.2.3 the `Piece.dynamic` of a `$sformat` whose format `args[0]` is
+/// held in a variable: every other argument as it is (`selfOrReal`), the
+/// conversion read when the task runs.
+fn dynamic(l: *Lower, args: []const ExprId, pc: u32) E!u32 {
+    const r = l.r;
+    const ex = &r.file.exprs;
+    const none = @backingInt(Program.Ref.none);
+    var rows: std.ArrayList(u32) = .empty;
+    var nets: std.ArrayList(u32) = .empty;
+    for (args[1..]) |v| {
+        var n: u32 = none;
+        if (v != .none and ex.tag(v) == .ident) if (r.netlist.slot_nets.get(r.slot(v) catch return l.refuse("a %v name the old engine refuses"))) |k| {
+            n = k;
+        };
+        try rows.append(l.a, if (v == .none) none else try l.selfOrReal(v));
+        try nets.append(l.a, n);
+    }
+    const def = r.hier.scopes.items[r.scope].def;
+    const name = try std.fmt.allocPrint(l.a, "{s}.{s}", .{ r.file.str(r.hier.def_lib[def]), r.file.str(r.file.modules[def].name) });
+    const d = try l.b.extraOf(Program.Dynamic{
+        .format = try l.self_(args[0], 0),
+        .args = try l.b.listOf(rows.items),
+        .nets = try l.b.listOf(nets.items),
+        .pc = pc,
+        .lib = try l.b.string(name),
+    });
+    return add(l, .{ .kind = .dynamic, .a = d });
 }
 
 /// §17.2.2 a file output task's `Program.FShow`: its descriptor, then

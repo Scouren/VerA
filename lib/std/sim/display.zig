@@ -147,6 +147,7 @@ fn piece(s: *State, a: Allocator, sh: Program.Show, pc_: Piece) Error!void {
         .text, .lib => try out.writeAll(p.str(.{ .start = pc_.a, .len = pc_.width })),
         .space => try out.writeByte(' '),
         .scope => try scopeName(s, sh.scope, pc_.a),
+        .dynamic => try dynamic(s, a, sh, pc_.a),
         .strength => {
             const none = @backingInt(Program.Ref.none);
             const sig: net.Signal = if (pc_.b == none)
@@ -203,6 +204,65 @@ fn piece(s: *State, a: Allocator, sh: Program.Show, pc_: Piece) Error!void {
             if (fill) |f| try fillField(out, field.written(), f);
         },
     }
+}
+
+/// §17.2.3 a format held in a variable (`Program.Dynamic` at `at`): its
+/// text read now, each conversion taking the next argument. A format that
+/// runs out of arguments, or leaves some over, warns and stops there.
+fn dynamic(s: *State, a: Allocator, sh: Program.Show, at: u32) Error!void {
+    const p = s.p;
+    const d = p.extraData(Program.Dynamic, at);
+    const args = p.list(d.args);
+    const nets = p.list(d.nets);
+    const none = @backingInt(Program.Ref.none);
+    const format = (try @import("readmem.zig").text(a, try eval.eval(s, a, d.format))) orelse "";
+    var next: usize = 0;
+    var i: usize = 0;
+    while (i < format.len) : (i += 1) {
+        if (format[i] != '%') {
+            try s.out.writeByte(format[i]);
+            continue;
+        }
+        i += 1;
+        if (i == format.len) return mismatch(s);
+        if (format[i] == '%') {
+            try s.out.writeByte('%');
+            continue;
+        }
+        const sp = fmt.spec(format, &i);
+        if (i == format.len) return mismatch(s);
+        const conv = format[i];
+        if (conv == '%') return s.fail("a flag, width or precision before the second `%` of `%%`", .{});
+        if (fmt.flagVerdict(sp.flags, conv) != .ok) return s.fail("`%{c}`: a flag IEEE 1364-2005 §17.1.1.2 does not grant this conversion", .{conv});
+        var one: Piece = .{
+            .kind = .spec,
+            .conv = conv,
+            .flags = sp.flags,
+            .width = if (sp.width) |w| std.math.cast(u32, w) orelse return s.fail("a field width past u32", .{}) else Piece.none_width,
+            .precision = std.math.cast(i32, sp.precision) orelse return s.fail("a precision past i32", .{}),
+        };
+        switch (conv | 0x20) {
+            'm' => one = .{ .kind = .scope, .a = d.pc },
+            'l' => one = .{ .kind = .lib, .a = d.lib.start, .width = d.lib.len },
+            'b', 'o', 'h', 'x', 'd', 'e', 'f', 'g', 'r', 't', 's', 'c', 'u', 'z', 'v' => {
+                if (next == args.len) return mismatch(s);
+                if (args[next] == none) return s.fail("§17.1.1.2: a format specification's argument is an expression, not a null argument", .{});
+                one.a = args[next];
+                if (conv | 0x20 == 'v') one = .{ .kind = .strength, .a = args[next], .b = nets[next] };
+                next += 1;
+            },
+            else => return s.fail("`%{c}`: not a conversion of §9.4.3 Table 9-22, §9.4.7 or §17.1.1", .{conv}),
+        }
+        try piece(s, a, sh, one);
+    }
+    if (next != args.len) try mismatch(s);
+}
+
+/// W1153 §17.2.3: "If not enough arguments are supplied for the format
+/// specifiers or too many are supplied, then the application shall issue a
+/// warning and continue execution."
+fn mismatch(s: *State) Error!void {
+    try s.warn("$sformat: the format's specifiers and arguments do not match", .{});
 }
 
 /// §17.1.1.6 `%m`: the scope's path from the root, then every named block

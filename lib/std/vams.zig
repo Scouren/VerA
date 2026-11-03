@@ -7,10 +7,12 @@
 //! - `pub const tokenizer`, `pub const Token`, `pub const Tokenizer`
 //! - `pub const Ast`
 //! - `pub const Preprocessor`
+//! - `pub const Diag`
 
 pub const tokenizer = @import("vams/tokenizer.zig");
 pub const Ast = @import("vams/Ast.zig");
 pub const Preprocessor = @import("vams/Preprocessor.zig");
+pub const Diag = @import("vams/Diag.zig");
 pub const Token = tokenizer.Token;
 pub const Tokenizer = tokenizer.Tokenizer;
 
@@ -18,4 +20,5 @@ test {
     _ = tokenizer;
     _ = Ast;
     _ = Preprocessor;
+    _ = Diag;
 }

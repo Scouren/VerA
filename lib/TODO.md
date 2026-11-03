@@ -513,8 +513,11 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
     (§11.9: IEEE 754 intervals, no overflow contract, per-root guard boxes for versioned units,
     `default_unknown_bound = 10` measured; 10^7 runs incl. 165,717 overflowing, 0 failures).
   - in progress: Sema analog lowering (`lower.md`); follow-ups on sim.xfail and elab.xfail.
-  - open: a default box for an open-ended parameter (`Is from (0:inf)` times `exp(...)` is
-    `.strict` at any bound): sound if, like the unknown bound, the versioned unit checks it.
+  - settled: no default box for parameters. A parameter's guard interval is its declared range
+    (§3.4.2 `from`), which the specification sets; an open-ended one (`Is from (0:inf)` times
+    `exp(...)`) stays `.strict`. `default_unknown_bound` stays: unknowns have no declared range,
+    and the bound only partitions inputs between the fast and strict bodies (every value is still
+    computed exactly), so it restricts nothing the specification allows.
   - next: Sema analog lowering (Vir -> Air), digital lowering (Vir -> Program), codegen (with
     versioned units), kernels + Gompute, lib/vpi, Compilation; then the switch-over and the old
     pipeline's deletion.

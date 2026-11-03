@@ -6,7 +6,6 @@ spice/primitive_attribute_unknown_rejected.va E0358: Annex E.3.2 `port_disciplin
 spice/primitive_between_incompatible_disciplines_rejected.va E0355: Annex E.3.2.2 a SPICE primitive's port discipline from its other port's net is not ported
 verilog-a/ch03_data_types/aliasparam_hierarchical_read_rejected.va E0373 on a hierarchical read of an aliasparam (`u.alias`) is expression analysis, the per-instance stage of Sema (stage 5), not built yet
 verilog-a/ch03_data_types/aliasparam_hierarchical_system_rejected.va E0373 on a hierarchical read of an aliasparam (`u.alias`) is expression analysis, the per-instance stage of Sema (stage 5), not built yet
-verilog-a/ch03_data_types/incompatible_hierarchical_override_rejected.va Annex F.2.1 step 3 out-of-context discipline declarations (`magnetic u.q;`, E0902, E0375) are not ported
 verilog-a/ch03_data_types/parameter_array_long_override_rejected.va E0921: §3.4.3 parameter arrays (a `'{...}` value, its range's size) do not fold yet
 verilog-a/ch03_data_types/parameter_array_resize_without_value_rejected.va E0921: §3.4.3 parameter arrays (a `'{...}` value, its range's size) do not fold yet
 verilog-a/ch03_data_types/parameter_array_short_override_rejected.va E0921: §3.4.3 parameter arrays (a `'{...}` value, its range's size) do not fold yet
@@ -27,12 +26,10 @@ verilog-a/ch09_system_tasks/rng_paramset_nonfinite_integer_rejected.va E0816 a �
 verilog-ams/annex_a_syntax/udp_declared_and_instantiated.va W0252 (a UDP or gate instance computes nothing in an analog device) is the analog backend's notice, raised by its per-instance lowering, not by elaboration
 verilog-ams/annex_a_syntax/udp_named_instance_delay2.va W0252 (a UDP or gate instance computes nothing in an analog device) is the analog backend's notice, raised by its per-instance lowering, not by elaboration
 verilog-ams/annex_c_analog_subset/connectrules_is_not_a_device.va A.1.2 a file of no module: the old elaborate stops at NoModule before its connectrules checks; the new runs the compilation-wide checks (E0915 for the undeclared `a2d`) and the caller's E1001 stays the caller's
-verilog-ams/annex_f_resolution/conflicting_ooc_declarations.va Annex F.2.1 step 3 out-of-context discipline declarations (`magnetic u.q;`, E0902, E0375) are not ported
 verilog-ams/annex_f_resolution/detail_step4_behavioral_net_is_digital.va §3.6.2.4 an undeclared net read by digital behavioral code is discrete (Annex F.2.1 step 4): not ported, so the mixed port gets no bridge
 verilog-ams/annex_f_resolution/digital_behavioral_net_is_digital.va §3.6.2.4 an undeclared net read by digital behavioral code is discrete (Annex F.2.1 step 4): not ported, so the mixed port gets no bridge
 verilog-ams/annex_f_resolution/net_read_by_digital_code_resolves_digital.va §3.6.2.4 an undeclared net read by digital behavioral code is discrete (Annex F.2.1 step 4): not ported, so the mixed port gets no bridge
 verilog-ams/ch02_lexical/digital_scaled_udp_delay_rejected.va E0247 needs a literal's scale factor, which Vir's `real` drops (an AstGen addition), and W0252 is the analog backend's notice
 verilog-ams/ch07_mixed_signal/child_wrong_flow_rejected.va E0501 an access function across a port join is access analysis, the per-instance stage of Sema (stage 5), not built yet
 verilog-ams/ch07_mixed_signal/child_wrong_potential_rejected.va E0501 an access function across a port join is access analysis, the per-instance stage of Sema (stage 5), not built yet
-verilog-ams/ch07_mixed_signal/connect_insertion_upper_from_ooc_below.va Annex F.2.1 step 3 out-of-context discipline declarations (`magnetic u.q;`, E0902, E0375) are not ported
 verilog/03_lexical_conventions/ams_lexical_escaped_hierarchy.v §2.8.1 an escaped name `\a.b `: the old parser interns its `.` as a space, the new Vir keeps the `.`, so the rendered paths differ in that byte only

@@ -32,21 +32,27 @@ const Instance = Zcu.Instance;
 const String = InternPool.String;
 const payloadOf = walk.payloadOf;
 
-/// A net's declaration in a module: its discipline (empty when none) and,
-/// for a port, its direction.
+/// A net's declaration in a module: its discipline (empty when none), for
+/// a port its direction, and whether it declares a range.
 pub const Net = struct { discipline: []const u8, dir: Inst.Direction, vector: bool = false };
+
+/// An out-of-context declaration's discipline and where it is written.
+const Ooc = struct { discipline: []const u8, file: Zcu.File.Index, src: Inst.Ref };
+const Oocs = std.AutoHashMapUnmanaged(Zcu.NetKey, Ooc);
 
 /// A §7.7.2 statement's answer: its `resolveto` discipline, or `exclude`.
 const Resolution = struct { result: []const u8, exclude: bool };
 
-/// Resolves every instance's nets, children before parents. Asserts that
-/// `kids` lists each instance's children.
+/// Resolves every instance's nets, children before parents, after Annex
+/// F.2.1 step 3's out-of-context declarations. Asserts that `kids` lists
+/// each instance's children.
 pub fn run(s: *Sema, kids: []const std.ArrayList(Instance.Index)) Allocator.Error!void {
     assert(kids.len == s.zcu.instances.len);
+    const ooc = try collectOoc(s);
     var k = kids.len;
     while (k > 0) {
         k -= 1;
-        try resolveInstance(s, kids, @fromBackingInt(@intCast(k)));
+        try resolveInstance(s, kids, &ooc, @fromBackingInt(@intCast(k)));
     }
     assert(k == 0);
 }
@@ -135,17 +141,70 @@ pub fn internalName(vir: *const Vir, f: Inst.Index) []const u8 {
 
 // ---- private ----
 
+/// Annex F.2.1 step 3 every out-of-context discipline declaration
+/// (`electrical u.w;`, `magnetic $root.top.u.q;`) by the instance and net
+/// it names: §3.10's precedence order 1, over the net's own declaration.
+/// E0902 for a second declaration of one segment ("More than one
+/// conflicting out-of-context discipline declaration for the same
+/// hierarchical segment of a signal is an error"; §3.10 makes two at one
+/// level illegal even when compatible). A path that names no instance
+/// declares nothing.
+fn collectOoc(s: *Sema) Allocator.Error!Oocs {
+    const zcu = s.zcu;
+    var out: Oocs = .empty;
+    var paths: std.StringHashMapUnmanaged(Instance.Index) = .empty;
+    for (0..zcu.instances.len) |k| {
+        const i: Instance.Index = @fromBackingInt(@intCast(k));
+        const module = zcu.instances.items(.module)[k];
+        if (zcu.declRow(module).kind == .primitive) continue;
+        const vir = zcu.fileVir(module.file);
+        const m = payloadOf(vir, Inst.Module, zcu.declRow(module).inst);
+        for (vir.body(m.body)) |n| {
+            if (vir.instructions.items(.tag)[@backingInt(n)] != .net) continue;
+            const net = payloadOf(vir, Inst.Net, n);
+            const text = vir.string(net.name);
+            if (std.mem.findAny(u8, text, ".$") == null or net.discipline == .empty) continue;
+            if (paths.count() == 0) for (0..zcu.instances.len) |j|
+                try paths.put(s.arena, try std.fmt.allocPrint(s.arena, "{f}", .{zcu.fmtPath(@fromBackingInt(@intCast(j)))}), @fromBackingInt(@intCast(j)));
+            const abs = if (std.mem.startsWith(u8, text, "$root.")) text["$root.".len..] else try std.fmt.allocPrint(s.arena, "{f}.{s}", .{ zcu.fmtPath(i), text });
+            const dot = std.mem.findScalarLast(u8, abs, '.') orelse continue;
+            const owner = paths.get(abs[0..dot]) orelse continue;
+            const key: Zcu.NetKey = .{ .instance = owner, .net = try zcu.intern_pool.getString(s.gpa, abs[dot + 1 ..]) };
+            const gop = try out.getOrPut(s.arena, key);
+            if (gop.found_existing) {
+                try s.fail(.E0902, module.file, n.toRef(), "`{s}` already has the out-of-context discipline `{s}`", .{ abs, gop.value_ptr.discipline });
+                continue;
+            }
+            gop.value_ptr.* = .{ .discipline = vir.string(net.discipline), .file = module.file, .src = n.toRef() };
+        }
+    }
+    return out;
+}
+
 /// Records the resolved discipline of every net of instance `i` that has
 /// one: declared, or from its children's port segments (F.2 basic).
-fn resolveInstance(s: *Sema, kids: []const std.ArrayList(Instance.Index), i: Instance.Index) Allocator.Error!void {
+fn resolveInstance(s: *Sema, kids: []const std.ArrayList(Instance.Index), ooc: *const Oocs, i: Instance.Index) Allocator.Error!void {
     assert(@backingInt(i) < kids.len);
     assert(kids.len == s.zcu.instances.len);
     const zcu = s.zcu;
     const module = zcu.instances.items(.module)[@backingInt(i)];
     const decls = try netsOf(s, module);
     var it = decls.iterator();
-    while (it.next()) |e| if (e.value_ptr.discipline.len != 0)
-        try zcu.net_discipline.put(s.gpa, .{ .instance = i, .net = e.key_ptr.* }, try zcu.intern_pool.getString(s.gpa, e.value_ptr.discipline));
+    while (it.next()) |e| {
+        const name = zcu.intern_pool.stringToSlice(e.key_ptr.*);
+        // An out-of-context declaration names another scope's net.
+        if (std.mem.findAny(u8, name, ".$") != null) continue;
+        if (ooc.get(.{ .instance = i, .net = e.key_ptr.* })) |o| {
+            // §3.6.2: overriding an explicit declaration needs a compatible
+            // discipline (§3.11.1); a shipped primitive's is a placeholder.
+            if (e.value_ptr.discipline.len != 0 and !zcu.isBuiltin(module) and !try discipline.compatible(s, e.value_ptr.discipline, o.discipline))
+                try s.fail(.E0375, o.file, o.src, "`{f}.{s}` is declared `{s}` and cannot be overridden with `{s}` (§3.11.1)", .{ zcu.fmtPath(i), name, e.value_ptr.discipline, o.discipline });
+            try zcu.net_discipline.put(s.gpa, .{ .instance = i, .net = e.key_ptr.* }, try zcu.intern_pool.getString(s.gpa, o.discipline));
+            continue;
+        }
+        if (e.value_ptr.discipline.len != 0)
+            try zcu.net_discipline.put(s.gpa, .{ .instance = i, .net = e.key_ptr.* }, try zcu.intern_pool.getString(s.gpa, e.value_ptr.discipline));
+    }
     var cands: std.AutoArrayHashMapUnmanaged(String, std.ArrayList([]const u8)) = .empty;
     const vir = zcu.fileVir(module.file);
     for (kids[@backingInt(i)].items) |c| {
@@ -155,6 +214,7 @@ fn resolveInstance(s: *Sema, kids: []const std.ArrayList(Instance.Index), i: Ins
         for (zcu.ports.items(.formal)[run_.start..][0..run_.len], zcu.ports.items(.actual)[run_.start..][0..run_.len]) |formal, actual| {
             const sig = try netName(s, vir, actual) orelse continue;
             if (decls.get(sig)) |n| if (n.discipline.len != 0) continue;
+            if (ooc.contains(.{ .instance = i, .net = sig })) continue;
             const inner = try zcu.intern_pool.getString(s.gpa, internalName(cvir, formal));
             const lower = zcu.net_discipline.get(.{ .instance = c, .net = inner }) orelse continue;
             const gop = try cands.getOrPut(s.arena, sig);

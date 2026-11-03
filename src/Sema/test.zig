@@ -323,3 +323,19 @@ test "§7.8.5.1 a gate terminal on a continuous vector net gets no bridge (E0929
         \\connectrules r; connect a2d split; endconnectrules
     , "dd", &.{.E0929});
 }
+
+test "Annex F.2.1 step 3 an out-of-context declaration overrides a net's discipline: twice for one segment is E0902, an incompatible override E0375" {
+    const prelude =
+        \\nature V; units = "V"; access = V; endnature
+        \\nature R; units = "rad"; access = R; endnature
+        \\discipline ea; potential V; enddiscipline
+        \\discipline eb; potential V; enddiscipline
+        \\discipline rot; potential R; enddiscipline
+        \\module leaf(p); inout p; ea p; endmodule
+        \\
+    ;
+    try expectCodes(prelude ++ "module top; leaf u(n); eb u.p; endmodule", .{}, &.{});
+    try expectCodes(prelude ++ "module top; leaf u(n); eb u.p; ea u.p; endmodule", .{}, &.{.E0902});
+    try expectCodes(prelude ++ "module top; leaf u(n); rot u.p; endmodule", .{}, &.{.E0375});
+    try expectCodes(prelude ++ "module top; leaf u(n); rot $root.top.u.p; endmodule", .{}, &.{.E0375});
+}

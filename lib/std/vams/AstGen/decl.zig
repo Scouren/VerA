@@ -56,8 +56,10 @@ pub fn typeWords(tree: *const Ast, first: Ast.TokenIndex) TypeWords {
         .identifier, .escaped_identifier => {
             // A discipline is a name another name follows, or a range and
             // then a name (A.2.1.3 `discipline_identifier [range]
-            // list_of_net_identifiers`).
-            if (t.discipline != null or !AstGen.isName(tree.tokenTag(rangeEnd(tree, i + 1)))) return t;
+            // list_of_net_identifiers`); an out-of-context name may open
+            // with `$root` (Annex F.2.1).
+            const next = tree.tokenTag(rangeEnd(tree, i + 1));
+            if (t.discipline != null or !(AstGen.isName(next) or next == .system_identifier)) return t;
             t.discipline = i;
         },
         .keyword_wire => t.net = .wire,

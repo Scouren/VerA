@@ -220,7 +220,7 @@ fn timescaleOf(src: []const u8) !?Timescale {
 }
 
 /// Whether a `.lint` of `src` fails with a `code` diagnostic.
-fn lintReports(src: []const u8, opts: vera.Settings, code: diag.Code) !bool {
+fn lintReports(src: []const u8, opts: vera.Config, code: diag.Code) !bool {
     var bag: diag.Bag = .init(testing.allocator);
     defer bag.deinit(testing.allocator);
     try testing.expectError(error.CompileFailed, vera.analyze(testing.allocator, src, opts, &bag));

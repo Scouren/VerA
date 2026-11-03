@@ -229,7 +229,7 @@ fn runner(gpa: Allocator, arena: Allocator, src: []const u8, includes: []const [
     const d = try tb.Spec.parse(arena, source, null);
     var bag: vera.diag.Bag = .init(gpa);
     defer bag.deinit(gpa);
-    var opts: vera.Settings = .{
+    var opts: vera.Config = .{
         .file_name = src,
         .include_dirs = includes,
         .require_std_includes = true,

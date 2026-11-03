@@ -1,4 +1,4 @@
-//! The analysis spine: Verilog-A/AMS source text and `Settings` in, a
+//! The analysis spine: Verilog-A/AMS source text and a `Config` in, a
 //! `Result` (proven MIR, lowering's tables, the AST) and the caller's copy of
 //! the diagnostics out. The stages, in order: preprocess (§10), the annex C.4
 //! check, lex and parse (both resumed after the cached annex D/E prelude),
@@ -14,7 +14,7 @@
 //!
 //! Contents:
 //! - `pub const Error = Allocator.Error || error{ CompileFailed, NoModule, NothingToElaborate }`
-//! - `pub fn analyze(gpa: Allocator, source: []const u8, settings: Settings, bag: ?*diag.Bag) Error!Result`
+//! - `pub fn analyze(gpa: Allocator, source: []const u8, settings: Config, bag: ?*diag.Bag) Error!Result`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -39,7 +39,7 @@ const held = prove.held;
 const verify = prove.verify;
 const device = @import("device");
 const Display = device.Display;
-const Settings = @import("Settings.zig");
+const Config = @import("Config.zig");
 const Result = @import("Result.zig");
 
 /// Every way `analyze` fails. After any of them the arena is freed and the
@@ -50,7 +50,7 @@ pub const Error = Allocator.Error || error{
     /// The source declares no `module` of its own (§6.2); the annex D/E
     /// prelude and a SPICE netlist's modules do not count.
     NoModule,
-    /// `Settings.empty_unit_ok`: the source was checked and holds no module
+    /// `Config.empty_unit_ok`: the source was checked and holds no module
     /// to elaborate (A.1.2 admits that source_text). The bag holds warnings.
     NothingToElaborate,
 };
@@ -73,7 +73,7 @@ const Parsed = struct {
 /// overwritten, not appended to. Asserts that `source` is at most
 /// `preprocessor.max_text_bytes`, the bound `preprocessor.readText` enforces
 /// at the file boundary.
-pub fn analyze(gpa: Allocator, source: []const u8, settings: Settings, bag: ?*diag.Bag) Error!Result {
+pub fn analyze(gpa: Allocator, source: []const u8, settings: Config, bag: ?*diag.Bag) Error!Result {
     if (bag) |b| assert(b.isEmpty());
     assert(source.len <= preprocessor.max_text_bytes);
     const arena_state = try gpa.create(BigArena);
@@ -124,7 +124,7 @@ pub fn analyze(gpa: Allocator, source: []const u8, settings: Settings, bag: ?*di
 /// Runs every stage through the proof. Never frees `arena_state`: on success
 /// it goes to the `Result`, on failure `analyze` frees it once the bag is
 /// copied out.
-fn stages(gpa: Allocator, arena_state: *BigArena, source: []const u8, settings: Settings, bag: *diag.Bag) Error!Result {
+fn stages(gpa: Allocator, arena_state: *BigArena, source: []const u8, settings: Config, bag: *diag.Bag) Error!Result {
     const parsed = try front(arena_state.allocator(), source, settings, bag);
     assert(parsed.starts.len != 0); // The lexer ends every stream with an EOF token.
     // Every stage from here walks the AST by recursion, so it runs on a stack
@@ -140,7 +140,7 @@ fn stages(gpa: Allocator, arena_state: *BigArena, source: []const u8, settings: 
 
 /// Preprocess, lex, parse, check, overlay: text to the AST every later stage
 /// reads. A diagnosed stage stops here with `error.CompileFailed`.
-fn front(arena: Allocator, source: []const u8, settings: Settings, bag: *diag.Bag) Error!Parsed {
+fn front(arena: Allocator, source: []const u8, settings: Config, bag: *diag.Bag) Error!Parsed {
     const pp = preprocessor.process(arena, source, .{
         .include_dirs = settings.include_dirs,
         .defines = settings.defines,
@@ -150,7 +150,7 @@ fn front(arena: Allocator, source: []const u8, settings: Settings, bag: *diag.Ba
         .spice_primitives = true,
         .require_std_includes = settings.require_std_includes,
         .spice_netlist = settings.spice_netlist,
-        .spice_path = settings.spice_path,
+        .spice_path = settings.spice_path orelse "",
         .bag = bag,
     }) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
@@ -215,7 +215,7 @@ fn front(arena: Allocator, source: []const u8, settings: Settings, bag: *diag.Ba
 }
 
 /// The stages after the parse, through the proof, on `stages`' deep stack.
-fn back(gpa: Allocator, arena_state: *BigArena, parsed: Parsed, settings: Settings, bag: *diag.Bag) Error!Result {
+fn back(gpa: Allocator, arena_state: *BigArena, parsed: Parsed, settings: Config, bag: *diag.Bag) Error!Result {
     const arena = arena_state.allocator();
     try elab.spiceCase(arena, parsed.file);
     // §3.7/§6.5.3: the digital runner calls the same check, so both routes

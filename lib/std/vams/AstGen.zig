@@ -93,6 +93,9 @@ pub const Scope = struct {
     names: std.AutoHashMapUnmanaged(Vir.String, Inst.Index) = .empty,
     /// §12.4.3: generate constructs numbered so far in this scope.
     constructs: u32 = 0,
+    /// §12.4.3: the `genblk<n>` name construct `n` was given, which every
+    /// other arm of it shares (only one of them is ever instantiated).
+    auto: ?struct { n: u32, name: Vir.String } = null,
 
     /// The declaration of `name` in this scope or an enclosing one.
     pub fn lookup(s: *const Scope, name: Vir.String) ?Inst.Index {

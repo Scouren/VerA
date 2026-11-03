@@ -63,7 +63,6 @@ verilog/12_hierarchy/extra_ordered_value_ignored.v elaboration refuses it (E0907
 verilog/12_hierarchy/generate_block_variables.v lowering: an upward or absolute hierarchical name
 verilog/12_hierarchy/generate_past_65536_iterations.v lowering: a loop generate scheme past 65536 iterations
 verilog/12_hierarchy/generate_region_optional.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
-verilog/12_hierarchy/generate_scopes_in_names.v transcript differs at byte 87 (old 181 bytes, new 182): old "nerate_scopes_in_names.genblk02.nb2\nb_12_4_3_generate_scopes" new "nerate_scopes_in_names.genblk002.nb2\nb_12_4_3_generate_scope"
 verilog/12_hierarchy/genvar_hierarchical_index.v lowering: an upward or absolute hierarchical name
 verilog/12_hierarchy/hierarchical_path_names.v lowering: an upward or absolute hierarchical name
 verilog/12_hierarchy/hierarchical_task_call_suspends.v lowering: a hierarchical task or function name

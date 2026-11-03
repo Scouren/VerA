@@ -31,6 +31,9 @@
 //! - re-exported from `contract/build_config.zig`: `validating`, `DevicePart`
 //! - from `contract/display_records.zig`: `StatusSite`, `SaySite`, `Say`,
 //!   `SayPass`, `statusCode`, `statusSite`, `formatStatus`, `formatSay`
+//! - from `contract/c_format.zig`: `formatC`
+//! - `contract/str_real.zig` as `str_real` (§9.4.3's real conversions), and its
+//!   text as `str_real_source`
 //! - from `contract/sim_state.zig`: `UpdateResult`, `StateClass`, `StateCtlOp`,
 //!   `AnalysisKind`, `SimState`, `SimReads`, `Constant`, `LimitResult`,
 //!   `stateClass`, `simReads`, `InstancePtr`
@@ -69,6 +72,8 @@ const family = @import("contract/family.zig");
 const family_check = @import("contract/family_check.zig");
 const lead = @import("contract/lead.zig");
 const validate_file = @import("contract/validate.zig");
+const c_format = @import("contract/c_format.zig");
+const str_real_file = @import("contract/str_real.zig");
 
 /// The VerA release that generated a device, and that this file ships with
 /// (semver; `build.zig.zon`'s `.version`, which a test in `zig build test`
@@ -119,6 +124,14 @@ pub const statusCode = display_records.statusCode;
 pub const statusSite = display_records.statusSite;
 pub const formatStatus = display_records.formatStatus;
 pub const formatSay = display_records.formatSay;
+/// A C format over f64 arguments, as a host prints a recorded `Say` or status.
+pub const formatC = c_format.formatC;
+/// §9.4.3's real conversions (`zCReal`): the contract's, so a host's
+/// `formatC` and a device print one text; `kernels` re-exports it.
+pub const str_real = str_real_file;
+/// `str_real`'s text, for `kernels`' device-text splice.
+// ponytail: goes with the splice once kernels ship as a module (lib/TODO.md step 9).
+pub const str_real_source = @embedFile("contract/str_real.zig");
 pub const UpdateResult = sim_state.UpdateResult;
 pub const StateClass = sim_state.StateClass;
 pub const StateCtlOp = sim_state.StateCtlOp;
@@ -224,7 +237,8 @@ test {
     _ = family_check;
     _ = lead;
     _ = validate_file;
-    _ = @import("contract/c_format.zig");
+    _ = c_format;
+    _ = str_real_file;
     _ = @import("contract/host_fields.zig");
     _ = @import("contract/validate_entries.zig");
     _ = @import("contract/validate_shape.zig");

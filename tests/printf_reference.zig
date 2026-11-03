@@ -19,6 +19,10 @@
 //! One glibc defect is routed around, not matched: '#' %g of a value that
 //! rounds up to 10^P (`Tally.see` has the rule and its C11 derivation).
 //!
+//! The contract's `formatC` (the renderer a host prints a recorded `Say` or
+//! status through) is held to the same `snprintf`: before #TBD it rendered
+//! reals through `std.fmt.float` and printed `%.0f` of 2.5 as `3`.
+//!
 //! One deliberate gap: `%g` with an explicit precision. Both clauses' own
 //! example reads `%10.3g` as "3 fractional digits" where C reads significant
 //! digits, and VerA follows the example (`zCReal`'s comment, and the
@@ -27,6 +31,7 @@
 
 const std = @import("std");
 const zCReal = @import("kernels").str_real.zCReal;
+const formatC = @import("contract").formatC;
 
 extern "c" fn snprintf(buf: [*]u8, n: usize, format: [*:0]const u8, ...) c_int;
 
@@ -40,6 +45,8 @@ const Spec = struct { conv: u8, flags: u8 = 0, width: usize = 0, prec: i64 = -1 
 const Tally = struct {
     bad: usize = 0,
     ran: usize = 0,
+    /// The renderer under test: the device kernel or the host's `formatC`.
+    via: enum { zCReal, formatC } = .zCReal,
 
     fn see(t: *Tally, v: f64, s: Spec) !void {
         var fb: [48]u8 = undefined;
@@ -64,11 +71,18 @@ const Tally = struct {
             want = cb[0..@intCast(en)];
         }
         var zb: [8192]u8 = undefined;
-        const got = zCReal(&zb, v, s.conv, s.flags, s.width, s.prec);
+        const got = switch (t.via) {
+            .zCReal => zCReal(&zb, v, s.conv, s.flags, s.width, s.prec),
+            .formatC => blk: {
+                var w: std.Io.Writer = .fixed(&zb);
+                try formatC(f, &.{v}, "", &w);
+                break :blk w.buffered();
+            },
+        };
         t.ran += 1;
         if (std.mem.eql(u8, got, want)) return;
         t.bad += 1;
-        if (t.bad <= 12) std.debug.print("printf: {s} of {e} (0x{x:0>16}): C \"{s}\", zCReal \"{s}\"\n", .{ f, v, @as(u64, @bitCast(v)), want, got });
+        if (t.bad <= 12) std.debug.print("printf: {s} of {e} (0x{x:0>16}): C \"{s}\", {t} \"{s}\"\n", .{ f, v, @as(u64, @bitCast(v)), want, t.via, got });
     }
 
     fn done(t: Tally, what: []const u8) !void {
@@ -195,4 +209,30 @@ test "§17.1.1.3 zCReal = snprintf on 10^5 seeded random doubles" {
         });
     }
     try t.done("random");
+}
+
+test "§9.4.3 the host's formatC = snprintf: specials under every flag, width and precision, and 10^4 random doubles" {
+    // NaN is left out: its sign is the C library's to print, and formatC
+    // prints none. `%g` with a precision is the gap the header names.
+    var t: Tally = .{ .via = .formatC };
+    for ([_]f64{
+        0,      -0.0, inf,      -inf, 0x1p-1074, std.math.floatMax(f64), 1234.5678, -1234.5678,
+        0.5,    1.5,  2.5,      -2.5, 0.125,     0.25,                   1.125,     9.5,
+        99.5,   0.05, 999999.5, 1e6,  1e16,      1e23,                   0.1,       1.0 / 3.0,
+        1e-308, 4.35, 0.0005,   1e-7,
+    }) |v| try everySpec(&t, v);
+    var prng: std.Random.DefaultPrng = .init(0x943);
+    const r = prng.random();
+    var sb: [64]u8 = undefined;
+    for (0..10_000) |_| {
+        const v = try randomDouble(r, &sb);
+        const conv = "eEfFgG"[r.uintLessThan(usize, 6)];
+        try t.see(v, .{
+            .conv = conv,
+            .flags = r.uintLessThan(u8, 32),
+            .width = r.uintLessThan(usize, 31),
+            .prec = if (conv | 0x20 == 'g') -1 else r.intRangeAtMost(i64, -1, 25),
+        });
+    }
+    try t.done("formatC");
 }

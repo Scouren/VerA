@@ -21,6 +21,7 @@ const place = @import("place.zig");
 const task = @import("task.zig");
 const decl = @import("decl.zig");
 const nets = @import("nets.zig");
+const sub = @import("sub.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -42,6 +43,7 @@ pub fn compileAll(l: *Lower) Error!void {
     var early: std.ArrayList(u32) = .empty;
     var queued: std.ArrayList(u32) = .empty;
     try nets.compileDrivers(l);
+    try sub.compileBodies(l);
     const order = try processOrder(l);
     for (order) |s| {
         const procs = l.scopes.items[s].procs.items;
@@ -55,6 +57,7 @@ pub fn compileAll(l: *Lower) Error!void {
     for (l.driver_pcs.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
     for (queued.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
     try fanout(l);
+    try sub.finish(l);
     l.b.p.counters = l.repeats + l.joins;
     assert(l.b.starts.items.len == early.items.len + l.driver_pcs.items.len + queued.items.len);
 }
@@ -143,7 +146,7 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
             _ = try l.b.inst(.trigger, n.slot, 0, scope);
         },
         .call_sys => try task.task(l, i),
-        .call => return l.refuse("a task enable"),
+        .call => try sub.enable(l, i, depth),
         .store_timed, .store_nb_timed => return l.refuse("an intra-assignment timing control"),
         .case => return l.refuse("a case statement"),
         .proc_assign, .force, .deassign, .release => return l.refuse("a procedural continuous assignment"),
@@ -300,7 +303,12 @@ fn block(l: *Lower, i: Inst.Index, depth: u32) Error!void {
     if (name.len != 0) {
         const s = try decl.newScope(l, outer_scope, name, null, l.b.times.items[outer_scope], l.srcOffset(outer, i), false);
         l.frame = try decl.newFrame(l, outer, l.frames.items[outer].instance, s, l.frames.items[outer].genvars);
+        // §10.2.1 an automatic subroutine's block items are per activation,
+        // which its storage (laid out at its declaration) does not hold.
+        l.frames.items[l.frame].automatic = l.frames.items[outer].automatic;
+        const slots_before = l.b.p.slots.len;
         try decl.locals(l, l.frame, blk.body);
+        if (l.frames.items[outer].automatic and l.b.p.slots.len != slots_before) return l.refuse("a named block declaring storage in an automatic subroutine");
     } else for (vir.body(blk.body)) |x| switch (Lower.tag(vir, x)) {
         .variable, .param, .event => return l.refuse("a declaration in an unnamed block"),
         else => {}, // else: a statement

@@ -9,15 +9,14 @@ verilog/03_lexical_conventions/attribute_positions.v lowering: an untyped integr
 verilog/03_lexical_conventions/block_statement_attribute.v lowering: a fork-join block
 verilog/03_lexical_conventions/case_item_statement_attribute.v lowering: a case statement
 verilog/03_lexical_conventions/delay_then_unsized_constant.v lowering: an intra-assignment timing control
-verilog/03_lexical_conventions/examples.v lowering: a task or function
-verilog/03_lexical_conventions/subroutine_statement_attribute.v lowering: a task or function
+verilog/03_lexical_conventions/examples.v lowering: a case statement
 verilog/04_data_types/array_17_dimensions.v lowering: a continuous assignment to a net array element
 verilog/04_data_types/capacitive_network_figure_4_2.v lowering: a gate instance
 verilog/04_data_types/charge_strength_declaration.v lowering: a gate instance
 verilog/04_data_types/implicit_nets.v lowering: a gate instance
 verilog/04_data_types/localparam_from_parameter.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/04_data_types/name_spaces.v lowering: an lvalue form
-verilog/04_data_types/native_real_arrays.v lowering: a task or function
+verilog/04_data_types/native_real_arrays.v lowering: an intra-assignment timing control
 verilog/04_data_types/net_takes_driver_value.v lowering: a gate instance
 verilog/04_data_types/parameter_types_and_ranges.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/04_data_types/parameter_widths.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
@@ -35,13 +34,11 @@ verilog/05_expressions/constant_operands.v lowering: an untyped integral paramet
 verilog/05_expressions/constant_select_and_function.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/05_expressions/memory_index_out_of_range_x.v lowering: the system task `$sformat`
 verilog/05_expressions/native_array_selects.v lowering: an intra-assignment timing control
-verilog/05_expressions/native_real_conditionals.v lowering: a task or function
 verilog/05_expressions/native_wide_index_edges.v lowering: a range past 2^32 bits
 verilog/05_expressions/operand_forms.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
-verilog/06_assignments/native_select_assignment_effects.v lowering: a task or function
+verilog/06_assignments/native_select_assignment_effects.v lowering: an intra-assignment timing control
 verilog/06_assignments/net_array_element_selects.v lowering: a continuous assignment to a net array element
 verilog/06_assignments/select_bus.v lowering: a port with a net declaration assignment
-verilog/06_assignments/variable_holds_value.v lowering: a task or function
 verilog/07_gate_switch_level/bidirectional.v lowering: a gate instance
 verilog/07_gate_switch_level/charge_strength_sharing.v lowering: a gate instance
 verilog/07_gate_switch_level/every_primitive.v lowering: a gate instance
@@ -108,23 +105,22 @@ verilog/09_behavioral_modeling/assignment_force_release.v lowering: a procedural
 verilog/09_behavioral_modeling/blocking_order_and_target.v lowering: a fork-join block
 verilog/09_behavioral_modeling/block_name_reference.v lowering: a hierarchical name
 verilog/09_behavioral_modeling/block_parameter_and_event.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
-verilog/09_behavioral_modeling/case_linear_search.v lowering: a task or function
+verilog/09_behavioral_modeling/case_linear_search.v lowering: a case statement
 verilog/09_behavioral_modeling/concatenation_targets.v lowering: a procedural continuous assignment
-verilog/09_behavioral_modeling/constant_case_expression.v lowering: a task or function
+verilog/09_behavioral_modeling/constant_case_expression.v lowering: a case statement
 verilog/09_behavioral_modeling/control.v lowering: a case statement
 verilog/09_behavioral_modeling/dont_care_examples.v lowering: a case statement
-verilog/09_behavioral_modeling/event_array_automatic.v lowering: a task or function
-verilog/09_behavioral_modeling/event_array_native_automatic.v lowering: a task or function
-verilog/09_behavioral_modeling/event_array_native_effects.v lowering: a task or function
-verilog/09_behavioral_modeling/event_array_native_selection.v lowering: a task or function
-verilog/09_behavioral_modeling/event_arrays.v lowering: a task or function
+verilog/09_behavioral_modeling/event_array_automatic.v lowering: a timed task that enables itself
+verilog/09_behavioral_modeling/event_array_native_automatic.v lowering: a named block declaring storage in an automatic subroutine
+verilog/09_behavioral_modeling/event_array_native_effects.v lowering: a trigger of an event array element or a hierarchical event
+verilog/09_behavioral_modeling/event_array_native_selection.v lowering: a trigger of an event array element or a hierarchical event
+verilog/09_behavioral_modeling/event_arrays.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/09_behavioral_modeling/event_array.v lowering: a fork-join block
 verilog/09_behavioral_modeling/expression_event.v lowering: an event control on an expression or a select
 verilog/09_behavioral_modeling/force_immediate.v lowering: a gate instance
 verilog/09_behavioral_modeling/force_net_selects.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/force_wire_array_element.v lowering: a continuous assignment to a net array element
 verilog/09_behavioral_modeling/fork_join_is_concurrent.v lowering: a fork-join block
-verilog/09_behavioral_modeling/if_else_if_chain.v lowering: a task or function
 verilog/09_behavioral_modeling/intra_assign_delay.v lowering: an intra-assignment timing control
 verilog/09_behavioral_modeling/intra_assignment_delay_blocking.v lowering: an intra-assignment timing control
 verilog/09_behavioral_modeling/intra_assignment_delay_nonblocking.v lowering: an intra-assignment timing control
@@ -139,7 +135,7 @@ verilog/09_behavioral_modeling/native_force_net_selects.v lowering: a procedural
 verilog/09_behavioral_modeling/native_real_events.v lowering: an event control on an expression or a select
 verilog/09_behavioral_modeling/native_real_scalar_nba.v lowering: an intra-assignment timing control
 verilog/09_behavioral_modeling/native_select_events.v lowering: an event control on an expression or a select
-verilog/09_behavioral_modeling/native_select_timing.v lowering: a task or function
+verilog/09_behavioral_modeling/native_select_timing.v lowering: an intra-assignment timing control
 verilog/09_behavioral_modeling/native_wide_event_indices.v lowering: a trigger of an event array element or a hierarchical event
 verilog/09_behavioral_modeling/nba_event_control_region.v lowering: an intra-assignment timing control
 verilog/09_behavioral_modeling/nba_event_control_update_region.v lowering: an intra-assignment timing control
@@ -158,53 +154,31 @@ verilog/09_behavioral_modeling/select_edge_glitch.v lowering: an event control o
 verilog/09_behavioral_modeling/select_edge.v lowering: an event control on an expression or a select
 verilog/09_behavioral_modeling/sequential_block.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/09_behavioral_modeling/specify_block_specparam.v lowering: a specify block
-verilog/10_tasks_functions/automatic_activation_events.v lowering: a task or function
-verilog/10_tasks_functions/automatic_subroutine_parameters.v lowering: a task or function
+verilog/10_tasks_functions/automatic_activation_events.v lowering: a fork-join block
+verilog/10_tasks_functions/automatic_subroutine_parameters.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/10_tasks_functions/constant_function_clogb2.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
-verilog/10_tasks_functions/constant_function_generate_condition.v lowering: a task or function
+verilog/10_tasks_functions/constant_function_generate_condition.v lowering: a generate condition Sema/eval.zig does not fold
 verilog/10_tasks_functions/constant_function_named_block.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/10_tasks_functions/constant_function_parameters.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/10_tasks_functions/constant_function_system_task_ignored.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/10_tasks_functions/disable_ancestor_block.v lowering: a disable statement
-verilog/10_tasks_functions/disable_ancestor_task.v lowering: a task or function
-verilog/10_tasks_functions/disable_block_in_function.v lowering: a task or function
+verilog/10_tasks_functions/disable_ancestor_task.v lowering: an intra-assignment timing control
+verilog/10_tasks_functions/disable_block_in_function.v lowering: a disable statement
 verilog/10_tasks_functions/disable_named_block.v lowering: a disable statement
-verilog/10_tasks_functions/disable_recursive_task.v lowering: a task or function
+verilog/10_tasks_functions/disable_recursive_task.v lowering: a disable statement
 verilog/10_tasks_functions/disable_self_block.v lowering: a disable statement
 verilog/10_tasks_functions/disable_sibling_block.v lowering: a disable statement
-verilog/10_tasks_functions/disable_sibling_task.v lowering: a task or function
-verilog/10_tasks_functions/factorial.v lowering: a task or function
-verilog/10_tasks_functions/function_automatic_recursion.v lowering: a task or function
-verilog/10_tasks_functions/function_call_operand.v lowering: a task or function
-verilog/10_tasks_functions/function_declaration_forms.v lowering: a task or function
-verilog/10_tasks_functions/function_return_variable.v lowering: a task or function
-verilog/10_tasks_functions/function_return_width_is_the_boundary.v lowering: a task or function
-verilog/10_tasks_functions/native_real_subroutines.v lowering: a task or function
-verilog/10_tasks_functions/nested_task_completion.v lowering: a task or function
+verilog/10_tasks_functions/disable_sibling_task.v lowering: a disable statement
 verilog/10_tasks_functions/nonansi_function_port_typed_later.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
-verilog/10_tasks_functions/nonansi_task_output_reg_port.v lowering: a task or function
-verilog/10_tasks_functions/nonansi_task_port_completion.v lowering: a task or function
-verilog/10_tasks_functions/nonansi_task_real_port.v lowering: a task or function
-verilog/10_tasks_functions/real_function_return.v lowering: a task or function
-verilog/10_tasks_functions/recursion_past_1024.v lowering: a task or function
-verilog/10_tasks_functions/recursive_task_copyback.v lowering: a task or function
-verilog/10_tasks_functions/recursive_task_fork_join.v lowering: a task or function
-verilog/10_tasks_functions/static_task_item_hierarchical.v lowering: a task or function
-verilog/10_tasks_functions/task_argument_passing.v lowering: a task or function
-verilog/10_tasks_functions/task_concurrent_storage.v lowering: a task or function
-verilog/10_tasks_functions/task_copy_timing.v lowering: a task or function
-verilog/10_tasks_functions/task_declaration_forms.v lowering: a task or function
-verilog/10_tasks_functions/task_function_distinctions.v lowering: a task or function
-verilog/10_tasks_functions/task_output_lifetime.v lowering: a task or function
-verilog/10_tasks_functions/task_recursive_timed_automatic.v lowering: a task or function
-verilog/10_tasks_functions/task_static_lifetime.v lowering: a task or function
-verilog/10_tasks_functions/task_storage_per_instance.v lowering: a task or function
-verilog/10_tasks_functions/timed_subroutine_parameters.v lowering: a task or function
+verilog/10_tasks_functions/recursive_task_fork_join.v lowering: a fork-join block
+verilog/10_tasks_functions/static_task_item_hierarchical.v lowering: a hierarchical name
+verilog/10_tasks_functions/task_recursive_timed_automatic.v lowering: a timed task that enables itself
+verilog/10_tasks_functions/task_storage_per_instance.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/10_tasks_functions/timed_subroutine_parameters.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/11_scheduling/procedural_continuous_tracks_sources.v lowering: a procedural continuous assignment
 verilog/11_scheduling/sched_blocking_target_return.v lowering: an intra-assignment timing control
 verilog/11_scheduling/sched_fork_arm_chain_order.v lowering: a fork-join block
 verilog/11_scheduling/sched_fork_arm_wake_order.v lowering: a fork-join block
-verilog/11_scheduling/sched_task_copy_timing.v lowering: a task or function
 verilog/11_scheduling/switch_x_gate.v lowering: a gate instance
 verilog/11_scheduling/terminal_and_port_connections.v lowering: a gate instance
 verilog/12_hierarchy/defparam_absolute_inside_array_element.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
@@ -227,12 +201,11 @@ verilog/12_hierarchy/generate_select_per_iteration.v lowering: an untyped integr
 verilog/12_hierarchy/genvar_hierarchical_index.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/12_hierarchy/gray2bin_continuous_assign.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/12_hierarchy/hierarchical_path_names.v lowering: a fork-join block
-verilog/12_hierarchy/hierarchical_task_call_suspends.v lowering: a task or function
+verilog/12_hierarchy/hierarchical_task_call_suspends.v lowering: a hierarchical task or function name
 verilog/12_hierarchy/hierarchy_explicit_port_concat.v lowering: a port expression (§12.3.6)
 verilog/12_hierarchy/hierarchy_upward_reference.v lowering: an lvalue form
 verilog/12_hierarchy/inout_net_expressions.v lowering: an inout port joined to a select, a concatenation or a net of another width
 verilog/12_hierarchy/instance_array_concat_port.v lowering: an output port connected to a select or an expression
-verilog/12_hierarchy/instance_array_constant_port.v lowering: a task or function
 verilog/12_hierarchy/instance_array_width_product.v lowering: a hierarchical name
 verilog/12_hierarchy/instance_select.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/12_hierarchy/internal_type_cells.v lowering: a hierarchical name
@@ -289,7 +262,7 @@ verilog/14_specify_blocks/specify_path_delay_one.v lowering: a specify block
 verilog/14_specify_blocks/specify_timing_checks_named_by_w0251.v lowering: a specify block
 verilog/14_specify_blocks/state_dependent_paths.v lowering: a gate instance
 verilog/14_specify_blocks/x_transition_delays.v lowering: a specify block
-verilog/15_timing_checks/conditions.v lowering: a task or function
+verilog/15_timing_checks/conditions.v lowering: a specify block
 verilog/15_timing_checks/fullskew_checks_both_orders.v lowering: a specify block
 verilog/15_timing_checks/hold.v lowering: a specify block
 verilog/15_timing_checks/negative_timing_disabled_copies_signals.v lowering: a specify block
@@ -337,7 +310,7 @@ verilog/17_system_tasks/logic_planes.v lowering: the system task `$sync$and$arra
 verilog/17_system_tasks/native_binary_file_targets.v lowering: an event control on an expression or a select
 verilog/17_system_tasks/native_file_input_targets.v lowering: the system function `$fopen`
 verilog/17_system_tasks/native_file_scan_targets.v lowering: the system function `$fopen`
-verilog/17_system_tasks/native_nested_scan_destinations.v lowering: a task or function
+verilog/17_system_tasks/native_nested_scan_destinations.v lowering: the system function `$sscanf`
 verilog/17_system_tasks/native_sformat_dynamic.v lowering: the system task `$sformat`
 verilog/17_system_tasks/pla_async_personality.v lowering: the system task `$async$and$array`
 verilog/17_system_tasks/plane_example.v lowering: the system task `$async$and$plane`
@@ -421,22 +394,22 @@ verilog/17_system_tasks/ungetc_pushback_limit.v lowering: the system function `$
 verilog/17_system_tasks/ungetc_read_routines.v lowering: the system function `$fopen`
 verilog/18_vcd/dumpfile_default_name.v lowering: the system task `$dumpvars`
 verilog/18_vcd/dumpfile_variable_name.v lowering: the system task `$dumpfile`
-verilog/18_vcd/dumplimit_stops_with_comment.v lowering: a task or function
-verilog/18_vcd/dumpports_control_tasks.v lowering: a task or function
-verilog/18_vcd/dumpportslimit_stops_with_comment.v lowering: a task or function
-verilog/18_vcd/dumpports_node_information.v lowering: a task or function
-verilog/18_vcd/event_marker.v lowering: a task or function
+verilog/18_vcd/dumplimit_stops_with_comment.v lowering: the system task `$dumpfile`
+verilog/18_vcd/dumpports_control_tasks.v lowering: the system task `$dumpports`
+verilog/18_vcd/dumpportslimit_stops_with_comment.v lowering: the system task `$dumpports`
+verilog/18_vcd/dumpports_node_information.v lowering: the system task `$dumpports`
+verilog/18_vcd/event_marker.v lowering: the system task `$dumpfile`
 verilog/18_vcd/example_value_changes.v lowering: the system task `$dumpfile`
-verilog/18_vcd/port_value_changes.v lowering: a task or function
-verilog/18_vcd/real_value_format.v lowering: a task or function
+verilog/18_vcd/port_value_changes.v lowering: an lvalue form
+verilog/18_vcd/real_value_format.v lowering: the system task `$dumpfile`
 verilog/18_vcd/table_18_2_shortening.v lowering: the system task `$dumpfile`
-verilog/18_vcd/task_function_scopes.v lowering: a task or function
+verilog/18_vcd/task_function_scopes.v lowering: the system task `$dumpfile`
 verilog/18_vcd/var_sections.v lowering: the system task `$dumpfile`
 verilog/18_vcd/vcd_dumpoff_on.v lowering: the system task `$dumpfile`
 verilog/18_vcd/vcd_dumpvars_levels.v lowering: the system task `$dumpfile`
 verilog/18_vcd/vcd_dumpvars.v lowering: the system task `$dumpfile`
-verilog/18_vcd/version_names_dumpfile_literal.v lowering: a task or function
-verilog/18_vcd/version_names_dumpfile_variable.v lowering: a task or function
+verilog/18_vcd/version_names_dumpfile_literal.v lowering: the system task `$dumpfile`
+verilog/18_vcd/version_names_dumpfile_variable.v lowering: the system task `$dumpfile`
 verilog/19_compiler_directives/ams_keywords_are_identifiers.v lowering: a string variable
 verilog/19_compiler_directives/no_timescale_is_1s_1s.v lowering: the system task `$printtimescale`
 verilog/19_compiler_directives/text_macros.v lowering: a gate instance
@@ -454,11 +427,7 @@ verilog/A_formal_syntax/b_A_2_4_declaration_assignments.v lowering: an untyped i
 verilog/A_formal_syntax/b_A_2_4_pathpulse_error_limit.v lowering: a specify block
 verilog/A_formal_syntax/b_A_2_4_pathpulse_mintypmax.v lowering: a specify block
 verilog/A_formal_syntax/b_A_2_5_ranges.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
-verilog/A_formal_syntax/b_A_2_6_function_declarations.v lowering: a task or function
-verilog/A_formal_syntax/b_A_2_6_real_functions.v lowering: a task or function
-verilog/A_formal_syntax/b_A_2_7_task_declarations.v lowering: a task or function
-verilog/A_formal_syntax/b_A_2_8_block_item_declarations.v lowering: a task or function
-verilog/A_formal_syntax/b_A_2_8_event_and_parameter_items.v lowering: a task or function
+verilog/A_formal_syntax/b_A_2_8_event_and_parameter_items.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/A_formal_syntax/b_A_3_1_gate_instantiations.v lowering: a gate instance
 verilog/A_formal_syntax/b_A_3_1_pass_enable_delay.v lowering: a gate instance
 verilog/A_formal_syntax/b_A_3_2_primitive_strengths.v lowering: a gate instance
@@ -475,11 +444,10 @@ verilog/A_formal_syntax/b_A_5_4_udp_instances.v lowering: a UDP instance
 verilog/A_formal_syntax/b_A_6_2_procedural_assignments.v lowering: an intra-assignment timing control
 verilog/A_formal_syntax/b_A_6_2_repeat_intra_assignment.v lowering: an intra-assignment timing control
 verilog/A_formal_syntax/b_A_6_3_named_block_declarations.v lowering: a fork-join block
-verilog/A_formal_syntax/b_A_6_4_statements.v lowering: a task or function
+verilog/A_formal_syntax/b_A_6_4_statements.v lowering: a case statement
 verilog/A_formal_syntax/b_A_6_5_timing_controls.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
 verilog/A_formal_syntax/b_A_6_8_looping_statements.v lowering: a disable statement
-verilog/A_formal_syntax/b_A_6_9_hierarchical_task_enable.v lowering: a task or function
-verilog/A_formal_syntax/b_A_6_9_task_enables.v lowering: a task or function
+verilog/A_formal_syntax/b_A_6_9_hierarchical_task_enable.v lowering: a hierarchical task or function name
 verilog/A_formal_syntax/b_A_7_1_specify_block.v lowering: a specify block
 verilog/A_formal_syntax/b_A_7_2_path_declarations.v lowering: a specify block
 verilog/A_formal_syntax/b_A_7_3_specify_terminals.v lowering: a specify block

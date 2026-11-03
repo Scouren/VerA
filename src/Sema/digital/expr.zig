@@ -31,6 +31,7 @@ const kernels = @import("kernels");
 const digital = @import("../digital.zig");
 const place = @import("place.zig");
 const sysfn = @import("sysfn.zig");
+const sub = @import("sub.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -135,7 +136,7 @@ pub fn typeOf(l: *Lower, r: Inst.Ref) Error!Type {
             break :blk .{ .width = std.math.mul(u32, count, operand.width) catch return l.refuse("a replication past 2^32 bits"), .signed = false };
         },
         .call_sys => sysfn.sysType(l, i),
-        .call => l.refuse("a function call"),
+        .call => sub.resultType(l, i),
         .field => l.refuse("a hierarchical name"),
         else => l.refuseFmt("the expression form `{t}`", .{Lower.tag(vir, i)}),
     };
@@ -258,6 +259,7 @@ pub fn ctx(l: *Lower, r: Inst.Ref, ty: Type) Error!u32 {
             return l.b.expr(.replicate, t, try self_(l, b.rhs, 0), count);
         },
         .call_sys => return sysfn.sysCall(l, i, t, nat),
+        .call => return l.b.expr(.call, t, try sub.callRow(l, i), 0),
         else => return l.refuseFmt("the expression form `{t}`", .{tg}),
     }
 }
@@ -327,6 +329,7 @@ pub fn real(l: *Lower, r: Inst.Ref) Error!u32 {
         },
         .mintypmax => return real(l, Lower.payload(vir, Inst.Triple, i).b),
         .call_sys => return sysfn.sysReal(l, i),
+        .call => return l.b.expr(.call, rt, try sub.callRow(l, i), 0),
         else => return l.refuseFmt("the real expression form `{t}`", .{tg}),
     }
 }
@@ -360,6 +363,7 @@ pub fn reads(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
         },
         .concat => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |x| try reads(l, x, out),
         .call_sys => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.SysCall, i).args)) |x| try reads(l, x, out),
+        .call => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Call, i).args)) |x| try reads(l, x, out),
         else => return l.refuseFmt("the slots read by `{t}`", .{Lower.tag(vir, i)}),
     }
 }

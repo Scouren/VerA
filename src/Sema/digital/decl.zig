@@ -13,6 +13,11 @@
 //! - `pub fn newScope(l: *Lower, parent: u32, name: []const u8, index: ?i64, time: Program.Time, at: u32, queued: bool) Error!u32`
 //! - `pub fn newFrame(l: *Lower, parent: u32, instance: Zcu.Instance.Index, scope: u32, genvars: []const Frame.Genvar) Error!u32`
 //! - `pub fn locals(l: *Lower, f: u32, body: Vir.Body) Error!void`
+//! - `pub fn variable(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Index) Error!u32`
+//! - `pub fn param(l: *Lower, f: u32, i: Inst.Index) Error!u32`
+//! - `pub fn event(l: *Lower, f: u32, i: Inst.Index) Error!u32`
+//! - `pub fn rangeOf(l: *Lower, f: u32, range: Vir.Body) Error!struct { msb: i64, lsb: i64, width: u32 }`
+//! - `pub fn slots(l: *Lower, ty: Type, count: u32, fill: enum { x, zero }) Error!u32`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -25,6 +30,7 @@ const eval = @import("../eval.zig");
 const digital = @import("../digital.zig");
 const nets = @import("nets.zig");
 const ports = @import("ports.zig");
+const sub = @import("sub.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Name = digital.Name;
@@ -116,6 +122,163 @@ pub fn locals(l: *Lower, f: u32, body: Vir.Body) Error!void {
         .event => _ = try event(l, f, i),
         else => {}, // else: a statement or an expression declares nothing
     };
+}
+
+/// A §4.2 variable (a `reg`, `integer`, `time`, `real` or `realtime`, an
+/// array of them included) bound to fresh slots, x (a real 0.0) at time 0.
+pub fn variable(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Index) Error!u32 {
+    const vir = l.virOf(f);
+    var storage: Inst.Storage = .reg;
+    var signed = false;
+    var range: Vir.Body = .empty;
+    var dims: Vir.Body = .empty;
+    for (decls) |d| switch (Lower.tag(vir, d)) {
+        .io => {
+            const io = Lower.payload(vir, Inst.Io, d);
+            if (io.flags.storage != .none) storage = io.flags.storage;
+            signed = signed or io.flags.signed;
+            if (range.len == 0) range = io.range;
+            if (dims.len == 0) dims = io.dims;
+        },
+        .variable => {
+            const v = Lower.payload(vir, Inst.Variable, d);
+            if (v.flags.storage != .none) storage = v.flags.storage;
+            signed = signed or v.flags.signed;
+            if (range.len == 0) range = v.range;
+            if (dims.len == 0) dims = v.dims;
+        },
+        else => unreachable, // else: `signal` passes only these two
+    };
+    var n: Name = .{ .kind = .variable };
+    switch (storage) {
+        .real, .realtime => n.ty = Type.real_type,
+        .integer => n.ty = .{ .width = 32, .signed = true },
+        .time => n.ty = .{ .width = 64, .signed = false },
+        .string => return l.refuse("a string variable"),
+        .reg, .none => n.ty = .{ .width = 1, .signed = signed },
+    }
+    if (range.len != 0) {
+        if (n.ty.real) return l.refuse("a real with a range");
+        const r = try rangeOf(l, f, range);
+        n.msb = r.msb;
+        n.lsb = r.lsb;
+        n.ty.width = r.width;
+    } else {
+        n.msb = @as(i64, n.ty.width) - 1;
+        n.scalar = storage == .reg or storage == .none;
+    }
+    if (storage == .integer or storage == .time) n.scalar = false;
+    try arrayOf(l, f, dims, &n);
+    n.slot = try slots(l, n.ty, n.count, if (n.ty.real) .zero else .x);
+    return l.bind(f, first, n);
+}
+
+/// A §4.10 parameter (or specparam, or localparam) of frame `f`: one slot
+/// holding its folded value, in its §12.2 type.
+pub fn param(l: *Lower, f: u32, i: Inst.Index) Error!u32 {
+    const vir = l.virOf(f);
+    const p = Lower.payload(vir, Inst.Param, i);
+    if (p.dims.len != 0) return l.refuse("a parameter array");
+    const env = try l.envAt(f);
+    const value = (try env.param(i)) orelse return l.refuse("a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)");
+    var n: Name = .{ .kind = .param };
+    if (p.range.len != 0) {
+        const r = try rangeOf(l, f, p.range);
+        n.ty = .{ .width = r.width, .signed = p.flags.signed };
+        n.msb = r.msb;
+        n.lsb = r.lsb;
+    } else switch (p.flags.storage) {
+        .integer => n.ty = .{ .width = 32, .signed = true },
+        .time => n.ty = .{ .width = 64, .signed = false },
+        .real, .realtime => n.ty = Type.real_type,
+        .string => return l.refuse("a string parameter"),
+        .none, .reg => n.ty = switch (value) {
+            .real => Type.real_type,
+            .int => |v| .{ .width = if (std.math.cast(i32, v) != null) 32 else 64, .signed = true },
+            .str => |s| .{ .width = @intCast(@max(1, s.len) * 8), .signed = false },
+        },
+    }
+    if (p.flags.signed and !n.ty.real) n.ty.signed = true;
+    if (p.range.len == 0) n.msb = @as(i64, n.ty.width) - 1;
+    if (p.range.len == 0 and p.flags.storage == .none and value == .int) return l.refuse("an untyped integral parameter (its §12.2 type is its value expression's)");
+    const words = Program.words(n.ty.width);
+    const v = try l.a.alloc(u64, words);
+    const x = try l.a.alloc(u64, words);
+    @memset(v, 0);
+    @memset(x, 0);
+    switch (value) {
+        .int => |iv| {
+            if (n.ty.real) {
+                v[0] = @bitCast(@as(f64, @floatFromInt(iv)));
+            } else {
+                const bits: u64 = @bitCast(iv);
+                v[0] = bits;
+                if (n.ty.width < 64) v[0] &= (@as(u64, 1) << @intCast(n.ty.width)) - 1;
+                if (words > 1 and iv < 0 and n.ty.signed) for (v[1..]) |*word| {
+                    word.* = std.math.maxInt(u64);
+                };
+                if (words > 1 and n.ty.width % 64 != 0) v[words - 1] &= (@as(u64, 1) << @intCast(n.ty.width % 64)) - 1;
+            }
+        },
+        .real => |rv| {
+            if (!n.ty.real) return l.refuse("a real value of an integral parameter");
+            v[0] = @bitCast(rv);
+        },
+        .str => |s| {
+            if (n.ty.real) return l.refuse("a string value of a real parameter");
+            // §3.6: packed ASCII, the last character in the low byte.
+            for (0..@min(s.len, words * 8)) |k| {
+                const byte = s[s.len - 1 - k];
+                v[k / 8] |= @as(u64, byte) << @intCast((k % 8) * 8);
+            }
+        },
+    }
+    n.slot = try l.b.slot(try l.tyOf(n.ty), v, x);
+    return l.bind(f, i, n);
+}
+
+/// §5.10.4 a named event (an array of them included): one 1-bit slot per
+/// element, x.
+pub fn event(l: *Lower, f: u32, i: Inst.Index) Error!u32 {
+    const vir = l.virOf(f);
+    const e = Lower.payload(vir, Inst.Name, i);
+    var n: Name = .{ .kind = .event };
+    try arrayOf(l, f, e.dims, &n);
+    n.slot = try slots(l, n.ty, n.count, .x);
+    return l.bind(f, i, n);
+}
+
+/// The declared `[msb:lsb]` of a range body, folded.
+pub fn rangeOf(l: *Lower, f: u32, range: Vir.Body) Error!struct { msb: i64, lsb: i64, width: u32 } {
+    const vir = l.virOf(f);
+    const r = vir.body(range);
+    const bin = Lower.payload(vir, Inst.Bin, r[r.len - 1]);
+    const msb = try l.intOf(f, bin.lhs);
+    const lsb = try l.intOf(f, bin.rhs);
+    const width = std.math.cast(u32, @abs(@as(i128, msb) - lsb) + 1) orelse return l.refuse("a range past 2^32 bits");
+    return .{ .msb = msb, .lsb = lsb, .width = width };
+}
+
+/// `count` fresh slots of type `ty`, every bit `fill` (x, or 0).
+pub fn slots(l: *Lower, ty: Type, count: u32, fill: enum { x, zero }) Error!u32 {
+    const t = try l.tyOf(ty);
+    const words = Program.words(t.width);
+    const v = try l.a.alloc(u64, words);
+    const x = try l.a.alloc(u64, words);
+    @memset(v, 0);
+    @memset(x, 0);
+    if (fill == .x) {
+        @memset(v, std.math.maxInt(u64));
+        @memset(x, std.math.maxInt(u64));
+        if (t.width % 64 != 0) {
+            const mask = (@as(u64, 1) << @intCast(t.width % 64)) - 1;
+            v[words - 1] &= mask;
+            x[words - 1] &= mask;
+        }
+    }
+    const first: u32 = @intCast(l.b.p.slots.len);
+    for (0..count) |_| _ = try l.b.slot(t, v, x);
+    return first;
 }
 
 // ---- private ----
@@ -223,7 +386,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
         .gen_for => try genFor(w, f, scope, Lower.payload(vir, Inst.GenFor, i), prefix),
         .gen_block => try genBlock(w, f, scope, i, null, &.{}, prefix),
         .assign => try nets.assign(l, f, i),
-        .function => return l.refuse("a task or function"),
+        .function => try sub.declare(l, f, scope, i),
         .specify => return l.refuse("a specify block"),
         .defparam, .genvar, .param, .event, .port, .net => {},
         .analog, .analog_initial => return l.refuse("an analog block"),
@@ -389,141 +552,6 @@ fn signal(w: *Walk, f: u32, first: Inst.Index, decls: []const Inst.Index, conn: 
     try ports.outputVariable(l, f, l.names.items[at], c, &w.deferred);
 }
 
-/// A §4.2 variable (a `reg`, `integer`, `time`, `real` or `realtime`, an
-/// array of them included) bound to fresh slots, x (a real 0.0) at time 0.
-fn variable(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Index) Error!u32 {
-    const vir = l.virOf(f);
-    var storage: Inst.Storage = .reg;
-    var signed = false;
-    var range: Vir.Body = .empty;
-    var dims: Vir.Body = .empty;
-    for (decls) |d| switch (Lower.tag(vir, d)) {
-        .io => {
-            const io = Lower.payload(vir, Inst.Io, d);
-            if (io.flags.storage != .none) storage = io.flags.storage;
-            signed = signed or io.flags.signed;
-            if (range.len == 0) range = io.range;
-            if (dims.len == 0) dims = io.dims;
-        },
-        .variable => {
-            const v = Lower.payload(vir, Inst.Variable, d);
-            if (v.flags.storage != .none) storage = v.flags.storage;
-            signed = signed or v.flags.signed;
-            if (range.len == 0) range = v.range;
-            if (dims.len == 0) dims = v.dims;
-        },
-        else => unreachable, // else: `signal` passes only these two
-    };
-    var n: Name = .{ .kind = .variable };
-    switch (storage) {
-        .real, .realtime => n.ty = Type.real_type,
-        .integer => n.ty = .{ .width = 32, .signed = true },
-        .time => n.ty = .{ .width = 64, .signed = false },
-        .string => return l.refuse("a string variable"),
-        .reg, .none => n.ty = .{ .width = 1, .signed = signed },
-    }
-    if (range.len != 0) {
-        if (n.ty.real) return l.refuse("a real with a range");
-        const r = try rangeOf(l, f, range);
-        n.msb = r.msb;
-        n.lsb = r.lsb;
-        n.ty.width = r.width;
-    } else {
-        n.msb = @as(i64, n.ty.width) - 1;
-        n.scalar = storage == .reg or storage == .none;
-    }
-    if (storage == .integer or storage == .time) n.scalar = false;
-    try arrayOf(l, f, dims, &n);
-    n.slot = try slots(l, n.ty, n.count, if (n.ty.real) .zero else .x);
-    return l.bind(f, first, n);
-}
-
-/// A §4.10 parameter (or specparam, or localparam) of frame `f`: one slot
-/// holding its folded value, in its §12.2 type.
-fn param(l: *Lower, f: u32, i: Inst.Index) Error!u32 {
-    const vir = l.virOf(f);
-    const p = Lower.payload(vir, Inst.Param, i);
-    if (p.dims.len != 0) return l.refuse("a parameter array");
-    const env = try l.envAt(f);
-    const value = (try env.param(i)) orelse return l.refuse("a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)");
-    var n: Name = .{ .kind = .param };
-    if (p.range.len != 0) {
-        const r = try rangeOf(l, f, p.range);
-        n.ty = .{ .width = r.width, .signed = p.flags.signed };
-        n.msb = r.msb;
-        n.lsb = r.lsb;
-    } else switch (p.flags.storage) {
-        .integer => n.ty = .{ .width = 32, .signed = true },
-        .time => n.ty = .{ .width = 64, .signed = false },
-        .real, .realtime => n.ty = Type.real_type,
-        .string => return l.refuse("a string parameter"),
-        .none, .reg => n.ty = switch (value) {
-            .real => Type.real_type,
-            .int => |v| .{ .width = if (std.math.cast(i32, v) != null) 32 else 64, .signed = true },
-            .str => |s| .{ .width = @intCast(@max(1, s.len) * 8), .signed = false },
-        },
-    }
-    if (p.flags.signed and !n.ty.real) n.ty.signed = true;
-    if (p.range.len == 0) n.msb = @as(i64, n.ty.width) - 1;
-    if (p.range.len == 0 and p.flags.storage == .none and value == .int) return l.refuse("an untyped integral parameter (its §12.2 type is its value expression's)");
-    const words = Program.words(n.ty.width);
-    const v = try l.a.alloc(u64, words);
-    const x = try l.a.alloc(u64, words);
-    @memset(v, 0);
-    @memset(x, 0);
-    switch (value) {
-        .int => |iv| {
-            if (n.ty.real) {
-                v[0] = @bitCast(@as(f64, @floatFromInt(iv)));
-            } else {
-                const bits: u64 = @bitCast(iv);
-                v[0] = bits;
-                if (n.ty.width < 64) v[0] &= (@as(u64, 1) << @intCast(n.ty.width)) - 1;
-                if (words > 1 and iv < 0 and n.ty.signed) for (v[1..]) |*word| {
-                    word.* = std.math.maxInt(u64);
-                };
-                if (words > 1 and n.ty.width % 64 != 0) v[words - 1] &= (@as(u64, 1) << @intCast(n.ty.width % 64)) - 1;
-            }
-        },
-        .real => |rv| {
-            if (!n.ty.real) return l.refuse("a real value of an integral parameter");
-            v[0] = @bitCast(rv);
-        },
-        .str => |s| {
-            if (n.ty.real) return l.refuse("a string value of a real parameter");
-            // §3.6: packed ASCII, the last character in the low byte.
-            for (0..@min(s.len, words * 8)) |k| {
-                const byte = s[s.len - 1 - k];
-                v[k / 8] |= @as(u64, byte) << @intCast((k % 8) * 8);
-            }
-        },
-    }
-    n.slot = try l.b.slot(try l.tyOf(n.ty), v, x);
-    return l.bind(f, i, n);
-}
-
-/// §5.10.4 a named event (an array of them included): one 1-bit slot per
-/// element, x.
-fn event(l: *Lower, f: u32, i: Inst.Index) Error!u32 {
-    const vir = l.virOf(f);
-    const e = Lower.payload(vir, Inst.Name, i);
-    var n: Name = .{ .kind = .event };
-    try arrayOf(l, f, e.dims, &n);
-    n.slot = try slots(l, n.ty, n.count, .x);
-    return l.bind(f, i, n);
-}
-
-/// The declared `[msb:lsb]` of a range body, folded.
-fn rangeOf(l: *Lower, f: u32, range: Vir.Body) Error!struct { msb: i64, lsb: i64, width: u32 } {
-    const vir = l.virOf(f);
-    const r = vir.body(range);
-    const bin = Lower.payload(vir, Inst.Bin, r[r.len - 1]);
-    const msb = try l.intOf(f, bin.lhs);
-    const lsb = try l.intOf(f, bin.rhs);
-    const width = std.math.cast(u32, @abs(@as(i128, msb) - lsb) + 1) orelse return l.refuse("a range past 2^32 bits");
-    return .{ .msb = msb, .lsb = lsb, .width = width };
-}
-
 /// §4.9 the unpacked dimensions of a dims body, outermost first, into `n`.
 fn arrayOf(l: *Lower, f: u32, dims: Vir.Body, n: *Name) Error!void {
     if (dims.len == 0) return;
@@ -542,26 +570,4 @@ fn arrayOf(l: *Lower, f: u32, dims: Vir.Body, n: *Name) Error!void {
     }
     n.dims = spans.items;
     n.count = @intCast(count);
-}
-
-/// `count` fresh slots of type `ty`, every bit `fill` (x, or 0).
-fn slots(l: *Lower, ty: Type, count: u32, fill: enum { x, zero }) Error!u32 {
-    const t = try l.tyOf(ty);
-    const words = Program.words(t.width);
-    const v = try l.a.alloc(u64, words);
-    const x = try l.a.alloc(u64, words);
-    @memset(v, 0);
-    @memset(x, 0);
-    if (fill == .x) {
-        @memset(v, std.math.maxInt(u64));
-        @memset(x, std.math.maxInt(u64));
-        if (t.width % 64 != 0) {
-            const mask = (@as(u64, 1) << @intCast(t.width % 64)) - 1;
-            v[words - 1] &= mask;
-            x[words - 1] &= mask;
-        }
-    }
-    const first: u32 = @intCast(l.b.p.slots.len);
-    for (0..count) |_| _ = try l.b.slot(t, v, x);
-    return first;
 }

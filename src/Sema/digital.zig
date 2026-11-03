@@ -30,6 +30,7 @@ const eval = @import("eval.zig");
 const decl = @import("digital/decl.zig");
 const stmt = @import("digital/stmt.zig");
 const nets = @import("digital/nets.zig");
+const sub = @import("digital/sub.zig");
 const Program = std_sim.Program;
 const Builder = std_sim.Builder;
 const Vir = vams.Vir;
@@ -113,6 +114,8 @@ pub const Frame = struct {
     /// §12.4 the genvars bound at this frame (an iteration's own and its
     /// enclosing ones), for constants folded later.
     genvars: []const Genvar = &.{},
+    /// An automatic subroutine's frame, or a named block's inside one.
+    automatic: bool = false,
 
     pub const Genvar = struct { decl: Inst.Index, value: i64 };
 };
@@ -172,6 +175,8 @@ pub const Lower = struct {
     wires: std.ArrayList(nets.Wire) = .empty,
     slot_net: std.AutoHashMapUnmanaged(u32, u32) = .empty,
     driver_pcs: std.ArrayList(u32) = .empty,
+    /// §10 the tasks and functions, in declaration order (`Program.subs`).
+    subs: std.ArrayList(sub.Row) = .empty,
     /// §4.5 the implicit nets, by their instance frame and name.
     implicit: std.AutoHashMapUnmanaged(Implicit, u32) = .empty,
 

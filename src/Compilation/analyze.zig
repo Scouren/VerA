@@ -124,7 +124,12 @@ pub fn analyze(gpa: Allocator, source: []const u8, settings: Config, bag: ?*diag
 /// Runs every stage through the proof. Never frees `arena_state`: on success
 /// it goes to the `Result`, on failure `analyze` frees it once the bag is
 /// copied out.
-fn stages(gpa: Allocator, arena_state: *BigArena, source: []const u8, settings: Config, bag: *diag.Bag) Error!Result {
+fn stages(gpa: Allocator, arena_state: *BigArena, source: []const u8, config: Config, bag: *diag.Bag) Error!Result {
+    // ponytail: the process's single-threaded io for a caller that passes no
+    // `Files`; it goes once `Compilation` is a struct holding its `io`.
+    var own_files: frontend.Files = .init(std.Io.Threaded.global_single_threaded.io(), arena_state.allocator());
+    var settings = config;
+    if (settings.files == null) settings.files = &own_files;
     const parsed = try front(arena_state.allocator(), source, settings, bag);
     assert(parsed.starts.len != 0); // The lexer ends every stream with an EOF token.
     // Every stage from here walks the AST by recursion, so it runs on a stack
@@ -152,6 +157,7 @@ fn front(arena: Allocator, source: []const u8, settings: Config, bag: *diag.Bag)
         .spice_netlist = settings.spice_netlist,
         .spice_path = settings.spice_path orelse "",
         .bag = bag,
+        .files = settings.files.?,
     }) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         // Already in the bag with its own file and span: the preprocessor
@@ -229,6 +235,7 @@ fn back(gpa: Allocator, arena_state: *BigArena, parsed: Parsed, settings: Config
     const out = Lower.lower(arena, mir, parsed.file, parsed.text, parsed.starts, bag, .{
         .directives = parsed.directives,
         .include_dirs = settings.include_dirs, // §9.21.1 a $table_model data file
+        .files = settings.files.?,
         .param_overrides = settings.param_overrides, // §3.4 `--param`
         .displays_dropped = settings.display == .drop, // §3.2 retention
         .discipline_resolution = settings.discipline_resolution,

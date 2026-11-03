@@ -18,7 +18,7 @@
 //!   `require_std_includes: bool`, `language: KeywordSet`, `sim: Sim`
 //! - `param_overrides: []const ParamOverride`,
 //!   `discipline_resolution: DisciplineResolution`, `empty_unit_ok: bool`
-//! - `spice_netlist: []const u8`, `spice_path: ?[]const u8`
+//! - `spice_netlist: []const u8`, `spice_path: ?[]const u8`, `files: ?*Files`
 //! - `lint: diag.Levels`, `proof: proof.Options`, `display: Display`,
 //!   `int_systfs: []const []const u8`
 //! - `codegen: Codegen`, `verilog: ?Verilog`, `osdi: bool`,
@@ -77,6 +77,10 @@ spice_netlist: []const u8 = "",
 /// it. Null resolves them against the working directory. `compile` sets it
 /// to the source when a testbench's `//! spice` cards are the netlist.
 spice_path: ?[]const u8 = null,
+/// Reads every file the source names (`include, netlist cards,
+/// `$table_model` data) and records each; `compile` passes the one it makes
+/// from its `io`. Null: `analyze` reads through its own.
+files: ?*@import("frontend").Files = null,
 /// Per-code lint levels (`--allow=W0650`, `--deny=W0651`). Borrowed: the
 /// bag the analysis fills reads it until that bag is freed.
 lint: diag.Levels = .empty,

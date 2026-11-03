@@ -15,6 +15,7 @@ const Refusal = spice_cards.Refusal;
 const File = spice_cards.File;
 const deep_stack = @import("base").deep_stack;
 const preprocessor = @import("../preprocessor.zig");
+const Files = @import("../Files.zig");
 const spice_card = @import("card.zig");
 const Card = spice_card.Card;
 const Refusals = spice_card.Refusals;
@@ -36,6 +37,9 @@ pub const Reader = struct {
     arena: Allocator,
     scratch: Allocator,
     refusals: *Refusals,
+    /// Reads every file a card names (the compilation's `Files`); null
+    /// reads none, so every `.INCLUDE`/`.LIB` file is a refusal.
+    disk: ?*Files = null,
     /// Every physical line read, one `Card` each, in reading order.
     lines: std.ArrayList(Card) = .empty,
     files: std.ArrayList(File) = .empty,
@@ -158,8 +162,8 @@ pub const Reader = struct {
     fn open(r: *Reader, card: Card, kw: []const u8, name: []const u8) Allocator.Error!?u32 {
         assert(card.text.len > 0);
         const full = try r.resolve(card.file, name);
-        const io = std.Io.Threaded.global_single_threaded.io();
-        const text = preprocessor.readText(io, .cwd(), full, r.arena) catch |e| switch (e) {
+        const got = if (r.disk) |d| d.read(full, preprocessor.max_text_bytes) else error.FileNotFound;
+        const text = got catch |e| switch (e) {
             error.OutOfMemory => return error.OutOfMemory,
             else => {
                 try r.refusals.add(card, "`{s}`: cannot read \"{s}\" ({t})", .{ kw, full, e });

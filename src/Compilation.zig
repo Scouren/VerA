@@ -206,14 +206,18 @@ pub fn compile(
     // that flavor of SPICE netlist can be referenced". Read whole: a `+`
     // continuation makes a card longer than a line. Without `--spice`, a
     // testbench's own `//! spice` cards are the netlist, read beside the source.
+    // Every file the compilation reads goes through `files` (`Config.files`).
+    const files = try arena.create(frontend.Files);
+    files.* = .init(io, arena);
     const netlist: []const u8 = if (req.spice_path) |p|
-        frontend.preprocessor.readText(io, .cwd(), p, arena) catch |e| {
+        files.read(p, frontend.preprocessor.max_text_bytes) catch |e| {
             try readFailed(err, p, e);
             return o.done(2);
         }
     else
         spec.harness.spice;
     var settings = req;
+    if (settings.files == null) settings.files = files;
     settings.spice_netlist = netlist;
     settings.spice_path = req.spice_path orelse if (spec.harness.spice.len != 0) in_path else null;
     // A check accepts a source_text with no module; a device request does not.

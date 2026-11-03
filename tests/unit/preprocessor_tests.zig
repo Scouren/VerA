@@ -56,8 +56,9 @@ const sparse_files = struct {
         const dirs: []const []const u8 = &.{std.fs.path.dirname(any).?};
         var arena_state: std.heap.ArenaAllocator = .init(testing.allocator);
         defer arena_state.deinit();
+        var disk: frontend.Files = .init(testing.io, arena_state.allocator());
         var bag: diag.Bag = .init(arena_state.allocator());
-        try testing.expectError(error.PreprocessFailed, process(arena_state.allocator(), "`include \"huge.vh\"\n", .{ .std_defs = false, .bag = &bag, .include_dirs = dirs }));
+        try testing.expectError(error.PreprocessFailed, process(arena_state.allocator(), "`include \"huge.vh\"\n", .{ .std_defs = false, .bag = &bag, .include_dirs = dirs, .files = &disk }));
         try testing.expectEqual(diag.Code.E1013, bag.at(0).code);
         // 17 MiB, past the old 16 MiB `include cap, reads.
         {
@@ -66,7 +67,7 @@ const sparse_files = struct {
             try f.setLength(io, 17 << 20);
         }
         var ok_bag: diag.Bag = .init(arena_state.allocator());
-        const out = try process(arena_state.allocator(), "`include \"big.vh\"\n", .{ .std_defs = false, .bag = &ok_bag, .include_dirs = dirs });
+        const out = try process(arena_state.allocator(), "`include \"big.vh\"\n", .{ .std_defs = false, .bag = &ok_bag, .include_dirs = dirs, .files = &disk });
         try testing.expect(out.text.len >= 17 << 20);
     }
 };
@@ -102,7 +103,8 @@ fn runTest(src: []const u8) ![]u8 {
     var arena_state: std.heap.ArenaAllocator = .init(testing.allocator);
     defer arena_state.deinit();
     var bag: diag.Bag = .init(arena_state.allocator());
-    const text = (try process(arena_state.allocator(), src, .{ .std_defs = false, .bag = &bag })).text;
+    var disk: frontend.Files = .init(testing.io, arena_state.allocator());
+    const text = (try process(arena_state.allocator(), src, .{ .std_defs = false, .bag = &bag, .files = &disk })).text;
     return testing.allocator.dupe(u8, text);
 }
 
@@ -1810,18 +1812,19 @@ test "IEEE 1364 §19.5: include nesting is unbounded; only a repeating cycle is 
 
     var arena_state: std.heap.ArenaAllocator = .init(testing.allocator);
     defer arena_state.deinit();
+    var disk: frontend.Files = .init(testing.io, arena_state.allocator());
     const arena = arena_state.allocator();
     var ok_bag: diag.Bag = .init(arena);
-    const out = try process(arena, "`include \"a0.vh\"\n", .{ .std_defs = false, .bag = &ok_bag, .include_dirs = dirs });
+    const out = try process(arena, "`include \"a0.vh\"\n", .{ .std_defs = false, .bag = &ok_bag, .include_dirs = dirs, .files = &disk });
     try testing.expect(std.mem.find(u8, out.text, "deepest") != null);
     var self_bag: diag.Bag = .init(arena);
-    const self_out = try process(arena, "`include \"self.vh\"\n", .{ .std_defs = false, .bag = &self_bag, .include_dirs = dirs });
+    const self_out = try process(arena, "`include \"self.vh\"\n", .{ .std_defs = false, .bag = &self_bag, .include_dirs = dirs, .files = &disk });
     try testing.expectEqual(@as(usize, 1), std.mem.count(u8, self_out.text, "bottom"));
 
     for ([_][]const u8{ "loop.vh", "p.vh" }) |f| {
         var bag: diag.Bag = .init(arena);
         const src = try arena.print("`include \"{s}\"\n", .{f});
-        try testing.expectError(error.PreprocessFailed, process(arena, src, .{ .std_defs = false, .bag = &bag, .include_dirs = dirs }));
+        try testing.expectError(error.PreprocessFailed, process(arena, src, .{ .std_defs = false, .bag = &bag, .include_dirs = dirs, .files = &disk }));
         try testing.expectEqual(@as(usize, 1), bag.count());
         try testing.expectEqual(diag.Code.E0125, bag.at(0).code);
     }
@@ -1846,6 +1849,7 @@ test "§10.7: a file included through a macro numbers its own lines and owns its
 
     var arena_state: std.heap.ArenaAllocator = .init(testing.allocator);
     defer arena_state.deinit();
+    var disk: frontend.Files = .init(testing.io, arena_state.allocator());
     const arena = arena_state.allocator();
 
     // "An `include directive changes the expansions of `__FILE__ and `__LINE__
@@ -1853,14 +1857,14 @@ test "§10.7: a file included through a macro numbers its own lines and owns its
     // lines.vh is 3, wherever the `include was written.
     {
         var bag: diag.Bag = .init(arena);
-        const out = try process(arena, "`define INC `include \"lines.vh\"\n`INC\n`FROM_INC\n", .{ .std_defs = false, .bag = &bag, .include_dirs = dirs });
+        const out = try process(arena, "`define INC `include \"lines.vh\"\n`INC\n`FROM_INC\n", .{ .std_defs = false, .bag = &bag, .include_dirs = dirs, .files = &disk });
         try testing.expectEqualStrings("\n\n\n3\n\n5\n", out.text);
         try expectSortedMap(&bag);
     }
     // A diagnostic raised inside that file is in that file, on its own line.
     {
         var bag: diag.Bag = .init(arena);
-        try testing.expectError(error.PreprocessFailed, process(arena, "`define INC `include \"bad.vh\"\n`INC\n", .{ .std_defs = false, .bag = &bag, .include_dirs = dirs }));
+        try testing.expectError(error.PreprocessFailed, process(arena, "`define INC `include \"bad.vh\"\n`INC\n", .{ .std_defs = false, .bag = &bag, .include_dirs = dirs, .files = &disk }));
         const e = bag.at(0);
         try testing.expectEqual(diag.Code.E0115, e.code);
         try testing.expectEqualStrings("bad.vh", std.fs.path.basename(bag.fileName(e.file)));
@@ -1874,7 +1878,7 @@ test "§10.7: a file included through a macro numbers its own lines and owns its
     {
         var bag: diag.Bag = .init(arena);
         const src = "`define INC `include \"word.vh\"\n`define ID(x) x\n`ID(`INC) tail\n";
-        const out = try process(arena, src, .{ .std_defs = false, .bag = &bag, .include_dirs = dirs });
+        const out = try process(arena, src, .{ .std_defs = false, .bag = &bag, .include_dirs = dirs, .files = &disk });
         try expectSortedMap(&bag);
         const r = bag.map.resolve(@intCast(std.mem.find(u8, out.text, "wire_from_inc").?));
         try testing.expectEqual(diag.FileId.root, r.file);
@@ -2240,4 +2244,31 @@ test "joinChain spells an include or expansion chain" {
     var pp: Pp = .{ .arena = arena, .scratch = arena, .opts = .{ .bag = &bag } };
     try testing.expectEqualStrings("A -> B -> C", try pp.joinChain(&.{ "A", "B" }, "C"));
     try testing.expectEqualStrings("C", try pp.joinChain(&.{}, "C"));
+}
+
+test "Config.files: the compilation reads every file the source names through its own reader, and records each" {
+    // Oracle: the one file the source includes, written here, and nothing
+    // for a source that includes no file but the built-in annex D ones.
+    const io = testing.io;
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(io, .{ .sub_path = "gain.vams", .data = "`define GAIN 2.0\n" });
+    const any = try tmp.dir.realPathFileAlloc(io, "gain.vams", testing.allocator);
+    defer testing.allocator.free(any);
+    const dirs: []const []const u8 = &.{std.fs.path.dirname(any).?};
+    var arena_state: std.heap.ArenaAllocator = .init(testing.allocator);
+    defer arena_state.deinit();
+    for ([_]bool{ true, false }) |includes| {
+        var disk: frontend.Files = .init(io, arena_state.allocator());
+        const src = if (includes)
+            "`include \"disciplines.vams\"\n`include \"gain.vams\"\nmodule r(p, n); inout p, n; electrical p, n; analog I(p, n) <+ `GAIN * V(p, n); endmodule\n"
+        else
+            "`include \"disciplines.vams\"\nmodule r(p, n); inout p, n; electrical p, n; analog I(p, n) <+ V(p, n); endmodule\n";
+        var res = try vera.analyze(testing.allocator, src, .{ .include_dirs = dirs, .files = &disk }, null);
+        res.deinit(testing.allocator);
+        if (includes) {
+            try testing.expectEqual(@as(usize, 1), disk.paths.items.len);
+            try testing.expect(std.mem.endsWith(u8, disk.paths.items[0], "gain.vams"));
+        } else try testing.expectEqual(@as(usize, 0), disk.paths.items.len);
+    }
 }

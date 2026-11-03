@@ -94,6 +94,7 @@ pub const Env = struct {
 
     /// The value of a body: its last instruction's. Null for an empty body.
     pub fn body(env: *Env, b: Vir.Body) Allocator.Error!?Const {
+        assert(b.start + b.len <= env.vir.extra.len);
         const insts = env.vir.body(b);
         if (insts.len == 0) return null;
         return env.ref(insts[insts.len - 1].toRef());
@@ -128,6 +129,7 @@ pub const Env = struct {
     /// or the original an aliasparam of that name reaches (§3.4.6). Null
     /// for no parameter, and for an alias of a §9.18 system parameter.
     pub fn named(env: *const Env, name: []const u8) ?Inst.Index {
+        assert(name.len != 0);
         const vir = env.vir;
         for (env.positions.keys()) |p| if (std.mem.eql(u8, vir.string(env.payload(Inst.Param, p).name), name)) return p;
         for (env.aliases.items) |a| {
@@ -140,6 +142,7 @@ pub const Env = struct {
     /// The §9.18 system parameter `name` names: its own spelling, or an
     /// aliasparam (a chain of them) of it. Null for any other name.
     pub fn systemNamed(env: *const Env, name: []const u8) ?Zcu.SystemParam {
+        assert(name.len != 0);
         if (Zcu.SystemParam.fromName(name)) |k| return k;
         const vir = env.vir;
         var at = name;
@@ -187,6 +190,8 @@ pub const Env = struct {
     }
 
     fn inst(env: *Env, i: Inst.Index) Allocator.Error!?Const {
+        assert(@backingInt(i) < env.vir.instructions.len);
+        assert(env.depth <= eval_depth_max);
         const vir = env.vir;
         const tag = vir.instructions.items(.tag)[@backingInt(i)];
         const data = vir.instructions.items(.data)[@backingInt(i)];
@@ -223,6 +228,7 @@ pub const Env = struct {
 
     /// A name's value: a parameter's, a genvar's, or an alias's original's.
     fn declValue(env: *Env, d: Inst.Index) Allocator.Error!?Const {
+        assert(@backingInt(d) < env.vir.instructions.len);
         return switch (env.vir.instructions.items(.tag)[@backingInt(d)]) {
             .param => env.param(d),
             .genvar => if (env.genvars.get(d)) |v| .{ .int = v } else null,
@@ -234,6 +240,7 @@ pub const Env = struct {
     /// §4.3's functions and IEEE 1364-2005 §17.11's `$clog2` and math
     /// functions; any other call has no constant value.
     fn sysCall(env: *Env, call: Inst.SysCall) Allocator.Error!?Const {
+        assert(call.name != .empty);
         const raw = env.vir.string(call.name);
         const name = if (raw.len != 0 and raw[0] == '$') raw[1..] else raw;
         const args = env.vir.list(Inst.Ref, call.args);
@@ -254,6 +261,7 @@ pub const Env = struct {
     /// signed only when declared so); an untyped parameter keeps its value's
     /// type.
     fn coerce(env: *Env, decl: Inst.Param, value: Const) Allocator.Error!?Const {
+        assert(decl.name != .empty);
         // §2.7 a string given to a numeric parameter is its characters'
         // integer, eight bits each.
         const numeric = decl.range.len != 0 or (decl.flags.storage != .none and decl.flags.storage != .string);
@@ -288,6 +296,7 @@ const max_alias_chain = 64;
 /// The parameter a chain of aliasparams from `alias` reaches, or null (a
 /// §9.18 system parameter, a name declared nowhere, a cycle).
 fn originalOf(vir: *const Vir, alias: Inst.Index) ?Inst.Index {
+    assert(vir.instructions.items(.tag)[@backingInt(alias)] == .aliasparam);
     const tags = vir.instructions.items(.tag);
     const data = vir.instructions.items(.data);
     var at = alias;
@@ -347,6 +356,7 @@ fn binaryOp(tag: Inst.Tag) fold.BinaryOp {
 /// truncated to its size and sign-extended when signed. Null for an x, z or
 /// `?` digit or a value wider than 64 bits.
 fn bigInt(vir: *const Vir, b: Inst.BigInt) ?Const {
+    assert(b.digits != .empty);
     const digits = vir.string(b.digits);
     const radix: u8 = b.flags.radix;
     if (radix != 2 and radix != 8 and radix != 10 and radix != 16) return null;

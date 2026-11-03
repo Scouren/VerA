@@ -104,6 +104,7 @@ pub fn bound(s: *Sema, cell: InternPool.String, path: []const u8) InternPool.Str
 /// configuration's first design cell, not its rules); `liblist` clauses and
 /// the library map (§13.2) bind nothing.
 fn configRoots(s: *Sema, roots: *std.ArrayList(Zcu.Decl)) Allocator.Error!bool {
+    assert(roots.items.len == 0);
     const zcu = s.zcu;
     var configs: std.ArrayList(struct { vir: *const Vir, c: Inst.Config }) = .empty;
     for (0..zcu.files.len) |f| {
@@ -146,6 +147,7 @@ fn configRoots(s: *Sema, roots: *std.ArrayList(Zcu.Decl)) Allocator.Error!bool {
 /// `:` glued to their neighbours, so `top . u use work . gate` is `top.u`,
 /// `use`, `work.gate`.
 fn ruleWords(s: *Sema, text: []const u8) Allocator.Error![]const []const u8 {
+    assert(text.len != 0);
     var words: std.ArrayList([]const u8) = .empty;
     var glue = false;
     var it = std.mem.tokenizeScalar(u8, text, ' ');
@@ -170,6 +172,7 @@ fn cellOf(text: []const u8) []const u8 {
 /// §13.2.1.1; W1152 for a user module defined again), `paramsets` (all, in
 /// order), `disciplines` and `natures`, in file then source order.
 fn namespace(s: *Sema) Allocator.Error!void {
+    assert(s.zcu.modules.count() == 0);
     const zcu = s.zcu;
     for (0..zcu.files.len) |f| {
         const file: Zcu.File.Index = @fromBackingInt(@intCast(f));
@@ -200,6 +203,7 @@ fn namespace(s: *Sema) Allocator.Error!void {
 /// names the cycle. A connect module is placed by §7.6 insertion, never a
 /// root.
 fn pickRoots(s: *Sema) Allocator.Error![]const Zcu.Decl {
+    assert(s.zcu.instances.len == 0);
     const zcu = s.zcu;
     var named: std.AutoHashMapUnmanaged(InternPool.String, void) = .empty;
     for (0..zcu.files.len) |f| {

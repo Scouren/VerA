@@ -68,6 +68,7 @@ pub fn compatible(s: *Sema, a: []const u8, b: []const u8) Allocator.Error!bool {
 // ---- private ----
 
 fn lookup(s: *Sema, name: []const u8) Allocator.Error!?Found {
+    assert(name.len < std.math.maxInt(u32));
     if (name.len == 0) return null;
     const zcu = s.zcu;
     const d = zcu.disciplines.get(try zcu.intern_pool.getString(s.gpa, name)) orelse return null;
@@ -85,6 +86,7 @@ fn natureOf(d: Found, half: ItemKind) ?[]const u8 {
 /// §3.6.1.1 the `units` string nature `name` gives (or its parent chain
 /// does), or null.
 fn unitsOf(s: *Sema, name: []const u8) Allocator.Error!?[]const u8 {
+    assert(name.len != 0);
     const zcu = s.zcu;
     var at = name;
     for (0..nature_hops_max) |_| {
@@ -110,6 +112,8 @@ fn unitsOf(s: *Sema, name: []const u8) Allocator.Error!?[]const u8 {
 /// `parent` that is a nature, or a discipline's half); itself when it has
 /// none or names no nature.
 fn baseNature(s: *Sema, name: []const u8) Allocator.Error![]const u8 {
+    assert(name.len != 0);
+    defer assert(name.len != 0);
     const zcu = s.zcu;
     var at = name;
     for (0..nature_hops_max) |_| {

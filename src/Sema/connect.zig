@@ -60,6 +60,8 @@ const Resolution = struct { result: []const u8, exclude: bool };
 /// hierarchical names). A design with no connect statement still resolves
 /// its disciplines and judges its mixed ports (E0927).
 pub fn run(s: *Sema, waiting: defparam.Waiting) Allocator.Error!void {
+    assert(s.zcu.inserts.len == 0);
+    for (waiting.rows) |r| assert(r.origin < waiting.origins.len);
     const zcu = s.zcu;
     const rules = try collectRules(s);
     const count = zcu.instances.len;
@@ -130,6 +132,8 @@ fn collectRules(s: *Sema) Allocator.Error![]const Rule {
 /// Records the resolved discipline of every net of instance `i` that has
 /// one: declared, or from its children's port segments (F.2 basic).
 fn resolveInstance(s: *Sema, kids: []const std.ArrayList(Instance.Index), i: Instance.Index) Allocator.Error!void {
+    assert(@backingInt(i) < kids.len);
+    assert(kids.len == s.zcu.instances.len);
     const zcu = s.zcu;
     const module = zcu.instances.items(.module)[@backingInt(i)];
     const decls = try netsOf(s, module);
@@ -167,6 +171,7 @@ fn resolveInstance(s: *Sema, kids: []const std.ArrayList(Instance.Index), i: Ins
 /// unknown, an error (E0903) when the net also joins the other domain, and
 /// insertion then reads the first candidate.
 fn merge(s: *Sema, i: Instance.Index, list: []const []const u8) Allocator.Error!?[]const u8 {
+    assert(@backingInt(i) < s.zcu.instances.len);
     assert(list.len != 0);
     var continuous = false;
     for (list) |d| continuous = continuous or try discipline.domainOf(s, d) == .continuous;
@@ -230,6 +235,9 @@ fn resolution(s: *Sema, cands: []const []const u8, exact: bool, at: Zcu.File.Ind
 /// lower connections resolve to different domains, then matched against
 /// the statements (E0922 for more than one, E0927 for none).
 fn mixedPorts(s: *Sema, rules: []const Rule, p: Instance.Index, c: Instance.Index, hits: *std.ArrayList(Hit)) Allocator.Error!void {
+    assert(s.zcu.instances.items(.parent)[@backingInt(c)] == p);
+    const before = hits.items.len;
+    defer assert(hits.items.len >= before);
     const zcu = s.zcu;
     const pmod = zcu.instances.items(.module)[@backingInt(p)];
     const cmod = zcu.instances.items(.module)[@backingInt(c)];
@@ -287,6 +295,7 @@ fn mixedPorts(s: *Sema, rules: []const Rule, p: Instance.Index, c: Instance.Inde
 /// digital input only) as its actual is E0906. A select or concatenation
 /// names net parts and is judged where it is bound.
 fn analogActual(s: *Sema, file: Zcu.File.Index, vir: *const Vir, c: Instance.Index, inner: String, actual: Inst.Ref, formal: Inst.Index, cvir: *const Vir) Allocator.Error!void {
+    assert(@backingInt(c) < s.zcu.instances.len);
     const zcu = s.zcu;
     const i = actual.toIndex() orelse return;
     const low = zcu.net_discipline.get(.{ .instance = c, .net = inner }) orelse return;
@@ -306,6 +315,7 @@ fn analogActual(s: *Sema, file: Zcu.File.Index, vir: *const Vir, c: Instance.Ind
 /// disciplines are compatible with the two and its directions carry the
 /// signal the port's way (an inout pair any way).
 fn matches(s: *Sema, r: Rule, dir: Inst.Direction, upper: []const u8, lower: []const u8) Allocator.Error!bool {
+    assert(r.cont.port != r.disc.port);
     if (r.cont.dir == .inout and r.disc.dir == .inout) {
         const up_cont = try discipline.domainOf(s, upper) == .continuous;
         const c = if (up_cont) upper else lower;
@@ -333,6 +343,8 @@ fn compat(s: *Sema, a: []const u8, b: []const u8) Allocator.Error!bool {
 /// Appends one bridge instance per merged group or split port, as a child
 /// of the upper connection's instance, and one `Zcu.inserts` row per port.
 fn insert(s: *Sema, rules: []const Rule, hits: []const Hit, waiting: defparam.Waiting) Allocator.Error!void {
+    assert(hits.len != 0);
+    defer assert(s.zcu.inserts.len == hits.len);
     const zcu = s.zcu;
     for (hits, 0..) |h, k| {
         const r = rules[h.rule];
@@ -356,6 +368,7 @@ fn insert(s: *Sema, rules: []const Rule, hits: []const Hit, waiting: defparam.Wa
 
 /// The bridge an earlier hit of a merged group made: its `inserts` row.
 fn bridgeOf(zcu: *const Zcu, h: Hit) Instance.Index {
+    assert(zcu.inserts.len != 0);
     for (zcu.inserts.items(.instance), zcu.inserts.items(.port), zcu.inserts.items(.bridge)) |i, p, b| if (i == h.child and p == h.port) return b;
     unreachable; // the owner was inserted before every later member of its group
 }
@@ -363,6 +376,8 @@ fn bridgeOf(zcu: *const Zcu, h: Hit) Instance.Index {
 /// One connect-module instance under `parent`, its parameters folded with
 /// the statement's values (§7.7.3).
 fn bridgeInstance(s: *Sema, r: Rule, parent: Instance.Index, name: String, dps: []const defparam.Dp) Allocator.Error!Instance.Index {
+    assert(@backingInt(parent) < s.zcu.instances.len);
+    assert(name != .empty);
     const zcu = s.zcu;
     const mvir = zcu.fileVir(r.module.file);
     const row = zcu.declRow(r.module);
@@ -457,6 +472,7 @@ fn preorder(s: *Sema) Allocator.Error!void {
 /// ponytail: read again per instance, linear in the module's items; a cache
 /// by module if a design's size makes it show.
 fn netsOf(s: *Sema, module: Zcu.Decl) Allocator.Error!std.AutoHashMapUnmanaged(String, Net) {
+    assert(s.zcu.declRow(module).kind != .primitive);
     const zcu = s.zcu;
     const vir = zcu.fileVir(module.file);
     const m = payloadOf(vir, Inst.Module, zcu.declRow(module).inst);
@@ -484,6 +500,7 @@ fn netsOf(s: *Sema, module: Zcu.Decl) Allocator.Error!std.AutoHashMapUnmanaged(S
 /// The net a port connection names in `vir`: a declared net or port, or an
 /// undeclared name (§3.6.5's implicit net); null for anything else.
 fn netName(s: *Sema, vir: *const Vir, actual: Inst.Ref) Allocator.Error!?String {
+    assert(vir.instructions.len != 0);
     const i = actual.toIndex() orelse return null;
     const data = vir.instructions.items(.data)[@backingInt(i)];
     const text = switch (vir.instructions.items(.tag)[@backingInt(i)]) {

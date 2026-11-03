@@ -54,6 +54,7 @@ pub const Late = struct { param: []const u8, value: InternPool.Index, file: Zcu.
 
 /// E0907 for every defparam that reached no instance.
 pub fn reportUnused(s: *Sema, waiting: Waiting) Allocator.Error!void {
+    for (waiting.rows) |r| assert(r.origin < waiting.origins.len);
     for (waiting.origins) |o| if (!o.used)
         try s.fail(.E0907, o.file, o.src, "`{s}` names no parameter of the elaborated design", .{o.text});
 }
@@ -62,6 +63,8 @@ pub fn reportUnused(s: *Sema, waiting: Waiting) Allocator.Error!void {
 /// connect module §7.8 inserts), each marked used, the later of two for one
 /// parameter kept (IEEE 1364-2005 §12.2.1).
 pub fn waitingFor(s: *Sema, waiting: Waiting, parent: Instance.Index, name: []const u8) Allocator.Error![]const Dp {
+    assert(name.len != 0);
+    assert(@backingInt(parent) < s.zcu.instances.len);
     var out: std.ArrayList(Dp) = .empty;
     for (waiting.rows) |r| {
         if (r.anchor != parent or !std.mem.eql(u8, r.rel, name)) continue;
@@ -75,6 +78,8 @@ pub fn waitingFor(s: *Sema, waiting: Waiting, parent: Instance.Index, name: []co
 /// Gives each defparam's value to the parameter it names, over any `#()`
 /// override; E0907 for a name that is no parameter of the module.
 pub fn applyDefparams(s: *Sema, env: *Env, dps: []const Dp, module: Vir.String) Allocator.Error!void {
+    assert(env.positions.count() == env.values.items.len);
+    for (dps) |dp| assert(dp.name.len != 0);
     for (dps) |dp| {
         if (env.systemNamed(dp.name) != null) continue;
         const q = env.named(dp.name) orelse {
@@ -94,6 +99,8 @@ pub fn applyDefparams(s: *Sema, env: *Env, dps: []const Dp, module: Vir.String) 
 /// §12.2.1: files in order, then instructions, which AstGen numbers in
 /// source order). Re-anchors at it those that name its descendants.
 pub fn reaching(w: *Walk, p: Pending, index: Instance.Index) Allocator.Error![]const Dp {
+    assert(@backingInt(index) == w.zcu.instances.len);
+    if (p.parent != .none) assert(@backingInt(p.parent) < @backingInt(index));
     const s = w.s;
     const name = w.zcu.intern_pool.stringToSlice(p.name);
     var out: std.ArrayList(Dp) = .empty;
@@ -120,6 +127,9 @@ pub fn reaching(w: *Walk, p: Pending, index: Instance.Index) Allocator.Error![]c
 }
 
 pub fn keepLatest(s: *Sema, out: *std.ArrayList(Dp), dp: Dp) Allocator.Error!void {
+    assert(dp.name.len != 0);
+    const before = out.items.len;
+    defer assert(out.items.len == before or out.items.len == before + 1);
     for (out.items) |*o| if (std.mem.eql(u8, o.name, dp.name)) {
         if (later(dp, o.*)) o.* = dp;
         return;
@@ -131,6 +141,8 @@ pub fn keepLatest(s: *Sema, out: *std.ArrayList(Dp), dp: Dp) Allocator.Error!voi
 /// instance (a path through this module's scopes) or, for a path whose head
 /// names no declaration here, below the ancestor or root it names.
 pub fn collect(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i: Inst.Index) Allocator.Error!void {
+    assert(env.vir.instructions.items(.tag)[@backingInt(i)] == .defparam);
+    assert(@backingInt(index) < w.zcu.instances.len);
     const s = w.s;
     const vir = env.vir;
     const a = payloadOf(vir, Inst.Assign, i);
@@ -167,6 +179,7 @@ fn later(a: Dp, b: Dp) bool {
 /// §12.5): the nearest ancestor, `from` included, whose module or instance
 /// name it is, else a root of that module name.
 fn upwardAnchor(w: *Walk, from: Instance.Index, head: []const u8) ?Instance.Index {
+    assert(@backingInt(from) < w.zcu.instances.len);
     const zcu = w.zcu;
     const parents = zcu.instances.items(.parent);
     var it = from;
@@ -184,6 +197,8 @@ fn upwardAnchor(w: *Walk, from: Instance.Index, head: []const u8) ?Instance.Inde
 /// goes. A target that exists already takes the value late; else the
 /// defparam waits at the deepest instance reached for the rest of `rel`.
 fn place(w: *Walk, anchor: Instance.Index, rel: []const u8, param: []const u8, value: InternPool.Index, origin: u32) Allocator.Error!void {
+    assert(origin < w.origins.items.len);
+    assert(@backingInt(anchor) < w.zcu.instances.len);
     const zcu = w.zcu;
     var cur = anchor;
     var rest = rel;
@@ -208,6 +223,8 @@ fn place(w: *Walk, anchor: Instance.Index, rel: []const u8, param: []const u8, v
 /// A defparam whose target `target` exists: recorded under its path, and
 /// the walk runs again when the value is not the one the target took.
 fn lateDefparam(w: *Walk, target: Instance.Index, param: []const u8, value: InternPool.Index, origin: u32) Allocator.Error!void {
+    assert(origin < w.origins.items.len);
+    assert(@backingInt(target) < w.zcu.instances.len);
     const s = w.s;
     const zcu = w.zcu;
     w.origins.items[origin].used = true;
@@ -230,6 +247,9 @@ fn lateDefparam(w: *Walk, target: Instance.Index, param: []const u8, value: Inte
 /// the head names nothing here (an upward or absolute path), or null when
 /// the target is no path or an index does not fold.
 fn render(w: *Walk, env: *Env, r: Inst.Ref, out: *std.ArrayList(u8)) Allocator.Error!?bool {
+    assert(r != .none);
+    const before = out.items.len;
+    defer assert(out.items.len >= before);
     const arena = w.s.arena;
     const vir = env.vir;
     const i = r.toIndex() orelse return null;
@@ -269,6 +289,7 @@ fn render(w: *Walk, env: *Env, r: Inst.Ref, out: *std.ArrayList(u8)) Allocator.E
 }
 
 fn moduleName(zcu: *const Zcu, i: Instance.Index) []const u8 {
+    assert(@backingInt(i) < zcu.instances.len);
     const d = zcu.instances.items(.module)[@backingInt(i)];
     return zcu.fileVir(d.file).string(zcu.declRow(d).name);
 }

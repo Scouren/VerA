@@ -117,7 +117,11 @@ pub fn run(s: *Sema, roots: []const Zcu.Decl) Allocator.Error!defparams.Waiting 
         // defparams feeds itself stop changing or the passes run out.
         if (w.rerun and pass > late.count() + 1) for (w.origins.items) |o| if (o.used)
             try s.fail(.E0907, o.file, o.src, "`{s}` keeps changing the value it reads (IEEE 1364-2005 §12.8.1)", .{o.text});
-        if (!w.rerun or pass > late.count() + 1) return .{ .rows = w.rows.items, .origins = w.origins.items };
+        if (!w.rerun or pass > late.count() + 1) {
+            // Every root is a module, so each made an instance.
+            assert(zcu.instances.len >= roots.len);
+            return .{ .rows = w.rows.items, .origins = w.origins.items };
+        }
     }
 }
 
@@ -126,6 +130,8 @@ pub fn run(s: *Sema, roots: []const Zcu.Decl) Allocator.Error!defparams.Waiting 
 /// that is no overridable parameter and for too many ordered values, and
 /// E0908 for a parameter given twice.
 pub fn applyGivens(s: *Sema, env: *Env, file: Zcu.File.Index, src: Inst.Ref, givens: []const Given, quiet: bool, module: Vir.String) Allocator.Error!void {
+    assert(env.positions.count() == env.values.items.len);
+    defer assert(env.given.count() <= env.positions.count());
     const vir = env.vir;
     const ip = &s.zcu.intern_pool;
     var ordered: u32 = 0;
@@ -160,12 +166,14 @@ pub fn applyGivens(s: *Sema, env: *Env, file: Zcu.File.Index, src: Inst.Ref, giv
 /// §6.3.2: a `parameter`, not a `localparam` or `specparam`, and not local
 /// by IEEE 1364-2005 §4.10.1.
 pub fn isOverridable(vir: *const Vir, p: Inst.Index) bool {
+    assert(vir.instructions.items(.tag)[@backingInt(p)] == .param);
     const f = payloadOf(vir, Inst.Param, p).flags;
     return f.kind == .parameter and !f.local;
 }
 
 /// The payload of `pl_node` instruction `i`.
 pub fn payloadOf(vir: *const Vir, comptime T: type, i: Inst.Index) T {
+    assert(Inst.dataKind(vir.instructions.items(.tag)[@backingInt(i)]) == .pl_node);
     return vir.extraData(T, vir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index);
 }
 
@@ -177,6 +185,8 @@ pub fn payloadOf(vir: *const Vir, comptime T: type, i: Inst.Index) T {
 /// specified value outside the kind's domain, E0908 for one kind given
 /// under two spellings.
 pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const Given, dps: []const Dp, file: Zcu.File.Index, src: Inst.Ref) Allocator.Error!Zcu.Hier {
+    assert(env.positions.count() == env.values.items.len);
+    if (base) |b| assert(b.get(.mfactor) != .none);
     const zcu = s.zcu;
     var specified: std.EnumArray(Zcu.SystemParam, ?struct { value: InternPool.Index, spelling: []const u8 }) = .initFill(null);
     for (givens) |g| {
@@ -213,6 +223,8 @@ pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const G
 
 /// Creates the instance `p` names, then walks its body for its children.
 fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
+    assert(p.name != .empty);
+    if (p.parent != .none) assert(@backingInt(p.parent) < w.zcu.instances.len);
     const s = w.s;
     const zcu = w.zcu;
     const index: Instance.Index = @fromBackingInt(@intCast(zcu.instances.len));
@@ -263,6 +275,8 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
 /// ports, a mix of the two spellings, a name that is no port and a port
 /// named twice (IEEE 1364-2005 §12.3.6). A root binds nothing.
 fn bindPorts(s: *Sema, p: Pending, vir: *const Vir, m: Inst.Module, module: Vir.String) Allocator.Error!Vir.List(Zcu.Port) {
+    if (p.parent != .none) assert(p.src != .none);
+    assert(m.ports.start + m.ports.len <= vir.extra.len);
     const zcu = s.zcu;
     const start: u32 = @intCast(zcu.ports.len);
     const i = p.src.toIndex() orelse return .{ .start = start, .len = 0 };
@@ -317,6 +331,8 @@ fn portNamed(vir: *const Vir, formals: []const Inst.Index, name: []const u8) ?In
 /// E0905's depth when `key` is already on the path from the root to `p`,
 /// or when the tree is past `depth_max`; else null.
 fn recursion(w: *Walk, p: Pending, key: Instance.Key) Allocator.Error!?u32 {
+    assert(key.params != .none);
+    if (p.parent != .none) assert(@backingInt(p.parent) < w.zcu.instances.len);
     const parents = w.zcu.instances.items(.parent);
     const modules = w.zcu.instances.items(.module);
     const params = w.zcu.instances.items(.params);
@@ -334,6 +350,9 @@ fn recursion(w: *Walk, p: Pending, key: Instance.Key) Allocator.Error!?u32 {
 /// One scope's items: its instances (each array element in rising index
 /// order), then its generate constructs, then its defparams.
 fn items(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, body: Vir.Body, prefix: []const u8) Allocator.Error!void {
+    assert(@backingInt(index) < w.zcu.instances.len);
+    const kids_before = w.kids.items.len;
+    defer assert(w.kids.items.len >= kids_before);
     const s = w.s;
     const vir = env.vir;
     const tags = vir.instructions.items(.tag);
@@ -361,6 +380,8 @@ fn items(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, body:
 
 /// One module instance (or each element of an array of them) as a child.
 fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i: Inst.Index, prefix: []const u8) Allocator.Error!void {
+    assert(env.vir.instructions.items(.tag)[@backingInt(i)] == .instance);
+    assert(@backingInt(index) < w.zcu.instances.len);
     const s = w.s;
     const ip = &w.zcu.intern_pool;
     const vir = env.vir;
@@ -403,6 +424,8 @@ fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i:
 
 /// The cell a child named `name` of `parent` binds (`Sema.bound`).
 fn boundTarget(w: *Walk, parent: Instance.Index, name: InternPool.String, target: InternPool.String) Allocator.Error!InternPool.String {
+    assert(@backingInt(parent) < w.zcu.instances.len);
+    assert(name != .empty);
     if (w.s.uses.count() == 0) return target;
     const path = try std.fmt.allocPrint(w.s.arena, "{f}.{s}", .{ w.zcu.fmtPath(parent), w.zcu.intern_pool.stringToSlice(name) });
     return w.s.bound(target, path);
@@ -411,6 +434,8 @@ fn boundTarget(w: *Walk, parent: Instance.Index, name: InternPool.String, target
 /// §6.6.1 a loop generate scheme: the genvar from its first value while the
 /// condition holds, one `name[value]` scope per iteration.
 fn genFor(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, g: Inst.GenFor, prefix: []const u8) Allocator.Error!void {
+    assert(@backingInt(index) < w.zcu.instances.len);
+    assert(env.depth == 0);
     const vir = env.vir;
     const init = storeOf(vir, g.init) orelse return;
     const gv = declOf(vir, init.lhs) orelse return;
@@ -420,6 +445,7 @@ fn genFor(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, g: I
     var n: u32 = 0;
     while (n < loop_max) : (n += 1) {
         try env.genvars.put(w.s.gpa, gv, v);
+        assert(env.genvars.get(gv).? == v);
         const c = (try env.body(g.cond)) orelse return;
         if (!c.isTrue()) return;
         for (vir.body(g.body)) |b| {
@@ -437,6 +463,8 @@ fn genFor(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, g: I
 /// §6.6 a case generate scheme: the first arm a label of which equals the
 /// operand, else the default arm.
 fn genCase(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, g: Inst.GenCase, prefix: []const u8) Allocator.Error!void {
+    assert(@backingInt(index) < w.zcu.instances.len);
+    assert(env.depth == 0);
     const vir = env.vir;
     const operand = (try env.body(g.operand)) orelse return;
     var default: ?Vir.Body = null;

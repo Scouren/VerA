@@ -44,6 +44,8 @@ const TieRule = enum { un_overridden, ranged_locals, unconnected_ports };
 /// paramset of the name, or a chain that never reaches a module), E0911 (no
 /// paramset admits the values) or E0914 (still ambiguous).
 pub fn resolve(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, target: InternPool.String, givens: walk.Run, list: *std.ArrayList(walk.Given), dps: []const defparam.Dp, parent: ?*const Zcu.Hier) Allocator.Error!?Picked {
+    assert(target != .empty);
+    assert(givens.start + givens.len <= list.items.len);
     const zcu = s.zcu;
     var name = target;
     var run = givens;
@@ -82,6 +84,7 @@ pub fn resolve(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, target: InternPool
 /// each overload's target, followed while it names paramsets. Bounded by the
 /// paramset count, so a cycle ends.
 pub fn chainEnds(s: *Sema, name: InternPool.String, out: *std.AutoHashMapUnmanaged(InternPool.String, void)) Allocator.Error!void {
+    assert(name != .empty);
     const zcu = s.zcu;
     var work: std.ArrayList(InternPool.String) = .empty;
     try work.append(s.arena, name);
@@ -103,6 +106,7 @@ pub fn chainEnds(s: *Sema, name: InternPool.String, out: *std.AutoHashMapUnmanag
 /// §6.4.2 the one paramset named `name` that admits `givens`, after the
 /// tie-breaking rules; null after E0904, E0911 or E0914.
 fn select(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, name: InternPool.String, givens: []const walk.Given, dps: []const defparam.Dp) Allocator.Error!?Zcu.Decl {
+    assert(name != .empty);
     var candidates: u32 = 0;
     var live: std.ArrayList(Zcu.Decl) = .empty;
     for (s.zcu.paramsets.items) |d| {
@@ -131,11 +135,13 @@ fn select(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, name: InternPool.String
 }
 
 fn hasParamset(s: *Sema, name: InternPool.String) Allocator.Error!bool {
+    assert(name != .empty);
     for (s.zcu.paramsets.items) |d| if (try nameIs(s, d, name)) return true;
     return false;
 }
 
 fn nameIs(s: *Sema, d: Zcu.Decl, name: InternPool.String) Allocator.Error!bool {
+    assert(s.zcu.declRow(d).kind == .paramset);
     const vir = s.zcu.fileVir(d.file);
     return std.mem.eql(u8, vir.string(s.zcu.declRow(d).name), s.zcu.intern_pool.stringToSlice(name));
 }
@@ -146,6 +152,7 @@ fn nameIs(s: *Sema, d: Zcu.Decl, name: InternPool.String) Allocator.Error!bool {
 /// declared ranges, and the module declares every port the instance
 /// connects. A value or bound that does not fold admits.
 fn admits(s: *Sema, ps: Zcu.Decl, file: Zcu.File.Index, src: Inst.Ref, givens: []const walk.Given, dps: []const defparam.Dp) Allocator.Error!bool {
+    assert(s.zcu.declRow(ps).kind == .paramset);
     const zcu = s.zcu;
     const vir = zcu.fileVir(ps.file);
     const decl = payloadOf(vir, Inst.Paramset, zcu.declRow(ps).inst);
@@ -203,6 +210,7 @@ fn admits(s: *Sema, ps: Zcu.Decl, file: Zcu.File.Index, src: Inst.Ref, givens: [
 /// `exclude` range. A bound that does not fold matches a `from` and misses
 /// an `exclude`, so it admits.
 fn inRanges(env: *Env, v: Const, ranges: []const Inst.ValueRange) Allocator.Error!bool {
+    assert(ranges.len != 0);
     var from = false;
     var inside = false;
     for (ranges) |r| {
@@ -315,6 +323,7 @@ fn instanceConns(zcu: *const Zcu, file: Zcu.File.Index, src: Inst.Ref) ?struct {
 
 /// A module's port names in declaration order, with the Vir they are in.
 fn portNames(s: *Sema, module: Zcu.Decl) Allocator.Error!struct { vir: *const Vir, names: []const Vir.String } {
+    assert(s.zcu.declRow(module).kind != .paramset);
     const vir = s.zcu.fileVir(module.file);
     const m = payloadOf(vir, Inst.Module, s.zcu.declRow(module).inst);
     var names: std.ArrayList(Vir.String) = .empty;

@@ -164,6 +164,10 @@ pub fn body(w: *Walk, insts: []const Inst.Index, depth: u32) Allocator.Error!voi
                 // An unprovable domain is not an error (§4.3.2); it costs
                 // the result its finiteness.
                 if (Air.tag_info.getPtrConst(tag).domain != .all and !w.check(i, tag, data)) a.nan = true;
+                // Code no input in the box reaches defines nothing: its
+                // values are vacuously finite (a larger box that reaches it
+                // must not prove more than this one).
+                if (!w.reached) a = bottom;
                 w.define(i, a);
                 w.classify(i, tag, data);
             },

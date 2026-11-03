@@ -48,6 +48,7 @@ const InternPool = @import("intern_pool");
 const gen = @import("air_passes/gen.zig");
 const examples = @import("air_passes/examples.zig");
 const falsify = @import("air_passes/falsify.zig");
+const bound = @import("air_passes/bound.zig");
 const seed = falsify.seed;
 const loop_cap = falsify.loop_cap;
 const examples_max = falsify.examples_max;
@@ -68,6 +69,8 @@ const planted_points = 50;
 /// The Setup sweeps record a sequence per invariant value per run: the
 /// costliest oracle, so fewer samples per program.
 const setup_points: u32 = if (full) 200 else 50;
+/// Programs the bound-vs-proven table rates, five times each.
+const bound_programs: u32 = if (full) 10_000 else 2_000;
 
 /// The metamorphic sweep's totals.
 const Pair = struct { programs: u64 = 0, compared: u64 = 0, pure: u64 = 0, speculate: u64 = 0, differ: u64 = 0, printed: u32 = 0 };
@@ -301,6 +304,7 @@ fn heldSweep(gpa: Allocator, plant: bool, n_programs: u32, n_points: u32) !Setup
 test {
     _ = examples;
     _ = falsify;
+    _ = bound;
 }
 
 test "Float: each planted bug goes red" {
@@ -327,6 +331,14 @@ test "Float: each planted bug goes red" {
     const wide = try falsify.sweep(gpa, .wide_box, planted_programs, planted_points);
     falsify.report("planted wide_box", wide);
     try std.testing.expect(wide.failed.get(.slice) != 0);
+}
+
+test "Float: a root proven at a probe bound is proven at every smaller one (the default's table)" {
+    // The measurement `default_unknown_bound` was chosen by (Float.zig's
+    // header), and the metamorphic relation it rests on.
+    const t = try bound.measure(std.testing.allocator, bound_programs);
+    bound.print(t);
+    try std.testing.expectEqual(@as(u32, 0), t.breaks);
 }
 
 test "Float: sound on generated programs (falsification)" {

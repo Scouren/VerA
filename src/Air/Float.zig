@@ -25,13 +25,23 @@
 //! on the default bound; the verdict's walk reads them as the box admits
 //! them, and its tables are the ones this struct holds.
 //!
-//! `default_unknown_bound`, measured over the generated programs of
-//! `diff-air-passes` and hand-built device roots (diode `exp(V/vt)`, MOSFET
-//! square law, a BSIM-like rational), fraction of roots `.optimized`:
+//! `default_unknown_bound` is measured (`diff-air-passes`, its
+//! `air_passes/bound.zig`): the roots rated `.optimized` with every probe
+//! in `[-B, B]`, over generated programs and hand-built devices (resistor,
+//! capacitor, diode and Ebers-Moll `exp(V/vt)`, diode with `$vt`, MOSFET
+//! square law, BSIM-like softplus rational, `tanh` limiter):
 //!
-//!   bound (V or A)        1      10     100    1e3    1e4
-//!   generated (4,000)     -      -      -      -      -
-//!   device roots (6)      -      -      -      -      -
+//!   B (V or A)              1        10       100      1e3      1e4
+//!   generated (2,000)       38.5%    36.6%    36.6%    35.1%    35.1%
+//!   devices (8)             7        5        4        4        4
+//!
+//! 1 proves the junctions, but a node voltage past 1 V is everyday; 10 is
+//! the largest bound that keeps the softplus `exp` finite and covers the
+//! supplies of most analog ICs; past it only the polynomial devices stay.
+//! So B = 10: a probe past it runs the strict body, correct and slower. A
+//! junction `exp(V(a,c)/vt)` reads two node voltages, so no generous box
+//! proves it (2B/vt passes 709 at B = 9.2); `$vt` of `$temperature` is
+//! unbounded, so that diode is proven at no bound.
 //!
 //! Cites: VAMS-2023 §3.2, §3.4.2, §4.2.3, §4.2.4, §4.2.5, §4.2.7, §4.2.8,
 //! §4.2.12, §4.3, §4.3.2, §4.4, §4.5.13, §5.8, §5.9, §9.15, §9.19.

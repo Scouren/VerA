@@ -16,6 +16,7 @@
 //! - `pub fn addAlloc(s: *Sema, ty: Sema.Ty) Allocator.Error!Air.Inst.Index`
 //! - `pub fn tyOf(storage: Inst.Storage) Sema.Ty`
 //! - `pub fn foldBody(s: *Sema, unit: *Sema.Unit, b: Vir.Body) Allocator.Error!?eval.Const`
+//! - `pub fn foldRef(s: *Sema, unit: *Sema.Unit, r: Inst.Ref) Allocator.Error!?eval.Const`
 //! - `pub fn intern(s: *Sema, c: eval.Const) Allocator.Error!InternPool.Index`
 //! - `pub fn portDecl(vir: *const Vir, p: Inst.Index) ?Inst.Index`
 
@@ -117,6 +118,19 @@ pub fn foldBody(s: *Sema, unit: *Unit, b: Vir.Body) Allocator.Error!?eval.Const 
     var env = try envOf(s, unit);
     defer env.deinit();
     return env.body(b);
+}
+
+/// The constant value of `r` in `unit`'s instance (genvars bound as the
+/// lowering has them), or null.
+pub fn foldRef(s: *Sema, unit: *Unit, r: Inst.Ref) Allocator.Error!?eval.Const {
+    var env = try envOf(s, unit);
+    defer env.deinit();
+    var it = unit.binds.iterator();
+    while (it.next()) |e| if (e.value_ptr.* == .constant and unit.vir.instructions.items(.tag)[@backingInt(e.key_ptr.*)] == .genvar) {
+        const c = s.zcu.intern_pool.indexToKey(e.value_ptr.constant);
+        if (c == .int and c.int.storage == .small) try env.genvars.put(s.gpa, e.key_ptr.*, c.int.storage.small);
+    };
+    return env.ref(r);
 }
 
 /// Interns a folded constant.
@@ -323,12 +337,10 @@ fn disciplineOf(unit: *const Unit, first: Inst.Index) Vir.String {
 fn ports(s: *Sema, unit: *Unit) Allocator.Error!void {
     const vir = unit.vir;
     const tags = vir.instructions.items(.tag);
+    _ = tags;
     for (vir.body(unit.module.ports)) |p| {
         const first = portDecl(vir, p) orelse continue;
-        const name = vir.string(nameOf(vir, first));
-        const row = try internNode(s, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disciplineOf(unit, first), vir);
-        try unit.binds.put(s.arena, first, .{ .node = row });
-        _ = tags;
+        try declareNet(s, unit, first);
     }
 }
 
@@ -352,10 +364,7 @@ fn nets(s: *Sema, unit: *Unit) Allocator.Error!void {
         const first = canonical(vir, i);
         if (unit.binds.contains(first) or child_ports.contains(first)) continue;
         if (tag == .io and tags[@backingInt(first)] == .io and !hasNet(unit, first)) continue;
-        const name = vir.string(nameOf(vir, first));
-        const row = try internNode(s, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disciplineOf(unit, first), vir);
-        // §3.6.4 a `ground` net keeps its row, and its name reads the reference node.
-        try unit.binds.put(s.arena, first, .{ .node = if (isGround(unit, first)) .ground else row });
+        try declareNet(s, unit, first);
     }
 }
 
@@ -367,6 +376,46 @@ fn isGround(unit: *const Unit, first: Inst.Index) bool {
         if (payloadOf(vir, Inst.Net, i).flags.net == .ground) return true;
     }
     return false;
+}
+
+/// One net or port: a row, or a §3.6.3 vector's rows msb first (`name[k]`).
+/// §3.6.4 a `ground` net keeps its row, and its name reads the reference node.
+fn declareNet(s: *Sema, unit: *Unit, first: Inst.Index) Allocator.Error!void {
+    const vir = unit.vir;
+    const name = vir.string(nameOf(vir, first));
+    const disc = disciplineOf(unit, first);
+    if (try vectorRange(s, unit, first)) |r| {
+        const at: u32 = @intCast(unit.vec_rows.items.len);
+        const n: u32 = @intCast(@abs(r[0] - r[1]) + 1);
+        for (0..n) |k| {
+            const i: i64 = if (r[0] >= r[1]) r[0] - @as(i64, @intCast(k)) else r[0] + @as(i64, @intCast(k));
+            try unit.vec_rows.append(s.arena, try internNode(s, try std.fmt.allocPrint(s.arena, "{s}{s}[{d}]", .{ unit.prefix, name, i }), disc, vir));
+        }
+        try unit.binds.put(s.arena, first, .{ .vector = .{ .first = at, .len = n, .msb = r[0], .lsb = r[1] } });
+        return;
+    }
+    const row = try internNode(s, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disc, vir);
+    try unit.binds.put(s.arena, first, .{ .node = if (isGround(unit, first)) .ground else row });
+}
+
+/// The folded `[msb:lsb]` any declaration of `first`'s name carries, or null.
+fn vectorRange(s: *Sema, unit: *Unit, first: Inst.Index) Allocator.Error!?[2]i64 {
+    const vir = unit.vir;
+    for ([_]Vir.Body{ unit.module.ports, unit.module.body }) |body| for (vir.body(body)) |i| {
+        const tag = vir.instructions.items(.tag)[@backingInt(i)];
+        if (tag != .net and tag != .io) continue;
+        if (canonical(vir, i) != first) continue;
+        const range = if (tag == .net) payloadOf(vir, Inst.Net, i).range else payloadOf(vir, Inst.Io, i).range;
+        const insts = vir.body(range);
+        if (insts.len == 0) continue;
+        const bin = payloadOf(vir, Inst.Bin, insts[insts.len - 1]);
+        var env = try envOf(s, unit);
+        defer env.deinit();
+        const msb = ((try env.ref(bin.lhs)) orelse return null).asIntExact() orelse return null;
+        const lsb = ((try env.ref(bin.rhs)) orelse return null).asIntExact() orelse return null;
+        return .{ msb, lsb };
+    };
+    return null;
 }
 
 /// Whether a `net` declares the name `first` (an `io`) names too.

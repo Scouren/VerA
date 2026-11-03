@@ -17,6 +17,7 @@
 //! - `pub const Tag = enum(u8)` (`fromName`)
 //! - `pub const Ty`, `pub const Arity` (`exactly`, `admits`), `pub const Family`, `pub const Context`, `pub const Math`
 //! - `pub const Info = struct`
+//! - `pub const foreign: std.StaticStringMap(Context)`
 //! - `pub const table: std.EnumArray(Tag, Info)`
 //! - `pub fn get(tag: Tag) *const Info`
 
@@ -264,8 +265,9 @@ pub const Family = enum(u8) {
     kernel,
 };
 
-/// The contexts a call may stand in (§7.2.2).
-pub const Context = enum(u8) { both, analog, digital };
+/// The contexts a call may stand in (§7.2.2, §9.2, §9.22); `connect` is a
+/// connect module's digital context only.
+pub const Context = enum(u8) { both, analog, digital, connect };
 
 /// §4.3 the math functions a call computes, one per Table 4-14/4-15 row.
 pub const Math = enum(u8) { sqrt, exp, expm1, ln, ln1p, log10, pow, hypot, floor, ceil, abs, min, max, sin, cos, tan, asin, acos, atan, atan2, sinh, cosh, tanh, asinh, acosh, atanh };
@@ -279,6 +281,29 @@ pub const Info = struct {
     /// The §4.3 function a `math` row computes.
     math: ?Math = null,
 };
+
+/// The calls of the other contexts no row names, by spelling: §9.2 Tables
+/// 9-19/9-20's digital-only tasks and functions (an analog call is E0806)
+/// and §9.22's driver access functions, a connect module's only (E0818).
+/// Nothing lowers them, so they have no `Tag`.
+pub const foreign = std.StaticStringMap(Context).initComptime(pairs(.digital, &.{
+    "$monitorb",         "$monitorh",         "$monitoro",        "$fdisplayb",
+    "$fdisplayh",        "$fdisplayo",        "$fwriteb",         "$fwriteh",
+    "$fwriteo",          "$fstrobeb",         "$fstrobeh",        "$fstrobeo",
+    "$fmonitorb",        "$fmonitorh",        "$fmonitoro",       "$swriteb",
+    "$swriteh",          "$swriteo",          "$fgetc",           "$ungetc",
+    "$fread",            "$readmemb",         "$readmemh",        "$sdf_annotate",
+    "$printtimescale",   "$timeformat",       "$async$and$array", "$async$and$plane",
+    "$async$nand$array", "$async$nand$plane", "$async$or$array",  "$async$or$plane",
+    "$async$nor$array",  "$async$nor$plane",  "$sync$and$array",  "$sync$and$plane",
+    "$sync$nand$array",  "$sync$nand$plane",  "$sync$or$array",   "$sync$or$plane",
+    "$sync$nor$array",   "$sync$nor$plane",   "$q_initialize",    "$q_remove",
+    "$q_exam",           "$q_add",            "$q_full",          "$time",
+    "$stime",            "$signed",           "$unsigned",
+}) ++ pairs(.connect, &.{
+    "$driver_count", "$receiver_count",    "$driver_state",         "$driver_strength",
+    "$driver_delay", "$driver_next_state", "$driver_next_strength", "$driver_type",
+}));
 
 /// Per-tag facts, total over `Tag`.
 pub const table = std.EnumArray(Tag, Info).init(.{
@@ -342,7 +367,7 @@ pub const table = std.EnumArray(Tag, Info).init(.{
     .@"$vt" = query(.real, .{ .max = 1 }),
     .@"$mfactor" = query(.real, .exactly(0)),
     .@"$abstime" = query(.real, .exactly(0)),
-    .@"$realtime" = query(.real, .{ .max = 1 }),
+    .@"$realtime" = .{ .ty = .real, .args = .{ .max = 1 }, .family = .query, .context = .digital },
     .@"$simparam" = query(.real, .{ .min = 1, .max = 2 }),
     .@"$simparam$str" = query(.str, .{ .min = 1, .max = 2 }),
     .@"$param_given" = query(.int, .exactly(1)),
@@ -386,20 +411,20 @@ pub const table = std.EnumArray(Tag, Info).init(.{
     .@"$hypot" = math2(.hypot),
     .@"$atan2" = math2(.atan2),
     .@"$display" = display,
-    .@"$displayb" = display,
-    .@"$displayo" = display,
-    .@"$displayh" = display,
+    .@"$displayb" = .{ .ty = .none, .family = .display, .context = .digital },
+    .@"$displayo" = .{ .ty = .none, .family = .display, .context = .digital },
+    .@"$displayh" = .{ .ty = .none, .family = .display, .context = .digital },
     .@"$write" = display,
-    .@"$writeb" = display,
-    .@"$writeo" = display,
-    .@"$writeh" = display,
+    .@"$writeb" = .{ .ty = .none, .family = .display, .context = .digital },
+    .@"$writeo" = .{ .ty = .none, .family = .display, .context = .digital },
+    .@"$writeh" = .{ .ty = .none, .family = .display, .context = .digital },
     .@"$strobe" = display,
-    .@"$strobeb" = display,
-    .@"$strobeo" = display,
-    .@"$strobeh" = display,
+    .@"$strobeb" = .{ .ty = .none, .family = .display, .context = .digital },
+    .@"$strobeo" = .{ .ty = .none, .family = .display, .context = .digital },
+    .@"$strobeh" = .{ .ty = .none, .family = .display, .context = .digital },
     .@"$monitor" = display,
-    .@"$monitoron" = .{ .ty = .none, .args = .exactly(0), .family = .display },
-    .@"$monitoroff" = .{ .ty = .none, .args = .exactly(0), .family = .display },
+    .@"$monitoron" = .{ .ty = .none, .args = .exactly(0), .family = .display, .context = .digital },
+    .@"$monitoroff" = .{ .ty = .none, .args = .exactly(0), .family = .display, .context = .digital },
     .@"$debug" = display,
     .@"$fatal" = display,
     .@"$error" = display,
@@ -462,6 +487,11 @@ pub fn get(tag: Tag) *const Info {
 
 // ---- private ----
 
+fn pairs(comptime c: Context, comptime names: []const []const u8) [names.len]struct { []const u8, Context } {
+    var out: [names.len]struct { []const u8, Context } = undefined;
+    for (names, &out) |n, *o| o.* = .{ n, c };
+    return out;
+}
 fn op(args: Arity) Info {
     return .{ .ty = .real, .args = args, .family = .analog_op, .context = .analog };
 }

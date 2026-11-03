@@ -45,8 +45,12 @@ pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Erro
     const vir = b.unit.vir;
     const name = vir.string(c.name);
     const args = vir.list(Inst.Ref, c.args);
-    const tag = SysFn.Tag.fromName(name) orelse return userCall(s, b, args, .real);
+    const tag = SysFn.Tag.fromName(name) orelse {
+        if (try refuseForeign(s, b, name, src)) return expr.poison;
+        return userCall(s, b, args, .real);
+    };
     const info = SysFn.get(tag);
+    if (try refuseContext(s, b, tag, src)) return expr.poison;
     if (!info.args.admits(args.len)) {
         try s.fail(.E0506, b.unit.file, src, "`{s}` takes {d} to {d}, given {d}", .{ name, info.args.min, info.args.max, args.len });
         return expr.poison;
@@ -87,10 +91,12 @@ pub fn task(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error
     const name = vir.string(c.name);
     const args = vir.list(Inst.Ref, c.args);
     const tag = SysFn.Tag.fromName(name) orelse {
+        if (try refuseForeign(s, b, name, src)) return;
         _ = try userCall(s, b, args, null);
         return;
     };
     const info = SysFn.get(tag);
+    if (try refuseContext(s, b, tag, src)) return;
     switch (info.family) {
         .display, .file_out, .simctl, .string => {},
         else => {
@@ -204,6 +210,33 @@ fn portConnected(s: *Sema, b: *Block, args: []const Inst.Ref, src: Inst.Ref) All
         if (decl.portDecl(vir, f) == port.?) break act != .none;
     } else false;
     return .{ .ref = .fromIntern(if (connected) .one else .zero), .ty = .integer };
+}
+
+/// §9.2 a digital-context name in an analog block is E0806; §9.22 a driver
+/// access function outside a connect module E0818 (and in one's analog
+/// block E0806).
+fn refuseContext(s: *Sema, b: *Block, tag: SysFn.Tag, src: Inst.Ref) Allocator.Error!bool {
+    return refuseIn(s, b, SysFn.get(tag).context, @tagName(tag), src);
+}
+
+/// `refuseContext` for a spelling of `SysFn.foreign`.
+fn refuseForeign(s: *Sema, b: *Block, name: []const u8, src: Inst.Ref) Allocator.Error!bool {
+    return refuseIn(s, b, SysFn.foreign.get(name) orelse return false, name, src);
+}
+
+fn refuseIn(s: *Sema, b: *Block, context: SysFn.Context, name: []const u8, src: Inst.Ref) Allocator.Error!bool {
+    switch (context) {
+        .both, .analog => return false,
+        .digital => try s.fail(.E0806, b.unit.file, src, "`{s}`", .{name}),
+        .connect => {
+            const in_cm = b.unit.module.flags.kind == .connectmodule;
+            if (in_cm and !std.mem.eql(u8, name, "$receiver_count"))
+                try s.fail(.E0806, b.unit.file, src, "`{s}` in the analog block of a connect module", .{name})
+            else
+                try s.fail(.E0818, b.unit.file, src, "`{s}` can only be called from a connect module", .{name});
+        },
+    }
+    return true;
 }
 
 /// Each argument lowered, in order; an omitted one is a real 0.

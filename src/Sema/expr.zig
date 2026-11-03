@@ -306,7 +306,10 @@ fn declRef(s: *Sema, b: *Block, d: Inst.Index, src: Inst.Ref) Allocator.Error!Va
                 else => .integer, // else: a genvar's integer
             },
         },
-        .node, .vector, .branch => refuse(s, b, src, "a net or branch read as a value"),
+        .node, .vector, .branch => {
+            try s.fail(.E0315, b.unit.file, src, "a net or branch is not a value; read it through an access function", .{});
+            return poison;
+        },
     };
 }
 

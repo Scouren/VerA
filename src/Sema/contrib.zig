@@ -229,39 +229,73 @@ fn target(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src: In
         try s.fail(.E0512, unit.file, src, "`{s}` with {d} arguments", .{ name, args.len });
         return null;
     }
-    const first = args[0].toIndex() orelse return null;
-    if (vir.instructions.items(.tag)[@backingInt(first)] != .decl_ref) {
-        try s.fail(.E0512, unit.file, src, "an access of a select or a hierarchical name is not lowered by Sema yet", .{});
-        return null;
-    }
-    const bind = unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(first)].decl_tok.decl)) orelse {
-        try s.fail(.E0512, unit.file, src, "an access of a name with no node", .{});
-        return null;
+    if (args.len == 1) if (args[0].toIndex()) |a| if (vir.instructions.items(.tag)[@backingInt(a)] == .decl_ref) {
+        if (unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(a)].decl_tok.decl))) |bind| if (bind == .branch) {
+            const row = s.device.branches.get(@backingInt(bind.branch) - 1);
+            return canonical(accessOn(s, name, global, row.hi, row.lo), row.hi, row.lo, bind.branch);
+        };
     };
-    if (bind == .branch and args.len == 1) {
-        const row = s.device.branches.get(@backingInt(bind.branch) - 1);
-        return canonical(accessOn(s, name, global, row.hi, row.lo), row.hi, row.lo, bind.branch);
-    }
-    if (bind != .node) {
-        try s.fail(.E0512, unit.file, src, "an access of a vector or a non-net", .{});
-        return null;
-    }
-    const hi = bind.node;
-    const lo: Node.Index = if (args.len == 1) .ground else blk: {
-        const second = args[1].toIndex() orelse return null;
-        if (vir.instructions.items(.tag)[@backingInt(second)] != .decl_ref) {
-            try s.fail(.E0512, unit.file, src, "an access of a select is not lowered by Sema yet", .{});
-            return null;
-        }
-        const lb = unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(second)].decl_tok.decl)) orelse return null;
-        if (lb != .node) return null;
-        break :blk lb.node;
-    };
+    const hi = (try nodeOf(s, unit, args[0], src)) orelse return null;
+    const lo: Node.Index = if (args.len == 1) .ground else (try nodeOf(s, unit, args[1], src)) orelse return null;
     if (args.len == 2 and hi == lo and hi != .ground) {
         try s.fail(.E0315, unit.file, src, "`{s}` names one signal twice", .{name});
         return null;
     }
     return canonical(accessOn(s, name, global, hi, lo), hi, lo, .unnamed);
+}
+
+/// The node a terminal names: a scalar net, or an element of a vector by
+/// a constant index (§3.6.3); null after a diagnostic.
+fn nodeOf(s: *Sema, unit: *Sema.Unit, r: Inst.Ref, src: Inst.Ref) Allocator.Error!?Node.Index {
+    const vir = unit.vir;
+    const i = r.toIndex() orelse return null;
+    switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .decl_ref => {
+            const bind = unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl)) orelse {
+                try s.fail(.E0512, unit.file, src, "an access of a name with no node", .{});
+                return null;
+            };
+            switch (bind) {
+                .node => |n| return n,
+                .vector => {
+                    try s.fail(.E0512, unit.file, src, "an access of a whole vector", .{});
+                    return null;
+                },
+                else => {
+                    try s.fail(.E0512, unit.file, src, "an access of a name with no node", .{});
+                    return null;
+                },
+            }
+        },
+        .elem => {
+            const x = decl.payloadOf(vir, Inst.Bin, i);
+            const base = x.lhs.toIndex() orelse return null;
+            if (vir.instructions.items(.tag)[@backingInt(base)] != .decl_ref) {
+                try s.fail(.E0512, unit.file, src, "an access of a select of a select", .{});
+                return null;
+            }
+            const bind = unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(base)].decl_tok.decl)) orelse return null;
+            if (bind != .vector) {
+                try s.fail(.E0351, unit.file, src, "the net was not declared with a range", .{});
+                return null;
+            }
+            const v = bind.vector;
+            const k = ((try decl.foldRef(s, unit, x.rhs)) orelse {
+                try s.fail(.E0512, unit.file, src, "an access of a vector element at a run-time index", .{});
+                return null;
+            }).asIntExact() orelse return null;
+            if (k < @min(v.msb, v.lsb) or k > @max(v.msb, v.lsb)) {
+                try s.fail(.E0352, unit.file, src, "{d} is not an element of [{d}:{d}]", .{ k, v.msb, v.lsb });
+                return null;
+            }
+            const off: u32 = @intCast(if (v.msb >= v.lsb) v.msb - k else k - v.msb);
+            return unit.vec_rows.items[v.first + off];
+        },
+        else => {
+            try s.fail(.E0512, unit.file, src, "an access of a select or a hierarchical name is not lowered by Sema yet", .{});
+            return null;
+        },
+    }
 }
 
 /// §3.6.2 the access `name` is on the discipline of the pair's non-ground node.

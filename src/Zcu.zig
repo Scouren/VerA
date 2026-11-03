@@ -22,8 +22,8 @@
 //! (the last cell of a name).
 //!
 //! Contents:
-//! - fields `gpa`, `intern_pool`, `files`, `modules`, `paramsets`, `instances`, `instance_map`, `defparams`, `failed`
-//! - `pub const File` (`File.Index`), `pub const Decl` (`none`), `pub const Instance` (`Index`, `Key`), `pub const Defparam`, `pub const Failure`
+//! - fields `gpa`, `intern_pool`, `files`, `modules`, `paramsets`, `disciplines`, `natures`, `instances`, `instance_map`, `ports`, `defparams`, `net_discipline`, `inserts`, `failed`
+//! - `pub const File` (`File.Index`), `pub const Decl` (`none`), `pub const Instance` (`Index`, `Key`), `pub const Port`, `pub const Defparam`, `pub const NetKey`, `pub const Insert`, `pub const Failure`
 //! - `pub const SystemParam` (`fromName`, `initial`, `allows`, `domain`), `pub const Hier`, `pub const PathFormatter`
 //! - `pub const instances_max: u32`
 //! - `pub fn init(gpa: Allocator) Allocator.Error!Zcu`
@@ -52,14 +52,27 @@ modules: std.AutoArrayHashMapUnmanaged(InternPool.String, Decl) = .empty,
 /// §6.4: every paramset in file then source order; several may share a
 /// name (§6.4.2 chooses among them per instance).
 paramsets: std.ArrayList(Decl) = .empty,
+/// §3.6.2: each discipline and nature name's last declaration (the Annex D
+/// prelude's come first, so a source's own wins).
+disciplines: std.AutoArrayHashMapUnmanaged(InternPool.String, Decl) = .empty,
+natures: std.AutoArrayHashMapUnmanaged(InternPool.String, Decl) = .empty,
 /// The elaborated instance tree, depth-first preorder: each root, then its
 /// descendants before the next root.
 instances: std.MultiArrayList(Instance) = .empty,
 /// The first instance of each key: the one a per-instance analysis runs on.
 instance_map: std.AutoHashMapUnmanaged(Instance.Key, Instance.Index) = .empty,
+/// §6.2.2 every instance's port bindings: a run per instance
+/// (`Instance.ports`), one row per port of its module in declaration order.
+ports: std.MultiArrayList(Port) = .empty,
 /// §6.3.1: every defparam that set a parameter, by the instance and the
 /// parameter's name, to the value it set.
 defparams: std.AutoArrayHashMapUnmanaged(Defparam, InternPool.Index) = .empty,
+/// Annex F: the discipline every port-connected net of every instance
+/// resolved to (declared, or from the segments below it), by name.
+net_discipline: std.AutoHashMapUnmanaged(NetKey, InternPool.String) = .empty,
+/// §7.8.4 every port a connect module was inserted on: the bridge takes
+/// the port's upper connection, the port the bridge's other port.
+inserts: std.MultiArrayList(Insert) = .empty,
 /// Every diagnostic elaboration raised, in the order raised.
 failed: std.MultiArrayList(Failure) = .empty,
 
@@ -109,12 +122,20 @@ pub const Instance = struct {
     /// §9.18 Table 9-29: each hierarchical system parameter's value here,
     /// its specified value composed with the parent's.
     hier: Hier,
+    /// Its rows of `ports`; empty for a root.
+    ports: Vir.List(Port),
 
     pub const Index = enum(u32) { none = std.math.maxInt(u32), _ };
 
     /// What makes two instances one analysis.
     pub const Key = struct { module: Decl, params: InternPool.Index };
 };
+
+/// One §6.2.2 port binding: the port as the child's module declares it
+/// (an `io` of an ANSI header, a `port` of another) and the connection the
+/// instance gives it in the parent's file, none when it leaves the port
+/// unconnected (a blank, or not mentioned).
+pub const Port = struct { formal: Vir.Inst.Index, actual: Vir.Inst.Ref };
 
 /// One §9.18 Table 9-29 hierarchical system parameter; the tag is its
 /// spelling without the `$` (§6.3.6 names exactly these six).
@@ -171,6 +192,14 @@ pub const Hier = std.EnumArray(SystemParam, InternPool.Index);
 /// A §6.3.1 defparam's target: an instance and one of its parameters.
 pub const Defparam = struct { instance: Instance.Index, name: InternPool.String };
 
+/// A net of an instance, by name.
+pub const NetKey = struct { instance: Instance.Index, net: InternPool.String };
+
+/// One §7.8.4 insertion: port `port` (a header port of the instance's
+/// module) of `instance`, re-pointed at the connect-module instance
+/// `bridge`, a child of `instance`'s parent.
+pub const Insert = struct { instance: Instance.Index, port: Vir.Inst.Index, bridge: Instance.Index };
+
 /// One diagnostic: its code, the file and instruction it is about (none
 /// when it is about the design as a whole) and its message.
 pub const Failure = struct {
@@ -212,7 +241,8 @@ pub const instances_max: u32 = 1 << 24;
 comptime {
     // A hot row, read by column: two unit handles, three indexes, one ref.
     assert(@sizeOf(Decl) == 8);
-    assert(2 * @sizeOf(Decl) + 4 * 4 + @sizeOf(Hier) == @sizeOf(Instance));
+    assert(2 * @sizeOf(Decl) + 6 * 4 + @sizeOf(Hier) == @sizeOf(Instance));
+    assert(@sizeOf(Port) == 8);
 }
 
 const Zcu = @This();
@@ -229,9 +259,14 @@ pub fn deinit(zcu: *Zcu) void {
     zcu.files.deinit(gpa);
     zcu.modules.deinit(gpa);
     zcu.paramsets.deinit(gpa);
+    zcu.disciplines.deinit(gpa);
+    zcu.natures.deinit(gpa);
     zcu.instances.deinit(gpa);
     zcu.instance_map.deinit(gpa);
+    zcu.ports.deinit(gpa);
     zcu.defparams.deinit(gpa);
+    zcu.net_discipline.deinit(gpa);
+    zcu.inserts.deinit(gpa);
     zcu.failed.deinit(gpa);
     zcu.* = undefined;
 }

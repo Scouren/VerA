@@ -16,6 +16,10 @@ test {
     _ = Sema;
     _ = @import("Sema/eval.zig");
     _ = @import("Sema/walk.zig");
+    _ = @import("Sema/defparam.zig");
     _ = @import("Sema/paramset.zig");
+    _ = @import("Sema/checks.zig");
+    _ = @import("Sema/discipline.zig");
+    _ = @import("Sema/connect.zig");
     _ = @import("Sema/test.zig");
 }

@@ -71,9 +71,9 @@ fn expectCodes(src: [:0]const u8, config: Sema.Config, want: []const Diag.Code) 
 
 test "§6.2.2 the root is the module nothing instantiates, whatever the source order; children depth first" {
     try expectTree(
-        \\module kid(a); inout a; electrical a; endmodule
-        \\module mid(a); inout a; electrical a; kid k1(a); kid k2(a); endmodule
-        \\module top(p); inout p; electrical p; mid m1(p); kid k(p); endmodule
+        \\module kid(a); inout a; endmodule
+        \\module mid(a); inout a; kid k1(a); kid k2(a); endmodule
+        \\module top(p); inout p; mid m1(p); kid k(p); endmodule
     , .{},
         \\top top
         \\top.m1 mid
@@ -194,4 +194,95 @@ test "§6.4.2 no admitting paramset is E0911" {
         \\paramset nch dev; parameter real l = 1 from [0:10); .l = l; endparamset
         \\module top; nch #(.l(20)) u(); endmodule
     , .{}, &.{.E0911});
+}
+
+test "§6.5.5 a connection list is all ordered or all named, no longer than the ports, each port once (E0906)" {
+    try expectCodes(
+        \\module kid(a, b); inout a, b; endmodule
+        \\module top(p, n); inout p, n;
+        \\  kid u1(p, n, n); kid u2(p, .b(n)); kid u3(.a(p), n); kid u4(.zz(p)); kid u5(.a(p), .a(n));
+        \\  kid ok1(p, n); kid ok2(.b(n), .a(p)); kid ok3(p);
+        \\endmodule
+    , .{}, &.{ .E0906, .E0906, .E0906, .E0906, .E0906 });
+}
+
+test "§9.18 Table 9-29 composes the hierarchical system parameters; one outside its domain is E0890" {
+    try expectTree(
+        \\module leaf; endmodule
+        \\module kid; if ($mfactor > 5 && $angle == 30) leaf big(); endmodule
+        \\module mid; kid #(.$mfactor(3), .$angle(10)) k(); endmodule
+        \\module top; mid #(.$mfactor(2), .$angle(380 - 360)) m(); endmodule
+    , .{}, "top top\ntop.m mid\ntop.m.k kid\ntop.m.k.genblk1.big leaf\n");
+    try expectCodes(
+        \\module kid; endmodule
+        \\module top; kid #(.$angle(360)) a(); kid #(.$mfactor(0)) b(); kid #(.$hflip(2)) c(); kid #(.$vflip(-1)) d(); endmodule
+    , .{}, &.{ .E0890, .E0890, .E0890 });
+}
+
+test "A.2.1.3 a net names a declared discipline (E0371); a module defined again is W1152" {
+    try expectCodes(
+        \\discipline ca; domain continuous; enddiscipline
+        \\module top(p); inout p; ca p; kid c1; nowhere n; endmodule
+        \\module kid(a); inout a; ca a; endmodule
+        \\module kid(a); inout a; ca a; endmodule
+    , .{}, &.{ .W1152, .E0371, .E0371 });
+}
+
+test "§3.4.2 a paramset range's first bound is below its second (E0347)" {
+    try expectCodes(
+        \\module dev; parameter real l = 1; endmodule
+        \\paramset p dev; parameter real l = 1 from [10:2); .l = l; endparamset
+        \\paramset p dev; parameter real l = 1 from [2:10); .l = l; endparamset
+        \\module top; endmodule
+    , .{}, &.{.E0347});
+}
+
+test "§7.7 a connect statement names a connect module (E0915) and one discrete, one continuous discipline (E0923); Table 7-2 (E0982)" {
+    try expectCodes(
+        \\discipline el; potential V; enddiscipline
+        \\nature V; access = V; endnature
+        \\discipline dg; domain discrete; enddiscipline
+        \\connectmodule cm(a, d); input a; output d; el a; dg d; endmodule
+        \\connectmodule bad(a, d); input a; input d; el a; dg d; endmodule
+        \\module plain(a); input a; endmodule
+        \\connectrules r; connect cm; connect plain; connect nowhere; connect cm el, el; connect bad; connect el, dg resolveto nothing; endconnectrules
+        \\module top; endmodule
+    , .{}, &.{ .E0915, .E0915, .E0923, .E0982, .E0916 });
+}
+
+test "§7.8.4 a mixed port gets a connect module in its upper connection's module: merged by default, one per port when split (§7.8.5 names)" {
+    const src =
+        \\nature V; access = V; endnature
+        \\discipline ca; potential V; enddiscipline
+        \\discipline dd; domain discrete; enddiscipline
+        \\module top; ca a; din u1(a); din u2(a); endmodule
+        \\connectmodule a2d(el, cm); input el; output cm; ca el; dd cm; endmodule
+        \\module din(d); input d; dd d; endmodule
+        \\connectrules r; connect a2d{s}; endconnectrules
+    ;
+    var buf: [1024]u8 = undefined;
+    try expectTree(try std.mem.printSentinel(&buf, src, .{""}, 0), .{}, "top top\ntop.u1 din\ntop.u2 din\ntop.a__a2d__dd a2d\n");
+    try expectTree(try std.mem.printSentinel(&buf, src, .{" split"}, 0), .{}, "top top\ntop.u1 din\ntop.u2 din\ntop.a__u1__d a2d\ntop.a__u2__d a2d\n");
+}
+
+test "§7.8.4 a mixed port no statement bridges is E0927; one two statements match is E0922" {
+    try expectCodes(
+        \\nature V; access = V; endnature
+        \\discipline ca; potential V; enddiscipline
+        \\discipline dd; domain discrete; enddiscipline
+        \\module top; ca a; din u1(a); endmodule
+        \\module din(d); output d; dd d; endmodule
+        \\connectmodule a2d(el, cm); input el; output cm; ca el; dd cm; endmodule
+        \\connectrules r; connect a2d; endconnectrules
+    , .{}, &.{.E0927});
+    try expectCodes(
+        \\nature V; access = V; endnature
+        \\discipline ca; potential V; enddiscipline
+        \\discipline dd; domain discrete; enddiscipline
+        \\module top; ca a; din u1(a); endmodule
+        \\module din(d); input d; dd d; endmodule
+        \\connectmodule a2d(el, cm); input el; output cm; ca el; dd cm; endmodule
+        \\connectmodule b2d(el, cm); input el; output cm; ca el; dd cm; endmodule
+        \\connectrules r; connect a2d; connect b2d; endconnectrules
+    , .{}, &.{.E0922});
 }

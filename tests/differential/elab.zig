@@ -5,7 +5,9 @@
 //! disagrees). The old preprocessor makes both sides' text, as in
 //! diff-astgen. Checks, in order:
 //! - codes (`.va`/`.vams`): the set of codes the old `elab.elaborate` adds
-//!   to its bag equals the set in `Zcu.failed`;
+//!   to its bag equals the set in `Zcu.failed` plus the per-file codes of
+//!   `Vir.diag` the old elaboration owns (`elab_codes`: AstGen judges a few
+//!   of its rules alone, E0373 and E0376);
 //! - tree: when the old side elaborates, every instance's hierarchical path
 //!   and module name, in order (`.va`/`.vams`: `Design.units`, one root; `.v`:
 //!   the instance scopes of `sim.digital.elaborate`'s `Run.hier`, every root,
@@ -32,6 +34,9 @@ const sim = @import("sim");
 const options = @import("rewrite_options");
 const Zcu = sema.Zcu;
 const Sema = sema.Sema;
+
+/// Every code the old `src/elab` reports: the codes this oracle compares.
+const elab_codes = [_][]const u8{ "E0235", "E0237", "E0239", "E0247", "E0337", "E0347", "E0355", "E0358", "E0363", "E0371", "E0373", "E0375", "E0376", "E0501", "E0816", "E0890", "E0901", "E0902", "E0903", "E0904", "E0905", "E0906", "E0907", "E0908", "E0909", "E0911", "E0914", "E0915", "E0916", "E0917", "E0921", "E0922", "E0923", "E0927", "E0929", "E0952", "E0982", "E0997", "W0252", "W0950", "W0951", "W1152" };
 
 const Tally = struct {
     compared: u32 = 0,
@@ -293,6 +298,10 @@ fn newSide(arena: std.mem.Allocator, path: []const u8, text: [:0]const u8, digit
     }
     var codes: std.ArrayList([]const u8) = .empty;
     for (zcu.failed.items(.code)) |c| try codes.append(arena, @tagName(c));
+    for (vir.diag.messages()) |m| {
+        const name = @tagName(vir.diag.message(m).tag.code);
+        for (elab_codes) |c| if (std.mem.eql(u8, c, name)) try codes.append(arena, name);
+    }
     return .{ .tree = lines.items, .codes = try setOf(arena, codes.items) };
 }
 

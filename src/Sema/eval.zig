@@ -52,6 +52,9 @@ pub const Env = struct {
     /// A value from outside the declaration: an override, a defparam or a
     /// paramset statement. Wins over the declared default.
     given: std.AutoHashMapUnmanaged(Inst.Index, InternPool.Index) = .empty,
+    /// The name each `given` value was given under (an alias's, or the
+    /// parameter's own), for §3.4.7's E0908.
+    spelling: std.AutoHashMapUnmanaged(Inst.Index, []const u8) = .empty,
     /// §6.6.1 the genvars the generate walk has bound.
     genvars: std.AutoHashMapUnmanaged(Inst.Index, i64) = .empty,
     /// Parameters being folded: a read of one of these closes a cycle.
@@ -83,6 +86,7 @@ pub const Env = struct {
         env.aliases.deinit(env.gpa);
         env.values.deinit(env.gpa);
         env.given.deinit(env.gpa);
+        env.spelling.deinit(env.gpa);
         env.genvars.deinit(env.gpa);
         env.busy.deinit(env.gpa);
         env.* = undefined;

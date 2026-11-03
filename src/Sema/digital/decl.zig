@@ -205,6 +205,10 @@ fn instance(w: *Walk, k: u32) Error!void {
         };
         try w.conns.put(l.a, inner, .{ .actual = actual, .frame = if (actual == .none) none else w.placed[k].frame, .lane = w.placed[k].lane });
     }
+    // A.1.3 the header's `#( parameter ... )` list, before the body's items.
+    for (vir.body(m.params)) |p| if (Lower.tag(vir, p) == .param) {
+        _ = try vars.param(l, f, p);
+    };
     try items(w, f, scope, if (m.flags.ansi) m.ports else .empty, m.body, "");
 }
 

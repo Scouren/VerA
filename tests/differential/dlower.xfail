@@ -6,8 +6,6 @@
 # line goes.
 verilog/03_lexical_conventions/ams_lexical_escaped_hierarchy.v lowering: an instance the elaboration did not make
 verilog/04_data_types/array_17_dimensions.v lowering: a continuous assignment to a net array element
-verilog/04_data_types/port_list_parameter_defparam.v lowering: a name declared by `param` that has no slot
-verilog/04_data_types/time_parameter_is_unsigned_64.v lowering: a name declared by `param` that has no slot
 verilog/04_data_types/type_net_array.v lowering: a continuous assignment to a net array element
 verilog/05_expressions/concatenation.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
 verilog/05_expressions/native_wide_index_edges.v lowering: a range past 2^32 bits
@@ -27,14 +25,9 @@ verilog/12_hierarchy/generate_region_optional.v lowering: a constant expression 
 verilog/12_hierarchy/hierarchical_task_call_suspends.v lowering: a hierarchical task or function name
 verilog/12_hierarchy/hierarchy_explicit_port_concat.v lowering: a port expression (§12.3.6)
 verilog/12_hierarchy/inout_net_expressions.v lowering: an inout port joined to a select, a concatenation or a net of another width
-verilog/12_hierarchy/instance_array_concat_port.v lowering: an output port connected to a select or an expression
-verilog/12_hierarchy/module_header_forms.v lowering: a name declared by `param` that has no slot
 verilog/12_hierarchy/null_port_combinations.v lowering: a port expression (§12.3.6)
 verilog/12_hierarchy/real_through_bits.v lowering: a port with a net declaration assignment
 verilog/12_hierarchy/select_and_concatenation_ports.v lowering: a port expression (§12.3.6)
-verilog/12_hierarchy/select_sinks.v lowering: an output port connected to a select or an expression
-verilog/12_hierarchy/select_warning.v lowering: an output port connected to a select or an expression
-verilog/12_hierarchy/variable_port_select_sinks.v lowering: an output port connected to a select or an expression
 verilog/13_configuration/cfg1_default_liblist.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/13_configuration/cfg2_gate_first.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/13_configuration/cfg3_cell_use.v a library map or list (`//@ libmap`, `//@ liblist`)
@@ -55,9 +48,7 @@ verilog/A_formal_syntax/b_A_1_1_incdir.v a library map or list (`//@ libmap`, `/
 verilog/A_formal_syntax/b_A_1_1_library_text.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/A_formal_syntax/b_A_1_3_concat_port.v lowering: a port expression (§12.3.6)
 verilog/A_formal_syntax/b_A_1_3_part_select_port.v lowering: a port expression (§12.3.6)
-verilog/A_formal_syntax/b_A_1_3_ports.v lowering: a name declared by `param` that has no slot
 verilog/A_formal_syntax/b_A_6_9_hierarchical_task_enable.v lowering: a hierarchical task or function name
-verilog/A_formal_syntax/grammar_parameter_header.v lowering: a name declared by `param` that has no slot
 verilog-ams/digital/realtobits_bitstoreal_bridge.v lowering: a wreal net
 verilog-ams/digital/vams_digital_abstime_math.v lowering: the system function `$abstime`
 verilog-ams/digital/wreal_event_on_change.v lowering: a wreal net

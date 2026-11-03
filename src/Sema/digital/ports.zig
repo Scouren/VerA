@@ -107,8 +107,7 @@ pub fn declareNet(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Inde
     switch (dir) {
         .input => try deferred.append(l.a, .{ .net = n.net, .frame = c.frame, .source = .{ .expr = if (slice) |lo| .{ .value = c.actual, .slice = true, .lo = lo, .total = width * c.lane.?[1] } else .{ .value = c.actual } } }),
         .output => if (slice) |lo| {
-            const outer = (try wholeNet(l, c)) orelse return l.refuse("§12.1.2 an instance array output sliced into no whole net");
-            try deferred.append(l.a, .{ .net = outer.net, .frame = f, .source = .{ .bridge = .{ .src = n.slot, .src_lo = 0, .dst_lo = lo, .width = width } } });
+            try sendLane(l, f, c, n.slot, width, lo, deferred);
         } else try send(l, f, c, n.slot, width, signed, deferred),
         .inout => return l.refuse("an inout port joined to a select, a concatenation or a net of another width"),
         .none => return l.refuse("a port with no direction"),
@@ -261,11 +260,8 @@ fn send(l: *Lower, f: u32, c: Conn, src: u32, width: u32, signed: bool, deferred
     var leaves: std.ArrayList(Inst.Ref) = .empty;
     try leavesOf(l, c.actual, &leaves);
     var operands: std.ArrayList(nets.Sink) = .empty;
-    for (leaves.items) |x| {
-        const n = (try expr.nameOf(l, x)) orelse return l.refuse("an output port connected to a select or an expression");
-        if (n.kind != .net or n.dims.len != 0) return l.refuse("an output port connected to a variable");
-        try operands.append(l.a, .{ .net = n.net, .lo = 0, .width = l.nets.items[n.net].width });
-    }
+    // §12.3.9.2 each operand a whole net or a constant select of one.
+    for (leaves.items) |x| try operands.append(l.a, try nets.sink(l, x));
     var lo: u32 = 0;
     var k = operands.items.len;
     while (k != 0) {
@@ -281,6 +277,27 @@ fn send(l: *Lower, f: u32, c: Conn, src: u32, width: u32, signed: bool, deferred
             .sign_at = if (signed and width != 0) width - 1 else null,
         } } });
         lo += copy;
+    }
+}
+
+/// §12.1.2 an instance array element's output port (`src`, `width` bits)
+/// driving bits [lo, lo + width) of the connection's operands, the
+/// rightmost operand its low bits: a bridge per operand it overlaps.
+fn sendLane(l: *Lower, f: u32, c: Conn, src: u32, width: u32, lo: u32, deferred: *std.ArrayList(nets.Wire)) Error!void {
+    const saved = l.frame;
+    defer l.frame = saved;
+    l.frame = c.frame;
+    var leaves: std.ArrayList(Inst.Ref) = .empty;
+    try leavesOf(l, c.actual, &leaves);
+    var pos: u32 = 0;
+    var k = leaves.items.len;
+    while (k != 0) {
+        k -= 1;
+        const op = try nets.sink(l, leaves.items[k]);
+        const start = @max(pos, lo);
+        const end = @min(pos + op.width, lo + width);
+        if (start < end) try deferred.append(l.a, .{ .net = op.net, .frame = f, .source = .{ .bridge = .{ .src = src, .src_lo = start - lo, .dst_lo = op.lo + (start - pos), .width = end - start } } });
+        pos += op.width;
     }
 }
 

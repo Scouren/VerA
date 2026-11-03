@@ -230,10 +230,9 @@ fn compare(a: Allocator, io: std.Io, c: Case, cov: *Coverage) !?[]const u8 {
         .file => |want| {
             requests += 1;
             if (requests > 10_000) return "more than 10,000 requests";
-            try n.answer(readText(io, .cwd(), want.path, a) catch |e| switch (e) {
-                error.OutOfMemory => return e,
-                else => null,
-            });
+            const got = readText(io, .cwd(), want.path, a);
+            if (got) |_| {} else |e| if (e == error.OutOfMemory) return error.OutOfMemory;
+            try n.answer(got);
         },
     };
     const out = n.output();

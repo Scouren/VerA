@@ -64,7 +64,7 @@ fn finish(n: *Netlist, disk: []const DiskFile) !usize {
             requests += 1;
             try n.answer(for (disk) |f| {
                 if (std.mem.eql(u8, f[0], want.path)) break f[1];
-            } else null);
+            } else error.FileNotFound);
         },
     };
     return requests;

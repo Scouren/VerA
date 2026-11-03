@@ -3,7 +3,7 @@
 //! instantiate them, with the refusals, the `.MODEL`s of unsupported types
 //! and the `.HDL` names. The reader never opens a file: when an `.INCLUDE`
 //! or `.LIB` card names one it stops and returns a request with one path,
-//! and the caller answers with the bytes or null ("cannot read").
+//! and the caller answers with the read's own result: bytes, or the error.
 //!
 //! ```zig
 //! var n: spice.Netlist = .init(gpa, "top.sp", netlist);
@@ -61,7 +61,7 @@ pub const Netlist = struct {
     text: []const u8,
     /// The caller's answers by path, keys on `gpa`, bytes borrowed. The same
     /// path is never asked twice.
-    answers: std.StringHashMapUnmanaged(?[]const u8) = .empty,
+    answers: Reader.Answers = .empty,
     /// The path the last `run` asked for, on `gpa`, until `answer`.
     want: ?[]const u8 = null,
     /// Owns the output.
@@ -128,14 +128,16 @@ pub const Netlist = struct {
         return null;
     }
 
-    /// Answers the last request: the file's bytes, or null for "cannot
-    /// read" (a refusal at the card). `bytes` is borrowed until `deinit`.
+    /// Answers the last request with the read's own result: the file's
+    /// bytes, or the error that stopped it, which the refusal at the card
+    /// names (`cannot read "x" (IsDir)`). Bytes are borrowed until `deinit`.
     /// Asserts a pending request and at most `maxInt(u32)` bytes, the
     /// offsets a refusal can address.
-    pub fn answer(n: *Netlist, bytes: ?[]const u8) Allocator.Error!void {
+    pub fn answer(n: *Netlist, read: anyerror![]const u8) Allocator.Error!void {
         const path = n.want.?;
-        if (bytes) |b| assert(b.len <= std.math.maxInt(u32));
-        try n.answers.putNoClobber(n.gpa, path, bytes);
+        const a: Reader.Answer = if (read) |b| .{ .bytes = b } else |e| .{ .failed = @errorName(e) };
+        if (a == .bytes) assert(a.bytes.len <= std.math.maxInt(u32));
+        try n.answers.putNoClobber(n.gpa, path, a);
         n.want = null;
         assert(n.answers.contains(path));
     }

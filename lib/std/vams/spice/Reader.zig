@@ -11,6 +11,7 @@
 //! Contents:
 //! - fields `arena`, `scratch`, `refusals`, `lines`, `files`, `hdl`, `frames`
 //! - `pub fn start(r: *Reader, name: []const u8, text: []const u8) Allocator.Error!void`
+//! - `pub const Answer = union(enum)`, `pub const Answers`
 //! - `pub fn step(r: *Reader, answers: *const Answers) Allocator.Error!?[]const u8`
 
 const std = @import("std");
@@ -43,8 +44,11 @@ hdl: std.ArrayList([]const u8) = .empty,
 /// (the same path and `.LIB` entry) is a cycle.
 frames: std.ArrayList(Frame) = .empty,
 
-/// The caller's answers by path: bytes, or null for "cannot read".
-pub const Answers = std.StringHashMapUnmanaged(?[]const u8);
+/// The caller's answer for one path: the file's bytes, or the name of the
+/// error that stopped the read, which the refusal prints ("IsDir").
+pub const Answer = union(enum) { bytes: []const u8, failed: []const u8 };
+/// The caller's answers by path.
+pub const Answers = std.StringHashMapUnmanaged(Answer);
 
 const Reader = @This();
 
@@ -151,9 +155,12 @@ fn advance(r: *Reader, answers: *const Answers) Allocator.Error!?[]const u8 {
                 f.pos = line_start;
                 return full;
             };
-            const bytes = got orelse {
-                try r.refusals.add(at, "`{s}`: cannot read \"{s}\" (FileNotFound)", .{ kw, full });
-                continue;
+            const bytes = switch (got) {
+                .bytes => |b| b,
+                .failed => |why| {
+                    try r.refusals.add(at, "`{s}`: cannot read \"{s}\" ({s})", .{ kw, full, why });
+                    continue;
+                },
             };
             try r.files.append(r.arena, .{ .name = try r.arena.dupe(u8, full), .text = bytes });
             const sub: u32 = @intCast(r.files.items.len - 1);

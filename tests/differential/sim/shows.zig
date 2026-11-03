@@ -121,12 +121,89 @@ pub fn task(l: *Lower, t: Task, args: []const ExprId, tok: u32, pc: u32) E!u32 {
             const dc = try l.b.extraOf(Program.DumpCall{ .op = std.meta.stringToEnum(Program.DumpOp, @tagName(op)).?, .arg = arg, .call = call, .targets = try l.b.listOf(targets.items) });
             break :blk l.b.extraOf(Program.Task{ .kind = .dump, .a = dc });
         },
-        .ports => l.refuse("a §18.3 EVCD task"),
+        .ports => |op| l.b.extraOf(Program.Task{ .kind = .ports, .a = try portsCall(l, op, args, tok) }),
         .user => l.refuse("a PLI task"),
     };
 }
 
 // ---- private ----
+
+/// §18.3 a port dump task's `Program.PortsCall`; for `$dumpports`, its
+/// scopes, ports and header resolved here as `evcd.task` resolves them.
+fn portsCall(l: *Lower, op: digital.for_emitter.evcd.Op, all: []const ExprId, tok: u32) E!u32 {
+    const r = l.r;
+    const ex = &r.file.exprs;
+    const evcd = digital.for_emitter.evcd;
+    const none = @backingInt(Program.Ref.none);
+    const args = if (all.len == 1 and all[0] == .none) all[0..0] else all;
+    if (op != .ports) {
+        var c: Program.PortsCall = .{ .op = std.meta.stringToEnum(Program.PortsOp, @tagName(op)).?, .ports = 0, .name = none, .size = none };
+        if (args.len != 0 and (op != .limit or args.len == 2)) c.name = try l.self_(args[args.len - 1], 0);
+        if (op == .limit) c.size = try l.self_(args[0], 0);
+        return l.b.extraOf(c);
+    }
+    var scopes: std.ArrayList(u32) = .empty;
+    var name_row: u32 = none;
+    for (args, 0..) |e, i| {
+        if (ex.tag(e) == .ident or ex.tag(e) == .hier_ident) switch (digital.for_emitter.vcd.target(r, e) catch return l.refuse("a $dumpports target the old engine refuses")) {
+            .scope => |sc| {
+                try scopes.append(l.a, sc);
+                continue;
+            },
+            .slot => {},
+        };
+        if (i + 1 == args.len) name_row = try l.self_(e, 0);
+    }
+    if (scopes.items.len == 0) try scopes.append(l.a, r.instanceOf(r.scope));
+    var header: std.Io.Writer.Allocating = .init(l.a);
+    const w = &header.writer;
+    var ports: std.ArrayList(u32) = .empty;
+    var n: u32 = 0;
+    for (scopes.items) |sc| {
+        w.writeAll("$scope module ") catch return error.OutOfMemory;
+        evcd.path(r, w, sc) catch return error.OutOfMemory;
+        w.writeAll(" $end\n") catch return error.OutOfMemory;
+        const m = &r.file.modules[r.hier.scopes.items[sc].def];
+        for (m.ports) |port| {
+            const slot = r.hier.names.get(.{ .scope = sc, .str = port.name }) orelse continue;
+            const net = r.netlist.slot_nets.get(slot);
+            var inside: std.ArrayList(u32) = .empty;
+            var outside: std.ArrayList(u32) = .empty;
+            if (net) |k| for (r.netDrivers(k)) |d| {
+                if (evcd.below(r, r.netlist.drivers[d].scope, sc)) try inside.append(l.a, d) else try outside.append(l.a, d);
+            };
+            const dir: Program.PortDir = switch (port.direction) {
+                .input => .input,
+                .output => .output,
+                .inout, .unspecified => .inout,
+            };
+            try l.b.evcd_ports.append(l.b.arena, .{ .slot = slot, .net = net orelse none, .dir = dir, .inside = try l.b.listOf(inside.items), .outside = try l.b.listOf(outside.items) });
+            try ports.append(l.a, @intCast(l.b.evcd_ports.items.len - 1));
+            const width = r.values[slot].width;
+            w.writeAll("$var port ") catch return error.OutOfMemory;
+            if (width == 1) {
+                w.writeAll("1") catch return error.OutOfMemory;
+            } else {
+                const range = r.vecRange(slot);
+                w.print("[{d}:{d}]", .{ range.msb, range.lsb }) catch return error.OutOfMemory;
+            }
+            // `evcd.portName`: the first port name bound to the slot.
+            const shown = for (m.ports) |mp| {
+                if (r.hier.names.get(.{ .scope = sc, .str = mp.name }) == slot) break mp.name;
+            } else port.name;
+            w.print(" <{d} {s} $end\n", .{ n, r.file.str(shown) }) catch return error.OutOfMemory;
+            n += 1;
+        }
+        w.writeAll("$upscope $end\n") catch return error.OutOfMemory;
+    }
+    const dp = try l.b.extraOf(Program.DumpPorts{
+        .name_row = name_row,
+        .call = try l.b.string(digital.for_emitter.vcd.callText(r.text, r.starts[tok])),
+        .header = try l.b.string(header.written()),
+        .ports = try l.b.listOf(ports.items),
+    });
+    return l.b.extraOf(Program.PortsCall{ .op = .ports, .ports = dp, .name = none, .size = none });
+}
 
 /// §18.1 the design's dump catalog, written into `Program.vcd` once, from
 /// the old engine's own (`vcd.catalog`).

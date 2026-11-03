@@ -25,6 +25,7 @@
 //! - `pub const Net = struct` (`Net.no_decay`), `pub const Driver = struct` (`Driver.Source`)
 //! - `pub const Cond = struct` (`Cond.Op`), `pub const CheckEvent = struct`, `pub const Check = struct`
 //! - `pub const Vcd = struct` (`Vcd.VcdScope`, `Vcd.Var`), `pub const DumpCall = struct`, `pub const DumpOp = enum(u32)`
+//! - `pub const EvcdPort = struct`, `pub const PortDir = enum(u8)`, `pub const DumpPorts = struct`, `pub const PortsCall = struct`, `pub const PortsOp = enum(u32)`
 //! - `pub const Override = struct`, `pub const OverrideEval = struct`, `pub const Tran = struct`, `pub const Path = struct`, `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
 //! - `pub fn words(width: u32) u32`
 //! - `pub fn list(p: *const Program, l: List) []const u32`
@@ -475,7 +476,7 @@ pub const Task = struct {
     kind: Kind,
     /// `.readmem`: a `ReadMem` in `extra`. `.swrite`: a `SWrite`.
     /// `.fshow`, `.fstrobe`: an `FShow`. `.fclose`: the descriptor row.
-    /// `.dump`: a `DumpCall`.
+    /// `.dump`: a `DumpCall`. `.ports`: a `PortsCall`.
     /// `.show`, `.strobe`: a `Show` index in `shows`. `.monitor`: a
     /// `Monitor` in `extra`. `.timeformat`: a `TimeFormat` in `extra`, or
     /// `none`.
@@ -483,7 +484,7 @@ pub const Task = struct {
     a: u32,
     b: List = .empty,
 
-    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem, swrite, fshow, fstrobe, fclose, fflush, dump };
+    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem, swrite, fshow, fstrobe, fclose, fflush, dump, ports };
 };
 
 /// §17.2.9 a `$readmemb`/`$readmemh` call: the file's name (text, or the
@@ -531,6 +532,26 @@ pub const DumpCall = struct { op: DumpOp, arg: u32, call: List, targets: List };
 
 /// §18.1's tasks.
 pub const DumpOp = enum(u32) { file, vars, off, on, all, limit, flush };
+
+/// §18.3 one dumped port: its slot, the net it is (`none` for a variable),
+/// its direction, and its net's drivers inside the dumped instance (its
+/// output side) and outside it (its input side), as `drivers` indices.
+pub const EvcdPort = struct { slot: u32, net: u32, dir: PortDir, inside: List, outside: List };
+
+/// A §18.4 port's direction.
+pub const PortDir = enum(u8) { input, output, inout };
+
+/// §18.3.1 one `$dumpports` call: its file name row (`none`: the default
+/// "dumpports.vcd"), the call's text, the header's scope and `$var port`
+/// lines, and its ports (a `List` of `evcd_ports` rows).
+pub const DumpPorts = struct { name_row: u32, call: List, header: List, ports: List };
+
+/// §18.3 one port dump task: which, its `DumpPorts` (for `.ports`), the
+/// file name row it names (`none`: every file) and `$dumpportslimit`'s size.
+pub const PortsCall = struct { op: PortsOp, ports: u32, name: u32, size: u32 };
+
+/// §18.3's tasks.
+pub const PortsOp = enum(u32) { ports, off, on, all, limit, flush };
 
 /// §17.9 one `$random`/`$dist_*` call: the distribution, the seed row and
 /// the place its inout seed is written back to (`none` for a seedless
@@ -760,6 +781,7 @@ fan: []const u32 = &.{},
 subs: []const Sub = &.{},
 checks: []const Check = &.{},
 vcd: Vcd = .{},
+evcd_ports: []const EvcdPort = &.{},
 /// Per slot, the checks its change reaches, each `check * 2 + event`:
 /// `check_codes[check_start[slot]..check_start[slot + 1]]`.
 check_start: []const u32 = &.{},

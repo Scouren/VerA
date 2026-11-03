@@ -11,8 +11,9 @@
 //! - `pub const Dump = struct`
 //! - `pub fn task(s: *State, a: Allocator, at: u32) Error!void`
 //! - `pub fn tick(s: *State, a: Allocator) Error!void`
-//! - `pub fn changed(s: *State, slot: u32) Error!void`
 //! - `pub fn fired(s: *State, slot: u32) Error!void`
+//! - `pub fn request(s: *State) Error!void`
+//! - `pub fn preamble(w: *std.Io.Writer, io: std.Io, call: []const u8, finest: i32) std.Io.Writer.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -105,12 +106,6 @@ pub fn tick(s: *State, a: Allocator) Error!void {
     try checkpoint(s, a, "$dumpvars", false);
 }
 
-/// A dumped slot changed: one dump event this step.
-pub fn changed(s: *State, slot: u32) Error!void {
-    _ = slot;
-    return request(s);
-}
-
 /// §18.2.2 named event `slot` occurred: its marker is due this step.
 pub fn fired(s: *State, slot: u32) Error!void {
     const v = s.p.vcd.vars;
@@ -120,13 +115,28 @@ pub fn fired(s: *State, slot: u32) Error!void {
     return request(s);
 }
 
-// ---- private ----
-
-fn request(s: *State) Error!void {
+/// One dump event this step, for the VCD and the §18.3 port dumps alike.
+pub fn request(s: *State) Error!void {
     if (s.dump.pending) return;
     s.dump.pending = true;
     try s.enqueueMonitor(.vcd_tick);
 }
+
+/// §18.2.3 the header before the definitions: the date, the version (naming
+/// the dump call), and the timescale of a tick (the precision).
+pub fn preamble(w: *std.Io.Writer, io: std.Io, call: []const u8, finest: i32) std.Io.Writer.Error!void {
+    const t = std.time.epoch.EpochSeconds{ .secs = @intCast(@max(0, @divFloor(std.Io.Clock.real.now(io).nanoseconds, std.time.ns_per_s))) };
+    const yd = t.getEpochDay().calculateYearDay();
+    const md = yd.calculateMonthDay();
+    const ds = t.getDaySeconds();
+    try w.print("$date\n\t{d}-{d:0>2}-{d:0>2} {d:0>2}:{d:0>2}:{d:0>2}\n$end\n", .{ yd.year, md.month.numeric(), md.day_index + 1, ds.getHoursIntoDay(), ds.getMinutesIntoHour(), ds.getSecondsIntoMinute() });
+    try w.print("$version\n\tVerA\n\t{s}\n$end\n", .{call});
+    const units = [_][]const u8{ "fs", "ps", "ns", "us", "ms", "s" };
+    const k: i32 = @divFloor(finest, 3);
+    try w.print("$timescale {d}{s} $end\n", .{ std.math.pow(u32, 10, @intCast(finest - 3 * k)), units[@intCast(k + 5)] });
+}
+
+// ---- private ----
 
 fn fail(s: *State, comptime what: []const u8) Error {
     return s.fail(what ++ " `{s}`", .{s.dump.name});
@@ -252,20 +262,6 @@ fn changes(s: *State, a: Allocator) Error!void {
         try value(&w.writer, cat.vars[c.v], c.last, @intCast(i), false);
     }
     try put(s, w.written());
-}
-
-/// §18.2.3 the header before the definitions: the date, the version (naming
-/// the `$dumpfile` call), and the timescale of a tick (the precision).
-fn preamble(w: *std.Io.Writer, io: std.Io, call: []const u8, finest: i32) std.Io.Writer.Error!void {
-    const t = std.time.epoch.EpochSeconds{ .secs = @intCast(@max(0, @divFloor(std.Io.Clock.real.now(io).nanoseconds, std.time.ns_per_s))) };
-    const yd = t.getEpochDay().calculateYearDay();
-    const md = yd.calculateMonthDay();
-    const ds = t.getDaySeconds();
-    try w.print("$date\n\t{d}-{d:0>2}-{d:0>2} {d:0>2}:{d:0>2}:{d:0>2}\n$end\n", .{ yd.year, md.month.numeric(), md.day_index + 1, ds.getHoursIntoDay(), ds.getMinutesIntoHour(), ds.getSecondsIntoMinute() });
-    try w.print("$version\n\tVerA\n\t{s}\n$end\n", .{call});
-    const units = [_][]const u8{ "fs", "ps", "ns", "us", "ms", "s" };
-    const k: i32 = @divFloor(finest, 3);
-    try w.print("$timescale {d}{s} $end\n", .{ std.math.pow(u32, 10, @intCast(finest - 3 * k)), units[@intCast(k + 5)] });
 }
 
 /// §18.2.1 identifier codes from `!` to `~`, counting on in base 94.

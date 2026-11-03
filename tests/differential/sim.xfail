@@ -63,8 +63,4 @@ verilog/17_system_tasks/sscanf_unknown_input.v bridge: the system function $ssca
 verilog/17_system_tasks/test_plusargs_absent.v bridge: the system function $test_plusargs
 verilog/17_system_tasks/ungetc_read_routines.v bridge: the system function $fscanf
 verilog/17_system_tasks/value_plusargs_absent.v bridge: the system function $value_plusargs
-verilog/18_vcd/dumpports_control_tasks.v bridge: a §18.3 EVCD task
-verilog/18_vcd/dumpports_node_information.v bridge: a §18.3 EVCD task
-verilog/18_vcd/dumpportslimit_stops_with_comment.v bridge: a §18.3 EVCD task
-verilog/18_vcd/port_value_changes.v bridge: a §18.3 EVCD task
 verilog/A_formal_syntax/b_A_6_2_repeat_intra_assignment.v bridge: §9.7.7 repeat event control

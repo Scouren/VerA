@@ -33,7 +33,7 @@ pub fn task(l: *Lower, t: Task, args: []const ExprId, tok: u32, pc: u32) E!u32 {
             l.b.extraOf(Program.Task{ .kind = .fstrobe, .a = try fileShow(l, args, sh, pc) })
         else
             l.b.extraOf(Program.Task{ .kind = .strobe, .a = try show(l, args, sh, pc) }),
-        .monitor => |sh| if (sh.file) l.refuse("$fmonitor") else l.b.extraOf(Program.Task{ .kind = .monitor, .a = try monitor(l, args, sh, pc) }),
+        .monitor => |sh| l.b.extraOf(Program.Task{ .kind = .monitor, .a = try monitor(l, args, sh, pc) }),
         .monitor_enable => |on| l.b.extraOf(Program.Task{ .kind = if (on) .monitor_on else .monitor_off, .a = 0 }),
         .finish => |stop| blk: {
             const verbose: u32 = if (args.len == 0) @backingInt(Program.Ref.none) else try l.self_(args[0], 0);
@@ -377,10 +377,19 @@ fn add(l: *Lower, p: Program.Piece) E!u32 {
 /// §17.1.3 the `Program.Monitor` of a `$monitor` call: its show, the
 /// arguments compared on a change (`monitor.comparable` ones), the slots
 /// every argument reads, and those of the arguments not compared.
-fn monitor(l: *Lower, args: []const ExprId, sh: display.Show, pc: u32) E!u32 {
+fn monitor(l: *Lower, all: []const ExprId, sh: display.Show, pc: u32) E!u32 {
     const r = l.r;
     const ex = &r.file.exprs;
-    const at = try show(l, args, sh, pc);
+    var fd: u32 = @backingInt(Program.Ref.none);
+    var args = all;
+    var plain = sh;
+    if (sh.file) {
+        if (all.len == 0 or all[0] == .none) return l.refuse("a file task with no descriptor");
+        fd = try l.self_(all[0], 0);
+        args = all[1..];
+        plain.file = false;
+    }
+    const at = try show(l, args, plain, pc);
     var compared: std.ArrayList(u32) = .empty;
     var slots: std.ArrayList(u32) = .empty;
     var loose: std.ArrayList(u32) = .empty;
@@ -398,6 +407,7 @@ fn monitor(l: *Lower, args: []const ExprId, sh: display.Show, pc: u32) E!u32 {
         .compared = try l.b.listOf(compared.items),
         .slots = try l.b.listOf(slots.items),
         .loose = try l.b.listOf(loose.items),
+        .fd = fd,
     });
 }
 

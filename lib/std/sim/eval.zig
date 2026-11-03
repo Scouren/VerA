@@ -27,6 +27,7 @@ const calls = @import("calls.zig");
 const files = @import("files.zig");
 const scan = @import("scan.zig");
 const queues = @import("queues.zig");
+const time = @import("time.zig");
 const Literal = logic.Literal;
 const Bit = logic.Bit;
 const Error = State.Error;
@@ -169,7 +170,7 @@ pub fn eval(s: *State, a: Allocator, e: u32) Error!Literal {
             break :blk normalize(a, v, w, ty.signed);
         },
         .int_of_real => normalize(a, try logic.intOfReal(a, try real(s, a, d.a)), w, ty.signed),
-        .real_of_int, .real_neg, .real_add, .real_sub, .real_mul, .real_div, .real_pow, .real_cond, .realtime, .bitstoreal, .math1, .math2 => logic.realLiteral(a, try real(s, a, e)),
+        .real_of_int, .real_neg, .real_add, .real_sub, .real_mul, .real_div, .real_pow, .real_cond, .realtime, .abstime, .bitstoreal, .math1, .math2 => logic.realLiteral(a, try real(s, a, e)),
         .real_eq, .real_neq, .real_lt, .real_le, .real_gt, .real_ge => blk: {
             const l = try real(s, a, d.a);
             const r = try real(s, a, d.b);
@@ -268,6 +269,7 @@ pub fn real(s: *State, a: Allocator, e: u32) Error!f64 {
             };
         },
         .realtime => p.times[d.a].scale.realAt(s.scheduler.now),
+        .abstime => time.secondsAt(s.scheduler.now, p.finest),
         .bitstoreal => @bitCast((try eval(s, a, d.a)).values()[0]),
         .math1 => math1(@fromBackingInt(@intCast(d.b)), try real(s, a, d.a)),
         .math2 => blk: {
@@ -520,6 +522,7 @@ fn math1(f: Program.Math, x: f64) f64 {
         .atanh => std.math.atanh(x),
         .ln1p => std.math.log1p(x),
         .expm1 => std.math.expm1(x),
+        .itor => if (std.math.isFinite(@round(x))) @round(x) else 0,
         .pow, .atan2, .hypot => unreachable, // two arguments: `math2`
     };
 }

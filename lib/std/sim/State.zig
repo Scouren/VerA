@@ -121,11 +121,14 @@ pub const PathEdge = struct { time: u64, before: [2]u64, after: [2]u64 };
 /// §8.5.3.3 one parked right-hand side.
 pub const Hold = struct { planes: []u64 = &.{}, width: u32 = 0, signed: bool = false };
 
-/// §17.1.3 the standing monitor: its `Program.Monitor` and what each
-/// compared argument read when last evaluated.
+/// §17.1.3 the standing monitor or a §17.2.2 `$fmonitor`: its
+/// `Program.Monitor`, what each compared argument read when last
+/// evaluated, and an `$fmonitor`'s descriptor and pending report.
 pub const Monitor = struct {
     m: Program.Monitor,
     values: [][]u64,
+    fd: i64 = 0,
+    hit: bool = false,
 };
 
 /// The nested activations a run allows by default: 20,000 (the old engine's
@@ -155,6 +158,9 @@ holds: []Hold,
 /// Per slot: a standing monitor argument reads it.
 monitored: []bool,
 monitor: ?Monitor = null,
+/// §17.2.2 "any number of $fmonitor tasks", each until an `$fclose` of its
+/// descriptor.
+fmonitors: std.ArrayList(Monitor) = .empty,
 monitor_on: bool = true,
 monitor_pending: bool = false,
 monitor_hit: bool = false,
@@ -366,7 +372,7 @@ pub fn store(s: *State, slot: u32, value: Literal) Error!void {
         s.path_edge[slot] = .{ .time = s.scheduler.now, .before = before_words, .after = .{ v[0], x[0] } };
         s.path_changed[slot] = true;
     }
-    if (s.monitored[slot]) try monitorChanged(s, slot);
+    if (s.monitored[slot] or s.fmonitors.items.len != 0) try monitorChanged(s, slot);
     if (s.dumped[slot] or s.port_slots[slot]) try vcd.request(s);
     const after = logic.planeBit(v[0], x[0]);
     try wake(s, slot, before, after);
@@ -468,9 +474,11 @@ pub fn stopRange(s: *State, start: u32, end: u32) Error!bool {
     return hit;
 }
 
-/// §17.1.3 one end-of-step monitor check, however many values moved.
-pub fn requestMonitor(s: *State) Error!void {
-    if (s.monitor == null or !s.monitor_on or s.monitor_pending) return;
+/// §17.1.3 one end-of-step monitor check, however many values moved; an
+/// `$fmonitor` (`file`) needs it whether or not a `$monitor` stands.
+pub fn requestMonitor(s: *State, file: bool) Error!void {
+    if (!file and (s.monitor == null or !s.monitor_on)) return;
+    if (s.monitor_pending) return;
     s.monitor_pending = true;
     try enqueueMonitor(s, .monitor_tick);
 }
@@ -594,29 +602,34 @@ fn selectChanged(s: *State, t: *Term, slot: u32) bool {
     return matches(t.edge, before, after);
 }
 
-/// A slot the standing monitor reads changed: a loose slot, or a compared
-/// argument whose value moved (each keeps its new value), makes the report
-/// due. A store its own evaluation makes asks nothing again.
+/// A slot a monitor reads changed: a loose slot, or a compared argument
+/// whose value moved (each keeps its new value), makes its report due. A
+/// store its own evaluation makes asks nothing again.
 fn monitorChanged(s: *State, slot: u32) Error!void {
     if (s.monitor_evaluating) return;
     s.monitor_evaluating = true;
     defer s.monitor_evaluating = false;
-    const m = s.monitor orelse return;
     var tmp: std.heap.ArenaAllocator = .init(s.arena);
     defer tmp.deinit();
-    const moved = moved: {
-        if (std.mem.findScalar(u32, s.p.list(m.m.loose), slot) != null) break :moved true;
-        var any = false;
-        for (s.p.list(m.m.compared), m.values) |e, old| {
-            const now = try monitorValue(s, tmp.allocator(), e);
-            if (std.mem.eql(u64, old, now)) continue;
-            any = true;
-            @memcpy(old, now);
-        }
-        break :moved any;
-    };
-    if (moved and s.monitor_on) {
+    if (s.monitored[slot]) if (s.monitor) |m| if (try moved(s, tmp.allocator(), m, slot) and s.monitor_on) {
         s.monitor_hit = true;
-        try requestMonitor(s);
+        try requestMonitor(s, false);
+    };
+    for (s.fmonitors.items) |*m| if (std.mem.findScalar(u32, s.p.list(m.m.slots), slot) != null and try moved(s, tmp.allocator(), m.*, slot)) {
+        m.hit = true;
+        try requestMonitor(s, true);
+    };
+}
+
+/// Whether monitor `m`'s report is due after `slot` changed.
+fn moved(s: *State, a: Allocator, m: Monitor, slot: u32) Error!bool {
+    if (std.mem.findScalar(u32, s.p.list(m.m.loose), slot) != null) return true;
+    var any = false;
+    for (s.p.list(m.m.compared), m.values) |e, old| {
+        const now = try monitorValue(s, a, e);
+        if (std.mem.eql(u64, old, now)) continue;
+        any = true;
+        @memcpy(old, now);
     }
+    return any;
 }

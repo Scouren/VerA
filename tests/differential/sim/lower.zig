@@ -305,9 +305,10 @@ pub const Lower = struct {
                 const args = ex.args(e);
                 return switch (f) {
                     .realtime => l.b.expr(.realtime, rt, try l.timeRow(), 0),
-                    .itor => if (compile.typeOf(r, args[0]).real) l.refuse("$itor of a real") else l.b.expr(.real_of_int, rt, try l.self_(args[0], 0), 0),
+                    .abstime => l.b.expr(.abstime, rt, 0, 0),
+                    .itor => if (compile.typeOf(r, args[0]).real) l.b.expr(.math1, rt, try l.real(args[0]), @backingInt(Program.Math.itor)) else l.b.expr(.real_of_int, rt, try l.self_(args[0], 0), 0),
                     .bitstoreal => l.b.expr(.bitstoreal, rt, try l.self_(args[0], 64), 0),
-                    inline .ln, .log10, .exp, .sqrt, .floor, .ceil, .sin, .cos, .tan, .asin, .acos, .atan, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh => |m| l.b.expr(.math1, rt, try l.real(args[0]), @backingInt(@field(Program.Math, @tagName(m)))),
+                    inline .ln, .log10, .exp, .sqrt, .floor, .ceil, .sin, .cos, .tan, .asin, .acos, .atan, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh, .ln1p, .expm1 => |m| l.b.expr(.math1, rt, try l.real(args[0]), @backingInt(@field(Program.Math, @tagName(m)))),
                     inline .pow, .atan2, .hypot => |m| blk: {
                         const pair = try l.b.listOf(&.{ try l.real(args[0]), try l.real(args[1]) });
                         break :blk l.b.expr(.math2, rt, pair.start, @backingInt(@field(Program.Math, @tagName(m))));
@@ -467,6 +468,8 @@ pub const Lower = struct {
             .time => try l.b.expr(.time, natural, try l.timeRow(), 0),
             .stime => try l.b.expr(.stime, natural, try l.timeRow(), 0),
             .clog2 => try l.b.expr(.clog2, Ty.int(32, true), try l.self_(args[0], 0), 0),
+            // §17.10: a run is given no plusargs, so no query matches.
+            .test_plusargs, .value_plusargs => try l.b.int(natural, 0),
             .fopen, .fgets, .ferror, .fgetc, .ungetc, .ftell, .rewind, .fseek, .feof => blk: {
                 const none = @backingInt(Program.Ref.none);
                 var c: Program.FileCall = .{ .op = std.meta.stringToEnum(Program.FileOp, @tagName(f)).?, .x = none, .y = none, .z = none, .place = none, .ty = .bit };

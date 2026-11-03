@@ -2,19 +2,13 @@
 # line, its path under tests/conformance/tests and why it is not compared yet.
 # Every line is a construct the bridge (tests/differential/sim/bridge.zig) does
 # not express yet; a listed fixture that agrees fails the run until its line goes.
-verilog-ams/digital/vams_digital_abstime_math.v bridge: the real system function $abstime
 verilog/05_expressions/native_select_boundaries.v bridge: a vector bound past i32
 verilog/05_expressions/native_wide_index_edges.v bridge: a vector bound past i32
 verilog/09_behavioral_modeling/event_array_automatic.v bridge: a timed task activation
 verilog/10_tasks_functions/recursive_task_fork_join.v bridge: a timed task activation
 verilog/10_tasks_functions/task_recursive_timed_automatic.v bridge: a timed task activation
 verilog/10_tasks_functions/timed_subroutine_parameters.v bridge: a timed task activation
-verilog/17_system_tasks/fmonitor.v bridge: $fmonitor
-verilog/17_system_tasks/itor_real_argument_converts.v bridge: $itor of a real
 verilog/17_system_tasks/native_binary_file_targets.v bridge: an array bound past i32
 verilog/17_system_tasks/native_sformat_dynamic.v bridge: a $sformat format held in a variable
-verilog/17_system_tasks/plusargs_variable_query.v bridge: the system function $test_plusargs
 verilog/17_system_tasks/sformat_excess_argument_warning.v bridge: a $sformat format held in a variable
 verilog/17_system_tasks/sformat_variable_format.v bridge: a $sformat format held in a variable
-verilog/17_system_tasks/test_plusargs_absent.v bridge: the system function $test_plusargs
-verilog/17_system_tasks/value_plusargs_absent.v bridge: the system function $value_plusargs

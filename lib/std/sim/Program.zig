@@ -281,6 +281,8 @@ pub const Expr = struct {
         stime,
         /// §17.7.2 `$realtime` in time row `a`'s units.
         realtime,
+        /// VAMS §9.10 `$abstime`: the time in seconds.
+        abstime,
         /// §17.8 `$rtoi(a)`, `$realtobits(a)`, `$bitstoreal(a)`, `$itor(a)`.
         rtoi,
         realtobits,
@@ -316,7 +318,8 @@ pub const Expr = struct {
 };
 
 /// §17.11.2's real functions, `Expr.math1`/`math2`'s `b` and pair tag.
-pub const Math = enum(u8) { ln, log10, exp, sqrt, floor, ceil, sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh, pow, atan2, hypot, ln1p, expm1 };
+/// `itor` is §17.8 `$itor` of a real: §4.8.2's rounding, a non-finite one 0.
+pub const Math = enum(u8) { ln, log10, exp, sqrt, floor, ceil, sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh, pow, atan2, hypot, ln1p, expm1, itor };
 
 /// §5.10.1: a change toward 1 (posedge), away from 1 (negedge), or any.
 pub const Edge = enum(u2) { any, posedge, negedge };
@@ -642,8 +645,9 @@ pub const TimeFormat = struct { units: u32, precision: u32, suffix: List, width:
 
 /// §17.1.3 a `$monitor` call: its show row, the argument rows it compares
 /// (each self-determined), the slots its arguments read, and those of them
-/// whose change reports without a comparison (`loose`).
-pub const Monitor = struct { show: u32, compared: List, slots: List, loose: List };
+/// whose change reports without a comparison (`loose`); §17.2.2 an
+/// `$fmonitor`'s descriptor row `fd` (`none` for a `$monitor`).
+pub const Monitor = struct { show: u32, compared: List, slots: List, loose: List, fd: u32 };
 
 /// §7.6 one pass switch between bit `a_bit` of net `a` and bit `b_bit` of
 /// net `b`: always on (`ctrl` none), or on while row `ctrl` is `on`; its

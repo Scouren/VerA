@@ -9,6 +9,7 @@
 //! - `pub fn show(s: *State, a: Allocator, at: u32, pc: u32) Error!void`
 //! - `pub fn install(s: *State, a: Allocator, at: u32) Error!void`
 //! - `pub fn monitorPrint(s: *State, a: Allocator) Error!void`
+//! - `pub fn fmonitorPrint(s: *State, a: Allocator) Error!void`
 //! - `pub fn swrite(s: *State, a: Allocator, at: u32) Error!void`
 //! - `pub fn timeformat(s: *State, a: Allocator, at: u32) Error!void`
 //! - `pub fn real(out: *std.Io.Writer, gpa: Allocator, r: f64, conv: u8, flags: u8, precision: i64, width: ?u64) Error!void`
@@ -22,6 +23,7 @@ const str_real = kernels.str_real;
 const Program = @import("Program.zig");
 const State = @import("State.zig");
 const eval = @import("eval.zig");
+const files = @import("files.zig");
 const logic = @import("logic.zig");
 const Error = State.Error;
 const Literal = logic.Literal;
@@ -46,6 +48,15 @@ pub fn show(s: *State, a: Allocator, at: u32, pc: u32) Error!void {
 pub fn install(s: *State, a: Allocator, at: u32) Error!void {
     const p = s.p;
     const m = p.extraData(Program.Monitor, at);
+    if (m.fd != @backingInt(Program.Ref.none)) {
+        // §17.2.2 an `$fmonitor` joins the others; an x/z descriptor
+        // installs nothing.
+        const fd = ((try eval.eval(s, a, m.fd)).asInt() orelse return) & 0xffff_ffff;
+        const values = try s.arena.alloc([]u64, m.compared.len);
+        for (p.list(m.compared), values) |e, *v| v.* = try s.arena.dupe(u64, try s.monitorValue(a, e));
+        try s.fmonitors.append(s.arena, .{ .m = m, .values = values, .fd = fd, .hit = true });
+        return s.requestMonitor(true);
+    }
     if (s.monitor) |old| for (p.list(old.m.slots)) |slot| {
         s.monitored[slot] = false;
     };
@@ -55,7 +66,7 @@ pub fn install(s: *State, a: Allocator, at: u32) Error!void {
     s.monitor = .{ .m = m, .values = values };
     for (p.list(m.slots)) |slot| s.monitored[slot] = true;
     s.monitor_hit = true;
-    try s.requestMonitor();
+    try s.requestMonitor(false);
 }
 
 /// Prints the standing monitor, if one is due: on, or a change seen while
@@ -65,6 +76,14 @@ pub fn monitorPrint(s: *State, a: Allocator) Error!void {
     if (!s.monitor_on and !s.monitor_hit) return;
     try show(s, a, m.m.show, 0);
     s.monitor_hit = false;
+}
+
+/// The end-of-step `$fmonitor` lines: each one whose arguments moved.
+pub fn fmonitorPrint(s: *State, a: Allocator) Error!void {
+    for (s.fmonitors.items) |*m| if (m.hit) {
+        m.hit = false;
+        try files.write(s, a, m.fd, m.m.show);
+    };
 }
 
 /// §17.2.3 `$swrite`/`$sformat` (`Program.SWrite` at `at`): the show's

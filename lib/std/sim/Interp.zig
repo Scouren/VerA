@@ -79,6 +79,7 @@ pub fn runUntil(s: *State, limit: u64) Error!Stop {
             .monitor_tick => {
                 s.monitor_pending = false;
                 if (s.monitor_hit) try display.monitorPrint(s, a);
+                try display.fmonitorPrint(s, a);
             },
             .drive => |at| try resolve.drive(s, a, at),
             .net_update => |net| try resolve.netUpdate(s, net),

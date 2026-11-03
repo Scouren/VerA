@@ -56,7 +56,8 @@ The rules of the rewrite:
 | `std_sim` | `lib/std/sim.zig` | `kernels`, `contract` | `sim.md` | merged (815/815) |
 | `sema` (digital lowering) | `src/Sema/digital.zig` | + `std_sim` | `dlower.md` | in progress |
 | `std_kernels` | `lib/std/kernels.zig` | `contract`, Gompute | `kernels.md` | merged |
-| next: `codegen` (versioned units §11.9, written-element masks §11.10), `Compilation`, then the switch-over | | | written when their inputs exist | |
+| `codegen` (Zig device backend) | `src/codegen.zig`, `src/codegen/zig.zig` | `air`, `sema`, `std_kernels`, `contract`, `link` | `codegen.md` | in progress |
+| next: the other backends (`exe`, `verilog`, `osdi`, digital native, `rtlil`, VPI table) (versioned units §11.9, written-element masks §11.10), `Compilation`, then the switch-over | | | written when their inputs exist | |
 
 The handle types other modules build against are fixed already:
 `InternPool.Index = enum(u32) { none = maxInt(u32), _ }` and

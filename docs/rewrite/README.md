@@ -47,7 +47,9 @@ The rules of the rewrite:
 | `vams` | `lib/std/vams.zig` | std | `parse.md` (tokenizer, Ast, Parse), `preprocess.md` (Preprocessor) | in progress |
 | `intern_pool` | `src/InternPool.zig` | std | `core-ir.md` | in progress |
 | `air` | `src/Air.zig` | `intern_pool` | `core-ir.md` | in progress |
-| next: `link`, `Diag`, `AstGen`+`Vir`, `Zcu`+`Sema`, Air passes, `codegen`, `Compilation` | | | written when their inputs exist | |
+| `link` | `src/link.zig` | `contract`, `dynlib` | `link.md` | spec ready |
+| `vams` (`Diag`) | `lib/std/vams/Diag.zig` | std | `diag.md` | spec ready |
+| next: `AstGen`+`Vir` (after Ast), `Zcu`+`Sema` (after Vir, InternPool, Air), Air passes, `codegen`, `Compilation` | | | written when their inputs exist | |
 
 The handle types other modules build against are fixed already:
 `InternPool.Index = enum(u32) { none = maxInt(u32), _ }` and

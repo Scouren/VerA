@@ -457,7 +457,19 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
   route goes through `Compilation` (they live in `sim`, below `vera` in `module_specs`).
 - [ ] Step 3 rest: read requests (preprocessor includes, `.hdl`, SPICE `.INCLUDE`/`.LIB`,
   `$table_model` data, libmap), `std.Build.Cache` for `artifact_cache`, one zig-runner path.
-- [ ] Step 2, steps 4-12.
+- [x] Step 3 (part): `frontend.Files`, the one reader the compilation owns; the preprocessor,
+  the SPICE reader and `$table_model` read through it (`Config.files`).
+- **The rewrite is under way (2026-11-03): steps 4-12 are now built as new modules beside the old
+  pipeline, not as edits to it.** Each new module is its own `module_specs` row that builds and tests
+  alone (`zig build test-vams`: 3.6 s after an edit) and is held to the old code by a differential
+  oracle over the whole fixture corpus (`zig build diff-*`, `build/rewrite.zig`). The old pipeline
+  stays the product until the new one matches it, then is deleted. `docs/rewrite/` is the contract
+  every module's author reads: `README.md` (rules, references, build), one spec per module.
+  - in progress: `vams` tokenizer/Ast/Parse (`parse.md`), `vams` Preprocessor (`preprocess.md`),
+    `intern_pool` + `air` (`core-ir.md`).
+  - specs ready: `link` (`link.md`), `vams` Diag (`diag.md`).
+  - next: AstGen + Vir (after Ast), Zcu + Sema (after Vir, InternPool, Air), the Air passes,
+    codegen, Compilation; then the switch-over and the old pipeline's deletion.
 - [ ] Changelog: two lines drafted (formatC, `--jobs`); they need their issues filed (`gh auth login`).
 
 Notes from this session:

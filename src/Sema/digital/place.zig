@@ -125,8 +125,23 @@ pub fn terms(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
             if (n.dims.len != 0) return l.refuse("an event control on a whole array");
             return out.appendSlice(l.a, &.{ n.slot, @backingInt(edge), 0, 0, none });
         },
-        else => return l.refuse("an event control on an expression or a select"),
+        .elem, .slice, .slice_up, .slice_down => {
+            const s = try selectOf(l, w);
+            // §9.7.3 an event array element: every element, each waking
+            // only when the index names it at the occurrence.
+            if (s.name.kind == .event and s.whole_elem) {
+                const el = try elemRow(l, s);
+                for (0..s.name.count) |k| try out.appendSlice(l.a, &.{ s.name.slot + @as(u32, @intCast(k)), @backingInt(Program.Edge.any), 0, 0, el });
+                return;
+            }
+            // A constant select of a vector watches its own bits.
+            if (!s.whole_elem and s.name.dims.len == 0 and !s.name.ty.real) if (try constantFirst(l, s)) |first| if (s.count <= 64) {
+                return out.appendSlice(l.a, &.{ s.name.slot, @backingInt(edge), first, s.count, none });
+            };
+        },
+        else => {}, // else: an expression, watched below
     }
+    try out.appendSlice(l.a, &.{ try exprTerm(l, watched), @backingInt(edge), 0, 0, none });
 }
 
 /// Resolves an `elem`/`slice*` chain `i`: an array element, or a bit- or
@@ -151,10 +166,8 @@ pub fn selectOf(l: *Lower, i: Inst.Index) Error!Sel {
     const dims = n.dims.len;
     if (indices.items.len < dims) return l.refuse("a select of a whole array dimension");
     for (indices.items) |r| if ((try expr.typeOf(l, r)).real) return l.refuse("a real index");
-    if (top_tag == .elem and indices.items.len == dims) {
-        if (n.kind == .event) return l.refuse("a named event element read as a value");
-        return .{ .name = n, .indices = indices.items, .whole_elem = true, .ty = n.ty };
-    }
+    if (top_tag == .elem and indices.items.len == dims) return .{ .name = n, .indices = indices.items, .whole_elem = true, .ty = n.ty };
+    if (n.kind == .event) return l.refuse("a select of a named event");
     if (n.ty.real) return l.refuse("a select of a real");
     if (n.scalar) return l.refuse("§5.2.1 a select of a scalar");
     if (n.kind == .event) return l.refuse("a select of a named event");
@@ -220,4 +233,43 @@ fn writable(l: *Lower, n: Name) Error!void {
         .param, .genvar => return l.refuse("an assignment to a parameter"),
         .event, .sub, .scope => return l.refuse("an assignment to a named event, task, function or scope"),
     }
+}
+
+/// The bit position a constant select `s` starts at, or null when its
+/// index is not constant or it leaves its vector.
+fn constantFirst(l: *Lower, s: Sel) Error!?u32 {
+    const first: i64 = switch (s.mode) {
+        .const_part => s.first,
+        .bit, .up, .down => blk: {
+            const c = (try l.constOf(l.frame, s.index)) orelse return null;
+            const idx = switch (c) {
+                .int => |v| v,
+                else => return null,
+            };
+            break :blk if (s.name.msb >= s.name.lsb) idx -| s.name.lsb else s.name.lsb -| idx;
+        },
+    };
+    if (first < 0 or first + s.count > s.name.ty.width) return null;
+    return @intCast(first);
+}
+
+/// §9.7.2 "an implicit event shall be detected on any change in the value
+/// of the expression": a hidden slot kept equal to `r` by a process of its
+/// own (jumped over here, started at time 0), which the term watches.
+fn exprTerm(l: *Lower, r: Inst.Ref) Error!u32 {
+    const scope = l.frames.items[l.frame].scope;
+    const ty = try expr.typeValue(l, r);
+    const slot = try @import("vars.zig").slots(l, ty, 1, if (ty.real) .zero else .x);
+    var reads: std.ArrayList(u32) = .empty;
+    try expr.reads(l, r, &reads);
+    var terms_: std.ArrayList(u32) = .empty;
+    for (reads.items) |s| try terms_.appendSlice(l.a, &.{ s, @backingInt(Program.Edge.any), 0, 0, none });
+    const skip = try l.b.inst(.jump, 0, 0, scope);
+    const start: u32 = @intCast(l.b.p.insts.len);
+    _ = try l.b.inst(.init_var, slot, try expr.evalFor(l, r, ty), scope);
+    _ = try l.b.inst(.wait_event, try l.b.extraOf(.{ .l = try l.b.listOf(terms_.items) }), 0, scope);
+    _ = try l.b.inst(.jump, start, 0, scope);
+    l.b.setInst(skip, .jump, @intCast(l.b.p.insts.len), 0);
+    try l.term_starts.append(l.a, start);
+    return slot;
 }

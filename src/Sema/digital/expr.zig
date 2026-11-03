@@ -118,7 +118,11 @@ pub fn typeOf(l: *Lower, r: Inst.Ref) Error!Type {
             break :blk common(try typeValue(l, t.b), try typeValue(l, t.c));
         },
         .mintypmax => typeValue(l, Lower.payload(vir, Inst.Triple, i).b),
-        .elem, .slice, .slice_up, .slice_down => (try place.selectOf(l, i)).ty,
+        .elem, .slice, .slice_up, .slice_down => blk: {
+            const s = try place.selectOf(l, i);
+            if (s.name.kind == .event) return l.refuse("a named event element read as a value");
+            break :blk s.ty;
+        },
         .concat => blk: {
             var width: u32 = 0;
             for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |arg| {

@@ -63,6 +63,7 @@ pub fn compileAll(l: *Lower) Error!void {
             if (p.kind == .always and try order_.levelControlled(l, p)) try early.append(l.a, start) else try queued.append(l.a, start);
         };
     }
+    for (l.term_starts.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
     for (early.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
     for (l.driver_pcs.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
     var switches: usize = 0;
@@ -79,7 +80,7 @@ pub fn compileAll(l: *Lower) Error!void {
     try sub.finish(l);
     l.b.p.counters = l.repeats + l.joins;
     l.b.p.holds = l.holds;
-    assert(l.b.starts.items.len == early.items.len + l.driver_pcs.items.len + switches + queued.items.len);
+    assert(l.b.starts.items.len == l.term_starts.items.len + early.items.len + l.driver_pcs.items.len + switches + queued.items.len);
 }
 
 /// Appends statement `i`'s instructions, compiled in `Lower.frame`.
@@ -161,7 +162,14 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
         },
         .trigger => {
             const r = vir.instructions.items(.data)[@backingInt(i)].un_node.operand;
-            const n = (try expr.nameOf(l, r)) orelse return l.refuse("a trigger of an event array element or a hierarchical event");
+            // §9.7.3 an element of an event array, chosen when it runs.
+            if (r.toIndex()) |ri| if (Lower.tag(vir, ri) == .elem) {
+                const s = try place.selectOf(l, ri);
+                if (s.name.kind != .event or !s.whole_elem) return l.refuse("§5.10.4 `->` of a variable or net");
+                _ = try l.b.inst(.trigger_elem, try place.elemRow(l, s), 0, scope);
+                return;
+            };
+            const n = (try expr.nameOf(l, r)) orelse return l.refuse("a trigger of no named event");
             if (n.kind != .event) return l.refuse("§5.10.4 `->` of a variable or net");
             _ = try l.b.inst(.trigger, n.slot, 0, scope);
         },

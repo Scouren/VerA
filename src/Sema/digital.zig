@@ -178,6 +178,9 @@ pub const Lower = struct {
     /// §8.5.3.3 the hold cells handed out so far, one per intra-assignment
     /// timing control.
     holds: u32 = 0,
+    /// §9.7.2 the processes keeping an expression term's hidden slot,
+    /// queued at time 0 before every other.
+    term_starts: std.ArrayList(u32) = .empty,
     /// A.6.5 each named block's pc range, by the frame it is compiled in and
     /// its name (`blockKey`), and the disables waiting for every block.
     block_ranges: std.StringHashMapUnmanaged([2]u32) = .empty,

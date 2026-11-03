@@ -158,7 +158,7 @@ const Walk = struct {
         const index = r.toInterned().?;
         if (@backingInt(index) >= w.ip.items.len) return .operand;
         return switch (w.ip.indexToKey(index)) {
-            .float, .int, .str, .undef => null,
+            .float, .int, .str, .undef, .aggregate => null,
             .simple_type, .int_type, .array_type, .nature, .discipline => .operand,
         };
     }
@@ -185,7 +185,7 @@ const Walk = struct {
         if (ty == .none or @backingInt(ty) >= w.ip.items.len) return false;
         return switch (w.ip.indexToKey(ty)) {
             .simple_type, .int_type, .array_type => true,
-            .nature, .discipline, .undef, .float, .int, .str => false,
+            .nature, .discipline, .undef, .float, .int, .str, .aggregate => false,
         };
     }
 

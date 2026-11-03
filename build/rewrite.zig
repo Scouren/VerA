@@ -4,10 +4,12 @@
 //! Preprocessor vs lib/frontend's preprocessor), `diff-diag` (vams Diag vs
 //! lib/diag), `diff-air` (Air's interpreter vs src/ir's opcode folds),
 //! `diff-air-passes` (the Air passes against Air's interpreter over
-//! generated programs), `diff-sim` (the std_sim runtime vs lib/sim/digital
-//! over every `.v`), `diff-link` (link vs src/zigbuild over the same device
-//! builds), `diff-astgen` (vams AstGen/Vir vs the old compiler's per-file
-//! codes and design units), and
+//! generated programs; `-Dfull-oracles` runs the nightly's full sweep),
+//! `diff-sim` (the std_sim runtime vs lib/sim/digital over every `.v`),
+//! `diff-link` (link vs src/zigbuild over the same device builds),
+//! `diff-astgen` (vams AstGen/Vir vs the old compiler's per-file codes and
+//! design units), `diff-elab` (sema's elaboration vs src/elab and the
+//! digital route's), and
 //! `rewrite`, which runs them and the new modules' own tests. All are in
 //! `test`. `build.zig` calls `add` once.
 //!
@@ -27,12 +29,15 @@ pub fn add(g: Graph) void {
     const mods = g.mods;
     // One description for every new module: each oracle names itself in its row below.
     const all = b.step("rewrite", "The rewrite's modules' tests (test-<module>) and every diff-* oracle below");
-    for ([_][]const u8{ "vams", "intern_pool", "air", "link", "std_sim" }) |name| {
+    for ([_][]const u8{ "vams", "intern_pool", "air", "link", "std_sim", "sema" }) |name| {
         all.dependOn(&b.top_level_steps.get(b.fmt("test-{s}", .{name})).?.step);
     }
     const o = b.addOptions();
     o.addOption([]const u8, "fixture_root", pathFromRoot(b, "tests/conformance/tests"));
     o.addOption([]const u8, "repo_root", pathFromRoot(b, "."));
+    // The merge tier runs a generated-program oracle at a size inside its
+    // budget; the nightly passes `-Dfull-oracles` for the whole sweep.
+    o.addOption(bool, "full_oracles", b.option(bool, "full-oracles", "diff-air-passes: the nightly's full sweep (10^4 programs x 10^3 points) instead of the merge tier's") orelse false);
     // `libc`: the root loads libraries (`dynlib` needs glibc on Linux).
     // `emit_zig`: fixtures whose `vera --emit-zig` text the root reads from
     // the directory `rewrite_options.emitted`, as `<stem>.zig`.
@@ -46,6 +51,7 @@ pub fn add(g: Graph) void {
         .{ .step = "diff-astgen", .root = "tests/differential/astgen.zig", .what = "vams AstGen/Vir against the old compiler's per-file codes and design units on every fixture", .imports = &.{ "vams", "frontend", "diag", "vera" } },
         .{ .step = "diff-air-passes", .root = "tests/differential/air_passes.zig", .what = "the Air passes (Interval, Float, Legalize, Setup) against Air's interpreter over generated programs", .imports = &.{ "air", "intern_pool", "vams" } },
         .{ .step = "diff-sim", .root = "tests/differential/sim.zig", .what = "the std_sim runtime against lib/sim/digital: every .v fixture's transcript, through the bridge", .imports = &.{ "std_sim", "sim", "frontend", "diag", "kernels" } },
+        .{ .step = "diff-elab", .root = "tests/differential/elab.zig", .what = "sema's elaboration against src/elab and the digital route's elaboration on every fixture", .imports = &.{ "sema", "vams", "frontend", "diag", "elab", "sim" } },
         .{ .step = "diff-link", .root = "tests/differential/link.zig", .what = "link against src/zigbuild: the same devices built by both, at 1 and N jobs", .imports = &.{ "link", "zigbuild", "dynlib", "contract" }, .libc = true, .emit_zig = &.{ "tests/osdi/resistor.va", "tests/osdi/diode.va", "tests/osdi/mixed.va" } },
     };
     for (diffs) |d| {

@@ -508,8 +508,13 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
     3,790/3,793; parse.xfail 30 -> 3), the Air passes (prove/ 9,016 -> 2,635 lines: Interval,
     Float, Legalize, Setup; 10^7 falsification runs, 2*10^7 Legalize comparisons, four soundness
     bugs found and fixed). Float's inherited overflow assumption is being replaced (§11.9).
-  - in progress: Zcu + elaboration (`elab.md`), the digital runtime (`sim.md`), the sound float
-    verdict with guard boxes (`float-guard.md`).
+  - merged: the digital runtime `std_sim` (diff-sim: 710/807 bridged and agree, 97 constructs
+    listed), Zcu + elaboration (diff-elab: 3,727/3,776, 49 named), the sound float verdict
+    (§11.9: IEEE 754 intervals, no overflow contract, per-root guard boxes for versioned units,
+    `default_unknown_bound = 10` measured; 10^7 runs incl. 165,717 overflowing, 0 failures).
+  - in progress: Sema analog lowering (`lower.md`); follow-ups on sim.xfail and elab.xfail.
+  - open: a default box for an open-ended parameter (`Is from (0:inf)` times `exp(...)` is
+    `.strict` at any bound): sound if, like the unknown bound, the versioned unit checks it.
   - next: Sema analog lowering (Vir -> Air), digital lowering (Vir -> Program), codegen (with
     versioned units), kernels + Gompute, lib/vpi, Compilation; then the switch-over and the old
     pipeline's deletion.

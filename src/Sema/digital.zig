@@ -15,7 +15,7 @@
 //! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
-//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `refuse`, `refuseFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
+//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
 //! - `pub const none: u32`
 //! - `pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *[]const u8) Error!Lowered`
 
@@ -31,6 +31,7 @@ const decl = @import("digital/decl.zig");
 const stmt = @import("digital/stmt.zig");
 const nets = @import("digital/nets.zig");
 const sub = @import("digital/sub.zig");
+const vars = @import("digital/vars.zig");
 const gates = @import("digital/gates.zig");
 const Program = std_sim.Program;
 const Builder = std_sim.Builder;
@@ -178,6 +179,9 @@ pub const Lower = struct {
     /// §8.5.3.3 the hold cells handed out so far, one per intra-assignment
     /// timing control.
     holds: u32 = 0,
+    /// Parameters `Sema/eval.zig` does not fold: each slot and the row of
+    /// its value, evaluated at the end (`vars.finishParams`).
+    late_params: std.ArrayList(LateParam) = .empty,
     /// §9.7.2 the processes keeping an expression term's hidden slot,
     /// queued at time 0 before every other.
     term_starts: std.ArrayList(u32) = .empty,
@@ -217,6 +221,11 @@ pub const Lower = struct {
 
     /// A.6.5 a `disable` at pc `pc` of the name `name`, written in frame `frame`.
     pub const Disable = struct { pc: u32, frame: u32, name: []const u8 };
+
+    /// A parameter `Sema/eval.zig` does not fold: its slot and type, its
+    /// final value expression and the frame it is written in, and once
+    /// compiled (after every subroutine is declared) the value's row.
+    pub const LateParam = struct { slot: u32, ty: Type, frame: u32, value: Inst.Ref, row: u32 = none };
 
     /// A child instance's `instance` instruction and the parent frame it is in.
     pub const Site = struct { frame: u32, inst: Inst.Index };
@@ -355,6 +364,10 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *[]const u8) Er
         return e;
     };
     var program = b.finish();
+    vars.finishParams(&l, &program) catch |e| {
+        why.* = l.why;
+        return e;
+    };
     nets.finish(&l, &program) catch |e| {
         why.* = l.why;
         return e;

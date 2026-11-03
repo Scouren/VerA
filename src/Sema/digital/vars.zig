@@ -12,6 +12,8 @@
 //! - `pub fn event(l: *Lower, f: u32, i: Inst.Index) Error!u32`
 //! - `pub fn rangeOf(l: *Lower, f: u32, range: Vir.Body) Error!struct { msb: i64, lsb: i64, width: u32 }`
 //! - `pub fn slots(l: *Lower, ty: Type, count: u32, fill: enum { x, zero }) Error!u32`
+//! - `pub fn compileParams(l: *Lower) Error!void`
+//! - `pub fn finishParams(l: *Lower, p: *Program) Error!void`
 
 const std = @import("std");
 const vams = @import("vams");
@@ -105,7 +107,7 @@ pub fn param(l: *Lower, f: u32, i: Inst.Index) Error!u32 {
     const p = Lower.payload(vir, Inst.Param, i);
     if (p.dims.len != 0) return l.refuse("a parameter array");
     const env = try l.envAt(f);
-    const value = (try env.param(i)) orelse return l.refuse("a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)");
+    const value = (try env.param(i)) orelse return lateParam(l, f, i);
     var n: Name = .{ .kind = .param };
     if (p.range.len != 0) {
         const r = try rangeOf(l, f, p.range);
@@ -210,18 +212,60 @@ pub fn slots(l: *Lower, ty: Type, count: u32, fill: enum { x, zero }) Error!u32 
     return first;
 }
 
+/// Compiles every late parameter's value row, in its frame, once every
+/// subroutine a constant function call names is declared.
+pub fn compileParams(l: *Lower) Error!void {
+    const saved = l.frame;
+    defer l.frame = saved;
+    for (l.late_params.items) |*lp| {
+        l.frame = lp.frame;
+        lp.row = try expr.evalFor(l, lp.value, lp.ty);
+    }
+}
+
+/// Evaluates every late parameter's value (`lateParam`), in declaration
+/// order so a later one reads an earlier, with the run's own evaluator, and
+/// makes it its slot's time-0 value.
+pub fn finishParams(l: *Lower, p: *Program) Error!void {
+    if (l.late_params.items.len == 0) return;
+    var discard: std.Io.Writer.Discarding = .init(&.{});
+    var s = std_sim.State.init(l.a, p, &discard.writer) catch |e| switch (e) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.SimFailed, error.WriteFailed => return l.refuse("a design the runtime cannot start"),
+    };
+    for (l.late_params.items) |lp| {
+        const v = std_sim.eval.eval(&s, l.a, lp.row) catch |e| switch (e) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.SimFailed, error.WriteFailed => return l.refuse("a parameter value the runtime cannot evaluate"),
+        };
+        const word = p.slots.items(.word)[lp.slot];
+        const words = Program.words(p.slots.items(.ty)[lp.slot].width);
+        @memcpy(s.v[word..][0..words], v.values()[0..words]);
+        @memcpy(s.x[word..][0..words], v.unknowns()[0..words]);
+    }
+    p.init_v = s.v;
+    p.init_x = s.x;
+}
+
 // ---- private ----
 
 /// §12.2 the self-determined type of the expression that gave untyped
-/// parameter `i` of frame `f` its final value: its instance's `#( )`
-/// override (by name, or in order among the overridable parameters), else
-/// its declaration's own. The `Zcu` keeps no defparam's source, so a
-/// parameter a defparam sets is refused.
+/// parameter `i` of frame `f` its final value (`finalValue`).
 fn untypedType(l: *Lower, f: u32, i: Inst.Index) Error!Type {
-    const vir = l.virOf(f);
-    const p = Lower.payload(vir, Inst.Param, i);
     const saved = l.frame;
     defer l.frame = saved;
+    const fv = try finalValue(l, f, i);
+    l.frame = fv.frame;
+    return expr.typeOf(l, fv.value);
+}
+
+/// The expression that gives parameter `i` of frame `f` its final value,
+/// and the frame it is written in: a defparam's (§12.2.1, which takes
+/// precedence), its instance's `#( )` override (by name, or in order among
+/// the overridable parameters), else its declaration's own.
+fn finalValue(l: *Lower, f: u32, i: Inst.Index) Error!struct { frame: u32, value: Inst.Ref } {
+    const vir = l.virOf(f);
+    const p = Lower.payload(vir, Inst.Param, i);
     var from = f;
     var value = p.value;
     if (l.frames.items[f].parent == none and walk.isOverridable(vir, i)) {
@@ -243,9 +287,39 @@ fn untypedType(l: *Lower, f: u32, i: Inst.Index) Error!Type {
         }
     }
     const b = l.virOf(from).body(value);
-    if (b.len == 0) return l.refuse("an untyped parameter with no value");
-    l.frame = from;
-    return expr.typeOf(l, b[b.len - 1].toRef());
+    if (b.len == 0) return l.refuse("a parameter with no value");
+    return .{ .frame = from, .value = b[b.len - 1].toRef() };
+}
+
+/// A parameter whose value `Sema/eval.zig` does not fold (an x or z bit,
+/// past 64 bits, a constant function's call): a slot of its §12.2 type,
+/// x until `finishParams` evaluates its final value expression at the end
+/// of lowering with the run's own evaluator.
+fn lateParam(l: *Lower, f: u32, i: Inst.Index) Error!u32 {
+    const vir = l.virOf(f);
+    const p = Lower.payload(vir, Inst.Param, i);
+    if (p.dims.len != 0) return l.refuse("a parameter array");
+    var n: Name = .{ .kind = .param };
+    if (p.range.len != 0) {
+        const r = try rangeOf(l, f, p.range);
+        n.ty = .{ .width = r.width, .signed = p.flags.signed };
+        n.msb = r.msb;
+        n.lsb = r.lsb;
+    } else {
+        n.ty = switch (p.flags.storage) {
+            .integer => .{ .width = 32, .signed = true },
+            .time => .{ .width = 64, .signed = false },
+            .real, .realtime => Type.real_type,
+            .string => return l.refuse("a string parameter"),
+            .none, .reg => try untypedType(l, f, i),
+        };
+        if (p.flags.signed and !n.ty.real) n.ty.signed = true;
+        n.msb = @as(i64, n.ty.width) - 1;
+    }
+    n.slot = try slots(l, n.ty, 1, if (n.ty.real) .zero else .x);
+    const fv = try finalValue(l, f, i);
+    try l.late_params.append(l.a, .{ .slot = n.slot, .ty = n.ty, .frame = fv.frame, .value = fv.value });
+    return l.bind(f, i, n);
 }
 
 /// The frame of the instance writing defparam `src`, which the walk of

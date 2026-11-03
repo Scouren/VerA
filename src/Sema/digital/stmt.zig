@@ -51,6 +51,7 @@ const depth_max: u32 = 1 << 12;
 pub fn compileAll(l: *Lower) Error!void {
     var early: std.ArrayList(u32) = .empty;
     var queued: std.ArrayList(u32) = .empty;
+    try vars.compileParams(l);
     try nets.compileDrivers(l);
     try gates.compileTrans(l);
     try sub.compileBodies(l);

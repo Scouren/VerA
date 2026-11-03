@@ -235,6 +235,8 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
     for (later.keys(), later.values()) |first, decls| try signal(w, f, first, decls.items, if (top) w.conns.get(first) else null);
     try l.wires.appendSlice(l.a, w.deferred.items);
     try ports.implicitNets(l, f, all);
+    // A parameter's value may call a constant function (§10.4.5).
+    for (all) |i| if (Lower.tag(vir, i) == .function) try sub.declare(l, f, scope, i);
     for (all) |i| switch (Lower.tag(vir, i)) {
         .param => _ = try vars.param(l, f, i),
         .event => _ = try vars.event(l, f, i),
@@ -256,7 +258,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
         .gen_for => try genFor(w, f, scope, Lower.payload(vir, Inst.GenFor, i), prefix),
         .gen_block => try genBlock(w, f, scope, i, null, &.{}, prefix),
         .assign => try nets.assign(l, f, i),
-        .function => try sub.declare(l, f, scope, i),
+        .function => {}, // declared above
         .specify => try specify.block(l, f, i),
         .defparam => try l.defparam_frames.put(l.a, .{ .instance = @backingInt(l.frames.items[f].instance), .inst = i }, f),
         .genvar, .param, .event, .port, .net => {},

@@ -165,7 +165,9 @@ pub const Contribution = struct {
 pub const ChargeSite = struct { contrib: Contribution.Index, sign: f64, slot: Air.Inst.Index };
 
 /// §5.10 a variable kept between evaluations and its slot.
-pub const Held = struct { name: String, slot: Air.Inst.Index };
+/// A §3.2.2 array is one row: `count` consecutive slots from `slot`, its
+/// elements in declaration order (a scalar's `count` is 1).
+pub const Held = struct { name: String, slot: Air.Inst.Index, count: u32 };
 
 /// §9.17.3 one limited access function: `label` as the source spells it
 /// (`V(g,s)`), its target, and `slot`, the value the last site returned this

@@ -45,7 +45,6 @@ verilog-a/annex_d_standard_definitions/unbound_nature_access_rejected.va the old
 verilog-a/annex_d_standard_definitions/unbound_nature_charge_rejected.va codes: old {}, new E0512 (E0512: `Q` is not lowered by Sema yet)
 verilog-a/annex_g_change_history/generate_replaced_by_analog_for.va codes: old {}, new E0322,E0426,E0512 (E0512: an assignment to a name with no slot)
 verilog-a/annex_g_change_history/limexp_v1_spelling_rejected.va codes: old E0808, new {}
-verilog-a/annex_g_change_history/real_array_range_after_name.va tables row 3: old `held x`, new `limit_slots 0`
 verilog-a/ch01_intro/incompatible_flow_natures_rejected.va the old side refused, the new side lowered
 verilog-a/ch01_intro/potential_contribution_to_flow_only.va the old side refused, the new side lowered
 verilog-a/ch01_intro/probe_branch_both_quantities.va codes: old E0423, new {}
@@ -105,7 +104,6 @@ verilog-a/ch03_data_types/duplicate_access_name.va codes: old E0335, new {}
 verilog-a/ch03_data_types/duplicate_discipline_name.va codes: old E0342, new {}
 verilog-a/ch03_data_types/duplicate_nature_name.va codes: old E0342, new {}
 verilog-a/ch03_data_types/duplicate_user_attribute.va codes: old E0343, new {}
-verilog-a/ch03_data_types/dynamic_multidim_numeric.va tables row 6: old `held a`, new `limit_slots 0`
 verilog-a/ch03_data_types/dynamic_multidim_order.va codes: old {}, new E0313,E0512 (E0512: `a whole array read as a value` is not lowered by Sema yet)
 verilog-a/ch03_data_types/dynamic_multidim_parameter_index.va codes: old {}, new E0512 (E0512: an array of more than 8 dimensions)
 verilog-a/ch03_data_types/dynamic_multidim_scope.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
@@ -194,7 +192,9 @@ verilog-a/ch03_data_types/vector_branch_on_part_select.va codes: old {}, new E05
 verilog-a/ch03_data_types/vector_branch_part_select_reversed_rejected.va codes: old E0352, new {}
 verilog-a/ch03_data_types/vector_branch_size_mismatch.va codes: old E0353, new {}
 verilog-a/ch03_data_types/vector_range_past_65535_elements.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch03_data_types/vera_scratch_starts_each_evaluation.va tables row 4: old `held ht`, new `held s`
+verilog-a/ch03_data_types/vera_scratch_starts_each_evaluation.va tables row 4: old `held ht`, new `held st`
+verilog-a/ch03_data_types/vera_scratch_uninit_reads_nan_when_safe.va tables row 4: old `limit_slots 0`, new `held st`
+verilog-a/ch03_data_types/vera_scratch_uninit_tape.va tables row 4: old `limit_slots 0`, new `held st`
 verilog-a/ch03_data_types/wrong_access_function.va codes: old E0360, new {}
 verilog-a/ch04_expressions/13b_generic_access.va codes: old {}, new E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch04_expressions/absdelay_missing_td_rejected.va codes: old E0505, new E0506 (E0506: `absdelay` takes 2 to 3, given 1)
@@ -220,7 +220,6 @@ verilog-a/ch04_expressions/constant_expression_reads_a_probe_rejected.va the old
 verilog-a/ch04_expressions/ddt_abstol_dynamic_rejected.va codes: old E0515, new {}
 verilog-a/ch04_expressions/ddt_idt_nature_tolerance.va codes: old {}, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
 verilog-a/ch04_expressions/ddt_output_abstol.va codes: old {}, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
-verilog-a/ch04_expressions/ddx_runtime_indexed_array_element.va tables row 5: old `held st`, new `limit_slots 0`
 verilog-a/ch04_expressions/filter_scalar_coefficient_rejected.va codes: old E0572, new {}
 verilog-a/ch04_expressions/function_array_inout_pattern_actual.va codes: old {}, new E0512 (E0512: `pattern` is not lowered by Sema yet)
 verilog-a/ch04_expressions/function_array_inout_pattern_size_rejected.va codes: old E0511, new E0512 (E0512: `pattern` is not lowered by Sema yet)
@@ -250,7 +249,6 @@ verilog-a/ch04_expressions/last_crossing_direction_rejected.va codes: old E0516,
 verilog-a/ch04_expressions/last_crossing_directions.va codes: old {}, new E0514 (E0514: `last_crossing`)
 verilog-a/ch04_expressions/limexp_not_a_constant_expression_rejected.va the old side refused, the new side lowered
 verilog-a/ch04_expressions/noise_generator_without_branch_rejected.va tables row 1: old `contrib flow direct br0 p gnd`, new `node 1 gnd_node net`
-verilog-a/ch04_expressions/noise_psd_beside_a_held_history.va tables row 6: old `held hist`, new `held nh`
 verilog-a/ch04_expressions/noise_source_inside_array_pattern_argument.va codes: old {}, new E0512 (E0512: `pattern` is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_parameter_part_select.va codes: old {}, new E0512 (E0512: `slice` is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_part_select_out_of_range_rejected.va codes: old E0310, new E0512 (E0512: `slice` is not lowered by Sema yet)
@@ -258,7 +256,6 @@ verilog-a/ch04_expressions/nonfinite_array_subscript_rejected.va codes: old E031
 verilog-a/ch04_expressions/operator_in_genvar_for.va codes: old {}, new E0512,E0514 (E0512: an assignment to a name with no slot)
 verilog-a/ch04_expressions/operator_in_repeat.va codes: old E0514, new {}
 verilog-a/ch04_expressions/operator_missing_mandatory_argument.va codes: old E0505, new E0506 (E0506: `ddt` takes 1 to 2, given 0)
-verilog-a/ch04_expressions/parameterized_dimension_override.va tables row 5: old `held b`, new `limit_slots 0`
 verilog-a/ch04_expressions/parameter_reduction_and_arithmetic_shift.va tables row 2: old `param r_and integer = 1`, new `param r_and integer = ?`
 verilog-a/ch04_expressions/partial_slice_assignment.va codes: old {}, new E0309,E0313,E0512 (E0309: 1 subscripts for 2 dimensions)
 verilog-a/ch04_expressions/port_access_bus_genvar_index.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
@@ -316,9 +313,6 @@ verilog-a/ch05_analog_behavior/event_control_undeclared_event_rejected.va codes:
 verilog-a/ch05_analog_behavior/event_null_argument_invalid.va codes: old E0517, new {}
 verilog-a/ch05_analog_behavior/generic_access.va codes: old {}, new E0408,E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/genvar_loop_condition_reads_a_probe_rejected.va codes: old E0418, new E0426,E0512 (E0512: an assignment to a name with no slot)
-verilog-a/ch05_analog_behavior/held_array_after_a_pruned_held_scalar.va tables row 7: old `held arr`, new `limit_slots 0`
-verilog-a/ch05_analog_behavior/held_array_element_between_events.va tables row 3: old `held s`, new `held k`
-verilog-a/ch05_analog_behavior/held_counter_advances_outside_its_event.va tables row 5: old `held h`, new `limit_slots 0`
 verilog-a/ch05_analog_behavior/held_sformat_string_survives_rejected_step.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch05_analog_behavior/held_through_output_actual_seed_and_scan.va tables row 4: old `held b`, new `held n`
 verilog-a/ch05_analog_behavior/hierarchical_access_unsupported.va tables row 5: old `contrib potential direct br0 drv.a gnd`, new `contrib potential direct br0 a gnd`
@@ -373,12 +367,11 @@ verilog-a/ch05_analog_behavior/sequential_ifs_10000.va codes: old {}, new E0512 
 verilog-a/ch05_analog_behavior/simparam_dynamic_name.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch05_analog_behavior/simparam_str_hierarchy_names.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch05_analog_behavior/string_written_in_event_body_is_held.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch05_analog_behavior/timer_body_array_controls.va tables row 6: old `held rate[0]`, new `held fires`
+verilog-a/ch05_analog_behavior/timer_body_array_controls.va tables row 6: old `held rate[0]`, new `held rate`
 verilog-a/ch05_analog_behavior/timer_body_array_function_controls.va codes: old {}, new E0512 (E0512: `a whole array read as a value` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/timer_body_constant_effect_controls.va tables row 11: old `held visits`, new `held stamp`
 verilog-a/ch05_analog_behavior/timer_body_context_controls.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch05_analog_behavior/timer_body_effect_controls.va tables row 12: old `held visits`, new `held stamp`
-verilog-a/ch05_analog_behavior/timer_body_index_controls.va tables row 6: old `held rate`, new `held index`
 verilog-a/ch05_analog_behavior/timer_body_precomputed_controls.va tables row 12: old `held visits`, new `held stamp`
 verilog-a/ch05_analog_behavior/timer_body_reg_controls.va codes: old E0316, new {}
 verilog-a/ch05_analog_behavior/timer_changed_effectful_file_function_input_rejected.va codes: old E0528, new {}
@@ -389,8 +382,6 @@ verilog-a/ch05_analog_behavior/timer_changed_effectful_random_function_input_rej
 verilog-a/ch05_analog_behavior/timer_effectful_file_leaf.va tables row 6: old `held line`, new `limit_slots 0`
 verilog-a/ch05_analog_behavior/value_retention.va contribution 0 resist: old 7e0, new 8e0
 verilog-a/ch05_analog_behavior/vector_net_index_not_constant_rejected.va codes: old E0352, new E0512 (E0512: an access of a vector element at a run-time index)
-verilog-a/ch05_analog_behavior/vera_timepoint_cache.va tables row 5: old `held e`, new `limit_slots 0`
-verilog-a/ch05_analog_behavior/vera_timepoint_held_history.va tables row 6: old `held ht`, new `held tacc`
 verilog-a/ch06_hierarchy/conditional_direct_nesting_is_not_a_scope.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch06_hierarchy/continuous_net_without_potential_nature_rejected.va the old side refused, the new side lowered
 verilog-a/ch06_hierarchy/defparam_precedence_over_instance_override.va tables row 5: old `contrib flow direct br1 p n`, new `contrib flow direct br0 p n`
@@ -534,7 +525,7 @@ verilog-a/ch09_system_tasks/dist_type_string_inside_paramset.va tables row 2: ol
 verilog-a/ch09_system_tasks/dist_type_string_misspelled_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/fatal_finish_number_3_rejected.va codes: old E0824, new {}
 verilog-a/ch09_system_tasks/fclose_two_descriptors_rejected.va codes: old E0887, new {}
-verilog-a/ch09_system_tasks/fd_channels_past_30.va tables row 6: old `held fd`, new `held m`
+verilog-a/ch09_system_tasks/fd_channels_past_30.va tables row 16: old `held name`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/fdebug.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/fdisplay.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/feof.va tables row 4: old `held text`, new `limit_slots 0`
@@ -763,12 +754,11 @@ verilog-ams/ch05_analog_behavior/cross_expr_tol_and_time_tol_both_hold.va tables
 verilog-ams/ch05_analog_behavior/final_step_in_digital_context_rejected.va codes: old E0708, new {}
 verilog-ams/ch05_analog_behavior/initial_step_in_digital_context_rejected.va codes: old E0708, new {}
 verilog-ams/ch05_analog_behavior/node_alias_reevaluated_when_a_parameter_changes.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
-verilog-ams/ch05_analog_behavior/timer_body_array_controls.va tables row 6: old `held rate[0]`, new `held fires`
+verilog-ams/ch05_analog_behavior/timer_body_array_controls.va tables row 6: old `held rate[0]`, new `held rate`
 verilog-ams/ch05_analog_behavior/timer_body_array_function_controls.va codes: old {}, new E0512 (E0512: `a whole array read as a value` is not lowered by Sema yet)
 verilog-ams/ch05_analog_behavior/timer_body_constant_effect_controls.va tables row 11: old `held visits`, new `held stamp`
 verilog-ams/ch05_analog_behavior/timer_body_context_controls.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-ams/ch05_analog_behavior/timer_body_effect_controls.va tables row 12: old `held visits`, new `held stamp`
-verilog-ams/ch05_analog_behavior/timer_body_index_controls.va tables row 6: old `held rate`, new `held index`
 verilog-ams/ch05_analog_behavior/timer_body_precomputed_controls.va tables row 12: old `held visits`, new `held stamp`
 verilog-ams/ch05_analog_behavior/timer_body_reg_controls.va codes: old E0316, new {}
 verilog-ams/ch06_hierarchy/connect_insertion_follows_paramset_selection.va codes: old {}, new E0512 (E0512: an access of a name with no node)

@@ -23,6 +23,7 @@
 //! - `pub fn portDecl(vir: *const Vir, p: Inst.Index) ?Inst.Index`
 //! - `pub fn rowInstance(i: Zcu.Instance.Index) Device.Instance`
 //! - `pub fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String`
+//! - `pub fn addHeld(s: *Sema, name: []const u8, bind: Sema.Bind) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -210,6 +211,19 @@ pub fn typeIndex(ty: Sema.Ty) InternPool.Index {
 pub fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String {
     const at = vir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index;
     return @fromBackingInt(vir.extra[at]);
+}
+
+/// A §5.10 held row named `name` for a variable's (or array's) slots.
+pub fn addHeld(s: *Sema, name: []const u8, bind: Sema.Bind) Allocator.Error!void {
+    const slots: []const Air.Inst.Index = switch (bind) {
+        .slot => |x| &.{x.alloc},
+        .array => |a| a.slots,
+        else => return,
+    };
+    if (slots.len == 0) return;
+    // `declareArray` mints the slots back to back.
+    assert(@backingInt(slots[slots.len - 1]) - @backingInt(slots[0]) == slots.len - 1);
+    try s.device.held.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .slot = slots[0], .count = @intCast(slots.len) });
 }
 
 // ---- private ----
@@ -554,16 +568,8 @@ fn variables(s: *Sema, unit: *Unit) Allocator.Error!void {
         const v = payloadOf(vir, Inst.Variable, i);
         const first = canonical(vir, i);
         if (unit.binds.contains(first)) continue;
-        if (v.dims.len != 0) {
-            try declareArray(s, unit, first, v.dims, tyOf(v.flags.storage));
-            continue;
-        }
         const ty = tyOf(v.flags.storage);
-        const slot = try addAlloc(s, ty);
-        try unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = slot, .ty = ty } });
-        if (unit.held.contains(first)) try s.device.held.append(s.gpa, .{
-            .name = try s.zcu.intern_pool.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, vir.string(v.name) })),
-            .slot = slot,
-        });
+        if (v.dims.len != 0) try declareArray(s, unit, first, v.dims, ty) else try unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = try addAlloc(s, ty), .ty = ty } });
+        if (unit.held.contains(first)) try addHeld(s, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, vir.string(v.name) }), unit.binds.get(first) orelse continue);
     }
 }

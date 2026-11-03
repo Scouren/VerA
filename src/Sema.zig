@@ -150,6 +150,9 @@ pub const Bind = union(enum) {
     branch: Air.Device.Branch.Index,
     /// A §6.6.1 genvar's current value, or another name with one constant.
     constant: InternPool.Index,
+    /// A §3.2.2 array: one slot per element, row-major (the last
+    /// subscript fastest), and each dimension's `[msb, lsb]`.
+    array: struct { slots: []const Air.Inst.Index, dims: []const [2]i64, ty: Ty },
 };
 
 /// One instance being lowered: its module's file and Vir, the flat-name

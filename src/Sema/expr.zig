@@ -32,6 +32,7 @@ const decl = @import("decl.zig");
 const contrib = @import("contrib.zig");
 const syscall = @import("syscall.zig");
 const control = @import("control.zig");
+const array = @import("array.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Block = Sema.Block;
@@ -257,7 +258,11 @@ fn inst(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!Value {
         .call_sys => syscall.lower(s, b, decl.payloadOf(vir, Inst.SysCall, i), src),
         .call => callExpr(s, b, decl.payloadOf(vir, Inst.Call, i), src),
         .mintypmax => lower(s, b, decl.payloadOf(vir, Inst.Triple, i).b),
-        .str_ref, .field, .elem, .slice, .slice_up, .slice_down, .concat, .pattern, .replicate, .pattern_repl, .port_branch, .event_or, .posedge, .negedge, .driver_update, .step_event, .paramset_output, .range, .pulse_limits => refuse(s, b, src, @tagName(tag)),
+        .elem => blk: {
+            const e = (try array.element(s, b, src, src)) orelse break :blk poison;
+            break :blk array.load(s, b, e);
+        },
+        .str_ref, .field, .slice, .slice_up, .slice_down, .concat, .pattern, .replicate, .pattern_repl, .port_branch, .event_or, .posedge, .negedge, .driver_update, .step_event, .paramset_output, .range, .pulse_limits => refuse(s, b, src, @tagName(tag)),
         .module, .nature, .discipline, .paramset, .primitive, .connectrules, .config, .port, .io, .net, .variable, .param, .aliasparam, .genvar, .event, .branch, .instance, .assign, .defparam, .analog, .analog_initial, .initial, .always, .function, .gen_for, .gen_if, .gen_case, .gen_block, .specify, .path, .timing_check, .pulse_style, .timing_event, .ps_override, .connect_resolve, .connect_insert, .block, .condbr, .case, .loop, .repeat, .wait, .delay, .event_wait, .store, .store_nb, .contrib, .proc_assign, .force, .store_timed, .store_nb_timed, .contrib_indirect, .deassign, .release, .trigger, .disable, .ret, .brk, .cont, .delay_ctl, .event_ctl, .repeat_ctl => unreachable, // AstGen: an operand is an expression
     };
 }
@@ -306,6 +311,7 @@ fn declRef(s: *Sema, b: *Block, d: Inst.Index, src: Inst.Ref) Allocator.Error!Va
                 else => .integer, // else: a genvar's integer
             },
         },
+        .array => refuse(s, b, src, "a whole array read as a value"),
         .node, .vector, .branch => {
             try s.fail(.E0315, b.unit.file, src, "a net or branch is not a value; read it through an access function", .{});
             return poison;

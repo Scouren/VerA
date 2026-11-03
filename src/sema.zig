@@ -31,4 +31,6 @@ test {
     _ = @import("Sema/held.zig");
     _ = @import("Sema/func.zig");
     _ = @import("Sema/op.zig");
+    _ = @import("Sema/param.zig");
+    _ = @import("Sema/array.zig");
 }

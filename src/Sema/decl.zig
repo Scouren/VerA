@@ -15,9 +15,11 @@
 //! - `pub fn payloadOf(vir: *const Vir, comptime T: type, i: Inst.Index) T`
 //! - `pub fn addAlloc(s: *Sema, ty: Sema.Ty) Allocator.Error!Air.Inst.Index`
 //! - `pub fn tyOf(storage: Inst.Storage) Sema.Ty`
+//! - `pub fn typeIndex(ty: Sema.Ty) InternPool.Index`
 //! - `pub fn foldBody(s: *Sema, unit: *Sema.Unit, b: Vir.Body) Allocator.Error!?eval.Const`
 //! - `pub fn foldRef(s: *Sema, unit: *Sema.Unit, r: Inst.Ref) Allocator.Error!?eval.Const`
 //! - `pub fn intern(s: *Sema, c: eval.Const) Allocator.Error!InternPool.Index`
+//! - `pub fn declareArray(s: *Sema, unit: *Sema.Unit, first: Inst.Index, v: Inst.Variable) Allocator.Error!void`
 //! - `pub fn portDecl(vir: *const Vir, p: Inst.Index) ?Inst.Index`
 
 const std = @import("std");
@@ -33,6 +35,7 @@ const control = @import("control.zig");
 const syscall = @import("syscall.zig");
 const contrib = @import("contrib.zig");
 const held = @import("held.zig");
+const param = @import("param.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Device = Air.Device;
@@ -44,6 +47,9 @@ const Block = Sema.Block;
 const gen_loop_max: u32 = 1 << 16;
 /// The deepest generate nesting followed.
 const gen_depth_max: u32 = 1 << 10;
+
+/// The most elements one array is lowered to (a slot each).
+const array_cells_max: u64 = 1 << 16;
 
 /// Lowers the design under `zcu.instances[0]` and returns the main body,
 /// its `ret` included. Asserts that nothing was lowered before.
@@ -58,7 +64,7 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     s.device.num_ports = @intCast(s.device.nodes.len);
     for (s.units.items) |*u| try nets(s, u);
     for (s.units.items[1..]) |*u| try bindChildPorts(s, u);
-    for (s.units.items) |*u| try params(s, u);
+    for (s.units.items) |*u| try param.declare(s, u);
     for (s.units.items) |*u| try branches(s, u);
     for (s.units.items) |*u| try held.mark(s, u);
     for (s.units.items) |*u| try variables(s, u);
@@ -162,15 +168,38 @@ pub fn portDecl(vir: *const Vir, p: Inst.Index) ?Inst.Index {
     }
 }
 
-// ---- private ----
+/// §3.2.2 an array variable: a slot per element.
+pub fn declareArray(s: *Sema, unit: *Unit, first: Inst.Index, v: Inst.Variable) Allocator.Error!void {
+    const vir = unit.vir;
+    var env = try envOf(s, unit);
+    defer env.deinit();
+    var dims: std.ArrayList([2]i64) = .empty;
+    var cells: u64 = 1;
+    for (vir.body(v.dims)) |d| {
+        if (vir.instructions.items(.tag)[@backingInt(d)] != .range) continue;
+        const bin = payloadOf(vir, Inst.Bin, d);
+        const msb = ((try env.ref(bin.lhs)) orelse return s.fail(.E0352, unit.file, first.toRef(), "an array bound is not constant", .{})).asIntExact() orelse return;
+        const lsb = ((try env.ref(bin.rhs)) orelse return s.fail(.E0352, unit.file, first.toRef(), "an array bound is not constant", .{})).asIntExact() orelse return;
+        try dims.append(s.arena, .{ msb, lsb });
+        cells = std.math.mul(u64, cells, @abs(msb - lsb) + 1) catch return s.fail(.E1015, unit.file, first.toRef(), "the array is too large", .{});
+    }
+    if (cells > array_cells_max) return s.fail(.E1015, unit.file, first.toRef(), "the array has {d} elements, past {d}", .{ cells, array_cells_max });
+    const ty = tyOf(v.flags.storage);
+    const slots = try s.arena.alloc(Air.Inst.Index, @intCast(cells));
+    for (slots) |*slot| slot.* = try addAlloc(s, ty);
+    try unit.binds.put(s.arena, first, .{ .array = .{ .slots = slots, .dims = dims.items, .ty = ty } });
+}
 
-fn typeIndex(ty: Sema.Ty) InternPool.Index {
+/// The `InternPool` type of a value type.
+pub fn typeIndex(ty: Sema.Ty) InternPool.Index {
     return switch (ty) {
         .real => .real_type,
         .integer => .integer_type,
         .string => .string_type,
     };
 }
+
+// ---- private ----
 
 /// The main body: the prologue's slots, the entry assignments, `body`, and the `ret`.
 fn finish(s: *Sema, body: []const Air.Inst.Index) Allocator.Error![]const Air.Inst.Index {
@@ -451,82 +480,6 @@ fn bindChildPorts(s: *Sema, unit: *Unit) Allocator.Error!void {
     }
 }
 
-/// §3.4 the instance's parameters, in declaration order: the root's on
-/// the card, a child's as local rows of the folded value. Each is read by
-/// an `arg` in the prologue.
-fn params(s: *Sema, unit: *Unit) Allocator.Error!void {
-    const zcu = s.zcu;
-    const ip = &zcu.intern_pool;
-    const vir = unit.vir;
-    const elems = ip.indexToKey(zcu.instances.items(.params)[@backingInt(unit.instance)]).aggregate.elems;
-    var at: usize = 0;
-    for ([_]Vir.Body{ unit.module.params, unit.module.body }) |b| for (vir.body(b)) |i| {
-        if (vir.instructions.items(.tag)[@backingInt(i)] != .param) continue;
-        defer at += 1;
-        const p = payloadOf(vir, Inst.Param, i);
-        if (p.flags.kind == .specparam) continue;
-        const ty: Device.Param.Type = switch (p.flags.storage) {
-            .real, .realtime => .real,
-            .integer, .time => .integer,
-            .string => .string,
-            .none, .reg => if (p.range.len != 0) .integer else .unspecified,
-        };
-        const row: Device.Param.Index = @fromBackingInt(@intCast(s.device.params.len));
-        const ranges_start: u32 = @intCast(s.device.ranges.items.len);
-        for (vir.list(Inst.ValueRange, p.ranges)) |r| try s.device.ranges.append(s.gpa, try rangeOf(s, unit, r));
-        try s.device.params.append(s.gpa, .{
-            .name = try ip.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, vir.string(p.name) })),
-            .ty = ty,
-            .local = p.flags.local or unit.prefix.len != 0,
-            .default = elems[at],
-            .ranges_start = ranges_start,
-            .ranges_len = @intCast(s.device.ranges.items.len - ranges_start),
-        });
-        try unit.binds.put(s.arena, canonical(vir, i), .{ .param = row });
-        const vty: Sema.Ty = switch (ty) {
-            .real => .real,
-            .integer => .integer,
-            .string => .string,
-            .unspecified => switch (ip.indexToKey(elems[at])) {
-                .float => .real,
-                .str => .string,
-                else => .integer, // else: an integer, or an unfoldable default read as one
-            },
-        };
-        const arg = try s.air.addInst(s.gpa, .{ .tag = .arg, .data = .{ .ty_index = .{ .ty = typeIndex(vty), .index = @backingInt(row) } } });
-        try s.prologue.append(s.arena, arg);
-        try s.param_args.append(s.arena, .{ .ref = .fromIndex(arg), .ty = vty });
-    };
-    assert(s.param_args.items.len == s.device.params.len);
-}
-
-/// §3.4.2 one range, each bound folded over literals alone.
-fn rangeOf(s: *Sema, unit: *Unit, r: Inst.ValueRange) Allocator.Error!Device.Range {
-    const lo = try literalBound(s, unit, r.lo);
-    const hi = if (r.flags.interval) try literalBound(s, unit, r.hi) else lo;
-    return .{
-        .exclude = r.flags.exclude,
-        .lo = if (r.flags.set) null else lo,
-        .hi = if (r.flags.set) null else hi,
-        .lo_closed = if (r.flags.interval) r.flags.lo_closed else true,
-        .hi_closed = if (r.flags.interval) r.flags.hi_closed else true,
-        .strings = r.flags.set,
-    };
-}
-
-/// A bound's value when it reads no name; a NaN or string is none.
-fn literalBound(s: *Sema, unit: *Unit, b: Vir.Body) Allocator.Error!?f64 {
-    const vir = unit.vir;
-    for (vir.body(b)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .decl_ref, .str_ref, .call_sys, .call => return null,
-        else => {}, // else: a literal or an operator over literals
-    };
-    const c = (try foldBody(s, unit, b)) orelse return null;
-    if (c == .str) return null;
-    const x = c.asReal();
-    return if (std.math.isNan(x)) null else x;
-}
-
 /// §3.12 the instance's named branches, in declaration order.
 fn branches(s: *Sema, unit: *Unit) Allocator.Error!void {
     const vir = unit.vir;
@@ -561,9 +514,12 @@ fn variables(s: *Sema, unit: *Unit) Allocator.Error!void {
     for (vir.body(unit.module.body)) |i| {
         if (vir.instructions.items(.tag)[@backingInt(i)] != .variable) continue;
         const v = payloadOf(vir, Inst.Variable, i);
-        if (v.dims.len != 0) continue;
         const first = canonical(vir, i);
         if (unit.binds.contains(first)) continue;
+        if (v.dims.len != 0) {
+            try declareArray(s, unit, first, v);
+            continue;
+        }
         const ty = tyOf(v.flags.storage);
         const slot = try addAlloc(s, ty);
         try unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = slot, .ty = ty } });

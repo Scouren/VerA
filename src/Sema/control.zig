@@ -100,6 +100,12 @@ pub fn operands(s: *Sema, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapU
 pub fn assignTo(s: *Sema, b: *Block, lhs_ref: Inst.Ref, v: Sema.Value, src: Inst.Ref) Allocator.Error!void {
     const vir = b.unit.vir;
     const lhs = lhs_ref.toIndex() orelse return;
+    if (vir.instructions.items(.tag)[@backingInt(lhs)] == .elem) {
+        const array = @import("array.zig");
+        const e = (try array.element(s, b, lhs_ref, src)) orelse return;
+        const r = try expr.coerce(s, b, v, e.ty);
+        return array.store(s, b, e, r);
+    }
     if (vir.instructions.items(.tag)[@backingInt(lhs)] != .decl_ref)
         return s.fail(.E0512, b.unit.file, src, "an assignment to a select is not lowered by Sema yet", .{});
     const first = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(lhs)].decl_tok.decl);
@@ -165,6 +171,60 @@ fn block(s: *Sema, b: *Block, x: Inst.Block) Allocator.Error!void {
     try body(s, b, x.body);
 }
 
+/// §5.10.3.1-§5.10.3.3 the shape of a monitored event's arguments (the old
+/// `event_args.zig`): the required slots, the enable last and integral, the
+/// tolerances and a timer's time_tol non-negative, cross's direction
+/// integral (E0517). False when a required slot is missing.
+fn eventArgs(s: *Sema, b: *Block, tag: vams.SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!bool {
+    const file = b.unit.file;
+    const required: usize = switch (tag) {
+        .cross, .above, .timer => 1,
+        else => 0, // else: initial_step/final_step take names, not slots
+    };
+    const enable: ?usize = switch (tag) {
+        .cross => 4,
+        .above, .timer => 3,
+        else => null, // else: no enable slot
+    };
+    var complete = true;
+    for (0..required) |k| if (k >= args.len or args[k] == .none) {
+        try s.fail(.E0517, file, src, "`{t}()` requires its {s} argument", .{ tag, if (tag == .timer) "start_time" else "expr" });
+        complete = false;
+    };
+    if (enable) |k| {
+        if (k < args.len and args[k] == .none) {
+            try s.fail(.E0517, file, src, "`{t}()` has a comma before its enable and no enable", .{tag});
+            complete = false;
+        }
+        if (args.len > k + 1) {
+            try s.fail(.E0517, file, src, "`{t}()` takes at most {d} arguments, got {d} (A.6.5)", .{ tag, k + 1, args.len });
+            complete = false;
+        }
+    }
+    if (!complete) return false;
+    if (enable) |k| if (k < args.len) if (try decl.foldRef(s, b.unit, args[k])) |c| {
+        if (c != .str and c.asReal() != @round(c.asReal())) try s.fail(.E0517, file, src, "`{t}()` enable shall evaluate to an integer, got {d}", .{ tag, c.asReal() });
+    };
+    switch (tag) {
+        .timer => if (args.len >= 3 and args[2] != .none) if (try decl.foldRef(s, b.unit, args[2])) |c| {
+            if (c != .str and c.asReal() < 0) try s.fail(.E0517, file, src, "`timer()` time_tol shall be non-negative, got {d}", .{c.asReal()});
+        },
+        .cross, .above => {
+            if (tag == .cross and args.len > 1 and args[1] != .none) if (try decl.foldRef(s, b.unit, args[1])) |c| {
+                if (c != .str and c.asReal() != @round(c.asReal())) try s.fail(.E0517, file, src, "`cross()` direction shall evaluate to an integer, got {d}", .{c.asReal()});
+            };
+            const first: usize = if (tag == .cross) 2 else 1;
+            for (first..@max(first, @min(first + 2, args.len))) |k| {
+                if (args[k] == .none) continue;
+                const c = (try decl.foldRef(s, b.unit, args[k])) orelse continue;
+                if (c != .str and c.asReal() < 0) try s.fail(.E0517, file, src, "`{t}()` tolerance shall be non-negative, got {d}", .{ tag, c.asReal() });
+            }
+        },
+        else => {}, // else: no bound to check
+    }
+    return true;
+}
+
 /// §5.10 `@(event) s`: the event's flag guards `s`.
 fn eventWait(s: *Sema, b: *Block, x: Inst.EventWait, src: Inst.Ref) Allocator.Error!void {
     const file = b.unit.file;
@@ -215,8 +275,20 @@ fn eventExpr(s: *Sema, b: *Block, r: vams.Vir.Inst.Ref, src: Inst.Ref) Allocator
                 return null;
             }
             const vargs = vir.list(Inst.Ref, c.args);
+            if (!try eventArgs(s, b, tag, vargs, src)) return null;
             const args = try s.arena.alloc(Air.Inst.Ref, vargs.len);
-            for (vargs, args) |a, *o| o.* = if (a == .none) .fromIntern(.zero_real) else try expr.coerce(s, b, try expr.lower(s, b, a), .real);
+            for (vargs, args, 1..) |a, *o, k| {
+                if (a == .none) {
+                    o.* = .fromIntern(.zero_real);
+                    continue;
+                }
+                const v = try expr.lower(s, b, a);
+                if (v.ty == .string and expr.constOf(s, v.ref) == null) {
+                    try s.fail(.E0517, b.unit.file, src, "`{t}()` argument {d} is a string", .{ tag, k });
+                    return null;
+                }
+                o.* = try expr.coerce(s, b, v, .real);
+            }
             return try expr.call(s, b, @backingInt(tag), .integer, args);
         },
         .posedge, .negedge => {
@@ -236,7 +308,7 @@ fn local(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!void {
     const v = decl.payloadOf(vir, Inst.Variable, i);
     const first = decl.canonical(vir, i);
     if (b.unit.binds.contains(first)) return;
-    if (v.dims.len != 0) return s.fail(.E0512, b.unit.file, i.toRef(), "a local array is not lowered by Sema yet", .{});
+    if (v.dims.len != 0) return decl.declareArray(s, b.unit, first, v);
     const ty = decl.tyOf(v.flags.storage);
     const slot = try decl.addAlloc(s, ty);
     try b.unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = slot, .ty = ty } });

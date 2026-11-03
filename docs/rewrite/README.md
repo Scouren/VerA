@@ -54,7 +54,7 @@ The rules of the rewrite:
 | `sema` (Zcu, elaboration) | `src/sema.zig` | `vams`, `intern_pool`, `air`, `kernels` | `elab.md` | merged (49 named, follow-up pending) |
 | `sema` (analog lowering) | `src/Sema/*`, `src/Air/Device.zig` | as above | `lower.md` | next |
 | `std_sim` | `lib/std/sim.zig` | `kernels`, `contract` | `sim.md` | merged (97 named, follow-up in progress) |
-| next: digital lowering (Vir -> Program), `codegen` (versioned units, written-element masks), `Compilation`, then the switch-over | | | written when their inputs exist | |
+| next: digital lowering (Vir -> Program), `codegen` (versioned units §11.9, written-element masks §11.10), `Compilation`, then the switch-over | | | written when their inputs exist | |
 
 The handle types other modules build against are fixed already:
 `InternPool.Index = enum(u32) { none = maxInt(u32), _ }` and

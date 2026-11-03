@@ -450,6 +450,17 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
    cross-target determinism) wait for the LLVM backend. A deliberate behaviour change: devices
    re-baselined with §11.3's. The old pipeline keeps the unsound rule until the switch-over.
    Spec: `docs/rewrite/float-guard.md`.
+10. **Scratch arrays: a written-element mask, not a memset, in the rewrite's codegen only**
+    (2026-11-03, from ESPice's bsource.va: the per-eval zeroing of a 1152 B stack was 3.5% of a
+    benchmark's cycles). VAMS §3.2 makes an unwritten element read 0, and a stack indexed by a
+    moving pointer cannot be proven written-before-read, so the old codegen's memset stays in the
+    shipped product (ESPice uses `(* vera_scratch = "uninit" *)` plus a guard meanwhile: -7.4%).
+    The new codegen gives each scratch array of at most 64 elements a bitmask of written elements;
+    a read of an unwritten one returns 0, every write sets its bit, and the per-eval reset clears
+    one word instead of the array. Exact §3.2 semantics, no attribute, no undefined behaviour.
+    Oracle: bit-identical device results against the memset version on every fixture with a
+    scratch array, plus a codegen test that no memset is emitted; measured on bsource.va
+    (hand-deleted memset: -17%, the ceiling).
 6. **VPI runtime goes to `lib/vpi/`** (Zig's rule: what a user's program links ships in `lib/`);
    only the host driver (`src/vpi_host.zig`) and the emitter (`src/codegen/vpi.zig`) stay in `src/`.
 

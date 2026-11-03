@@ -12,6 +12,9 @@
 //! - `pub fn task(l: *Lower, i: Inst.Index, op: Program.DumpOp, args: []const Inst.Ref) Error!u32`
 //! - `pub fn ports(l: *Lower, i: Inst.Index, op: Program.PortsOp, all: []const Inst.Ref) Error!u32`
 //! - `pub fn catalog(l: *Lower) Error!void`
+//! - `pub fn target(l: *Lower, r: Inst.Ref) Error!struct { slot: bool, at: u32 }`
+//! - `pub fn namesOf(l: *Lower, f: u32) Error!std.StringHashMapUnmanaged(Name)`
+//! - `pub fn declText(vir: *const Vir, d: Inst.Index) []const u8`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -147,6 +150,60 @@ pub fn catalog(l: *Lower) Error!void {
     l.b.p.vcd = .{ .scopes = scopes, .var_start = var_start, .vars = vars.items };
 }
 
+/// §18.1.2 what a `$dumpvars` argument names: an instance's scope (a root
+/// module by its name, a child instance, or one a hierarchical name
+/// reaches), or a variable's slot.
+pub fn target(l: *Lower, r: Inst.Ref) Error!struct { slot: bool, at: u32 } {
+    const vir = l.virOf(l.frame);
+    const i = r.toIndex() orelse return l.refuse("an omitted $dumpvars argument");
+    switch (Lower.tag(vir, i)) {
+        .str_ref => {
+            const k = rootNamed(l, vir.string(vir.instructions.items(.data)[@backingInt(i)].str_tok.start)) orelse return l.refuse("a $dumpvars argument naming no root module");
+            return .{ .slot = false, .at = l.frames.items[l.instance_frame[k]].scope };
+        },
+        .decl_ref => {
+            const d = vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl;
+            if (Lower.tag(vir, d) == .instance) return .{ .slot = false, .at = l.frames.items[l.instance_frame[try childOf(l, l.rootFrame(l.frame), d)]].scope };
+            return .{ .slot = true, .at = (try varName(l, try expr.leafName(l, i))).slot };
+        },
+        .field => {
+            const fd = Lower.payload(vir, Inst.Field, i);
+            const k = try instanceAt(l, vir, fd.operand, 0);
+            const want = vir.string(fd.name);
+            const f = l.instance_frame[k];
+            if (try childNamed(l, f, want)) |c| return .{ .slot = false, .at = l.frames.items[l.instance_frame[c]].scope };
+            const n = (try namesOf(l, f)).get(want) orelse return l.refuse("a $dumpvars argument its instance does not declare");
+            return .{ .slot = true, .at = (try varName(l, n)).slot };
+        },
+        else => return l.refuse("a $dumpvars argument that names no scope or variable"),
+    }
+}
+
+/// Frame `f`'s names by their text.
+pub fn namesOf(l: *Lower, f: u32) Error!std.StringHashMapUnmanaged(Name) {
+    const vir = l.virOf(f);
+    var out: std.StringHashMapUnmanaged(Name) = .empty;
+    var it = l.frames.items[f].names.iterator();
+    while (it.next()) |e| {
+        const text = declText(vir, e.key_ptr.*);
+        if (text.len != 0) try out.put(l.a, text, l.names.items[e.value_ptr.*]);
+    }
+    return out;
+}
+
+/// The name declaration `d` declares, or "".
+pub fn declText(vir: *const Vir, d: Inst.Index) []const u8 {
+    return vir.string(switch (Lower.tag(vir, d)) {
+        .variable => Lower.payload(vir, Inst.Variable, d).name,
+        .net => Lower.payload(vir, Inst.Net, d).name,
+        .io => Lower.payload(vir, Inst.Io, d).name,
+        .event => Lower.payload(vir, Inst.Name, d).name,
+        .port => Lower.payload(vir, Inst.Port, d).name,
+        .param => Lower.payload(vir, Inst.Param, d).name,
+        else => return "", // else: no other declaration is dumped
+    });
+}
+
 // ---- private ----
 
 /// §18.2.3.8 the call as written, for `$version`: from its `$` to the `)`
@@ -174,35 +231,6 @@ fn callText(l: *Lower, i: Inst.Index) Error![]const u8 {
         else => {},
     };
     return text[start..];
-}
-
-/// §18.1.2 what a `$dumpvars` argument names: an instance's scope (a root
-/// module by its name, a child instance, or one a hierarchical name
-/// reaches), or a variable's slot.
-fn target(l: *Lower, r: Inst.Ref) Error!struct { slot: bool, at: u32 } {
-    const vir = l.virOf(l.frame);
-    const i = r.toIndex() orelse return l.refuse("an omitted $dumpvars argument");
-    switch (Lower.tag(vir, i)) {
-        .str_ref => {
-            const k = rootNamed(l, vir.string(vir.instructions.items(.data)[@backingInt(i)].str_tok.start)) orelse return l.refuse("a $dumpvars argument naming no root module");
-            return .{ .slot = false, .at = l.frames.items[l.instance_frame[k]].scope };
-        },
-        .decl_ref => {
-            const d = vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl;
-            if (Lower.tag(vir, d) == .instance) return .{ .slot = false, .at = l.frames.items[l.instance_frame[try childOf(l, l.rootFrame(l.frame), d)]].scope };
-            return .{ .slot = true, .at = (try varName(l, try expr.leafName(l, i))).slot };
-        },
-        .field => {
-            const fd = Lower.payload(vir, Inst.Field, i);
-            const k = try instanceAt(l, vir, fd.operand, 0);
-            const want = vir.string(fd.name);
-            const f = l.instance_frame[k];
-            if (try childNamed(l, f, want)) |c| return .{ .slot = false, .at = l.frames.items[l.instance_frame[c]].scope };
-            const n = (try namesOf(l, f)).get(want) orelse return l.refuse("a $dumpvars argument its instance does not declare");
-            return .{ .slot = true, .at = (try varName(l, n)).slot };
-        },
-        else => return l.refuse("a $dumpvars argument that names no scope or variable"),
-    }
 }
 
 /// The instance a `$dumpports` argument names, or null when it names none
@@ -319,18 +347,6 @@ fn childNamed(l: *Lower, root: u32, name: []const u8) Error!?u32 {
     return null;
 }
 
-/// Frame `f`'s names by their text.
-fn namesOf(l: *Lower, f: u32) Error!std.StringHashMapUnmanaged(Name) {
-    const vir = l.virOf(f);
-    var out: std.StringHashMapUnmanaged(Name) = .empty;
-    var it = l.frames.items[f].names.iterator();
-    while (it.next()) |e| {
-        const text = declText(vir, e.key_ptr.*);
-        if (text.len != 0) try out.put(l.a, text, l.names.items[e.value_ptr.*]);
-    }
-    return out;
-}
-
 /// The variables of frame `f` (an instance's, or static task or function
 /// `sub`'s) in `vcd.catalog`'s order, each name once.
 fn scopeVars(l: *Lower, f: u32, sub: ?u32, out: *std.ArrayList(Program.Vcd.Var)) Error!void {
@@ -401,16 +417,4 @@ fn variable(l: *Lower, vir: *const Vir, text: []const u8, n: Name, decls: []cons
     try tail.appendSlice(l.a, " $end\n");
     assert(width != 0);
     return .{ .slot = n.slot, .width = width, .real = n.ty.real, .event = event, .head = try l.b.string(head), .tail = try l.b.string(tail.items) };
-}
-
-/// The name declaration `d` declares, or "".
-fn declText(vir: *const Vir, d: Inst.Index) []const u8 {
-    return vir.string(switch (Lower.tag(vir, d)) {
-        .variable => Lower.payload(vir, Inst.Variable, d).name,
-        .net => Lower.payload(vir, Inst.Net, d).name,
-        .io => Lower.payload(vir, Inst.Io, d).name,
-        .event => Lower.payload(vir, Inst.Name, d).name,
-        .port => Lower.payload(vir, Inst.Port, d).name,
-        else => return "", // else: no other declaration is dumped
-    });
 }

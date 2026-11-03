@@ -191,6 +191,9 @@ pub const Lower = struct {
     check_sites: std.ArrayList(u32) = .empty,
     /// §18.1 a dump task was lowered: the catalog is written at the end.
     dumps: bool = false,
+    /// §17.2.10 an `$sdf_annotate` was lowered: the scope table is written
+    /// at the end.
+    sdf: bool = false,
     /// A function body is being compiled (§10.4.4: its fork runs in order).
     in_function: bool = false,
     /// The nets, their drivers (compiled after the walk), per slot its

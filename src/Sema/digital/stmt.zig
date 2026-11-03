@@ -28,6 +28,7 @@ const gates = @import("gates.zig");
 const link = @import("link.zig");
 const tchk = @import("tchk.zig");
 const vcd = @import("vcd.zig");
+const sdf = @import("sdf.zig");
 const holds = @import("holds.zig");
 const order_ = @import("order.zig");
 const Lower = digital.Lower;
@@ -74,6 +75,7 @@ pub fn compileAll(l: *Lower) Error!void {
     try link.resolveDisables(l);
     try tchk.finish(l);
     try vcd.catalog(l);
+    try sdf.scopes(l);
     try sub.finish(l);
     l.b.p.counters = l.repeats + l.joins;
     l.b.p.holds = l.holds;

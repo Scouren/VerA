@@ -21,6 +21,7 @@ const digital = @import("../digital.zig");
 const expr = @import("expr.zig");
 const place = @import("place.zig");
 const vcd = @import("vcd.zig");
+const sdf = @import("sdf.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const none = digital.none;
@@ -29,7 +30,7 @@ const Vir = vams.Vir;
 const Inst = Vir.Inst;
 
 const Show = struct { radix: Program.Radix, newline: bool };
-const Kind = union(enum) { show: Show, strobe: Show, monitor: Show, monitor_on, monitor_off, finish, stop, timeformat, fshow: Show, fstrobe: Show, fmonitor: Show, swrite: Show, sformat, readmem: Program.Radix, fclose, fflush, queue: Program.QueueOp, printtimescale, dump: Program.DumpOp, ports: Program.PortsOp };
+const Kind = union(enum) { show: Show, strobe: Show, monitor: Show, monitor_on, monitor_off, finish, stop, timeformat, fshow: Show, fstrobe: Show, fmonitor: Show, swrite: Show, sformat, readmem: Program.Radix, fclose, fflush, queue: Program.QueueOp, printtimescale, dump: Program.DumpOp, ports: Program.PortsOp, sdf };
 
 const tasks = std.StaticStringMap(Kind).initComptime(.{
     .{ "$display", Kind{ .show = .{ .radix = .decimal, .newline = true } } },
@@ -83,6 +84,7 @@ const tasks = std.StaticStringMap(Kind).initComptime(.{
     .{ "$q_remove", Kind{ .queue = .remove } },
     .{ "$q_exam", Kind{ .queue = .exam } },
     .{ "$printtimescale", Kind.printtimescale },
+    .{ "$sdf_annotate", Kind.sdf },
     .{ "$dumpports", Kind{ .ports = .ports } },
     .{ "$dumpportsoff", Kind{ .ports = .off } },
     .{ "$dumpportson", Kind{ .ports = .on } },
@@ -164,6 +166,7 @@ pub fn task(l: *Lower, i: Inst.Index) Error!void {
         .printtimescale => .{ .kind = .show, .a = try printTimescale(l, args) },
         .dump => |op| .{ .kind = .dump, .a = try vcd.task(l, i, op, args) },
         .ports => |op| .{ .kind = .ports, .a = try vcd.ports(l, i, op, args) },
+        .sdf => .{ .kind = .sdf, .a = try sdf.task(l, args) },
         .monitor_on => .{ .kind = .monitor_on, .a = 0 },
         .monitor_off => .{ .kind = .monitor_off, .a = 0 },
         .finish, .stop => blk: {

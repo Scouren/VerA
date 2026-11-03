@@ -188,7 +188,7 @@ const Run = struct {
                 .big => error.Unsupported,
             },
             .undef => error.NoValue,
-            .str => error.Unsupported,
+            .str, .aggregate => error.Unsupported,
             .simple_type, .int_type, .array_type, .nature, .discipline => unreachable, // Verify: an operand is a value
         };
     }
@@ -347,7 +347,7 @@ fn zeroOf(r: *Run, ty: InternPool.Index) Error!Value {
             .string => error.Unsupported,
         },
         .int_type => .{ .int = 0 },
-        .nature, .discipline, .undef, .float, .int, .str => unreachable, // Verify: a slot's type is a type
+        .nature, .discipline, .undef, .float, .int, .str, .aggregate => unreachable, // Verify: a slot's type is a type
     };
 }
 

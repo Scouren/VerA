@@ -1,5 +1,7 @@
-//! The verdict and the words: `Float`'s finite bits in, one float mode per
-//! root out, ANDed over the root's backward slice, with W0650 naming the
+//! The verdict and the words: `Float`'s intervals and NaN bits in, one
+//! float mode per root out, ANDed over the root's backward slice (a member
+//! is finite when its interval excludes ±inf and it cannot be NaN), with
+//! W0650 naming the
 //! value that broke an accepted root's proof; and the text of every `Float`
 //! diagnostic, naming a value as the user wrote it (a parameter, a probe, a
 //! constant, or the unbounded leaf a computed value depends on).
@@ -73,7 +75,7 @@ const Slice = struct {
             s.seen[i] = s.gen;
             const tag = tags[i];
             const data = datas[i];
-            if (tag != .alloc and s.air.typeOfIndex(s.ip, inst) != .none and !s.f.finite[i]) return ref;
+            if (tag != .alloc and s.air.typeOfIndex(s.ip, inst) != .none and !s.f.finite(i)) return ref;
             switch (tag) {
                 .load => try s.pushUsers(@backingInt(data.un_op.toIndex().?)),
                 .block => try s.pushUsers(i),
@@ -211,7 +213,7 @@ pub fn report(wip: *Diag.Wip, air: Air, ip: *const InternPool, in: Float.Input, 
 /// gets W0650. Asserts that `f` holds the walk's tables.
 pub fn rate(arena: Allocator, air: Air, ip: *const InternPool, in: Float.Input, f: *Float, wip: *Diag.Wip) Allocator.Error!void {
     assert(f.modes.len == in.roots.len);
-    assert(f.finite.len == air.instructions.len);
+    assert(f.nan.len == air.instructions.len);
     const tree = try buildTree(arena, air);
     const n = air.instructions.len;
     // Generation stamps, not cleared per root: `seen[i] == gen` is "on this slice".

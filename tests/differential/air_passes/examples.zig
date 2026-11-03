@@ -165,8 +165,8 @@ test "Float: ln(x) proves for x from (0:inf), errs for x from [-10:-1], stays op
 
 test "Float: a guard on V(p,n) proves ln of a recomputed V(p,n)" {
     // if (V(p,n) > 0) ln(V(p,n)): lowering computes a fresh `fsub` per
-    // V(p,n), so only the congruence class carries the fact. Probes are
-    // finite by the host contract and `-` keeps them finite (rule 3).
+    // V(p,n), so only the congruence class carries the fact. Probes lie in
+    // the host's bound, so `-` keeps them finite.
     const gpa = testing.allocator;
     var t = try T.init(gpa);
     defer t.deinit();
@@ -183,7 +183,7 @@ test "Float: a guard on V(p,n) proves ln of a recomputed V(p,n)" {
     const blk = try t.ifElse(&t.main, .real_type, c, &then, l, &els, try t.real(0));
     var air = try t.finish(blk);
     defer air.deinit(gpa);
-    var o = try analyze(&t, air, .{ .roots = &.{.{ .refs = &.{blk} }} });
+    var o = try analyze(&t, air, .{ .roots = &.{.{ .refs = &.{blk} }}, .unknown_bound = 10 });
     defer o.f.deinit(gpa);
     try testing.expectEqual(Float.Domain.proven, o.f.domain[@backingInt(l.toIndex().?)]);
     try testing.expectEqual(Float.Mode.optimized, o.f.modes[0]);
@@ -215,25 +215,28 @@ test "Float: a guard on a variable reaches its next read; a write in between cut
     }
 }
 
-test "Float: 1/R is finite for R with exclude 0 and not for an unranged R" {
-    // §4.2.4 `/` by a possible zero is ±inf, not an error; the hole proves it away.
+test "Float: 1/R is finite for R from [1m:1M], not for R with only exclude 0, nor for an unranged R" {
+    // §4.2.4 `/` by a possible zero is ±inf, not an error; the hole proves
+    // the zero away, but not the overflow: 1 / 5e-324 is inf in IEEE 754
+    // (the merged prover called it finite). A range bounded away from 0
+    // proves both.
     const gpa = testing.allocator;
-    for ([_]bool{ true, false }) |hole| {
+    const open_line: Interval.Range = .{ .kind = .from, .lo = -inf, .hi = inf, .lo_inclusive = false, .hi_inclusive = false };
+    const cases = [_]struct { ranges: []const Interval.Range, mode: Float.Mode }{
+        .{ .ranges = &.{.{ .kind = .from, .lo = 1e-3, .hi = 1e6 }}, .mode = .optimized },
+        .{ .ranges = &.{ open_line, .{ .kind = .exclude, .lo = 0, .hi = 0 } }, .mode = .strict },
+        .{ .ranges = &.{open_line}, .mode = .strict },
+    };
+    for (cases) |c| {
         var t = try T.init(gpa);
         defer t.deinit();
         const q = try t.bin(&t.main, .fdiv, try t.real(1), try t.arg(.real_type, 0));
         var air = try t.finish(q);
         defer air.deinit(gpa);
-        // `from (-inf:inf)`: every finite double (a closed or absent bound
-        // admits inf, which no rule makes finite); `exclude 0` the hole.
-        const ranges: []const Interval.Range = if (hole) &.{
-            .{ .kind = .from, .lo = -inf, .hi = inf, .lo_inclusive = false, .hi_inclusive = false },
-            .{ .kind = .exclude, .lo = 0, .hi = 0 },
-        } else &.{.{ .kind = .from, .lo = -inf, .hi = inf, .lo_inclusive = false, .hi_inclusive = false }};
-        var o = try analyze(&t, air, .{ .params = &.{.{ .ranges = ranges }}, .roots = &.{.{ .refs = &.{q} }} });
+        var o = try analyze(&t, air, .{ .params = &.{.{ .ranges = c.ranges }}, .roots = &.{.{ .refs = &.{q} }} });
         defer o.f.deinit(gpa);
-        try testing.expectEqual(if (hole) Float.Mode.optimized else .strict, o.f.modes[0]);
-        try testing.expectEqual(!hole, o.has(.W0650));
+        try testing.expectEqual(c.mode, o.f.modes[0]);
+        try testing.expectEqual(c.mode == .strict, o.has(.W0650));
     }
 }
 
@@ -276,7 +279,9 @@ test "Float: the host's unknown bound makes exp(V) provable" {
 
 test "Float: a loop widens its counter and keeps its sign; a constant-false arm reports nothing" {
     // s = 0; k = 0; while (k < 3) { s = s + 1; k = k + 1 }; ln(s + 1): s >= 0
-    // after widening, so s + 1 >= 1 > 0. Then `if (0 > 1) ln(-1)`: §4.2.3, the
+    // after widening, so s + 1 >= 1 > 0. Widening pushes s's upper end to
+    // inf (nothing ties s to the trip count), so s + 1 is not provably
+    // finite and the root is `.strict`. Then `if (0 > 1) ln(-1)`: §4.2.3, the
     // untaken arm's violation is not reported.
     const gpa = testing.allocator;
     var t = try T.init(gpa);
@@ -313,7 +318,7 @@ test "Float: a loop widens its counter and keeps its sign; a constant-false arm 
     try testing.expectEqual(Float.Domain.proven, o.f.domain[@backingInt(l.toIndex().?)]);
     try testing.expect(o.f.iv[@backingInt(l.toIndex().?)].ge(0));
     try testing.expectEqual(@as(u8, 0), o.f.error_count);
-    try testing.expectEqual(Float.Mode.optimized, o.f.modes[0]);
+    try testing.expectEqual(Float.Mode.strict, o.f.modes[0]);
 }
 
 test "Legalize: a diamond's result becomes a select, a one-armed write an assign of one" {

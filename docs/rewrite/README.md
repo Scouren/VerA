@@ -75,9 +75,11 @@ The handle types other modules build against are fixed already:
 
 - Every `zig build` runs inside `nix develop -c ...` (AGENTS.md "Building").
 - In a fresh git worktree: `ln -s /home/omare/Documents/Projects/EDA-Tools/Simulator/VerA/.zig-cache .zig-cache`
-  (share the warm cache) and `git submodule update --init --recursive tests/conformance` (the
-  fixtures and the external suites inside them, e.g. Xyce's netlists: without `--recursive` an
-  oracle sees a smaller corpus than the merged branch does, and passes where the merge fails).
+  (share the warm cache), and use the main checkout's fixtures instead of fetching any:
+  `rm -rf tests/conformance && ln -s /home/omare/Documents/Projects/EDA-Tools/Simulator/VerA/tests/conformance tests/conformance`.
+  That copy holds the full corpus the merge sees (the external suites included).
+  Never run `git submodule update` or any other fetch: it clones large repositories over
+  the network and asks the user for credentials. Never `git add` `tests/conformance`.
 - The loop: `nix develop -c zig build test-<module> -j4`, then your oracle
   `nix develop -c zig build diff-<name> -j4`. Before you finish:
   `zig build check`, `zig build rewrite`, `zig build test-unit` (the repo-wide guards

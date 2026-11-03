@@ -1397,3 +1397,10 @@ src/
     main.zig
         
 ```
+
+- **Zero `.xfail` (user, 2026-11-03):** "I want 100% green, no xfails." Every
+  `tests/differential/*.xfail` is empty before the switch-over, and an agent is
+  done only with its file empty. A difference ends as built code, as a stage
+  that owns the check (a stage-ownership table for diagnostic codes), or as an
+  old-side bug that an independent tiebreaker settles (an f128 reference, or an
+  `//! lrm` fixture). Never as a line. `docs/rewrite/README.md` rule 3.

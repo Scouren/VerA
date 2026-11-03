@@ -16,6 +16,7 @@
 //! - `pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Error!void`
 //! - `pub fn probe(s: *Sema, n: Node.Index) Allocator.Error!Air.Inst.Ref`
 //! - `pub fn loadDisciplines(s: *Sema) Allocator.Error!void`
+//! - `pub fn rowOf(s: *Sema, b: *const Block, t: Target) Allocator.Error!Device.Contribution.Index`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -172,6 +173,27 @@ pub fn loadDisciplines(s: *Sema) Allocator.Error!void {
     }
 }
 
+/// The contribution row of `t`, made on its first `<+` with its slots.
+pub fn rowOf(s: *Sema, b: *const Block, t: Target) Allocator.Error!Device.Contribution.Index {
+    const key: Sema.ContribKey = .{ .access = t.access, .branch = t.branch, .hi = t.hi, .lo = t.lo };
+    const gop = try s.contrib_rows.getOrPut(s.arena, key);
+    if (gop.found_existing) return gop.value_ptr.*;
+    const row: Device.Contribution.Index = @fromBackingInt(@intCast(s.device.contributions.len));
+    try s.device.contributions.append(s.gpa, .{
+        .access = t.access,
+        .kind = .direct,
+        .branch = t.branch,
+        .hi = t.hi,
+        .lo = t.lo,
+        .resist = try decl.addAlloc(s, .real),
+        .react = try decl.addAlloc(s, .real),
+        .wrote = try decl.addAlloc(s, .real),
+    });
+    try s.contrib_units.append(s.arena, b.unit.instance);
+    gop.value_ptr.* = row;
+    return row;
+}
+
 // ---- private ----
 
 /// A nature's `access` attribute, its parent's when it has none.
@@ -287,27 +309,6 @@ fn nodeName(s: *const Sema, n: Node.Index) []const u8 {
     return s.zcu.intern_pool.stringToSlice(s.device.nodes.items(.name)[@backingInt(n)]);
 }
 
-/// The contribution row of `t`, made on its first `<+` with its slots.
-fn rowOf(s: *Sema, b: *const Block, t: Target) Allocator.Error!Device.Contribution.Index {
-    const key: Sema.ContribKey = .{ .access = t.access, .branch = t.branch, .hi = t.hi, .lo = t.lo };
-    const gop = try s.contrib_rows.getOrPut(s.arena, key);
-    if (gop.found_existing) return gop.value_ptr.*;
-    const row: Device.Contribution.Index = @fromBackingInt(@intCast(s.device.contributions.len));
-    try s.device.contributions.append(s.gpa, .{
-        .access = t.access,
-        .kind = .direct,
-        .branch = t.branch,
-        .hi = t.hi,
-        .lo = t.lo,
-        .resist = try decl.addAlloc(s, .real),
-        .react = try decl.addAlloc(s, .real),
-        .wrote = try decl.addAlloc(s, .real),
-    });
-    try s.contrib_units.append(s.arena, b.unit.instance);
-    gop.value_ptr.* = row;
-    return row;
-}
-
 /// The old `reactive.splitTerm`: a sum's terms, each a linear `ddt` term
 /// (into `react`, with a charge site) or a resistive one.
 fn splitTerm(s: *Sema, b: *Block, r: Inst.Ref, negate: bool, out: *Split) Allocator.Error!void {
@@ -398,6 +399,7 @@ fn reactive(s: *Sema, b: *Block, r: Inst.Ref) Allocator.Error!?Reactive {
     const i = r.toIndex() orelse return null;
     const vir = b.unit.vir;
     if (isDdt(b.unit, i)) {
+        if (!try @import("op.zig").checkPlace(s, b, .ddt, r)) return null;
         const args = vir.list(Inst.Ref, decl.payloadOf(vir, Inst.SysCall, i).args);
         if (args.len == 0 or args[0] == .none) {
             try s.fail(.E0502, b.unit.file, r, "", .{});

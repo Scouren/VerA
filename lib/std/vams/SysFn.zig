@@ -202,6 +202,10 @@ pub const Tag = enum(u8) {
     @"$limit",
     @"$table_model",
     @"$vera_reject_step",
+    // VerA-synthetic, never a source spelling: §4.5.4 `idt`'s static-point
+    // flag and its held form.
+    @"op$static",
+    @"idt$hold",
 
     /// The tag `spelling` names, or null for a user system function.
     pub fn fromName(spelling: []const u8) ?Tag {
@@ -442,6 +446,8 @@ pub const table = std.EnumArray(Tag, Info).init(.{
     .@"$limit" = .{ .ty = .real, .args = .{ .min = 1 }, .family = .kernel, .context = .analog },
     .@"$table_model" = .{ .ty = .real, .args = .{ .min = 2 }, .family = .kernel, .context = .analog },
     .@"$vera_reject_step" = .{ .ty = .none, .args = .exactly(1), .family = .kernel, .context = .analog },
+    .@"op$static" = .{ .ty = .int, .args = .exactly(0), .family = .query, .context = .analog },
+    .@"idt$hold" = .{ .ty = .real, .args = .exactly(3), .family = .analog_op, .context = .analog },
 });
 
 const display: Info = .{ .ty = .none, .family = .display };

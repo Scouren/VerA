@@ -158,12 +158,14 @@ fn typeIndex(ty: Sema.Ty) InternPool.Index {
     };
 }
 
-/// The main body: the prologue's slots, `body`, and the `ret`.
+/// The main body: the prologue's slots, the entry assignments, `body`, and the `ret`.
 fn finish(s: *Sema, body: []const Air.Inst.Index) Allocator.Error![]const Air.Inst.Index {
     const ret = try s.air.addUnOp(s.gpa, .ret, .fromIntern(.zero_real));
-    const main = try s.arena.alloc(Air.Inst.Index, s.prologue.items.len + body.len + 1);
+    const head = s.prologue.items.len + s.entry.items.len;
+    const main = try s.arena.alloc(Air.Inst.Index, head + body.len + 1);
     @memcpy(main[0..s.prologue.items.len], s.prologue.items);
-    @memcpy(main[s.prologue.items.len..][0..body.len], body);
+    @memcpy(main[s.prologue.items.len..head], s.entry.items);
+    @memcpy(main[head..][0..body.len], body);
     main[main.len - 1] = ret;
     assert(main.len >= 1);
     return main;

@@ -26,6 +26,7 @@ const decl = @import("decl.zig");
 const expr = @import("expr.zig");
 const contrib = @import("contrib.zig");
 const syscall = @import("syscall.zig");
+const op = @import("op.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Block = Sema.Block;
@@ -105,6 +106,7 @@ pub fn assignTo(s: *Sema, b: *Block, lhs_ref: Inst.Ref, v: Sema.Value, src: Inst
     const bind = b.unit.binds.get(first) orelse return s.fail(.E0512, b.unit.file, src, "an assignment to a name with no slot", .{});
     if (bind != .slot) return s.fail(.E0313, b.unit.file, src, "an assignment to a name that is not a variable", .{});
     const r = try expr.coerce(s, b, v, bind.slot.ty);
+    if (op.isStatic(s, r, 0)) try s.static_slots.put(s.arena, bind.slot.alloc, {}) else _ = s.static_slots.remove(bind.slot.alloc);
     _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(bind.slot.alloc), .rhs = r } } });
 }
 // ---- private ----
@@ -171,6 +173,7 @@ fn eventWait(s: *Sema, b: *Block, x: Inst.EventWait, src: Inst.Ref) Allocator.Er
     const c = (try eventExpr(s, b, x.event, src)) orelse return;
     var then_b = b.child();
     then_b.conditional += 1;
+    then_b.runtime += 1;
     then_b.in_event = true;
     try body(s, &then_b, x.body);
     var else_b = b.child();
@@ -247,11 +250,14 @@ fn local(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!void {
 /// §5.8.1 `if (c) a else b`.
 fn condbr(s: *Sema, b: *Block, x: Inst.CondBr) Allocator.Error!void {
     const c = try expr.toBool(s, b, try expr.lower(s, b, x.cond));
+    const rt: u32 = @intFromBool(!op.isStatic(s, c, 0));
     var then_b = b.child();
     then_b.conditional += 1;
+    then_b.runtime += rt;
     try body(s, &then_b, x.then);
     var else_b = b.child();
     else_b.conditional += 1;
+    else_b.runtime += rt;
     try body(s, &else_b, x.@"else");
     try ifElse(s, b, c, &then_b, &else_b);
 }
@@ -287,11 +293,14 @@ fn caseFrom(s: *Sema, b: *Block, subject: Sema.Value, arms: []const Inst.Arm, de
         const eq = try expr.binOp(s, b, if (real) .feq else .ieq, try expr.coerce(s, b, subject, ty), try expr.coerce(s, b, l, ty));
         hit = if (hit) |h| try expr.binOp(s, b, .logor, h, eq) else eq;
     }
+    const rt: u32 = @intFromBool(!op.isStatic(s, hit orelse .fromIntern(.zero), 0));
     var then_b = b.child();
     then_b.conditional += 1;
+    then_b.runtime += rt;
     try body(s, &then_b, arm.body);
     var else_b = b.child();
     else_b.conditional += 1;
+    else_b.runtime += rt;
     try caseFrom(s, &else_b, subject, arms, default, at + 1);
     try ifElse(s, b, hit orelse .fromIntern(.zero), &then_b, &else_b);
 }
@@ -306,6 +315,7 @@ fn loop(s: *Sema, b: *Block, x: Inst.Loop) Allocator.Error!void {
     const cont = try s.air.addInst(s.gpa, .{ .tag = .block, .data = undefined });
     var head = b.child();
     head.conditional += 1;
+    head.runtime += 1;
     const cond_insts = vir.body(x.cond);
     const c: Air.Inst.Ref = if (cond_insts.len == 0) .fromIntern(.one) else try expr.toBool(s, &head, try expr.lower(s, &head, cond_insts[cond_insts.len - 1].toRef()));
     var inner = head.child();

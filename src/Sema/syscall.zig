@@ -57,7 +57,8 @@ pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Erro
             try task(s, b, c, src);
             return .{ .ref = .fromIntern(.zero_real), .ty = .real };
         },
-        .analog_op, .event, .kernel => {
+        .analog_op => return @import("op.zig").lower(s, b, tag, args, src),
+        .event, .kernel => {
             try s.fail(.E0512, b.unit.file, src, "`{s}` is not lowered by Sema yet", .{name});
             return expr.poison;
         },

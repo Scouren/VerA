@@ -2,19 +2,10 @@
 # diff-lower`, tests/differential/lower.zig). One line each: the fixture path
 # under tests/conformance/tests, then the first disagreement the oracle found.
 # A listed fixture that agrees fails the run until its line goes.
-netlist/hdl/a09_absdelay_accepted_only.assets/a09_delayed_ramp.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-netlist/hdl/a09_idt_bystander_reject.assets/a09_idt_ramp.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
-netlist/hdl/a09_idt_lte_reject.assets/a09_idt_ramp.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
-netlist/hdl/a09_idt_ramp_clean.assets/a09_idt_ramp.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
-netlist/hdl/a09_idt_self_reject.assets/a09_idt_latched.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
 netlist/hdl/a09_limit_root_transient.assets/a09_limit_ramp.va codes: old {}, new E0512 (E0512: `$limit` is not lowered by Sema yet)
-netlist/hdl/veriloga_diode_clamp.assets/va_diode.va codes: old {}, new E0512 (E0512: `limexp` is not lowered by Sema yet)
-netlist/hdl/veriloga_idt_ac.assets/va_idt.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
 netlist/hdl/veriloga_limit.assets/va_limit.va codes: old {}, new E0512 (E0512: `$limit` is not lowered by Sema yet)
 netlist/hdl/veriloga_limit.assets/va_limit_state.va codes: old {}, new E0512 (E0512: `$limit` is not lowered by Sema yet)
 netlist/hdl/veriloga_table_snapshot.assets/va_table_snapshot.va codes: old {}, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
-netlist/hdl/veriloga_timer_rearm.assets/va_tick.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-netlist/hdl/veriloga_transition_reject.assets/va_cmp.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
 netlist/hdl/veriloga_wide_ladder.assets/ladder70.va codes: old {}, new E0426,E0512 (E0512: an access of a select is not lowered by Sema yet)
 netlist/noise/va_noise.assets/coeff_res.va codes: old {}, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
 netlist/noise/va_noise.assets/corr_res.va codes: old {}, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
@@ -23,7 +14,6 @@ netlist/noise/va_noise.assets/ntab_card.va codes: old {}, new E0512 (E0512: `noi
 netlist/noise/va_noise.assets/ntab_lin.va codes: old {}, new E0512 (E0512: `noise_table` is not lowered by Sema yet)
 netlist/noise/va_noise.assets/ntab_log.va codes: old {}, new E0512 (E0512: `noise_table_log` is not lowered by Sema yet)
 netlist/noise/va_noise.assets/vseries_res.va codes: old {}, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
-netlist/qpss/idt_lowpass_two_tone.assets/va_idt_lp.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
 spice/attribute_ignored_on_ordinary_instances.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 spice/limit_fet.va codes: old {}, new E0512 (E0512: `$limit` is not lowered by Sema yet)
 spice/limit_fetlim_missing_vth.va codes: old E0809, new E0512 (E0512: `$limit` is not lowered by Sema yet)
@@ -78,7 +68,7 @@ spice/spice_passive_primitives.va codes: old {}, new E0512 (E0512: `field` is no
 spice/spice_semiconductor_primitives.va codes: old {}, new E0512 (E0512: `field` is not lowered by Sema yet)
 spice/spice_source_primitives.va codes: old {}, new E0512 (E0512: `field` is not lowered by Sema yet)
 spice/vsine_dc_is_the_operating_point_value.va codes: old {}, new E0512 (E0512: `field` is not lowered by Sema yet)
-verilog-a/annex_a_syntax/abstol_nature_identifier.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
+verilog-a/annex_a_syntax/abstol_nature_identifier.va codes: old {}, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
 verilog-a/annex_a_syntax/analog_function_default_type.va contribution 0 resist: old 7.573134526231753e0, new 8e0
 verilog-a/annex_a_syntax/analog_function_integer_string.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/annex_a_syntax/branch_array.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
@@ -103,7 +93,6 @@ verilog-a/annex_a_syntax/replication.va codes: old {}, new E0512 (E0512: `replic
 verilog-a/annex_a_syntax/sum_chain_past_the_old_parser_limit.va codes: old {}, new E0241 (E0241: 4096 levels deep)
 verilog-a/annex_a_syntax/system_task_null_argument_space.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/annex_b_keywords/escaped_keyword_name_positions.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
-verilog-a/annex_c_analog_subset/analog_operators.va codes: old {}, new E0512 (E0512: `limexp` is not lowered by Sema yet)
 verilog-a/annex_c_analog_subset/disable_rejected.va codes: old E0401, new E0512 (E0512: `disable` is not lowered by Sema yet)
 verilog-a/annex_c_analog_subset/no_discipline_rejected.va the old side refused, the new side lowered
 verilog-a/annex_c_analog_subset/port_access_contribution_rejected.va codes: old E0407, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
@@ -114,7 +103,7 @@ verilog-a/annex_c_analog_subset/time_in_analog_rejected.va codes: old E0806, new
 verilog-a/annex_d_standard_definitions/abstol_override_branches.va codes: old {}, new E0512 (E0512: `field` is not lowered by Sema yet)
 verilog-a/annex_d_standard_definitions/discrete_disciplines.va the old side refused, the new side lowered
 verilog-a/annex_d_standard_definitions/literal_logic_discipline.va the old side refused, the new side lowered
-verilog-a/annex_d_standard_definitions/nature_as_ddt_abstol_argument.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
+verilog-a/annex_d_standard_definitions/nature_as_ddt_abstol_argument.va codes: old {}, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
 verilog-a/annex_d_standard_definitions/nature_attribute_defaults.va codes: old {}, new E0512 (E0512: `field` is not lowered by Sema yet)
 verilog-a/annex_d_standard_definitions/signal_flow_flow_access_rejected.va codes: old E0360, new {}
 verilog-a/annex_d_standard_definitions/signal_flow_potential_access_rejected.va codes: old E0360, new {}
@@ -126,9 +115,6 @@ verilog-a/annex_g_change_history/generate_replaced_by_analog_for.va codes: old {
 verilog-a/annex_g_change_history/limexp_v1_spelling_rejected.va codes: old E0808, new {}
 verilog-a/annex_g_change_history/real_array_range_after_name.va codes: old {}, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/annex_g_change_history/realtime_analog_context_rejected.va codes: old E0806, new {}
-verilog-a/annex_g_change_history/transition_fall_time_binding.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/annex_g_change_history/transition_time_tolerance.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/annex_h_glossary/nonlinear_nr_relationship.va codes: old {}, new E0512 (E0512: `limexp` is not lowered by Sema yet)
 verilog-a/ch01_intro/incompatible_flow_natures_rejected.va the old side refused, the new side lowered
 verilog-a/ch01_intro/potential_contribution_to_flow_only.va the old side refused, the new side lowered
 verilog-a/ch01_intro/probe_branch_both_quantities.va codes: old E0423, new {}
@@ -177,11 +163,10 @@ verilog-a/ch03_data_types/brace_array_initializer_rejected.va codes: old E0349, 
 verilog-a/ch03_data_types/branch_incompatible_terminals.va the old side refused, the new side lowered
 verilog-a/ch03_data_types/compatible_hierarchical_override.va tables row 2: old `contrib flow direct br0 a b`, new `node 2 ca.p net`
 verilog-a/ch03_data_types/conflicting_disciplines_in_context_rejected.va the old side refused, the new side lowered
-verilog-a/ch03_data_types/ddt_nature_names_and_overrides.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch03_data_types/ddt_nature_string_rejected.va codes: old E0340, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch03_data_types/ddt_nature_undeclared_rejected.va codes: old E0374, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch03_data_types/ddt_nature_unrelated_to_default_rejected.va codes: old E0374, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch03_data_types/ddt_nature_unrelated_to_explicit_rejected.va codes: old E0374, new E0512 (E0512: `ddt` is not lowered by Sema yet)
+verilog-a/ch03_data_types/ddt_nature_string_rejected.va codes: old E0340, new {}
+verilog-a/ch03_data_types/ddt_nature_undeclared_rejected.va codes: old E0374, new {}
+verilog-a/ch03_data_types/ddt_nature_unrelated_to_default_rejected.va codes: old E0374, new {}
+verilog-a/ch03_data_types/ddt_nature_unrelated_to_explicit_rejected.va codes: old E0374, new {}
 verilog-a/ch03_data_types/dependent_control_host.va codes: old {}, new E0512 (E0512: `elem` is not lowered by Sema yet)
 verilog-a/ch03_data_types/dependent_control_shift_mixed.va tables row 3: old `param mixed integer local = 1`, new `param mixed integer local = 0`
 verilog-a/ch03_data_types/dependent_control_shift_mixed_folded.va tables row 1: old `param mixed integer local = 1`, new `param mixed integer local = 0`
@@ -213,12 +198,10 @@ verilog-a/ch03_data_types/genvar_assigned_outside_loop.va codes: old E0313, new 
 verilog-a/ch03_data_types/genvar_nonstatic_loop_control.va codes: old E0419, new E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch03_data_types/genvar_static_dependencies.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch03_data_types/idt_nature_not_a_nature.va codes: old E0341, new {}
-verilog-a/ch03_data_types/idt_nature_related_overrides.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
-verilog-a/ch03_data_types/idt_nature_self_reference.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
 verilog-a/ch03_data_types/idt_nature_string_rejected.va codes: old E0340, new {}
 verilog-a/ch03_data_types/idt_nature_unrelated_override.va codes: old E0341, new {}
-verilog-a/ch03_data_types/idt_nature_unrelated_to_default_rejected.va codes: old E0341, new E0512 (E0512: `idt` is not lowered by Sema yet)
-verilog-a/ch03_data_types/idt_nature_unrelated_to_explicit_rejected.va codes: old E0341, new E0512 (E0512: `idt` is not lowered by Sema yet)
+verilog-a/ch03_data_types/idt_nature_unrelated_to_default_rejected.va codes: old E0341, new {}
+verilog-a/ch03_data_types/idt_nature_unrelated_to_explicit_rejected.va codes: old E0341, new {}
 verilog-a/ch03_data_types/implicit_net_discipline_from_connected_ports.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-a/ch03_data_types/implicit_net_solution.va tables row 1: old `node 1 implicit_link net`, new `node 1 child.b net`
 verilog-a/ch03_data_types/implicit_nets.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
@@ -228,7 +211,6 @@ verilog-a/ch03_data_types/incompatible_nets_access.va the old side refused, the 
 verilog-a/ch03_data_types/integer_conversion_saturates.va tables row 2: old `param big integer = 1e300`, new `param big integer = ?`
 verilog-a/ch03_data_types/integer_parameter_precision.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch03_data_types/integer_parameter_precision_conditional.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch03_data_types/integer_parameter_precision_control.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
 verilog-a/ch03_data_types/integer_parameter_precision_derive.va codes: old {}, new E0512 (E0512: `elem` is not lowered by Sema yet)
 verilog-a/ch03_data_types/integer_parameter_precision_host.va tables row 0: old `param base integer = 9007199254740993`, new `param base unspecified = 9007199254740993`
 verilog-a/ch03_data_types/integer_parameter_precision_override.va tables row 0: old `param child.code integer local = 4702394921427289928`, new `param child.code unspecified local = 4702394921427289928`
@@ -250,7 +232,6 @@ verilog-a/ch03_data_types/nodeset_not_constant.va codes: old E0365, new {}
 verilog-a/ch03_data_types/nonconstant_array_dimension.va codes: old E0308,E0309, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch03_data_types/nonconstant_replication_to_integral.va codes: old E0354, new E0512 (E0512: `replicate` is not lowered by Sema yet)
 verilog-a/ch03_data_types/nonconstant_user_attribute.va codes: old E0340, new {}
-verilog-a/ch03_data_types/operator_equation_tolerances.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
 verilog-a/ch03_data_types/output_variable_units_numeric_rejected.va the old side refused, the new side lowered
 verilog-a/ch03_data_types/parameter_array.va codes: old {}, new E0512 (E0512: `elem` is not lowered by Sema yet)
 verilog-a/ch03_data_types/parameter_array_exact_override.va codes: old {}, new E0512 (E0512: `elem` is not lowered by Sema yet)
@@ -326,23 +307,12 @@ verilog-a/ch03_data_types/vera_scratch_uninit_tape.va codes: old {}, new E0512 (
 verilog-a/ch03_data_types/wrong_access_function.va codes: old E0360, new {}
 verilog-a/ch04_expressions/13b_generic_access.va codes: old {}, new E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch04_expressions/abs_zero_derivative.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
-verilog-a/ch04_expressions/absdelay.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/ch04_expressions/absdelay_ac_phase.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/ch04_expressions/absdelay_dynamic_maxdelay_sampled.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/ch04_expressions/absdelay_history_beyond_capacity.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/ch04_expressions/absdelay_history_past_capacity.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/ch04_expressions/absdelay_initial_output_is_input_at_zero.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/ch04_expressions/absdelay_linear_interpolation.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/ch04_expressions/absdelay_maxdelay_sizes_history.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/ch04_expressions/absdelay_maxdelay_substitution.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
 verilog-a/ch04_expressions/absdelay_missing_td_rejected.va codes: old E0505, new E0506 (E0506: `absdelay` takes 2 to 3, given 1)
-verilog-a/ch04_expressions/absdelay_negative_delay_rejected.va codes: old E0516, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/ch04_expressions/absdelay_td_frozen_without_maxdelay.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/ch04_expressions/absdelay_three_arg_negative_rejected.va codes: old E0516, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/ch04_expressions/absdelay_vera_interp_linear.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/ch04_expressions/absdelay_vera_interp_quadratic.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/ch04_expressions/absdelay_vera_interp_quadratic_uneven.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/ch04_expressions/absdelay_zero_delay_rejected.va codes: old E0516, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
+verilog-a/ch04_expressions/absdelay_negative_delay_rejected.va codes: old E0516, new {}
+verilog-a/ch04_expressions/absdelay_three_arg_negative_rejected.va codes: old E0516, new {}
+verilog-a/ch04_expressions/absdelay_vera_interp_quadratic.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
+verilog-a/ch04_expressions/absdelay_vera_interp_quadratic_uneven.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
+verilog-a/ch04_expressions/absdelay_zero_delay_rejected.va codes: old E0516, new {}
 verilog-a/ch04_expressions/ac_stim.va codes: old {}, new E0512 (E0512: `ac_stim` is not lowered by Sema yet)
 verilog-a/ch04_expressions/ac_stim_ac_analysis.va codes: old {}, new E0512 (E0512: `ac_stim` is not lowered by Sema yet)
 verilog-a/ch04_expressions/ac_stim_dynamic_magnitude.va codes: old {}, new E0512 (E0512: `ac_stim` is not lowered by Sema yet)
@@ -354,8 +324,7 @@ verilog-a/ch04_expressions/ac_stim_quadrature.va codes: old {}, new E0512 (E0512
 verilog-a/ch04_expressions/access_bus_genvar_index.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch04_expressions/access_bus_variable_index_rejected.va codes: old E0352, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-a/ch04_expressions/analog_function_four_return_mechanisms.va codes: old {}, new E0512 (E0512: `return` with a value is not lowered by Sema yet)
-verilog-a/ch04_expressions/analog_operator_in_short_circuit_operand.va codes: old {}, new E0512 (E0512: `slew` is not lowered by Sema yet)
-verilog-a/ch04_expressions/analog_operator_keeps_internal_state.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
+verilog-a/ch04_expressions/analog_operator_in_short_circuit_operand.va codes: old {}, new E0514 (E0514: `slew`)
 verilog-a/ch04_expressions/analysis_numeric_argument_rejected.va codes: old E0574, new {}
 verilog-a/ch04_expressions/array_assignment.va codes: old {}, new E0512 (E0512: a user task enable is not lowered by Sema yet)
 verilog-a/ch04_expressions/assignment_pattern.va codes: old {}, new E0512 (E0512: `elem` is not lowered by Sema yet)
@@ -371,13 +340,10 @@ verilog-a/ch04_expressions/concatenation_real_operand_rejected.va codes: old E03
 verilog-a/ch04_expressions/constant_expression_of_parameters_and_operators.va codes: old {}, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch04_expressions/constant_expression_reads_a_probe_rejected.va the old side refused, the new side lowered
 verilog-a/ch04_expressions/correlated_noise.va codes: old {}, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
-verilog-a/ch04_expressions/ddt.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
 verilog-a/ch04_expressions/ddt_abstol_dynamic_rejected.va codes: old E0515, new {}
-verilog-a/ch04_expressions/ddt_idt_nature_tolerance.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/ddt_in_expression_is_a_charge_site.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/ddt_of_a_ramp_held_in_a_variable.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/ddt_output_abstol.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/ddx.va codes: old {}, new E0512 (E0512: `limexp` is not lowered by Sema yet)
+verilog-a/ch04_expressions/ddt_idt_nature_tolerance.va codes: old {}, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
+verilog-a/ch04_expressions/ddt_output_abstol.va codes: old {}, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
+verilog-a/ch04_expressions/ddx.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
 verilog-a/ch04_expressions/ddx_flow_column_in_eval.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
 verilog-a/ch04_expressions/ddx_flow_unknown.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
 verilog-a/ch04_expressions/ddx_in_noise_power.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
@@ -390,11 +356,9 @@ verilog-a/ch04_expressions/diode_noise_sources_in_dc.va codes: old {}, new E0512
 verilog-a/ch04_expressions/discontinuity_degree_out_of_range_rejected.va codes: old E0820, new E0512 (E0512: `$discontinuity` is not lowered by Sema yet)
 verilog-a/ch04_expressions/discontinuity_real_degree.va codes: old {}, new E0512 (E0512: `$discontinuity` is not lowered by Sema yet)
 verilog-a/ch04_expressions/discontinuity_string_degree_rejected.va codes: old E0820, new E0512 (E0512: `$discontinuity` is not lowered by Sema yet)
-verilog-a/ch04_expressions/dynamic_constant_argument_resampled_per_analysis.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
 verilog-a/ch04_expressions/dynamic_scalar_output_writeback.va codes: old {}, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
-verilog-a/ch04_expressions/filter_null_zeros_argument.va codes: old {}, new E0512 (E0512: `laplace_zp` is not lowered by Sema yet)
-verilog-a/ch04_expressions/filter_parameter_arrays.va codes: old {}, new E0512 (E0512: `laplace_nd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/filter_scalar_coefficient_rejected.va codes: old E0572, new E0512 (E0512: `laplace_nd` is not lowered by Sema yet)
+verilog-a/ch04_expressions/filter_parameter_arrays.va tables row 2: old `param numerator[0] real = 1e0`, new `param numerator real = ?`
+verilog-a/ch04_expressions/filter_scalar_coefficient_rejected.va codes: old E0572, new {}
 verilog-a/ch04_expressions/flicker_noise_missing_exponent_rejected.va codes: old E0522, new E0506 (E0506: `flicker_noise` takes 2 to 3, given 1)
 verilog-a/ch04_expressions/flicker_noise_topology.va codes: old {}, new E0512 (E0512: `flicker_noise` is not lowered by Sema yet)
 verilog-a/ch04_expressions/flicker_psd_frequency.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
@@ -409,7 +373,6 @@ verilog-a/ch04_expressions/function_array_output_scalar_actual_rejected.va codes
 verilog-a/ch04_expressions/function_array_slice_actuals.va codes: old {}, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch04_expressions/function_direct_recursion.va codes: old E0510, new {}
 verilog-a/ch04_expressions/function_event_ban.va codes: old E0702, new {}
-verilog-a/ch04_expressions/function_filter_ban.va codes: old E0422, new E0512 (E0512: `laplace_nd` is not lowered by Sema yet)
 verilog-a/ch04_expressions/function_indirect_recursion.va codes: old E0510, new {}
 verilog-a/ch04_expressions/function_inout_nonvariable.va codes: old E0316, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch04_expressions/function_local_parameter_does_not_leak_into_folding.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
@@ -420,47 +383,20 @@ verilog-a/ch04_expressions/function_reads_genvar_rejected.va codes: old E0314, n
 verilog-a/ch04_expressions/function_return.va codes: old {}, new E0321,E0512 (E0512: `return` with a value is not lowered by Sema yet)
 verilog-a/ch04_expressions/function_string_output_starts_empty.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch04_expressions/hypot_fmod_extreme_magnitude.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
-verilog-a/ch04_expressions/idt.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/idt_abstol_dynamic_rejected.va codes: old E0515, new E0512 (E0512: `idt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/idt_assert_release_resumes.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/idt_hold_revert.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/idt_is_a_charge_site.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/idt_no_ic_dc_feedback.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/idt_reset_rejected.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/idtmod.va codes: old {}, new E0512 (E0512: `idtmod` is not lowered by Sema yet)
-verilog-a/ch04_expressions/idtmod_ic_forces_dc_solution.va codes: old {}, new E0512 (E0512: `idtmod` is not lowered by Sema yet)
-verilog-a/ch04_expressions/idtmod_modulus_rejected.va codes: old E0516, new E0512 (E0512: `idtmod` is not lowered by Sema yet)
-verilog-a/ch04_expressions/idtmod_offset_window_negative_integrand.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/idtmod_one_argument_starts_at_zero.va codes: old {}, new E0512 (E0512: `idtmod` is not lowered by Sema yet)
+verilog-a/ch04_expressions/idt_abstol_dynamic_rejected.va codes: old E0515, new {}
+verilog-a/ch04_expressions/idtmod.va codes: old {}, new E0514 (E0514: `idtmod`)
+verilog-a/ch04_expressions/idtmod_modulus_rejected.va codes: old E0516, new {}
 verilog-a/ch04_expressions/invalid_index_read_value.va codes: old {}, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch04_expressions/invalid_index_write_preserves.va codes: old {}, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_ac_response.va codes: old {}, new E0512 (E0512: `laplace_nd` is not lowered by Sema yet)
 verilog-a/ch04_expressions/laplace_dynamic_coefficient_sampled.va codes: old {}, new E0512 (E0512: a user task enable is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_filters.va codes: old {}, new E0512 (E0512: `laplace_zp` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_nd_dc_gain.va codes: old {}, new E0512 (E0512: `laplace_nd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_nd_null_denominator_rejected.va codes: old E0505, new E0512 (E0512: `laplace_nd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_nd_pole_at_origin.va codes: old {}, new E0512 (E0512: `laplace_nd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_nd_ramp_response.va codes: old {}, new E0512 (E0512: `laplace_nd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_nd_slow_pole_holds_dc_gain.va codes: old {}, new E0512 (E0512: `laplace_nd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_nd_zero_padded_coefficients.va codes: old {}, new E0512 (E0512: `laplace_nd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_np_dc_gain.va codes: old {}, new E0512 (E0512: `laplace_np` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_np_parameter_roots_unpaired_is_nan.va codes: old {}, new E0512 (E0512: `laplace_np` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_np_real_pole_zero_imaginary.va codes: old {}, new E0512 (E0512: `laplace_np` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_transcendental_coefficient.va codes: old {}, new E0512 (E0512: `laplace_nd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_unpaired_complex_root_rejected.va codes: old {}, new E0512 (E0512: `laplace_zp` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_zd_conjugate_zeros.va codes: old {}, new E0512 (E0512: `laplace_zd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_zd_dc_gain.va codes: old {}, new E0512 (E0512: `laplace_zd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_zd_unpaired_zero_rejected.va codes: old {}, new E0512 (E0512: `laplace_zd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_zp_dynamic_pole_sampled.va codes: old {}, new E0512 (E0512: `laplace_zp` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_zp_lrm_example.va codes: old {}, new E0512 (E0512: `laplace_zp` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_zp_parameter_roots_ac.va codes: old {}, new E0512 (E0512: `laplace_zp` is not lowered by Sema yet)
-verilog-a/ch04_expressions/laplace_zp_parameter_roots_step.va codes: old {}, new E0512 (E0512: `laplace_zp` is not lowered by Sema yet)
-verilog-a/ch04_expressions/last_crossing.va codes: old {}, new E0512 (E0512: `last_crossing` is not lowered by Sema yet)
-verilog-a/ch04_expressions/last_crossing_direction_rejected.va codes: old E0516, new E0512 (E0512: `last_crossing` is not lowered by Sema yet)
-verilog-a/ch04_expressions/last_crossing_directions.va codes: old {}, new E0512 (E0512: `last_crossing` is not lowered by Sema yet)
-verilog-a/ch04_expressions/last_crossing_in_creating_step.va codes: old {}, new E0512 (E0512: `last_crossing` is not lowered by Sema yet)
-verilog-a/ch04_expressions/limexp.va codes: old {}, new E0512 (E0512: `limexp` is not lowered by Sema yet)
-verilog-a/ch04_expressions/limexp_is_exp_at_a_converged_point.va codes: old {}, new E0512 (E0512: `limexp` is not lowered by Sema yet)
+verilog-a/ch04_expressions/laplace_nd_zero_padded_coefficients.va tables row 3: old `param nlit[0] real = 1e0`, new `param nlit real = ?`
+verilog-a/ch04_expressions/laplace_np_parameter_roots_unpaired_is_nan.va tables row 2: old `param bad[0] real = -1e0`, new `param bad real = ?`
+verilog-a/ch04_expressions/laplace_zd_dc_gain.va codes: old {}, new E0505 (E0505: `laplace_zd()`)
+verilog-a/ch04_expressions/laplace_zp_parameter_roots_ac.va tables row 3: old `param z[0] real = -3e0`, new `param z real = ?`
+verilog-a/ch04_expressions/laplace_zp_parameter_roots_step.va tables row 2: old `param z[0] real = -3e0`, new `param z real = ?`
+verilog-a/ch04_expressions/last_crossing_direction_rejected.va codes: old E0516, new {}
+verilog-a/ch04_expressions/last_crossing_directions.va codes: old {}, new E0514 (E0514: `last_crossing`)
+verilog-a/ch04_expressions/limexp_is_exp_at_a_converged_point.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
 verilog-a/ch04_expressions/limexp_not_a_constant_expression_rejected.va the old side refused, the new side lowered
 verilog-a/ch04_expressions/minmax_source_selection.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
 verilog-a/ch04_expressions/minmax_tie_derivatives.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
@@ -486,23 +422,15 @@ verilog-a/ch04_expressions/noise_table_file_name_variable_rejected.va codes: old
 verilog-a/ch04_expressions/noise_table_linear_device.va codes: old {}, new E0512 (E0512: `noise_table` is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_log_device.va codes: old {}, new E0512 (E0512: `noise_table_log` is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_log_topology.va codes: old {}, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
-verilog-a/ch04_expressions/noise_table_parameter_part_select.va codes: old {}, new E0512 (E0512: `laplace_nd` is not lowered by Sema yet)
+verilog-a/ch04_expressions/noise_table_parameter_part_select.va codes: old {}, new E0512 (E0512: `slice` is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_part_select_out_of_range_rejected.va codes: old E0310, new E0512 (E0512: `noise_table` is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_resistor_device.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_sorts_pairs.va codes: old {}, new E0512 (E0512: `noise_table` is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_topology.va codes: old {}, new E0512 (E0512: `noise_table` is not lowered by Sema yet)
 verilog-a/ch04_expressions/nonfinite_array_subscript_rejected.va codes: old E0310, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
-verilog-a/ch04_expressions/operator_in_case_rejected.va codes: old E0514, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch04_expressions/operator_in_conditional.va codes: old E0514, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch04_expressions/operator_in_event.va codes: old E0514, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/operator_in_function.va codes: old E0422, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/operator_in_genvar_for.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
-verilog-a/ch04_expressions/operator_in_repeat.va codes: old E0514, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/operator_in_runtime_for.va codes: old E0514, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch04_expressions/operator_in_ternary_rejected.va codes: old E0514, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch04_expressions/operator_in_while.va codes: old E0514, new E0512 (E0512: `ddt` is not lowered by Sema yet)
+verilog-a/ch04_expressions/operator_in_genvar_for.va codes: old {}, new E0512,E0514 (E0512: an assignment to a name with no slot)
+verilog-a/ch04_expressions/operator_in_repeat.va codes: old E0514, new {}
 verilog-a/ch04_expressions/operator_missing_mandatory_argument.va codes: old E0505, new E0506 (E0506: `ddt` takes 1 to 2, given 0)
-verilog-a/ch04_expressions/operator_under_constant_condition.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
 verilog-a/ch04_expressions/parameter_reduction_and_arithmetic_shift.va tables row 2: old `param r_and integer = 1`, new `param r_and integer = ?`
 verilog-a/ch04_expressions/parameterized_dimension_override.va codes: old {}, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch04_expressions/partial_slice_assignment.va codes: old {}, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
@@ -518,17 +446,12 @@ verilog-a/ch04_expressions/pow_negative_base_runtime_exponent.va codes: old {}, 
 verilog-a/ch04_expressions/pow_parameter_derivative.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
 verilog-a/ch04_expressions/psd_bias_dependent.va codes: old {}, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
 verilog-a/ch04_expressions/psd_white_flicker_export.va codes: old {}, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
-verilog-a/ch04_expressions/rc_88_operator_outside_event.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
 verilog-a/ch04_expressions/reduction_on_real_rejected.va codes: old E0319, new E0348 (E0348: )
-verilog-a/ch04_expressions/reject_4_5_11_1_laplace_zp_parameter_roots.va codes: old {}, new E0512 (E0512: `laplace_zp` is not lowered by Sema yet)
-verilog-a/ch04_expressions/reject_4_5_11_3_laplace_np_unpaired_pole.va codes: old {}, new E0512 (E0512: `laplace_np` is not lowered by Sema yet)
-verilog-a/ch04_expressions/reject_4_5_11_concatenation_coefficients.va codes: old E0572, new E0512 (E0512: `laplace_nd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/reject_4_5_12_1_zi_zp_unpaired_zero.va codes: old {}, new E0512 (E0512: `zi_zp` is not lowered by Sema yet)
-verilog-a/ch04_expressions/reject_4_5_12_2_zi_zd_unpaired_zero.va codes: old {}, new E0512 (E0512: `zi_zd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/reject_4_5_12_3_zi_np_unpaired_pole.va codes: old {}, new E0512 (E0512: `zi_np` is not lowered by Sema yet)
+verilog-a/ch04_expressions/reject_4_5_11_1_laplace_zp_parameter_roots.va tables row 2: old `param z[0] real = -1e9`, new `param z real = ?`
+verilog-a/ch04_expressions/reject_4_5_11_concatenation_coefficients.va codes: old E0572, new {}
 verilog-a/ch04_expressions/reject_4_6_4_4_noise_table_log_duplicate_frequency.va codes: old {}, new E0512 (E0512: `noise_table_log` is not lowered by Sema yet)
-verilog-a/ch04_expressions/reject_absdelay_vera_interp_parameter.va codes: old E0524, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/ch04_expressions/reject_absdelay_vera_interp_value.va codes: old E0524, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
+verilog-a/ch04_expressions/reject_absdelay_vera_interp_parameter.va codes: old E0524, new {}
+verilog-a/ch04_expressions/reject_absdelay_vera_interp_value.va codes: old E0524, new {}
 verilog-a/ch04_expressions/reject_vera_nodiff_contribution.va codes: old E0526, new {}
 verilog-a/ch04_expressions/reject_vera_nodiff_parameter.va codes: old E0525, new {}
 verilog-a/ch04_expressions/replication.va codes: old {}, new E0512 (E0512: `replicate` is not lowered by Sema yet)
@@ -540,13 +463,10 @@ verilog-a/ch04_expressions/replication_zero_alone_rejected.va codes: old E0326, 
 verilog-a/ch04_expressions/replication_zero_beside_sized_operand.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
 verilog-a/ch04_expressions/replication_zero_effect.va codes: old {}, new E0512 (E0512: a user task enable is not lowered by Sema yet)
 verilog-a/ch04_expressions/replication_zero_width.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
-verilog-a/ch04_expressions/revert_ops.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch04_expressions/rollback_a04_rollback_ops.va codes: old {}, new E0512 (E0512: `slew` is not lowered by Sema yet)
+verilog-a/ch04_expressions/revert_ops.va tables row 34: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-a/ch04_expressions/select_on_probe_call_rejected.va codes: old E0330, new E0512 (E0512: `elem` is not lowered by Sema yet)
-verilog-a/ch04_expressions/slew.va codes: old {}, new E0512 (E0512: `slew` is not lowered by Sema yet)
-verilog-a/ch04_expressions/slew_rate_sign_rejected.va codes: old E0516, new E0512 (E0512: `slew` is not lowered by Sema yet)
-verilog-a/ch04_expressions/slew_small_signal.va codes: old {}, new E0512 (E0512: `slew` is not lowered by Sema yet)
-verilog-a/ch04_expressions/slew_small_signal_transfer.va codes: old {}, new E0512 (E0512: `slew` is not lowered by Sema yet)
+verilog-a/ch04_expressions/slew_rate_sign_rejected.va codes: old E0516, new {}
+verilog-a/ch04_expressions/slew_small_signal_transfer.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
 verilog-a/ch04_expressions/slice_index_is_dynamic.va codes: old {}, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch04_expressions/small_signal_linearization.va codes: old {}, new E0512 (E0512: `ac_stim` is not lowered by Sema yet)
 verilog-a/ch04_expressions/spice_noise_rc_white.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
@@ -554,41 +474,22 @@ verilog-a/ch04_expressions/spice_noise_series_resistor.va codes: old {}, new E05
 verilog-a/ch04_expressions/spice_noise_shared_pair.va codes: old {}, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
 verilog-a/ch04_expressions/status_site_beside_noise.va codes: old {}, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
 verilog-a/ch04_expressions/system_math_result_type_division.va contribution 0 resist: old -1.0060885934957882e0, new had no value (Unsupported)
-verilog-a/ch04_expressions/transition.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch04_expressions/transition_default_td_and_fall_time.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch04_expressions/transition_interrupted_falling_higher.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch04_expressions/transition_interrupted_falling_lower.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch04_expressions/transition_interrupted_rising.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch04_expressions/transition_interrupted_rising_higher.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch04_expressions/transition_negative_time_rejected.va codes: old E0516, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch04_expressions/transition_resolution.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch04_expressions/transition_simulator_default.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch04_expressions/transition_transport_delay.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
+verilog-a/ch04_expressions/transition_negative_time_rejected.va codes: old E0516, new {}
 verilog-a/ch04_expressions/white_noise_declaration_initializer.va codes: old {}, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
 verilog-a/ch04_expressions/white_noise_numeric_label_rejected.va codes: old E0573, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
 verilog-a/ch04_expressions/white_noise_topology.va codes: old {}, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
 verilog-a/ch04_expressions/wide_unsigned_compare_extends_each_operand_folded.va tables row 2: old `param f2 integer local = 1`, new `param f2 integer local = 0`
 verilog-a/ch04_expressions/wrong_discipline_access.va the old side refused, the new side lowered
-verilog-a/ch04_expressions/z_filter_period_rejected.va codes: old {}, new E0512 (E0512: `zi_zd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/z_filter_zero_transition_branch_rejected.va codes: old E0518, new E0512 (E0512: `zi_zp` is not lowered by Sema yet)
-verilog-a/ch04_expressions/z_transform_filters.va codes: old {}, new E0512 (E0512: `zi_nd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/zi_ac_response.va codes: old {}, new E0512 (E0512: `zi_nd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/zi_dc_gains.va codes: old {}, new E0512 (E0512: `zi_zp` is not lowered by Sema yet)
-verilog-a/ch04_expressions/zi_nd_dynamic_coefficient_sampled.va codes: old {}, new E0512 (E0512: `zi_nd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/zi_nd_null_denominator_rejected.va codes: old E0505, new E0512 (E0512: `zi_nd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/zi_nd_output_at_sample_instant.va codes: old {}, new E0512 (E0512: `zi_nd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/zi_negative_transition_time_rejected.va codes: old {}, new E0512 (E0512: `zi_nd` is not lowered by Sema yet)
-verilog-a/ch04_expressions/zi_np_parameter_roots_dc_gain.va codes: old {}, new E0512 (E0512: `zi_np` is not lowered by Sema yet)
-verilog-a/ch04_expressions/zi_sampling_period.va codes: old {}, new E0512 (E0512: `zi_zp` is not lowered by Sema yet)
-verilog-a/ch04_expressions/zi_transition_time_and_first_transition.va codes: old {}, new E0512 (E0512: `zi_nd` is not lowered by Sema yet)
+verilog-a/ch04_expressions/z_filter_zero_transition_branch_rejected.va codes: old E0518, new {}
+verilog-a/ch04_expressions/zi_np_parameter_roots_dc_gain.va tables row 2: old `param r[0] real = 5e-1`, new `param r real = ?`
 verilog-a/ch05_analog_behavior/above_noninteger_enable_rejected.va codes: old E0517, new {}
-verilog-a/ch05_analog_behavior/absdelay_short_delay.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
+verilog-a/ch05_analog_behavior/absdelay_short_delay.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/absdelta_digital_only.va codes: old E0513, new E0706 (E0706: )
 verilog-a/ch05_analog_behavior/access_function_not_of_the_branch_discipline_rejected.va the old side refused, the new side lowered
 verilog-a/ch05_analog_behavior/access_function_on_whole_vector_rejected.va codes: old E0351, new {}
 verilog-a/ch05_analog_behavior/analog_genvar_loop.va codes: old {}, new E0426,E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch05_analog_behavior/analog_signals_nets_branches_contributions.va codes: old {}, new E0512 (E0512: `contrib_indirect` is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/analysis_or_constant_primaries.va codes: old {}, new E0512 (E0512: `elem` is not lowered by Sema yet)
+verilog-a/ch05_analog_behavior/analysis_or_constant_primaries.va codes: old {}, new E0512,E0514 (E0512: `elem` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/array_assignment_compatible.va codes: old {}, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/array_assignment_element_types_differ_rejected.va codes: old E0429, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/array_parameter_assigned_outside_default_rejected.va codes: old E0312, new E0313,E0512 (E0512: an assignment to a select is not lowered by Sema yet)
@@ -598,11 +499,7 @@ verilog-a/ch05_analog_behavior/assignment_hierarchical_invalid.va codes: old E03
 verilog-a/ch05_analog_behavior/branch_flow_probe_includes_the_reactive_part.va codes: old {}, new E0512 (E0512: a read of a reactive flow source is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/case_duplicate_default_invalid.va codes: old E0427, new {}
 verilog-a/ch05_analog_behavior/child_named_branch_potential_and_flow_access.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/conditional_ddt_bias_variable_invalid.va codes: old E0514, new {}
-verilog-a/ch05_analog_behavior/conditional_ddt_contribution_invalid.va codes: old E0514, new {}
-verilog-a/ch05_analog_behavior/conditional_ddt_contribution_static.va codes: old {}, new E0512 (E0512: a read of a reactive flow source is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/conditional_filter_assignment_invalid.va codes: old E0514, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/conditional_filter_invalid.va codes: old E0514, new E0512 (E0512: `laplace_nd` is not lowered by Sema yet)
+verilog-a/ch05_analog_behavior/conditional_ddt_contribution_static.va codes: old {}, new E0512,E0514 (E0514: `ddt`)
 verilog-a/ch05_analog_behavior/conditional_indirect_invalid.va codes: old E0412, new E0512 (E0512: `contrib_indirect` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/contribution_to_discrete_net_rejected.va the old side refused, the new side lowered
 verilog-a/ch05_analog_behavior/controlled_sources.va contribution 0 resist: old 0e0, new 2.6579876889098655e0
@@ -615,7 +512,6 @@ verilog-a/ch05_analog_behavior/cross_under_runtime_condition_rejected.va codes: 
 verilog-a/ch05_analog_behavior/cross_used_as_a_value_rejected.va codes: old E0701, new E0512 (E0512: `cross` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/cross_without_expr_rejected.va codes: old E0517, new {}
 verilog-a/ch05_analog_behavior/ddt_inside_array_pattern_argument.va codes: old {}, new E0512 (E0512: a user task enable is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/derivative_contribution.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/disable_in_analog_for_does_not_exit_the_loop.va codes: old {}, new E0512,E0707 (E0512: an assignment to a name with no slot)
 verilog-a/ch05_analog_behavior/disable_inner_versus_outer_named_block.va codes: old {}, new E0512 (E0512: `disable` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/disable_keeps_contributions_already_made.va codes: old {}, new E0512 (E0512: `disable` is not lowered by Sema yet)
@@ -625,8 +521,6 @@ verilog-a/ch05_analog_behavior/double_throw_switch_topology.va contribution 2 re
 verilog-a/ch05_analog_behavior/event_bounds_cross_expr_tol_without_time_tol_rejected.va codes: old E0517, new {}
 verilog-a/ch05_analog_behavior/event_control_undeclared_event_rejected.va codes: old E0705, new E0512 (E0512: this event expression is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/event_null_argument_invalid.va codes: old E0517, new {}
-verilog-a/ch05_analog_behavior/event_timer.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/event_timer_enable.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/event_trigger_global_event_rejected.va codes: old {}, new E0512 (E0512: `trigger` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/generic_access.va codes: old {}, new E0408,E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/genvar_loop_condition_reads_a_probe_rejected.va codes: old E0418, new E0426,E0512 (E0512: an assignment to a name with no slot)
@@ -662,14 +556,13 @@ verilog-a/ch05_analog_behavior/jump_in_analog_for_invalid.va codes: old E0440, n
 verilog-a/ch05_analog_behavior/jump_in_function_outside_loop_invalid.va codes: old E0404, new E0512 (E0512: `break` outside a loop)
 verilog-a/ch05_analog_behavior/jump_in_runtime_for_in_analog_for.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch05_analog_behavior/jump_outside_loop_invalid.va codes: old E0404, new E0512 (E0512: `break` outside a loop)
-verilog-a/ch05_analog_behavior/loop_filter_invalid.va codes: old E0514, new E0512 (E0512: `ddt` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/monitored_event_timer_used_as_a_value_rejected.va codes: old E0701, new E0512 (E0512: `timer` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/multiple_indirect.va codes: old {}, new E0512 (E0512: `contrib_indirect` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/named_block_local_assigned_from_outside_rejected.va codes: old E0316, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/named_block_local_by_hierarchical_name.va codes: old {}, new E0512 (E0512: `field` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/named_block_locals.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/named_block_scope_rejected.va codes: old E0314, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/nature_as_ddt_abstol_argument.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
+verilog-a/ch05_analog_behavior/nature_as_ddt_abstol_argument.va codes: old {}, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/nature_attribute_nonconstant_invalid.va codes: old E0359, new {}
 verilog-a/ch05_analog_behavior/nature_attribute_unsupported.va codes: old {}, new E0512 (E0512: `field` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/net_named_gnd_is_not_ground.va tables row 3: old `node 3 flow(a,gnd)#1 branch_flow`, new `node 3 flow(a,gnd) branch_flow`
@@ -693,19 +586,17 @@ verilog-a/ch05_analog_behavior/reject_5_5_1_parameter_V_hides_access_function.va
 verilog-a/ch05_analog_behavior/reject_5_5_1_probe_of_discrete_net.va the old side refused, the new side lowered
 verilog-a/ch05_analog_behavior/reject_5_5_1_unnamed_branch_mixed_disciplines.va codes: old {}, new E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/reject_5_5_5_hierarchical_access_to_missing_branch.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/reject_5_9_2_analog_operator_in_integer_for.va codes: old E0514, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/reject_A_6_5_timer_empty_enable.va codes: old E0517, new E0512 (E0512: `transition` is not lowered by Sema yet)
+verilog-a/ch05_analog_behavior/reject_A_6_5_timer_empty_enable.va codes: old E0517, new {}
 verilog-a/ch05_analog_behavior/reject_charge_site_lte_parameter.va codes: old E0523, new {}
 verilog-a/ch05_analog_behavior/reject_vera_timepoint_contribution.va codes: old E0530, new {}
 verilog-a/ch05_analog_behavior/reject_vera_timepoint_event.va codes: old E0530, new {}
 verilog-a/ch05_analog_behavior/reject_vera_timepoint_in_loop.va codes: old E0532, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/reject_vera_timepoint_operator.va codes: old E0530, new E0512 (E0512: `idt` is not lowered by Sema yet)
+verilog-a/ch05_analog_behavior/reject_vera_timepoint_operator.va codes: old E0530, new {}
 verilog-a/ch05_analog_behavior/reject_vera_timepoint_parameter.va codes: old E0529, new {}
 verilog-a/ch05_analog_behavior/reject_vera_timepoint_probe.va codes: old E0530, new {}
 verilog-a/ch05_analog_behavior/return_expression_of_the_function_type.va codes: old {}, new E0512 (E0512: `return` with a value is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/return_outside_analog_function_rejected.va codes: old E0403, new E0512 (E0512: `return` outside a function)
 verilog-a/ch05_analog_behavior/return_string_from_integer_function_rejected.va codes: old E0354, new E0512 (E0512: `return` with a value is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/rlc.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/sequential_ifs_10000.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch05_analog_behavior/simparam_dynamic_name.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch05_analog_behavior/simparam_str_hierarchy_names.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
@@ -729,11 +620,10 @@ verilog-a/ch05_analog_behavior/timer_changed_effectful_known_input_rejected.va c
 verilog-a/ch05_analog_behavior/timer_changed_effectful_nested_function_input_rejected.va codes: old E0528, new {}
 verilog-a/ch05_analog_behavior/timer_changed_effectful_random_function_input_rejected.va codes: old E0528, new {}
 verilog-a/ch05_analog_behavior/timer_effectful_file_leaf.va tables row 6: old `held line`, new `limit_slots 0`
-verilog-a/ch05_analog_behavior/timer_enable_integer.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/timer_negative_time_tol_rejected.va codes: old E0517, new {}
-verilog-a/ch05_analog_behavior/timer_noninteger_enable_rejected.va codes: old E0517, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/timer_null_start_time_rejected.va codes: old E0517, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/timer_without_start_time_rejected.va codes: old E0517, new E0512 (E0512: `transition` is not lowered by Sema yet)
+verilog-a/ch05_analog_behavior/timer_noninteger_enable_rejected.va codes: old E0517, new {}
+verilog-a/ch05_analog_behavior/timer_null_start_time_rejected.va codes: old E0517, new {}
+verilog-a/ch05_analog_behavior/timer_without_start_time_rejected.va codes: old E0517, new {}
 verilog-a/ch05_analog_behavior/two_named_branches_retain_separately.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/value_retention.va contribution 0 resist: old 7e0, new 8e0
 verilog-a/ch05_analog_behavior/vector_access.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
@@ -796,7 +686,6 @@ verilog-a/ch06_hierarchy/mfactor_multiplies_named_branch_flow_noise_power.va cod
 verilog-a/ch06_hierarchy/mfactor_potential_noise.va codes: old {}, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/mfactor_propagation_unsupported.va contribution 0 resist: old -1.9117281725282727e1, new -1.3655201232344805e0
 verilog-a/ch06_hierarchy/mfactor_scales_named_branch_flow.va tables row 4: old `node 4 flow(n,y) branch_flow`, new `node 4 flow(p,x) branch_flow`
-verilog-a/ch06_hierarchy/multiple_analog_blocks.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/named_block_reads_a_sibling_block_name_rejected.va codes: old E0314, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/named_port_expressions.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/nested_loop_generates_share_genvar_rejected.va codes: old E0419, new {}
@@ -889,12 +778,6 @@ verilog-a/ch06_hierarchy/vector_ports_range_equal.va codes: old {}, new E0512 (E
 verilog-a/ch08_scheduling/absdelta_d2a_discards_pending.va tables row 1: old `param clamp integer = 0`, new `contrib potential direct br0 p gnd`
 verilog-a/ch08_scheduling/continuous_variable_interpolation_host.va tables row 3: old `held x`, new `held held`
 verilog-a/ch08_scheduling/digital_assignment_unsupported.va codes: old E0438, new {}
-verilog-a/ch08_scheduling/dynamic_nodal.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch08_scheduling/integrator_state.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
-verilog-a/ch08_scheduling/multiple_analog_blocks.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
-verilog-a/ch08_scheduling/nonlinear_safe.va codes: old {}, new E0512 (E0512: `limexp` is not lowered by Sema yet)
-verilog-a/ch08_scheduling/timer_wakeup.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch08_scheduling/transient_derivative.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/abs.va contribution 0 resist: old 3.3637570688444276e0, new had no value (Unsupported)
 verilog-a/ch09_system_tasks/aliasparam_mfactor.va tables row 2: old `param m real = 1e0`, new `contrib flow direct br0 p n`
 verilog-a/ch09_system_tasks/analog_decimal_is_auto_sized.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
@@ -1047,7 +930,7 @@ verilog-a/ch09_system_tasks/numeric_string_width_rejected.va codes: old E0819, n
 verilog-a/ch09_system_tasks/param_given_variable_rejected.va codes: old E0822, new {}
 verilog-a/ch09_system_tasks/percent_escape_prints_one_percent.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch09_system_tasks/percent_escape_with_width_rejected.va codes: old E0826, new {}
-verilog-a/ch09_system_tasks/port_connected_controls_analog_operator.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
+verilog-a/ch09_system_tasks/port_connected_controls_analog_operator.va tables row 3: old `contrib flow direct br0 p gnd`, new `contrib flow direct br0 p n`
 verilog-a/ch09_system_tasks/quadratic_spline.va codes: old {}, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/rc_154_pla_array_analog_rejected.va codes: old E0806, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/rc_154_stochastic_queue_analog_rejected.va codes: old E0806, new {}
@@ -1139,7 +1022,6 @@ verilog-a/ch09_system_tasks/table_snapshot_per_instance.va codes: old {}, new E0
 verilog-a/ch09_system_tasks/table_status.va codes: old {}, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/time_stime_analog_rejected.va codes: old E0806, new {}
 verilog-a/ch09_system_tasks/timescale_pla_queue_analog_rejected.va codes: old E0806, new {}
-verilog-a/ch09_system_tasks/top_port_connected_controls_ddt.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/two_instances_hold_distinct_channels.va tables row 9: old `held a.got`, new `held b.fd`
 verilog-a/ch09_system_tasks/unsigned_analog_rejected.va codes: old E0806, new {}
 verilog-a/ch09_system_tasks/value_plusargs_without_variable_rejected.va codes: old E0887, new E0506 (E0506: `$value$plusargs` takes 2 to 2, given 1)
@@ -1151,15 +1033,9 @@ verilog-a/ch10_directives/compact_modeling_nonlin_res_example.va codes: old {}, 
 verilog-a/ch10_directives/default_nettype_crosses_a_file_boundary.va codes: old E0367, new {}
 verilog-a/ch10_directives/default_nettype_none_rejects_an_implicit_net.va codes: old E0367, new {}
 verilog-a/ch10_directives/default_nettype_none_rejects_an_undeclared_probe.va codes: old E0367, new E0512 (E0512: an access of a select is not lowered by Sema yet)
-verilog-a/ch10_directives/default_transition.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch10_directives/default_transition_ramp.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch10_directives/default_transition_rise_only_sets_fall.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch10_directives/default_transition_supersedes.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
 verilog-a/ch10_directives/file_macro_is_the_opened_path.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch10_directives/nounconnected_drive_leaves_an_input_undriven.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-a/ch10_directives/predefined_compact_modeling.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
-verilog-a/ch10_directives/transition_arguments_override_default.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/ch10_directives/transition_without_default.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
 verilog-a/ch10_directives/unconnected_drive_pulls_an_input_high.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-a/ch10_directives/unconnected_drive_pulls_an_input_low.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-a/ch10_directives/unconnected_drive_reaches_a_named_port_connection.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
@@ -1173,20 +1049,9 @@ verilog-a/combined/named_limiter_nonlinear.va codes: old {}, new E0512 (E0512: `
 verilog-a/combined/noise_and_analysis.va codes: old {}, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
 verilog-a/combined/noise_temperature_analysis.va codes: old {}, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
 verilog-a/combined/resistor_with_directives.va codes: old {}, new E0512 (E0512: `$bound_step` is not lowered by Sema yet)
-verilog-a/combined/temperature_diode.va codes: old {}, new E0512 (E0512: `limexp` is not lowered by Sema yet)
-verilog-a/exhaustive/absdelay.va codes: old {}, new E0512 (E0512: `absdelay` is not lowered by Sema yet)
-verilog-a/exhaustive/ddt_charge.va codes: old {}, new E0512 (E0512: `ddt` is not lowered by Sema yet)
 verilog-a/exhaustive/ddx_derivative.va codes: old {}, new E0512 (E0512: `ddx` is not lowered by Sema yet)
-verilog-a/exhaustive/diode.va codes: old {}, new E0512 (E0512: `limexp` is not lowered by Sema yet)
-verilog-a/exhaustive/idt_integral.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
-verilog-a/exhaustive/idtmod.va codes: old {}, new E0512 (E0512: `idtmod` is not lowered by Sema yet)
+verilog-a/exhaustive/idtmod.va codes: old {}, new E0514 (E0514: `idtmod`)
 verilog-a/exhaustive/indirect_contribution.va codes: old {}, new E0512 (E0512: `contrib_indirect` is not lowered by Sema yet)
-verilog-a/exhaustive/laplace_dc_gain.va codes: old {}, new E0512 (E0512: `laplace_nd` is not lowered by Sema yet)
-verilog-a/exhaustive/last_crossing_direction.va codes: old {}, new E0512 (E0512: `last_crossing` is not lowered by Sema yet)
-verilog-a/exhaustive/limexp.va codes: old {}, new E0512 (E0512: `limexp` is not lowered by Sema yet)
-verilog-a/exhaustive/slew.va codes: old {}, new E0512 (E0512: `slew` is not lowered by Sema yet)
-verilog-a/exhaustive/transition.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-a/exhaustive/zi_sample_hold.va codes: old {}, new E0512 (E0512: `zi_nd` is not lowered by Sema yet)
 verilog-ams/annex_a_syntax/digital_statements_in_initial.va tables row 1: old `param f integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/annex_a_syntax/mintypmax_constant_takes_typical.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
 verilog-ams/annex_a_syntax/named_event_trigger.va codes: old {}, new E0512 (E0512: `trigger` is not lowered by Sema yet)
@@ -1241,7 +1106,6 @@ verilog-ams/ch03_data_types/discrete_domain_with_natures.va codes: old E0339, ne
 verilog-ams/ch03_data_types/ground_non_continuous.va codes: old E0344, new {}
 verilog-ams/ch03_data_types/mixed_port_with_connect_statement.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-ams/ch03_data_types/nodeset_non_continuous.va codes: old E0366, new {}
-verilog-ams/ch03_data_types/operator_equation_tolerances.va codes: old {}, new E0512 (E0512: `idt` is not lowered by Sema yet)
 verilog-ams/ch03_data_types/reject_vera_scratch_analog_initial.va codes: old E0536, new {}
 verilog-ams/ch03_data_types/wand_interconnect_resolves_wired_and.va tables row 2: old `param r.seen integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch03_data_types/wire_without_discipline_in_analog_rejected.va the old side refused, the new side lowered
@@ -1251,11 +1115,8 @@ verilog-ams/ch03_data_types/wreal_wire_port_merge.va codes: old {}, new E0512 (E
 verilog-ams/ch04_expressions/function_called_outside_analog_rejected.va codes: old E0430, new {}
 verilog-ams/ch04_expressions/operator_in_always_rejected.va codes: old E0422, new {}
 verilog-ams/ch04_expressions/operator_in_initial.va codes: old E0422, new {}
-verilog-ams/ch04_expressions/revert_ops.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-ams/ch04_expressions/slew_small_signal.va codes: old {}, new E0512 (E0512: `slew` is not lowered by Sema yet)
+verilog-ams/ch04_expressions/revert_ops.va tables row 34: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-ams/ch04_expressions/table_4_1_every_operator.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
-verilog-ams/ch04_expressions/transition_resolution.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
-verilog-ams/ch04_expressions/transition_simulator_default.va codes: old {}, new E0512 (E0512: `transition` is not lowered by Sema yet)
 verilog-ams/ch05_analog_behavior/absdelta_direction_change.va tables row 1: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch05_analog_behavior/absdelta_dynamic_controls.va tables row 2: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch05_analog_behavior/absdelta_enable_transitions.va tables row 1: old `param n integer = 0`, new `contrib flow direct br0 p gnd`
@@ -1269,7 +1130,7 @@ verilog-ams/ch05_analog_behavior/analog_initial_access_rejected.va codes: old E0
 verilog-ams/ch05_analog_behavior/analog_initial_contribution.va codes: old E0405, new {}
 verilog-ams/ch05_analog_behavior/analog_initial_digital_access_rejected.va codes: old E0431, new {}
 verilog-ams/ch05_analog_behavior/analog_initial_event_rejected.va codes: old E0702, new {}
-verilog-ams/ch05_analog_behavior/analog_initial_operator_rejected.va codes: old E0422, new E0512 (E0512: `transition` is not lowered by Sema yet)
+verilog-ams/ch05_analog_behavior/analog_initial_operator_rejected.va codes: old E0422, new {}
 verilog-ams/ch05_analog_behavior/array_assignment_from_packed_vector_rejected.va codes: old E0429, new E0512 (E0512: an assignment to a name with no slot)
 verilog-ams/ch05_analog_behavior/bare_event_trigger_in_analog_rejected.va codes: old E0434, new E0512 (E0512: `trigger` is not lowered by Sema yet)
 verilog-ams/ch05_analog_behavior/cross_expr_tol_and_time_tol_both_hold.va tables row 1: old `param n_dig integer = 0`, new `contrib flow direct br0 p gnd`
@@ -1519,7 +1380,7 @@ verilog-ams/ch09_system_tasks/severity_task_digital_context_rejected.va codes: o
 verilog-ams/ch09_system_tasks/status_ops.va codes: old {}, new E0512 (E0512: `white_noise` is not lowered by Sema yet)
 verilog-ams/ch09_system_tasks/stochastic_queue_in_digital_context.va tables row 1: old `param bad integer = 0`, new `contrib potential direct br0 out gnd`
 verilog-ams/ch09_system_tasks/stop_in_analog_initial_rejected.va codes: old E0807, new {}
-verilog-ams/ch09_system_tasks/strobe_writes_once_per_accepted_solution.va codes: old {}, new E0512 (E0512: `limexp` is not lowered by Sema yet)
+verilog-ams/ch09_system_tasks/strobe_writes_once_per_accepted_solution.va tables row 6: old `display $fopen`, new `display $fstrobe`
 verilog-ams/ch09_system_tasks/table_status.va codes: old {}, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-ams/ch09_system_tasks/timescale_tasks_in_digital_context.va tables row 1: old `param ps_ok integer = 0`, new `contrib potential direct br0 out gnd`
 verilog-ams/ch09_system_tasks/ungetc_cancelled_by_fseek_and_gap_reads_zero.va tables row 6: old `display $fopen`, new `(none)`

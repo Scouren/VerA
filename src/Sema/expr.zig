@@ -293,7 +293,11 @@ fn declRef(s: *Sema, b: *Block, d: Inst.Index, src: Inst.Ref) Allocator.Error!Va
     const bind = b.unit.binds.get(first) orelse return refuse(s, b, src, "a name with no analog binding");
     return switch (bind) {
         .param => |p| s.param_args.items[@backingInt(p)],
-        .slot => |slot| .{ .ref = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot.alloc) } }), .ty = slot.ty },
+        .slot => |slot| blk: {
+            const r = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot.alloc) } });
+            if (s.static_slots.contains(slot.alloc)) try s.static_loads.put(s.arena, r.toIndex().?, {});
+            break :blk .{ .ref = r, .ty = slot.ty };
+        },
         .constant => |c| .{
             .ref = .fromIntern(c),
             .ty = switch (s.zcu.intern_pool.indexToKey(c)) {
@@ -415,6 +419,7 @@ fn shortCircuit(s: *Sema, b: *Block, is_and: bool, bin: Inst.Bin) Allocator.Erro
     const blk = try s.air.addInst(s.gpa, .{ .tag = .block, .data = undefined });
     var rhs_b = b.child();
     rhs_b.conditional += 1;
+    rhs_b.runtime += @intFromBool(!@import("op.zig").isStatic(s, a, 0));
     const r = try toBool(s, &rhs_b, try lower(s, &rhs_b, bin.rhs));
     try control.br(s, &rhs_b, blk, r);
     var short_b = b.child();
@@ -434,10 +439,13 @@ fn ternary(s: *Sema, b: *Block, t: Inst.Triple) Allocator.Error!Value {
     const c = try toBool(s, b, try lower(s, b, t.a));
     if (constOf(s, c)) |k| return lower(s, b, if (k.isTrue()) t.b else t.c);
     const blk = try s.air.addInst(s.gpa, .{ .tag = .block, .data = undefined });
+    const rt: u32 = @intFromBool(!@import("op.zig").isStatic(s, c, 0));
     var then_b = b.child();
     then_b.conditional += 1;
+    then_b.runtime += rt;
     var else_b = b.child();
     else_b.conditional += 1;
+    else_b.runtime += rt;
     const x = try lower(s, &then_b, t.b);
     const y = try lower(s, &else_b, t.c);
     const ty = unify(x.ty, y.ty);

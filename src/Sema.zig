@@ -80,6 +80,14 @@ access_both: std.StringHashMapUnmanaged(void) = .empty,
 deferred: std.ArrayList(@import("Sema/syscall.zig").Deferred) = .empty,
 /// The target of the `<+` whose right-hand side is being lowered (contrib.zig).
 contrib_target: ?@import("Sema/contrib.zig").Target = null,
+/// §4.5.2 operator unknowns minted so far, the `<k>` of `ddt$<k>` (op.zig).
+op_states: u32 = 0,
+/// The slots whose last assignment so far is a static value, and the
+/// `load`s of them (op.zig's `isStatic`).
+static_slots: std.AutoHashMapUnmanaged(Air.Inst.Index, void) = .empty,
+static_loads: std.AutoHashMapUnmanaged(Air.Inst.Index, void) = .empty,
+/// Assignments run at the main body's entry, after the prologue (op.zig).
+entry: std.ArrayList(Air.Inst.Index) = .empty,
 /// The user functions being inlined, outermost first (func.zig).
 inlining: std.ArrayList(Inst.Index) = .empty,
 /// Each contribution row's instance, by row (contrib.zig).
@@ -183,6 +191,8 @@ pub const Block = struct {
     loop: ?Loop = null,
     /// How many runtime conditions enclose this body (§5.8.1).
     conditional: u32 = 0,
+    /// How many of them change during the analysis (not static, §5.8.1).
+    runtime: u32 = 0,
     /// Inside an `analog initial` block (§5.2.1).
     analog_initial: bool = false,
     /// A `break` or `continue` ended the body: nothing more is appended.
@@ -200,7 +210,7 @@ pub const Block = struct {
 
     /// A child of `parent`: the same instance and restrictions, no instructions.
     pub fn child(parent: *Block) Block {
-        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path, .function = parent.function };
+        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .runtime = parent.runtime, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path, .function = parent.function };
     }
 };
 

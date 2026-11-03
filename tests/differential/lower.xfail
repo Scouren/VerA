@@ -3,11 +3,6 @@
 # under tests/conformance/tests, then the first disagreement the oracle found.
 # A listed fixture that agrees fails the run until its line goes.
 netlist/hdl/veriloga_wide_ladder.assets/ladder70.va codes: old {}, new E0426,E0512 (E0512: an assignment to a name with no slot)
-spice/primitive_capacitor.va tables row 6: old `contrib potential direct br0 p n`, new `contrib flow direct br0 p gnd`
-spice/primitive_iexp.va tables row 32: old `contrib flow direct br0 n a1`, new `contrib flow direct br0 p n`
-spice/primitive_ipulse.va tables row 68: old `contrib flow direct br0 n a1`, new `contrib flow direct br0 p n`
-spice/primitive_ipwl.va tables row 31: old `contrib flow direct br0 n a1`, new `contrib flow direct br0 p n`
-spice/primitive_isine.va tables row 47: old `contrib flow direct br0 n a1`, new `contrib flow direct br0 p n`
 spice/primitive_segment_discipline.va codes: old {}, new E0512 (E0512: a port access of an instance's port (`<u.p>`) is not lowered by Sema yet)
 spice/reject_limit_vera_seed_attr_not_constant.va codes: old E0357, new {}
 spice/spice_binning.va tables row 4: old `param m1.annex_e_bin.l real local = 1.8e-7 from[1e-7:2.5e-7)`, new `param m1.w real local = 1e-6`
@@ -23,7 +18,6 @@ verilog-a/annex_a_syntax/declarations.va contribution 0 resist: old 4.4583400706
 verilog-a/annex_a_syntax/escaped_system_identifier_rejected.va codes: old E0314, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
 verilog-a/annex_a_syntax/expression_composites.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
 verilog-a/annex_a_syntax/jump_statements.va codes: old E0403, new E0512 (E0512: `return` outside a function)
-verilog-a/annex_a_syntax/module_instance_named.va tables row 2: old `contrib flow direct br0 p gnd`, new `contrib flow direct br0 p n`
 verilog-a/annex_a_syntax/null_port_connects_nothing.va tables row 1: old `node 1 	null2 net port`, new `node 1 n net port`
 verilog-a/annex_a_syntax/parameter_declarations.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/annex_a_syntax/paramset.va tables row 2: old `param instance_of_paramset.annex_a_parameters.scale real local = 1.5e0 from(0e0:inf)`, new `param instance_of_paramset.gain real local = 3e0`
@@ -47,8 +41,6 @@ verilog-a/ch01_intro/sf_flow_contribution_to_input.va codes: old E0425, new {}
 verilog-a/ch01_intro/sf_flow_on_inout.va codes: old E0360, new {}
 verilog-a/ch01_intro/sf_potential_contribution_to_input.va codes: old E0425, new {}
 verilog-a/ch01_intro/sf_potential_on_inout.va codes: old E0360, new {}
-verilog-a/ch01_intro/signal_continuity_through_hierarchy.va tables row 2: old `contrib flow direct br0 top_in top_out`, new `contrib flow direct br0 top_out gnd`
-verilog-a/ch01_intro/signal_flow_bound_to_conservative_node.va tables row 2: old `contrib potential direct br0 n gnd`, new `contrib flow direct br0 n gnd`
 verilog-a/ch02_lexical/attribute_block_item_and_function_port.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
 verilog-a/ch02_lexical/attribute_value_not_constant_rejected.va codes: old E0357, new {}
 verilog-a/ch02_lexical/desc_attribute_numeric_rejected.va the old side refused, the new side lowered
@@ -89,7 +81,6 @@ verilog-a/ch03_data_types/desc_units_parameter_rows.va codes: old {}, new E0512 
 verilog-a/ch03_data_types/discipline_binds_undeclared_nature_rejected.va codes: old E0378, new {}
 verilog-a/ch03_data_types/discipline_duplicate_user_attribute_rejected.va codes: old E0343, new {}
 verilog-a/ch03_data_types/discipline_nonconstant_user_attribute_rejected.va codes: old E0340, new {}
-verilog-a/ch03_data_types/domainless_discipline.va tables row 3: old `contrib flow direct br0 p link`, new `contrib flow direct br0 p gnd`
 verilog-a/ch03_data_types/domainless_net_behavioral.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-a/ch03_data_types/duplicate_access_name.va codes: old E0335, new {}
 verilog-a/ch03_data_types/duplicate_discipline_name.va codes: old E0342, new {}
@@ -139,7 +130,6 @@ verilog-a/ch03_data_types/parameter_override_type.va tables row 0: old `param ch
 verilog-a/ch03_data_types/parameter_types.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch03_data_types/parameter_units_are_documentation.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
 verilog-a/ch03_data_types/port_branch_on_internal_net_rejected.va codes: old E0372, new {}
-verilog-a/ch03_data_types/primitive_net_defaults_to_electrical.va tables row 9: old `contrib flow direct br0 in mid`, new `contrib flow direct br0 in gnd`
 verilog-a/ch03_data_types/range_first_expression_larger.va codes: old {}, new E0361 (E0361: `gain` is 5, outside the declared range)
 verilog-a/ch03_data_types/real_parameter_from_string.va codes: old E0345, new {}
 verilog-a/ch03_data_types/real_scalar_is_not_indexable_rejected.va codes: old E0309, new E0512 (E0512: a bit or part select of a scalar is not lowered by Sema yet)
@@ -273,7 +263,6 @@ verilog-a/ch05_analog_behavior/assignment_concatenation_invalid.va codes: old E0
 verilog-a/ch05_analog_behavior/assignment_hierarchical_invalid.va codes: old E0316, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/branch_flow_probe_includes_the_reactive_part.va codes: old {}, new E0512 (E0512: a read of a reactive flow source is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/case_duplicate_default_invalid.va codes: old E0427, new {}
-verilog-a/ch05_analog_behavior/child_named_branch_potential_and_flow_access.va tables row 3: old `contrib potential direct br1 p n`, new `contrib flow direct br0 p n`
 verilog-a/ch05_analog_behavior/conditional_ddt_contribution_static.va codes: old {}, new E0512,E0514 (E0514: `ddt`)
 verilog-a/ch05_analog_behavior/contribution_to_discrete_net_rejected.va the old side refused, the new side lowered
 verilog-a/ch05_analog_behavior/controlled_sources.va contribution 0 resist: old 0e0, new 2.6579876889098655e0
@@ -288,15 +277,8 @@ verilog-a/ch05_analog_behavior/generic_access.va codes: old {}, new E0408,E0512 
 verilog-a/ch05_analog_behavior/genvar_loop_condition_reads_a_probe_rejected.va codes: old E0418, new E0426,E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch05_analog_behavior/held_sformat_string_survives_rejected_step.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch05_analog_behavior/held_through_output_actual_seed_and_scan.va tables row 4: old `held b`, new `held n`
-verilog-a/ch05_analog_behavior/hierarchical_access_unsupported.va tables row 5: old `contrib potential direct br0 drv.a gnd`, new `contrib potential direct br0 a gnd`
 verilog-a/ch05_analog_behavior/hierarchical_contribution_closes_a_source_triangle_rejected.va codes: old E0477, new {}
-verilog-a/ch05_analog_behavior/hierarchical_contribution_creates_a_new_branch.va tables row 4: old `contrib potential direct br0 drv.x gnd`, new `contrib potential direct br0 drv.x drv.y`
-verilog-a/ch05_analog_behavior/hierarchical_contribution_to_indirect_branch_rejected.va codes: old E0409, new E0415 (E0415: `(g,drv.x)`)
-verilog-a/ch05_analog_behavior/hierarchical_contribution_unsupported.va tables row 5: old `contrib flow direct br0 p gnd`, new `contrib potential direct br0 m gnd`
 verilog-a/ch05_analog_behavior/hierarchical_contribution_voltage_loop_rejected.va codes: old E0477, new {}
-verilog-a/ch05_analog_behavior/hierarchical_direct_contribution_to_indirect_branch_rejected.va codes: old E0415, new E0409 (E0409: `(p,n)`)
-verilog-a/ch05_analog_behavior/hierarchical_named_branch_accumulates.va tables row 4: old `contrib flow direct br0 drv.x gnd`, new `contrib flow direct br0 g gnd`
-verilog-a/ch05_analog_behavior/hierarchical_net_reference_probes_solve.va tables row 4: old `contrib potential direct br0 drv.a gnd`, new `contrib potential direct br0 a gnd`
 verilog-a/ch05_analog_behavior/hierarchical_reference_to_a_variable_rejected.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-a/ch05_analog_behavior/hierarchical_switch_branch_rejected.va codes: old E0439, new {}
 verilog-a/ch05_analog_behavior/hierarchical_unnamed_branch_reference.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
@@ -356,11 +338,9 @@ verilog-a/ch05_analog_behavior/timer_effectful_file_leaf.va tables row 6: old `h
 verilog-a/ch05_analog_behavior/value_retention.va contribution 0 resist: old 7e0, new 8e0
 verilog-a/ch05_analog_behavior/vector_net_index_not_constant_rejected.va codes: old E0352, new E0512 (E0512: an access of a vector element at a run-time index)
 verilog-a/ch06_hierarchy/conditional_direct_nesting_is_not_a_scope.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch06_hierarchy/defparam_precedence_over_instance_override.va tables row 5: old `contrib flow direct br1 p n`, new `contrib flow direct br0 p n`
 verilog-a/ch06_hierarchy/defparam_rhs_not_constant_rejected.va the old side refused, the new side lowered
 verilog-a/ch06_hierarchy/defparam_upward_collect_first.va tables row 2: old `param gt real local = 2e0`, new `param gt real = 2e0`
 verilog-a/ch06_hierarchy/duplicate_parameter_rejected.va codes: old E0362, new {}
-verilog-a/ch06_hierarchy/elaboration_parameter_and_connectivity_binding.va tables row 7: old `contrib potential direct br0 s1 gnd`, new `contrib flow direct br0 com gnd`
 verilog-a/ch06_hierarchy/escaped_name_vs_vector_element.va tables row 3: old `node 3 \bus[0] net`, new `contrib potential direct br0 a gnd`
 verilog-a/ch06_hierarchy/escaped_period_is_not_a_path.va tables row 1: old `node 1 u.x y net`, new `node 1 u.x.y net`
 verilog-a/ch06_hierarchy/external_genblk_reference_unsupported.va codes: old E0998, new {}
@@ -379,28 +359,23 @@ verilog-a/ch06_hierarchy/genvar_loop_4097_iterations.va codes: old {}, new E0512
 verilog-a/ch06_hierarchy/genvar_loop_at_unroll_limit.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch06_hierarchy/genvar_outside_loop_rejected.va codes: old E0314, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/geometric_position_sets_a_layout_dependent_value.va contribution 0 resist: old 4.317734366945014e-1, new had no value (Unsupported)
-verilog-a/ch06_hierarchy/geometry_parameters_do_not_affect_the_simulation.va tables row 3: old `contrib flow direct br1 p n`, new `contrib flow direct br0 p gnd`
 verilog-a/ch06_hierarchy/hierarchical_contributions_to_named_and_unnamed_branches.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/hierarchical_vector_element_access.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/hierarchy_empty_paramset_tie.va tables row 1: old `param u.audit_empty_bin.b real local = 4e0`, new `param u.k real local = 1e1`
 verilog-a/ch06_hierarchy/hierarchy_overview_instances_and_overrides.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/if_generate_values_drive_paramset_selection.va tables row 3: old `param g1.u1.b4_pgi_sel.w real local = 9e0 from[5e0:inf)`, new `param g1.u1.w real local = 9e0`
 verilog-a/ch06_hierarchy/implicit_net_hierarchical_reference_coerced.va the old side lowered, the new side refused
-verilog-a/ch06_hierarchy/inherited_flow_tolerance_minimum.va tables row 1: old `contrib flow direct br0 p gnd`, new `contrib potential direct br1 p gnd`
 verilog-a/ch06_hierarchy/matching_size_concatenation_of_a_vector.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/matching_size_concatenation.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/matching_size_vector_net.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch06_hierarchy/mfactor_divides_a_flow_probe.va tables row 3: old `contrib potential direct br0 p x`, new `contrib flow direct br0 p x`
 verilog-a/ch06_hierarchy/mfactor_double_scaling_rejected.va codes: old E0912, new {}
-verilog-a/ch06_hierarchy/mfactor_multiplies_a_flow_contribution.va tables row 5: old `contrib flow direct br0 n x`, new `contrib potential direct br0 p x`
+verilog-a/ch06_hierarchy/mfactor_multiplies_a_flow_contribution.va contribution 0 resist: old 1.0766548193102018e-1, new 3.5888493977006726e-2
 verilog-a/ch06_hierarchy/mfactor_propagation_unsupported.va contribution 0 resist: old -1.9117281725282727e1, new -1.3655201232344805e0
-verilog-a/ch06_hierarchy/mfactor_scales_named_branch_flow.va tables row 4: old `node 4 flow(n,y) branch_flow`, new `node 4 flow(p,x) branch_flow`
+verilog-a/ch06_hierarchy/mfactor_scales_named_branch_flow.va contribution 0 resist: old 6.056082463453803e0, new 2.018694154484601e0
 verilog-a/ch06_hierarchy/named_block_reads_a_sibling_block_name_rejected.va codes: old E0314, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/named_port_expressions.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/nested_loop_generates_share_genvar_rejected.va codes: old E0419, new {}
 verilog-a/ch06_hierarchy/nonfinite_real_to_integer_rejected.va codes: old E0368, new {}
-verilog-a/ch06_hierarchy/null_port_expression_connects_nothing.va tables row 2: old `contrib flow direct br0 p n`, new `contrib flow direct br0 p gnd`
-verilog-a/ch06_hierarchy/oomr_branch_probe_two_levels.va tables row 3: old `contrib potential direct br1 p n`, new `contrib flow direct br0 p n`
 verilog-a/ch06_hierarchy/oomr_function_unsupported.va codes: old {}, new E0512 (E0512: `a call` is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/oomr_in_parameter_declaration_rejected.va codes: old E0924, new {}
 verilog-a/ch06_hierarchy/oomr_variable_assign_rejected.va codes: old E0316, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
@@ -565,7 +540,6 @@ verilog-a/ch09_system_tasks/numeric_string_width.va codes: old {}, new E0321 (E0
 verilog-a/ch09_system_tasks/param_given_variable_rejected.va codes: old E0822, new {}
 verilog-a/ch09_system_tasks/percent_escape_prints_one_percent.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch09_system_tasks/percent_escape_with_width_rejected.va codes: old E0826, new {}
-verilog-a/ch09_system_tasks/port_connected_controls_analog_operator.va tables row 3: old `contrib flow direct br0 p gnd`, new `contrib flow direct br0 p n`
 verilog-a/ch09_system_tasks/rdist_domain_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/rdist_real_seed_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/rdist_type_string_outside_paramset_rejected.va the old side refused, the new side lowered
@@ -639,12 +613,11 @@ verilog-a/ch10_directives/default_nettype_crosses_a_file_boundary.va codes: old 
 verilog-a/ch10_directives/default_nettype_none_rejects_an_implicit_net.va codes: old E0367, new {}
 verilog-a/ch10_directives/default_nettype_none_rejects_an_undeclared_probe.va codes: old E0367, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-a/ch10_directives/file_macro_is_the_opened_path.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch10_directives/nounconnected_drive_leaves_an_input_undriven.va tables row 2: old `contrib flow direct br0 p u.a`, new `contrib flow direct br0 p gnd`
-verilog-a/ch10_directives/unconnected_drive_pulls_an_input_high.va tables row 2: old `contrib potential direct br0 u.a gnd`, new `contrib flow direct br0 p gnd`
-verilog-a/ch10_directives/unconnected_drive_pulls_an_input_low.va tables row 2: old `contrib potential direct br0 u.a gnd`, new `contrib flow direct br0 p gnd`
-verilog-a/ch10_directives/unconnected_drive_reaches_a_named_port_connection.va tables row 4: old `contrib potential direct br0 u1.a gnd`, new `contrib flow direct br0 p gnd`
-verilog-a/ch10_directives/unconnected_drive_region_closes_mid_compilation.va tables row 3: old `contrib potential direct br0 mi.u.a gnd`, new `contrib flow direct br0 p gnd`
-verilog-a/ch10_directives/unconnected_drive_spares_an_unconnected_inout.va tables row 3: old `contrib potential direct br0 u.a gnd`, new `contrib flow direct br0 p gnd`
+verilog-a/ch10_directives/unconnected_drive_pulls_an_input_high.va tables row 2: old `contrib potential direct br0 u.a gnd`, new `contrib flow direct br0 p u.a`
+verilog-a/ch10_directives/unconnected_drive_pulls_an_input_low.va tables row 2: old `contrib potential direct br0 u.a gnd`, new `contrib flow direct br0 p u.a`
+verilog-a/ch10_directives/unconnected_drive_reaches_a_named_port_connection.va tables row 4: old `contrib potential direct br0 u1.a gnd`, new `contrib flow direct br0 p u1.a`
+verilog-a/ch10_directives/unconnected_drive_region_closes_mid_compilation.va tables row 3: old `contrib potential direct br0 mi.u.a gnd`, new `contrib flow direct br0 p mi.u.a`
+verilog-a/ch10_directives/unconnected_drive_spares_an_unconnected_inout.va tables row 3: old `contrib potential direct br0 u.a gnd`, new `contrib flow direct br0 p u.a`
 verilog-a/combined/file_and_display_side_effects.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/combined/file_display_diagnostics.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/exhaustive/idtmod.va codes: old {}, new E0514 (E0514: `idtmod`)
@@ -711,7 +684,7 @@ verilog-ams/ch05_analog_behavior/timer_body_effect_controls.va tables row 12: ol
 verilog-ams/ch05_analog_behavior/timer_body_precomputed_controls.va tables row 12: old `held visits`, new `held stamp`
 verilog-ams/ch05_analog_behavior/timer_body_reg_controls.va codes: old E0316, new {}
 verilog-ams/ch06_hierarchy/connect_insertion_follows_paramset_selection.va codes: old {}, new E0512 (E0512: an access of a name with no node)
-verilog-ams/ch06_hierarchy/digital_port_expression_actual.va codes: old {}, new E0315,E0512 (E0512: an access of a name with no node)
+verilog-ams/ch06_hierarchy/digital_port_expression_actual.va codes: old {}, new E0315,E0512 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch06_hierarchy/generate_block_event_declaration.va tables row 1: old `param hits integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch06_hierarchy/genvar_set_to_x_rejected.va codes: old E0486, new {}
 verilog-ams/ch06_hierarchy/paramset_outer_defparam_connect_array.va codes: old {}, new E0512 (E0512: an access of a name with no node)
@@ -793,7 +766,6 @@ verilog-ams/ch07_mixed_signal/mixed_event_parameters_defaults.va tables row 3: o
 verilog-ams/ch07_mixed_signal/mixed_event_parameters_instance.va tables row 3: old `param u.threshold real local = 6.000000000000001e-1`, new `param u.threshold unspecified local = 6.000000000000001e-1`
 verilog-ams/ch07_mixed_signal/mixed_event_parameters_override.va tables row 3: old `param threshold real = 3.75e-1`, new `param threshold unspecified = 3.75e-1`
 verilog-ams/ch07_mixed_signal/mixed_event_parameters_sweep.va tables row 3: old `param threshold real = 3.75e-1`, new `param threshold unspecified = 3.75e-1`
-verilog-ams/ch07_mixed_signal/mixed_top_with_an_analog_child.va tables row 3: old `contrib flow direct br0 a b`, new `contrib potential direct br0 a b`
 verilog-ams/ch07_mixed_signal/named_event_from_digital_reaches_analog.va tables row 1: old `param __d2a0 integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch07_mixed_signal/nan_contribution_rejected.va codes: old E0424, new {}
 verilog-ams/ch07_mixed_signal/neg_inf_contribution_rejected.va codes: old E0424, new {}
@@ -888,6 +860,5 @@ verilog-ams/ch09_system_tasks/ungetc_cancelled_by_fseek_and_gap_reads_zero.va ta
 verilog-ams/ch10_directives/default_discipline_reset_leaves_no_default.va the old side refused, the new side lowered
 verilog-ams/ch10_directives/default_discipline_two_qualifiers.va the old side lowered, the new side refused
 verilog-ams/ch10_directives/resetall_clears_default_discipline.va the old side refused, the new side lowered
-verilog-ams/ch10_directives/resetall_restores_the_unconnected_drive_default.va tables row 3: old `contrib potential direct br0 mi.u.a gnd`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch11_vpi/vpi_design.va tables row 20: old `contrib flow direct br0 p mid`, new `contrib flow direct br0 p n`
+verilog-ams/ch10_directives/resetall_restores_the_unconnected_drive_default.va tables row 3: old `contrib potential direct br0 mi.u.a gnd`, new `contrib flow direct br0 p mi.u.a`
 verilog/pli/analog_attributes.va tables row 2: old `param BASE integer = 10`, new `param BASE unspecified = 10`

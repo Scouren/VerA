@@ -183,6 +183,8 @@ pub const Unit = struct {
     /// §7.3.1 the digital-owned values the analog blocks read, each a card
     /// row (discrete.zig).
     discrete: std.ArrayList(Inst.Index) = .empty,
+    /// Its analog blocks are lowered (decl.zig).
+    lowered: bool = false,
 };
 
 /// §5.6 what makes two contributions one row.

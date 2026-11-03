@@ -75,12 +75,11 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     for (s.units.items) |*u| try held.mark(s, u);
     for (s.units.items) |*u| try variable.declare(s, u);
     var main: Block = .{ .parent = null, .unit = &s.units.items[0] };
-    for (s.units.items) |*u| {
-        main.unit = u;
-        var env = try envOf(s, u);
-        defer env.deinit();
-        try items(s, &main, &env, u.module.body, 0);
-    }
+    // The old flattener's order: an instance's blocks where its instance
+    // statement stands; then any unit no statement places (an inserted
+    // connect module), in preorder.
+    try lowerUnit(s, &main, &s.units.items[0], 0);
+    for (s.units.items) |*u| if (!u.lowered) try lowerUnit(s, &main, u, 0);
     try syscall.finishDisplays(s, &main);
     // §5.4.2 a potential or indirect row's branch current, wherever
     // lowering minted it; a flow row's is its own value.
@@ -266,8 +265,22 @@ fn units(s: *Sema) Allocator.Error!void {
     }
 }
 
+/// Lowers `u`'s analog blocks (and its children's, where their instance
+/// statements stand) into `main`.
+fn lowerUnit(s: *Sema, main: *Block, u: *Unit, depth: u32) Allocator.Error!void {
+    assert(!u.lowered);
+    u.lowered = true;
+    const saved = main.unit;
+    defer main.unit = saved;
+    main.unit = u;
+    var env = try envOf(s, u);
+    defer env.deinit();
+    try items(s, main, &env, u.module.body, depth);
+}
+
 /// The analog blocks of a body, in source order, generate schemes unrolled
-/// with their genvars bound (§6.6): each block lowered into `main`.
+/// with their genvars bound (§6.6): each block lowered into `main`; an
+/// instance statement lowers its instances' blocks there.
 fn items(s: *Sema, main: *Block, env: *eval.Env, body: Vir.Body, depth: u32) Allocator.Error!void {
     const unit = main.unit;
     const vir = unit.vir;
@@ -280,6 +293,14 @@ fn items(s: *Sema, main: *Block, env: *eval.Env, body: Vir.Body, depth: u32) All
             try main.insts.appendSlice(s.arena, b.insts.items);
         },
         .gen_block => try items(s, main, env, payloadOf(vir, Inst.GenBlock, i).body, depth + 1),
+        .instance => {
+            const zcu = s.zcu;
+            for (s.units.items) |*c| {
+                if (c.lowered or zcu.instances.items(.parent)[@backingInt(c.instance)] != unit.instance) continue;
+                if (zcu.instances.items(.src)[@backingInt(c.instance)] != i.toRef()) continue;
+                try lowerUnit(s, main, c, depth + 1);
+            }
+        },
         .gen_if => {
             const g = payloadOf(vir, Inst.GenIf, i);
             const c = (try env.body(g.cond)) orelse continue;

@@ -6,7 +6,7 @@
 //!
 //! Contents:
 //! - `pub const Program`, `pub const Builder`, `pub const State`, `pub const Interp`
-//! - `pub const eval`, `pub const display`, `pub const logic`, `pub const net`, `pub const resolve`, `pub const calls`
+//! - `pub const eval`, `pub const display`, `pub const logic`, `pub const net`, `pub const resolve`, `pub const calls`, `pub const readmem`
 //! - `pub const scheduler`, `pub const time`
 
 pub const Program = @import("sim/Program.zig");
@@ -19,6 +19,7 @@ pub const logic = @import("sim/logic.zig");
 pub const net = @import("sim/net.zig");
 pub const resolve = @import("sim/resolve.zig");
 pub const calls = @import("sim/calls.zig");
+pub const readmem = @import("sim/readmem.zig");
 pub const scheduler = @import("sim/scheduler.zig");
 pub const time = @import("sim/time.zig");
 
@@ -33,6 +34,7 @@ test {
     _ = net;
     _ = resolve;
     _ = calls;
+    _ = readmem;
     _ = scheduler;
     _ = time;
     _ = @import("sim/test.zig");

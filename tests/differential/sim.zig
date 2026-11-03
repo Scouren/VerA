@@ -167,6 +167,7 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
         };
         var s: std_sim.State = try .init(a, &p, &new_out.writer);
         s.budget = opts.event_budget;
+        s.io = io;
         // The run nests one native frame chain per §10 activation: a stack
         // for `State.depth_max` of them, as the old engine reserves one.
         var result: std_sim.State.Error!void = {};

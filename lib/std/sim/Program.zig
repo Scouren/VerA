@@ -21,7 +21,7 @@
 //! - `pub const Math = enum(u8)`, `pub const Elem = struct`, `pub const Select = struct` (`Select.Mode`)
 //! - `pub const Piece.none_width`
 //! - `pub const Repeat = struct`, `pub const Fork = struct`, `pub const Sample = struct` (`Sample.Mode`)
-//! - `pub const Task = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
+//! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
 //! - `pub const Net = struct` (`Net.no_decay`), `pub const Driver = struct` (`Driver.Source`)
 //! - `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
 //! - `pub fn words(width: u32) u32`
@@ -450,6 +450,7 @@ pub const Sample = struct {
 /// §17 one system task call (`Inst.task`).
 pub const Task = struct {
     kind: Kind,
+    /// `.readmem`: a `ReadMem` in `extra`.
     /// `.show`, `.strobe`: a `Show` index in `shows`. `.monitor`: a
     /// `Monitor` in `extra`. `.timeformat`: a `TimeFormat` in `extra`, or
     /// `none`.
@@ -457,7 +458,21 @@ pub const Task = struct {
     a: u32,
     b: List = .empty,
 
-    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat };
+    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem };
+};
+
+/// §17.2.9 a `$readmemb`/`$readmemh` call: the file's name (text, or the
+/// row `name_row` holding it when not `none`), the array's first element
+/// slot and declared bounds, and the optional start and finish rows.
+pub const ReadMem = struct {
+    radix: Radix,
+    name: List,
+    name_row: u32,
+    base: u32,
+    low: i32,
+    high: i32,
+    start: u32,
+    finish: u32,
 };
 
 /// §17.3.2 `$timeformat`'s four arguments, or none for the reset.
@@ -559,6 +574,8 @@ extra: []const u32 = &.{},
 /// Constant planes: per constant, its v words then its x words.
 consts: []const u64 = &.{},
 string_bytes: []const u8 = &.{},
+/// The design's source path, beside which §17.2.9 looks for a memory file.
+file_name: List = .empty,
 scopes: []const Scope = &.{},
 times: []const Time = &.{},
 /// §17.3.2's default `units_number`, the finest precision's exponent.

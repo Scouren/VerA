@@ -147,52 +147,7 @@ verilog/17_system_tasks/queue_order_payload.v bridge: a §17.6 queue task
 verilog/17_system_tasks/queue_status_boundaries.v bridge: a §17.6 queue task
 verilog/17_system_tasks/random_seed_reference.v bridge: the system function $random
 verilog/17_system_tasks/read_needs_read_type.v bridge: the system function $fopen
-verilog/17_system_tasks/readmem_address_outside_memory.v bridge: $readmem
-verilog/17_system_tasks/readmem_address_outside_task_range.v bridge: $readmem
-verilog/17_system_tasks/readmem_address_range_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_address_restart.v bridge: $readmem
-verilog/17_system_tasks/readmem_address_underscore.v bridge: $readmem
-verilog/17_system_tasks/readmem_address_x_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_address_zero_padding.v bridge: $readmem
-verilog/17_system_tasks/readmem_binary_file_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_count_warning.v bridge: $readmem
-verilog/17_system_tasks/readmem_edge_address_bad_digit_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_edge_address_gap_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_edge_address_overflow_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_edge_after_range_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_edge_underscore_leading_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_edge_underscore_only_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_excess_legal_neighbor.v bridge: $readmem
-verilog/17_system_tasks/readmem_file_name_variable.v bridge: $readmem
 verilog/17_system_tasks/readmem_file_past_4mib.v bridge: the system function $fopen
-verilog/17_system_tasks/readmem_invalid_high_binary_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_invalid_high_hex_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_lowest_descending.v bridge: $readmem
-verilog/17_system_tasks/readmem_malformed_base_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_malformed_base_wide_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_malformed_binary_digit_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_malformed_hex_digit_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_malformed_legal_neighbors.v bridge: $readmem
-verilog/17_system_tasks/readmem_malformed_punctuation_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_malformed_width_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_malformed_width_wide_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_overflow_rejected.v bridge: $readmem
-verilog/17_system_tasks/readmem_oversized_legal.v bridge: $readmem
-verilog/17_system_tasks/readmem_question_z.v bridge: $readmem
-verilog/17_system_tasks/readmem_start_address_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_start_formfeed.v bridge: $readmem
-verilog/17_system_tasks/readmem_underscore_legal.v bridge: $readmem
-verilog/17_system_tasks/readmem_unknown_bound_load_terminated.v bridge: $readmem
-verilog/17_system_tasks/readmem_variable_bounds.v bridge: $readmem
-verilog/17_system_tasks/readmem_warn_binary_excess_start.v bridge: $readmem
-verilog/17_system_tasks/readmem_warn_binary_short_start.v bridge: $readmem
-verilog/17_system_tasks/readmem_warn_empty.v bridge: $readmem
-verilog/17_system_tasks/readmem_warn_hex_excess_down.v bridge: $readmem
-verilog/17_system_tasks/readmem_warn_hex_excess_up.v bridge: $readmem
-verilog/17_system_tasks/readmem_warn_hex_short_down.v bridge: $readmem
-verilog/17_system_tasks/readmem_warn_hex_short_up.v bridge: $readmem
-verilog/17_system_tasks/readmemb_range.v bridge: $readmem
-verilog/17_system_tasks/readmemh.v bridge: $readmem
 verilog/17_system_tasks/same_seed_same_value.v bridge: the system function $dist_uniform
 verilog/17_system_tasks/seedless_random_starts_at_seed_0.v bridge: the system function $random
 verilog/17_system_tasks/seek_gap_and_origin.v bridge: the system function $fopen

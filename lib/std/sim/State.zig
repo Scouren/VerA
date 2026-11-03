@@ -14,6 +14,7 @@
 //! - `pub const default_budget: u64`, `pub const default_depth: u32`
 //! - `pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!State`
 //! - `pub fn fail(s: *State, comptime f: []const u8, args: anytype) Error`
+//! - `pub fn warn(s: *State, comptime f: []const u8, args: anytype) Error!void`
 //! - `pub fn store(s: *State, slot: u32, value: Literal) Error!void`
 //! - `pub fn trigger(s: *State, slot: u32) Error!void`
 //! - `pub fn scheduleWrite(s: *State, slot: u32, sel: ?eval.Sel, value: Literal, delay: ?u64) Error!void`
@@ -135,6 +136,10 @@ budget_time: u64 = 0,
 budget_used: u64 = 0,
 /// The runtime error that ended the run (`fail`).
 failure: ?[]const u8 = null,
+/// The warnings the run raised (`warn`), in order; none ends the run.
+warnings: std.ArrayList([]const u8) = .empty,
+/// What §17.2.9 reads files through; without it a load warns and ends.
+io: ?std.Io = null,
 /// §6.1 every driver's value now (`resolve.current`), its §7.10.2 H/L
 /// flag and its transition in flight; per net, its own transition, §3.8
 /// capacitive state and decay countdown; §8 UDP inputs and states.
@@ -215,6 +220,11 @@ pub fn fail(s: *State, comptime f: []const u8, args: anytype) Error {
     assert(s.failure == null);
     s.failure = try std.fmt.allocPrint(s.arena, f, args);
     return error.SimFailed;
+}
+
+/// Records a warning; the run goes on.
+pub fn warn(s: *State, comptime f: []const u8, args: anytype) Error!void {
+    try s.warnings.append(s.arena, try std.fmt.allocPrint(s.arena, f, args));
 }
 
 /// Stores `value` (as wide as the slot) into `slot` and wakes what watches

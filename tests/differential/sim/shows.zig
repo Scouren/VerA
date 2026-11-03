@@ -51,7 +51,24 @@ pub fn task(l: *Lower, t: Task, args: []const ExprId, tok: u32, pc: u32) E!u32 {
             });
             break :blk l.b.extraOf(Program.Task{ .kind = .timeformat, .a = tf });
         },
-        .readmem => l.refuse("$readmem"),
+        .readmem => |radix| blk: {
+            const ex = &r.file.exprs;
+            const none = @backingInt(Program.Ref.none);
+            const base = r.slot(args[1]) catch return l.refuse("a $readmem memory the old engine refuses");
+            const arr = r.decls.arrays.get(base) orelse return l.refuse("a $readmem of no array");
+            const named = ex.tag(args[0]) == .str_literal;
+            const rm = try l.b.extraOf(Program.ReadMem{
+                .radix = @fromBackingInt(@intCast(@backingInt(radix))),
+                .name = if (named) try l.b.string(r.file.str(ex.strOf(args[0]))) else .empty,
+                .name_row = if (named) none else try l.self_(args[0], 0),
+                .base = base,
+                .low = std.math.cast(i32, arr.low) orelse return l.refuse("an array bound past i32"),
+                .high = std.math.cast(i32, arr.high) orelse return l.refuse("an array bound past i32"),
+                .start = if (args.len >= 3) try l.self_(args[2], 0) else none,
+                .finish = if (args.len == 4) try l.self_(args[3], 0) else none,
+            });
+            break :blk l.b.extraOf(Program.Task{ .kind = .readmem, .a = rm });
+        },
         .queue => l.refuse("a §17.6 queue task"),
         .pla => l.refuse("a §17.5 PLA task"),
         .fclose, .fflush, .fshow => l.refuse("a §17.2 file task"),

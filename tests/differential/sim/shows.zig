@@ -82,7 +82,20 @@ pub fn task(l: *Lower, t: Task, args: []const ExprId, tok: u32, pc: u32) E!u32 {
             const q = try l.queueCall(@fromBackingInt(@intCast(@backingInt(op))), args, outs);
             break :blk l.b.extraOf(Program.Task{ .kind = .queue, .a = q });
         },
-        .pla => l.refuse("a §17.5 PLA task"),
+        .pla => |pl| blk: {
+            const base = r.slot(args[0]) catch return l.refuse("a PLA memory the old engine refuses");
+            const arr = r.decls.arrays.get(base) orelse return l.refuse("a PLA personality that is no memory");
+            const c = try l.b.extraOf(Program.PlaCall{
+                .logic = std.meta.stringToEnum(Program.PlaLogic, @tagName(pl.logic)).?,
+                .plane = pl.plane,
+                .base = base,
+                .count = arr.count,
+                .in = try l.self_(args[1], 0),
+                .out = try l.place(args[2]),
+                .ty = try l.tyOf(try l.targetType(args[2])),
+            });
+            break :blk l.b.extraOf(Program.Task{ .kind = .pla, .a = c });
+        },
         .fclose => l.b.extraOf(Program.Task{ .kind = .fclose, .a = try l.self_(args[0], 0) }),
         .fflush => l.b.extraOf(Program.Task{ .kind = .fflush, .a = 0 }),
         .fshow => |sh| l.b.extraOf(Program.Task{ .kind = .fshow, .a = try fileShow(l, args, sh, pc) }),

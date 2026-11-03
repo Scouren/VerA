@@ -224,7 +224,7 @@ fn inst(l: *Lower, ins: compile.Instruction, pc: u32, repeats: u32) E!void {
         .disable_task => |idx| _ = try b.inst(.disable_task, idx, 0, scope),
         .call_timed => return l.refuse("a timed task activation"),
         .task_return => return l.refuse("a timed task return"),
-        .pla_start => return l.refuse("a process of its own (PLA or event-controlled NBA)"),
+        .pla_start => |ps| _ = try b.inst(.spawn, ps.at, @intFromBool(ps.now), scope),
         .override_on => |o| _ = try b.inst(.override_on, try b.extraOf(Program.Override{ .slot = o.slot, .force = o.force, .lo = o.bits.lo, .width = o.bits.width, .start = o.start, .end = o.end }), 0, scope),
         .override_off => |o| _ = try b.inst(.override_off, try b.extraOf(Program.Override{ .slot = o.slot, .force = o.force, .lo = o.bits.lo, .width = o.bits.width, .start = 0, .end = 0 }), 0, scope),
         .override_eval => |o| {

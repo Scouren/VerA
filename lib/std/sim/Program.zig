@@ -21,7 +21,7 @@
 //! - `pub const Math = enum(u8)`, `pub const Elem = struct`, `pub const Select = struct` (`Select.Mode`)
 //! - `pub const Piece.none_width`
 //! - `pub const Repeat = struct`, `pub const Fork = struct`, `pub const Sample = struct` (`Sample.Mode`)
-//! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const SWrite = struct`, `pub const Random = struct`, `pub const Dist = enum(u32)`, `pub const FileCall = struct`, `pub const QueueCall = struct`, `pub const QueueOp = enum(u32)`, `pub const ScanCall = struct`, `pub const Fread = struct`, `pub const FileOp = enum(u32)`, `pub const FShow = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
+//! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const SWrite = struct`, `pub const Random = struct`, `pub const Dist = enum(u32)`, `pub const FileCall = struct`, `pub const PlaCall = struct`, `pub const PlaLogic = enum(u32)`, `pub const QueueCall = struct`, `pub const QueueOp = enum(u32)`, `pub const ScanCall = struct`, `pub const Fread = struct`, `pub const FileOp = enum(u32)`, `pub const FShow = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
 //! - `pub const Net = struct` (`Net.no_decay`), `pub const Driver = struct` (`Driver.Source`)
 //! - `pub const Cond = struct` (`Cond.Op`), `pub const CheckEvent = struct`, `pub const Check = struct`
 //! - `pub const Vcd = struct` (`Vcd.VcdScope`, `Vcd.Var`), `pub const DumpCall = struct`, `pub const DumpOp = enum(u32)`
@@ -156,6 +156,11 @@ pub const Inst = struct {
         override_eval,
         /// §9.3 `deassign`/`release`: `a` an `Override` (no range).
         override_off,
+        /// Starts a process of its own at pc `a`: at once, running up to its
+        /// first wait inside this one, when `b` is 1 (§9.7.7's event-
+        /// controlled nonblocking assignment), else queued (§17.5's
+        /// asynchronous PLA).
+        spawn,
         /// §7.6 controlled switch `a` (a `trans` row) reads its control,
         /// re-resolves both sides and is armed on the control's operands.
         switch_ctrl,
@@ -485,7 +490,7 @@ pub const Task = struct {
     /// `.readmem`: a `ReadMem` in `extra`. `.swrite`: a `SWrite`.
     /// `.fshow`, `.fstrobe`: an `FShow`. `.fclose`: the descriptor row.
     /// `.dump`: a `DumpCall`. `.ports`: a `PortsCall`. `.sdf`: an `SdfCall`.
-    /// `.queue`: a `QueueCall`.
+    /// `.queue`: a `QueueCall`. `.pla`: a `PlaCall`.
     /// `.show`, `.strobe`: a `Show` index in `shows`. `.monitor`: a
     /// `Monitor` in `extra`. `.timeformat`: a `TimeFormat` in `extra`, or
     /// `none`.
@@ -493,7 +498,7 @@ pub const Task = struct {
     a: u32,
     b: List = .empty,
 
-    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem, swrite, fshow, fstrobe, fclose, fflush, dump, ports, sdf, queue };
+    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem, swrite, fshow, fstrobe, fclose, fflush, dump, ports, sdf, queue, pla };
 };
 
 /// §17.2.9 a `$readmemb`/`$readmemh` call: the file's name (text, or the
@@ -597,6 +602,14 @@ pub const ScanCall = struct { src: u32, format: u32, outs: List, module: List, s
 /// memory's elements `base..` over declared [low, high] from row `start`
 /// for at most row `count` words (`none`: the defaults).
 pub const Fread = struct { fd: u32, place: u32, ty: Ty, prior: u32, base: u32, low: i32, high: i32, start: u32, count: u32 };
+
+/// §17.5 one PLA task: its logic and form (`plane`: §17.5.4's plane
+/// format, else array), the personality memory's first element slot and
+/// element count, the input row, and the output place and its type.
+pub const PlaCall = struct { logic: PlaLogic, plane: bool, base: u32, count: u32, in: u32, out: u32, ty: Ty };
+
+/// §17.5's four logics.
+pub const PlaLogic = enum(u32) { @"and", @"or", nand, nor };
 
 /// §17.6 a queue task or `$q_full`: which, the scope whose time unit
 /// times the jobs, the arguments (4 value rows, then 4 places; `none`

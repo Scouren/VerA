@@ -31,6 +31,7 @@ const vcd = @import("vcd.zig");
 const evcd = @import("evcd.zig");
 const sdf = @import("sdf.zig");
 const queues = @import("queues.zig");
+const pla = @import("pla.zig");
 const Error = State.Error;
 const Literal = logic.Literal;
 
@@ -250,6 +251,16 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                 pc += 1;
             },
             .switch_ctrl => return resolve.switchCtrl(s, a, d.a, pc),
+            .spawn => {
+                if (d.b == 1) {
+                    // Nested, as a call's body runs: the child parks at its
+                    // wait and this process carries on.
+                    var nested: std.heap.ArenaAllocator = .init(s.arena);
+                    defer nested.deinit();
+                    try runFrom(s, &nested, d.a);
+                } else _ = try s.enqueue(.{ .run = d.a }, null, false);
+                pc += 1;
+            },
             .override_on => {
                 try holds.on(s, d.a);
                 pc += 1;
@@ -381,6 +392,7 @@ fn task(s: *State, a: Allocator, at: u32, pc: u32) Error!Flow {
         .ports => try evcd.task(s, a, t.a),
         .sdf => try sdf.annotate(s, a, t.a),
         .queue => try queues.task(s, a, t.a),
+        .pla => try pla.task(s, a, t.a),
         .finish, .stop => {
             const verbose = t.a == @backingInt(Program.Ref.none) or ((try eval.eval(s, a, t.a)).asInt() orelse 1) != 0;
             if (verbose) {

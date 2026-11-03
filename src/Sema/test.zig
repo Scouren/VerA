@@ -351,3 +351,12 @@ test "§3.6.2.4 an undeclared net digital behavioral code drives is discrete, so
         \\connectrules r; connect d2a; endconnectrules
     , .{}, "top top\ntop.l load\ntop.w__d2a__el d2a\n");
 }
+
+test "§3.4.4 an array parameter's override is of its exact size, and a resize brings an array of the new size (E0921)" {
+    const target =
+        \\module t; parameter integer n = 2; parameter real c[0:n-1] = '{1.0, 2.0}; endmodule
+        \\
+    ;
+    try expectCodes(target ++ "module top; t #(.c('{4.0, 5.0})) a(); t #(.n(3), .c('{1.0, 2.0, 3.0})) b(); endmodule", .{}, &.{});
+    try expectCodes(target ++ "module top; t #(.c('{4.0, 5.0, 6.0})) a(); t #(.c('{4.0})) b(); t #(.n(3)) c(); endmodule", .{}, &.{ .E0921, .E0921, .E0921 });
+}

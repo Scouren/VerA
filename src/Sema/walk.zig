@@ -245,6 +245,7 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     const base: ?*const Zcu.Hier = if (picked.base) |*b| b else if (p.parent == .none) null else &zcu.instances.items(.hier)[@backingInt(p.parent)];
     env.hier = try hierValues(s, &env, base, w.givens.items[picked.givens.start..][0..picked.givens.len], if (picked.base == null) dps else &.{}, p.file, p.src);
     for (env.positions.keys()) |param_inst| _ = try env.param(param_inst);
+    try arraySizes(s, &env, p);
     const params = try zcu.intern_pool.get(s.gpa, .{ .aggregate = .{ .ty = .none, .elems = env.values.items } });
     const key: Instance.Key = .{ .module = picked.module, .params = params };
     if (try recursion(w, p, key)) |depth| {
@@ -266,6 +267,28 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     while (k > 0) {
         k -= 1;
         try w.pending.append(s.arena, w.kids.items[k]);
+    }
+}
+
+/// §3.4.4 "An array assigned to an instance of a module to override the
+/// default value of an array parameter shall be of the exact size of the
+/// parameter array", and one whose size an override changed "shall be
+/// assigned an array of the new size" (E0921 for either). A value or range
+/// that does not fold is not judged.
+fn arraySizes(s: *Sema, env: *Env, p: Pending) Allocator.Error!void {
+    assert(env.positions.count() == env.values.items.len);
+    for (env.positions.keys(), env.values.items) |q, v| {
+        const want = try env.arraySize(q) orelse continue;
+        if (v == InternPool.Index.undef or v == .none) continue;
+        const k = s.zcu.intern_pool.indexToKey(v);
+        if (k != .aggregate) continue;
+        const got = k.aggregate.elems.len;
+        if (got == want) continue;
+        const name = env.vir.string(payloadOf(env.vir, Inst.Param, q).name);
+        if (env.given.contains(q))
+            try s.fail(.E0921, p.file, p.src, "the array assigned to `{s}` has {d} elements, and its declared range has {d}", .{ name, got, want })
+        else
+            try s.fail(.E0921, p.file, p.src, "an override resized `{s}` to {d} elements, and no array of the new size was assigned to it (its default has {d})", .{ name, want, got });
     }
 }
 
@@ -400,7 +423,7 @@ fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i:
     const start: u32 = @intCast(w.givens.items.len);
     for (vir.list(Inst.Arg, in.params)) |a| {
         // An empty `.name()` keeps the default but still names a parameter.
-        const v = if (a.value.len == 0) InternPool.Index.none else if (try env.body(a.value)) |c| try env.intern(c) else InternPool.Index.undef;
+        const v = if (a.value.len == 0) InternPool.Index.none else try env.bodyValue(a.value);
         try w.givens.append(s.arena, .{ .name = try ip.getString(s.gpa, vir.string(a.name)), .value = v });
     }
     const givens: Run = .{ .start = start, .len = @intCast(w.givens.items.len - start) };

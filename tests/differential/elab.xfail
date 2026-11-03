@@ -6,9 +6,6 @@ spice/primitive_attribute_unknown_rejected.va E0358: Annex E.3.2 `port_disciplin
 spice/primitive_between_incompatible_disciplines_rejected.va E0355: Annex E.3.2.2 a SPICE primitive's port discipline from its other port's net is not ported
 verilog-a/ch03_data_types/aliasparam_hierarchical_read_rejected.va E0373 on a hierarchical read of an aliasparam (`u.alias`) is expression analysis, the per-instance stage of Sema (stage 5), not built yet
 verilog-a/ch03_data_types/aliasparam_hierarchical_system_rejected.va E0373 on a hierarchical read of an aliasparam (`u.alias`) is expression analysis, the per-instance stage of Sema (stage 5), not built yet
-verilog-a/ch03_data_types/parameter_array_long_override_rejected.va E0921: §3.4.3 parameter arrays (a `'{...}` value, its range's size) do not fold yet
-verilog-a/ch03_data_types/parameter_array_resize_without_value_rejected.va E0921: §3.4.3 parameter arrays (a `'{...}` value, its range's size) do not fold yet
-verilog-a/ch03_data_types/parameter_array_short_override_rejected.va E0921: §3.4.3 parameter arrays (a `'{...}` value, its range's size) do not fold yet
 verilog-a/ch06_hierarchy/defparam_upward_value_cycle_rejected.va IEEE 1364-2005 §12.8.1 E0907 for a defparam whose value reads the parameter it sets through another defparam: the late-defparam re-walk converges on the value and does not see the dependency yet
 verilog-a/ch06_hierarchy/generate_block_unselected_in_a_parent_module_rejected.va E0901 a hierarchical name into an unselected generate block is expression analysis, the per-instance stage of Sema (stage 5), not built yet
 verilog-a/ch06_hierarchy/generate_if_instantiates_one_arm.va §6.6.2 the old flatten inlines both arms of an if-generate under gates; the new walk evaluates the scheme and elaborates the selected arm only

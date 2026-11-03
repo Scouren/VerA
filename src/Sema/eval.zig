@@ -11,7 +11,7 @@
 //!
 //! Contents:
 //! - `pub const Const`
-//! - `pub const Env = struct` (`init`, `deinit`, `body`, `ref`, `param`, `named`, `systemNamed`, `toConst`, `intern`)
+//! - `pub const Env = struct` (`init`, `deinit`, `body`, `bodyValue`, `ref`, `param`, `named`, `systemNamed`, `toConst`, `intern`, `arraySize`)
 //! - `pub const eval_depth_max: u32`
 
 const std = @import("std");
@@ -100,6 +100,43 @@ pub const Env = struct {
         return env.ref(insts[insts.len - 1].toRef());
     }
 
+    /// The value of a body as an interned constant: a §3.4.4 assignment
+    /// pattern `'{...}` is an untyped aggregate of its elements' values, any
+    /// other value as `intern`s, `undef` when it does not fold.
+    pub fn bodyValue(env: *Env, b: Vir.Body) Allocator.Error!InternPool.Index {
+        const insts = env.vir.body(b);
+        if (insts.len == 0) return .undef;
+        const last = insts[insts.len - 1];
+        if (env.vir.instructions.items(.tag)[@backingInt(last)] != .pattern) {
+            return if (try env.body(b)) |c| env.intern(c) else .undef;
+        }
+        const refs = env.vir.list(Inst.Ref, env.payload(Inst.Refs, last));
+        const elems = try env.arena.alloc(InternPool.Index, refs.len);
+        for (refs, elems) |r, *e| e.* = if (try env.ref(r)) |c| try env.intern(c) else .undef;
+        const out = try env.ip.get(env.gpa, .{ .aggregate = .{ .ty = .none, .elems = elems } });
+        assert(out != .none);
+        return out;
+    }
+
+    /// §3.4.4 the element count of parameter `p`'s first (outermost)
+    /// declared dimension: an assignment pattern's own length (a nested
+    /// pattern holds the inner dimensions). Null for a scalar or a range
+    /// that does not fold.
+    /// ponytail: the inner dimensions' sizes are not judged.
+    pub fn arraySize(env: *Env, p: Inst.Index) Allocator.Error!?u64 {
+        const decl = env.payload(Inst.Param, p);
+        if (decl.dims.len == 0) return null;
+        const first = for (env.vir.body(decl.dims)) |d| {
+            if (env.vir.instructions.items(.tag)[@backingInt(d)] == .range) break d;
+        } else return null;
+        const bin = env.payload(Inst.Bin, first);
+        const msb = ((try env.ref(bin.lhs)) orelse return null).asIntExact() orelse return null;
+        const lsb = ((try env.ref(bin.rhs)) orelse return null).asIntExact() orelse return null;
+        const n: u64 = @intCast(@min(@abs(@as(i128, msb) - lsb) + 1, std.math.maxInt(u64)));
+        assert(n >= 1);
+        return n;
+    }
+
     /// The value of `r`, or null when it has none at elaboration.
     pub fn ref(env: *Env, r: Inst.Ref) Allocator.Error!?Const {
         const i = r.toIndex() orelse return null;
@@ -119,6 +156,12 @@ pub const Env = struct {
         try env.busy.put(env.gpa, p, {});
         defer _ = env.busy.remove(p);
         const decl = env.payload(Inst.Param, p);
+        // §3.4.4 an array parameter's value is an aggregate: no `Const`.
+        if (decl.dims.len != 0) {
+            const v = env.given.get(p) orelse try env.bodyValue(decl.value);
+            if (pos) |k| env.values.items[k] = v;
+            return null;
+        }
         const raw = if (env.given.get(p)) |g| env.toConst(g) else try env.body(decl.value);
         const v = if (raw) |c| try env.coerce(decl, c) else null;
         if (pos) |k| env.values.items[k] = if (v) |c| try env.intern(c) else .undef;

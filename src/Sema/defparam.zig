@@ -152,7 +152,7 @@ pub fn collect(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index,
     const upward = (try render(w, env, lhs[lhs.len - 1].toRef(), &text)) orelse return;
     const origin: u32 = @intCast(w.origins.items.len);
     try w.origins.append(s.arena, .{ .file = file, .src = i.toRef(), .text = text.items });
-    const value = if (try env.body(a.rhs)) |c| try env.intern(c) else InternPool.Index.undef;
+    const value = try env.bodyValue(a.rhs);
     const dot = std.mem.findScalarLast(u8, text.items, '.');
     const param = if (dot) |d| text.items[d + 1 ..] else text.items;
     var rel = if (dot) |d| text.items[0..d] else "";

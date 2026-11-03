@@ -3,7 +3,9 @@
 //! (vams Ast/Parse vs lib/frontend's lexer and parser), `diff-pp` (vams
 //! Preprocessor vs lib/frontend's preprocessor), `diff-diag` (vams Diag vs
 //! lib/diag), `diff-air` (Air's interpreter vs src/ir's opcode folds),
-//! `diff-link` (link vs src/zigbuild over the same device builds), and
+//! `diff-link` (link vs src/zigbuild over the same device builds),
+//! `diff-astgen` (vams AstGen/Vir vs the old compiler's per-file codes and
+//! design units), and
 //! `rewrite`, which runs them and the new modules' own tests. All are in
 //! `test`. `build.zig` calls `add` once.
 //!
@@ -21,7 +23,7 @@ const testRun = common.testRun;
 pub fn add(g: Graph) void {
     const b = g.b;
     const mods = g.mods;
-    const all = b.step("rewrite", "The rewrite's modules and their oracles: test-vams, test-intern_pool, test-air, test-link, diff-parse, diff-pp, diff-diag, diff-air, diff-link");
+    const all = b.step("rewrite", "The rewrite's modules and their oracles: test-vams, test-intern_pool, test-air, test-link, diff-parse, diff-pp, diff-diag, diff-air, diff-link, diff-astgen");
     for ([_][]const u8{ "vams", "intern_pool", "air", "link" }) |name| {
         all.dependOn(&b.top_level_steps.get(b.fmt("test-{s}", .{name})).?.step);
     }
@@ -38,6 +40,7 @@ pub fn add(g: Graph) void {
         .{ .step = "diff-diag", .root = "tests/differential/diag.zig", .what = "vams Diag against lib/diag: the catalogue, rendering, JSON and --explain", .imports = &.{ "vams", "diag", "vera", "frontend" } },
         .{ .step = "diff-air", .root = "tests/differential/air.zig", .what = "Air's interpreter against src/ir's opcode folds", .imports = &.{ "air", "intern_pool", "ir", "kernels" } },
         .{ .step = "diff-spice", .root = "tests/differential/spice.zig", .what = "vams spice against lib/frontend's spice_cards.synthesize on every netlist the fixtures use", .imports = &.{ "vams", "frontend" } },
+        .{ .step = "diff-astgen", .root = "tests/differential/astgen.zig", .what = "vams AstGen/Vir against the old compiler's per-file codes and design units on every fixture", .imports = &.{ "vams", "frontend", "diag", "vera" } },
         .{ .step = "diff-link", .root = "tests/differential/link.zig", .what = "link against src/zigbuild: the same devices built by both, at 1 and N jobs", .imports = &.{ "link", "zigbuild", "dynlib", "contract" }, .libc = true, .emit_zig = &.{ "tests/osdi/resistor.va", "tests/osdi/diode.va", "tests/osdi/mixed.va" } },
     };
     for (diffs) |d| {

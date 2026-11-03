@@ -339,7 +339,7 @@ fn bindValue(s: *Sema, b: *Block, bind: Sema.Bind, src: Inst.Ref) Allocator.Erro
             },
         },
         .array => refuse(s, b, src, "a whole array read as a value"),
-        .node, .vector, .branch => {
+        .node, .vector, .branch, .port => {
             try s.fail(.E0315, b.unit.file, src, "a net or branch is not a value; read it through an access function", .{});
             return poison;
         },

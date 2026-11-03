@@ -14,6 +14,7 @@
 //! - `pub fn accessOf(s: *Sema, b: *Block, name: []const u8) Allocator.Error!?Device.Access`
 //! - `pub fn access(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value`
 //! - `pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Error!void`
+//! - `pub fn indirect(s: *Sema, b: *Block, x: Inst.Triple, src: Inst.Ref) Allocator.Error!void`
 //! - `pub fn probe(s: *Sema, n: Node.Index) Allocator.Error!Air.Inst.Ref`
 //! - `pub fn loadDisciplines(s: *Sema) Allocator.Error!void`
 //! - `pub fn rowOf(s: *Sema, b: *const Block, t: Target) Allocator.Error!Device.Contribution.Index`
@@ -31,6 +32,7 @@ const Sema = @import("../Sema.zig");
 const decl = @import("decl.zig");
 const expr = @import("expr.zig");
 const hier = @import("hier.zig");
+const reactive = @import("reactive.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Device = Air.Device;
@@ -52,18 +54,6 @@ pub const Target = struct {
     neg: bool,
 };
 
-/// A `<+` right-hand side split into its resistive and reactive sums and
-/// the charge sites of its `ddt` terms.
-const Split = struct {
-    resist: ?Ref = null,
-    react: ?Ref = null,
-    sites: std.ArrayList(Site) = .empty,
-};
-const Site = struct { charge: Ref, negate: bool };
-
-/// One linear `ddt` term: its argument `b` and the factor on it.
-const Reactive = struct { b: Ref, coeff: ?Ref = null, coeff_nonconst: bool = false };
-
 /// The access `name` is under any discipline (§3.6.2: a nature's `access`
 /// attribute), or null when no nature names it.
 pub fn accessOf(s: *Sema, b: *Block, name: []const u8) Allocator.Error!?Device.Access {
@@ -74,6 +64,11 @@ pub fn accessOf(s: *Sema, b: *Block, name: []const u8) Allocator.Error!?Device.A
 
 /// §4.4 `name(args)` read as a value.
 pub fn access(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
+    if (b.restricted()) |ctx| {
+        try s.fail(.E0421, b.unit.file, src, "not allowed in {s}", .{ctx});
+        return expr.poison;
+    }
+    if (args.len == 1) if (try portOf(s, b, args[0], src)) |p| return portFlow(s, b, name, p, src);
     const t = (try target(s, b, name, args, src)) orelse return expr.poison;
     switch (t.access) {
         .potential => {
@@ -114,15 +109,21 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
     const callee = c.callee.toIndex() orelse return;
     if (vir.instructions.items(.tag)[@backingInt(callee)] != .str_ref) return s.fail(.E0408, file, src, "", .{});
     const name = vir.string(vir.instructions.items(.data)[@backingInt(callee)].str_tok.start);
-    if (b.function != null) return s.fail(.E0405, file, src, "not allowed in an analog function", .{});
+    if (b.restricted()) |ctx| return s.fail(.E0405, file, src, "not allowed in {s}", .{ctx});
     if (b.in_event) return s.fail(.E0406, file, src, "", .{});
     if (b.loop != null) return s.fail(.E0426, file, src, "", .{});
+    // §5.4.3 a port access is read-only: it measures what the world outside
+    // the module drives in.
+    for (vir.list(Inst.Ref, c.args)) |a| if (isPortBranch(b.unit, a)) return s.fail(.E0407, file, src, "a contribution to a port access", .{});
     const t = (try target(s, b, name, vir.list(Inst.Ref, c.args), src)) orelse return;
+    // §5.6.7.2 "Once a value is indirectly assigned to a branch, it cannot
+    // be contributed to using the branch contribution operator <+."
+    if (indirectOn(s, t.hi, t.lo)) return s.fail(.E0409, file, src, "`({s},{s})`", .{ nodeName(s, t.hi), nodeName(s, t.lo) });
     const row = try rowOf(s, b, t);
-    var split: Split = .{};
+    var split: reactive.Split = .{};
     s.contrib_target = t;
     defer s.contrib_target = null;
-    try splitTerm(s, b, x.rhs, false, &split);
+    try reactive.split(s, b, x.rhs, false, &split);
     if (split.react != null) try s.react_written.put(s.arena, row, {});
     const slots = s.device.contributions.get(@backingInt(row));
     inline for (.{ "resist", "react" }) |half| if (@field(split, half)) |v0| {
@@ -137,6 +138,47 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
         _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slot), .rhs = site.charge } } });
         try s.device.charge_sites.append(s.gpa, .{ .contrib = row, .sign = if (site.negate != t.neg) -1.0 else 1.0, .slot = slot });
     }
+    _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slots.wrote), .rhs = .fromIntern(.one_real) } } });
+}
+
+/// §5.6.7 `V(out) : probe == eqn`: "drive V(out) so that probe == eqn", a
+/// row of its own (never accumulated, §5.6.7.1) whose resistive value is
+/// `probe - eqn`. Not in a restricted context (E0410), an event (E0411), a
+/// run-time conditional or loop (E0412); the target an access (E0413), the
+/// probe an access or `ddt`/`idt`/`idtmod` of one (E0414); no `<+` on the
+/// pair before it (E0415).
+pub fn indirect(s: *Sema, b: *Block, x: Inst.Triple, src: Inst.Ref) Allocator.Error!void {
+    const unit = b.unit;
+    const file = unit.file;
+    if (b.restricted()) |ctx| return s.fail(.E0410, file, src, "not allowed in {s}", .{ctx});
+    if (b.in_event) return s.fail(.E0411, file, src, "", .{});
+    if (b.conditional != 0 or b.loop != null) return s.fail(.E0412, file, src, "the condition is not a constant expression", .{});
+    const lhs = (try accessCall(s, unit, x.a)) orelse return s.fail(.E0413, file, src, "", .{});
+    if (!try indirectProbe(s, unit, x.b)) return s.fail(.E0414, file, src, "", .{});
+    const t = (try target(s, b, lhs.name, lhs.args, src)) orelse return;
+    for (0..s.device.contributions.len) |k| {
+        const row = s.device.contributions.get(k);
+        if (row.kind != .direct) continue;
+        if (!((row.hi == t.hi and row.lo == t.lo) or (row.hi == t.lo and row.lo == t.hi))) continue;
+        return s.fail(.E0415, file, src, "`({s},{s})`", .{ nodeName(s, t.hi), nodeName(s, t.lo) });
+    }
+    const p = try expr.coerce(s, b, try expr.lower(s, b, x.b), .real);
+    const e = try expr.coerce(s, b, try expr.lower(s, b, x.c), .real);
+    const v = try expr.binOp(s, b, .fsub, p, e);
+    const row: Device.Contribution.Index = @fromBackingInt(@intCast(s.device.contributions.len));
+    try s.device.contributions.append(s.gpa, .{
+        .access = t.access,
+        .kind = .indirect,
+        .branch = t.branch,
+        .hi = t.hi,
+        .lo = t.lo,
+        .resist = try decl.addAlloc(s, .real),
+        .react = try decl.addAlloc(s, .real),
+        .wrote = try decl.addAlloc(s, .real),
+        .instance = decl.rowInstance(unit.instance),
+    });
+    const slots = s.device.contributions.get(@backingInt(row));
+    _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slots.resist), .rhs = v } } });
     _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slots.wrote), .rhs = .fromIntern(.one_real) } } });
 }
 
@@ -391,165 +433,91 @@ fn flowUnknown(s: *Sema, unit: *const Sema.Unit, hi: Node.Index, lo: Node.Index)
     return row;
 }
 
+/// Whether `r` is a §4.4.2 port reference (`<p>`) or names a §3.12.1 port
+/// branch.
+fn isPortBranch(unit: *const Sema.Unit, r: Inst.Ref) bool {
+    const vir = unit.vir;
+    const i = r.toIndex() orelse return false;
+    return switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .port_branch => true,
+        .decl_ref => if (unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl))) |x| x == .port else false,
+        else => false, // else: a net or a branch
+    };
+}
+
+/// The port node `r` reaches: `<p>` (§4.4.2) or a §3.12.1 port branch;
+/// null for any other argument, or after a diagnostic.
+fn portOf(s: *Sema, b: *Block, r: Inst.Ref, src: Inst.Ref) Allocator.Error!?Node.Index {
+    const unit = b.unit;
+    const vir = unit.vir;
+    if (!isPortBranch(unit, r)) return null;
+    const i = r.toIndex().?;
+    if (vir.instructions.items(.tag)[@backingInt(i)] == .decl_ref)
+        return unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl)).?.port;
+    const operand = vir.instructions.items(.data)[@backingInt(i)].un_node.operand;
+    if (operand.toIndex()) |o| if (vir.instructions.items(.tag)[@backingInt(o)] != .decl_ref) {
+        try s.fail(.E0512, unit.file, src, "a port access of an instance's port (`<u.p>`) is not lowered by Sema yet", .{});
+        return null;
+    };
+    return nodeOf(s, b, operand, src);
+}
+
+/// §5.4.3 `I(<p>)`: the flow into the module's port `p`, its own unknown
+/// `flow(<p>)`. "The expression V(<a>) is invalid for ports and nets"
+/// (E0507); `p` must be a port of the module (E0508).
+fn portFlow(s: *Sema, b: *Block, name: []const u8, p: Node.Index, src: Inst.Ref) Allocator.Error!Value {
+    const file = b.unit.file;
+    const global = (try accessOf(s, b, name)) orelse {
+        try s.fail(.E0501, file, src, "`{s}`", .{name});
+        return expr.poison;
+    };
+    if (accessOn(s, name, global, p, .ground) == .potential) {
+        try s.fail(.E0507, file, src, "`{s}` is a potential access function", .{name});
+        return expr.poison;
+    }
+    if (p == .ground or @backingInt(p) >= s.device.num_ports) {
+        try s.fail(.E0508, file, src, "`{s}(<{s}>)`", .{ name, nodeName(s, p) });
+        return expr.poison;
+    }
+    // ponytail: a child's port is the parent's net it binds; its flow is
+    // the old flattener's ammeter split, which Sema does not make yet.
+    if (b.unit.prefix.len != 0) {
+        try s.fail(.E0512, file, src, "a port access in an instance below the root is not lowered by Sema yet", .{});
+        return expr.poison;
+    }
+    const gop = try s.port_rows.getOrPut(s.arena, p);
+    if (!gop.found_existing) {
+        gop.value_ptr.* = @fromBackingInt(@intCast(s.device.nodes.len));
+        const ip = &s.zcu.intern_pool;
+        try s.device.nodes.append(s.gpa, .{ .name = try ip.getString(s.gpa, try std.fmt.allocPrint(s.arena, "flow(<{s}>)", .{nodeName(s, p)})), .kind = .port_flow, .of = p, .discipline = .empty, .instance = decl.rowInstance(b.unit.instance) });
+    }
+    return .{ .ref = try probe(s, gop.value_ptr.*), .ty = .real };
+}
+
+/// Whether an indirect contribution (§5.6.7) defines the unordered pair.
+fn indirectOn(s: *const Sema, hi: Node.Index, lo: Node.Index) bool {
+    const d = &s.device.contributions;
+    for (d.items(.kind), d.items(.hi), d.items(.lo)) |k, h, l| {
+        if (k == .indirect and ((h == hi and l == lo) or (h == lo and l == hi))) return true;
+    }
+    return false;
+}
+
+/// A.8.3 `indirect_expression`: an access, or `ddt`/`idt`/`idtmod` of one.
+fn indirectProbe(s: *Sema, unit: *const Sema.Unit, r: Inst.Ref) Allocator.Error!bool {
+    if (try accessCall(s, unit, r) != null) return true;
+    const vir = unit.vir;
+    const i = r.toIndex() orelse return false;
+    if (vir.instructions.items(.tag)[@backingInt(i)] != .call_sys) return false;
+    const c = decl.payloadOf(vir, Inst.SysCall, i);
+    const name = vir.string(c.name);
+    if (!std.mem.eql(u8, name, "ddt") and !std.mem.eql(u8, name, "idt") and !std.mem.eql(u8, name, "idtmod")) return false;
+    const args = vir.list(Inst.Ref, c.args);
+    return args.len != 0 and try accessCall(s, unit, args[0]) != null;
+}
+
 /// Whether this instance has a potential source on `t`'s branch.
 fn potentialSourceHere(s: *const Sema, b: *const Block, t: Target) bool {
     const row = s.contrib_rows.get(.{ .access = .potential, .branch = t.branch, .hi = t.hi, .lo = t.lo }) orelse return false;
     return s.device.contributions.items(.instance)[@backingInt(row)] == decl.rowInstance(b.unit.instance);
-}
-
-/// The old `reactive.splitTerm`: a sum's terms, each a linear `ddt` term
-/// (into `react`, with a charge site) or a resistive one.
-fn splitTerm(s: *Sema, b: *Block, r: Inst.Ref, negate: bool, out: *Split) Allocator.Error!void {
-    const i = r.toIndex() orelse return;
-    const vir = b.unit.vir;
-    switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .add, .sub => |tag| {
-            const bin = decl.payloadOf(vir, Inst.Bin, i);
-            try splitTerm(s, b, bin.lhs, negate, out);
-            return splitTerm(s, b, bin.rhs, if (tag == .sub) !negate else negate, out);
-        },
-        .pos => return splitTerm(s, b, vir.instructions.items(.data)[@backingInt(i)].un_node.operand, negate, out),
-        .neg => return splitTerm(s, b, vir.instructions.items(.data)[@backingInt(i)].un_node.operand, !negate, out),
-        else => {}, // else: one term
-    }
-    if (linearDdt(b.unit, r, 0)) {
-        const t = (try reactive(s, b, r)) orelse return;
-        const q = try finishReactive(s, b, t);
-        try accumulate(s, b, &out.react, q, negate);
-        try out.sites.append(s.arena, .{ .charge = q, .negate = negate });
-        return;
-    }
-    const v = try expr.coerce(s, b, try expr.lower(s, b, r), .real);
-    try accumulate(s, b, &out.resist, v, negate);
-}
-
-fn accumulate(s: *Sema, b: *Block, slot: *?Ref, v: Ref, negate: bool) Allocator.Error!void {
-    slot.* = if (slot.*) |old|
-        try expr.binOp(s, b, if (negate) .fsub else .fadd, old, v)
-    else if (negate) try expr.unOp(s, b, .fneg, v) else v;
-}
-
-fn isDdt(unit: *const Sema.Unit, i: Inst.Index) bool {
-    const vir = unit.vir;
-    if (vir.instructions.items(.tag)[@backingInt(i)] != .call_sys) return false;
-    return std.mem.eql(u8, vir.string(decl.payloadOf(vir, Inst.SysCall, i).name), "ddt");
-}
-
-fn containsDdt(unit: *const Sema.Unit, r: Inst.Ref, depth: u32) bool {
-    const i = r.toIndex() orelse return false;
-    if (depth > expr.depth_max) return false;
-    if (isDdt(unit, i)) return true;
-    const vir = unit.vir;
-    return switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .pos, .neg, .not, .bit_not => containsDdt(unit, vir.instructions.items(.data)[@backingInt(i)].un_node.operand, depth + 1),
-        .add, .sub, .mul, .div, .mod, .pow, .lt, .gt, .lte, .gte, .eq, .neq, .bool_and, .bool_or => blk: {
-            const bin = decl.payloadOf(vir, Inst.Bin, i);
-            break :blk containsDdt(unit, bin.lhs, depth + 1) or containsDdt(unit, bin.rhs, depth + 1);
-        },
-        .ternary => blk: {
-            const t = decl.payloadOf(vir, Inst.Triple, i);
-            break :blk containsDdt(unit, t.a, depth + 1) or containsDdt(unit, t.b, depth + 1) or containsDdt(unit, t.c, depth + 1);
-        },
-        .call_sys => for (vir.list(Inst.Ref, decl.payloadOf(vir, Inst.SysCall, i).args)) |a| {
-            if (containsDdt(unit, a, depth + 1)) break true;
-        } else false,
-        else => false, // else: a leaf, or a construct whose ddt `reactive` never reaches
-    };
-}
-
-/// The old `reactive.linearDdt`: a `ddt` on a linear spine (signs, a
-/// factor, a divisor, sums of such).
-fn linearDdt(unit: *const Sema.Unit, r: Inst.Ref, depth: u32) bool {
-    const i = r.toIndex() orelse return false;
-    if (depth > expr.depth_max) return false;
-    if (isDdt(unit, i)) return true;
-    const vir = unit.vir;
-    return switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .pos, .neg => linearDdt(unit, vir.instructions.items(.data)[@backingInt(i)].un_node.operand, depth + 1),
-        .mul => blk: {
-            const bin = decl.payloadOf(vir, Inst.Bin, i);
-            break :blk if (containsDdt(unit, bin.lhs, depth + 1)) !containsDdt(unit, bin.rhs, depth + 1) and linearDdt(unit, bin.lhs, depth + 1) else linearDdt(unit, bin.rhs, depth + 1);
-        },
-        .div => blk: {
-            const bin = decl.payloadOf(vir, Inst.Bin, i);
-            break :blk !containsDdt(unit, bin.rhs, depth + 1) and linearDdt(unit, bin.lhs, depth + 1);
-        },
-        .add, .sub => blk: {
-            const bin = decl.payloadOf(vir, Inst.Bin, i);
-            break :blk linearDdt(unit, bin.lhs, depth + 1) and linearDdt(unit, bin.rhs, depth + 1);
-        },
-        else => false, // else: no other node keeps a ddt on a linear spine
-    };
-}
-
-/// The old `reactive.lowerReactive`.
-fn reactive(s: *Sema, b: *Block, r: Inst.Ref) Allocator.Error!?Reactive {
-    const i = r.toIndex() orelse return null;
-    const vir = b.unit.vir;
-    if (isDdt(b.unit, i)) {
-        if (!try @import("op.zig").checkPlace(s, b, .ddt, r)) return null;
-        const args = vir.list(Inst.Ref, decl.payloadOf(vir, Inst.SysCall, i).args);
-        if (args.len == 0 or args[0] == .none) {
-            try s.fail(.E0502, b.unit.file, r, "", .{});
-            return null;
-        }
-        return .{ .b = try expr.coerce(s, b, try expr.lower(s, b, args[0]), .real) };
-    }
-    switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .pos => return reactive(s, b, vir.instructions.items(.data)[@backingInt(i)].un_node.operand),
-        .neg => {
-            var t = (try reactive(s, b, vir.instructions.items(.data)[@backingInt(i)].un_node.operand)) orelse return null;
-            t.coeff = if (t.coeff) |old| try expr.unOp(s, b, .fneg, old) else .fromIntern(.neg_one_real);
-            return t;
-        },
-        .mul => {
-            const bin = decl.payloadOf(vir, Inst.Bin, i);
-            if (containsDdt(b.unit, bin.lhs, 0)) {
-                var t = (try reactive(s, b, bin.lhs)) orelse return null;
-                try mulCoeff(s, b, &t, try expr.coerce(s, b, try expr.lower(s, b, bin.rhs), .real), .fmul);
-                return t;
-            }
-            const c = try expr.coerce(s, b, try expr.lower(s, b, bin.lhs), .real);
-            var t = (try reactive(s, b, bin.rhs)) orelse return null;
-            try mulCoeff(s, b, &t, c, .fmul);
-            return t;
-        },
-        .div => {
-            const bin = decl.payloadOf(vir, Inst.Bin, i);
-            var t = (try reactive(s, b, bin.lhs)) orelse return null;
-            try mulCoeff(s, b, &t, try expr.coerce(s, b, try expr.lower(s, b, bin.rhs), .real), .fdiv);
-            return t;
-        },
-        else => {
-            try s.fail(.E0512, b.unit.file, r, "a reactive term of this shape is not lowered by Sema yet", .{});
-            return null;
-        },
-    }
-}
-
-fn mulCoeff(s: *Sema, b: *Block, t: *Reactive, c: Ref, tag: Air.Inst.Tag) Allocator.Error!void {
-    t.coeff = if (t.coeff) |old|
-        try expr.binOp(s, b, tag, old, c)
-    else if (tag == .fdiv)
-        try expr.binOp(s, b, .fdiv, .fromIntern(.one_real), c)
-    else
-        c;
-    t.coeff_nonconst = t.coeff_nonconst or !coeffIsConst(s, c);
-}
-
-/// A factor a solve cannot change: a constant or a parameter.
-fn coeffIsConst(s: *const Sema, c: Ref) bool {
-    if (c.toInterned() != null) return true;
-    const i = c.toIndex().?;
-    return s.air.instructions.items(.tag)[@backingInt(i)] == .arg;
-}
-
-/// The charge `q` of a linear `ddt` term: `B` alone, `c·B` for a constant
-/// factor, and the §5.6.1.2 path form `acc(c·ΔB) + c·ΔB` otherwise.
-fn finishReactive(s: *Sema, b: *Block, t: Reactive) Allocator.Error!Ref {
-    const c = t.coeff orelse return t.b;
-    if (!t.coeff_nonconst) return expr.binOp(s, b, .fmul, c, t.b);
-    const pb = try expr.unOp(s, b, .path_prev, t.b);
-    const d = try expr.binOp(s, b, .fmul, c, try expr.binOp(s, b, .fsub, t.b, pb));
-    return expr.binOp(s, b, .fadd, try expr.unOp(s, b, .path_acc, d), d);
 }

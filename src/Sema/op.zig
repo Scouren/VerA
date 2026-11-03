@@ -151,8 +151,8 @@ pub fn noise(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
 /// changes during the analysis (E0514); none in a function (E0422).
 pub fn checkPlace(s: *Sema, b: *Block, tag: SysFn.Tag, src: Inst.Ref) Allocator.Error!bool {
     const historyless = tag == .ddx or tag == .limexp;
-    if (b.function != null) {
-        try s.fail(.E0422, b.unit.file, src, "not allowed in an analog function", .{});
+    if (b.restricted()) |ctx| {
+        try s.fail(.E0422, b.unit.file, src, "not allowed in {s}", .{ctx});
         return false;
     }
     if (b.runtime != 0 and !historyless) try s.fail(.E0514, b.unit.file, src, "`{t}`", .{tag});
@@ -296,8 +296,8 @@ fn readsUnknown(s: *const Sema, r: Ref, depth: u32) bool {
     };
 }
 
-/// A coefficient vector (`'{a, b}` or `{a, b}`): its length, then each
-/// element as a real. False for any other argument.
+/// A coefficient vector (`'{a, b}`, `{a, b}`, or a §3.2.2 array's name):
+/// its length, then each element as a real. False for any other argument.
 fn vectorArg(s: *Sema, b: *Block, r: Inst.Ref, out: *std.ArrayList(Ref)) Allocator.Error!bool {
     const i = r.toIndex() orelse return false;
     const vir = b.unit.vir;
@@ -308,6 +308,17 @@ fn vectorArg(s: *Sema, b: *Block, r: Inst.Ref, out: *std.ArrayList(Ref)) Allocat
             for (elems) |e| try out.append(s.arena, try expr.coerce(s, b, try expr.lower(s, b, e), .real));
             return true;
         },
-        else => return false, // else: an array name or select: not lowered yet
+        .decl_ref => {
+            const bind = b.unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl)) orelse return false;
+            if (bind != .array) return false;
+            const arr = bind.array;
+            try out.append(s.arena, .fromIntern(try decl.intern(s, .{ .int = @intCast(arr.slots.len) })));
+            for (arr.slots) |slot| {
+                const v = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot) } });
+                try out.append(s.arena, try expr.coerce(s, b, .{ .ref = v, .ty = arr.ty }, .real));
+            }
+            return true;
+        },
+        else => return false, // else: a select of an array: not lowered yet
     }
 }

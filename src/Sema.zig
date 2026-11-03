@@ -15,7 +15,7 @@
 //! - `pub const Config = struct` (`Roots`, `Override`)
 //! - `pub fn elaborate(zcu: *Zcu, config: Config) Allocator.Error!void`
 //! - `pub const Analysis = struct` (`deinit`)
-//! - lowering's types: `pub const Ty`, `pub const Value`, `pub const Slot`, `pub const Bind`, `pub const Unit`, `pub const ContribKey`, `pub const Block` (`Loop`, `child`)
+//! - lowering's types: `pub const Ty`, `pub const Value`, `pub const Slot`, `pub const Bind`, `pub const Unit`, `pub const ContribKey`, `pub const Block` (`Loop`, `Label`, `restricted`, `child`)
 //! - `pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis`
 //! - `pub fn addInst(s: *Sema, b: *Block, inst: Air.Inst) Allocator.Error!Air.Inst.Ref`
 //! - `pub fn fail(s: *Sema, code: Diag.Code, file: Zcu.File.Index, src: Vir.Inst.Ref, comptime fmt: []const u8, args: anytype) Allocator.Error!void`
@@ -61,6 +61,8 @@ units: std.ArrayList(Unit) = .empty,
 node_rows: std.AutoHashMapUnmanaged(InternPool.String, Air.Device.Node.Index) = .empty,
 /// §5.4.2 a node pair to its flow unknown (contrib.zig).
 flow_rows: std.AutoHashMapUnmanaged([2]Air.Device.Node.Index, Air.Device.Node.Index) = .empty,
+/// §5.4.3 a port's row to its port flow unknown (contrib.zig).
+port_rows: std.AutoHashMapUnmanaged(Air.Device.Node.Index, Air.Device.Node.Index) = .empty,
 /// §5.6 a contribution target to its row (contrib.zig).
 contrib_rows: std.AutoHashMapUnmanaged(ContribKey, Air.Device.Contribution.Index) = .empty,
 /// Each `device.params` row's `arg` in the prologue, by row (decl.zig).
@@ -151,6 +153,8 @@ pub const Bind = union(enum) {
     slot: Slot,
     /// A §3.12 named branch.
     branch: Air.Device.Branch.Index,
+    /// A §3.12.1 port branch (`branch (<p>) pb;`): its port's node.
+    port: Air.Device.Node.Index,
     /// A §6.6.1 genvar's current value, or another name with one constant.
     constant: InternPool.Index,
     /// A §3.2.2 array: one slot per element, row-major (the last
@@ -209,14 +213,27 @@ pub const Block = struct {
     path: []const u8 = "",
     /// Inside an inlined function: the `block` a `return` leaves (func.zig).
     function: ?Air.Inst.Index = null,
+    /// The innermost enclosing named block (control.zig).
+    label: ?*const Label = null,
 
     /// A loop's targets: the `block` a `break` leaves and the one a
     /// `continue` leaves (the step follows it).
     pub const Loop = struct { exit: Air.Inst.Index, cont: Air.Inst.Index };
+    /// A §5.3.2 named block: its name, the `block` a `disable` leaves, and
+    /// whether one does.
+    pub const Label = struct { name: []const u8, exit: Air.Inst.Index, up: ?*const Label, disabled: *bool };
+
+    /// The context §4.7.1 and §5.2.1 restrict (an analog function, an
+    /// analog initial block), or null.
+    pub fn restricted(b: *const Block) ?[]const u8 {
+        if (b.function != null) return "an analog function";
+        if (b.analog_initial) return "an analog initial block";
+        return null;
+    }
 
     /// A child of `parent`: the same instance and restrictions, no instructions.
     pub fn child(parent: *Block) Block {
-        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .runtime = parent.runtime, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path, .function = parent.function };
+        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .runtime = parent.runtime, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path, .function = parent.function, .label = parent.label };
     }
 };
 

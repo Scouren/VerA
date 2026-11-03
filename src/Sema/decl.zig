@@ -19,7 +19,7 @@
 //! - `pub fn foldBody(s: *Sema, unit: *Sema.Unit, b: Vir.Body) Allocator.Error!?eval.Const`
 //! - `pub fn foldRef(s: *Sema, unit: *Sema.Unit, r: Inst.Ref) Allocator.Error!?eval.Const`
 //! - `pub fn intern(s: *Sema, c: eval.Const) Allocator.Error!InternPool.Index`
-//! - `pub fn declareArray(s: *Sema, unit: *Sema.Unit, first: Inst.Index, v: Inst.Variable) Allocator.Error!void`
+//! - `pub fn declareArray(s: *Sema, unit: *Sema.Unit, first: Inst.Index, dims_body: Vir.Body, ty: Sema.Ty) Allocator.Error!void`
 //! - `pub fn portDecl(vir: *const Vir, p: Inst.Index) ?Inst.Index`
 //! - `pub fn rowInstance(i: Zcu.Instance.Index) Device.Instance`
 //! - `pub fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String`
@@ -170,14 +170,15 @@ pub fn portDecl(vir: *const Vir, p: Inst.Index) ?Inst.Index {
     }
 }
 
-/// §3.2.2 an array variable: a slot per element.
-pub fn declareArray(s: *Sema, unit: *Unit, first: Inst.Index, v: Inst.Variable) Allocator.Error!void {
+/// §3.2.2 an array variable (or §3.4.4 parameter) of type `ty` whose
+/// dimensions are `dims_body`: a slot per element.
+pub fn declareArray(s: *Sema, unit: *Unit, first: Inst.Index, dims_body: Vir.Body, ty: Sema.Ty) Allocator.Error!void {
     const vir = unit.vir;
     var env = try envOf(s, unit);
     defer env.deinit();
     var dims: std.ArrayList([2]i64) = .empty;
     var cells: u64 = 1;
-    for (vir.body(v.dims)) |d| {
+    for (vir.body(dims_body)) |d| {
         if (vir.instructions.items(.tag)[@backingInt(d)] != .range) continue;
         const bin = payloadOf(vir, Inst.Bin, d);
         const msb = ((try env.ref(bin.lhs)) orelse return s.fail(.E0352, unit.file, first.toRef(), "an array bound is not constant", .{})).asIntExact() orelse return;
@@ -186,7 +187,6 @@ pub fn declareArray(s: *Sema, unit: *Unit, first: Inst.Index, v: Inst.Variable) 
         cells = std.math.mul(u64, cells, @abs(msb - lsb) + 1) catch return s.fail(.E1015, unit.file, first.toRef(), "the array is too large", .{});
     }
     if (cells > array_cells_max) return s.fail(.E1015, unit.file, first.toRef(), "the array has {d} elements, past {d}", .{ cells, array_cells_max });
-    const ty = tyOf(v.flags.storage);
     const slots = try s.arena.alloc(Air.Inst.Index, @intCast(cells));
     for (slots) |*slot| slot.* = try addAlloc(s, ty);
     try unit.binds.put(s.arena, first, .{ .array = .{ .slots = slots, .dims = dims.items, .ty = ty } });
@@ -494,6 +494,10 @@ fn branches(s: *Sema, unit: *Unit) Allocator.Error!void {
     for (vir.body(unit.module.body)) |i| {
         if (vir.instructions.items(.tag)[@backingInt(i)] != .branch) continue;
         const br = payloadOf(vir, Inst.Branch, i);
+        if (portOfBody(unit, br.hi)) |p| {
+            try unit.binds.put(s.arena, canonical(vir, i), .{ .port = p });
+            continue;
+        }
         const hi = nodeOfBody(unit, br.hi) orelse continue;
         const lo = if (br.lo.len == 0) Node.Index.ground else nodeOfBody(unit, br.lo) orelse continue;
         try s.device.branches.append(s.gpa, .{
@@ -504,6 +508,19 @@ fn branches(s: *Sema, unit: *Unit) Allocator.Error!void {
         });
         try unit.binds.put(s.arena, canonical(vir, i), .{ .branch = @fromBackingInt(@intCast(s.device.branches.len)) });
     }
+}
+
+/// The port node a §3.12.1 terminal body names (`<p>`), or null.
+fn portOfBody(unit: *const Unit, b: Vir.Body) ?Node.Index {
+    const vir = unit.vir;
+    const insts = vir.body(b);
+    if (insts.len == 0) return null;
+    const last = insts[insts.len - 1];
+    if (vir.instructions.items(.tag)[@backingInt(last)] != .port_branch) return null;
+    const o = vir.instructions.items(.data)[@backingInt(last)].un_node.operand.toIndex() orelse return null;
+    if (vir.instructions.items(.tag)[@backingInt(o)] != .decl_ref) return null;
+    const bind = unit.binds.get(canonical(vir, vir.instructions.items(.data)[@backingInt(o)].decl_tok.decl)) orelse return null;
+    return if (bind == .node) bind.node else null;
 }
 
 /// The node a terminal body names (a scalar net), or null.
@@ -517,16 +534,28 @@ fn nodeOfBody(unit: *const Unit, b: Vir.Body) ?Node.Index {
     return if (bind == .node) bind.node else null;
 }
 
-/// §3.2 the instance's module-level variables: one slot each.
+/// §3.2 the instance's module-level variables: one slot each. §5.10.4 a
+/// named event is an integer flag (one per element of an event array), 0 at
+/// entry to every evaluation.
 fn variables(s: *Sema, unit: *Unit) Allocator.Error!void {
     const vir = unit.vir;
     for (vir.body(unit.module.body)) |i| {
+        if (vir.instructions.items(.tag)[@backingInt(i)] == .event) {
+            const first = canonical(vir, i);
+            if (unit.binds.contains(first)) continue;
+            const dims = payloadOf(vir, Inst.Name, i).dims;
+            if (dims.len != 0) try declareArray(s, unit, first, dims, .integer) else try unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = try addAlloc(s, .integer), .ty = .integer } });
+            const bind = unit.binds.get(first) orelse continue;
+            const slots: []const Air.Inst.Index = if (bind == .array) bind.array.slots else &.{bind.slot.alloc};
+            for (slots) |slot| try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slot), .rhs = .fromIntern(.zero) } } }));
+            continue;
+        }
         if (vir.instructions.items(.tag)[@backingInt(i)] != .variable) continue;
         const v = payloadOf(vir, Inst.Variable, i);
         const first = canonical(vir, i);
         if (unit.binds.contains(first)) continue;
         if (v.dims.len != 0) {
-            try declareArray(s, unit, first, v);
+            try declareArray(s, unit, first, v.dims, tyOf(v.flags.storage));
             continue;
         }
         const ty = tyOf(v.flags.storage);

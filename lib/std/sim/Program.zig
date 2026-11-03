@@ -12,17 +12,21 @@
 //! - `pub const Ref = enum(u32)`, `pub const Slot = struct`
 //! - `pub const Inst = struct` (`Inst.Tag`, `Inst.Data`)
 //! - `pub const Expr = struct` (`Expr.Tag`, `Expr.Data`)
-//! - `pub const Edge = enum(u2)`, `pub const Term = struct`
+//! - `pub const Edge = enum(u2)`, `pub const Term = struct` (`Term.words`)
 //! - `pub const Place = struct` (`Place.Kind`)
-//! - `pub const Piece = struct` (`Piece.Kind`), `pub const Show = struct`, `pub const Radix`
+//! - `pub const Piece = struct` (`Piece.Kind`), `pub const Dynamic = struct`, `pub const Show = struct`, `pub const Radix`
 //! - `pub const Scope = struct`, `pub const Time = struct`, `pub const Block = struct`
 //! - `pub const Start = struct`, `pub const Case = struct`, `pub const Arm = struct`
 //! - `pub const List = struct`, `List.empty`
-//! - `pub const Math = enum(u8)`, `pub const Elem = struct`, `pub const Select = struct` (`Select.Mode`)
+//! - `pub const Math = enum(u8)`, `pub const Elem = struct` (`Elem.dim_words`), `pub const Select = struct` (`Select.Mode`)
 //! - `pub const Piece.none_width`
 //! - `pub const Repeat = struct`, `pub const Fork = struct`, `pub const Sample = struct` (`Sample.Mode`)
-//! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const SWrite = struct`, `pub const Random = struct`, `pub const Dist = enum(u32)`, `pub const FileCall = struct`, `pub const FileOp = enum(u32)`, `pub const FShow = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
+//! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const SWrite = struct`, `pub const Random = struct`, `pub const Dist = enum(u32)`, `pub const FileCall = struct`, `pub const PlaCall = struct`, `pub const PlaLogic = enum(u32)`, `pub const QueueCall = struct`, `pub const QueueOp = enum(u32)`, `pub const ScanCall = struct`, `pub const Fread = struct`, `pub const FileOp = enum(u32)`, `pub const FShow = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
 //! - `pub const Net = struct` (`Net.no_decay`), `pub const Driver = struct` (`Driver.Source`)
+//! - `pub const Cond = struct` (`Cond.Op`), `pub const CheckEvent = struct`, `pub const Check = struct`
+//! - `pub const Vcd = struct` (`Vcd.VcdScope`, `Vcd.Var`), `pub const DumpCall = struct`, `pub const DumpOp = enum(u32)`
+//! - `pub const EvcdPort = struct`, `pub const PortDir = enum(u8)`, `pub const DumpPorts = struct`, `pub const PortsCall = struct`, `pub const PortsOp = enum(u32)`
+//! - `pub const SdfScope = struct`, `pub const SdfCall = struct`
 //! - `pub const Override = struct`, `pub const OverrideEval = struct`, `pub const Tran = struct`, `pub const Path = struct`, `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
 //! - `pub fn words(width: u32) u32`
 //! - `pub fn list(p: *const Program, l: List) []const u32`
@@ -123,6 +127,9 @@ pub const Inst = struct {
         wait_level,
         /// §5.10.4 `-> e`: slot `a`.
         trigger,
+        /// §5.10.4 `-> e[i]`: the element `Elem` `a` (in `extra`) names now;
+        /// none for an x/z or out-of-range index.
+        trigger_elem,
         /// §6.1 driver `a` (a `drivers` row) evaluates, drives its net (at
         /// once or after its delay), and is armed on its operands.
         continuous,
@@ -145,6 +152,13 @@ pub const Inst = struct {
         copy_out,
         /// §10.3 `disable` of task `a` (a `subs` row): every activation ends.
         disable_task,
+        /// §10.2.3 a new timed activation of a task that reaches itself:
+        /// `a` a `Call` in `extra` (over the body's frame); the process goes
+        /// on at the task's `Sub.body` and comes back after this pc.
+        call_timed,
+        /// The end of a `call_timed` activation of task `a`: the outputs
+        /// copied back, the caller's activation resumed.
+        task_return,
         /// §9.3 `assign`/`force` installs its holding process: `a` an
         /// `Override` in `extra`.
         override_on,
@@ -152,6 +166,11 @@ pub const Inst = struct {
         override_eval,
         /// §9.3 `deassign`/`release`: `a` an `Override` (no range).
         override_off,
+        /// Starts a process of its own at pc `a`: at once, running up to its
+        /// first wait inside this one, when `b` is 1 (§9.7.7's event-
+        /// controlled nonblocking assignment), else queued (§17.5's
+        /// asynchronous PLA).
+        spawn,
         /// §7.6 controlled switch `a` (a `trans` row) reads its control,
         /// re-resolves both sides and is armed on the control's operands.
         switch_ctrl,
@@ -269,6 +288,8 @@ pub const Expr = struct {
         stime,
         /// §17.7.2 `$realtime` in time row `a`'s units.
         realtime,
+        /// VAMS §9.10 `$abstime`: the time in seconds.
+        abstime,
         /// §17.8 `$rtoi(a)`, `$realtobits(a)`, `$bitstoreal(a)`, `$itor(a)`.
         rtoi,
         realtobits,
@@ -288,6 +309,13 @@ pub const Expr = struct {
         /// §17.2 a file function: `a` a `FileCall` in `extra`; its result's
         /// low bits in `ty` (its natural type).
         file,
+        /// §17.2.4.3 `$sscanf` (`b` 0) or `$fscanf` (`b` 1): `a` a
+        /// `ScanCall` in `extra`; the count in `ty`.
+        scan,
+        /// §17.2.4.4 `$fread`: `a` an `Fread` in `extra`; the bytes read in `ty`.
+        fread,
+        /// §17.6.4 `$q_full`: `a` a `QueueCall` in `extra`; 1 when full, in `ty`.
+        q_full,
     };
 
     // One row per operator.
@@ -297,18 +325,27 @@ pub const Expr = struct {
 };
 
 /// §17.11.2's real functions, `Expr.math1`/`math2`'s `b` and pair tag.
-pub const Math = enum(u8) { ln, log10, exp, sqrt, floor, ceil, sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh, pow, atan2, hypot, ln1p, expm1 };
+/// `itor` is §17.8 `$itor` of a real: §4.8.2's rounding, a non-finite one 0.
+pub const Math = enum(u8) { ln, log10, exp, sqrt, floor, ceil, sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh, pow, atan2, hypot, ln1p, expm1, itor };
 
 /// §5.10.1: a change toward 1 (posedge), away from 1 (negedge), or any.
 pub const Edge = enum(u2) { any, posedge, negedge };
 
 /// One term of an event control: slot `slot` changing with `edge`; with a
 /// nonzero `width`, only bits [lo, lo + width) of it (a constant select).
+/// Stored in `extra` as `Term.words` words.
 pub const Term = struct {
     slot: u32,
     edge: Edge,
     lo: u32 = 0,
     width: u32 = 0,
+    /// §9.7.3 an event array element's occurrence wakes the term only
+    /// when this `Elem` (in `extra`) names `slot` at that moment; `none`
+    /// for any other term.
+    select: u32 = std.math.maxInt(u32),
+
+    /// The words one term takes in `extra`.
+    pub const words = 5;
 };
 
 /// An assignment's target, at its index in `extra`.
@@ -324,11 +361,14 @@ pub const Place = struct {
 
 /// §3.9 an element reference: the array's first slot, how many slots it
 /// has, and per dimension (outermost first) the index row and its declared
-/// span, at `dims` in `extra` as triples (index, low, high) of i32 bits.
+/// span, at `dims` in `extra` as `dim_words` words: the index row, then low
+/// and high as i64 bits (low word first).
 pub const Elem = struct {
     base: u32,
     count: u32,
     dims: List,
+
+    pub const dim_words = 5;
 };
 
 /// §5.2.1 a select of a vector held in a slot (`elem == none`: slot `slot`)
@@ -337,8 +377,8 @@ pub const Select = struct {
     slot: u32,
     elem: u32,
     /// The vector's declared `[msb:lsb]`.
-    msb: i32,
-    lsb: i32,
+    msb: i64,
+    lsb: i64,
     /// How the selected position is computed: `const_part` reads `first`,
     /// `bit` the index row `index`, `up`/`down` the base row `index`.
     mode: Mode,
@@ -346,7 +386,7 @@ pub const Select = struct {
     /// The bit count selected, and for `const_part` the position of its
     /// least significant bit in storage.
     count: u32,
-    first: i32,
+    first: i64,
 
     pub const Mode = enum(u32) { const_part, bit, up, down };
 };
@@ -388,8 +428,16 @@ pub const Piece = struct {
         /// §17.1.1.5 `%v`: the strength of scalar net `b`, or of argument
         /// `a`'s value at strong strength.
         strength,
+        /// §17.2.3 a `$sformat` format held in a variable: the `Dynamic` at
+        /// `a` in `extra`, read as a format when the task runs.
+        dynamic,
     };
 };
+
+/// §17.2.3 a format row read when the task runs, the argument rows it
+/// takes from (`none`: a null argument), each one's net for `%v` (`none`:
+/// not a net), the pc whose named blocks `%m` names, and `%l`'s text.
+pub const Dynamic = struct { format: u32, args: List, nets: List, pc: u32, lib: List };
 
 /// §9.4.1 the default radix of a display task (`Piece.bare`).
 pub const Radix = enum(u8) { binary = 2, octal = 8, decimal = 10, hex = 16 };
@@ -473,6 +521,8 @@ pub const Task = struct {
     kind: Kind,
     /// `.readmem`: a `ReadMem` in `extra`. `.swrite`: a `SWrite`.
     /// `.fshow`, `.fstrobe`: an `FShow`. `.fclose`: the descriptor row.
+    /// `.dump`: a `DumpCall`. `.ports`: a `PortsCall`. `.sdf`: an `SdfCall`.
+    /// `.queue`: a `QueueCall`. `.pla`: a `PlaCall`.
     /// `.show`, `.strobe`: a `Show` index in `shows`. `.monitor`: a
     /// `Monitor` in `extra`. `.timeformat`: a `TimeFormat` in `extra`, or
     /// `none`.
@@ -480,7 +530,7 @@ pub const Task = struct {
     a: u32,
     b: List = .empty,
 
-    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem, swrite, fshow, fstrobe, fclose, fflush };
+    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem, swrite, fshow, fstrobe, fclose, fflush, dump, ports, sdf, queue, pla };
 };
 
 /// §17.2.9 a `$readmemb`/`$readmemh` call: the file's name (text, or the
@@ -491,8 +541,8 @@ pub const ReadMem = struct {
     name: List,
     name_row: u32,
     base: u32,
-    low: i32,
-    high: i32,
+    low: i64,
+    high: i64,
     start: u32,
     finish: u32,
 };
@@ -506,6 +556,57 @@ pub const Override = struct { slot: u32, force: bool, lo: u32, width: u32, start
 /// for the held bits, or read `of` bits wide and sliced from `slice_lo`)
 /// into `slot` or its bits [lo, lo + width).
 pub const OverrideEval = struct { slot: u32, value: u32, force: bool, lo: u32, width: u32, slice_lo: u32, of: u32 };
+
+/// §18.1 what a `$dumpvars` can select: per scope its `$scope` line,
+/// parent, whether it is lexical and whether it is written as a scope of
+/// its own (`child`); its variables `vars[var_start[s]..var_start[s + 1]]`,
+/// each with the `$var` text around its code.
+pub const Vcd = struct {
+    scopes: []const VcdScope = &.{},
+    var_start: []const u32 = &.{},
+    vars: []const Var = &.{},
+
+    pub const VcdScope = struct { line: List, parent: u32, lexical: bool, child: bool };
+    pub const Var = struct { slot: u32, width: u32, real: bool, event: bool, head: List, tail: List };
+};
+
+/// §18.1 one dump task call: which, its argument row (`$dumpfile`'s name,
+/// `$dumpvars`' levels, `$dumplimit`'s size; `none` when absent), the
+/// `$dumpfile` call's text for §18.2.3.8's `$version`, and `$dumpvars`'
+/// targets (pairs: 0 and a scope, or 1 and a slot).
+pub const DumpCall = struct { op: DumpOp, arg: u32, call: List, targets: List };
+
+/// §18.1's tasks.
+pub const DumpOp = enum(u32) { file, vars, off, on, all, limit, flush };
+
+/// §18.3 one dumped port: its slot, the net it is (`none` for a variable),
+/// its direction, and its net's drivers inside the dumped instance (its
+/// output side) and outside it (its input side), as `drivers` indices.
+pub const EvcdPort = struct { slot: u32, net: u32, dir: PortDir, inside: List, outside: List };
+
+/// A §18.4 port's direction.
+pub const PortDir = enum(u8) { input, output, inout };
+
+/// §18.3.1 one `$dumpports` call: its file name row (`none`: the default
+/// "dumpports.vcd"), the call's text, the header's scope and `$var port`
+/// lines, and its ports (a `List` of `evcd_ports` rows).
+pub const DumpPorts = struct { name_row: u32, call: List, header: List, ports: List };
+
+/// §18.3 one port dump task: which, its `DumpPorts` (for `.ports`), the
+/// file name row it names (`none`: every file) and `$dumpportslimit`'s size.
+pub const PortsCall = struct { op: PortsOp, ports: u32, name: u32, size: u32 };
+
+/// §18.3's tasks.
+pub const PortsOp = enum(u32) { ports, off, on, all, limit, flush };
+
+/// §16 what an annotation matches per scope: its module's name, whether it
+/// is lexical, and its ports and specparams as triples (name start, name
+/// length, slot; `none` for an unbound port) in `extra`.
+pub const SdfScope = struct { module: List, lexical: bool, ports: List, specparams: List };
+
+/// §17.2.10 one `$sdf_annotate` call: the file name row, the annotation
+/// scope, and the mtm_spec row (`none`: TYPICAL).
+pub const SdfCall = struct { name: u32, scope: u32, mtm: u32 };
 
 /// §17.9 one `$random`/`$dist_*` call: the distribution, the seed row and
 /// the place its inout seed is written back to (`none` for a seedless
@@ -523,6 +624,33 @@ pub const FileCall = struct { op: FileOp, x: u32, y: u32, z: u32, place: u32, ty
 /// The §17.2 functions a `FileCall` runs.
 pub const FileOp = enum(u32) { fopen, fgets, ferror, fgetc, ungetc, ftell, rewind, fseek, feof };
 
+/// §17.2.4.3 a scan: the input (a string row, or the descriptor row), the
+/// format row, the outputs (triples: place, its `Ty` bits, its width), the
+/// `%m` path text, and the scope whose time unit `%t` reads.
+pub const ScanCall = struct { src: u32, format: u32, outs: List, module: List, scope: u32 };
+
+/// §17.2.4.4 `$fread`: the descriptor row; into a variable (`place` of
+/// type `ty`, whose value now is row `prior`), or (`base` not `none`) a
+/// memory's elements `base..` over declared [low, high] from row `start`
+/// for at most row `count` words (`none`: the defaults).
+pub const Fread = struct { fd: u32, place: u32, ty: Ty, prior: u32, base: u32, low: i64, high: i64, start: u32, count: u32 };
+
+/// §17.5 one PLA task: its logic and form (`plane`: §17.5.4's plane
+/// format, else array), the personality memory's first element slot and
+/// element count, the input row, and the output place and its type.
+pub const PlaCall = struct { logic: PlaLogic, plane: bool, base: u32, count: u32, in: u32, out: u32, ty: Ty };
+
+/// §17.5's four logics.
+pub const PlaLogic = enum(u32) { @"and", @"or", nand, nor };
+
+/// §17.6 a queue task or `$q_full`: which, the scope whose time unit
+/// times the jobs, the arguments (4 value rows, then 4 places; `none`
+/// where an argument is not that kind) and the output places' types.
+pub const QueueCall = struct { op: QueueOp, scope: u32, args: List, ty1: Ty, ty2: Ty, ty3: Ty };
+
+/// §17.6's four tasks (`$q_full` is `q_full`, an expression).
+pub const QueueOp = enum(u32) { initialize, add, remove, exam };
+
 /// §17.2.2 a file output task: show row `show` to descriptor row `fd`.
 pub const FShow = struct { show: u32, fd: u32 };
 
@@ -535,8 +663,9 @@ pub const TimeFormat = struct { units: u32, precision: u32, suffix: List, width:
 
 /// §17.1.3 a `$monitor` call: its show row, the argument rows it compares
 /// (each self-determined), the slots its arguments read, and those of them
-/// whose change reports without a comparison (`loose`).
-pub const Monitor = struct { show: u32, compared: List, slots: List, loose: List };
+/// whose change reports without a comparison (`loose`); §17.2.2 an
+/// `$fmonitor`'s descriptor row `fd` (`none` for a `$monitor`).
+pub const Monitor = struct { show: u32, compared: List, slots: List, loose: List, fd: u32 };
 
 /// §7.6 one pass switch between bit `a_bit` of net `a` and bit `b_bit` of
 /// net `b`: always on (`ctrl` none), or on while row `ctrl` is `on`; its
@@ -569,12 +698,58 @@ pub const Path = struct {
     table: [4][4]u64,
     reject: ?u64,
     err: ?u64,
+    /// The A.7.4 delay rows `table` was folded from, which a §16.2.3 LABEL
+    /// re-folds (a `List` in `extra`).
+    delays: List = .empty,
+};
+
+/// §15.6 a timing check condition, analysed once: `none` (no condition),
+/// a bare expression (`plain`, true on 1), `~` of one (`invert`), or a
+/// comparison of `signal`'s least significant bit with constant `want`.
+pub const Cond = struct {
+    op: Op = .none,
+    signal: u32 = 0,
+    want: Bit = .one,
+
+    pub const Op = enum(u8) { none, plain, invert, eq, neq, case_eq, case_neq };
+};
+
+/// One event of a timing check: slot `slot` (bits [lo, lo + width) of it;
+/// width 0 the whole slot), the §15.4 transitions `mask` (0: any change),
+/// and its §15.6 condition.
+pub const CheckEvent = struct { slot: u32 = 0, lo: u32 = 0, width: u32 = 0, mask: u8 = 0, cond: Cond = .{} };
+
+/// IEEE 1364-2005 §15 one timing check of one instance: its command, its
+/// reference [0] and data [1] events, its limits in ticks (by kind, as
+/// lib/sim/digital's `tchk.Tchk.lim`), its notifier slot (`none`), its
+/// stamp- and checktime conditions, §15.3.2's flags, and §15.5.1's delays
+/// of each event's signal.
+pub const Check = struct {
+    kind: Kind,
+    /// The instance whose specify block wrote it.
+    scope: u32 = 0,
+    ev: [2]CheckEvent,
+    lim: [2]u64,
+    notifier: u32,
+    stamp_cond: Cond,
+    check_cond: Cond,
+    event_based: bool,
+    remain_active: bool,
+    delay: [2]u64,
+    /// The select events' bits at time 0 (values, unknowns).
+    v: [2]u64,
+    x: [2]u64,
+
+    pub const Kind = enum(u8) { setup, hold, setuphold, removal, recovery, recrem, skew, timeskew, fullskew, width, period, nochange };
 };
 
 /// §10 one task or function: its body's entry pc, its storage (slots
 /// [first, first + count), set aside per activation when `automatic`), its
 /// ports' slots (a `List`), a function's result slot, and the pc ranges of
-/// its inlined copies (pairs, a `List`) a §10.3 disable stops.
+/// its inlined copies (pairs, a `List`) a §10.3 disable stops. A timed task
+/// that reaches itself has its body once more out of line at `body`
+/// (`none`: no such body), over a frame of its own: slots [body_first,
+/// body_first + body_count), its ports `body_ports` (§10.2.3).
 pub const Sub = struct {
     entry: u32,
     function: bool,
@@ -584,6 +759,10 @@ pub const Sub = struct {
     result: u32,
     ports: List,
     ranges: List,
+    body: u32 = std.math.maxInt(u32),
+    body_first: u32 = 0,
+    body_count: u32 = 0,
+    body_ports: List = .empty,
 };
 
 /// A call of `subs` row `sub`: per port, an `Arg` (4 words) in `args`.
@@ -622,6 +801,9 @@ pub const Net = struct {
     strength_read: bool = false,
     /// A switch-joined net's first word in `resolved_init` (v then x).
     resolved: u32 = 0,
+    /// It had a delay, a switch or a path at elaboration (§16 PATHPULSE
+    /// with no ports annotates every such net's paths).
+    cold: bool = false,
 
     pub const no_decay = std.math.maxInt(u64);
 };
@@ -643,6 +825,9 @@ pub const Driver = struct {
     init: u32,
     init_or_z: bool,
     source: Source,
+    /// The slots whose change re-evaluates it (§16.2.4's INTERCONNECT
+    /// annotates the drivers reading a load port).
+    sensitivity: List = .empty,
 
     pub const Source = union(enum) {
         /// A.6.1 an expression row, in the net's type; with `slice`, read
@@ -684,6 +869,10 @@ string_bytes: []const u8 = &.{},
 file_name: List = .empty,
 scopes: []const Scope = &.{},
 times: []const Time = &.{},
+/// §10.2.3 per slot, the automatic task whose timed activations each own a
+/// copy of it (`none`: one copy), so a change in one activation wakes no
+/// waiter of another; empty when no task has a timed activation.
+slot_act: []const u32 = &.{},
 /// §17.3.2's default `units_number`, the finest precision's exponent.
 finest: i32 = 0,
 blocks: []const Block = &.{},
@@ -695,6 +884,15 @@ starts: []const Start = &.{},
 fan_start: []const u32 = &.{},
 fan: []const u32 = &.{},
 subs: []const Sub = &.{},
+checks: []const Check = &.{},
+vcd: Vcd = .{},
+evcd_ports: []const EvcdPort = &.{},
+/// Per scope, what §16 annotation matches; empty with no `$sdf_annotate`.
+sdf_scopes: []const SdfScope = &.{},
+/// Per slot, the checks its change reaches, each `check * 2 + event`:
+/// `check_codes[check_start[slot]..check_start[slot + 1]]`.
+check_start: []const u32 = &.{},
+check_codes: []const u32 = &.{},
 paths: []const Path = &.{},
 /// Per slot, the net it is (`none` for a variable's).
 slot_net: []const u32 = &.{},
@@ -746,6 +944,10 @@ pub fn extraData(p: *const Program, comptime T: type, at: u32) T {
         switch (F) {
             u32 => @field(out, name) = p.extra[i],
             i32 => @field(out, name) = @bitCast(p.extra[i]),
+            i64 => {
+                @field(out, name) = @bitCast(@as(u64, p.extra[i]) | @as(u64, p.extra[i + 1]) << 32);
+                i += 1;
+            },
             Ty => @field(out, name) = @bitCast(p.extra[i]),
             bool => @field(out, name) = p.extra[i] != 0,
             List => {

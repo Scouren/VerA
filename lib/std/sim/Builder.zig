@@ -39,6 +39,7 @@ blocks: std.ArrayList(Program.Block) = .empty,
 pieces: std.ArrayList(Program.Piece) = .empty,
 shows: std.ArrayList(Program.Show) = .empty,
 starts: std.ArrayList(Program.Start) = .empty,
+evcd_ports: std.ArrayList(Program.EvcdPort) = .empty,
 
 const Builder = @This();
 
@@ -110,6 +111,7 @@ pub fn extraOf(b: *Builder, value: anytype) Error!u32 {
         switch (F) {
             u32 => try b.extra.append(b.arena, x),
             i32 => try b.extra.append(b.arena, @bitCast(x)),
+            i64 => try b.extra.appendSlice(b.arena, &.{ @truncate(@as(u64, @bitCast(x))), @truncate(@as(u64, @bitCast(x)) >> 32) }),
             Program.Ty => try b.extra.append(b.arena, @bitCast(x)),
             bool => try b.extra.append(b.arena, @intFromBool(x)),
             Program.List => try b.extra.appendSlice(b.arena, &.{ x.start, x.len }),
@@ -148,6 +150,7 @@ pub fn finish(b: *Builder) Program {
     p.pieces = b.pieces.items;
     p.shows = b.shows.items;
     p.starts = b.starts.items;
+    p.evcd_ports = b.evcd_ports.items;
     assert(p.inst_scope.len == p.insts.len);
     assert(p.init_v.len == p.init_x.len);
     return p;

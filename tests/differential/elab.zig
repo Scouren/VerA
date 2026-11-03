@@ -4,7 +4,8 @@
 //! disagreeing fixture is named in `elab.xfail` (and each named one still
 //! disagrees). The old preprocessor makes both sides' text, as in
 //! diff-astgen. Checks, in order:
-//! - codes (`.va`/`.vams`): the set of codes the old `elab.elaborate` adds
+//! - codes (`.va`/`.vams`, unless the old elaboration stopped at NoModule,
+//!   before any check): the set of codes the old `elab.elaborate` adds
 //!   to its bag equals the set in `Zcu.failed` plus the per-file codes of
 //!   `Vir.diag` the old elaboration owns (`elab_codes`: AstGen judges a few
 //!   of its rules alone, E0373 and E0376);
@@ -64,7 +65,7 @@ const Outcome = union(enum) { old_refused, new_refused, verdict: struct { why: ?
 /// One side's answer: the tree as `path module` lines, the codes as a
 /// sorted, deduplicated list; `tree` is null when that side has none.
 /// `params`: `path.name` to a known integer's low `width` bits.
-const Side = struct { tree: ?[]const []const u8, codes: []const []const u8, params: std.StringHashMapUnmanaged(Bits) = .empty };
+const Side = struct { tree: ?[]const []const u8, codes: []const []const u8, params: std.StringHashMapUnmanaged(Bits) = .empty, judged: bool = true };
 
 /// A parameter's value as compared: its low `width` bits (`width` 64 on the
 /// new side, which folds to an `i64`).
@@ -187,12 +188,20 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8) !Outcome {
         // Compared on nothing, but the new side must still elaborate.
         break :blk .{ .tree = null, .codes = &.{} };
     } else (try oldAnalog(arena, pp, bag)) orelse return .old_refused;
-    const new = (try newSide(arena, path, text, digital, builtins)) orelse return .new_refused;
-    const again = (try newSide(arena, path, text, digital, builtins)).?;
+    // The old preprocessor's §10.2 events, as the new AstGen reads them.
+    const defaults = try arena.alloc(vams.Preprocessor.events.DefaultDiscipline, pp.directives.disciplines.len);
+    for (pp.directives.disciplines, defaults) |e, *d| d.* = .{
+        .at = e.at,
+        .qualifier = if (e.qualifier) |q| std.meta.stringToEnum(vams.Preprocessor.events.Qualifier, @tagName(q)).? else null,
+        .discipline = e.discipline,
+    };
+    const directives: vams.Preprocessor.Directives = .{ .disciplines = defaults };
+    const new = (try newSide(arena, path, text, digital, builtins, directives)) orelse return .new_refused;
+    const again = (try newSide(arena, path, text, digital, builtins, directives)).?;
     const refused = digital and old.tree == null;
     if (!sameLines(new.codes, again.codes) or !sameLines(new.tree.?, again.tree.?))
         return .{ .verdict = .{ .why = "determinism: two elaborations differ", .tree = false, .digital_refused = refused } };
-    if (!digital and !sameLines(old.codes, new.codes))
+    if (!digital and old.judged and !sameLines(old.codes, new.codes))
         return .{ .verdict = .{ .why = try arena.print("codes: old {s}, new {s}", .{ try join(arena, old.codes), try join(arena, new.codes) }), .tree = false } };
     var compared: u32 = 0;
     if (try paramsDiffer(arena, &old.params, &new.params, &compared)) |why| return .{ .verdict = .{ .why = why, .tree = false } };
@@ -239,7 +248,10 @@ fn oldAnalog(arena: std.mem.Allocator, pp: frontend.preprocessor.Output, bag: *d
         .default_disciplines = pp.directives.disciplines,
     }) catch |e| switch (e) {
         error.OutOfMemory => return e,
-        error.NoModule, error.DiagnosticsReported => null,
+        // No module: the old elaboration stops before its checks, so it
+        // judged nothing to compare against.
+        error.NoModule => return .{ .tree = null, .codes = &.{}, .judged = false },
+        error.DiagnosticsReported => null,
     };
     var codes: std.ArrayList([]const u8) = .empty;
     for (before..bag.count()) |k| try codes.append(arena, @tagName(bag.at(k).code));
@@ -343,12 +355,12 @@ fn paramsDiffer(arena: std.mem.Allocator, old: *const std.StringHashMapUnmanaged
 
 /// The new side: parse, AstGen, elaborate. Null when the new parser
 /// refuses the text.
-fn newSide(arena: std.mem.Allocator, path: []const u8, text: [:0]const u8, digital: bool, builtins: u32) !?Side {
+fn newSide(arena: std.mem.Allocator, path: []const u8, text: [:0]const u8, digital: bool, builtins: u32, directives: vams.Preprocessor.Directives) !?Side {
     const gpa = std.heap.smp_allocator;
     var tree = try vams.Ast.parse(gpa, text, .{ .keywords = if (digital) .v1364_2005 else .vams_2023 });
     defer tree.deinit(gpa);
     if (tree.errors.len != 0) return null;
-    var vir = try vams.AstGen.generate(gpa, &tree, .{});
+    var vir = try vams.AstGen.generate(gpa, &tree, .{ .directives = directives });
     defer vir.deinit(gpa);
     var zcu: Zcu = try .init(gpa);
     defer zcu.deinit();
@@ -359,7 +371,8 @@ fn newSide(arena: std.mem.Allocator, path: []const u8, text: [:0]const u8, digit
     var lines: std.ArrayList([]const u8) = .empty;
     for (0..zcu.instances.len) |k| {
         const d = zcu.instances.items(.module)[k];
-        try lines.append(arena, try arena.print("{f} {s}", .{ zcu.fmtPath(@fromBackingInt(@intCast(k))), zcu.fileVir(d.file).string(zcu.declRow(d).name) }));
+        const at = try arena.print("{f}", .{zcu.fmtPath(@fromBackingInt(@intCast(k)))});
+        try lines.append(arena, try arena.print("{s} {s}", .{ try oldSpelling(arena, at), zcu.fileVir(d.file).string(zcu.declRow(d).name) }));
     }
     var params: std.StringHashMapUnmanaged(Bits) = .empty;
     for (0..zcu.instances.len) |k| {
@@ -376,7 +389,7 @@ fn newSide(arena: std.mem.Allocator, path: []const u8, text: [:0]const u8, digit
             const p = mvir.extraData(vams.Vir.Inst.Param, mvir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index);
             const key = zcu.intern_pool.indexToKey(elems[at]);
             if (key != .int or key.int.storage != .small) continue;
-            const name = try arena.print("{f}.{s}", .{ zcu.fmtPath(@fromBackingInt(@intCast(k))), mvir.string(p.name) });
+            const name = try arena.print("{s}.{s}", .{ try oldSpelling(arena, try arena.print("{f}", .{zcu.fmtPath(@fromBackingInt(@intCast(k)))})), mvir.string(p.name) });
             try params.put(arena, name, .{ .bits = @bitCast(key.int.storage.small), .width = 64 });
         };
     }
@@ -387,6 +400,25 @@ fn newSide(arena: std.mem.Allocator, path: []const u8, text: [:0]const u8, digit
         for (elab_codes) |c| if (std.mem.eql(u8, c, name)) try codes.append(arena, name);
     }
     return .{ .tree = lines.items, .codes = try setOf(arena, codes.items), .params = params };
+}
+
+/// A new path as the old parser spells it: an escaped segment `\a.b `
+/// without its backslash and space, its `.` a space (the old parser interns
+/// an escaped name's `.` as a space).
+fn oldSpelling(arena: std.mem.Allocator, path: []const u8) ![]const u8 {
+    if (std.mem.findScalar(u8, path, '\\') == null) return path;
+    var out: std.ArrayList(u8) = .empty;
+    var k: usize = 0;
+    while (k < path.len) : (k += 1) {
+        if (path[k] != '\\') {
+            try out.append(arena, path[k]);
+            continue;
+        }
+        const end = std.mem.findScalarPos(u8, path, k, ' ') orelse path.len;
+        for (path[k + 1 .. end]) |c| try out.append(arena, if (c == '.') ' ' else c);
+        k = end;
+    }
+    return out.items;
 }
 
 fn setOf(arena: std.mem.Allocator, codes: []const []const u8) ![]const []const u8 {

@@ -156,10 +156,12 @@ pub const SystemParam = enum(u8) {
     /// The value of an instance nothing sets: the identity of the kind's
     /// composition (0 for the sums, 1 for the products).
     pub fn initial(k: SystemParam) f64 {
-        return switch (k) {
+        const v: f64 = switch (k) {
             .angle, .xposition, .yposition => 0.0,
             .hflip, .mfactor, .vflip => 1.0,
         };
+        assert(k.allows(v));
+        return v;
     }
 
     /// Whether `v` is in Table 9-29's domain for the kind; a NaN is in no
@@ -197,8 +199,11 @@ pub const NetKey = struct { instance: Instance.Index, net: InternPool.String };
 
 /// One §7.8.4 insertion: port `port` (a header port of the instance's
 /// module) of `instance`, re-pointed at the connect-module instance
-/// `bridge`, a child of `instance`'s parent.
-pub const Insert = struct { instance: Instance.Index, port: Vir.Inst.Index, bridge: Instance.Index };
+/// `bridge`, a child of `instance`'s parent. For a §7.8.5.1 primitive
+/// terminal, `instance` is the one whose module holds the primitive,
+/// `port` its `instance` instruction, `terminal` the terminal's position,
+/// and the bridge `instance`'s child.
+pub const Insert = struct { instance: Instance.Index, port: Vir.Inst.Index, bridge: Instance.Index, terminal: u32 = 0 };
 
 /// One diagnostic: its code, the file and instruction it is about (none
 /// when it is about the design as a whole) and its message.
@@ -249,11 +254,13 @@ const Zcu = @This();
 
 /// Returns an empty unit. The caller frees it with `deinit`.
 pub fn init(gpa: Allocator) Allocator.Error!Zcu {
+    assert(@sizeOf(Instance) != 0);
     return .{ .gpa = gpa, .intern_pool = try .init(gpa) };
 }
 
 /// Frees every table; the files' Vir stay the caller's.
 pub fn deinit(zcu: *Zcu) void {
+    assert(zcu.instance_map.count() <= zcu.instances.len);
     const gpa = zcu.gpa;
     zcu.intern_pool.deinit(gpa);
     zcu.files.deinit(gpa);
@@ -292,6 +299,7 @@ pub fn addFile(zcu: *Zcu, path: []const u8, vir: Vir, builtins: u32) Allocator.E
 
 /// The Vir of `file`. Asserts that the file exists.
 pub fn fileVir(zcu: *const Zcu, file: File.Index) *const Vir {
+    assert(zcu.files.items(.vir).len == zcu.files.len);
     assert(@backingInt(file) < zcu.files.len);
     return &zcu.files.items(.vir)[@backingInt(file)];
 }
@@ -305,6 +313,7 @@ pub fn declRow(zcu: *const Zcu, d: Decl) Vir.Decl {
 
 /// Whether `d` is a shipped module (`File.builtin_end`).
 pub fn isBuiltin(zcu: *const Zcu, d: Decl) bool {
+    assert(@backingInt(d.file) < zcu.files.len);
     return @backingInt(d.index) < zcu.files.items(.builtin_end)[@backingInt(d.file)] and zcu.declRow(d).kind == .module;
 }
 
@@ -317,5 +326,6 @@ pub fn fmtPath(zcu: *const Zcu, i: Instance.Index) PathFormatter {
 
 /// Whether elaboration raised `code`.
 pub fn hasCode(zcu: *const Zcu, code: Diag.Code) bool {
+    assert(zcu.failed.len == zcu.failed.items(.code).len);
     return std.mem.findScalar(Diag.Code, zcu.failed.items(.code), code) != null;
 }

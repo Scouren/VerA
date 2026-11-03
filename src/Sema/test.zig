@@ -27,6 +27,10 @@ const Out = struct {
 // ---- private ----
 
 fn elab(src: [:0]const u8, config: Sema.Config) !Out {
+    return elabUnder(src, config, &.{}, 0);
+}
+
+fn elabUnder(src: [:0]const u8, config: Sema.Config, defaults: []const vams.Preprocessor.events.DefaultDiscipline, builtins: u32) !Out {
     const gpa = std.testing.allocator;
     var out: Out = .{ .arena = .init(gpa), .tree = "", .codes = &.{}, .keys = 0 };
     errdefer out.arena.deinit();
@@ -35,11 +39,11 @@ fn elab(src: [:0]const u8, config: Sema.Config) !Out {
     defer ast.deinit(gpa);
     if (ast.errors.len != 0) std.debug.print("parse error {t} at token {d}\n", .{ ast.errors[0].tag, ast.errors[0].token });
     try std.testing.expectEqual(@as(usize, 0), ast.errors.len);
-    var vir = try vams.AstGen.generate(gpa, &ast, .{});
+    var vir = try vams.AstGen.generate(gpa, &ast, .{ .directives = .{ .disciplines = defaults } });
     defer vir.deinit(gpa);
     var zcu: Zcu = try .init(gpa);
     defer zcu.deinit();
-    _ = try zcu.addFile("test.va", vir, 0);
+    _ = try zcu.addFile("test.va", vir, builtins);
     try Sema.elaborate(&zcu, config);
     var text: std.Io.Writer.Allocating = .init(arena);
     for (0..zcu.instances.len) |k| {
@@ -54,6 +58,20 @@ fn elab(src: [:0]const u8, config: Sema.Config) !Out {
     out.codes = try arena.dupe(Diag.Code, zcu.failed.items(.code));
     out.keys = zcu.instance_map.count();
     return out;
+}
+
+/// `expectCodes` with `default_discipline <discipline>` in force from the
+/// first byte (§10.2).
+fn expectCodesUnder(src: [:0]const u8, default: []const u8, want: []const Diag.Code) !void {
+    var o = try elabUnder(src, .{}, &.{.{ .at = 0, .qualifier = null, .discipline = default }}, 0);
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, want, o.codes);
+}
+
+/// `elab` with the file's first module shipped (Annex E), as the prelude's
+/// Table E.1 primitives are.
+fn elabBuiltins(src: [:0]const u8) !Out {
+    return elabUnder(src, .{}, &.{}, 1);
 }
 
 fn expectTree(src: [:0]const u8, config: Sema.Config, want: []const u8) !void {
@@ -299,4 +317,97 @@ test "IEEE 1364-2005 §12.8.1 a defparam of the module's own parameter is in for
         \\module kid; endmodule
         \\module top; parameter n = 1; if (n == 2) kid k(); defparam n = 2; endmodule
     , .{}, "top top\ntop.genblk1.k kid\n");
+}
+
+test "§7.8.5.1 a gate terminal on a continuous vector net gets no bridge (E0929)" {
+    try expectCodesUnder(
+        \\nature V; access = V; endnature
+        \\discipline el; potential V; enddiscipline
+        \\discipline dd; domain discrete; enddiscipline
+        \\connectmodule a2d(e, c); input e; output c; el e; dd c; endmodule
+        \\module top; el [1:0] a; wire [1:0] y; reg [1:0] b; and g[1:0] (y, a, b); endmodule
+        \\connectrules r; connect a2d split; endconnectrules
+    , "dd", &.{.E0929});
+}
+
+test "Annex F.2.1 step 3 an out-of-context declaration overrides a net's discipline: twice for one segment is E0902, an incompatible override E0375" {
+    const prelude =
+        \\nature V; units = "V"; access = V; endnature
+        \\nature R; units = "rad"; access = R; endnature
+        \\discipline ea; potential V; enddiscipline
+        \\discipline eb; potential V; enddiscipline
+        \\discipline rot; potential R; enddiscipline
+        \\module leaf(p); inout p; ea p; endmodule
+        \\
+    ;
+    try expectCodes(prelude ++ "module top; leaf u(n); eb u.p; endmodule", .{}, &.{});
+    try expectCodes(prelude ++ "module top; leaf u(n); eb u.p; ea u.p; endmodule", .{}, &.{.E0902});
+    try expectCodes(prelude ++ "module top; leaf u(n); rot u.p; endmodule", .{}, &.{.E0375});
+    try expectCodes(prelude ++ "module top; leaf u(n); rot $root.top.u.p; endmodule", .{}, &.{.E0375});
+}
+
+test "§3.6.2.4 an undeclared net digital behavioral code drives is discrete, so its analog port gets a bridge" {
+    try expectTree(
+        \\nature V; access = V; endnature
+        \\discipline el; potential V; enddiscipline
+        \\discipline dd; domain discrete; enddiscipline
+        \\connectmodule d2a(c, e); input c; output e; dd c; el e; endmodule
+        \\module load(p); input p; el p; endmodule
+        \\module top; reg s; assign w = s; load l(w); endmodule
+        \\connectrules r; connect d2a; endconnectrules
+    , .{}, "top top\ntop.l load\ntop.w__d2a__el d2a\n");
+}
+
+test "§3.4.4 an array parameter's override is of its exact size, and a resize brings an array of the new size (E0921)" {
+    const target =
+        \\module t; parameter integer n = 2; parameter real c[0:n-1] = '{1.0, 2.0}; endmodule
+        \\
+    ;
+    try expectCodes(target ++ "module top; t #(.c('{4.0, 5.0})) a(); t #(.n(3), .c('{1.0, 2.0, 3.0})) b(); endmodule", .{}, &.{});
+    try expectCodes(target ++ "module top; t #(.c('{4.0, 5.0, 6.0})) a(); t #(.c('{4.0})) b(); t #(.n(3)) c(); endmodule", .{}, &.{ .E0921, .E0921, .E0921 });
+}
+
+test "Annex E.3.2.1 port_discipline on a shipped primitive names a continuous discipline (E0358); two incompatible segments of one domain are E0355" {
+    const prelude =
+        \\nature V; units = "V"; access = V; endnature
+        \\nature R; units = "rad"; access = R; endnature
+        \\discipline electrical; potential V; enddiscipline
+        \\discipline rot; potential R; enddiscipline
+        \\discipline dd; domain discrete; enddiscipline
+        \\module resistor(p, n); inout p, n; electrical p, n; endmodule
+        \\
+    ;
+    var o = try elabBuiltins(prelude ++
+        \\module top; (* port_discipline = "rot" *) resistor a(x, y); (* port_discipline = "dd" *) resistor b(x, y);
+        \\  (* port_discipline = 3 *) resistor c(x, y); (* port_discipline = "nowhere" *) resistor d(x, y); endmodule
+    );
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{ .E0358, .E0358, .E0358 }, o.codes);
+    try expectCodes(
+        \\nature V; units = "V"; access = V; endnature
+        \\nature R; units = "rad"; access = R; endnature
+        \\discipline el; potential V; enddiscipline
+        \\discipline rot; potential R; enddiscipline
+        \\module a(x); inout x; el x; endmodule
+        \\module b(x); inout x; rot x; endmodule
+        \\module top; a u(q); b v(q); endmodule
+    , .{}, &.{.E0355});
+}
+
+test "§2.6.2 a scale factor in a UDP's delay is E0247; IEEE 1364-2005 §12.8.1 a defparam of its own parameter that reads it is E0907" {
+    try expectCodes(
+        \\primitive buf1(q, a); output q; input a; table 0 : 0; 1 : 1; endtable endprimitive
+        \\module top; wire q; buf1 #(0 ? 2u : 0.25) g(q, 1'b0); buf1 #(1) h(q, 1'b0); endmodule
+    , .{}, &.{.E0247});
+    try expectCodes(
+        \\module w; parameter real x = 1.0; parameter real y = x; defparam w.x = y; endmodule
+        \\module top; w w(); endmodule
+    , .{}, &.{.E0907});
+}
+
+test "§2.7.1 an escaped instance name is one path segment" {
+    try expectTree(
+        \\module kid; endmodule
+        \\module top; kid \a.b (); kid plain(); endmodule
+    , .{}, "top top\ntop.\\a.b  kid\ntop.plain kid\n");
 }

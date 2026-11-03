@@ -21,5 +21,6 @@ test {
     _ = @import("Sema/checks.zig");
     _ = @import("Sema/discipline.zig");
     _ = @import("Sema/connect.zig");
+    _ = @import("Sema/resolve.zig");
     _ = @import("Sema/test.zig");
 }

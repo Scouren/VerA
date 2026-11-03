@@ -54,6 +54,7 @@ pub fn run(s: *Sema) Allocator.Error!void {
 /// (an instance missing its parentheses), names a module.
 /// ponytail: nets declared in a generate block are not visited.
 fn netDisciplines(s: *Sema, file: Zcu.File.Index, m: Inst.Module) Allocator.Error!void {
+    assert(m.body.start + m.body.len <= s.zcu.fileVir(file).extra.len);
     assert(@backingInt(file) < s.zcu.files.len);
     const zcu = s.zcu;
     const vir = zcu.fileVir(file);
@@ -82,6 +83,7 @@ fn netDisciplines(s: *Sema, file: Zcu.File.Index, m: Inst.Module) Allocator.Erro
 /// than the second expression in the range", for every paramset parameter
 /// whose bounds fold over the paramset's own defaults (E0347).
 fn paramsetRanges(s: *Sema, file: Zcu.File.Index, inst: Inst.Index) Allocator.Error!void {
+    assert(@backingInt(file) < s.zcu.files.len);
     assert(s.zcu.fileVir(file).instructions.items(.tag)[@backingInt(inst)] == .paramset);
     const zcu = s.zcu;
     const vir = zcu.fileVir(file);
@@ -105,6 +107,7 @@ fn paramsetRanges(s: *Sema, file: Zcu.File.Index, inst: Inst.Index) Allocator.Er
 /// (E0923, §7.8) and its ports a Table 7-2 direction pair (E0982); each
 /// resolution's disciplines (E0916).
 fn connectRules(s: *Sema, file: Zcu.File.Index, cr: Inst.ConnectRules) Allocator.Error!void {
+    assert(cr.body.start + cr.body.len <= s.zcu.fileVir(file).extra.len);
     assert(@backingInt(file) < s.zcu.files.len);
     const zcu = s.zcu;
     const vir = zcu.fileVir(file);
@@ -149,6 +152,8 @@ fn connectRules(s: *Sema, file: Zcu.File.Index, cr: Inst.ConnectRules) Allocator
 /// specified": a connect statement's values name overridable parameters of
 /// it, no more in order than it has (E0907, as for an instance).
 fn connectParams(s: *Sema, file: Zcu.File.Index, at: Inst.Index, ins: Inst.ConnectInsert, m: Zcu.Decl) Allocator.Error!void {
+    const before = s.zcu.failed.len;
+    defer assert(s.zcu.failed.len >= before);
     assert(s.zcu.declRow(m).kind == .connectmodule);
     assert(s.zcu.fileVir(file).instructions.items(.tag)[@backingInt(at)] == .connect_insert);
     const zcu = s.zcu;
@@ -178,6 +183,8 @@ fn connectParams(s: *Sema, file: Zcu.File.Index, at: Inst.Index, ins: Inst.Conne
 /// input/output, output/input or inout/inout (E0982). A module whose ports
 /// do not split into one of each is judged by insertion.
 fn tableDirections(s: *Sema, file: Zcu.File.Index, at: Inst.Index, m: Zcu.Decl) Allocator.Error!void {
+    const before = s.zcu.failed.len;
+    defer assert(s.zcu.failed.len <= before + 1);
     assert(s.zcu.declRow(m).kind == .connectmodule);
     assert(s.zcu.fileVir(file).instructions.items(.tag)[@backingInt(at)] == .connect_insert);
     const zcu = s.zcu;

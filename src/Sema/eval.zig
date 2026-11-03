@@ -11,7 +11,7 @@
 //!
 //! Contents:
 //! - `pub const Const`
-//! - `pub const Env = struct` (`init`, `deinit`, `body`, `ref`, `param`, `named`, `systemNamed`, `toConst`, `intern`)
+//! - `pub const Env = struct` (`init`, `deinit`, `body`, `bodyValue`, `ref`, `param`, `named`, `systemNamed`, `toConst`, `intern`, `arraySize`, `dependsOn`)
 //! - `pub const eval_depth_max: u32`
 
 const std = @import("std");
@@ -59,6 +59,8 @@ pub const Env = struct {
     genvars: std.AutoHashMapUnmanaged(Inst.Index, i64) = .empty,
     /// Parameters being folded: a read of one of these closes a cycle.
     busy: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty,
+    /// A read of a `busy` parameter happened (`dependsOn`).
+    cycled: bool = false,
     /// §9.18 this instance's hierarchical system parameters, once known.
     hier: Zcu.Hier = .initFill(.undef),
     depth: u32 = 0,
@@ -82,6 +84,7 @@ pub const Env = struct {
     }
 
     pub fn deinit(env: *Env) void {
+        assert(env.busy.count() == 0);
         env.positions.deinit(env.gpa);
         env.aliases.deinit(env.gpa);
         env.values.deinit(env.gpa);
@@ -94,14 +97,72 @@ pub const Env = struct {
 
     /// The value of a body: its last instruction's. Null for an empty body.
     pub fn body(env: *Env, b: Vir.Body) Allocator.Error!?Const {
+        const depth = env.depth;
+        defer assert(env.depth == depth);
         assert(b.start + b.len <= env.vir.extra.len);
         const insts = env.vir.body(b);
         if (insts.len == 0) return null;
         return env.ref(insts[insts.len - 1].toRef());
     }
 
+    /// The value of a body as an interned constant: a §3.4.4 assignment
+    /// pattern `'{...}` is an untyped aggregate of its elements' values, any
+    /// other value as `intern`s, `undef` when it does not fold.
+    pub fn bodyValue(env: *Env, b: Vir.Body) Allocator.Error!InternPool.Index {
+        const insts = env.vir.body(b);
+        if (insts.len == 0) return .undef;
+        const last = insts[insts.len - 1];
+        if (env.vir.instructions.items(.tag)[@backingInt(last)] != .pattern) {
+            return if (try env.body(b)) |c| env.intern(c) else .undef;
+        }
+        const refs = env.vir.list(Inst.Ref, env.payload(Inst.Refs, last));
+        const elems = try env.arena.alloc(InternPool.Index, refs.len);
+        for (refs, elems) |r, *e| e.* = if (try env.ref(r)) |c| try env.intern(c) else .undef;
+        const out = try env.ip.get(env.gpa, .{ .aggregate = .{ .ty = .none, .elems = elems } });
+        assert(out != .none);
+        return out;
+    }
+
+    /// §3.4.4 the element count of parameter `p`'s first (outermost)
+    /// declared dimension: an assignment pattern's own length (a nested
+    /// pattern holds the inner dimensions). Null for a scalar or a range
+    /// that does not fold.
+    /// ponytail: the inner dimensions' sizes are not judged.
+    pub fn arraySize(env: *Env, p: Inst.Index) Allocator.Error!?u64 {
+        const decl = env.payload(Inst.Param, p);
+        if (decl.dims.len == 0) return null;
+        const first = for (env.vir.body(decl.dims)) |d| {
+            if (env.vir.instructions.items(.tag)[@backingInt(d)] == .range) break d;
+        } else return null;
+        const bin = env.payload(Inst.Bin, first);
+        const msb = ((try env.ref(bin.lhs)) orelse return null).asIntExact() orelse return null;
+        const lsb = ((try env.ref(bin.rhs)) orelse return null).asIntExact() orelse return null;
+        const n: u64 = @intCast(@min(@abs(@as(i128, msb) - lsb) + 1, std.math.maxInt(u64)));
+        assert(n >= 1);
+        return n;
+    }
+
+    /// Whether folding `b` reads parameter `target`, directly or through
+    /// the defaults of the parameters it reads: every cached value is
+    /// folded again with `target` busy, then restored.
+    pub fn dependsOn(env: *Env, b: Vir.Body, target: Inst.Index) Allocator.Error!bool {
+        assert(env.vir.instructions.items(.tag)[@backingInt(target)] == .param);
+        assert(!env.busy.contains(target));
+        const saved = try env.arena.dupe(InternPool.Index, env.values.items);
+        defer @memcpy(env.values.items, saved);
+        @memset(env.values.items, .none);
+        try env.busy.put(env.gpa, target, {});
+        defer _ = env.busy.remove(target);
+        env.cycled = false;
+        _ = try env.body(b);
+        defer env.cycled = false;
+        return env.cycled;
+    }
+
     /// The value of `r`, or null when it has none at elaboration.
     pub fn ref(env: *Env, r: Inst.Ref) Allocator.Error!?Const {
+        const depth = env.depth;
+        defer assert(env.depth == depth);
         const i = r.toIndex() orelse return null;
         if (env.depth >= eval_depth_max) return null;
         env.depth += 1;
@@ -115,10 +176,19 @@ pub const Env = struct {
         assert(env.vir.instructions.items(.tag)[@backingInt(p)] == .param);
         const pos = env.positions.get(p);
         if (pos) |k| if (env.values.items[k] != .none) return env.toConst(env.values.items[k]);
-        if (env.busy.contains(p)) return null;
+        if (env.busy.contains(p)) {
+            env.cycled = true;
+            return null;
+        }
         try env.busy.put(env.gpa, p, {});
         defer _ = env.busy.remove(p);
         const decl = env.payload(Inst.Param, p);
+        // §3.4.4 an array parameter's value is an aggregate: no `Const`.
+        if (decl.dims.len != 0) {
+            const v = env.given.get(p) orelse try env.bodyValue(decl.value);
+            if (pos) |k| env.values.items[k] = v;
+            return null;
+        }
         const raw = if (env.given.get(p)) |g| env.toConst(g) else try env.body(decl.value);
         const v = if (raw) |c| try env.coerce(decl, c) else null;
         if (pos) |k| env.values.items[k] = if (v) |c| try env.intern(c) else .undef;
@@ -159,6 +229,7 @@ pub const Env = struct {
     /// The value `index` holds, or null for `undef`. A string is copied, so
     /// it outlives the pool's next string.
     pub fn toConst(env: *Env, index: InternPool.Index) ?Const {
+        assert(@backingInt(index) < env.ip.items.len);
         assert(index != .none);
         return switch (env.ip.indexToKey(index)) {
             .float => |f| .{ .real = f },
@@ -186,6 +257,7 @@ pub const Env = struct {
     // ---- private ----
 
     fn payload(env: *const Env, comptime T: type, i: Inst.Index) T {
+        assert(Inst.dataKind(env.vir.instructions.items(.tag)[@backingInt(i)]) == .pl_node);
         return env.vir.extraData(T, env.vir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index);
     }
 
@@ -228,6 +300,7 @@ pub const Env = struct {
 
     /// A name's value: a parameter's, a genvar's, or an alias's original's.
     fn declValue(env: *Env, d: Inst.Index) Allocator.Error!?Const {
+        assert(env.depth <= eval_depth_max);
         assert(@backingInt(d) < env.vir.instructions.len);
         return switch (env.vir.instructions.items(.tag)[@backingInt(d)]) {
             .param => env.param(d),
@@ -313,6 +386,7 @@ fn originalOf(vir: *const Vir, alias: Inst.Index) ?Inst.Index {
 }
 
 fn unaryOp(tag: Inst.Tag) fold.UnaryOp {
+    assert(Inst.dataKind(tag) == .un_node);
     return switch (tag) {
         .pos => .plus,
         .neg => .minus,
@@ -323,6 +397,7 @@ fn unaryOp(tag: Inst.Tag) fold.UnaryOp {
 }
 
 fn binaryOp(tag: Inst.Tag) fold.BinaryOp {
+    assert(Inst.dataKind(tag) == .pl_node);
     return switch (tag) {
         .add => .add,
         .sub => .sub,
@@ -356,6 +431,7 @@ fn binaryOp(tag: Inst.Tag) fold.BinaryOp {
 /// truncated to its size and sign-extended when signed. Null for an x, z or
 /// `?` digit or a value wider than 64 bits.
 fn bigInt(vir: *const Vir, b: Inst.BigInt) ?Const {
+    assert(b.flags.radix != 0);
     assert(b.digits != .empty);
     const digits = vir.string(b.digits);
     const radix: u8 = b.flags.radix;

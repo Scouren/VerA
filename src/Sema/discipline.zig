@@ -4,7 +4,7 @@
 //! Cites: VAMS-2023 §3.6.1.1, §3.6.1.2, §3.6.2.2, §3.6.2.6, §3.11.1.
 //!
 //! Contents:
-//! - `pub const Domain`
+//! - `pub const Domain`, `pub const behavioral`
 //! - `pub fn domainOf(s: *Sema, name: []const u8) Allocator.Error!?Domain`
 //! - `pub fn compatible(s: *Sema, a: []const u8, b: []const u8) Allocator.Error!bool`
 
@@ -22,6 +22,11 @@ const payloadOf = walk.payloadOf;
 /// §3.6.2.2 a discipline's domain.
 pub const Domain = enum { continuous, discrete };
 
+/// §3.6.2.4 the discipline of an undeclared net digital behavioral code
+/// uses: discrete and natureless, so compatible with every discrete one
+/// (§3.11.1). A `$` name, so no declaration can take it.
+pub const behavioral = "$behavioral";
+
 const ItemKind = @FieldType(Inst.DisciplineItem, "kind");
 
 /// The derived-nature chain `baseNature` follows at most.
@@ -35,6 +40,8 @@ const Found = struct { vir: *const Vir, decl: Inst.Discipline };
 /// continuous"). Null for no discipline of the name, and for a domainless
 /// one (no domain, no nature).
 pub fn domainOf(s: *Sema, name: []const u8) Allocator.Error!?Domain {
+    assert(name.len < std.math.maxInt(u32));
+    if (std.mem.eql(u8, name, behavioral)) return .discrete;
     const d = try lookup(s, name) orelse return null;
     var natures = false;
     for (d.vir.list(Inst.DisciplineItem, d.decl.items)) |it| switch (it.kind) {
@@ -50,6 +57,8 @@ pub fn domainOf(s: *Sema, name: []const u8) Allocator.Error!?Domain {
 /// one base nature, or of equal `units`). A name no discipline declares
 /// conflicts with nothing.
 pub fn compatible(s: *Sema, a: []const u8, b: []const u8) Allocator.Error!bool {
+    assert(a.len < std.math.maxInt(u32));
+    assert(b.len < std.math.maxInt(u32));
     if (std.mem.eql(u8, a, b)) return true;
     const da = try lookup(s, a) orelse return true;
     const db = try lookup(s, b) orelse return true;
@@ -78,6 +87,7 @@ fn lookup(s: *Sema, name: []const u8) Allocator.Error!?Found {
 
 /// The nature `d` binds to `half`, or null.
 fn natureOf(d: Found, half: ItemKind) ?[]const u8 {
+    assert(d.decl.name != .empty);
     assert(half == .potential or half == .flow);
     for (d.vir.list(Inst.DisciplineItem, d.decl.items)) |it| if (it.kind == half) return d.vir.string(it.name);
     return null;

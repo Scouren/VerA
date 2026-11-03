@@ -1,34 +1,60 @@
 //! The float verdict: an `Air` and what the caller knows of its leaves
 //! (`Input`: §3.4.2 parameter ranges, the host's unknown bound, the roots,
-//! the callees) in; per instruction an interval and a finite bit, per root a
-//! float mode, and the §4.3.2 diagnostics (E0601-E0607, E0609, W0650,
-//! W0651, W0653) into a `Diag.Wip` out. A root is `.optimized` when no value
-//! on its backward slice can be inf or NaN, so `@setFloatMode(.optimized)`
-//! is safe for it; else `.strict`, which is never an error.
+//! the callees) in; per instruction an interval and a NaN bit, per root a
+//! float mode with the input box its proof assumed (`Verdict`), and the
+//! §4.3.2 diagnostics (E0601-E0607, E0609, W0650, W0651, W0653) into a
+//! `Diag.Wip` out. A root is `.optimized` when, for every input inside its
+//! box, no value on its backward slice can be inf or NaN, so
+//! `@setFloatMode(.optimized)` is safe for it there; else `.strict`, which
+//! is never an error. Codegen emits an `.optimized` root as a versioned
+//! unit: an entry check that every input lies in its box (`Guard.admits`),
+//! then the fast-math body, else the strict body. So the fast path's
+//! precondition is checked, never assumed, and the unit is right on every
+//! input.
 //!
-//! One recursive walk of the nesting (Zig's `Air/Liveness.zig` shape): a
-//! guard fact is pushed entering a `cond_br` body and popped leaving it, so
-//! the facts on a value are its enclosing conditions; a block's result is
-//! the join of its `br` operands; a slot's state at a block's exit is the
-//! join of its states on every `br` to it; a `loop` iterates to a fixpoint,
-//! widening after `widen_after` rounds. A fact about one value holds for
-//! every value structurally equal to it (a congruence class: the same tag
-//! over the same classes, a `load` keyed by its slot's version), which is
-//! what proves `if (V(p,n) > 0) ln(V(p,n))` when each `V(p,n)` is computed
-//! anew. Finiteness follows the old prover's rules: a probe is finite by the
-//! host contract, a parameter when its range excludes infinity, `+ - * /`,
-//! `%` and `hypot` on finite operands are taken not to overflow
-//! (`Interval.binary`), an unproven domain costs finiteness.
+//! Finiteness is proven, never assumed (`Interval`: sound IEEE 754
+//! transfers, no overflow contract): a value is finite when its interval
+//! excludes ±inf and it cannot be NaN. The leaves are inputs: a parameter's
+//! interval is its declared range (it may be NaN only when that is the
+//! whole line, which no entry check refuses), a probe's is `[-B, B]` for
+//! `B` the caller's `unknown_bound`, or `default_unknown_bound`.
+//!
+//! Two walks of the nesting (`Float/Walk.zig`): the diagnostics' walk reads
+//! the leaves as the model's legal inputs (numbers in their ranges, a probe
+//! any finite number unless the caller bounds it), so an error never rests
+//! on the default bound; the verdict's walk reads them as the box admits
+//! them, and its tables are the ones this struct holds.
+//!
+//! `default_unknown_bound` is measured (`diff-air-passes`, its
+//! `air_passes/bound.zig`): the roots rated `.optimized` with every probe
+//! in `[-B, B]`, over generated programs and hand-built devices (resistor,
+//! capacitor, diode and Ebers-Moll `exp(V/vt)`, diode with `$vt`, MOSFET
+//! square law, BSIM-like softplus rational, `tanh` limiter):
+//!
+//!   B (V or A)              1        10       100      1e3      1e4
+//!   generated (2,000)       38.4%    36.6%    36.6%    35.1%    35.1%
+//!   devices (8)             7        5        4        4        4
+//!
+//! 1 proves the junctions, but a node voltage past 1 V is everyday; 10 is
+//! the largest bound that keeps the softplus `exp` finite and covers the
+//! supplies of most analog ICs; past it only the polynomial devices stay.
+//! So B = 10: a probe past it runs the strict body, correct and slower. A
+//! junction `exp(V(a,c)/vt)` reads two node voltages, so no generous box
+//! proves it (2B/vt passes 709 at B = 9.2); `$vt` of `$temperature` is
+//! unbounded, so that diode is proven at no bound.
+//!
 //! Cites: VAMS-2023 §3.2, §3.4.2, §4.2.3, §4.2.4, §4.2.5, §4.2.7, §4.2.8,
 //! §4.2.12, §4.3, §4.3.2, §4.4, §4.5.13, §5.8, §5.9, §9.15, §9.19.
 //!
 //! Contents:
-//! - `pub const Float = @This()` (fields `iv`, `finite`, `domain`, `modes`, `error_count`)
+//! - `pub const Float = @This()` (fields `iv`, `nan`, `domain`, `verdict`, `error_count`)
 //! - `pub const Mode = enum(u8) { optimized, strict }`, `Mode.strictest(a: Mode, b: Mode) Mode`
 //! - `pub const Domain = enum(u8) { none, proven, open, violated }`
+//! - `pub const Guard = struct` (`Leaf`, `admits`), `pub const Verdict = struct` (`box`)
 //! - `pub const Param = struct`, `pub const Root = struct`, `pub const Input = struct`
-//! - `pub const errors_max: u8`
+//! - `pub const errors_max: u8`, `pub const default_unknown_bound: f64`
 //! - `pub fn analyze(gpa: Allocator, air: Air, ip: *const InternPool, in: Input, wip: *Diag.Wip) Allocator.Error!Float`
+//! - `pub fn finite(f: Float, i: u32) bool`
 //! - `pub fn deinit(f: *Float, gpa: Allocator) void`
 
 const std = @import("std");
@@ -40,25 +66,28 @@ const Diag = @import("vams").Diag;
 const Air = @import("../Air.zig");
 const Interval = @import("Interval.zig");
 const domains = @import("Float/domain.zig");
-const verdict = @import("Float/verdict.zig");
+const rating = @import("Float/verdict.zig");
+const Walk = @import("Float/Walk.zig");
 const Inst = Air.Inst;
 const Abstract = Interval.Abstract;
 
 /// File-as-struct: the verdict. Every slice is allocated with the `gpa`
-/// passed to `analyze`; free with `deinit`.
+/// passed to `analyze`; free with `deinit`. The per-instruction tables hold
+/// for every input inside the box (the parameters in their ranges, the
+/// probes in `[-B, B]`).
 pub const Float = @This();
 
-/// Per instruction: an interval holding every value it defines (a `block`
-/// its result, an `assign` the value it writes), over every execution.
+/// Per instruction: an interval holding every non-NaN value it defines (a
+/// `block` its result, an `assign` the value it writes), over every
+/// execution.
 iv: []Interval,
-/// Per instruction: every value it defines is a finite double (an integer
-/// always is, unless its domain is unproven).
-finite: []bool,
+/// Per instruction: some value it defines may be NaN (an integer never is,
+/// unless its domain is unproven).
+nan: []bool,
 /// Per instruction: how its §4.3.2 obligation came out (`none`: it has none).
 domain: []Domain,
-/// Per `Input.roots` row. Invariant: a nonzero `error_count` rates every
-/// root `.strict`.
-modes: []Mode,
+/// Per root: its mode and its guard box.
+verdict: Verdict,
 /// §4.3.2 errors reported, saturating at `errors_max`.
 error_count: u8,
 
@@ -79,6 +108,54 @@ pub const Mode = enum(u8) {
 
 /// A domain obligation's outcome (`Float/domain.zig`).
 pub const Domain = enum(u8) { none, proven, open, violated };
+
+/// One input of a root's guard box: the interval the proof assumed for
+/// `arg` or `probe` number `index`. The entry check is `admits`: one
+/// compare pair (plus `x != 0` for a `nonzero` hole), and NaN fails it.
+pub const Guard = struct {
+    iv: Interval,
+    index: u32,
+    leaf: Leaf,
+
+    /// The `Air` tag that reads the input.
+    pub const Leaf = enum(u8) { arg, probe };
+
+    /// Returns whether input value `x` lies in the box's interval: the
+    /// entry check codegen emits, the oracle's reading of it.
+    pub fn admits(g: Guard, x: f64) bool {
+        const r = g.iv.contains(x);
+        if (r) assert(!math.isNan(x));
+        return r;
+    }
+
+    comptime {
+        assert(@sizeOf(Guard) <= 32);
+    }
+};
+
+/// Per root, the float mode and the box it was proven under. A `.strict`
+/// root has an empty box; an `.optimized` one lists every input on its
+/// slice whose interval is not `whole` (an integer parameter whose range is
+/// its type's, `Interval.i32_range`, needs no check either). An empty box
+/// on an `.optimized` root needs no entry check.
+pub const Verdict = struct {
+    /// Per `Input.roots` row. Invariant: a nonzero `error_count` rates every
+    /// root `.strict`.
+    modes: []Mode,
+    /// Per root `r`, its box is `guards[guard_start[r]..guard_start[r + 1]]`
+    /// (`roots + 1` entries).
+    guard_start: []u32,
+    guards: []Guard,
+
+    /// Returns root `r`'s guard box. Asserts that `r` names a root.
+    pub fn box(v: Verdict, r: usize) []const Guard {
+        assert(r < v.modes.len);
+        assert(v.guard_start.len == v.modes.len + 1);
+        const g = v.guards[v.guard_start[r]..v.guard_start[r + 1]];
+        if (v.modes[r] == .strict) assert(g.len == 0);
+        return g;
+    }
+};
 
 /// What the caller knows of `arg` index `i` (`Input.params[i]`).
 pub const Param = struct {
@@ -106,9 +183,10 @@ pub const Input = struct {
     calls: []const Air.CallFacts = &.{},
     /// One per instruction, or empty: where a diagnostic points.
     locs: []const Diag.Loc = &.{},
-    /// A bound B with |unknown| <= B for every §4.4 probe: the hardware knob
-    /// that makes probe-dependent transcendentals provable. Null or NaN:
-    /// unbounded, still finite.
+    /// A bound B with |unknown| <= B assumed for every §4.4 probe (the
+    /// `--unknown-bound` knob): the box's probe half, and the diagnostics'
+    /// too. Null or NaN: `default_unknown_bound` for the box, and any
+    /// finite number for the diagnostics.
     unknown_bound: ?f64 = null,
 };
 
@@ -116,543 +194,87 @@ pub const Input = struct {
 /// reports a cascade.
 pub const errors_max: u8 = 64;
 
-/// Rounds a `loop` joins exactly before it widens.
-const widen_after: u32 = 3;
-/// The empty interval: a block nothing leaves, a slot no path reaches.
-const empty: Interval = .{ .lo = math.inf(f64), .hi = -math.inf(f64) };
-const bottom: Abstract = .{ .iv = empty, .finite = true };
-const none: u32 = std.math.maxInt(u32);
+/// The probes' half of the box when the caller gives no bound, in volts or
+/// amperes: a physically generous envelope that still proves most roots
+/// (the header's table). A larger one proves fewer roots; a smaller one
+/// sends more evaluations to the strict body.
+pub const default_unknown_bound: f64 = 10;
 
-/// A guard fact: "instruction `inst` lies in `iv` here".
-const Fact = struct { inst: u32, iv: Interval };
-/// What one fact push overwrote: class `rep`'s fact interval.
-const Saved = struct { rep: u32, prev: Interval };
-/// A `block` or `loop` around the walk: the join of what reaches its exit
-/// (a block's `br`s) or its head again (a loop's `repeat`s).
-const Frame = struct { inst: Inst.Index, reached: bool = false, slots: []Abstract, result: Abstract = bottom };
-/// A congruence class key: a tag over its operands' classes.
-const Key = struct { tag: Inst.Tag, a: u32, b: u32 = 0, c: u32 = 0 };
-
-const Walk = struct {
-    arena: Allocator,
-    air: Air,
-    ip: *const InternPool,
-    in: Input,
-    tags: []const Inst.Tag,
-    datas: []const Inst.Data,
-    f: *Float,
-    /// Per instruction: why its last domain check was not proven, and the
-    /// interval of the operand its message describes.
-    why: []domains.Why,
-    dom_iv: []Interval,
-    /// Per instruction: an `alloc`'s slot; per slot its state here and its
-    /// version (bumped by every write); per `load` the version it read.
-    slot_of: []u32,
-    state: []Abstract,
-    ver: []u32,
-    load_ver: []u32,
-    next_ver: u32 = 0,
-    /// The walk's point can run (false past a `br` or in a provably untaken arm).
-    reached: bool = true,
-    /// Domain violations are reported here (false in a provably untaken arm, §4.2.3).
-    active: bool = true,
-    /// Per instruction: its class representative; per representative the
-    /// meet of the active facts on the class; the undo log.
-    rep: []u32,
-    civ: []Interval,
-    classes: std.AutoHashMapUnmanaged(Key, u32) = .empty,
-    saved: std.ArrayList(Saved) = .empty,
-    frames: std.ArrayList(Frame) = .empty,
-    probe: Abstract,
-
-    fn init(arena: Allocator, air: Air, ip: *const InternPool, in: Input, f: *Float) Allocator.Error!Walk {
-        const n = air.instructions.len;
-        const tags = air.instructions.items(.tag);
-        const slot_of = try arena.alloc(u32, n);
-        var slots: u32 = 0;
-        for (tags, slot_of) |tag, *s| {
-            s.* = if (tag == .alloc) slots else none;
-            slots += @intFromBool(tag == .alloc);
-        }
-        const bound: ?f64 = if (in.unknown_bound) |b| (if (math.isNan(b)) null else @abs(b)) else null;
-        const w: Walk = .{
-            .arena = arena,
-            .air = air,
-            .ip = ip,
-            .in = in,
-            .tags = tags,
-            .datas = air.instructions.items(.data),
-            .f = f,
-            .why = try arena.alloc(domains.Why, n),
-            .dom_iv = try arena.alloc(Interval, n),
-            .slot_of = slot_of,
-            .state = try arena.alloc(Abstract, slots),
-            .ver = try arena.alloc(u32, slots),
-            .load_ver = try arena.alloc(u32, n),
-            .rep = try arena.alloc(u32, n),
-            .civ = try arena.alloc(Interval, n),
-            .probe = .{ .iv = if (bound) |b| .{ .lo = -b, .hi = b } else .top, .finite = true },
-        };
-        @memset(w.why, .none);
-        @memset(w.state, bottom);
-        @memset(w.ver, 0);
-        @memset(w.civ, .top);
-        for (w.rep, 0..) |*r, i| r.* = @intCast(i);
-        assert(w.state.len == slots);
-        return w;
-    }
-
-    /// Walks `insts`, a body ending in its noreturn instruction.
-    fn body(w: *Walk, insts: []const Inst.Index, depth: u32) Allocator.Error!void {
-        assert(depth <= Air.nesting_max);
-        assert(insts.len != 0);
-        for (insts) |inst| {
-            const i = @backingInt(inst);
-            const data = w.datas[i];
-            switch (w.tags[i]) {
-                .block => {
-                    const x = w.air.extraData(Air.Block, data.ty_pl.payload);
-                    try w.frames.append(w.arena, .{ .inst = inst, .slots = try w.arena.alloc(Abstract, w.state.len) });
-                    try w.body(w.air.body(x.end, x.data.body_len), depth + 1);
-                    const fr = w.frames.pop().?;
-                    w.reached = fr.reached;
-                    if (fr.reached) @memcpy(w.state, fr.slots);
-                    w.define(i, fr.result);
-                },
-                .loop => return w.loop(inst, data, depth),
-                .cond_br => return w.condBr(data, depth),
-                .br => return w.exit(data.br.block_inst, data.br.operand),
-                .repeat => return w.exit(data.repeat.loop_inst, .none),
-                .ret => {
-                    w.reached = false;
-                    return;
-                },
-                .alloc => w.write(i, .{ .iv = .point(0), .finite = true }),
-                .assign => {
-                    const v = w.abs(data.bin_op.rhs);
-                    w.write(@backingInt(data.bin_op.lhs.toIndex().?), v);
-                    w.define(i, v);
-                },
-                else => |tag| { // else: the value tags
-                    var a = w.transfer(i, tag, data);
-                    // An unprovable domain is not an error (§4.3.2); it costs
-                    // the result its finiteness.
-                    if (Air.tag_info.getPtrConst(tag).domain != .all and !w.check(i, tag, data)) a.finite = false;
-                    w.define(i, a);
-                    w.classify(i, tag, data);
-                },
-            }
-        }
-        unreachable; // a well-formed body ends in a noreturn tag
-    }
-
-    /// Joins the walk's state into the frame `br` or `repeat` names.
-    fn exit(w: *Walk, target: Inst.Index, operand: Inst.Ref) void {
-        defer w.reached = false;
-        if (!w.reached) return;
-        var k = w.frames.items.len;
-        const fr = while (k > 0) {
-            k -= 1;
-            if (w.frames.items[k].inst == target) break &w.frames.items[k];
-        } else unreachable; // Verify: a `br` leaves an enclosing block
-        if (operand != .none) fr.result = joinAbs(fr.result, w.abs(operand));
-        if (fr.reached) {
-            for (fr.slots, w.state) |*s, x| s.* = joinAbs(s.*, x);
-        } else @memcpy(fr.slots, w.state);
-        fr.reached = true;
-    }
-
-    /// Walks both bodies, each under its edge's facts and from the state
-    /// before the branch. A provably untaken body is walked unreached, with
-    /// its domains off (§4.2.3).
-    fn condBr(w: *Walk, data: Inst.Data, depth: u32) Allocator.Error!void {
-        const x = w.air.extraData(Air.CondBr, data.pl_op.payload);
-        const cond = data.pl_op.operand;
-        const c = w.abs(cond).iv;
-        const before = try w.arena.dupe(Abstract, w.state);
-        const reached = w.reached;
-        const active = w.active;
-        defer w.active = active;
-        try w.arm(w.air.body(x.end, x.data.then_body_len), cond, true, c.lo == 0 and c.hi == 0, depth);
-        @memcpy(w.state, before);
-        w.reached = reached;
-        w.active = active;
-        try w.arm(w.air.body(x.end + x.data.then_body_len, x.data.else_body_len), cond, false, c.excludesZero(), depth);
-        assert(!w.reached);
-    }
-
-    fn arm(w: *Walk, insts: []const Inst.Index, cond: Inst.Ref, taken: bool, dead: bool, depth: u32) Allocator.Error!void {
-        const mark = w.saved.items.len;
-        if (dead) {
-            w.reached = false;
-            w.active = false;
-        }
-        var buf: [2]Fact = undefined;
-        try w.pushFacts(w.condFacts(cond, taken, &buf));
-        try w.body(insts, depth + 1);
-        w.popFacts(mark);
-        assert(w.saved.items.len == mark);
-    }
-
-    /// Iterates the body from the join of the entry state and every
-    /// `repeat`'s, widening after `widen_after` rounds, until the head stops
-    /// growing. The last round's tables are the fixpoint's.
-    fn loop(w: *Walk, inst: Inst.Index, data: Inst.Data, depth: u32) Allocator.Error!void {
-        const x = w.air.extraData(Air.Block, data.ty_pl.payload);
-        const insts = w.air.body(x.end, x.data.body_len);
-        const entry = w.reached;
-        const head = try w.arena.dupe(Abstract, w.state);
-        try w.frames.append(w.arena, .{ .inst = inst, .slots = try w.arena.alloc(Abstract, w.state.len) });
-        const k = w.frames.items.len - 1;
-        // Bound: past `widen_after`, a changing round moves one of six
-        // one-way features of one slot (each end to infinity, the two
-        // openness flags, `nonzero`, `finite`).
-        const rounds_max = widen_after + 6 * @as(u32, @intCast(head.len)) + 1;
-        var rounds: u32 = 0;
-        while (true) : (rounds += 1) {
-            assert(rounds <= rounds_max);
-            @memcpy(w.state, head);
-            w.reached = entry;
-            w.frames.items[k].reached = false;
-            try w.body(insts, depth + 1);
-            const fr = w.frames.items[k];
-            if (!fr.reached) break;
-            var changed = false;
-            for (head, fr.slots) |*h, back| {
-                const j = joinAbs(h.*, back);
-                if (j.finite == h.finite and std.meta.eql(j.iv, h.iv)) continue;
-                changed = true;
-                h.* = if (rounds < widen_after) j else .{ .iv = h.iv.widen(j.iv), .finite = j.finite };
-            }
-            if (!changed) break;
-        }
-        _ = w.frames.pop();
-        w.reached = false;
-    }
-
-    /// Returns the abstract result of value tag `tag` before its domain.
-    fn transfer(w: *Walk, i: u32, tag: Inst.Tag, data: Inst.Data) Abstract {
-        const info = Air.tag_info.getPtrConst(tag);
-        return switch (tag) {
-            .arg => blk: {
-                const int = data.ty_index.ty == InternPool.Index.integer_type;
-                const p: []const Interval.Range = if (data.ty_index.index < w.in.params.len) w.in.params[data.ty_index.index].ranges else &.{};
-                const iv = Interval.fromRanges(p, int);
-                break :blk .{ .iv = iv, .finite = int or iv.excludesInf() };
-            },
-            .probe => w.probe,
-            .load => blk: {
-                const s = w.slot_of[@backingInt(data.un_op.toIndex().?)];
-                w.load_ver[i] = w.ver[s];
-                break :blk w.state[s];
-            },
-            // §4.2.12: the arm the condition picks, or both.
-            .select => blk: {
-                const bin = w.air.extraData(Air.Bin, data.pl_op.payload).data;
-                const c = w.abs(data.pl_op.operand).iv;
-                if (c.excludesZero()) break :blk w.abs(bin.lhs);
-                if (c.lo == 0 and c.hi == 0) break :blk w.abs(bin.rhs);
-                break :blk joinAbs(w.abs(bin.lhs), w.abs(bin.rhs));
-            },
-            // §3.2.2: an array version's interval covers every element; a
-            // fresh one is zero, an index outside it reads zero.
-            .anew => .{ .iv = .point(0), .finite = true },
-            .fload, .iload => blk: {
-                const arr = w.abs(data.bin_op.lhs);
-                break :blk .{ .iv = arr.iv.join(.point(0)), .finite = arr.finite or tag == .iload };
-            },
-            .store => blk: {
-                const bin = w.air.extraData(Air.Bin, data.pl_op.payload).data;
-                break :blk joinAbs(w.abs(data.pl_op.operand), w.abs(bin.rhs));
-            },
-            .call => blk: {
-                const x = w.air.extraData(Air.Call, data.ty_pl.payload);
-                const facts: Air.CallFacts = if (x.data.callee < w.in.calls.len) w.in.calls[x.data.callee] else .{};
-                const arg: Abstract = if (x.data.args_len == 1) w.abs(@fromBackingInt(w.air.extra[x.end])) else .{ .iv = .top, .finite = false };
-                break :blk Interval.call(facts.range, arg);
-            },
-            .opt_barrier, .dstop => w.abs(data.un_op),
-            .if_cast => .{ .iv = w.abs(data.un_op).iv, .finite = true },
-            // §4.2.1.1: NaN converts to 0.
-            .fi_cast => blk: {
-                const a = w.abs(data.un_op);
-                const iv = Interval.integer(.fi_cast, a.iv, .top);
-                break :blk .{ .iv = if (a.finite) iv else iv.join(.point(0)), .finite = true };
-            },
-            // §4.2.5/§4.2.7: decided where the operands' intervals decide it.
-            .flt, .fgt, .fle, .fge, .feq, .fne, .ilt, .igt, .ile, .ige, .ieq, .ine => .{ .iv = Interval.compare(
-                info.rel.?,
-                w.abs(data.bin_op.lhs).iv,
-                w.abs(data.bin_op.rhs).iv,
-                w.nanFree(data.bin_op.lhs) and w.nanFree(data.bin_op.rhs),
-                info.operand == .int,
-            ), .finite = true },
-            .lognot => blk: {
-                const x = w.abs(data.un_op).iv;
-                break :blk .{ .iv = if (x.excludesZero()) .point(0) else if (x.lo == 0 and x.hi == 0) .point(1) else .{ .lo = 0, .hi = 1 }, .finite = true };
-            },
-            else => switch (info.class) { // else: the rest by class
-                .un_op => if (info.int)
-                    .{ .iv = Interval.integer(tag, w.abs(data.un_op).iv, .top), .finite = true }
-                else
-                    Interval.unary(tag, w.abs(data.un_op)),
-                .bin_op => if (info.int)
-                    .{ .iv = Interval.integer(tag, w.abs(data.bin_op.lhs).iv, w.abs(data.bin_op.rhs).iv), .finite = true }
-                else
-                    Interval.binary(tag, w.abs(data.bin_op.lhs), w.abs(data.bin_op.rhs)),
-                .pl_op, .ty_pl, .ty, .ty_index, .br, .repeat => unreachable, // each has its prong above or in `body`
-            },
-        };
-    }
-
-    /// Checks `i`'s domain; returns whether it is proven, recording the
-    /// outcome for `report`.
-    fn check(w: *Walk, i: u32, tag: Inst.Tag, data: Inst.Data) bool {
-        const unary_tag = Air.tag_info.getPtrConst(tag).class == .un_op;
-        const x = w.abs(if (unary_tag) data.un_op else data.bin_op.lhs).iv;
-        const y = if (unary_tag) Interval.top else w.abs(data.bin_op.rhs).iv;
-        const int_y = !unary_tag and w.integral(data.bin_op.rhs);
-        const c = domains.check(tag, x, y, int_y);
-        w.f.domain[i] = if (w.active) c.state else .open;
-        w.why[i] = if (w.active) c.why else .none;
-        if (c.why != .none) w.dom_iv[i] = if (domains.text(c.why).operand == 0) x else y;
-        return w.active and c.state == .proven;
-    }
-
-    /// Whether `ref` is provably an integer value (Table 4-14's "integer y").
-    fn integral(w: *const Walk, ref: Inst.Ref) bool {
-        if (ref.toIndex()) |i| {
-            const tag = w.tags[@backingInt(i)];
-            return tag == .if_cast or w.air.typeOfIndex(w.ip, i) == InternPool.Index.integer_type;
-        }
-        return switch (w.ip.indexToKey(ref.toInterned().?)) {
-            .float => |c| math.isFinite(c) and c == @trunc(c),
-            .int => true,
-            .undef, .str, .simple_type, .int_type, .array_type, .nature, .discipline => false,
-        };
-    }
-
-    /// Returns `ref`'s abstract value here: its own, met with its class's facts.
-    fn abs(w: *const Walk, ref: Inst.Ref) Abstract {
-        if (ref.toIndex()) |inst| {
-            const i = @backingInt(inst);
-            return .{ .iv = w.f.iv[i].meet(w.civ[w.rep[i]]), .finite = w.f.finite[i] };
-        }
-        return switch (w.ip.indexToKey(ref.toInterned().?)) {
-            .float => |c| .{ .iv = .point(c), .finite = math.isFinite(c) },
-            .int => |int| switch (int.storage) {
-                .small => |v| .{ .iv = .point(@floatFromInt(v)), .finite = true },
-                .big => .{ .iv = .top, .finite = true },
-            },
-            .str => .{ .iv = .top, .finite = true },
-            .undef => .{ .iv = .top, .finite = false },
-            .simple_type, .int_type, .array_type, .nature, .discipline => unreachable, // Verify: an operand is a value
-        };
-    }
-
-    fn define(w: *Walk, i: u32, a: Abstract) void {
-        w.f.iv[i] = a.iv;
-        w.f.finite[i] = a.finite;
-    }
-
-    /// Writes slot `alloc`'s state; a new version, so no older `load` speaks for it.
-    fn write(w: *Walk, alloc: u32, a: Abstract) void {
-        const s = w.slot_of[alloc];
-        assert(s != none);
-        w.state[s] = a;
-        w.next_ver += 1;
-        w.ver[s] = w.next_ver;
-    }
-
-    /// Puts `i` in the class of the first instruction with its key; a tag
-    /// whose value is not a function of its operands stays alone.
-    fn classify(w: *Walk, i: u32, tag: Inst.Tag, data: Inst.Data) void {
-        const key: Key = switch (tag) {
-            .call, .opt_barrier, .anew, .store, .path_prev, .path_acc => return,
-            .arg, .probe => .{ .tag = tag, .a = data.ty_index.index, .b = @backingInt(data.ty_index.ty) },
-            .load => .{ .tag = tag, .a = w.slot_of[@backingInt(data.un_op.toIndex().?)], .b = w.load_ver[i] },
-            .select => blk: {
-                const bin = w.air.extraData(Air.Bin, data.pl_op.payload).data;
-                break :blk .{ .tag = tag, .a = w.canon(data.pl_op.operand), .b = w.canon(bin.lhs), .c = w.canon(bin.rhs) };
-            },
-            else => switch (Air.tag_info.getPtrConst(tag).class) { // else: the rest are keyed by class
-                .un_op => .{ .tag = tag, .a = w.canon(data.un_op) },
-                .bin_op => .{ .tag = tag, .a = w.canon(data.bin_op.lhs), .b = w.canon(data.bin_op.rhs) },
-                .pl_op, .ty_pl, .ty, .ty_index, .br, .repeat => unreachable, // `body` keeps the rest
-            },
-        };
-        // ponytail: a failed insert leaves `i` alone, which is sound.
-        const gop = w.classes.getOrPut(w.arena, key) catch return;
-        if (!gop.found_existing) gop.value_ptr.* = i;
-        w.rep[i] = gop.value_ptr.*;
-        assert(w.rep[w.rep[i]] == w.rep[i]);
-    }
-
-    fn canon(w: *const Walk, ref: Inst.Ref) u32 {
-        const i = ref.toIndex() orelse return @backingInt(ref);
-        return @backingInt(Inst.Ref.fromIndex(@fromBackingInt(w.rep[@backingInt(i)])));
-    }
-
-    /// Returns the facts taking (or not) a branch on `cond` gives, in `buf`:
-    /// `!` and `p != 0` over a predicate peel, a bare `x != 0` gives the
-    /// §4.2.4 hole, a comparison bounds both sides (§4.2.5, §4.2.7).
-    fn condFacts(w: *const Walk, cond: Inst.Ref, taken: bool, buf: *[2]Fact) []const Fact {
-        var c = cond;
-        var t = taken;
-        // Bound: each hop moves to an operand defined before its user.
-        for (0..w.tags.len + 1) |_| {
-            const i = @backingInt(c.toIndex() orelse return buf[0..0]);
-            const tag = w.tags[i];
-            const data = w.datas[i];
-            if (tag == .lognot) {
-                c = data.un_op;
-                t = !t;
-                continue;
-            }
-            const rel = Air.tag_info.getPtrConst(tag).rel orelse return buf[0..0];
-            if (rel == .eq or rel == .ne) {
-                const zl = w.isZero(data.bin_op.lhs);
-                const other = if (w.isZero(data.bin_op.rhs)) data.bin_op.lhs else if (zl) data.bin_op.rhs else null;
-                if (other) |o| {
-                    const flip = rel == .eq;
-                    if (o.toIndex()) |oi| if (Air.tag_info.getPtrConst(w.tags[@backingInt(oi)]).predicate) {
-                        c = o;
-                        t = t != flip;
-                        continue;
-                    };
-                    if (t == flip) return buf[0..0];
-                    buf[0] = .{ .inst = @backingInt(o.toIndex() orelse return buf[0..0]), .iv = .{ .nonzero = true } };
-                    return buf[0..1];
-                }
-            }
-            return w.relation(tag, rel, data, t, buf);
-        }
-        unreachable; // the hop bound
-    }
-
-    /// The facts of comparison `lhs REL rhs` that went `taken`, as `lo < hi`
-    /// or `lo <= hi` or `a == b`. A false ordering says the reverse only
-    /// between numbers (every ordering against NaN is false); an integer's
-    /// facts close their ends (`@floatFromInt` is monotone, not injective).
-    fn relation(w: *const Walk, tag: Inst.Tag, rel: Air.Relation, data: Inst.Data, taken: bool, buf: *[2]Fact) []const Fact {
-        const ordering = rel != .eq and rel != .ne;
-        if (!taken and ordering and !(w.nanFree(data.bin_op.lhs) and w.nanFree(data.bin_op.rhs))) return buf[0..0];
-        const Norm = enum { lt, le, eq };
-        const norm: Norm, const swap: bool = switch (rel) {
-            .lt => if (taken) .{ .lt, false } else .{ .le, true },
-            .le => if (taken) .{ .le, false } else .{ .lt, true },
-            .gt => if (taken) .{ .lt, true } else .{ .le, false },
-            .ge => if (taken) .{ .le, true } else .{ .lt, false },
-            .eq => if (taken) .{ .eq, false } else return buf[0..0],
-            .ne => if (taken) return buf[0..0] else .{ .eq, false },
-        };
-        const lo_ref = if (swap) data.bin_op.rhs else data.bin_op.lhs;
-        const hi_ref = if (swap) data.bin_op.lhs else data.bin_op.rhs;
-        const a = w.abs(lo_ref).iv;
-        const b = w.abs(hi_ref).iv;
-        const strict = norm == .lt and Air.tag_info.getPtrConst(tag).operand == .real;
-        const real = Air.tag_info.getPtrConst(tag).operand == .real;
-        const lo_fact: Interval = if (norm == .eq) b else .{ .hi = b.hi, .hi_open = strict or (real and b.hi_open) };
-        const hi_fact: Interval = if (norm == .eq) a else .{ .lo = a.lo, .lo_open = strict or (real and a.lo_open) };
-        var n: usize = 0;
-        for ([_]Inst.Ref{ lo_ref, hi_ref }, [_]Interval{ lo_fact, hi_fact }) |ref, iv| {
-            const i = ref.toIndex() orelse continue;
-            buf[n] = .{ .inst = @backingInt(i), .iv = iv };
-            n += 1;
-        }
-        assert(n <= buf.len);
-        return buf[0..n];
-    }
-
-    fn isZero(w: *const Walk, ref: Inst.Ref) bool {
-        const index = ref.toInterned() orelse return false;
-        return switch (w.ip.indexToKey(index)) {
-            .float => |c| c == 0,
-            .int => |int| int.storage == .small and int.storage.small == 0,
-            .undef, .str, .simple_type, .int_type, .array_type, .nature, .discipline => false,
-        };
-    }
-
-    /// Whether `ref` is never NaN: a number constant, a parameter or a probe
-    /// (finite or ±inf by the host contract), an integer, or a value proven finite.
-    fn nanFree(w: *const Walk, ref: Inst.Ref) bool {
-        const inst = ref.toIndex() orelse return switch (w.ip.indexToKey(ref.toInterned().?)) {
-            .float => |c| !math.isNan(c),
-            .int, .str => true,
-            .undef, .simple_type, .int_type, .array_type, .nature, .discipline => false,
-        };
-        const i = @backingInt(inst);
-        const tag = w.tags[i];
-        return tag == .arg or tag == .probe or Air.tag_info.getPtrConst(tag).int or w.f.finite[i];
-    }
-
-    /// Applies facts to their classes, and a fact on a `load` that still
-    /// reads its slot's current version to the slot.
-    fn pushFacts(w: *Walk, facts: []const Fact) Allocator.Error!void {
-        const before = w.saved.items.len;
-        for (facts) |fa| {
-            const r = w.rep[fa.inst];
-            try w.saved.append(w.arena, .{ .rep = r, .prev = w.civ[r] });
-            w.civ[r] = w.civ[r].meet(fa.iv);
-            if (w.tags[fa.inst] != .load) continue;
-            const s = w.slot_of[@backingInt(w.datas[fa.inst].un_op.toIndex().?)];
-            if (w.ver[s] == w.load_ver[fa.inst]) w.state[s].iv = w.state[s].iv.meet(fa.iv);
-        }
-        assert(w.saved.items.len == before + facts.len);
-    }
-
-    /// Undoes every push after `mark`, newest first.
-    fn popFacts(w: *Walk, mark: usize) void {
-        assert(mark <= w.saved.items.len);
-        while (w.saved.items.len > mark) {
-            const s = w.saved.pop().?;
-            w.civ[s.rep] = s.prev;
-        }
-    }
-};
-
-/// Walks `air` once, checks every domain, reports into `wip` and rates
-/// every root. Scratch lives in an arena on `gpa` that dies before return.
-/// Asserts that `air` is well formed (`Air.Verify`).
+/// Walks `air` twice (diagnostics, then verdict), checks every domain,
+/// reports into `wip` and rates every root. Scratch lives in an arena on
+/// `gpa` that dies before return. Asserts that `air` is well formed
+/// (`Air.Verify`).
 pub fn analyze(gpa: Allocator, air: Air, ip: *const InternPool, in: Input, wip: *Diag.Wip) Allocator.Error!Float {
     var scratch: std.heap.ArenaAllocator = .init(gpa);
     defer scratch.deinit();
     const arena = scratch.allocator();
     const n = air.instructions.len;
-    var f: Float = .{ .iv = &.{}, .finite = &.{}, .domain = &.{}, .modes = &.{}, .error_count = 0 };
-    errdefer f.deinit(gpa);
-    f.iv = try gpa.alloc(Interval, n);
-    f.finite = try gpa.alloc(bool, n);
-    f.domain = try gpa.alloc(Domain, n);
-    f.modes = try gpa.alloc(Mode, in.roots.len);
-    @memset(f.iv, empty);
-    @memset(f.finite, false);
-    @memset(f.domain, .none);
+    const bound: ?f64 = if (in.unknown_bound) |b| (if (math.isNan(b)) null else @abs(b)) else null;
+    const inf = math.inf(f64);
 
-    var w = try Walk.init(arena, air, ip, in, &f);
+    // The diagnostics' walk, into scratch tables: an error must hold for
+    // every legal input, never only inside the default box.
+    var d = try alloc(arena, n, in.roots.len);
+    var wd = try Walk.init(arena, air, ip, in, .{
+        .probe = if (bound) |b| .{ .lo = -b, .hi = b } else .{ .lo = -inf, .hi = inf, .lo_open = true, .hi_open = true },
+        .whole_nan = false,
+    }, &d);
+    try wd.body(air.mainBody(), 0);
+    try rating.report(wip, air, ip, in, &d, wd.why, wd.dom_iv);
+
+    var f = try alloc(gpa, n, in.roots.len);
+    errdefer f.deinit(gpa);
+    f.error_count = d.error_count;
+    const b = bound orelse default_unknown_bound;
+    var w = try Walk.init(arena, air, ip, in, .{ .probe = .{ .lo = -b, .hi = b }, .whole_nan = true }, &f);
     try w.body(air.mainBody(), 0);
-    assert(w.saved.items.len == 0); // every fact popped
-    assert(w.frames.items.len == 0);
-    try verdict.report(wip, air, ip, in, &f, w.why, w.dom_iv);
-    try verdict.rate(arena, air, ip, in, &f, wip);
-    if (f.error_count != 0) for (f.modes) |m| assert(m == .strict);
+    try rating.rate(gpa, arena, air, ip, in, &f, wip);
+    if (f.error_count != 0) for (f.verdict.modes) |m| assert(m == .strict);
+    assert(f.verdict.guard_start[in.roots.len] == f.verdict.guards.len);
     return f;
+}
+
+/// Returns whether every value instruction `i` defines is a finite double:
+/// never NaN, ±inf no member of its interval (`Interval.Abstract.finite`).
+pub fn finite(f: Float, i: u32) bool {
+    const r = (Abstract{ .iv = f.iv[i], .nan = f.nan[i] }).finite();
+    if (r) assert(!f.nan[i]);
+    return r;
 }
 
 /// Frees every table.
 pub fn deinit(f: *Float, gpa: Allocator) void {
     assert(f.error_count <= errors_max);
     gpa.free(f.iv);
-    gpa.free(f.finite);
+    gpa.free(f.nan);
     gpa.free(f.domain);
-    gpa.free(f.modes);
+    gpa.free(f.verdict.modes);
+    gpa.free(f.verdict.guard_start);
+    gpa.free(f.verdict.guards);
     f.* = undefined;
 }
 
 // ---- private ----
 
-fn joinAbs(a: Abstract, b: Abstract) Abstract {
-    return .{ .iv = a.iv.join(b.iv), .finite = a.finite and b.finite };
+/// Returns tables for `n` instructions and `roots` roots, every value
+/// unwritten (empty and maybe NaN) and every box empty.
+fn alloc(a: Allocator, n: usize, roots: usize) Allocator.Error!Float {
+    const iv = try a.alloc(Interval, n);
+    errdefer a.free(iv);
+    const nan = try a.alloc(bool, n);
+    errdefer a.free(nan);
+    const domain = try a.alloc(Domain, n);
+    errdefer a.free(domain);
+    const modes = try a.alloc(Mode, roots);
+    errdefer a.free(modes);
+    const guard_start = try a.alloc(u32, roots + 1);
+    @memset(iv, Walk.empty);
+    @memset(nan, true);
+    @memset(domain, .none);
+    @memset(modes, .strict);
+    @memset(guard_start, 0);
+    assert(iv.len == n);
+    return .{ .iv = iv, .nan = nan, .domain = domain, .verdict = .{ .modes = modes, .guard_start = guard_start, .guards = &.{} }, .error_count = 0 };
 }
 
 test Mode {
@@ -665,5 +287,6 @@ test Mode {
 
 test {
     _ = domains;
-    _ = verdict;
+    _ = rating;
+    _ = Walk;
 }

@@ -3,18 +3,25 @@
 //! differential against the old `src/prove` exists until Sema does.
 //!
 //! - Float, by falsification (the old `src/prove/falsify.zig` is the
-//!   model): over `programs` programs and `points` samples each, every value
-//!   a run defines lies in the interval `Float` gave its instruction; an
-//!   instruction `Float` calls finite never defines inf or NaN; a root rated
-//!   `.optimized` sees no inf or NaN on its slice, which the oracle finds on
-//!   its own (operands, a loaded slot's writes, a block's `br`s, the
-//!   conditions around each); an instruction `Float` reports outside its
-//!   domain never runs inside it. Rule 3 (`+ - * /`, `%`, `hypot` on finite
-//!   operands do not overflow) is the host contract: a run where one does is
-//!   dropped whole, as falsify.zig drops it.
+//!   model), dropping nothing: over `programs` programs and `points`
+//!   samples each, drawn inside and outside the input box (each parameter's
+//!   declared range, `[-bound, bound]` for each probe, `gen.admits`) and
+//!   reaching the overflowing magnitudes, ±inf and NaN. At a point inside
+//!   the box, every non-NaN value a run defines lies in the interval
+//!   `Float` gave its instruction, an instruction `Float` calls finite
+//!   never defines inf or NaN, and one it reports outside its domain never
+//!   runs inside it. At a point inside a root's guard box (the box
+//!   `Float.Verdict` hands codegen, which checks it at run time), a root
+//!   rated `.optimized` sees no inf or NaN on its slice, which the oracle
+//!   finds on its own (operands, a loaded slot's writes, a block's `br`s,
+//!   the conditions around each). A point outside makes no claim (the strict
+//!   body runs there) but is still run.
 //! - Each oracle goes red on a planted bug first: a Float that calls every
 //!   value finite and every root `.optimized`, one whose intervals are a
-//!   point, one that calls every domain violated.
+//!   point, one that calls every domain violated; the old prover's overflow
+//!   contract (`+ - * /`, `%`, `hypot` on finite operands stay finite), an
+//!   interval one ulp short of its computed ends (rounded inward, not
+//!   outward), and a guard box wider than the one the proof assumed.
 //! - Legalize, by a metamorphic pair: each program and its `.pure` and
 //!   `.speculate` conversions give the same bits (any NaN equals any NaN)
 //!   or the same error at every sample. Planted: a conversion whose
@@ -50,14 +57,16 @@ const Legalize = Air.Legalize;
 const Setup = Air.Setup;
 const Interval = Air.Interval;
 
-const programs = 10_000;
-const points = 1_000;
+/// `-Dfull-oracles`: the nightly's sweep; else the merge tier's.
+const full = @import("rewrite_options").full_oracles;
+const programs: u32 = if (full) 10_000 else 2_000;
+const points: u32 = if (full) 1_000 else 200;
 /// The planted bugs run on fewer: they only have to go red.
 const planted_programs = 200;
 const planted_points = 50;
 /// The Setup sweeps record a sequence per invariant value per run: the
 /// costliest oracle, so fewer samples per program.
-const setup_points = 200;
+const setup_points: u32 = if (full) 200 else 50;
 const seed: u64 = 0xA1F0_5EED;
 const loop_cap = 1_000;
 /// Failures printed per oracle kind, one per tag.
@@ -78,7 +87,14 @@ const Kind = enum { interval, finite, slice, violation };
 const Stats = struct {
     programs: u64 = 0,
     runs: u64 = 0,
-    dropped: u64 = 0,
+    /// Runs inside the whole input box, and inside the root's guard box.
+    inside: u64 = 0,
+    inside_root: u64 = 0,
+    /// Runs where `+ - * /`, `%` or `hypot` made ±inf or NaN from finite
+    /// operands (the old oracle dropped them), and those of them inside the
+    /// root's guard box.
+    overflowed: u64 = 0,
+    overflowed_inside_root: u64 = 0,
     optimized: u64 = 0,
     failed: std.EnumArray(Kind, u64) = .initFill(0),
     /// The tags an example was printed for, per kind: one example each.
@@ -126,6 +142,10 @@ const Watch = struct {
     slice: []const bool,
     /// Per instruction: its value in this run so far, for operand reads.
     last: []Value,
+    /// The point lies inside the whole input box: the per-instruction
+    /// claims hold. Inside the root's guard box: the slice claim holds.
+    inside: bool,
+    inside_root: bool,
     overflow: bool = false,
     failure: ?struct { kind: Kind, inst: u32, value: f64 } = null,
 
@@ -141,13 +161,13 @@ const Watch = struct {
         const tag = w.air.instructions.items(.tag)[i];
         if (v == .real and !math.isFinite(x) and rule3(tag) and w.operandsFinite(i)) w.overflow = true;
         if (w.failure != null) return;
-        const kind: ?Kind = if (!math.isNan(x) and !w.claims.iv[i].contains(x))
+        const kind: ?Kind = if (w.inside and !math.isNan(x) and !w.claims.iv[i].contains(x))
             .interval
-        else if (w.claims.finite[i] and !math.isFinite(x))
+        else if (w.inside and w.claims.finite[i] and !math.isFinite(x))
             .finite
-        else if (w.claims.optimized and w.slice[i] and !math.isFinite(x))
+        else if (w.inside_root and w.claims.optimized and w.slice[i] and !math.isFinite(x))
             .slice
-        else if (w.claims.domain[i] == .violated and w.inDomain(i))
+        else if (w.inside and w.claims.domain[i] == .violated and w.inDomain(i))
             .violation
         else
             null;
@@ -197,7 +217,7 @@ const Watch = struct {
 
 // ---- private ----
 
-/// The tags rule 3 covers.
+/// The tags the old prover's overflow contract (its rule 3) covered.
 fn rule3(tag: Inst.Tag) bool {
     return switch (tag) {
         .fadd, .fsub, .fmul, .fdiv, .fmod, .hypot => true,
@@ -283,8 +303,9 @@ fn parents(air: Air, insts: []const Inst.Index, parent: u32, out: []u32) !void {
     }
 }
 
-/// Runs `n_points` samples of `p` against `claims`, adding to `stats`.
-fn falsify(gpa: Allocator, ip: *const InternPool, p: *const gen.Program, claims: Claims, slice: []const bool, r: std.Random, n_points: u32, stats: *Stats) !void {
+/// Runs `n_points` samples of `p` against `claims`, adding to `stats`;
+/// `bound` is the probes' half of the input box.
+fn falsify(gpa: Allocator, ip: *const InternPool, p: *const gen.Program, claims: Claims, slice: []const bool, bound: f64, r: std.Random, n_points: u32, stats: *Stats) !void {
     var run_arena: std.heap.ArenaAllocator = .init(gpa);
     defer run_arena.deinit();
     const last = try gpa.alloc(Value, p.air.instructions.len);
@@ -293,17 +314,23 @@ fn falsify(gpa: Allocator, ip: *const InternPool, p: *const gen.Program, claims:
     var probes: [gen.probes_n]f64 = undefined;
     for (0..n_points) |_| {
         _ = run_arena.reset(.retain_capacity);
-        gen.sample(p, r, &args, &probes);
-        var w: Watch = .{ .air = p.air, .ip = ip, .claims = claims, .slice = slice, .last = last };
+        gen.sampleBox(p, r, bound, &args, &probes);
+        const inside = for (args, p.shapes) |a, s| {
+            if (!gen.admits(s, a.real)) break false;
+        } else for (probes) |x| {
+            if (!(@abs(x) <= bound)) break false;
+        } else true;
+        const inside_root = inside;
+        var w: Watch = .{ .air = p.air, .ip = ip, .claims = claims, .slice = slice, .last = last, .inside = inside, .inside_root = inside_root };
         _ = interp.run(run_arena.allocator(), p.air, ip, .{ .args = &args, .probes = &probes, .loop_cap = loop_cap, .observe = .{ .ctx = &w, .seen = Watch.seen } }) catch |e| switch (e) {
             error.NoValue, error.LoopCap => {},
             error.Unsupported, error.OutOfMemory => return e,
         };
         stats.runs += 1;
-        if (w.overflow) {
-            stats.dropped += 1;
-            continue;
-        }
+        stats.inside += @intFromBool(inside);
+        stats.inside_root += @intFromBool(inside_root);
+        stats.overflowed += @intFromBool(w.overflow);
+        stats.overflowed_inside_root += @intFromBool(w.overflow and inside_root);
         const f = w.failure orelse continue;
         stats.failed.getPtr(f.kind).* += 1;
         const printed = stats.printed.getPtr(f.kind);
@@ -362,7 +389,7 @@ fn sweep(gpa: Allocator, plant: Plant, n_programs: u32, n_points: u32) !Stats {
         }
         stats.programs += 1;
         stats.optimized += @intFromBool(claims.optimized);
-        try falsify(gpa, &ip, &p, claims, try oracleSlice(a, p.air, p.root), r, n_points, &stats);
+        try falsify(gpa, &ip, &p, claims, try oracleSlice(a, p.air, p.root), p.bound orelse 1e3, r, n_points, &stats);
     }
     return stats;
 }
@@ -565,7 +592,7 @@ fn heldSweep(gpa: Allocator, plant: bool, n_programs: u32, n_points: u32) !Setup
 }
 
 fn report(name: []const u8, s: Stats) void {
-    std.debug.print("air_passes {s}: {d} programs ({d} rated .optimized), {d} runs, {d} dropped (rule 3), failures: interval {d}, finite {d}, slice {d}, violation {d}\n", .{ name, s.programs, s.optimized, s.runs, s.dropped, s.failed.get(.interval), s.failed.get(.finite), s.failed.get(.slice), s.failed.get(.violation) });
+    std.debug.print("air_passes {s}: {d} programs ({d} rated .optimized), {d} runs ({d} inside the box, {d} inside the root's guard box), {d} overflowed ({d} inside the guard box), failures: interval {d}, finite {d}, slice {d}, violation {d}\n", .{ name, s.programs, s.optimized, s.runs, s.inside, s.inside_root, s.overflowed, s.overflowed_inside_root, s.failed.get(.interval), s.failed.get(.finite), s.failed.get(.slice), s.failed.get(.violation) });
 }
 
 test {

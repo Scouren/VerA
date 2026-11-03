@@ -4,7 +4,8 @@
 //! Preprocessor vs lib/frontend's preprocessor), `diff-diag` (vams Diag vs
 //! lib/diag), `diff-air` (Air's interpreter vs src/ir's opcode folds),
 //! `diff-air-passes` (the Air passes against Air's interpreter over
-//! generated programs), `diff-link` (link vs src/zigbuild over the same
+//! generated programs; `-Dfull-oracles` runs the nightly's full sweep),
+//! `diff-link` (link vs src/zigbuild over the same
 //! device builds), `diff-astgen` (vams AstGen/Vir vs the old compiler's
 //! per-file codes and design units), and
 //! `rewrite`, which runs them and the new modules' own tests. All are in
@@ -31,6 +32,9 @@ pub fn add(g: Graph) void {
     const o = b.addOptions();
     o.addOption([]const u8, "fixture_root", pathFromRoot(b, "tests/conformance/tests"));
     o.addOption([]const u8, "repo_root", pathFromRoot(b, "."));
+    // The merge tier runs a generated-program oracle at a size inside its
+    // budget; the nightly passes `-Dfull-oracles` for the whole sweep.
+    o.addOption(bool, "full_oracles", b.option(bool, "full-oracles", "diff-air-passes: the nightly's full sweep (10^4 programs x 10^3 points) instead of the merge tier's") orelse false);
     // `libc`: the root loads libraries (`dynlib` needs glibc on Linux).
     // `emit_zig`: fixtures whose `vera --emit-zig` text the root reads from
     // the directory `rewrite_options.emitted`, as `<stem>.zig`.

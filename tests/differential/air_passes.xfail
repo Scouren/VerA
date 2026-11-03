@@ -4,3 +4,5 @@
 # finite, slice, violation), legalize (bits), setup (invariant), held (pruned).
 # A line whose oracle never fails in that kind fails the run (an unexpected
 # pass); a failure no line names fails it too. Empty: every oracle is clean.
+float finite the merged Float's overflow contract: `+ - * /` on finite operands called finite (1e300 * 1e300 is inf)
+float interval the merged Float takes an unranged parameter NaN-free: a comparison on a NaN parameter is decided as if it were a number

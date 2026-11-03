@@ -436,10 +436,28 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
   `%.2r` of 999.996 as `1000.00` where the device prints `2.2K` and `1.00K`. Spliced device text is
   byte-identical (the file's device-text half is unchanged). `zig build test-printf` runs the oracle alone.
   Needs: an issue number for the changelog line.
-- [ ] Step 0, bug 2: `rt/logic/operators.zig:392` per-call arena on wide `* / % **`.
-- [ ] Step 0, bug 4: `wreal.check` runs twice.
-- [ ] Step 0, bug 5: `elab` module's conformance anonymous imports.
-- [ ] Steps 1-12.
+- [ ] Step 0, bug 2 (deferred to step 11): the per-call arena in `rt/logic/operators.zig:392`.
+  Replacing it with `wide_kernels.zwL` touches 4-state X, divide-by-zero and §5.1.5's power table;
+  it needs a differential oracle against `Integer.Literal` and a benchmark (AGENTS.md: a speed
+  claim cites one). It lands with the runtime merge.
+- [x] Step 0, bug 4: `wreal.check` judged once (`analyze.zig`); elab's copy could report nothing.
+- [x] Step 0, bug 5: the two Annex F fixtures are anonymous imports of `elab`'s test twin only
+  (`build/common.zig` `testRoot`), not of the exported module.
+- [x] Step 3 (part): `zigbuild` split builds keep at most `Options.jobs` `zig` children alive
+  (default: CPU count; was every piece at once, up to 67). Oracle: 1 job and N jobs give the same
+  library bytes (`tests/unit/zigbuild_tests.zig`). `Options.jobs` becomes `Config.thread_limit` (`-j`)
+  when step 3 merges the config types.
+- Step 1 is folded into the steps that rewrite each subsystem: several tests that use
+  `contract/mock_devices.zig` also check private declarations (`lead.region`'s signature helpers,
+  `validate`'s allowlist and shape rules), so a mass move gains little; each step moves its own tests.
+- [ ] Step 2, step 3 (Config merge, read requests, `std.Build.Cache`, one zig runner), steps 4-12.
+
+Notes from this session:
+- The shared `.zig-cache` had manifests whose `o/` outputs were gone (9 `checking cache failed:
+  FileNotFound` steps in untouched modules, identical on reruns). A gate on a fresh cache
+  (`--cache-dir .vera-work/fresh-cache`) was green. Something deletes `o/` entries while keeping `h/`.
+- In zsh, `exit "${PIPESTATUS[0]}"` exits 0 (zsh spells it `pipestatus`, 1-based); gate on `$?`
+  of the command itself, or run the pipeline under bash.
 
 ---
 

@@ -23,7 +23,7 @@
 //! - `pub const Repeat = struct`, `pub const Fork = struct`, `pub const Sample = struct` (`Sample.Mode`)
 //! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
 //! - `pub const Net = struct` (`Net.no_decay`), `pub const Driver = struct` (`Driver.Source`)
-//! - `pub const Path = struct`, `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
+//! - `pub const Tran = struct`, `pub const Path = struct`, `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
 //! - `pub fn words(width: u32) u32`
 //! - `pub fn list(p: *const Program, l: List) []const u32`
 //! - `pub fn extraData(p: *const Program, comptime T: type, at: u32) T`
@@ -145,6 +145,9 @@ pub const Inst = struct {
         copy_out,
         /// §10.3 `disable` of task `a` (a `subs` row): every activation ends.
         disable_task,
+        /// §7.6 controlled switch `a` (a `trans` row) reads its control,
+        /// re-resolves both sides and is armed on the control's operands.
+        switch_ctrl,
     };
 
     // One row per pc, read by every dispatch.
@@ -483,6 +486,22 @@ pub const TimeFormat = struct { units: u32, precision: u32, suffix: List, width:
 /// whose change reports without a comparison (`loose`).
 pub const Monitor = struct { show: u32, compared: List, slots: List, loose: List };
 
+/// §7.6 one pass switch between bit `a_bit` of net `a` and bit `b_bit` of
+/// net `b`: always on (`ctrl` none), or on while row `ctrl` is `on`; its
+/// turn-on and turn-off delays (constant, or rows read when it switches).
+pub const Tran = struct {
+    a: u32,
+    b: u32,
+    a_bit: u32,
+    b_bit: u32,
+    ctrl: u32,
+    on: Bit,
+    resistive: bool,
+    delay: net.Delay,
+    delay_rows: [3]u32,
+    state: net.TranState,
+};
+
 /// IEEE 1364-2005 §14.2 one module path into a net: from bit `src_bit` of
 /// slot `src`, on `edge` (an edge-sensitive path) and while row `cond` is
 /// true (`none`: always; a state-dependent path), or the `ifnone` default,
@@ -542,6 +561,15 @@ pub const Net = struct {
     paths: List = .empty,
     ondetect: bool = false,
     showcancelled: bool = false,
+    /// §7.6 the pass switches with this net as a terminal (a `List` of
+    /// `trans` indices in `extra`).
+    trans: List = .empty,
+    /// Its first per-bit §7.10 signal in `State.signals`, kept current for
+    /// a net a MOS switch or `%v` reads (`strength_read`).
+    signal: u32 = 0,
+    strength_read: bool = false,
+    /// A switch-joined net's first word in `resolved_init` (v then x).
+    resolved: u32 = 0,
 
     pub const no_decay = std.math.maxInt(u64);
 };
@@ -579,6 +607,10 @@ pub const Driver = struct {
         udp: struct { udp: u32, ins: List, sequential: bool, lane: ?u32, out_bit: ?u32, state: Bit, started: bool, prev: List },
         /// §19.9 a pull of an unconnected input.
         pull: Bit,
+        /// §7.6 a MOS switch: data and gate rows, the net the data names
+        /// (whose signal it passes; `none` for any other expression), the
+        /// lane of a vector terminal and the output bit.
+        mos: struct { data: u32, gate: u32, data_net: u32, n_type: bool, resistive: bool, lane: ?u32, out_bit: ?u32 },
     };
 };
 
@@ -612,6 +644,11 @@ fan_start: []const u32 = &.{},
 fan: []const u32 = &.{},
 subs: []const Sub = &.{},
 paths: []const Path = &.{},
+trans: []const Tran = &.{},
+/// Every net bit's §7.10 signal at time 0 (`Net.signal`).
+signal_init: []const net.Signal = &.{},
+/// Every net's resolved value at time 0, `words(width)` per plane.
+resolved_init: []const u64 = &.{},
 /// Per slot: a module path's source, whose last transition `State` keeps.
 path_source: []const bool = &.{},
 nets: []const Net = &.{},

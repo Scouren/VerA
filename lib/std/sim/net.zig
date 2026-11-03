@@ -12,6 +12,11 @@
 //! - `pub const Signal = struct` (`of`, `orZ`, `none`, `combine`, `combineWired`, `collapse`)
 //! - `pub const Delay = struct` (`to`, `continuous`)
 //! - `pub const UdpSym = union(enum)`, `pub const UdpRow = struct`
+//! - `pub const Node = struct`, `pub const SwitchPath = struct`, `pub const TranState = enum(u8)`
+//! - `pub fn reduce(s: Strength, resistive: bool) Strength`, `pub fn reduceSignal(sig: Signal, hops: u32, resistive: u32) Signal`
+//! - `pub fn crossed(own: Signal, z: Node, y: Node, p: SwitchPath) Signal`
+//! - `pub fn reach(g: anytype, a: std.mem.Allocator, from: Node) std.mem.Allocator.Error![]const Node`
+//! - `pub fn switchPaths(g: anytype, a: std.mem.Allocator, y: Node, group: []const Node) std.mem.Allocator.Error![]const SwitchPath`
 //! - `pub fn netPull(kind: NetKind) Signal`
 //! - `pub fn wiredLogic(kind: NetKind) ?Wired`
 //! - `pub fn gateBit(kind: GateKind, ins: []const Bit) GateOut`
@@ -167,6 +172,113 @@ pub const UdpSym = union(enum) { level: u8, pair: [2]u8, letter: u8 };
 /// entry; `state` is 0 in a combinational table.
 pub const UdpRow = struct { ins: []const UdpSym, state: u8, out: u8, edge_at: ?u32 };
 
+/// One bit of one net, as a pass switch terminal sees it.
+pub const Node = struct { net: u32, bit: u32 };
+
+/// From a group member to a node: the fewest resistive switches on a path
+/// that may conduct, and whether some path surely does.
+pub const SwitchPath = struct { res: u32, sure: bool };
+
+/// §7.6 a pass switch's conduction: by its control, unknown while x or z.
+pub const TranState = enum(u8) { on, off, unknown };
+
+/// IEEE 1364-2005 §7.12 Table 7-8: what a resistive switch makes of the
+/// strength it passes; a non-resistive one only turns supply into strong.
+pub fn reduce(s: Strength, resistive: bool) Strength {
+    const out: Strength = if (!resistive) (if (s == .supply) .strong else s) else switch (s) {
+        .supply, .strong => .pull,
+        .pull => .weak,
+        .large, .weak => .medium,
+        .medium, .small => .small,
+        .highz => .highz,
+    };
+    assert(@backingInt(out) <= @backingInt(s));
+    return out;
+}
+
+/// §7.11/§7.12 a signal that crossed `hops` pass switches, `resistive` of
+/// them resistive.
+pub fn reduceSignal(sig: Signal, hops: u32, resistive: u32) Signal {
+    if (hops == 0) return sig;
+    const one = struct {
+        fn side(v: i8, k: u32) i8 {
+            var s = reduce(@fromBackingInt(@intCast(@as(u8, @intCast(@abs(v))))), false);
+            for (0..k) |_| s = reduce(s, true);
+            const m: i8 = @intCast(@backingInt(s));
+            return if (v < 0) -m else m;
+        }
+    };
+    return .{ .lo = one.side(sig.lo, resistive), .hi = one.side(sig.hi, resistive) };
+}
+
+/// What `own`, asserted at `z`, is at `y` across path `p`: reduced, and
+/// widened to high impedance where no path surely conducts (§7.10.2).
+pub fn crossed(own: Signal, z: Node, y: Node, p: SwitchPath) Signal {
+    assert(p.res != std.math.maxInt(u32));
+    const sig = reduceSignal(own, @intFromBool(!std.meta.eql(z, y)), p.res);
+    return if (p.sure or sig.none()) sig else .{ .lo = @min(sig.lo, 0), .hi = @max(sig.hi, 0) };
+}
+
+/// The net bits joined to `from` through switches that may conduct; `g`
+/// has `switches(net)`, `tran(ti)`, `conduction(ti)` and `fixed(net)`
+/// (a supply net, which no path runs through).
+pub fn reach(g: anytype, a: std.mem.Allocator, from: Node) std.mem.Allocator.Error![]const Node {
+    var seen: std.ArrayList(Node) = .empty;
+    try seen.append(a, from);
+    var i: usize = 0;
+    while (i < seen.items.len) : (i += 1) {
+        const u = seen.items[i];
+        if (g.fixed(u.net)) continue;
+        for (g.switches(u.net)) |ti| {
+            if (g.conduction(ti) == .off) continue;
+            const v = across(g.tran(ti), u) orelse continue;
+            for (seen.items) |w| {
+                if (std.meta.eql(w, v)) break;
+            } else try seen.append(a, v);
+        }
+    }
+    return seen.items;
+}
+
+/// For each member of `group`, its `SwitchPath` to `y`.
+pub fn switchPaths(g: anytype, a: std.mem.Allocator, y: Node, group: []const Node) std.mem.Allocator.Error![]const SwitchPath {
+    const p = try a.alloc(SwitchPath, group.len);
+    @memset(p, .{ .res = std.math.maxInt(u32), .sure = false });
+    for (group, p) |u, *q| if (std.meta.eql(u, y)) {
+        q.* = .{ .res = 0, .sure = true };
+    };
+    const passes_max = group.len * (group.len + 2) + 1;
+    var passes: usize = 0;
+    var changed = true;
+    while (changed) : (passes += 1) {
+        assert(passes <= passes_max);
+        changed = false;
+        for (group, 0..) |u, iu| {
+            if (p[iu].res == std.math.maxInt(u32)) continue;
+            if (!std.meta.eql(u, y) and g.fixed(u.net)) continue;
+            for (g.switches(u.net)) |ti| {
+                const st = g.conduction(ti);
+                if (st == .off) continue;
+                const tr = g.tran(ti);
+                const v = across(tr, u) orelse continue;
+                const iv = for (group, 0..) |w, k| {
+                    if (std.meta.eql(w, v)) break k;
+                } else continue;
+                const res = p[iu].res + @intFromBool(tr.resistive);
+                if (res < p[iv].res) {
+                    p[iv].res = res;
+                    changed = true;
+                }
+                if (p[iu].sure and st == .on and !p[iv].sure) {
+                    p[iv].sure = true;
+                    changed = true;
+                }
+            }
+        }
+    }
+    return p;
+}
+
 /// §3.7/§7.9 what the net type itself contributes, at its own strength.
 pub fn netPull(kind: NetKind) Signal {
     return switch (kind) {
@@ -228,6 +340,13 @@ pub fn udpEval(rows: []const UdpRow, sequential: bool, ins: []const Bit, state: 
 }
 
 // ---- private ----
+
+fn across(tr: anytype, u: Node) ?Node {
+    const at_a = tr.a == u.net and tr.a_bit == u.bit;
+    const at_b = tr.b == u.net and tr.b_bit == u.bit;
+    if (!at_a and !at_b) return null;
+    return if (at_a) .{ .net = tr.b, .bit = tr.b_bit } else .{ .net = tr.a, .bit = tr.a_bit };
+}
 
 fn gateIn(b: Bit) Bit {
     return if (b == .z) .x else b;

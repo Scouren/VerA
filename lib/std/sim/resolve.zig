@@ -14,7 +14,11 @@
 //! - `pub fn drive(s: *State, a: Allocator, at: u32) Error!void`
 //! - `pub fn netUpdate(s: *State, net: u32) Error!void`
 //! - `pub fn decay(s: *State, a: Allocator, net: u32) Error!void`
+//! - `pub fn switchCtrl(s: *State, a: Allocator, at: u32, pc: u32) Error!void`
+//! - `pub fn tranSwitch(s: *State, a: Allocator, at: u32) Error!void`
+//! - `pub fn wakeSwitches(s: *State, slot: u32) Error!void`
 //! - `pub fn current(s: *const State, at: u32) Literal`
+//! - `Switches.switches`, `Switches.tran`, `Switches.conduction`, `Switches.fixed` (private type, `net.reach`'s view)
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -38,6 +42,26 @@ pub const Inertial = struct {
     or_z: bool = false,
     /// When the transition in flight lands (a path destination's, §14.6).
     due: u64 = 0,
+};
+
+/// The run's switches as `net.reach` and `net.switchPaths` see them.
+const Switches = struct {
+    s: *const State,
+    pub fn switches(g: Switches, n: u32) []const u32 {
+        return g.s.p.list(g.s.p.nets[n].trans);
+    }
+    pub fn tran(g: Switches, ti: u32) Program.Tran {
+        return g.s.p.trans[ti];
+    }
+    pub fn conduction(g: Switches, ti: u32) net_.TranState {
+        return g.s.tran_state[ti];
+    }
+    pub fn fixed(g: Switches, n: u32) bool {
+        return switch (g.s.p.nets[n].kind) {
+            .supply0, .supply1 => true,
+            else => false, // else: every other net kind is a conductor
+        };
+    }
 };
 
 /// A transition's delay and §14.6.1 reject and error limits.
@@ -102,6 +126,7 @@ pub fn continuous(s: *State, a: Allocator, at: u32, pc: u32) Error!void {
             break :blk out;
         },
         .pull => |b| try logic.filled(a, d.width, false, b),
+        .mos => |m| try mosValue(s, a, at, m, &or_z),
     };
     // §8.5: a sequential UDP's initial output is published at time 0; a
     // combinational one's is x until its first delayed value.
@@ -118,6 +143,7 @@ pub fn continuous(s: *State, a: Allocator, at: u32, pc: u32) Error!void {
                 .expr => timing.continuous(cur.truth(), target),
                 .gate => |g| timing.to(target.bit(g.out_bit orelse 0)),
                 .udp => |u| timing.to(target.bit(u.out_bit orelse 0)),
+                .mos => |m| timing.to(target.bit(m.out_bit orelse 0)),
                 .bridge, .pull => timing.to(target.bit(0)),
             };
             st.in_flight = try s.enqueue(.{ .drive = at }, delay, false);
@@ -135,6 +161,7 @@ pub fn continuous(s: *State, a: Allocator, at: u32, pc: u32) Error!void {
 pub fn resolve(s: *State, a: Allocator, net: u32) Error!void {
     const p = s.p;
     const n = p.nets[net];
+    if (n.trans.len != 0) return resolveJoined(s, a, net);
     const drivers = p.list(n.drivers);
     const width = p.slots.items(.ty)[n.slot].width;
     const resolved = try logic.filled(a, width, false, .z);
@@ -151,6 +178,9 @@ pub fn resolve(s: *State, a: Allocator, net: u32) Error!void {
     const now = try eval.read(s, a, n.slot);
     const tables = net_.wiredLogic(n.kind);
     var floating: u32 = 0;
+    // §7.10/§7.11: a MOS switch passes its data's strength, so a change of
+    // strength alone on a net one reads re-evaluates that switch.
+    var moved = false;
     for (0..width) |i| {
         const at: u32 = @intCast(i);
         var acc: Signal = .{};
@@ -164,6 +194,8 @@ pub fn resolve(s: *State, a: Allocator, net: u32) Error!void {
             floating += 1;
         }
         acc = acc.combine(net_.netPull(n.kind));
+        moved = moved or (n.strength_read and !std.meta.eql(s.signals[n.signal + at], acc));
+        s.signals[n.signal + at] = acc;
         logic.setBit(resolved, at, acc.collapse());
     }
     if (n.kind == .trireg) try chargeState(s, net, floating == width);
@@ -187,7 +219,39 @@ pub fn resolve(s: *State, a: Allocator, net: u32) Error!void {
         if (st.in_flight) |h| try s.cancel(h);
         st.in_flight = null;
     }
-    return s.store(n.slot, resolved);
+    try s.store(n.slot, resolved);
+    if (moved) try wakeSwitches(s, n.slot);
+}
+
+/// §7.6 a controlled switch's turn (`.switch_ctrl` at `pc`): its control
+/// read now, its conduction changed at once or after its delay, both sides
+/// re-resolved, and it is armed again.
+pub fn switchCtrl(s: *State, a: Allocator, at: u32, pc: u32) Error!void {
+    const t = s.p.trans[at];
+    const c = (try eval.eval(s, a, t.ctrl)).bit(0);
+    const next: net_.TranState = if (c == t.on) .on else if (c == .zero or c == .one) .off else .unknown;
+    const none = @backingInt(Program.Ref.none);
+    if (t.delay_rows[0] != none) {
+        var d: net_.Delay = .{ .present = true };
+        d.rise = try delayIn(s, a, t.delay_rows[0], s.p.inst_scope[pc]);
+        d.fall = if (t.delay_rows[1] != none) try delayIn(s, a, t.delay_rows[1], s.p.inst_scope[pc]) else d.rise;
+        d.off = if (t.delay_rows[2] != none) try delayIn(s, a, t.delay_rows[2], s.p.inst_scope[pc]) else @min(d.rise, d.fall);
+        s.tran_delay[at] = d;
+    }
+    if (s.tran_delay[at].present) try switchAfter(s, at, next) else {
+        s.tran_state[at] = next;
+        try resolve(s, a, t.a);
+        try resolve(s, a, t.b);
+    }
+    s.armed[pc] = true;
+}
+
+/// A delayed switch reaches its target conduction (`.tran_switch`).
+pub fn tranSwitch(s: *State, a: Allocator, at: u32) Error!void {
+    s.tran_pending[at] = null;
+    s.tran_state[at] = s.tran_target[at];
+    try resolve(s, a, s.p.trans[at].a);
+    try resolve(s, a, s.p.trans[at].b);
 }
 
 /// A delayed driver's transition lands (`.drive`).
@@ -215,6 +279,19 @@ pub fn decay(s: *State, a: Allocator, net: u32) Error!void {
     try s.store(slot, try logic.filled(a, s.p.slots.items(.ty)[slot].width, false, .x));
 }
 
+/// Re-runs the MOS switches reading slot `slot` (§7.11): its strength
+/// changed, which no event control sees.
+pub fn wakeSwitches(s: *State, slot: u32) Error!void {
+    const p = s.p;
+    if (slot + 1 >= p.fan_start.len) return;
+    for (p.fan[p.fan_start[slot]..p.fan_start[slot + 1]]) |pc| if (s.armed[pc]) {
+        if (p.insts.items(.tag)[pc] != .continuous) continue;
+        if (p.drivers[p.insts.items(.data)[pc].a].source != .mos) continue;
+        s.armed[pc] = false;
+        _ = try s.enqueue(.{ .run = pc }, null, false);
+    };
+}
+
 /// Driver `at`'s value now, in the run's own planes.
 pub fn current(s: *const State, at: u32) Literal {
     const d = s.p.drivers[at];
@@ -223,6 +300,90 @@ pub fn current(s: *const State, at: u32) Literal {
 }
 
 // ---- private ----
+
+/// §7.6 what a MOS switch drives: its data at the data's strength reduced
+/// by §7.12 (a net's resolved signal, strong for anything else) while its
+/// gate conducts; z when it does not; §7.10.2's H/L when the gate is x/z.
+/// A z on the data is z whatever the gate.
+fn mosValue(s: *State, a: Allocator, at: u32, m: @FieldType(Program.Driver.Source, "mos"), or_z: *bool) Error!Literal {
+    const d = s.p.drivers[at];
+    const gv = try eval.eval(s, a, m.gate);
+    const g = gv.bit(if (gv.width > 1) m.lane.? else 0);
+    const dv = try eval.eval(s, a, m.data);
+    const bit = if (dv.width > 1) m.lane.? else 0;
+    var sig: Signal = .of(dv.bit(bit), .strong, .strong);
+    if (m.data_net != @backingInt(Program.Ref.none)) sig = s.signals[s.p.nets[m.data_net].signal + bit];
+    s.drv_s0[at] = net_.reduce(if (sig.lo < 0) @fromBackingInt(@intCast(@as(u8, @intCast(-sig.lo)))) else .highz, m.resistive);
+    s.drv_s1[at] = net_.reduce(if (sig.hi > 0) @fromBackingInt(@intCast(@as(u8, @intCast(sig.hi)))) else .highz, m.resistive);
+    const value = sig.collapse();
+    const on: Bit = if (m.n_type) .one else .zero;
+    const out: Bit = if (value == .z or (g != on and (g == .zero or g == .one))) .z else value;
+    or_z.* = out != .z and g != on;
+    const result = try logic.filled(a, d.width, false, .z);
+    logic.setBit(result, m.out_bit orelse 0, out);
+    return result;
+}
+
+/// §7.6 a controlled switch with a delay: on after the first, off after the
+/// second, unknown after the smaller; a control that returns first cancels.
+fn switchAfter(s: *State, at: u32, next: net_.TranState) Error!void {
+    const settled = if (s.tran_pending[at] != null) s.tran_target[at] else s.tran_state[at];
+    if (settled == next) return;
+    if (s.tran_pending[at]) |h| try s.cancel(h);
+    s.tran_pending[at] = null;
+    if (next == s.tran_state[at]) return;
+    s.tran_target[at] = next;
+    s.tran_pending[at] = try s.enqueue(.{ .tran_switch = at }, s.tran_delay[at].to(switch (next) {
+        .on => .one,
+        .off => .zero,
+        .unknown => .x,
+    }), false);
+}
+
+/// IEEE 1364-2005 §7.6/§8.5.3.5: the net bits joined through switches that
+/// may conduct resolve as one, from every driver of every one of them,
+/// each crossing reduced (§7.11, §7.12) and widened across an unknown
+/// switch (§7.10.2); with no driver, the group's triregs share their charge.
+/// ponytail: no charge decay, wired logic or net delay inside a group, and
+/// the group is found afresh each time, as the old engine does.
+fn resolveJoined(s: *State, a: Allocator, start: u32) Error!void {
+    const p = s.p;
+    const g: Switches = .{ .s = s };
+    var touched: std.ArrayList(u32) = .empty;
+    try touched.append(a, start);
+    const width = p.slots.items(.ty)[p.nets[start].slot].width;
+    for (0..width) |i| {
+        const group = try net_.reach(g, a, .{ .net = start, .bit = @intCast(i) });
+        for (group) |y| {
+            const paths = try net_.switchPaths(g, a, y, group);
+            var acc: Signal = .{};
+            for (group, paths) |z, pz| {
+                const zn = p.nets[z.net];
+                var own = net_.netPull(zn.kind);
+                for (p.list(zn.drivers)) |d| own = own.combine(contribution(s, d, z.bit));
+                acc = acc.combine(net_.crossed(own, z, y, pz));
+            }
+            if (acc.none()) for (group, paths) |z, pz| {
+                const zn = p.nets[z.net];
+                if (zn.kind != .trireg) continue;
+                const v = try eval.read(s, a, zn.slot);
+                acc = acc.combine(net_.crossed(.of(v.bit(z.bit), zn.charge, zn.charge), z, y, pz));
+            };
+            const yn = p.nets[y.net];
+            s.signals[yn.signal + y.bit] = acc;
+            logic.setBit(joined(s, y.net), y.bit, acc.collapse());
+            if (std.mem.findScalar(u32, touched.items, y.net) == null) try touched.append(a, y.net);
+        }
+    }
+    for (touched.items) |t| try s.store(p.nets[t].slot, joined(s, t));
+}
+
+/// Net `n`'s value as the joined resolutions left it, bit by bit.
+fn joined(s: *const State, n: u32) Literal {
+    const nt = s.p.nets[n];
+    const width = s.p.slots.items(.ty)[nt.slot].width;
+    return .{ .width = width, .signed = false, .sized = true, .planes = s.net_resolved[nt.resolved..][0 .. 2 * Program.words(width)] };
+}
 
 /// The delay a driver schedules with: its constant one, or its rows read now.
 fn timingOf(s: *State, a: Allocator, d: Program.Driver) Error!net_.Delay {
@@ -242,9 +403,8 @@ fn delayIn(s: *State, a: Allocator, e: u32, scope: u32) Error!u64 {
 /// What driver `d` asserts on bit `at`: its value at its strengths, or
 /// §7.10.2's H/L.
 fn contribution(s: *const State, d: u32, at: u32) Signal {
-    const dr = s.p.drivers[d];
     const b = current(s, d).bit(at);
-    return if (s.drv_or_z[d] and b != .z) .orZ(b, dr.s0, dr.s1) else .of(b, dr.s0, dr.s1);
+    return if (s.drv_or_z[d] and b != .z) .orZ(b, s.drv_s0[d], s.drv_s1[d]) else .of(b, s.drv_s0[d], s.drv_s1[d]);
 }
 
 /// §6.1.3's inertial rule: whether a transition to `to` is needed, having

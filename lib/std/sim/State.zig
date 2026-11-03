@@ -36,6 +36,7 @@ const Program = @import("Program.zig");
 const logic = @import("logic.zig");
 const eval = @import("eval.zig");
 const resolve = @import("resolve.zig");
+const net = @import("net.zig");
 const sched = @import("scheduler.zig");
 const fmt = @import("kernels").fmt;
 const Literal = logic.Literal;
@@ -64,6 +65,8 @@ pub const Pending = union(enum) {
     net_update: u32,
     /// §3.8 a trireg's charge decays to x.
     decay: u32,
+    /// §7.6 a delayed switch reaching its target conduction.
+    tran_switch: u32,
     /// §14.6 a module path destination's value landing as a plain write
     /// (`slot`, its planes the row's `buf`).
     put: struct { slot: u32, width: u32 },
@@ -168,6 +171,18 @@ unwind: ?u32 = null,
 /// gives the run a stack for `depth_max` of them (`default_depth`).
 depth: u32 = 0,
 depth_max: u32 = default_depth,
+/// §7.6 per switch, its conduction, the conduction in flight and its event;
+/// per net bit, its §7.10 signal; per driver, the strengths it asserts (a
+/// MOS switch's follow its data).
+tran_state: []net.TranState,
+tran_target: []net.TranState,
+tran_pending: []?Handle,
+signals: []net.Signal,
+tran_delay: []net.Delay,
+/// Per switch-joined net, its value as the group resolutions left it.
+net_resolved: []u64,
+drv_s0: []net.Strength,
+drv_s1: []net.Strength,
 /// §14.3.3 per path source slot, its last transition (`path_changed`
 /// holds whether it has one).
 path_edge: []PathEdge,
@@ -204,11 +219,29 @@ pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!Stat
         .udp_state = try arena.alloc(Bit, p.drivers.len),
         .udp_started = try arena.alloc(bool, p.drivers.len),
         .sub_active = try arena.alloc(u32, p.subs.len),
+        .tran_state = try arena.alloc(net.TranState, p.trans.len),
+        .tran_target = try arena.alloc(net.TranState, p.trans.len),
+        .tran_pending = try arena.alloc(?Handle, p.trans.len),
+        .signals = try arena.dupe(net.Signal, p.signal_init),
+        .tran_delay = try arena.alloc(net.Delay, p.trans.len),
+        .net_resolved = try arena.dupe(u64, p.resolved_init),
+        .drv_s0 = try arena.alloc(net.Strength, p.drivers.len),
+        .drv_s1 = try arena.alloc(net.Strength, p.drivers.len),
         .path_edge = try arena.alloc(PathEdge, if (p.path_source.len != 0) p.slots.len else 0),
         .path_changed = try arena.alloc(bool, if (p.path_source.len != 0) p.slots.len else 0),
         .scratch = .init(arena),
     };
     @memset(s.sub_active, 0);
+    for (p.trans, s.tran_state, s.tran_target, s.tran_delay) |t, *st, *tg, *dl| {
+        st.* = t.state;
+        tg.* = t.state;
+        dl.* = t.delay;
+    }
+    @memset(s.tran_pending, null);
+    for (p.drivers, s.drv_s0, s.drv_s1) |d, *s0, *s1| {
+        s0.* = d.s0;
+        s1.* = d.s1;
+    }
     @memset(s.path_changed, false);
     for (p.drivers, s.drv_or_z, s.udp_state, s.udp_started) |d, *oz, *st, *started| {
         oz.* = d.init_or_z;
@@ -356,7 +389,7 @@ pub fn stopRange(s: *State, start: u32, end: u32) Error!bool {
             try cancel(s, row.handle);
             hit = true;
         },
-        .write, .strobe, .monitor_tick, .drive, .net_update, .decay, .put => {},
+        .write, .strobe, .monitor_tick, .drive, .net_update, .decay, .put, .tran_switch => {},
     };
     return hit;
 }

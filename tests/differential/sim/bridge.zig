@@ -191,7 +191,17 @@ fn inst(l: *Lower, ins: compile.Instruction, pc: u32, repeats: u32) E!void {
         .task_return => return l.refuse("a timed task return"),
         .pla_start => return l.refuse("a process of its own (PLA or event-controlled NBA)"),
         .override_on, .override_eval, .override_off => return l.refuse("§9.3 assign/force"),
-        .switch_ctrl => return l.refuse("§7.6 a controlled switch"),
+        .switch_ctrl => |sc| {
+            const t = r.netlist.switches[sc.tran];
+            const tr = @constCast(&b.p.trans[sc.tran]);
+            tr.ctrl = try l.self_(t.ctrl, 1);
+            if (r.netlist.switch_delays.get(sc.tran)) |d3| {
+                tr.delay_rows[0] = try l.selfOrReal(d3.rise);
+                if (d3.fall != .none) tr.delay_rows[1] = try l.selfOrReal(d3.fall);
+                if (d3.off != .none) tr.delay_rows[2] = try l.selfOrReal(d3.off);
+            }
+            _ = try b.inst(.switch_ctrl, sc.tran, 0, scope);
+        },
     }
 }
 
@@ -225,11 +235,15 @@ fn netlist(l: *Lower) E!void {
     const b = l.b;
     const nets = try b.arena.alloc(Program.Net, r.netlist.nets.len);
     var paths: std.ArrayList(Program.Path) = .empty;
+    var resolved: std.ArrayList(u64) = .empty;
     const path_source = try b.arena.alloc(bool, r.values.len);
     @memset(path_source, false);
     for (r.netlist.nets, nets, 0..) |n, *out, k| {
         const cold = r.netCold(n);
-        if (cold.trans.len != 0) return l.refuse("§7.6 pass switches");
+        const width = n.resolved.width;
+        const resolved_at: u32 = @intCast(resolved.items.len);
+        try resolved.appendSlice(b.arena, n.resolved.values()[0..Program.words(width)]);
+        try resolved.appendSlice(b.arena, n.resolved.unknowns()[0..Program.words(width)]);
         const first: u32 = @intCast(paths.items.len);
         for (cold.paths) |path| {
             path_source[path.src] = true;
@@ -254,8 +268,31 @@ fn netlist(l: *Lower) E!void {
             .paths = .{ .start = first, .len = @intCast(cold.paths.len) },
             .ondetect = cold.ondetect,
             .showcancelled = cold.showcancelled,
+            .trans = try b.listOf(cold.trans),
+            .signal = n.signal,
+            .strength_read = n.strength_read,
+            .resolved = resolved_at,
         };
     }
+    b.p.resolved_init = resolved.items;
+    const signals = try b.arena.alloc(net.Signal, r.netlist.signals.len);
+    for (r.netlist.signals, signals) |sig, *o| o.* = .{ .lo = sig.lo, .hi = sig.hi };
+    b.p.signal_init = signals;
+    const none = @backingInt(Program.Ref.none);
+    const trans = try b.arena.alloc(Program.Tran, r.netlist.switches.len);
+    for (r.netlist.switches, trans) |t, *o| o.* = .{
+        .a = t.a,
+        .b = t.b,
+        .a_bit = t.a_bit,
+        .b_bit = t.b_bit,
+        .ctrl = none,
+        .on = @fromBackingInt(@intCast(@backingInt(t.on))),
+        .resistive = t.resistive,
+        .delay = delay(t.delay),
+        .delay_rows = .{ none, none, none },
+        .state = std.meta.stringToEnum(net.TranState, @tagName(t.state)).?,
+    };
+    b.p.trans = trans;
     b.p.paths = paths.items;
     if (paths.items.len != 0) b.p.path_source = path_source;
     var init: std.ArrayList(u64) = .empty;
@@ -263,7 +300,6 @@ fn netlist(l: *Lower) E!void {
     var udps: std.ArrayList([]const net.UdpRow) = .empty;
     var tables: std.AutoHashMapUnmanaged(usize, u32) = .empty;
     const drivers = try b.arena.alloc(Program.Driver, r.netlist.drivers.len);
-    const none = @backingInt(Program.Ref.none);
     for (r.netlist.drivers, drivers, 0..) |d, *out, k| {
         r.scope = d.scope;
         const n = r.netlist.nets[d.net];
@@ -316,7 +352,14 @@ fn netlist(l: *Lower) E!void {
                     .prev = .{ .start = prev_start, .len = @intCast(u.prev.len) },
                 } };
             },
-            .mos => return l.refuse("a §7.6 MOS switch"),
+            .mos => |m| blk: {
+                const ex = &r.file.exprs;
+                var data_net: u32 = none;
+                if (ex.tag(m.data) == .ident) if (r.netlist.slot_nets.get(r.slot(m.data) catch return l.refuse("a MOS data name the old engine refuses"))) |dn| {
+                    data_net = dn;
+                };
+                break :blk .{ .mos = .{ .data = try l.self_(m.data, 1), .gate = try l.self_(m.gate, 1), .data_net = data_net, .n_type = m.n_type, .resistive = m.resistive, .lane = m.lane, .out_bit = m.out_bit } };
+            },
             .pull => |bit| .{ .pull = @fromBackingInt(@intCast(@backingInt(bit))) },
         };
         out.* = .{

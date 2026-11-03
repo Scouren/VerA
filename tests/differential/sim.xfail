@@ -3,30 +3,12 @@
 # Every line is a construct the bridge (tests/differential/sim/bridge.zig) does
 # not express yet; a listed fixture that agrees fails the run until its line goes.
 verilog-ams/digital/vams_digital_abstime_math.v bridge: the real system function $abstime
-verilog/04_data_types/capacitive_network_figure_4_2.v bridge: §7.6 pass switches
-verilog/04_data_types/value_set.v bridge: a §7.6 MOS switch
 verilog/05_expressions/memory_index_out_of_range_x.v bridge: $swrite/$sformat
 verilog/05_expressions/native_select_boundaries.v bridge: a vector bound past i32
 verilog/05_expressions/native_wide_index_edges.v bridge: a vector bound past i32
-verilog/07_gate_switch_level/bidirectional.v bridge: §7.6 pass switches
-verilog/07_gate_switch_level/charge_strength_sharing.v bridge: §7.6 pass switches
-verilog/07_gate_switch_level/every_primitive.v bridge: §7.6 pass switches
-verilog/07_gate_switch_level/mos_data_undriven_supply.v bridge: a §7.6 MOS switch
-verilog/07_gate_switch_level/mos_instance_array.v bridge: a §7.6 MOS switch
-verilog/07_gate_switch_level/primitive_tran_both_directions.v bridge: §7.6 pass switches
-verilog/07_gate_switch_level/pull_gate_bit_select.v bridge: §7.6 pass switches
-verilog/07_gate_switch_level/resistive_reduction_table.v bridge: §7.6 pass switches
-verilog/07_gate_switch_level/strength_reduction.v bridge: a §7.6 MOS switch
-verilog/07_gate_switch_level/supply_reduced_to_strong.v bridge: §7.6 pass switches
-verilog/07_gate_switch_level/switch_bits_strength_delay.v bridge: §7.6 pass switches
-verilog/07_gate_switch_level/switch_cmos.v bridge: a §7.6 MOS switch
-verilog/07_gate_switch_level/switch_mos.v bridge: a §7.6 MOS switch
-verilog/07_gate_switch_level/switch_strength_change.v bridge: a §7.6 MOS switch
-verilog/07_gate_switch_level/switch_supply_zero.v bridge: §7.6 pass switches
-verilog/07_gate_switch_level/tran_from_supply_undriven.v bridge: §7.6 pass switches
-verilog/07_gate_switch_level/tran_instance_array.v bridge: §7.6 pass switches
-verilog/07_gate_switch_level/tran_strength_display.v bridge: §7.6 pass switches
-verilog/07_gate_switch_level/tranif0_rtranif0_weak_reduction.v bridge: §7.6 pass switches
+verilog/07_gate_switch_level/mos_data_undriven_supply.v bridge: %v
+verilog/07_gate_switch_level/tran_from_supply_undriven.v bridge: %v
+verilog/07_gate_switch_level/tran_strength_display.v bridge: %v
 verilog/09_behavioral_modeling/assignment_assign_deassign.v bridge: §9.3 assign/force
 verilog/09_behavioral_modeling/assignment_force_release.v bridge: §9.3 assign/force
 verilog/09_behavioral_modeling/concatenation_targets.v bridge: §9.3 assign/force
@@ -53,10 +35,7 @@ verilog/10_tasks_functions/recursive_task_fork_join.v bridge: a timed task activ
 verilog/10_tasks_functions/task_recursive_timed_automatic.v bridge: a timed task activation
 verilog/10_tasks_functions/timed_subroutine_parameters.v bridge: a timed task activation
 verilog/11_scheduling/procedural_continuous_tracks_sources.v bridge: §9.3 assign/force
-verilog/11_scheduling/switch_x_gate.v bridge: §7.6 pass switches
-verilog/12_hierarchy/inout_net_expressions.v bridge: §7.6 pass switches
 verilog/12_hierarchy/real_through_bits.v bridge: §9.3 assign/force
-verilog/12_hierarchy/select_and_concatenation_ports.v bridge: §7.6 pass switches
 verilog/14_specify_blocks/sdf_pulse_limits_override_specparam.v bridge: the system function $fopen
 verilog/14_specify_blocks/specify_timing_checks_named_by_w0251.v bridge: §15 timing checks
 verilog/15_timing_checks/conditions.v bridge: §15 timing checks
@@ -158,11 +137,6 @@ verilog/18_vcd/task_function_scopes.v bridge: a §18 VCD task
 verilog/18_vcd/version_names_dumpfile_literal.v bridge: a §18 VCD task
 verilog/18_vcd/version_names_dumpfile_variable.v bridge: a §18 VCD task
 verilog/19_compiler_directives/no_timescale_is_1s_1s.v bridge: $printtimescale
-verilog/A_formal_syntax/b_A_3_1_gate_instantiations.v bridge: §7.6 pass switches
-verilog/A_formal_syntax/b_A_3_1_pass_enable_delay.v bridge: §7.6 pass switches
-verilog/A_formal_syntax/b_A_3_3_bit_select_terminals.v bridge: §7.6 pass switches
-verilog/A_formal_syntax/b_A_3_3_primitive_terminals.v bridge: §7.6 pass switches
-verilog/A_formal_syntax/b_A_3_4_gate_and_switch_types.v bridge: §7.6 pass switches
 verilog/A_formal_syntax/b_A_6_2_procedural_assignments.v bridge: §9.3 assign/force
 verilog/A_formal_syntax/b_A_6_2_repeat_intra_assignment.v bridge: §9.7.7 repeat event control
 verilog/A_formal_syntax/b_A_6_4_statements.v bridge: §9.3 assign/force

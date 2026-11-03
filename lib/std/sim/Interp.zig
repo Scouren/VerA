@@ -68,6 +68,7 @@ pub fn runUntil(s: *State, limit: u64) Error!Stop {
             .drive => |at| try resolve.drive(s, a, at),
             .net_update => |net| try resolve.netUpdate(s, net),
             .decay => |net| try resolve.decay(s, a, net),
+            .tran_switch => |t| try resolve.tranSwitch(s, a, t),
             .put => |w| {
                 const n = Program.words(w.width);
                 try s.store(w.slot, .{ .width = w.width, .signed = false, .sized = true, .planes = try a.dupe(u64, row.buf[0 .. 2 * n]) });
@@ -232,6 +233,7 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                 try eval.put(s, a, d.b, value, tags[pc] == .deposit_nb, null);
                 pc += 1;
             },
+            .switch_ctrl => return resolve.switchCtrl(s, a, d.a, pc),
             .call => {
                 _ = try calls.call(s, a, d.a);
                 pc += 1;

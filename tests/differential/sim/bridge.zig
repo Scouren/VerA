@@ -182,7 +182,6 @@ fn inst(l: *Lower, ins: compile.Instruction, pc: u32, repeats: u32) E!void {
         .wait_level => |s| _ = try b.inst(.wait_level, try l.selfOrReal(s.cond), try b.extraOf(.{ .l = try b.listOf(r.program.wordsOf(s.slots)) }), scope),
         .sample => |s| {
             const a = r.file.stmt(s.statement).assign;
-            if (a.timing_repeat != .none) return l.refuse("§9.7.7 repeat event control");
             const value = try l.evalFor(a.value, try l.targetType(a.target));
             var sm: Program.Sample = .{ .hold = s.cell, .value = value, .mode = .park, .place = 0, .timing = 0, .terms = .empty };
             if (!compile.parksOnly(a)) {

@@ -10,7 +10,9 @@
 //! `diff-astgen` (vams AstGen/Vir vs the old compiler's per-file codes and
 //! design units), `diff-elab` (sema's elaboration vs src/elab and the
 //! digital route's), `diff-lower` (sema's analog lowering vs src/analog,
-//! values by the old MIR interpreter against Air's), `diff-kernels`
+//! values by the old MIR interpreter against Air's), `diff-codegen`
+//! (codegen's Zig backend against src/codegen/device, both devices built
+//! and run), `diff-kernels`
 //! (std_kernels vs lib/kernels and the old kernel text; Gompute's math vs
 //! gm), and
 //! `rewrite`, which runs them and the new modules' own tests. All are in
@@ -32,7 +34,7 @@ pub fn add(g: Graph) void {
     const mods = g.mods;
     // One description for every new module: each oracle names itself in its row below.
     const all = b.step("rewrite", "The rewrite's modules' tests (test-<module>) and every diff-* oracle below");
-    for ([_][]const u8{ "vams", "intern_pool", "air", "link", "std_sim", "sema", "std_kernels" }) |name| {
+    for ([_][]const u8{ "vams", "intern_pool", "air", "link", "std_sim", "sema", "std_kernels", "codegen" }) |name| {
         all.dependOn(&b.top_level_steps.get(b.fmt("test-{s}", .{name})).?.step);
     }
     const o = b.addOptions();
@@ -42,6 +44,11 @@ pub fn add(g: Graph) void {
     // The merge tier runs a generated-program oracle at a size inside its
     // budget; the nightly passes `-Dfull-oracles` for the whole sweep.
     o.addOption(bool, "full_oracles", b.option(bool, "full-oracles", "diff-air-passes: the nightly's full sweep (10^4 programs x 10^3 points) instead of the merge tier's") orelse false);
+    o.addOption([]const u8, "codegen_filter", b.option([]const u8, "codegen-filter", "diff-codegen: only the fixtures whose path holds this") orelse "");
+    o.addOption(bool, "codegen_keep", b.option(bool, "codegen-keep", "diff-codegen: keep the built devices under zig-out/codegen-work") orelse false);
+    o.addOption(bool, "codegen_versioned", b.option(bool, "codegen-versioned", "diff-codegen: the new devices' units versioned by the float verdict instead of forced strict") orelse false);
+    // diff-codegen builds devices that import std_kernels, which imports Gompute's math.
+    o.addOptionPath("gompute_math", b.dependency("gompute", .{}).module("math").root_source_file.?);
     // `libc`: the root loads libraries (`dynlib` needs glibc on Linux).
     // `emit_zig`: fixtures whose `vera --emit-zig` text the root reads from
     // the directory `rewrite_options.emitted`, as `<stem>.zig`.
@@ -60,6 +67,7 @@ pub fn add(g: Graph) void {
         .{ .step = "diff-sim", .root = "tests/differential/sim.zig", .what = "the std_sim runtime against lib/sim/digital: every .v fixture's transcript, through the bridge", .imports = &.{ "std_sim", "sim", "frontend", "diag", "kernels" } },
         .{ .step = "diff-elab", .root = "tests/differential/elab.zig", .what = "sema's elaboration against src/elab and the digital route's elaboration on every fixture", .imports = &.{ "sema", "vams", "frontend", "diag", "elab", "sim" } },
         .{ .step = "diff-lower", .root = "tests/differential/lower.zig", .what = "sema's analog lowering against src/analog: tables, codes, and every contribution's value by both interpreters", .imports = &.{ "sema", "air", "intern_pool", "vams", "frontend", "diag", "elab", "analog", "ir", "old_interp" } },
+        .{ .step = "diff-codegen", .root = "tests/differential/codegen.zig", .what = "codegen's Zig backend against src/codegen/device: both devices built and run, rows, Jacobians and charges bit for bit", .imports = &.{ "sema", "air", "intern_pool", "vams", "codegen", "link", "dynlib", "frontend", "diag", "vera" }, .libc = true },
         .{ .step = "diff-link", .root = "tests/differential/link.zig", .what = "link against src/zigbuild: the same devices built by both, at 1 and N jobs", .imports = &.{ "link", "zigbuild", "dynlib", "contract" }, .libc = true, .emit_zig = &.{ "tests/osdi/resistor.va", "tests/osdi/diode.va", "tests/osdi/mixed.va" } },
     };
     for (diffs) |d| {

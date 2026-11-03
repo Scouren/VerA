@@ -49,6 +49,8 @@ pub const module_specs = [_]struct {
     .{ .name = "diag", .path = "lib/diag/root.zig" },
     .{ .name = "dynlib", .path = "src/dynlib.zig" },
     .{ .name = "link", .path = "src/link.zig", .imports = &.{ "contract", "dynlib" } },
+    // The Zig device backend (docs/rewrite/codegen.md): Air + Air.Device in, device text out.
+    .{ .name = "codegen", .path = "src/codegen.zig", .imports = &.{ "air", "intern_pool", "vams", "sema", "std_kernels", "contract", "link" } },
     .{ .name = "frontend", .path = "lib/frontend/root.zig", .imports = &.{ "base", "diag", "kernels" } },
     .{ .name = "elab", .path = "src/elab/root.zig", .imports = &.{ "base", "diag", "frontend", "kernels" } },
     .{ .name = "ir", .path = "src/ir/root.zig", .imports = &.{ "base", "diag", "kernels" } },

@@ -1,0 +1,101 @@
+# diff-sim's known differences (tests/differential/sim.zig): one fixture per
+# line, its path under tests/conformance/tests and why it is not compared yet.
+# Every line is a construct the bridge (tests/differential/sim/bridge.zig) does
+# not express yet; a listed fixture that agrees fails the run until its line goes.
+verilog-ams/digital/vams_digital_abstime_math.v bridge: the real system function $abstime
+verilog/05_expressions/native_select_boundaries.v bridge: a vector bound past i32
+verilog/05_expressions/native_wide_index_edges.v bridge: a vector bound past i32
+verilog/09_behavioral_modeling/event_array.v bridge: a trigger of an event array element
+verilog/09_behavioral_modeling/event_array_automatic.v bridge: a timed task activation
+verilog/09_behavioral_modeling/event_array_native_automatic.v bridge: an event array select term
+verilog/09_behavioral_modeling/event_array_native_effects.v bridge: a trigger of an event array element
+verilog/09_behavioral_modeling/event_array_native_selection.v bridge: a trigger of an event array element
+verilog/09_behavioral_modeling/event_arrays.v bridge: an event array select term
+verilog/09_behavioral_modeling/native_wide_event_indices.v bridge: a trigger of an event array element
+verilog/09_behavioral_modeling/nba_event_control_region.v bridge: a process of its own (PLA or event-controlled NBA)
+verilog/09_behavioral_modeling/nba_event_control_update_region.v bridge: a process of its own (PLA or event-controlled NBA)
+verilog/09_behavioral_modeling/nonblocking_event_control.v bridge: a process of its own (PLA or event-controlled NBA)
+verilog/09_behavioral_modeling/repeat_count_any_width.v bridge: §9.7.7 repeat event control
+verilog/09_behavioral_modeling/repeat_event_control.v bridge: §9.7.7 repeat event control
+verilog/09_behavioral_modeling/repeat_unsigned_64bit_count.v bridge: §9.7.7 repeat event control
+verilog/10_tasks_functions/recursive_task_fork_join.v bridge: a timed task activation
+verilog/10_tasks_functions/task_recursive_timed_automatic.v bridge: a timed task activation
+verilog/10_tasks_functions/timed_subroutine_parameters.v bridge: a timed task activation
+verilog/14_specify_blocks/sdf_pulse_limits_override_specparam.v bridge: $sdf_annotate
+verilog/14_specify_blocks/specify_timing_checks_named_by_w0251.v bridge: §15 timing checks
+verilog/15_timing_checks/conditions.v bridge: §15 timing checks
+verilog/15_timing_checks/fullskew_checks_both_orders.v bridge: §15 timing checks
+verilog/15_timing_checks/hold.v bridge: §15 timing checks
+verilog/15_timing_checks/negative_timing_disabled_copies_signals.v bridge: §15 timing checks
+verilog/15_timing_checks/nochange_high_window.v bridge: §15 timing checks
+verilog/15_timing_checks/notifier.v bridge: §15 timing checks
+verilog/15_timing_checks/period.v bridge: §15 timing checks
+verilog/15_timing_checks/recovery.v bridge: §15 timing checks
+verilog/15_timing_checks/recrem.v bridge: §15 timing checks
+verilog/15_timing_checks/removal.v bridge: §15 timing checks
+verilog/15_timing_checks/setup.v bridge: §15 timing checks
+verilog/15_timing_checks/setuphold.v bridge: §15 timing checks
+verilog/15_timing_checks/setuphold_delayed_args.v bridge: §15 timing checks
+verilog/15_timing_checks/setuphold_timecheck_condition.v bridge: §15 timing checks
+verilog/15_timing_checks/setuphold_timestamp_condition.v bridge: §15 timing checks
+verilog/15_timing_checks/skew_late_data_notifies.v bridge: §15 timing checks
+verilog/15_timing_checks/skew_waits_for_data_event.v bridge: §15 timing checks
+verilog/15_timing_checks/timeskew_missing_event_and_rearm.v bridge: §15 timing checks
+verilog/15_timing_checks/timeskew_remain_active.v bridge: §15 timing checks
+verilog/15_timing_checks/timing_check_forms.v bridge: §15 timing checks
+verilog/15_timing_checks/vector.v bridge: §15 timing checks
+verilog/15_timing_checks/width.v bridge: §15 timing checks
+verilog/16_sdf/sdf_absolute_path_delay.v bridge: $sdf_annotate
+verilog/16_sdf/sdf_interconnect_delay.v bridge: $sdf_annotate
+verilog/16_sdf/sdf_label_reevaluates_path.v bridge: $sdf_annotate
+verilog/16_sdf/sdf_min_typ_max_selection.v bridge: $sdf_annotate
+verilog/16_sdf/sdf_multiple_files_scoped.v bridge: $sdf_annotate
+verilog/16_sdf/sdf_ordered_increment.v bridge: $sdf_annotate
+verilog/16_sdf/sdf_timing_check_limit.v bridge: §15 timing checks
+verilog/17_system_tasks/fmonitor.v bridge: $fmonitor
+verilog/17_system_tasks/fread.v bridge: the system function $fread
+verilog/17_system_tasks/fscanf.v bridge: the system function $fscanf
+verilog/17_system_tasks/fscanf_unformatted_u.v bridge: the system function $fscanf
+verilog/17_system_tasks/itor_real_argument_converts.v bridge: $itor of a real
+verilog/17_system_tasks/logic_planes.v bridge: a §17.5 PLA task
+verilog/17_system_tasks/native_binary_file_targets.v bridge: the system function $fread
+verilog/17_system_tasks/native_file_scan_targets.v bridge: the system function $fscanf
+verilog/17_system_tasks/native_nested_scan_destinations.v bridge: the system function $sscanf
+verilog/17_system_tasks/native_sformat_dynamic.v bridge: a $sformat format held in a variable
+verilog/17_system_tasks/pla_async_personality.v bridge: a §17.5 PLA task
+verilog/17_system_tasks/pla_plane_ignore.v bridge: a §17.5 PLA task
+verilog/17_system_tasks/pla_plane_x_worst_case.v bridge: a §17.5 PLA task
+verilog/17_system_tasks/pla_sync_array_logic.v bridge: a §17.5 PLA task
+verilog/17_system_tasks/plane_example.v bridge: a §17.5 PLA task
+verilog/17_system_tasks/plusargs_variable_query.v bridge: the system function $test_plusargs
+verilog/17_system_tasks/q_exam.v bridge: a §17.6 queue task
+verilog/17_system_tasks/q_exam_code_runtime.v bridge: a §17.6 queue task
+verilog/17_system_tasks/q_exam_means.v bridge: a §17.6 queue task
+verilog/17_system_tasks/q_exam_peak_length.v bridge: a §17.6 queue task
+verilog/17_system_tasks/q_full.v bridge: a §17.6 queue task
+verilog/17_system_tasks/queue_capacity_stats.v bridge: a §17.6 queue task
+verilog/17_system_tasks/queue_order_payload.v bridge: a §17.6 queue task
+verilog/17_system_tasks/queue_status_boundaries.v bridge: a §17.6 queue task
+verilog/17_system_tasks/sformat_excess_argument_warning.v bridge: a $sformat format held in a variable
+verilog/17_system_tasks/sformat_variable_format.v bridge: a $sformat format held in a variable
+verilog/17_system_tasks/sscanf_conversions.v bridge: the system function $sscanf
+verilog/17_system_tasks/sscanf_field_rules.v bridge: the system function $sscanf
+verilog/17_system_tasks/sscanf_time_scaled.v bridge: the system function $sscanf
+verilog/17_system_tasks/sscanf_unformatted_z.v bridge: the system function $sscanf
+verilog/17_system_tasks/sscanf_unknown_input.v bridge: the system function $sscanf
+verilog/17_system_tasks/test_plusargs_absent.v bridge: the system function $test_plusargs
+verilog/17_system_tasks/ungetc_read_routines.v bridge: the system function $fscanf
+verilog/17_system_tasks/value_plusargs_absent.v bridge: the system function $value_plusargs
+verilog/18_vcd/dumplimit_stops_with_comment.v bridge: a §18 VCD task
+verilog/18_vcd/dumpports_control_tasks.v bridge: a §18.3 EVCD task
+verilog/18_vcd/dumpports_node_information.v bridge: a §18.3 EVCD task
+verilog/18_vcd/dumpportslimit_stops_with_comment.v bridge: a §18.3 EVCD task
+verilog/18_vcd/event_marker.v bridge: a §18 VCD task
+verilog/18_vcd/port_value_changes.v bridge: a §18.3 EVCD task
+verilog/18_vcd/real_value_format.v bridge: a §18 VCD task
+verilog/18_vcd/task_function_scopes.v bridge: a §18 VCD task
+verilog/18_vcd/version_names_dumpfile_literal.v bridge: a §18 VCD task
+verilog/18_vcd/version_names_dumpfile_variable.v bridge: a §18 VCD task
+verilog/A_formal_syntax/b_A_6_2_repeat_intra_assignment.v bridge: §9.7.7 repeat event control
+verilog/A_formal_syntax/b_A_7_1_specify_block.v bridge: §15 timing checks
+verilog/A_formal_syntax/b_A_7_5_system_timing_checks.v bridge: §15 timing checks

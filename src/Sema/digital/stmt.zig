@@ -276,10 +276,10 @@ fn timedStore(l: *Lower, i: Inst.Index, depth: u32) Error!void {
         const counter = counterCell(l, .repeat);
         const start = try l.b.inst(.repeat_start, try expr.self_(l, count, 0), 0, scope);
         const body_pc = pc(l);
-        try waitIntra(l, event, t.rhs);
+        try waitIntra(l, event, t.rhs, t.lhs);
         _ = try l.b.inst(.repeat_next, counter, body_pc, scope);
         l.b.setInst(start, .repeat_start, l.b.p.insts.items(.data)[start].a, try l.b.extraOf(Program.Repeat{ .counter = counter, .end = pc(l) }));
-    } else try waitIntra(l, event, t.rhs);
+    } else try waitIntra(l, event, t.rhs, t.lhs);
     _ = try l.b.inst(if (nb) .deposit_nb else .deposit, hold, try place.place(l, t.lhs), scope);
     if (nb) {
         _ = try l.b.inst(.stop, 0, 0, scope);
@@ -289,13 +289,14 @@ fn timedStore(l: *Lower, i: Inst.Index, depth: u32) Error!void {
 }
 
 /// An intra-assignment event control's wait: on `event`, or for `@*` on
-/// every slot the assigned value reads.
-fn waitIntra(l: *Lower, event: Inst.Ref, value: Inst.Ref) Error!void {
+/// every slot the assigned value and the target's indices read.
+fn waitIntra(l: *Lower, event: Inst.Ref, value: Inst.Ref, target: Inst.Ref) Error!void {
     const scope = l.frames.items[l.frame].scope;
     var terms: std.ArrayList(u32) = .empty;
     if (event == .none) {
         var slots: std.ArrayList(u32) = .empty;
         try expr.reads(l, value, &slots);
+        try indexReads(l, target, &slots);
         for (slots.items) |s| try terms.appendSlice(l.a, &.{ s, @backingInt(Program.Edge.any), 0, 0, none });
     } else try place.terms(l, event, &terms);
     _ = try l.b.inst(.wait_event, try l.b.extraOf(.{ .l = try l.b.listOf(terms.items) }), 0, scope);
@@ -470,10 +471,36 @@ fn statements(l: *Lower, b: Vir.Body) Error![]const Inst.Index {
 }
 
 /// Every slot the statements of body `b` read (§9.7.5's `@*`).
+/// The slots the index expressions of lvalue `r` read (not its targets).
+fn indexReads(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
+    const vir = l.virOf(l.frame);
+    const i = r.toIndex() orelse return;
+    switch (Lower.tag(vir, i)) {
+        .elem => {
+            const b = Lower.payload(vir, Inst.Bin, i);
+            try indexReads(l, b.lhs, out);
+            try expr.reads(l, b.rhs, out);
+        },
+        .slice, .slice_up, .slice_down => {
+            const t = Lower.payload(vir, Inst.Triple, i);
+            try indexReads(l, t.a, out);
+            try expr.reads(l, t.b, out);
+            try expr.reads(l, t.c, out);
+        },
+        .concat => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |x| try indexReads(l, x, out),
+        else => {}, // else: a name, whose slot is written, not read
+    }
+}
+
 fn bodyReads(l: *Lower, b: Vir.Body, out: *std.ArrayList(u32)) Error!void {
     const vir = l.virOf(l.frame);
     for (vir.body(b)) |i| switch (Lower.tag(vir, i)) {
-        .store, .store_nb => try expr.reads(l, Lower.payload(vir, Inst.Bin, i).rhs, out),
+        .store, .store_nb => {
+            const s = Lower.payload(vir, Inst.Bin, i);
+            try expr.reads(l, s.rhs, out);
+            // §9.7.5 the target's index expressions are read too.
+            try indexReads(l, s.lhs, out);
+        },
         .condbr => {
             const c = Lower.payload(vir, Inst.CondBr, i);
             try expr.reads(l, c.cond, out);

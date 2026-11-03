@@ -20,7 +20,6 @@ verilog/05_expressions/native_wide_index_edges.v lowering: a range past 2^32 bit
 verilog/06_assignments/net_array_element_selects.v lowering: a continuous assignment to a net array element
 verilog/06_assignments/select_bus.v lowering: a port with a net declaration assignment
 verilog/07_gate_switch_level/pull_gate_bit_select.v lowering: an inout port joined to a select, a concatenation or a net of another width
-verilog/07_gate_switch_level/tran_from_supply_undriven.v transcript differs at byte 0 (old 6 bytes, new 6): old "St1 1\n" new "HiZ z\n"
 verilog/09_behavioral_modeling/assignment_assign_deassign.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/assignment_force_release.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/block_name_reference.v lowering: an upward or absolute hierarchical name
@@ -47,7 +46,6 @@ verilog/09_behavioral_modeling/native_real_events.v lowering: an event control o
 verilog/09_behavioral_modeling/native_select_events.v lowering: an event control on an expression or a select
 verilog/09_behavioral_modeling/native_wide_event_indices.v lowering: a trigger of an event array element or a hierarchical event
 verilog/09_behavioral_modeling/sched_implicit_event_exclusion.v lowering: the slots `@*` reads in `event_wait`
-verilog/09_behavioral_modeling/sched_implicit_lhs_index.v transcript differs at byte 19 (old 21 bytes, new 21): old "first=7/0\nsecond=7/7\n" new "first=7/0\nsecond=7/0\n"
 verilog/09_behavioral_modeling/select_edge_glitch.v lowering: an event control on an expression or a select
 verilog/09_behavioral_modeling/select_edge.v lowering: an event control on an expression or a select
 verilog/10_tasks_functions/constant_function_clogb2.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)

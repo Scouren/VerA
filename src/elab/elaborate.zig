@@ -59,10 +59,8 @@ pub fn elaborate(ctx: design.Ctx) design.Error!design.Design {
     try decl_check.checkNetDisciplines(&f); // A.2.1.3, every module: see there
     try ports.checkPortDirections(&f); // §6.5.2.2, every module
     try paramset_select.checkRanges(&f); // §3.4.2, every paramset, selected or not
-    // §7.4.2 "the real-value nets shall obey the rules imposed by 3.7": the
-    // same structural check the digital runner makes (E0918/E0919).
-    try @import("frontend").wreal.check(ctx.file, ctx.tok_starts, ctx.bag);
-    if (ctx.bag.failed()) f.had_error = true;
+    // §7.4.2's wreal rules (E0918/E0919) are judged once, before lowering
+    // reaches here (`Compilation/analyze.zig` stops on them).
 
     // A tree of one goes to lowering by pointer, untouched. A `defparam` with
     // no instance still takes the flatten: §6.3.1's path then names nothing,

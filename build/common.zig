@@ -84,10 +84,6 @@ pub fn defineModules(b: *Build, target: Build.ResolvedTarget, exported: bool) []
         for (deps, spec.imports) |*d, name| d.* = .{ .name = name, .module = byName(created.items, name) };
         const opts: Module.CreateOptions = .{ .root_source_file = b.path(spec.path), .target = target, .imports = deps };
         const mod = if (exported) b.addModule(spec.name, opts) else b.createModule(opts);
-        if (std.mem.eql(u8, spec.name, "elab")) {
-            mod.addAnonymousImport("resolution_unknown_fixture", .{ .root_source_file = b.path("tests/conformance/tests/verilog-ams/annex_f_resolution/detail_resolution_unknown_after_bottom_up.va") });
-            mod.addAnonymousImport("resolution_digital_parent_fixture", .{ .root_source_file = b.path("tests/conformance/tests/verilog-ams/annex_f_resolution/detail_resolution_digital_parent.va") });
-        }
         if (spec.c) |c| {
             mod.addCSourceFile(.{ .file = b.path(c), .flags = &.{ "-std=c99", "-Wall", "-Werror" } });
             mod.addIncludePath(b.path(std.fs.path.dirname(c).?));
@@ -127,18 +123,27 @@ pub fn simSources(b: *Build) *Module {
     return b.createModule(.{ .root_source_file = wf.add("sim_sources.zig", root.written()) });
 }
 
-/// The root a module's tests compile from: the module, or on Linux, when its
-/// tests load a library (it is `dynlib` or imports it), a twin with the same
-/// file and imports that links glibc, so `std.DynLib` is `dlopen`
-/// (src/dynlib.zig refuses std's ElfDynLib, which applies no relocations).
-/// A twin, not the module: `vera` shares the module and links no libc.
+/// The root a module's tests compile from: the module, or a twin with the
+/// same file and imports when its tests need more than the module ships.
+/// On Linux, a module whose tests load a library (it is `dynlib` or imports
+/// it) links glibc in the twin, so `std.DynLib` is `dlopen` (src/dynlib.zig
+/// refuses std's ElfDynLib, which applies no relocations); `vera` shares the
+/// module and links no libc. `elab`'s twin gets the two Annex F conformance
+/// fixtures its `segment.zig` tests embed, so the exported module never
+/// names a file of the test submodule.
 pub fn testRoot(b: *Build, mod: Import) *Module {
     const m = mod.module;
-    if (m.resolved_target.?.result.os.tag != .linux) return m;
-    if (!std.mem.eql(u8, mod.name, "dynlib") and m.import_table.get("dynlib") == null) return m;
-    const twin = b.createModule(.{ .root_source_file = m.root_source_file, .target = m.resolved_target, .optimize = m.optimize, .link_libc = true });
+    const elab = std.mem.eql(u8, mod.name, "elab");
+    const dl = m.resolved_target.?.result.os.tag == .linux and
+        (std.mem.eql(u8, mod.name, "dynlib") or m.import_table.get("dynlib") != null);
+    if (!elab and !dl) return m;
+    const twin = b.createModule(.{ .root_source_file = m.root_source_file, .target = m.resolved_target, .optimize = m.optimize, .link_libc = dl });
     var it = m.import_table.iterator();
     while (it.next()) |e| twin.addImport(e.key_ptr.*, e.value_ptr.*);
+    if (elab) {
+        twin.addAnonymousImport("resolution_unknown_fixture", .{ .root_source_file = b.path("tests/conformance/tests/verilog-ams/annex_f_resolution/detail_resolution_unknown_after_bottom_up.va") });
+        twin.addAnonymousImport("resolution_digital_parent_fixture", .{ .root_source_file = b.path("tests/conformance/tests/verilog-ams/annex_f_resolution/detail_resolution_digital_parent.va") });
+    }
     return twin;
 }
 

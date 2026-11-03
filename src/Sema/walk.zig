@@ -267,7 +267,7 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     }
     if (zcu.isBuiltin(picked.module)) try portDisciplineAttrs(s, p);
     const ports = try bindPorts(s, p, vir, m, row.name);
-    try zcu.instances.append(s.gpa, .{ .module = picked.module, .parent = p.parent, .name = p.name, .params = params, .paramset = picked.paramset, .src = p.src, .hier = env.hier, .ports = ports });
+    try zcu.instances.append(s.gpa, .{ .module = picked.module, .parent = p.parent, .name = p.name, .params = params, .paramset = picked.paramset, .paramset_params = picked.own, .src = p.src, .hier = env.hier, .ports = ports });
     assert(zcu.instances.len == @backingInt(index) + 1);
     const gop = try zcu.instance_map.getOrPut(s.gpa, key);
     if (!gop.found_existing) gop.value_ptr.* = index;

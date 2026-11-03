@@ -5,9 +5,7 @@
 netlist/hdl/veriloga_wide_ladder.assets/ladder70.va codes: old {}, new E0426,E0512 (E0512: an assignment to a name with no slot)
 spice/primitive_segment_discipline.va codes: old {}, new E0512 (E0512: a port access of an instance's port (`<u.p>`) is not lowered by Sema yet)
 spice/reject_limit_vera_seed_attr_not_constant.va codes: old E0357, new {}
-spice/spice_binning.va tables row 4: old `param m1.annex_e_bin.l real local = 1.8e-7 from[1e-7:2.5e-7)`, new `param m1.w real local = 1e-6`
-spice/spice_paramset_primitive_shadow.va tables row 2: old `param selected.resistor.unused_item real local = 0e0`, new `param selected.gain real local = 3e0`
-spice/spice_paramset_shadow_warning.va tables row 3: old `param direct.pmodel.gain real local = 2e0`, new `param direct.gain real local = 2e0`
+spice/spice_paramset_shadow_warning.va tables row 6: old `param chained.pmodel.gain real local = 2e0`, new `param chained.gain real local = 6e0`
 spice/spice_passive_primitives.va codes: old {}, new E0512 (E0512: a port access of an instance's port (`<u.p>`) is not lowered by Sema yet)
 verilog-a/annex_a_syntax/abstol_nature_identifier.va codes: old {}, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
 verilog-a/annex_a_syntax/analog_function_default_type.va contribution 0 resist: old 7.573134526231753e0, new 8e0
@@ -20,7 +18,6 @@ verilog-a/annex_a_syntax/expression_composites.va codes: old {}, new E0512 (E051
 verilog-a/annex_a_syntax/jump_statements.va codes: old E0403, new E0512 (E0512: `return` outside a function)
 verilog-a/annex_a_syntax/null_port_connects_nothing.va tables row 1: old `node 1 	null2 net port`, new `node 1 n net port`
 verilog-a/annex_a_syntax/parameter_declarations.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/annex_a_syntax/paramset.va tables row 2: old `param instance_of_paramset.annex_a_parameters.scale real local = 1.5e0 from(0e0:inf)`, new `param instance_of_paramset.gain real local = 3e0`
 verilog-a/annex_a_syntax/pattern_empty_element_rejected.va codes: old E0894, new {}
 verilog-a/annex_a_syntax/replication.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
 verilog-a/annex_a_syntax/sum_chain_past_the_old_parser_limit.va codes: old {}, new E0241 (E0241: 4096 levels deep)
@@ -54,7 +51,6 @@ verilog-a/ch02_lexical/units_attribute_numeric_rejected.va the old side refused,
 verilog-a/ch03_data_types/access_name_shadow.va codes: old {}, new E0408,E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch03_data_types/alias_identifier_collision.va codes: old E0331, new {}
 verilog-a/ch03_data_types/aliasparam_mfactor.va tables row 2: old `param m real = 1e0`, new `contrib flow direct br0 p n`
-verilog-a/ch03_data_types/aliasparam_source_bindings.va tables row 2: old `param from_ps.aliasparam_good_ps.gain real local = 4e0`, new `param from_ps.gain real local = 8e0`
 verilog-a/ch03_data_types/aliasparam_target_must_be_a_parameter_rejected.va codes: old E0303, new {}
 verilog-a/ch03_data_types/annex_d_access_v_included_rejected.va codes: old E0335, new {}
 verilog-a/ch03_data_types/array_bound_not_constant_rejected.va codes: old E0308, new E0352 (E0352: an array bound is not constant)
@@ -351,7 +347,6 @@ verilog-a/ch06_hierarchy/generate_nonconstant_condition_rejected.va codes: old E
 verilog-a/ch06_hierarchy/generate_nonconstant_init_rejected.va codes: old E0417, new {}
 verilog-a/ch06_hierarchy/generate_nonconstant_rejected.va codes: old E0428, new {}
 verilog-a/ch06_hierarchy/generate_nonterminating_rejected.va codes: old E0420, new {}
-verilog-a/ch06_hierarchy/generate_values_drive_paramset_selection.va tables row 2: old `param g[0].u.b4_pag_sel.w real local = 1e0 from(-inf:5e0)`, new `param g[0].u.w real local = 1e0`
 verilog-a/ch06_hierarchy/genvar_init_self_reference_rejected.va codes: old E0417, new {}
 verilog-a/ch06_hierarchy/genvar_iteration_assigns_another_genvar_rejected.va codes: old E0419, new {}
 verilog-a/ch06_hierarchy/genvar_loop_4097_iterations.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
@@ -360,9 +355,9 @@ verilog-a/ch06_hierarchy/genvar_outside_loop_rejected.va codes: old E0314, new E
 verilog-a/ch06_hierarchy/geometric_position_sets_a_layout_dependent_value.va contribution 0 resist: old 4.317734366945014e-1, new had no value (Unsupported)
 verilog-a/ch06_hierarchy/hierarchical_contributions_to_named_and_unnamed_branches.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/hierarchical_vector_element_access.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch06_hierarchy/hierarchy_empty_paramset_tie.va tables row 1: old `param u.audit_empty_bin.b real local = 4e0`, new `param u.k real local = 1e1`
+verilog-a/ch06_hierarchy/hierarchy_empty_paramset_tie.va tables row 1: old `param u.audit_empty_bin.b real local = 4e0`, new `param u.audit_empty_bin.a real local = 1e0`
 verilog-a/ch06_hierarchy/hierarchy_overview_instances_and_overrides.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch06_hierarchy/if_generate_values_drive_paramset_selection.va tables row 3: old `param g1.u1.b4_pgi_sel.w real local = 9e0 from[5e0:inf)`, new `param g1.u1.w real local = 9e0`
+verilog-a/ch06_hierarchy/if_generate_values_drive_paramset_selection.va tables row 5: old `param g1.u2.b4_pgi_sel.w real local = 1e0 from(-inf:5e0)`, new `param g2.u4.b4_pgi_sel.w real local = 1e0 from(-inf:5e0)`
 verilog-a/ch06_hierarchy/implicit_net_hierarchical_reference_coerced.va the old side lowered, the new side refused
 verilog-a/ch06_hierarchy/matching_size_concatenation_of_a_vector.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/matching_size_concatenation.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
@@ -380,47 +375,21 @@ verilog-a/ch06_hierarchy/oomr_in_parameter_declaration_rejected.va codes: old E0
 verilog-a/ch06_hierarchy/oomr_variable_assign_rejected.va codes: old E0316, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/param_given_of_a_variable_rejected.va codes: old E0822, new {}
 verilog-a/ch06_hierarchy/paramset_aliasparam_names_a_system_parameter.va tables row 2: old `param u.ch6_ps_alias.m real local = 1e0`, new `param u.tag integer local = 1`
-verilog-a/ch06_hierarchy/paramset_assigns_in_module_range.va tables row 2: old `param u.b4_pmr_ps.s real local = 1e0`, new `param u.r real local = 2e0 from(0e0:inf)`
-verilog-a/ch06_hierarchy/paramset_connected_ports_select_the_module.va tables row 3: old `param u3.b4_pps.g real local = 3e0`, new `param u3.k real local = 3e0`
 verilog-a/ch06_hierarchy/paramset_defparam_chain_rejected.va codes: old E0926, new {}
 verilog-a/ch06_hierarchy/paramset_defparam_descendant_rejected.va codes: old E0926, new {}
 verilog-a/ch06_hierarchy/paramset_defparam_direct_rejected.va codes: old E0926, new {}
 verilog-a/ch06_hierarchy/paramset_defparam_generated_descendant_rejected.va codes: old E0926, new {}
 verilog-a/ch06_hierarchy/paramset_defparam_generated_instance_rejected.va codes: old E0926, new {}
-verilog-a/ch06_hierarchy/paramset_defparam_hierarchy_legal.va tables row 7: old `param valid.ps_dp_legal_card.unused_item real local = 0e0`, new `param valid.gain real local = 3e0`
+verilog-a/ch06_hierarchy/paramset_defparam_hierarchy_legal.va tables row 10: old `param valid.absent_child.bad.marker real local = 0e0`, new `param valid.present_child.good.gain real local = 3e0`
 verilog-a/ch06_hierarchy/paramset_generate_localparam_out_of_scope_rejected.va codes: old E0314, new {}
-verilog-a/ch06_hierarchy/paramset_local_range_in_range.va tables row 2: old `param u.b4_pli_ps.l real local = 7.5e-1 from(0e0:inf)`, new `param u.k real local = 1e1`
-verilog-a/ch06_hierarchy/paramset_local_range_selects.va tables row 2: old `param u.b4_plr_ps.l real local = 1.5e0 from(0e0:inf)`, new `param u.k real local = 2e1`
-verilog-a/ch06_hierarchy/paramset_oomr_localparam.va tables row 2: old `param u.h01_oomr_ps.w real local = 2e0 from(0e0:inf)`, new `param u.k real local = ?`
+verilog-a/ch06_hierarchy/paramset_oomr_localparam.va tables row 3: old `param u.k real local = 6e0`, new `param u.k real local = ?`
 verilog-a/ch06_hierarchy/paramset_oomr_nonlocal_parameter_rejected.va the old side refused, the new side lowered
-verilog-a/ch06_hierarchy/paramset_outer_defparam_alias.va tables row 1: old `param same_alias.ps_alias_bin.w integer local = 7 from[4e0:1e1]`, new `param same_alias.gain real local = 2.1e1`
-verilog-a/ch06_hierarchy/paramset_outer_defparam_chain.va tables row 1: old `param u.ps_chain_near.w real local = 7e0 from[4e0:1e1]`, new `param u.gain real local = 5e0`
-verilog-a/ch06_hierarchy/paramset_outer_defparam_defaults.va tables row 1: old `param high.ps_derived_bin.w real local = 7e0 from[0e0:1e1]`, new `param high.gain real local = 2.7e1`
+verilog-a/ch06_hierarchy/paramset_outer_defparam_chain.va tables row 2: old `param u.ps_chain_far_high.unused_item real local = 0e0`, new `param u.gain real local = 5e0`
 verilog-a/ch06_hierarchy/paramset_outer_defparam_forbidden_body_rejected.va codes: old E0926, new {}
-verilog-a/ch06_hierarchy/paramset_outer_defparam_hierarchy.va tables row 3: old `param middle.u[0].ps_hier_bin.w real local = 7e0 from[4e0:1e1]`, new `param middle.u[0].gain real local = 2.1e1`
-verilog-a/ch06_hierarchy/paramset_outer_defparam_max_index.va tables row 1: old `param u[9223372036854775807].ps_outer_max_bin.w real local = 7e0 from[4e0:1e1]`, new `param u[9223372036854775807].gain real local = 2.1e1`
-verilog-a/ch06_hierarchy/paramset_outer_defparam_precedence.va tables row 1: old `param by_name.ps_outer_bin.w real local = 7e0 from[4e0:1e1]`, new `param by_name.gain real local = 2.1e1`
-verilog-a/ch06_hierarchy/paramset_outer_defparam_selection_parameter.va tables row 2: old `param u.ps_parameter_bin.w real local = 2e0 from[0e0:4e0)`, new `param u.gain real local = 4e0`
-verilog-a/ch06_hierarchy/paramset_outer_defparam_shape.va tables row 5: old `param numeric.ps_shape_numeric.w real local = 2e0 from[0e0:4e0)`, new `param numeric.gain real local = 4e0`
 verilog-a/ch06_hierarchy/paramset_outer_defparam_wide_card.va tables row 1: old `param wide integer = 1`, new `param wide unspecified = 1`
-verilog-a/ch06_hierarchy/paramset_output_reads_a_module_output.va tables row 2: old `param u.b4_pmo_ps.s real local = 4e0`, new `param u.scale real local = 4e0`
-verilog-a/ch06_hierarchy/paramset_overload_lrm_table.va tables row 4: old `param m3.nch.l real local = 1e-6 from[2.5e-7:inf)`, new `param m3.l real local = 1e-6`
-verilog-a/ch06_hierarchy/paramset_overload_unsupported.va tables row 2: old `param u.ch6_sel.l real local = 5e-1 from[2.5e-1:1e0)`, new `param u.k real local = 2e1`
-verilog-a/ch06_hierarchy/paramset_override_integer_division.va tables row 2: old `param u.ch6_ps_div.x real local = 0e0 from[0e0:2.5e-1)`, new `param u.x real local = 0e0`
-verilog-a/ch06_hierarchy/paramset_parameter_inside_range.va tables row 2: old `param u.ch6_ppar_ps.l real local = 1.5e0 from[5e-1:2e0]`, new `param u.k real local = 3e0`
-verilog-a/ch06_hierarchy/paramset_range_bound_integer_division.va tables row 2: old `param u.ch6_ps_bound.x real local = 0e0 from[0e0:1e0]`, new `param u.x real local = 0e0`
-verilog-a/ch06_hierarchy/paramset_range_bound_modulus.va tables row 2: old `param u.ch6_ps_mod.x real local = 7e0 from[5e0:1e1]`, new `param u.x real local = 7e0`
-verilog-a/ch06_hierarchy/paramset_selected_after_generate.va tables row 3: old `param g1.u1.ch6_psg_sel.w real local = 1e1 from[5e0:inf)`, new `param g1.u1.gain real local = 2e0`
-verilog-a/ch06_hierarchy/paramset_selected_by_generate_localparam.va tables row 4: old `param g1.u1.ch6_pgl_sel.w real local = 1e1 from[5e0:inf)`, new `param g1.u1.gain real local = 2e0`
-verilog-a/ch06_hierarchy/paramset_selection_by_paramset_ranges.va tables row 2: old `param u.b4_psm.l real local = 1e0 from[0e0:2e0]`, new `param u.r real local = 2e0 from(0e0:inf)`
-verilog-a/ch06_hierarchy/paramset_string_range_selection.va tables row 2: old `param u.h01_type_ps.t string local = "PMOS" from{strings}`, new `param u.sign real local = -1e0`
-verilog-a/ch06_hierarchy/paramset_tie_break_fewest_unoverridden.va tables row 2: old `param u.ch6_tb_bin.l real local = 1e0 from[5e-1:2e0]`, new `param u.k real local = 2e1`
-verilog-a/ch06_hierarchy/paramset_under_parameter_sweep.va tables row 3: old `param u.h01_sweep_ps.w real local = 2e0 from(0e0:inf)`, new `param u.kk real local = 1e0 from(0e0:inf)`
-verilog-a/ch06_hierarchy/paramset_unoverridden_defaults.va tables row 2: old `param u.h01_defaults_ps.w real local = 2e0 from(0e0:inf)`, new `param u.k real local = 6e0`
-verilog-a/ch06_hierarchy/paramset_unsupported.va tables row 2: old `param u.ch6_ps.gain real local = 3e0`, new `param u.k real local = 6e0`
+verilog-a/ch06_hierarchy/paramset_selected_after_generate.va tables row 6: old `param g1.u2.ch6_psg_sel.w real local = 1e0 from(-inf:5e0)`, new `param g2.u4.ch6_psg_sel.w real local = 1e0 from(-inf:5e0)`
+verilog-a/ch06_hierarchy/paramset_selected_by_generate_localparam.va tables row 7: old `param g1.u2.ch6_pgl_sel.w real local = 1e0 from(-inf:5e0)`, new `param g2.u4.ch6_pgl_sel.w real local = 1e0 from(-inf:5e0)`
 verilog-a/ch06_hierarchy/paramset_variable_hides_module_output_variable_rejected.va codes: old E0817, new {}
-verilog-a/ch06_hierarchy/paramset_variable_is_an_output_variable.va tables row 2: old `param u.b4_pvo_ps.l real local = 1.5e0 from(0e0:inf)`, new `param u.k real local = 1.5e0`
-verilog-a/ch06_hierarchy/paramset_with_one_item_declaration.va tables row 2: old `param u.ch6_noitem_ps.unused_item real local = 0e0`, new `param u.k real local = 2e0`
 verilog-a/ch06_hierarchy/port_part_select_on_a_scalar_port_rejected.va codes: old E0925, new {}
 verilog-a/ch06_hierarchy/port_part_select_out_of_range_rejected.va codes: old E0352, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/port_part_select_reversed_rejected.va codes: old E0352, new E0351 (E0351: the net was not declared with a range)
@@ -461,7 +430,7 @@ verilog-a/ch09_system_tasks/display_formats.va tables row 4: old `held text`, ne
 verilog-a/ch09_system_tasks/display_library_binding.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/display_radix_of_integer_is_32_bits.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch09_system_tasks/distribution_arity_rejected.va codes: old {}, new E0506 (E0506: `$rdist_uniform` takes 3 to 4, given 2)
-verilog-a/ch09_system_tasks/dist_type_string_inside_paramset.va tables row 2: old `param u.ch09_ts_bin.unused_item real local = 0e0`, new `param u.ka integer local = ?`
+verilog-a/ch09_system_tasks/dist_type_string_inside_paramset.va tables row 3: old `param u.ka integer local = -2146999808`, new `param u.ka integer local = ?`
 verilog-a/ch09_system_tasks/dist_type_string_misspelled_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/fatal_finish_number_3_rejected.va codes: old E0824, new {}
 verilog-a/ch09_system_tasks/fclose_two_descriptors_rejected.va codes: old E0887, new {}
@@ -506,7 +475,7 @@ verilog-a/ch09_system_tasks/fwrite.va tables row 5: old `display $fopen`, new `d
 verilog-a/ch09_system_tasks/geometry_card_mfactor_outside_domain_is_fatal.va contribution 0 resist: old 2.0587485053701386e0, new 1e0
 verilog-a/ch09_system_tasks/geometry_defparam_alias.va tables row 0: old `param outer.leaf.placement_x real local = -1e0`, new `charge_sites 0`
 verilog-a/ch09_system_tasks/geometry_parameter_sweep.va contribution 0 resist: old -1.1992240966177543e0, new had no value (Unsupported)
-verilog-a/ch09_system_tasks/geometry_paramset.va tables row 0: old `param leaf.geometry_ps.dx real local = 3e0`, new `param leaf.seen_x real local = 2e0`
+verilog-a/ch09_system_tasks/geometry_paramset.va tables row 1: old `param leaf.geometry_ps.placement_x real local = 2e0`, new `param leaf.seen_x real local = 2e0`
 verilog-a/ch09_system_tasks/geometry_state_read_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/geometry_top_alias_host.va tables row 0: old `param placement_x real = 0e0`, new `charge_sites 0`
 verilog-a/ch09_system_tasks/hash_flag_without_alternative_form_rejected.va codes: old E0825, new {}

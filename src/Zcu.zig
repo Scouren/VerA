@@ -125,6 +125,10 @@ pub const Instance = struct {
     params: InternPool.Index,
     /// §6.4.2's selected paramset, or `Decl.none`.
     paramset: Decl,
+    /// §6.4.1 the selected paramset's own parameters, in declaration
+    /// order, folded at its level (the instance's overrides and defparams
+    /// applied): an `aggregate` with no type; `.none` without a paramset.
+    paramset_params: InternPool.Index = .none,
     /// The `instance` instruction in the parent's file; none for a root.
     src: Vir.Inst.Ref,
     /// §9.18 Table 9-29: each hierarchical system parameter's value here,
@@ -252,9 +256,9 @@ pub const PathFormatter = struct {
 pub const instances_max: u32 = 1 << 24;
 
 comptime {
-    // A hot row, read by column: two unit handles, three indexes, one ref.
+    // A hot row, read by column: two unit handles, four indexes, one ref.
     assert(@sizeOf(Decl) == 8);
-    assert(2 * @sizeOf(Decl) + 6 * 4 + @sizeOf(Hier) == @sizeOf(Instance));
+    assert(2 * @sizeOf(Decl) + 7 * 4 + @sizeOf(Hier) == @sizeOf(Instance));
     assert(@sizeOf(Port) == 8);
 }
 

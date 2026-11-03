@@ -27,8 +27,11 @@ const spice = vams.spice;
 const old = frontend.spice_cards;
 const readText = frontend.preprocessor.readText;
 
-/// Card-shaped inputs compared, each from its own seed.
+/// Generated inputs compared per generator (`generate`, `generateCards`,
+/// `generateFiles`), each from its own seed.
 const generated = 20_000;
+const generated_cards = 20_000;
+const generated_files = 20_000;
 
 /// The old `spice_cards.zig` fuzz test's words (`fuzz_words`), copied: the
 /// generator both sides read. No `.include`, `.lib` or `.hdl`, so a
@@ -38,6 +41,44 @@ const fuzz_words = [_][]const u8{ ".subckt", ".ends", ".model", ".param", ".endl
 /// One netlist of the corpus: its key, its bytes and the path both readers
 /// are given ("" for a generated one).
 const Case = struct { key: []const u8, text: []const u8, path: []const u8 };
+
+/// Heads a line-shaped card starts with (`generateCards`): every card kind
+/// the reader tells apart, so a card both opens a line and reaches its row.
+const heads = [_][]const u8{ ".subckt s1", ".subckt s2 a b", ".subckt s3 a 0 params: w=1", ".subckt", ".ends", ".model nch", ".model nch.1", ".model nch.2", ".model qm", ".model rm r", ".model 2n2222 npn", ".model sw1 sw", ".model", "r1", "c1", "l1", "v1", "vs", "i1", "e1", "f1", "g1", "h1", "m1", "q1", "j1", "d1", "x1", "k1", "s1", "+", ".param", ".tran", "*" };
+
+/// The fields after a head: the old fuzz words but the line break (index
+/// 53), and values that select bins, areas and controls.
+const tails = fuzz_words[0..53] ++ fuzz_words[54..] ++ [_][]const u8{ "vs", "l=0.25", "l=1", "w=2", "area=3", "{w}", "1meg", "s1", "s2", "qm", "rm", "tc=1", "level = 72" };
+
+/// What the agreeing netlists exercised, printed with the verdict so a
+/// green run shows it compared something.
+const Coverage = struct { modules: usize = 0, refusals: usize = 0, requests: usize = 0, hdl: usize = 0, bytes: usize = 0 };
+
+/// The verdicts so far: agreed, listed in `spice.xfail`, failed.
+const Tally = struct {
+    xfail: std.StringHashMapUnmanaged([]const u8),
+    seen: std.StringHashMapUnmanaged(void) = .empty,
+    agreed: usize = 0,
+    listed: usize = 0,
+    bad: usize = 0,
+
+    /// Records netlist `key`'s verdict: `why` it differs, or null.
+    fn judge(t: *Tally, ra: Allocator, key: []const u8, why: ?[]const u8) !void {
+        try t.seen.put(ra, key, {});
+        const reason = t.xfail.get(key);
+        if (why) |w| {
+            if (reason != null) {
+                t.listed += 1;
+                return;
+            }
+            t.bad += 1;
+            if (t.bad <= 40) std.debug.print("diff-spice: MISMATCH {s}: {s}\n", .{ key, w });
+        } else if (reason) |r| {
+            t.bad += 1;
+            std.debug.print("diff-spice: XPASS {s} agrees; remove its spice.xfail line ({s})\n", .{ key, r });
+        } else t.agreed += 1;
+    }
+};
 
 // ---- private ----
 
@@ -107,6 +148,57 @@ fn generate(a: Allocator, n: u64) ![]const u8 {
     return out.items;
 }
 
+/// Generated netlist `n` as cards: 1 to 30 lines, each a head and up to
+/// seven tail fields.
+fn generateCards(a: Allocator, n: u64) ![]const u8 {
+    var prng: std.Random.DefaultPrng = .init(n);
+    const r = prng.random();
+    var out: std.ArrayList(u8) = .empty;
+    for (0..1 + r.uintLessThan(usize, 30)) |_| {
+        try out.appendSlice(a, heads[r.uintLessThan(usize, heads.len)]);
+        for (0..r.uintLessThan(usize, 8)) |_| try out.print(a, " {s}", .{tails[r.uintLessThan(usize, tails.len)]});
+        try out.append(a, '\n');
+    }
+    return out.items;
+}
+
+/// The files of generated multi-file netlist `n` (`f0.sp` is the top):
+/// file `k` names only files `k..3`, itself included, so a cycle is a self
+/// read (of the file or of a `.LIB` entry) and the reads stay finite.
+fn generateFiles(a: Allocator, n: u64) ![4][]const u8 {
+    var prng: std.Random.DefaultPrng = .init(n);
+    const r = prng.random();
+    var files: [4][]const u8 = undefined;
+    for (&files, 0..) |*f, k| {
+        var out: std.ArrayList(u8) = .empty;
+        for (0..1 + r.uintLessThan(usize, 6)) |_| {
+            const j = k + r.uintLessThan(usize, 4 - k);
+            const e = r.uintLessThan(usize, 3);
+            switch (r.uintLessThan(u8, 18)) {
+                0 => try out.print(a, ".include f{d}.sp\n", .{j}),
+                1 => try out.print(a, ".inc 'f{d}.sp'\n", .{j}),
+                2 => try out.print(a, ".INCLUDE \"f{d}.sp\"\n", .{j}),
+                3 => try out.print(a, ".lib f{d}.sp e{d}\n", .{ j, e }),
+                4 => try out.print(a, ".LIB 'f{d}.sp' E{d}\n", .{ j, e }),
+                5 => try out.print(a, ".lib e{d}\n", .{e}),
+                6 => try out.appendSlice(a, ".endl\n"),
+                7 => try out.print(a, ".hdl m{d}.va\n", .{e}),
+                8 => try out.appendSlice(a, ".hdl\n.include\n"),
+                9 => try out.appendSlice(a, ".include nothere.sp\n"),
+                10, 11 => try out.print(a, ".subckt s{d} a b\nr1 a b 1k\n.ends\n", .{r.uintLessThan(usize, 6)}),
+                12 => try out.print(a, ".subckt t{d} a b\n", .{k}),
+                13 => try out.print(a, "x1 a b s{d}\n", .{e}),
+                14 => try out.appendSlice(a, ".ends\n"),
+                15 => try out.appendSlice(a, "+ c\n* note\n"),
+                16 => try out.print(a, ".model m{d} r r=1k\n", .{e}),
+                else => try out.print(a, "r{d} a b {d}k\n", .{ e, k }),
+            }
+        }
+        f.* = out.items;
+    }
+    return files;
+}
+
 /// `spice.xfail`: one `<key> <reason>` per line; `#` lines and blank lines
 /// are comments. A line without a reason is refused.
 fn readXfail(a: Allocator, io: std.Io, path: []const u8) !std.StringHashMapUnmanaged([]const u8) {
@@ -124,10 +216,6 @@ fn readXfail(a: Allocator, io: std.Io, path: []const u8) !std.StringHashMapUnman
     }
     return map;
 }
-
-/// What the agreeing netlists exercised, printed with the verdict so a
-/// green run shows it compared something.
-const Coverage = struct { modules: usize = 0, refusals: usize = 0, requests: usize = 0, hdl: usize = 0, bytes: usize = 0 };
 
 /// Runs both readers on `c` and returns null when they agree, else what
 /// differs first.
@@ -210,39 +298,39 @@ test "diff-spice: the vams SPICE reader agrees with spice_cards.synthesize on ev
     try cases.appendSlice(ra, try collect(ra, io, tests_root));
     const from_disk = cases.items.len;
     for (0..generated) |k| try cases.append(ra, .{ .key = try ra.print("gen:{d}", .{k}), .text = try generate(ra, k), .path = "" });
-    const xfail = try readXfail(ra, io, try std.fs.path.join(ra, &.{ tests_root, "differential/spice.xfail" }));
+    for (0..generated_cards) |k| try cases.append(ra, .{ .key = try ra.print("card:{d}", .{k}), .text = try generateCards(ra, k), .path = "" });
+    var tally: Tally = .{ .xfail = try readXfail(ra, io, try std.fs.path.join(ra, &.{ tests_root, "differential/spice.xfail" })) };
 
     var case_arena: std.heap.ArenaAllocator = .init(gpa);
     defer case_arena.deinit();
-    var agreed: usize = 0;
-    var listed: usize = 0;
-    var bad: usize = 0;
-    var seen: std.StringHashMapUnmanaged(void) = .empty;
     var cov: Coverage = .{};
     for (cases.items) |c| {
         _ = case_arena.reset(.retain_capacity);
-        try seen.put(ra, c.key, {});
-        const why = try compare(case_arena.allocator(), io, c, &cov);
-        const reason = xfail.get(c.key);
-        if (why) |w| {
-            if (reason != null) {
-                listed += 1;
-                continue;
-            }
-            bad += 1;
-            if (bad <= 40) std.debug.print("diff-spice: MISMATCH {s}: {s}\n", .{ c.key, w });
-        } else if (reason) |r| {
-            bad += 1;
-            std.debug.print("diff-spice: XPASS {s} agrees; remove its spice.xfail line ({s})\n", .{ c.key, r });
-        } else agreed += 1;
+        try tally.judge(ra, c.key, try compare(case_arena.allocator(), io, c, &cov));
     }
-    var it = xfail.keyIterator();
-    while (it.next()) |k| if (!seen.contains(k.*)) {
-        bad += 1;
+
+    // The multi-file netlists, rewritten into one directory per netlist and
+    // read from it by both sides under a cwd-relative path.
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const dir = try ra.print(".zig-cache/tmp/{s}", .{tmp.sub_path});
+    for (0..generated_files) |k| {
+        _ = case_arena.reset(.retain_capacity);
+        const a = case_arena.allocator();
+        const files = try generateFiles(a, k);
+        for (files, 0..) |f, i| try tmp.dir.writeFile(io, .{ .sub_path = try a.print("f{d}.sp", .{i}), .data = f });
+        const c: Case = .{ .key = try ra.print("files:{d}", .{k}), .text = files[0], .path = try a.print("{s}/f0.sp", .{dir}) };
+        try tally.judge(ra, c.key, try compare(a, io, c, &cov));
+    }
+
+    var it = tally.xfail.keyIterator();
+    while (it.next()) |k| if (!tally.seen.contains(k.*)) {
+        tally.bad += 1;
         std.debug.print("diff-spice: STALE {s} is in spice.xfail but not in the corpus\n", .{k.*});
     };
-    std.debug.print("diff-spice: {d} netlists compared ({d} from tests/, {d} generated), {d} agreed, {d} listed in spice.xfail, {d} failed\n", .{ cases.items.len, from_disk, generated, agreed, listed, bad });
+    const total = cases.items.len + generated_files;
+    std.debug.print("diff-spice: {d} netlists compared ({d} from tests/, {d} word-generated, {d} card-generated, {d} multi-file), {d} agreed, {d} listed in spice.xfail, {d} failed\n", .{ total, from_disk, generated, generated_cards, generated_files, tally.agreed, tally.listed, tally.bad });
     std.debug.print("diff-spice: compared {d} module text bytes, {d} modules, {d} refusals, {d} .hdl names, {d} file requests\n", .{ cov.bytes, cov.modules, cov.refusals, cov.hdl, cov.requests });
     try std.testing.expect(from_disk > 900);
-    try std.testing.expectEqual(@as(usize, 0), bad);
+    try std.testing.expectEqual(@as(usize, 0), tally.bad);
 }

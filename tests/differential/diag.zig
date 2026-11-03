@@ -1,14 +1,19 @@
 //! The differential oracle of the vams `Diag` (`zig build diff-diag`,
 //! docs/rewrite/diag.md). The oracle is lib/diag, the product until the
-//! rewrite replaces it. Three corpora:
+//! rewrite replaces it. The corpora:
 //!
 //! - The catalogue: every old `Code` exists in the new one under the same
 //!   name and tag number, with the same title, LRM clause and explain text;
 //!   `--explain` writes the same bytes for every code in both palettes.
 //! - Scripts: seeded reports (every stage, code, label, note, help and
 //!   fix-it shape, locations none, zero-width, inverted, past the end, in
-//!   two files and an unknown one, duplicates, past the cap) built both ways
-//!   from the same script, the old `Bag` + `Builder` and the new `Wip`.
+//!   two files and an unknown one, duplicates, past the cap, under seeded
+//!   lint levels) built both ways from the same script, the old `Bag` +
+//!   `Builder` and the new `Wip`.
+//! - Levels: every code at every level with a message, a label, a note and
+//!   a fix-it; every `level=code` directive (and malformed ones) through
+//!   `parseFlag` in a seeded order; `editDistance` and `didYouMean` over
+//!   every pair of the catalogue's title words.
 //! - Fixtures: every conformance `.va`/`.vams` fixture with a `//! reject`
 //!   or `//! warn` line, through the old `vera.analyze`; each kept row is
 //!   copied into a `Wip`, its spans resolved through the old file table and
@@ -82,7 +87,10 @@ const Report = struct {
 };
 
 /// What a corpus agreed on, printed with the verdict.
-const Tally = struct { bundles: usize = 0, rows: usize = 0, text_bytes: usize = 0, json_exact: usize = 0, json_relation: usize = 0 };
+const Tally = struct { bundles: usize = 0, rows: usize = 0, text_bytes: usize = 0, json_exact: usize = 0, json_relation: usize = 0, level_sets: usize = 0 };
+
+/// One `Levels.set` a script makes on both sides before it reports.
+const LevelSet = struct { code: u16, level: Diag.Level };
 
 /// How a JSON comparison holds the byte offsets of one span.
 const Offsets = union(enum) {
@@ -275,8 +283,24 @@ fn spanDiff(xo: std.json.ObjectMap, yo: std.json.ObjectMap, offsets: Offsets) !?
     return null;
 }
 
-/// One script bundle: `n` reports from `r`, built both ways and compared.
+/// One script bundle: `n` reports from `r`, under a few random lint
+/// levels half the time, built both ways and compared.
 fn scriptBundle(a: Allocator, r: Random, n: usize, tally: *Tally) !?[]const u8 {
+    const n_codes = @typeInfo(Diag.Code).@"enum".field_names.len;
+    const sets = try a.alloc(LevelSet, if (r.boolean()) r.uintLessThan(usize, 12) else 0);
+    for (sets) |*l| l.* = .{ .code = r.uintLessThan(u16, n_codes), .level = r.enumValueWithIndex(Diag.Level, u8) };
+    const reports = try a.alloc(Report, n);
+    var prev: ?Report = null;
+    for (reports) |*rep| {
+        rep.* = try genReport(a, r, prev);
+        prev = rep.*;
+    }
+    return compareScript(a, reports, sets, .{ .explain_hint = r.boolean(), .summary = r.boolean() }, tally);
+}
+
+/// Sets `sets` in order on both sides (each refusal must agree), builds
+/// `reports` both ways, and compares every rendering.
+fn compareScript(a: Allocator, reports: []const Report, sets: []const LevelSet, opts: diag.RenderOptions, tally: *Tally) !?[]const u8 {
     var bag: diag.Bag = .init(a);
     _ = try bag.addFile(files[0].name, files[0].text);
     _ = try bag.addFile(files[1].name, files[1].text);
@@ -287,17 +311,27 @@ fn scriptBundle(a: Allocator, r: Random, n: usize, tally: *Tally) !?[]const u8 {
     };
     bag.map = .{ .segs = &segs };
     var wip: Diag.Wip = .init(a);
-    var prev: ?Report = null;
-    for (0..n) |_| {
-        const rep = try genReport(a, r, prev);
+    for (sets) |l| {
+        const old = bag.levels.set(@fromBackingInt(l.code), std.meta.stringToEnum(diag.Level, @tagName(l.level)).?);
+        const new = wip.levels.set(@fromBackingInt(l.code), l.level);
+        if (!std.mem.eql(u8, outcome(old), outcome(new))) return try a.print("levels: set({d}, {t}) is {s} old, {s} new", .{ l.code, l.level, outcome(old), outcome(new) });
+        tally.level_sets += 1;
+    }
+    for (reports) |rep| {
         try buildOld(&bag, rep);
         try buildNew(&wip, rep);
-        prev = rep;
+        if (bag.enabled(@fromBackingInt(rep.code)) != wip.enabled(@fromBackingInt(rep.code))) return "enabled differs";
     }
+    if (bag.failed() != wip.failed()) return "failed differs";
     const d = try wip.toOwnedBundle();
     var sources: [2]Diag.Source = undefined;
     for (&sources, files[0..2]) |*s, f| s.* = .{ .name = f.name, .text = f.text, .line_starts = try Diag.lineStarts(a, f.text) };
-    return compareRendered(a, &bag, d, &sources, .script, .{ .explain_hint = r.boolean(), .summary = r.boolean() }, tally);
+    return compareRendered(a, &bag, d, &sources, .script, opts, tally);
+}
+
+/// A `Levels.set` result as text, so the old and new error sets compare.
+fn outcome(r: anytype) []const u8 {
+    return if (r) |_| "ok" else |e| @errorName(e);
 }
 
 /// Every `.va` and `.vams` path under `root` whose text has a `//! reject`
@@ -471,8 +505,8 @@ test "diff-diag: seeded scripts render the same both ways" {
             if (bad <= 5) std.debug.print("diff-diag: MISMATCH script bundle {d}: {s}\n", .{ k, why });
         }
     }
-    std.debug.print("diff-diag: scripts: {d} bundles agree ({d} rows, {d} text bytes, {d} JSON lines byte-equal, {d} by relation), {d} differ\n", .{
-        tally.bundles, tally.rows, tally.text_bytes, tally.json_exact, tally.json_relation, bad,
+    std.debug.print("diff-diag: scripts: {d} bundles agree ({d} rows, {d} level sets, {d} text bytes, {d} JSON lines byte-equal, {d} by relation), {d} differ\n", .{
+        tally.bundles, tally.rows, tally.level_sets, tally.text_bytes, tally.json_exact, tally.json_relation, bad,
     });
     try std.testing.expectEqual(@as(usize, 0), bad);
 }
@@ -521,5 +555,106 @@ test "diff-diag: the old compiler's diagnostics on the reject and warn fixtures 
     });
     try std.testing.expect(fixtures.len > 900);
     try std.testing.expect(tally.rows > 1000);
+    try std.testing.expectEqual(@as(usize, 0), bad);
+}
+
+test "diff-diag: every code at every level, with a message, a label, a note and a fix-it, renders the same" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const codes = std.enums.values(Diag.Code);
+    var tally: Tally = .{};
+    var bad: usize = 0;
+    for (std.enums.values(Diag.Level)) |level| {
+        // Bundles of 48 codes, under the cap, each code at `level`.
+        var first: usize = 0;
+        while (first < codes.len) : (first += 48) {
+            _ = arena_state.reset(.retain_capacity);
+            const a = arena_state.allocator();
+            const chunk = codes[first..@min(first + 48, codes.len)];
+            const sets = try a.alloc(LevelSet, chunk.len);
+            const reports = try a.alloc(Report, chunk.len);
+            for (chunk, sets, reports, 0..) |c, *l, *rep, k| {
+                l.* = .{ .code = @backingInt(c), .level = level };
+                const start: u32 = @intCast(1 + (k * 7) % (text_a.len - 8));
+                const b_at: u32 = @intCast(k % text_b.len);
+                const parts = try a.dupe(Part, &.{
+                    .{ .kind = .label, .where = .{ .file = 1, .start = b_at, .end = b_at + 3 }, .text = "the label" },
+                    .{ .kind = .note, .where = .{ .file = 0, .start = 1, .end = 1 }, .text = "the note" },
+                    .{ .kind = .fix, .where = .{ .file = 0, .start = start, .end = start + 2 }, .text = "fixed" },
+                });
+                rep.* = .{
+                    .stage = @intCast(k % 6),
+                    .code = @backingInt(c),
+                    .where = .{ .file = 0, .start = start, .end = start + 3 },
+                    .msg = "the message",
+                    .point = "here",
+                    .parts = parts,
+                };
+            }
+            if (try compareScript(a, reports, sets, .{}, &tally)) |why| {
+                bad += 1;
+                std.debug.print("diff-diag: MISMATCH {t} bundle at {t}: {s}\n", .{ level, chunk[0], why });
+            }
+        }
+    }
+    std.debug.print("diff-diag: levels: {d} bundles agree ({d} rows, {d} level sets), {d} differ\n", .{ tally.bundles, tally.rows, tally.level_sets, bad });
+    try std.testing.expect(tally.rows > 1000);
+    try std.testing.expectEqual(@as(usize, 0), bad);
+}
+
+test "diff-diag: parseFlag reads the same directives, refuses the same ones, and leaves the same levels" {
+    @setEvalBranchQuota(10_000);
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    var words: std.ArrayList([]const u8) = .empty;
+    for (std.enums.values(Diag.Code)) |c| for ([_][]const u8{ "allow", "warn", "deny", "forbid" }) |w| {
+        try words.append(a, try a.print("{s}={t}", .{ w, c }));
+    };
+    try words.appendSlice(a, &.{ "", "allow", "allow=", "=W0650", "Allow=W0650", "allow=w0650", "allow=W9999", "allow=W0650=x", "allow= W0650", "deny=W0650 " });
+    // Every directive once, in a seeded order, so a `forbid` meets later
+    // directives for the same code.
+    var prng: Random.DefaultPrng = .init(0x1e7e15);
+    prng.random().shuffle([]const u8, words.items);
+    var old: diag.Levels = .empty;
+    var new: Diag.Levels = .empty;
+    var bad: usize = 0;
+    for (words.items) |w| {
+        const os = if (old.parseFlag(w)) |v| (if (v) "true" else "false") else |e| @errorName(e);
+        const ns = if (new.parseFlag(w)) |v| (if (v) "true" else "false") else |e| @errorName(e);
+        if (!std.mem.eql(u8, os, ns)) {
+            bad += 1;
+            if (bad <= 5) std.debug.print("diff-diag: parseFlag(\"{s}\") is {s} old, {s} new\n", .{ w, os, ns });
+        }
+    }
+    for (std.enums.values(diag.Code)) |c| {
+        if (!std.mem.eql(u8, @tagName(old.get(c)), @tagName(new.get(@fromBackingInt(@backingInt(c)))))) bad += 1;
+    }
+    std.debug.print("diff-diag: parseFlag: {d} directives compared, result and final levels; {d} differ\n", .{ words.items.len, bad });
+    try std.testing.expectEqual(@as(usize, 0), bad);
+}
+
+test "diff-diag: editDistance and didYouMean agree over the catalogue's title words" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    var seen: std.StringArrayHashMapUnmanaged(void) = .empty;
+    for (std.enums.values(Diag.Code)) |c| {
+        var it = std.mem.tokenizeAny(u8, Diag.info(c).title, " `'(),:;$");
+        while (it.next()) |w| try seen.put(a, w, {});
+    }
+    const words = seen.keys();
+    var pairs: usize = 0;
+    var bad: usize = 0;
+    for (words) |x| {
+        for (words) |y| for ([_]usize{ 1, 2, 4, 64 }) |limit| {
+            pairs += 1;
+            if (diag.editDistance(x, y, limit) != Diag.editDistance(x, y, limit)) bad += 1;
+        };
+        const o = diag.didYouMean(x, words);
+        const n = Diag.didYouMean(x, words);
+        if ((o == null) != (n == null) or (o != null and !std.mem.eql(u8, o.?, n.?))) bad += 1;
+    }
+    std.debug.print("diff-diag: suggestions: {d} words, {d} distance pairs, {d} differ\n", .{ words.len, pairs, bad });
     try std.testing.expectEqual(@as(usize, 0), bad);
 }

@@ -181,6 +181,9 @@ pub const Lower = struct {
     /// A.6.5 each named block's pc range, by the frame it is compiled in and
     /// its name (`blockKey`), and the disables waiting for every block.
     block_ranges: std.StringHashMapUnmanaged([2]u32) = .empty,
+    /// §12.5 each named block's frame, by the frame around it and its
+    /// `block` instruction, made once (a process's at the walk).
+    block_frames: std.AutoHashMapUnmanaged(struct { outer: u32, inst: Inst.Index }, u32) = .empty,
     disables: std.ArrayList(Disable) = .empty,
     /// §15 the timing checks, and per check the byte its W1199 report is
     /// filed at.

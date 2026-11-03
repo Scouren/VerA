@@ -32,8 +32,9 @@ const Inst = Vir.Inst;
 
 /// The connection an instance gives one of its module's ports: the
 /// parent's expression and the frame it is written in (`none` when the
-/// port is left open).
-pub const Conn = struct { actual: Inst.Ref, frame: u32 };
+/// port is left open), and for an element of an instance array its lane
+/// (`lane[0]`, the lowest bits 0) of `lane[1]` (§12.1.2).
+pub const Conn = struct { actual: Inst.Ref, frame: u32, lane: ?[2]u32 = null };
 
 /// A net from its first declaration `first` and the later ones `decls`
 /// (`first` included) of frame `f`, joined to `conn` when it is a port.
@@ -79,7 +80,10 @@ pub fn declareNet(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Inde
     n.ty = .{ .width = width, .signed = signed };
     if (decl_net) |dn| if (dn.dims.len != 0) return netArray(l, f, first, n, nk, dn);
     // §12.3 a port joined to one whole net of its width is that net.
-    if (conn) |c| if (c.actual != .none) if (try wholeNet(l, c)) |outer| if (outer.ty.width == width) {
+    // §12.1.2 an instance array's element takes its own slice of an
+    // expression as wide as the port times the elements.
+    const slice: ?u32 = if (conn) |c| if (c.lane) |ln| if (c.actual != .none and try actualWidth(l, c) == width * ln[1]) ln[0] * width else null else null else null;
+    if (slice == null) if (conn) |c| if (c.actual != .none) if (try wholeNet(l, c)) |outer| if (outer.ty.width == width) {
         if (decl_net) |dn| if (dn.init.len != 0) return l.refuse("a port with a net declaration assignment");
         // §12.3.10.1 the merged net takes the dominating type (a `tri0`
         // inside a `wire` stays a tri0 and reads 0 undriven).
@@ -101,8 +105,11 @@ pub fn declareNet(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Inde
         return;
     }
     switch (dir) {
-        .input => try deferred.append(l.a, .{ .net = n.net, .frame = c.frame, .source = .{ .expr = .{ .value = c.actual } } }),
-        .output => try send(l, f, c, n.slot, width, signed, deferred),
+        .input => try deferred.append(l.a, .{ .net = n.net, .frame = c.frame, .source = .{ .expr = if (slice) |lo| .{ .value = c.actual, .slice = true, .lo = lo, .total = width * c.lane.?[1] } else .{ .value = c.actual } } }),
+        .output => if (slice) |lo| {
+            const outer = (try wholeNet(l, c)) orelse return l.refuse("§12.1.2 an instance array output sliced into no whole net");
+            try deferred.append(l.a, .{ .net = outer.net, .frame = f, .source = .{ .bridge = .{ .src = n.slot, .src_lo = 0, .dst_lo = lo, .width = width } } });
+        } else try send(l, f, c, n.slot, width, signed, deferred),
         .inout => return l.refuse("an inout port joined to a select, a concatenation or a net of another width"),
         .none => return l.refuse("a port with no direction"),
     }
@@ -228,6 +235,14 @@ fn netArray(l: *Lower, f: u32, first: Inst.Index, proto: Name, kind: net.NetKind
 
 /// The whole net (not an array, not a select) `c.actual` names in its
 /// frame, or null.
+/// The self-determined width of `c.actual` in its frame.
+fn actualWidth(l: *Lower, c: Conn) Error!u32 {
+    const saved = l.frame;
+    defer l.frame = saved;
+    l.frame = c.frame;
+    return (try expr.typeOf(l, c.actual)).width;
+}
+
 fn wholeNet(l: *Lower, c: Conn) Error!?Name {
     const saved = l.frame;
     defer l.frame = saved;

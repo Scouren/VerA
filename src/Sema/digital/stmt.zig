@@ -416,14 +416,7 @@ fn block(l: *Lower, i: Inst.Index, depth: u32) Error!void {
     const outer_scope = l.frames.items[outer].scope;
     const name = vir.string(blk.name);
     if (name.len != 0) {
-        const s = try decl.newScope(l, outer_scope, name, null, l.b.times.items[outer_scope], l.srcOffset(outer, i), false);
-        l.frame = try decl.newFrame(l, outer, l.frames.items[outer].instance, s, l.frames.items[outer].genvars);
-        // §10.2.1 an automatic subroutine's block items are per activation,
-        // which its storage (laid out at its declaration) does not hold.
-        l.frames.items[l.frame].automatic = l.frames.items[outer].automatic;
-        const slots_before = l.b.p.slots.len;
-        try vars.locals(l, l.frame, blk.body);
-        if (l.frames.items[outer].automatic and l.b.p.slots.len != slots_before) return l.refuse("a named block declaring storage in an automatic subroutine");
+        l.frame = try decl.blockFrame(l, outer, i);
     } else for (vir.body(blk.body)) |x| switch (Lower.tag(vir, x)) {
         .variable, .param, .event => return l.refuse("a declaration in an unnamed block"),
         else => {}, // else: a statement

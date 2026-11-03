@@ -156,6 +156,8 @@ pub const Unit = struct {
     binds: std.AutoHashMapUnmanaged(Inst.Index, Bind) = .empty,
     /// The rows of every vector net (`Bind.vector`).
     vec_rows: std.ArrayList(Air.Device.Node.Index) = .empty,
+    /// §5.10 the held variables, by declaration (held.zig).
+    held: std.AutoHashMapUnmanaged(Inst.Index, @import("Sema/held.zig").Why) = .empty,
 };
 
 /// §5.6 what makes two contributions one row.
@@ -183,6 +185,10 @@ pub const Block = struct {
     analog_initial: bool = false,
     /// A `break` or `continue` ended the body: nothing more is appended.
     dead: bool = false,
+    /// Inside an `@(...)` body (§5.10).
+    in_event: bool = false,
+    /// The enclosing named blocks' names, each with a `.` (§5.3.2).
+    path: []const u8 = "",
 
     /// A loop's targets: the `block` a `break` leaves and the one a
     /// `continue` leaves (the step follows it).
@@ -190,7 +196,7 @@ pub const Block = struct {
 
     /// A child of `parent`: the same instance and restrictions, no instructions.
     pub fn child(parent: *Block) Block {
-        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .analog_initial = parent.analog_initial };
+        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path };
     }
 };
 

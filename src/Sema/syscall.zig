@@ -29,6 +29,17 @@ const Block = Sema.Block;
 const Value = Sema.Value;
 const Ref = Air.Inst.Ref;
 
+/// A print `task` left for `finishDisplays`.
+pub const Deferred = struct {
+    unit: *Sema.Unit,
+    tag: SysFn.Tag,
+    args: []const Inst.Ref,
+    /// Each operand's value at the statement; null for one lowered at the end.
+    pre: []const ?Ref,
+    /// Its `device.displays` row.
+    row: u32,
+};
+
 /// A system function call read as a value.
 pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error!Value {
     const vir = b.unit.vir;
@@ -119,17 +130,6 @@ pub fn finishDisplays(s: *Sema, b: *Block) Allocator.Error!void {
     }
     assert(s.deferred.items.len <= s.device.displays.len);
 }
-
-/// A print `task` left for `finishDisplays`.
-pub const Deferred = struct {
-    unit: *Sema.Unit,
-    tag: SysFn.Tag,
-    args: []const Inst.Ref,
-    /// Each operand's value at the statement; null for one lowered at the end.
-    pre: []const ?Ref,
-    /// Its `device.displays` row.
-    row: u32,
-};
 
 // ---- private ----
 

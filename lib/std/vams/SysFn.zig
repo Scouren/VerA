@@ -47,6 +47,8 @@ pub const Tag = enum(u8) {
     cross,
     above,
     timer,
+    initial_step,
+    final_step,
     // §4.6 analysis-dependent functions, §4.6.3 ac_stim, §4.6.4 noise.
     analysis,
     ac_stim,
@@ -296,6 +298,8 @@ pub const table = std.EnumArray(Tag, Info).init(.{
     .cross = .{ .ty = .int, .args = .{ .max = 5 }, .family = .event, .context = .analog },
     .above = .{ .ty = .int, .args = .{ .max = 4 }, .family = .event, .context = .analog },
     .timer = .{ .ty = .int, .args = .{ .min = 1, .max = 4 }, .family = .event, .context = .analog },
+    .initial_step = .{ .ty = .int, .family = .event, .context = .analog },
+    .final_step = .{ .ty = .int, .family = .event, .context = .analog },
     .analysis = .{ .ty = .int, .args = .{ .min = 1 }, .family = .query, .context = .analog },
     .ac_stim = op(.{ .max = 3 }),
     .white_noise = op(.{ .min = 1, .max = 2 }),

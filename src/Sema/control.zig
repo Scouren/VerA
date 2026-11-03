@@ -13,6 +13,7 @@
 //! - `pub fn body(s: *Sema, b: *Block, vb: Vir.Body) Allocator.Error!void`
 //! - `pub fn br(s: *Sema, b: *Block, target: Air.Inst.Index, operand: Air.Inst.Ref) Allocator.Error!void`
 //! - `pub fn ifElse(s: *Sema, b: *Block, cond: Air.Inst.Ref, then_b: *Block, else_b: *Block) Allocator.Error!void`
+//! - `pub fn operands(s: *Sema, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -68,10 +69,9 @@ pub fn ifElse(s: *Sema, b: *Block, cond: Air.Inst.Ref, then_b: *Block, else_b: *
     try b.insts.append(s.arena, blk);
 }
 
-// ---- private ----
-
-/// Adds every instruction `i` reads as an operand to `out`.
-fn operands(s: *Sema, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void {
+/// Adds every instruction `i` reads as an operand to `out` (its payload's
+/// `Ref` and `List(Ref)` fields; a body is not an operand).
+pub fn operands(s: *Sema, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void {
     const data = vir.instructions.items(.data)[@backingInt(i)];
     switch (vir.instructions.items(.tag)[@backingInt(i)]) {
         inline else => |t| switch (comptime Inst.dataKind(t)) {
@@ -94,6 +94,8 @@ fn operands(s: *Sema, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapUnman
     }
 }
 
+// ---- private ----
+
 fn stmt(s: *Sema, b: *Block, i: Inst.Index, tag: Inst.Tag) Allocator.Error!void {
     const unit = b.unit;
     const vir = unit.vir;
@@ -114,7 +116,8 @@ fn stmt(s: *Sema, b: *Block, i: Inst.Index, tag: Inst.Tag) Allocator.Error!void 
         },
         .variable => try local(s, b, i),
         .param, .event => {},
-        .store_nb, .proc_assign, .force, .store_timed, .store_nb_timed, .contrib_indirect, .deassign, .release, .trigger, .disable, .ret, .wait, .delay, .event_wait => try s.fail(.E0512, unit.file, src, "`{t}` is not lowered by Sema yet", .{tag}),
+        .event_wait => try eventWait(s, b, decl.payloadOf(vir, Inst.EventWait, i), src),
+        .store_nb, .proc_assign, .force, .store_timed, .store_nb_timed, .contrib_indirect, .deassign, .release, .trigger, .disable, .ret, .wait, .delay => try s.fail(.E0512, unit.file, src, "`{t}` is not lowered by Sema yet", .{tag}),
         // An expression: lowered where its statement reads it.
         .decl_ref, .str_ref, .int, .big_int, .real, .str, .pos, .neg, .not, .bit_not, .red_and, .red_nand, .red_or, .red_nor, .red_xor, .red_xnor, .add, .sub, .mul, .div, .mod, .pow, .shl, .shr, .ashl, .ashr, .lt, .gt, .lte, .gte, .eq, .neq, .case_eq, .case_neq, .bit_and, .bit_or, .bit_xor, .bit_xnor, .bool_and, .bool_or, .ternary, .mintypmax, .field, .elem, .slice, .slice_up, .slice_down, .call, .call_sys, .port_branch, .concat, .pattern, .replicate, .pattern_repl, .event_or, .posedge, .negedge, .driver_update, .step_event, .paramset_output, .range, .pulse_limits, .delay_ctl, .event_ctl, .repeat_ctl => {},
         .module, .nature, .discipline, .paramset, .primitive, .connectrules, .config, .port, .io, .net, .aliasparam, .genvar, .branch, .instance, .assign, .defparam, .analog, .analog_initial, .initial, .always, .function, .gen_for, .gen_if, .gen_case, .gen_block, .specify, .path, .timing_check, .pulse_style, .timing_event, .ps_override, .connect_resolve, .connect_insert => try s.fail(.E0512, unit.file, src, "`{t}` in an analog body", .{tag}),
@@ -131,7 +134,74 @@ fn task(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!void {
 /// A.6.3 `begin ... end`: its locals, then its statements.
 fn block(s: *Sema, b: *Block, x: Inst.Block) Allocator.Error!void {
     if (x.flags.fork) return s.fail(.E0512, b.unit.file, .none, "a `fork` block in an analog body", .{});
+    const outer = b.path;
+    defer b.path = outer;
+    if (x.name != .empty) b.path = try std.fmt.allocPrint(s.arena, "{s}{s}.", .{ outer, b.unit.vir.string(x.name) });
     try body(s, b, x.body);
+}
+
+/// §5.10 `@(event) s`: the event's flag guards `s`.
+fn eventWait(s: *Sema, b: *Block, x: Inst.EventWait, src: Inst.Ref) Allocator.Error!void {
+    const file = b.unit.file;
+    if (b.in_event) return s.fail(.E0703, file, src, "", .{});
+    if (b.conditional != 0) try s.fail(.E0707, file, src, "", .{});
+    const c = (try eventExpr(s, b, x.event, src)) orelse return;
+    var then_b = b.child();
+    then_b.conditional += 1;
+    then_b.in_event = true;
+    try body(s, &then_b, x.body);
+    var else_b = b.child();
+    try ifElse(s, b, c, &then_b, &else_b);
+}
+
+/// An event expression's flag: §5.10.2 `initial_step`/`final_step`, a
+/// §5.10.3 monitored event, `or` of two.
+fn eventExpr(s: *Sema, b: *Block, r: vams.Vir.Inst.Ref, src: Inst.Ref) Allocator.Error!?Air.Inst.Ref {
+    const vir = b.unit.vir;
+    const i = r.toIndex() orelse {
+        try s.fail(.E0706, b.unit.file, src, "", .{});
+        return null;
+    };
+    switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .event_or => {
+            const x = decl.payloadOf(vir, Inst.Bin, i);
+            const l = (try eventExpr(s, b, x.lhs, src)) orelse return null;
+            const r2 = (try eventExpr(s, b, x.rhs, src)) orelse return null;
+            return try expr.binOp(s, b, .logor, l, r2);
+        },
+        .step_event => {
+            const x = decl.payloadOf(vir, Inst.StepEvent, i);
+            const names = vir.list(Vir.String, x.analyses);
+            const args = try s.arena.alloc(Air.Inst.Ref, names.len);
+            for (names, args) |n, *a| a.* = .fromIntern(try decl.intern(s, .{ .str = vir.string(n) }));
+            const tag: vams.SysFn.Tag = if (x.flags.final) .final_step else .initial_step;
+            return try expr.call(s, b, @backingInt(tag), .integer, args);
+        },
+        .call_sys => {
+            const c = decl.payloadOf(vir, Inst.SysCall, i);
+            const name = vir.string(c.name);
+            const tag = vams.SysFn.Tag.fromName(name) orelse {
+                try s.fail(.E0706, b.unit.file, src, "", .{});
+                return null;
+            };
+            if (vams.SysFn.get(tag).family != .event) {
+                try s.fail(.E0706, b.unit.file, src, "", .{});
+                return null;
+            }
+            const vargs = vir.list(Inst.Ref, c.args);
+            const args = try s.arena.alloc(Air.Inst.Ref, vargs.len);
+            for (vargs, args) |a, *o| o.* = if (a == .none) .fromIntern(.zero_real) else try expr.coerce(s, b, try expr.lower(s, b, a), .real);
+            return try expr.call(s, b, @backingInt(tag), .integer, args);
+        },
+        .posedge, .negedge => {
+            try s.fail(.E0704, b.unit.file, src, "", .{});
+            return null;
+        },
+        else => {
+            try s.fail(.E0512, b.unit.file, src, "this event expression is not lowered by Sema yet", .{});
+            return null;
+        },
+    }
 }
 
 /// A §3.2 variable declared in a block: a slot of its own.
@@ -142,7 +212,13 @@ fn local(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!void {
     if (b.unit.binds.contains(first)) return;
     if (v.dims.len != 0) return s.fail(.E0512, b.unit.file, i.toRef(), "a local array is not lowered by Sema yet", .{});
     const ty = decl.tyOf(v.flags.storage);
-    try b.unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = try decl.addAlloc(s, ty), .ty = ty } });
+    const slot = try decl.addAlloc(s, ty);
+    try b.unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = slot, .ty = ty } });
+    // §5.3.2 a held local of a named block is named by the block path.
+    if (b.path.len != 0 and b.unit.held.contains(first)) try s.device.held.append(s.gpa, .{
+        .name = try s.zcu.intern_pool.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}{s}{s}", .{ b.unit.prefix, b.path, vir.string(v.name) })),
+        .slot = slot,
+    });
 }
 
 /// §5.8.1 `if (c) a else b`.

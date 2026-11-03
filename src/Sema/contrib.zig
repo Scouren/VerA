@@ -15,6 +15,7 @@
 //! - `pub fn access(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value`
 //! - `pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Error!void`
 //! - `pub fn probe(s: *Sema, n: Node.Index) Allocator.Error!Air.Inst.Ref`
+//! - `pub fn loadDisciplines(s: *Sema) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -105,6 +106,7 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
     const callee = c.callee.toIndex() orelse return;
     if (vir.instructions.items(.tag)[@backingInt(callee)] != .str_ref) return s.fail(.E0408, file, src, "", .{});
     const name = vir.string(vir.instructions.items(.data)[@backingInt(callee)].str_tok.start);
+    if (b.in_event) return s.fail(.E0406, file, src, "", .{});
     if (b.loop != null) return s.fail(.E0426, file, src, "", .{});
     const t = (try target(s, b, name, vir.list(Inst.Ref, c.args), src)) orelse return;
     const row = try rowOf(s, b, t);
@@ -142,8 +144,6 @@ pub fn probe(s: *Sema, n: Node.Index) Allocator.Error!Ref {
     return gop.value_ptr.*;
 }
 
-// ---- private ----
-
 /// Fills `s.access_kind` and `s.disc_access` from every discipline once.
 pub fn loadDisciplines(s: *Sema) Allocator.Error!void {
     if (s.disciplines_loaded) return;
@@ -170,6 +170,8 @@ pub fn loadDisciplines(s: *Sema) Allocator.Error!void {
         };
     }
 }
+
+// ---- private ----
 
 /// A nature's `access` attribute, its parent's when it has none.
 fn natureAccess(s: *Sema, name: []const u8, depth: u32) Allocator.Error!?[]const u8 {

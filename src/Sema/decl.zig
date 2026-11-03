@@ -30,6 +30,7 @@ const eval = @import("eval.zig");
 const control = @import("control.zig");
 const syscall = @import("syscall.zig");
 const contrib = @import("contrib.zig");
+const held = @import("held.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Device = Air.Device;
@@ -52,6 +53,7 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     for (s.units.items[1..]) |*u| try bindChildPorts(s, u);
     for (s.units.items) |*u| try params(s, u);
     for (s.units.items) |*u| try branches(s, u);
+    for (s.units.items) |*u| try held.mark(s, u);
     for (s.units.items) |*u| try variables(s, u);
     var main: Block = .{ .parent = null, .unit = &s.units.items[0] };
     for (s.units.items) |*u| {
@@ -445,6 +447,11 @@ fn variables(s: *Sema, unit: *Unit) Allocator.Error!void {
         const first = canonical(vir, i);
         if (unit.binds.contains(first)) continue;
         const ty = tyOf(v.flags.storage);
-        try unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = try addAlloc(s, ty), .ty = ty } });
+        const slot = try addAlloc(s, ty);
+        try unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = slot, .ty = ty } });
+        if (unit.held.contains(first)) try s.device.held.append(s.gpa, .{
+            .name = try s.zcu.intern_pool.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, vir.string(v.name) })),
+            .slot = slot,
+        });
     }
 }

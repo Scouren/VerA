@@ -77,6 +77,8 @@ pub const ParseOptions = struct {
     keywords: KeywordSet = .vams_2023,
 };
 
+/// One row of the node table, 13 bytes SoA: what it is, the token it is
+/// named by, and two words whose reading the tag documents.
 pub const Node = struct {
     tag: Tag,
     main_token: TokenIndex,
@@ -427,6 +429,8 @@ pub const Node = struct {
     }
 };
 
+/// One parse error, kept in the tree: what was wrong at `token`, and the
+/// tag `expected_token` wanted.
 pub const Error = struct {
     tag: Tag,
     token: TokenIndex,
@@ -547,6 +551,7 @@ pub fn parse(gpa: Allocator, source: [:0]const u8, options: ParseOptions) Alloca
     return Parse.run(gpa, source, slice, options);
 }
 
+/// Frees every table `parse` allocated with `gpa`; the tree is undefined after.
 pub fn deinit(tree: *Ast, gpa: Allocator) void {
     tree.tokens.deinit(gpa);
     tree.nodes.deinit(gpa);

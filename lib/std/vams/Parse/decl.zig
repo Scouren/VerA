@@ -50,6 +50,7 @@ const Continue = enum { comma, comma_name };
 /// param_assignment {, param_assignment}`, without the `;`. A comma before
 /// another `parameter` ends the list (A.1.3 shares the comma).
 pub fn parseParamDecl(p: *Parse) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_parameter or p.tokenTag(p.tok_i) == .keyword_localparam or p.tokenTag(p.tok_i) == .keyword_specparam);
     const kw = p.tok_i;
     p.tok_i += 1;
     _ = p.eat(.keyword_signed);
@@ -96,6 +97,7 @@ pub fn parseParamDecl(p: *Parse) Error!Node.Index {
 /// §3.4.6 `aliasparam alias = target ;`; §3.4.7 prints a §9.18 system
 /// parameter as the target.
 pub fn parseAliasparam(p: *Parse) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_aliasparam);
     const kw = p.tok_i;
     p.tok_i += 1;
     _ = try p.expectIdent();
@@ -109,6 +111,7 @@ pub fn parseAliasparam(p: *Parse) Error!Node.Index {
 /// [discipline] [signed] [range] names`, each name `name {dim} [= expr]`,
 /// without the `;`.
 pub fn parseVarDecl(p: *Parse) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_integer or p.tokenTag(p.tok_i) == .keyword_real or p.tokenTag(p.tok_i) == .keyword_string or p.tokenTag(p.tok_i) == .keyword_realtime or p.tokenTag(p.tok_i) == .keyword_time or p.tokenTag(p.tok_i) == .keyword_reg);
     const kw = p.tok_i;
     p.tok_i += 1;
     var range: Node.OptionalIndex = .none;
@@ -122,6 +125,7 @@ pub fn parseVarDecl(p: *Parse) Error!Node.Index {
 
 /// `genvar names ;` (§3.5) or `event names ;` (§5.10.4).
 pub fn parseNameList(p: *Parse) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_genvar or p.tokenTag(p.tok_i) == .keyword_event);
     const kw = p.tok_i;
     p.tok_i += 1;
     const items = try declarators(p, .dims, .comma);
@@ -144,6 +148,7 @@ pub fn parseBlockDecl(p: *Parse) Error!Node.Index {
 /// §3.12 `branch ( a [, b] ) names ;` or `branch ( < p > ) names ;`, each
 /// name `name [range]`.
 pub fn parseBranch(p: *Parse) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_branch);
     const kw = p.tok_i;
     p.tok_i += 1;
     _ = try p.expect(.l_paren);
@@ -167,6 +172,7 @@ pub fn parseBranch(p: *Parse) Error!Node.Index {
 /// only; a task or function formal takes A.2.7's types instead, and an
 /// analog function formal no type but `output integer|time` (A.2.6).
 pub fn parsePortDecl(p: *Parse, where: PortWhere) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_input or p.tokenTag(p.tok_i) == .keyword_output or p.tokenTag(p.tok_i) == .keyword_inout);
     const kw = p.tok_i;
     const dir = p.tokenTag(kw);
     p.tok_i += 1;
@@ -279,6 +285,7 @@ pub fn parseNetDecl(p: *Parse) Error!Node.Index {
 
 /// A.6.1 `assign [drive_strength] [delay3] lhs = rhs {, lhs = rhs} ;`.
 pub fn parseContinuousAssign(p: *Parse) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_assign);
     const kw = p.tok_i;
     p.tok_i += 1;
     if (p.tokenTag(p.tok_i) == .l_paren) try prim.parseDriveStrength(p);

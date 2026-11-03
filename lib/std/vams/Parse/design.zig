@@ -27,6 +27,7 @@ const Error = Parse.Error;
 
 /// A.1.6 `nature name [: parent [. potential|flow]] [;] { attr } endnature`.
 pub fn parseNature(p: *Parse) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_nature);
     const kw = p.tok_i;
     p.tok_i += 1;
     _ = try p.expectIdent();
@@ -47,6 +48,7 @@ pub fn parseNature(p: *Parse) Error!Node.Index {
 /// A.1.7 `discipline name [;] { item } enddiscipline`: nature bindings,
 /// attribute overrides, `domain`, and (§3.6.2.7) user attributes.
 pub fn parseDiscipline(p: *Parse) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_discipline);
     const kw = p.tok_i;
     p.tok_i += 1;
     _ = try p.expectIdent();
@@ -84,6 +86,7 @@ pub fn parseDiscipline(p: *Parse) Error!Node.Index {
 /// contribution, event control, named block or `potential`/`flow` access
 /// (an access function by any other name is Sema's to find).
 pub fn parseParamset(p: *Parse) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_paramset);
     const kw = p.tok_i;
     p.tok_i += 1;
     _ = try p.expectIdent();
@@ -130,6 +133,7 @@ pub fn parseParamset(p: *Parse) Error!Node.Index {
 /// A.1.8 `connectrules name ; { connect_insertion | connect_resolution }
 /// endconnectrules`.
 pub fn parseConnectRules(p: *Parse) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_connectrules);
     const kw = p.tok_i;
     p.tok_i += 1;
     _ = try p.expectIdent();
@@ -179,6 +183,7 @@ pub fn parseConnectRules(p: *Parse) Error!Node.Index {
 /// `cell [lib.]cell liblist|use ... ;`. A library-qualified cell takes no
 /// liblist (§13.3.1.4); at most one default (§13.3.1.2).
 pub fn parseConfig(p: *Parse) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_config);
     const kw = p.tok_i;
     p.tok_i += 1;
     _ = try p.expectIdent();
@@ -226,6 +231,7 @@ pub fn parseConfig(p: *Parse) Error!Node.Index {
 /// library_text, which no source_text derives, so always
 /// `library_text_in_source` once parsed.
 pub fn parseLibraryDecl(p: *Parse) Error!void {
+    assert(p.tokenTag(p.tok_i) == .keyword_library or p.tokenTag(p.tok_i) == .keyword_include);
     const kw = p.tok_i;
     const library = p.tokenTag(kw) == .keyword_library;
     p.tok_i += 1;

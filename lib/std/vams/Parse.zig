@@ -145,6 +145,8 @@ pub fn tokenText(p: *const Parse, i: TokenIndex) []const u8 {
 
 /// Consumes the next token if it is `tag`.
 pub fn eat(p: *Parse, tag: Token.Tag) ?TokenIndex {
+    assert(p.tok_i < p.tokens.len);
+    assert(tag != .eof);
     if (p.tokenTag(p.tok_i) != tag) return null;
     p.tok_i += 1;
     return p.tok_i - 1;
@@ -176,8 +178,11 @@ pub fn expectIdent(p: *Parse) Error!TokenIndex {
 }
 
 pub fn addNode(p: *Parse, tag: Node.Tag, main_token: TokenIndex, data: Node.Data) Allocator.Error!Node.Index {
+    assert(main_token < p.tokens.len);
+    assert(tag != .root);
     const result: Node.Index = @fromBackingInt(@as(u32, @intCast(p.nodes.len)));
     try p.nodes.append(p.gpa, .{ .tag = tag, .main_token = main_token, .data = data });
+    assert(@backingInt(result) == p.nodes.len - 1);
     return result;
 }
 
@@ -194,8 +199,10 @@ pub fn addExtra(p: *Parse, extra: anytype) Allocator.Error!ExtraIndex {
 }
 
 pub fn listToSpan(p: *Parse, list: []const u32) Allocator.Error!Node.SubRange {
+    for (list) |n| assert(n == @backingInt(Node.OptionalIndex.none) or n < p.nodes.len);
     try p.extra_data.appendSlice(p.gpa, list);
     const end: u32 = @intCast(p.extra_data.items.len);
+    assert(end >= list.len);
     return .{ .start = @fromBackingInt(end - @as(u32, @intCast(list.len))), .end = @fromBackingInt(end) };
 }
 
@@ -286,7 +293,9 @@ pub fn pastAttributes(p: *const Parse) TokenIndex {
 /// or up to a keyword that closes the enclosing construct. Always moves
 /// past `before` unless that is `.eof`.
 pub fn recoverItem(p: *Parse, before: TokenIndex) void {
+    assert(p.tok_i >= before);
     if (p.tok_i == before and p.tokenTag(p.tok_i) != .eof) p.tok_i += 1;
+    defer assert(p.tok_i > before or p.tokenTag(p.tok_i) == .eof);
     while (true) : (p.tok_i += 1) switch (p.tokenTag(p.tok_i)) {
         .eof, .keyword_end, .keyword_endmodule, .keyword_endfunction, .keyword_endgenerate, .keyword_endcase, .keyword_endnature, .keyword_enddiscipline, .keyword_analog => return,
         .semicolon => {

@@ -46,6 +46,7 @@ const Chars = struct {
 /// table entries endtable endprimitive`, the ports bare names or (A.5.2)
 /// declarations; at least an output and an input.
 pub fn parseUdpDecl(p: *Parse) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_primitive);
     const kw = p.tok_i;
     p.tok_i += 1;
     _ = try p.expectIdent();

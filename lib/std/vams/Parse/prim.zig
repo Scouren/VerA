@@ -166,6 +166,7 @@ pub fn parseGates(p: *Parse) Error!Node.Index {
 
 /// A.7.1 `specify { specify_item } endspecify`.
 pub fn parseSpecify(p: *Parse) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_specify);
     const kw = p.tok_i;
     p.tok_i += 1;
     const top = p.scratch.items.len;

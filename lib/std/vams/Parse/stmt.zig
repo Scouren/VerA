@@ -140,6 +140,7 @@ pub fn parseFor(p: *Parse, comptime generate: bool) Error!Node.Index {
 /// `case_generate_construct`. An item is `default [:] body` or
 /// `e {, e} : body`.
 pub fn parseCase(p: *Parse, comptime generate: bool) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_case or p.tokenTag(p.tok_i) == .keyword_casex or p.tokenTag(p.tok_i) == .keyword_casez);
     const kw = p.tok_i;
     p.tok_i += 1;
     _ = try p.expect(.l_paren);

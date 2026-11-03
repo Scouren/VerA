@@ -31,6 +31,7 @@ const Error = Parse.Error;
 /// A.1.2 `module_keyword name [ #( parameter_declaration {, ...} ) ]
 /// [ ( ports ) ] ; { module_item } endmodule`.
 pub fn parseModule(p: *Parse) Error!Node.Index {
+    assert(p.tokenTag(p.tok_i) == .keyword_module or p.tokenTag(p.tok_i) == .keyword_macromodule or p.tokenTag(p.tok_i) == .keyword_connectmodule);
     const kw = p.tok_i;
     p.tok_i += 1;
     _ = try p.expectIdent();

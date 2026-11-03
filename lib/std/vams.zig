@@ -5,10 +5,11 @@
 //!
 //! Contents:
 //! - `pub const tokenizer`, `pub const Token`, `pub const Tokenizer`
-//! - `pub const Ast`
+//! - `pub const Ast`, `pub const number_literal`
 //! - `pub const Preprocessor`
 
 pub const tokenizer = @import("vams/tokenizer.zig");
+pub const number_literal = @import("vams/number_literal.zig");
 pub const Ast = @import("vams/Ast.zig");
 pub const Preprocessor = @import("vams/Preprocessor.zig");
 pub const Token = tokenizer.Token;
@@ -16,6 +17,7 @@ pub const Tokenizer = tokenizer.Tokenizer;
 
 test {
     _ = tokenizer;
+    _ = number_literal;
     _ = Ast;
     _ = Preprocessor;
 }

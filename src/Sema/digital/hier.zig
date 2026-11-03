@@ -1,13 +1,18 @@
-//! Downward hierarchical names of the digital lowering (§12.5): a `field`
-//! chain in `Lower.frame` (`u.n0`, `u.v.n0`) whose head is a child instance
-//! of the current instance in; the `Name` the last part binds in the
-//! instance the rest of the chain reaches, out. An upward or absolute name,
-//! an element of an instance array and a name inside a generate block of
-//! the child are refused by name.
-//! Cites: IEEE 1364-2005 §12.5.
+//! Hierarchical names of the digital lowering (§12.5): a `field` chain in
+//! `Lower.frame` (`u.n0`, `top.u.n0`, `blk.x`, `g[1].r`) in; the `Name` its
+//! last part binds in the scope the rest of the chain reaches, out. The
+//! first part is searched for from the current scope outward: a child
+//! scope of that name (an instance, a generate block, a named block, a task
+//! or function), or the scope itself when it is an instance of that module
+//! or instance name, then the enclosing scopes, then the roots by module
+//! name; every later part is a child scope of the one before. An index
+//! selects an instance array element or a loop generate iteration.
+//! Cites: IEEE 1364-2005 §12.5, §12.6.
 //!
 //! Contents:
 //! - `pub fn field(l: *Lower, i: Inst.Index) Error!Name`
+//! - `pub fn scopeOf(l: *Lower, r: Inst.Ref) Error!u32`
+//! - `pub fn frameOf(l: *Lower, s: u32) Error!u32`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -24,8 +29,7 @@ const Inst = Vir.Inst;
 pub fn field(l: *Lower, i: Inst.Index) Error!Name {
     const vir = l.virOf(l.frame);
     const fd = Lower.payload(vir, Inst.Field, i);
-    const k = try instanceOf(l, vir, fd.operand, 0);
-    const f = l.instance_frame[k];
+    const f = try frameOf(l, try scopeOf(l, fd.operand));
     const want = vir.string(fd.name);
     const cvir = l.virOf(f);
     var it = l.frames.items[f].names.iterator();
@@ -34,59 +38,93 @@ pub fn field(l: *Lower, i: Inst.Index) Error!Name {
         if (n.kind == .sub or n.kind == .scope) return l.refuse("a hierarchical name of a task, function or scope read as a value");
         return n;
     };
-    return l.refuse("a hierarchical name its instance does not declare at its top");
+    return l.refuse("a hierarchical name its scope does not declare");
+}
+
+/// The `Program.scopes` row the scope part chain `r` names from
+/// `Lower.frame`.
+pub fn scopeOf(l: *Lower, r: Inst.Ref) Error!u32 {
+    return part(l, l.virOf(l.frame), r, null, 0);
+}
+
+/// The frame binding scope `s`'s declarations: an instance's, a generate
+/// block's, a named block's, or a static task's or function's.
+pub fn frameOf(l: *Lower, s: u32) Error!u32 {
+    for (l.frames.items, 0..) |fr, k| if (fr.scope == s) return @intCast(k);
+    return l.refuse("a hierarchical name of a scope with no declarations");
 }
 
 // ---- private ----
 
-/// The child instance `r` names from `Lower.frame`: an `instance` the
-/// current instance holds, or a child of one a shorter chain reaches.
-fn instanceOf(l: *Lower, vir: *const Vir, r: Inst.Ref, depth: u32) Error!u32 {
-    if (depth > l.frames.items.len) return l.refuse("a hierarchical name nested past the design");
+fn part(l: *Lower, vir: *const Vir, r: Inst.Ref, index: ?i64, depth: u32) Error!u32 {
+    if (depth > l.b.scopes.items.len) return l.refuse("a hierarchical name nested past the design");
     const i = r.toIndex() orelse return l.refuse("a hierarchical name of nothing");
-    const root = l.rootFrame(l.frame);
+    const data = vir.instructions.items(.data)[@backingInt(i)];
     switch (Lower.tag(vir, i)) {
-        .decl_ref => {
-            const d = vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl;
-            if (Lower.tag(vir, d) != .instance) return l.refuse("a hierarchical name whose head is no instance");
-            return only(l, for (l.sites, 0..) |s, k| {
-                if (s.frame != none and s.inst == d and l.rootFrame(s.frame) == root) break @intCast(k);
-            } else none, d, root);
-        },
         .field => {
             const fd = Lower.payload(vir, Inst.Field, i);
-            const parent = try instanceOf(l, vir, fd.operand, depth + 1);
-            const want = vir.string(fd.name);
-            const pf = l.instance_frame[parent];
-            const pvir = l.virOf(pf);
-            for (l.sites, 0..) |s, k| {
-                if (s.frame == none or l.rootFrame(s.frame) != pf) continue;
-                if (std.mem.eql(u8, pvir.string(Lower.payload(pvir, Inst.Instance, s.inst).name), want)) {
-                    if (Lower.payload(pvir, Inst.Instance, s.inst).range.len != 0) return l.refuse("a hierarchical name through an instance array");
-                    return @intCast(k);
-                }
-            }
-            return l.refuse("a hierarchical name of an instance its parent does not hold");
+            const parent = try part(l, vir, fd.operand, null, depth + 1);
+            return child(l, parent, vir.string(fd.name), index) orelse l.refuse("a hierarchical name of a scope its parent does not hold");
         },
-        else => return l.refuse("an upward or absolute hierarchical name"),
+        .elem => {
+            if (index != null) return l.refuse("a hierarchical name of a multidimensional instance array");
+            const b = Lower.payload(vir, Inst.Bin, i);
+            return part(l, vir, b.lhs, try l.intOf(l.frame, b.rhs), depth + 1);
+        },
+        .str_ref => return head(l, vir.string(data.str_tok.start), index),
+        .decl_ref => return head(l, declName(vir, data.decl_tok.decl), index),
+        else => return l.refuse("a hierarchical name part that is no name"),
     }
 }
 
-/// `k` when it is the one instance `d` makes in the instance of frame
-/// `root` (an instance array makes several), else refused.
-fn only(l: *Lower, k: u32, d: Inst.Index, root: u32) Error!u32 {
-    if (k == none) return l.refuse("a hierarchical name of an instance the walk did not place");
-    var count: u32 = 0;
-    for (l.sites) |s| if (s.frame != none and s.inst == d and l.rootFrame(s.frame) == root) {
-        count += 1;
-    };
-    if (count != 1) return l.refuse("a hierarchical name through an instance array");
-    assert(k < l.sites.len);
-    return k;
+/// §12.5 the first part `name` (and `index`): from the current scope
+/// outward, a child of that name or the instance itself, then a root.
+fn head(l: *Lower, name: []const u8, index: ?i64) Error!u32 {
+    if (name.len == 0) return l.refuse("a hierarchical name of an unnamed scope");
+    var s = l.frames.items[l.frame].scope;
+    var steps: usize = 0;
+    while (steps <= l.b.scopes.items.len) : (steps += 1) {
+        if (child(l, s, name, index)) |c| return c;
+        if (index == null and instanceNamed(l, s, name)) return s;
+        const parent = l.b.scopes.items[s].parent;
+        if (parent == s) break;
+        s = parent;
+    }
+    for (l.roots.items) |root| if (index == null and instanceNamed(l, root, name)) return root;
+    return l.refuse("a hierarchical name whose first part names no scope");
 }
 
-/// The name declaration `d` declares, or "" for one that names nothing a
-/// hierarchical name reaches.
+/// The child scope of `s` named `name` with index `index`, or null.
+fn child(l: *Lower, s: u32, name: []const u8, index: ?i64) ?u32 {
+    for (l.b.scopes.items, 0..) |sc, k| {
+        if (sc.parent != s or k == s) continue;
+        if (!std.mem.eql(u8, text(l, sc.name), name)) continue;
+        const ki: ?i64 = if (sc.index) |x| x else null;
+        if (ki == index) return @intCast(k);
+    }
+    return null;
+}
+
+/// Whether scope `s` is an instance whose module or instance is `name`.
+fn instanceNamed(l: *Lower, s: u32, name: []const u8) bool {
+    if (std.mem.eql(u8, text(l, l.b.scopes.items[s].name), name) and l.b.scopes.items[s].index == null) return isInstance(l, s);
+    for (l.instance_frame) |f| if (l.frames.items[f].scope == s) {
+        const d = l.zcu.instances.items(.module)[@backingInt(l.frames.items[f].instance)];
+        return std.mem.eql(u8, l.virOf(f).string(l.zcu.declRow(d).name), name);
+    };
+    return false;
+}
+
+fn isInstance(l: *Lower, s: u32) bool {
+    for (l.instance_frame) |f| if (l.frames.items[f].scope == s) return true;
+    return false;
+}
+
+fn text(l: *Lower, s: anytype) []const u8 {
+    return l.b.string_bytes.items[s.start..][0..s.len];
+}
+
+/// The name declaration `d` declares, or "".
 fn declName(vir: *const Vir, d: Inst.Index) []const u8 {
     return vir.string(switch (Lower.tag(vir, d)) {
         .variable => Lower.payload(vir, Inst.Variable, d).name,
@@ -94,6 +132,10 @@ fn declName(vir: *const Vir, d: Inst.Index) []const u8 {
         .io => Lower.payload(vir, Inst.Io, d).name,
         .param => Lower.payload(vir, Inst.Param, d).name,
         .event => Lower.payload(vir, Inst.Name, d).name,
-        else => return "", // else: a subroutine, block or generate scope
+        .instance => Lower.payload(vir, Inst.Instance, d).name,
+        .gen_block => Lower.payload(vir, Inst.GenBlock, d).name,
+        .block => Lower.payload(vir, Inst.Block, d).name,
+        .function => Lower.payload(vir, Inst.Function, d).name,
+        else => return "", // else: no other declaration names a scope or value
     });
 }

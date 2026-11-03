@@ -12,6 +12,7 @@
 //! - `pub fn declare(l: *Lower) Error!void`
 //! - `pub fn newScope(l: *Lower, parent: u32, name: []const u8, index: ?i64, time: Program.Time, at: u32, queued: bool) Error!u32`
 //! - `pub fn newFrame(l: *Lower, parent: u32, instance: Zcu.Instance.Index, scope: u32, genvars: []const Frame.Genvar) Error!u32`
+//! - `pub fn blockFrame(l: *Lower, outer: u32, i: Inst.Index) Error!u32`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -40,7 +41,7 @@ const Inst = Vir.Inst;
 /// The most iterations one loop generate scheme unrolls (`walk.zig`'s).
 const loop_max: u32 = 1 << 16;
 
-const Placement = struct { scope: u32 = none, frame: u32 = none, inst: Inst.Index = undefined, index: ?i64 = null, at: u32 = 0, name: []const u8 = "" };
+const Placement = struct { scope: u32 = none, frame: u32 = none, inst: Inst.Index = undefined, index: ?i64 = null, lane: ?[2]u32 = null, at: u32 = 0, name: []const u8 = "" };
 const Child = struct { parent: u32, name: InternPool.String };
 
 const Walk = struct {
@@ -100,7 +101,58 @@ pub fn newFrame(l: *Lower, parent: u32, instance_index: Zcu.Instance.Index, scop
     return f;
 }
 
+/// §12.5 named block `i` of frame `outer`: its scope and frame, its block
+/// items bound, made the first time it is asked for.
+pub fn blockFrame(l: *Lower, outer: u32, i: Inst.Index) Error!u32 {
+    const gop = try l.block_frames.getOrPut(l.a, .{ .outer = outer, .inst = i });
+    if (gop.found_existing) return gop.value_ptr.*;
+    const vir = l.virOf(outer);
+    const blk = Lower.payload(vir, Inst.Block, i);
+    const outer_scope = l.frames.items[outer].scope;
+    const s = try newScope(l, outer_scope, vir.string(blk.name), null, l.b.times.items[outer_scope], l.srcOffset(outer, i), false);
+    const f = try newFrame(l, outer, l.frames.items[outer].instance, s, l.frames.items[outer].genvars);
+    // §10.2.1 an automatic subroutine's block items are per activation,
+    // which its storage (laid out at its declaration) does not hold.
+    l.frames.items[f].automatic = l.frames.items[outer].automatic;
+    gop.value_ptr.* = f;
+    const slots_before = l.b.p.slots.len;
+    try vars.locals(l, f, blk.body);
+    if (l.frames.items[outer].automatic and l.b.p.slots.len != slots_before) return l.refuse("a named block declaring storage in an automatic subroutine");
+    return f;
+}
+
 // ---- private ----
+
+/// §12.5 the named blocks of a process body, made at the walk (as
+/// lib/sim/digital's elaboration binds them), so a hierarchical name in any
+/// process reaches them.
+fn preBlocks(l: *Lower, f: u32, b: Vir.Body, depth: u32) Error!void {
+    if (depth >= 1 << 12) return l.refuse("statements nested past 4096 levels");
+    const vir = l.virOf(f);
+    for (vir.body(b)) |i| switch (Lower.tag(vir, i)) {
+        .block => {
+            const blk = Lower.payload(vir, Inst.Block, i);
+            const inner = if (blk.name == .empty) f else try blockFrame(l, f, i);
+            try preBlocks(l, inner, blk.body, depth + 1);
+        },
+        .condbr => {
+            const c = Lower.payload(vir, Inst.CondBr, i);
+            try preBlocks(l, f, c.then, depth + 1);
+            try preBlocks(l, f, c.@"else", depth + 1);
+        },
+        .loop => {
+            const lp = Lower.payload(vir, Inst.Loop, i);
+            try preBlocks(l, f, lp.body, depth + 1);
+            try preBlocks(l, f, lp.step, depth + 1);
+        },
+        .repeat => try preBlocks(l, f, Lower.payload(vir, Inst.Repeat, i).body, depth + 1),
+        .delay => try preBlocks(l, f, Lower.payload(vir, Inst.Delay, i).body, depth + 1),
+        .event_wait => try preBlocks(l, f, Lower.payload(vir, Inst.EventWait, i).body, depth + 1),
+        .wait => try preBlocks(l, f, Lower.payload(vir, Inst.Wait, i).body, depth + 1),
+        .case => for (vir.list(Inst.Arm, Lower.payload(vir, Inst.Case, i).arms)) |arm| try preBlocks(l, f, arm.body, depth + 1),
+        else => {}, // else: no other statement nests one
+    };
+}
 
 /// One instance: its env (its module's parameters as `Zcu` folded them),
 /// its scope and frame, then its module's items.
@@ -151,8 +203,12 @@ fn instance(w: *Walk, k: u32) Error!void {
             },
             else => continue, // else: a header holds only ports and port declarations
         };
-        try w.conns.put(l.a, inner, .{ .actual = actual, .frame = if (actual == .none) none else w.placed[k].frame });
+        try w.conns.put(l.a, inner, .{ .actual = actual, .frame = if (actual == .none) none else w.placed[k].frame, .lane = w.placed[k].lane });
     }
+    // A.1.3 the header's `#( parameter ... )` list, before the body's items.
+    for (vir.body(m.params)) |p| if (Lower.tag(vir, p) == .param) {
+        _ = try vars.param(l, f, p);
+    };
     try items(w, f, scope, if (m.flags.ansi) m.ports else .empty, m.body, "");
 }
 
@@ -183,13 +239,18 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
     for (later.keys(), later.values()) |first, decls| try signal(w, f, first, decls.items, if (top) w.conns.get(first) else null);
     try l.wires.appendSlice(l.a, w.deferred.items);
     try ports.implicitNets(l, f, all);
+    // A parameter's value may call a constant function (§10.4.5).
+    for (all) |i| if (Lower.tag(vir, i) == .function) try sub.declare(l, f, scope, i);
     for (all) |i| switch (Lower.tag(vir, i)) {
         .param => _ = try vars.param(l, f, i),
         .event => _ = try vars.event(l, f, i),
         else => {}, // else: declared above or below
     };
     for (all) |i| switch (Lower.tag(vir, i)) {
-        .initial, .always => try l.scopes.items[scope].procs.append(l.a, .{ .kind = if (Lower.tag(vir, i) == .initial) .initial else .always, .inst = i, .frame = f }),
+        .initial, .always => {
+            try l.scopes.items[scope].procs.append(l.a, .{ .kind = if (Lower.tag(vir, i) == .initial) .initial else .always, .inst = i, .frame = f });
+            try preBlocks(l, f, Lower.payload(vir, Inst.Process, i).body, 0);
+        },
         .variable => if (Lower.payload(vir, Inst.Variable, i).init.len != 0) {
             try l.scopes.items[scope].procs.append(l.a, .{ .kind = .init_var, .inst = i, .frame = f });
         },
@@ -201,9 +262,10 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
         .gen_for => try genFor(w, f, scope, Lower.payload(vir, Inst.GenFor, i), prefix),
         .gen_block => try genBlock(w, f, scope, i, null, &.{}, prefix),
         .assign => try nets.assign(l, f, i),
-        .function => try sub.declare(l, f, scope, i),
+        .function => {}, // declared above
         .specify => try specify.block(l, f, i),
-        .defparam, .genvar, .param, .event, .port, .net => {},
+        .defparam => try l.defparam_frames.put(l.a, .{ .instance = @backingInt(l.frames.items[f].instance), .inst = i }, f),
+        .genvar, .param, .event, .port, .net => {},
         .analog, .analog_initial => return l.refuse("an analog block"),
         else => {}, // else: an expression of a range or a delay, read where it is used
     };
@@ -334,21 +396,23 @@ fn childInstance(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8
     if (in.flags.kind == .udp) return l.refuse("a UDP instance of no primitive");
     const name = vir.string(in.name);
     const at = l.srcOffset(f, i);
-    if (in.range.len == 0) return place(w, f, scope, i, prefix, name, null, at);
+    if (in.range.len == 0) return place(w, f, scope, i, prefix, name, null, null, at);
     const r = vir.body(in.range);
     const bin = Lower.payload(vir, Inst.Bin, r[r.len - 1]);
     const msb = try l.intOf(f, bin.lhs);
     const lsb = try l.intOf(f, bin.rhs);
     var k: i64 = @min(msb, lsb);
-    while (k <= @max(msb, lsb)) : (k += 1) try place(w, f, scope, i, prefix, name, k, at);
+    // §12.1.2 the leftmost index takes the most significant lane.
+    const lanes: u32 = @intCast(@abs(msb - lsb) + 1);
+    while (k <= @max(msb, lsb)) : (k += 1) try place(w, f, scope, i, prefix, name, k, .{ lanes - 1 - @as(u32, @intCast(@abs(k - msb))), lanes }, at);
 }
 
-fn place(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8, name: []const u8, index: ?i64, at: u32) Error!void {
+fn place(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8, name: []const u8, index: ?i64, lane: ?[2]u32, at: u32) Error!void {
     const l = w.l;
     const full = if (index) |k| try std.fmt.allocPrint(l.a, "{s}{s}[{d}]", .{ prefix, name, k }) else try std.fmt.allocPrint(l.a, "{s}{s}", .{ prefix, name });
     const key: Child = .{ .parent = w.index, .name = try l.zcu.intern_pool.getString(l.a, full) };
     const child = w.children.get(key) orelse return l.refuse("an instance the elaboration did not make");
-    w.placed[child] = .{ .scope = scope, .frame = f, .inst = i, .index = index, .at = at, .name = name };
+    w.placed[child] = .{ .scope = scope, .frame = f, .inst = i, .index = index, .lane = lane, .at = at, .name = name };
 }
 
 /// A variable, net or port, from its first declaration `first` and the

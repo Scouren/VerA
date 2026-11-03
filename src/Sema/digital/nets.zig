@@ -390,6 +390,7 @@ pub fn finish(l: *Lower, p: *Program) Error!void {
     @memset(slot_net, none);
     for (nets, 0..) |n, k| slot_net[n.slot] = @intCast(k);
     p.slot_net = slot_net;
+    try switchJoined(l, p);
 }
 
 /// The net bits lvalue operand `r` names: a whole net (or net array
@@ -471,6 +472,29 @@ fn undriven(kind: net.NetKind) Bit {
         .trireg => .x,
         .wire, .tri, .triand, .trior, .wand, .wor, .uwire, .wreal => .z,
     };
+}
+
+/// §7.6 every switch-joined net resolved once at time 0, by the run's own
+/// group resolution over the drivers' time-0 values (lib/sim/digital's
+/// elaboration does the same): its slot, signals and resolution as the
+/// group leaves them.
+fn switchJoined(l: *Lower, p: *Program) Error!void {
+    for (p.nets) |n| {
+        if (n.trans.len != 0) break;
+    } else return;
+    var discard: std.Io.Writer.Discarding = .init(&.{});
+    var s = std_sim.State.init(l.a, p, &discard.writer) catch |e| switch (e) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.SimFailed, error.WriteFailed => return l.refuse("a design the runtime cannot start"),
+    };
+    for (p.nets, 0..) |n, k| if (n.trans.len != 0) std_sim.resolve.resolve(&s, l.a, @intCast(k)) catch |e| switch (e) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.SimFailed, error.WriteFailed => return l.refuse("a switch-joined net the runtime cannot resolve at time 0"),
+    };
+    p.init_v = s.v;
+    p.init_x = s.x;
+    p.signal_init = s.signals;
+    p.resolved_init = s.net_resolved;
 }
 
 /// The bits of each driver no operand value can make other than z are z

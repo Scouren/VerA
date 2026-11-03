@@ -15,7 +15,7 @@
 //! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
-//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `refuse`, `refuseFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
+//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
 //! - `pub const none: u32`
 //! - `pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *[]const u8) Error!Lowered`
 
@@ -31,6 +31,7 @@ const decl = @import("digital/decl.zig");
 const stmt = @import("digital/stmt.zig");
 const nets = @import("digital/nets.zig");
 const sub = @import("digital/sub.zig");
+const vars = @import("digital/vars.zig");
 const gates = @import("digital/gates.zig");
 const Program = std_sim.Program;
 const Builder = std_sim.Builder;
@@ -161,6 +162,9 @@ pub const Lower = struct {
     /// (`site.frame` `none` for a root).
     instance_frame: []u32 = &.{},
     sites: []Site = &.{},
+    /// §12.2.1 the frame each `defparam` of each instance is written in
+    /// (a generate block's, for one inside it).
+    defparam_frames: std.AutoHashMapUnmanaged(struct { instance: u32, inst: Inst.Index }, u32) = .empty,
     /// Per instance, its `eval.Env` (its module's parameters as folded).
     envs: []eval.Env = &.{},
     /// The roots' scopes, in order.
@@ -175,14 +179,28 @@ pub const Lower = struct {
     /// §8.5.3.3 the hold cells handed out so far, one per intra-assignment
     /// timing control.
     holds: u32 = 0,
+    /// Parameters `Sema/eval.zig` does not fold: each slot and the row of
+    /// its value, evaluated at the end (`vars.finishParams`).
+    late_params: std.ArrayList(LateParam) = .empty,
+    /// §9.7.2 the processes keeping an expression term's hidden slot,
+    /// queued at time 0 before every other.
+    term_starts: std.ArrayList(u32) = .empty,
     /// A.6.5 each named block's pc range, by the frame it is compiled in and
     /// its name (`blockKey`), and the disables waiting for every block.
     block_ranges: std.StringHashMapUnmanaged([2]u32) = .empty,
+    /// §12.5 each named block's frame, by the frame around it and its
+    /// `block` instruction, made once (a process's at the walk).
+    block_frames: std.AutoHashMapUnmanaged(struct { outer: u32, inst: Inst.Index }, u32) = .empty,
     disables: std.ArrayList(Disable) = .empty,
     /// §15 the timing checks, and per check the byte its W1199 report is
     /// filed at.
     checks: std.ArrayList(Program.Check) = .empty,
     check_sites: std.ArrayList(u32) = .empty,
+    /// §18.1 a dump task was lowered: the catalog is written at the end.
+    dumps: bool = false,
+    /// §17.2.10 an `$sdf_annotate` was lowered: the scope table is written
+    /// at the end.
+    sdf: bool = false,
     /// A function body is being compiled (§10.4.4: its fork runs in order).
     in_function: bool = false,
     /// The nets, their drivers (compiled after the walk), per slot its
@@ -203,6 +221,11 @@ pub const Lower = struct {
 
     /// A.6.5 a `disable` at pc `pc` of the name `name`, written in frame `frame`.
     pub const Disable = struct { pc: u32, frame: u32, name: []const u8 };
+
+    /// A parameter `Sema/eval.zig` does not fold: its slot and type, its
+    /// final value expression and the frame it is written in, and once
+    /// compiled (after every subroutine is declared) the value's row.
+    pub const LateParam = struct { slot: u32, ty: Type, frame: u32, value: Inst.Ref, row: u32 = none };
 
     /// A child instance's `instance` instruction and the parent frame it is in.
     pub const Site = struct { frame: u32, inst: Inst.Index };
@@ -341,6 +364,10 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *[]const u8) Er
         return e;
     };
     var program = b.finish();
+    vars.finishParams(&l, &program) catch |e| {
+        why.* = l.why;
+        return e;
+    };
     nets.finish(&l, &program) catch |e| {
         why.* = l.why;
         return e;

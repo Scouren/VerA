@@ -240,18 +240,22 @@ fn armBody(ag: *AstGen, scope: *Scope, arm: Node.Index, n: u32, loop: bool) Erro
 }
 
 /// One generate scope: named as written, or `genblk<n>` with zeros added
-/// until it names nothing else in `scope` (§12.4.3).
+/// until it names nothing else in `scope`, every arm of construct `n` the
+/// same name (§12.4.3: "if such a name conflicts with an explicitly
+/// declared name").
 fn genBlock(ag: *AstGen, scope: *Scope, arm: Node.Index, n: u32) Error!void {
     const tree = ag.tree;
     const inst = ag.block_insts.get(arm).?;
     const named = namedBlock(tree, arm);
     const name = if (named) |t| try ag.identString(t) else auto: {
+        if (scope.auto) |a| if (a.n == n) break :auto a.name;
         var zeros: usize = 0;
         while (true) : (zeros += 1) {
             const text = try ag.arena.print("genblk{s}{d}", .{ ("00000000")[0..zeros], n });
             const s = try ag.string(text);
             if (zeros == genblk_zeros_max or !scope.names.contains(s)) {
                 _ = try scope.declare(ag.arena, s, inst);
+                scope.auto = .{ .n = n, .name = s };
                 break :auto s;
             }
         }

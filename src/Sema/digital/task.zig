@@ -20,6 +20,9 @@ const kernels = @import("kernels");
 const digital = @import("../digital.zig");
 const expr = @import("expr.zig");
 const place = @import("place.zig");
+const vcd = @import("vcd.zig");
+const sdf = @import("sdf.zig");
+const hier = @import("hier.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const none = digital.none;
@@ -28,7 +31,7 @@ const Vir = vams.Vir;
 const Inst = Vir.Inst;
 
 const Show = struct { radix: Program.Radix, newline: bool };
-const Kind = union(enum) { show: Show, strobe: Show, monitor: Show, monitor_on, monitor_off, finish, stop, timeformat, fshow: Show, fstrobe: Show, fmonitor: Show, swrite: Show, sformat, readmem: Program.Radix, fclose, fflush, queue: Program.QueueOp, printtimescale };
+const Kind = union(enum) { show: Show, strobe: Show, monitor: Show, monitor_on, monitor_off, finish, stop, timeformat, fshow: Show, fstrobe: Show, fmonitor: Show, swrite: Show, sformat, readmem: Program.Radix, fclose, fflush, queue: Program.QueueOp, printtimescale, dump: Program.DumpOp, ports: Program.PortsOp, sdf };
 
 const tasks = std.StaticStringMap(Kind).initComptime(.{
     .{ "$display", Kind{ .show = .{ .radix = .decimal, .newline = true } } },
@@ -82,6 +85,20 @@ const tasks = std.StaticStringMap(Kind).initComptime(.{
     .{ "$q_remove", Kind{ .queue = .remove } },
     .{ "$q_exam", Kind{ .queue = .exam } },
     .{ "$printtimescale", Kind.printtimescale },
+    .{ "$sdf_annotate", Kind.sdf },
+    .{ "$dumpports", Kind{ .ports = .ports } },
+    .{ "$dumpportsoff", Kind{ .ports = .off } },
+    .{ "$dumpportson", Kind{ .ports = .on } },
+    .{ "$dumpportsall", Kind{ .ports = .all } },
+    .{ "$dumpportslimit", Kind{ .ports = .limit } },
+    .{ "$dumpportsflush", Kind{ .ports = .flush } },
+    .{ "$dumpfile", Kind{ .dump = .file } },
+    .{ "$dumpvars", Kind{ .dump = .vars } },
+    .{ "$dumpoff", Kind{ .dump = .off } },
+    .{ "$dumpon", Kind{ .dump = .on } },
+    .{ "$dumpall", Kind{ .dump = .all } },
+    .{ "$dumplimit", Kind{ .dump = .limit } },
+    .{ "$dumpflush", Kind{ .dump = .flush } },
 });
 
 /// Appends the `.task` instruction of system task call `i`.
@@ -148,6 +165,9 @@ pub fn task(l: *Lower, i: Inst.Index) Error!void {
             break :blk .{ .kind = .queue, .a = try queueCall(l, op, args, outs) };
         },
         .printtimescale => .{ .kind = .show, .a = try printTimescale(l, args) },
+        .dump => |op| .{ .kind = .dump, .a = try vcd.task(l, i, op, args) },
+        .ports => |op| .{ .kind = .ports, .a = try vcd.ports(l, i, op, args) },
+        .sdf => .{ .kind = .sdf, .a = try sdf.task(l, args) },
         .monitor_on => .{ .kind = .monitor_on, .a = 0 },
         .monitor_off => .{ .kind = .monitor_off, .a = 0 },
         .finish, .stop => blk: {
@@ -210,22 +230,34 @@ pub fn scopePath(l: *Lower, scope: u32, out: *std.ArrayList(u8), depth: u32) Err
 /// instance (or the local object the argument names) and its module's time
 /// unit and precision.
 fn printTimescale(l: *Lower, args: []const Inst.Ref) Error!u32 {
-    const scope = l.frames.items[l.rootFrame(l.frame)].scope;
-    var text: std.ArrayList(u8) = .empty;
-    try text.appendSlice(l.a, "Time scale of (");
-    try scopePath(l, scope, &text, 0);
     if (args.len > 1) return l.refuse("$printtimescale with more than one argument");
+    var scope = l.frames.items[l.rootFrame(l.frame)].scope;
+    var leaf: []const u8 = "";
     if (args.len == 1) {
         const vir = l.virOf(l.frame);
         const i = args[0].toIndex() orelse return l.refuse("$printtimescale of an omitted argument");
-        if (Lower.tag(vir, i) != .decl_ref) return l.refuse("$printtimescale of a hierarchical name");
-        const d = vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl;
-        switch (Lower.tag(vir, d)) {
-            .variable, .net, .param, .io, .event => {},
-            else => return l.refuse("$printtimescale of a scope"),
+        const d: ?Inst.Index = if (Lower.tag(vir, i) == .decl_ref) vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl else null;
+        const object = if (d) |x| switch (Lower.tag(vir, x)) {
+            .variable, .net, .param, .io, .event => true,
+            else => false, // else: an instance, block or generate block names a scope
+        } else false;
+        if (object) {
+            leaf = vir.string(declName(vir, d.?));
+        } else if (hier.scopeOf(l, args[0])) |s| {
+            // §17.3.1 a scope: an instance (or named block) by its name.
+            scope = s;
+        } else |e| {
+            if (e != error.Unsupported or Lower.tag(vir, i) != .field) return e;
+            // §17.3.1 an object a hierarchical name reaches, and its scope.
+            const fd = Lower.payload(vir, Inst.Field, i);
+            scope = try hier.scopeOf(l, fd.operand);
+            leaf = vir.string(fd.name);
         }
-        try text.print(l.a, ".{s}", .{vir.string(declName(vir, d))});
     }
+    var text: std.ArrayList(u8) = .empty;
+    try text.appendSlice(l.a, "Time scale of (");
+    try scopePath(l, scope, &text, 0);
+    if (leaf.len != 0) try text.print(l.a, ".{s}", .{leaf});
     const t = l.b.times.items[scope];
     const prec_exp = t.unit_exp - @as(i32, std.math.log10_int(@as(u64, t.scale.local_per_unit)));
     var w: std.Io.Writer.Allocating = .init(l.a);

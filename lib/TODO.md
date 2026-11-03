@@ -530,7 +530,10 @@ checked, the bundle smoked). ESPice bumps its pin after it.
     listed), Zcu + elaboration (diff-elab: 3,727/3,776, 49 named), the sound float verdict
     (§11.9: IEEE 754 intervals, no overflow contract, per-root guard boxes for versioned units,
     `default_unknown_bound = 10` measured; 10^7 runs incl. 165,717 overflowing, 0 failures).
-  - in progress: Sema analog lowering (`lower.md`); follow-ups on sim.xfail and elab.xfail.
+  - merged follow-ups: diff-sim 815/815 (sim.xfail empty; non-allocating wide `* / % **`, §9 bug 2
+    done), diff-elab 3,756/3,776 (elab.xfail 49 -> 20: 15 per-instance checks for lowering, 5
+    old-elaborator quirks).
+  - in progress: Sema analog lowering (`lower.md`), Sema digital lowering (`dlower.md`).
   - settled: no default box for parameters. A parameter's guard interval is its declared range
     (§3.4.2 `from`), which the specification sets; an open-ended one (`Is from (0:inf)` times
     `exp(...)`) stays `.strict`. `default_unknown_bound` stays: unknowns have no declared range,

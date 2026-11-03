@@ -26,7 +26,7 @@
 //! §5.6.7, §5.10, §9.4, §9.17.3.
 //!
 //! Contents:
-//! - fields `nodes`, `num_ports`, `branches`, `params`, `ranges`, `contributions`, `charge_sites`, `held`, `limit_slots`, `noise`, `kernel`, `displays`
+//! - fields `nodes`, `num_ports`, `branches`, `params`, `ranges`, `contributions`, `charge_sites`, `held`, `limit_slots`, `table_samples`, `noise`, `kernel`, `displays`
 //! - `pub const Instance`, `pub const Node` (`Index`, `Kind`), `pub const Branch` (`Index`), `pub const Param` (`Index`, `Type`), `pub const Range`
 //! - `pub const Access`, `pub const Contribution` (`Index`, `Kind`), `pub const ChargeSite`, `pub const Held`, `pub const LimitSlot`, `pub const Noise` (`Kind`), `pub const Kernel`, `pub const Display`
 //! - `pub const rows_max: u32`
@@ -62,6 +62,9 @@ charge_sites: std.MultiArrayList(ChargeSite) = .empty,
 held: std.MultiArrayList(Held) = .empty,
 /// §9.17.3 one row per access function a user-function `$limit` limits.
 limit_slots: std.MultiArrayList(LimitSlot) = .empty,
+/// §9.21.1 each array-source `$table_model` site's sample count (its
+/// `site` operand is the row's ordinal plus one).
+table_samples: std.ArrayList(u32) = .empty,
 /// §4.6.4 every noise source call and §4.6.3 `ac_stim`, in source order.
 noise: std.MultiArrayList(Noise) = .empty,
 /// §9.17 the kernel-control slots the host reads after an accepted step.
@@ -228,6 +231,7 @@ pub fn deinit(d: *Device, gpa: Allocator) void {
     d.held.deinit(gpa);
     d.limit_slots.deinit(gpa);
     d.noise.deinit(gpa);
+    d.table_samples.deinit(gpa);
     d.displays.deinit(gpa);
     d.* = undefined;
 }

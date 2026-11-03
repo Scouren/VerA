@@ -2,7 +2,6 @@
 # diff-lower`, tests/differential/lower.zig). One line each: the fixture path
 # under tests/conformance/tests, then the first disagreement the oracle found.
 # A listed fixture that agrees fails the run until its line goes.
-netlist/hdl/veriloga_table_snapshot.assets/va_table_snapshot.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
 netlist/hdl/veriloga_wide_ladder.assets/ladder70.va codes: old {}, new E0426,E0512 (E0512: an assignment to a name with no slot)
 spice/primitive_capacitor.va tables row 6: old `contrib potential direct br0 p n`, new `contrib flow direct br0 p gnd`
 spice/primitive_iexp.va tables row 32: old `contrib flow direct br0 n a1`, new `contrib flow direct br0 p n`
@@ -253,9 +252,6 @@ verilog-a/ch04_expressions/limexp_not_a_constant_expression_rejected.va the old 
 verilog-a/ch04_expressions/noise_generator_without_branch_rejected.va tables row 1: old `contrib flow direct br0 p gnd`, new `node 1 gnd_node net`
 verilog-a/ch04_expressions/noise_psd_beside_a_held_history.va tables row 6: old `held hist`, new `held nh`
 verilog-a/ch04_expressions/noise_source_inside_array_pattern_argument.va codes: old {}, new E0512 (E0512: `pattern` is not lowered by Sema yet)
-verilog-a/ch04_expressions/noise_table_file_comments_and_newlines.va codes: old {}, new E0512 (E0512: `noise_table()` of a file is not lowered by Sema yet)
-verilog-a/ch04_expressions/noise_table_file_input.va codes: old {}, new E0512 (E0512: `noise_table()` of a file is not lowered by Sema yet)
-verilog-a/ch04_expressions/noise_table_file_name_parameter.va codes: old {}, new E0512 (E0512: `noise_table()` of a file is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_parameter_part_select.va codes: old {}, new E0512 (E0512: `slice` is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_part_select_out_of_range_rejected.va codes: old E0310, new E0512 (E0512: `slice` is not lowered by Sema yet)
 verilog-a/ch04_expressions/nonfinite_array_subscript_rejected.va codes: old E0310, new {}
@@ -526,11 +522,7 @@ verilog-a/ch09_system_tasks/arandom_parameter_seed.va tables row 5: old `held $r
 verilog-a/ch09_system_tasks/arandom_type_string_outside_paramset_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/clog2_nested_contexts.va codes: old {}, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
 verilog-a/ch09_system_tasks/clog2_unsigned_width.va codes: old {}, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
-verilog-a/ch09_system_tasks/control_default_filling.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/conversion_constant_expressions.va tables row 0: old `param cp integer = 1`, new `param cp integer = ?`
-verilog-a/ch09_system_tasks/cubic_spline_constant_ends.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/cubic_spline_mixed_ends.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/cubic_spline_natural_ends.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/display_argument_pairing_rejected.va codes: old E0810, new {}
 verilog-a/ch09_system_tasks/display_argument_runs.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch09_system_tasks/display_c_format_flags.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
@@ -540,9 +532,6 @@ verilog-a/ch09_system_tasks/display_radix_of_integer_is_32_bits.va codes: old {}
 verilog-a/ch09_system_tasks/distribution_arity_rejected.va codes: old {}, new E0506 (E0506: `$rdist_uniform` takes 3 to 4, given 2)
 verilog-a/ch09_system_tasks/dist_type_string_inside_paramset.va tables row 2: old `param u.ch09_ts_bin.unused_item real local = 0e0`, new `param u.ka integer local = ?`
 verilog-a/ch09_system_tasks/dist_type_string_misspelled_rejected.va the old side refused, the new side lowered
-verilog-a/ch09_system_tasks/duplicate_points.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/error_extrapolation_inside_is_legal.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/error_extrapolation_is_fatal.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/fatal_finish_number_3_rejected.va codes: old E0824, new {}
 verilog-a/ch09_system_tasks/fclose_two_descriptors_rejected.va codes: old E0887, new {}
 verilog-a/ch09_system_tasks/fd_channels_past_30.va tables row 6: old `held fd`, new `held m`
@@ -559,8 +548,6 @@ verilog-a/ch09_system_tasks/fgets_line_over_4096.va codes: old {}, new E0321,E05
 verilog-a/ch09_system_tasks/fgets_on_write_only_fd_fails.va tables row 4: old `held s`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/fgets.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/file_io_categories_in_analog_context.va tables row 4: old `held a`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/file_loaded_on_first_executed_call.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/file_multiple_dependents.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/file_open_close.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/file_output_real_descriptor_rejected.va codes: old E0888, new {}
 verilog-a/ch09_system_tasks/file_output.va tables row 5: old `display $fopen`, new `display $strobe`
@@ -592,7 +579,6 @@ verilog-a/ch09_system_tasks/geometry_paramset.va tables row 0: old `param leaf.g
 verilog-a/ch09_system_tasks/geometry_state_read_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/geometry_top_alias_host.va tables row 0: old `param placement_x real = 0e0`, new `charge_sites 0`
 verilog-a/ch09_system_tasks/hash_flag_without_alternative_form_rejected.va codes: old E0825, new {}
-verilog-a/ch09_system_tasks/ignored_column_and_selector.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/input_position_restore_failure.va tables row 5: old `held sample`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/integer_default_fields.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch09_system_tasks/l_format_library_cell.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
@@ -603,7 +589,6 @@ verilog-a/ch09_system_tasks/max.va contribution 0 resist: old 8.05201432855025e-
 verilog-a/ch09_system_tasks/mcd_channels_exhausted_at_bit_31.va tables row 10: old `held name`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/m_format_hierarchical_name.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch09_system_tasks/min.va contribution 0 resist: old -5.996453579659319e0, new -2.9982267898296593e0
-verilog-a/ch09_system_tasks/mixed_interpolation_dimensions.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/monitor_ignores_abstime.va tables row 6: old `display $fopen`, new `display $fmonitor`
 verilog-a/ch09_system_tasks/monitor_reports_every_change.va tables row 6: old `display $fopen`, new `display $fmonitor`
 verilog-a/ch09_system_tasks/monitor_suppresses_an_unchanged_step.va tables row 6: old `display $fopen`, new `display $fmonitor`
@@ -622,7 +607,6 @@ verilog-a/ch09_system_tasks/param_given_variable_rejected.va codes: old E0822, n
 verilog-a/ch09_system_tasks/percent_escape_prints_one_percent.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch09_system_tasks/percent_escape_with_width_rejected.va codes: old E0826, new {}
 verilog-a/ch09_system_tasks/port_connected_controls_analog_operator.va tables row 3: old `contrib flow direct br0 p gnd`, new `contrib flow direct br0 p n`
-verilog-a/ch09_system_tasks/quadratic_spline.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/rdist_domain_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/rdist_real_seed_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/rdist_type_string_outside_paramset_rejected.va the old side refused, the new side lowered
@@ -637,7 +621,6 @@ verilog-a/ch09_system_tasks/real_hash_flag_f_always_prints_the_point.va codes: o
 verilog-a/ch09_system_tasks/real_hash_flag_g_keeps_trailing_zeros.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch09_system_tasks/real_hash_flag_string_operand_rejected.va codes: old E0819, new {}
 verilog-a/ch09_system_tasks/reject_9_16_simprobe_unresolved_without_fallback.va codes: old E0817, new {}
-verilog-a/ch09_system_tasks/reject_9_21_2_control_substring_too_long.va codes: old E0815, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/reject_9_5_3_swrite_into_real.va codes: old E0813, new {}
 verilog-a/ch09_system_tasks/reject_clog2_real_default.va codes: old E0892, new {}
 verilog-a/ch09_system_tasks/reject_clog2_real.va codes: old E0892, new {}
@@ -672,7 +655,6 @@ verilog-a/ch09_system_tasks/simparam_string.va codes: old {}, new E0321 (E0321: 
 verilog-a/ch09_system_tasks/simparam_str_unknown_name_rejected.va codes: old E0811, new {}
 verilog-a/ch09_system_tasks/simparam_unknown_no_fallback_rejected.va codes: old E0811, new {}
 verilog-a/ch09_system_tasks/simprobe.va contribution 0 resist: old -6.498062873668107e-1, new -3.1498062873668107e0
-verilog-a/ch09_system_tasks/spline_derivative_reaches_the_solver.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/sscanf_conversion_rules.va tables row 4: old `held second`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/sscanf_engineering_and_path_codes.va tables row 4: old `held v`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/sscanf_from_real_rejected.va codes: old E0813, new {}
@@ -687,25 +669,12 @@ verilog-a/ch09_system_tasks/strobe_flow_read_inside_array_pattern_argument.va co
 verilog-a/ch09_system_tasks/swrite_s_with_argument.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch09_system_tasks/swrite_s_without_argument_rejected.va codes: old E0810, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch09_system_tasks/swrite.va tables row 4: old `held text`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/table_capture_rejected_step_recaptures.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/table_model_array_control.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/table_model_assignment_pattern_arrays.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/table_model_columns_of_unequal_length_rejected.va codes: old E0815, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/table_model_discrete.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/table_model_example_selector_beyond_columns_rejected.va codes: old E0815, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/table_model_lrm_sample_set.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/table_model.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/table_non_numeric_entry_errors_at_first_call.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/table_snapshot_collapse.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/table_snapshot_function.va codes: old {}, new E0512 (E0512: `a whole array read as a value` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/table_snapshot_per_instance.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/table_snapshot.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/table_status.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
+verilog-a/ch09_system_tasks/table_snapshot_function.va codes: old {}, new E0512,E0815 (E0512: `a whole array read as a value` is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/two_instances_hold_distinct_channels.va tables row 9: old `held a.got`, new `held b.fd`
 verilog-a/ch09_system_tasks/value_plusargs_without_variable_rejected.va codes: old E0887, new E0506 (E0506: `$value$plusargs` takes 2 to 2, given 1)
 verilog-a/ch09_system_tasks/write_mode_path_65_opens.va tables row 10: old `held name`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/write_mode_reopen_appends_across_analyses.va tables row 5: old `held s`, new `limit_slots 0`
-verilog-a/ch10_directives/compact_modeling_extension_set.va codes: old {}, new E0321,E0512 (E0512: `$table_model` is not lowered by Sema yet)
+verilog-a/ch10_directives/compact_modeling_extension_set.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch10_directives/compact_modeling_macro_implies_its_extensions.va tables row 7: old `held fold`, new `limit_slots 0`
 verilog-a/ch10_directives/default_nettype_crosses_a_file_boundary.va codes: old E0367, new {}
 verilog-a/ch10_directives/default_nettype_none_rejects_an_implicit_net.va codes: old E0367, new {}
@@ -1027,7 +996,6 @@ verilog-ams/ch09_system_tasks/severity_task_digital_context_rejected.va codes: o
 verilog-ams/ch09_system_tasks/stochastic_queue_in_digital_context.va tables row 1: old `param bad integer = 0`, new `contrib potential direct br0 out gnd`
 verilog-ams/ch09_system_tasks/stop_in_analog_initial_rejected.va codes: old E0807, new {}
 verilog-ams/ch09_system_tasks/strobe_writes_once_per_accepted_solution.va tables row 6: old `display $fopen`, new `display $fstrobe`
-verilog-ams/ch09_system_tasks/table_status.va codes: old {}, new E0512 (E0512: `$table_model` is not lowered by Sema yet)
 verilog-ams/ch09_system_tasks/timescale_tasks_in_digital_context.va tables row 1: old `param ps_ok integer = 0`, new `contrib potential direct br0 out gnd`
 verilog-ams/ch09_system_tasks/ungetc_cancelled_by_fseek_and_gap_reads_zero.va tables row 6: old `display $fopen`, new `(none)`
 verilog-ams/ch10_directives/default_discipline_reset_leaves_no_default.va the old side refused, the new side lowered

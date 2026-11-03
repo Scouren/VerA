@@ -37,7 +37,8 @@ pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
         .@"$bound_step" => try boundStep(s, b, args, src),
         .@"$discontinuity" => try discontinuity(s, b, args, src),
         .@"$vera_reject_step" => try rejectStep(s, b, args, src),
-        .@"$table_model", .@"limit$old", .@"limit$uf" => {
+        .@"$table_model" => return @import("table.zig").lower(s, b, args, src),
+        .@"limit$old", .@"limit$uf" => {
             try s.fail(.E0512, b.unit.file, src, "`{t}` is not lowered by Sema yet", .{tag});
             return expr.poison;
         },

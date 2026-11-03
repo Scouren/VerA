@@ -14,6 +14,7 @@
 //! Contents:
 //! - `pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value`
 //! - `pub fn noise(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value`
+//! - `pub fn vectorArg(s: *Sema, b: *Block, r: Inst.Ref, out: *std.ArrayList(Ref)) Allocator.Error!bool`
 //! - `pub fn checkPlace(s: *Sema, b: *Block, tag: SysFn.Tag, src: Inst.Ref) Allocator.Error!bool`
 //! - `pub fn isStatic(s: *const Sema, r: Air.Inst.Ref, depth: u32) bool`
 
@@ -122,9 +123,12 @@ pub fn noise(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
     var vals: std.ArrayList(Ref) = .empty;
     for (args, 0..) |a, k| {
         if (table and k == 0) {
+            // §4.6.4.3 a file of frequency/power pairs, read at compile time.
             if (try decl.foldRef(s, b.unit, a)) |c| if (c == .str) {
-                try s.fail(.E0512, file, src, "`{t}()` of a file is not lowered by Sema yet", .{tag});
-                return expr.poison;
+                const pairs = (try @import("table.zig").noiseFile(s, b, c.str, src)) orelse return expr.poison;
+                try vals.append(s.arena, .fromIntern(try decl.intern(s, .{ .int = @intCast(pairs.len) })));
+                for (pairs) |x| try vals.append(s.arena, .fromIntern(try decl.intern(s, .{ .real = x })));
+                continue;
             };
             if (try vectorArg(s, b, a, &vals)) continue;
         }
@@ -185,6 +189,33 @@ pub fn isStatic(s: *const Sema, r: Ref, depth: u32) bool {
             .pl_op, .ty_pl, .ty, .ty_index, .br, .repeat => false,
         },
     };
+}
+
+/// A coefficient vector (`'{a, b}`, `{a, b}`, or a §3.2.2 array's name):
+/// its length, then each element as a real. False for any other argument.
+pub fn vectorArg(s: *Sema, b: *Block, r: Inst.Ref, out: *std.ArrayList(Ref)) Allocator.Error!bool {
+    const i = r.toIndex() orelse return false;
+    const vir = b.unit.vir;
+    switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .pattern, .concat => {
+            const elems = vir.list(Inst.Ref, decl.payloadOf(vir, Inst.Refs, i));
+            try out.append(s.arena, .fromIntern(try decl.intern(s, .{ .int = @intCast(elems.len) })));
+            for (elems) |e| try out.append(s.arena, try expr.coerce(s, b, try expr.lower(s, b, e), .real));
+            return true;
+        },
+        .decl_ref => {
+            const bind = b.unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl)) orelse return false;
+            if (bind != .array) return false;
+            const arr = bind.array;
+            try out.append(s.arena, .fromIntern(try decl.intern(s, .{ .int = @intCast(arr.slots.len) })));
+            for (arr.slots) |slot| {
+                const v = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot) } });
+                try out.append(s.arena, try expr.coerce(s, b, .{ .ref = v, .ty = arr.ty }, .real));
+            }
+            return true;
+        },
+        else => return false, // else: a select of an array: not lowered yet
+    }
 }
 
 // ---- private ----
@@ -294,31 +325,4 @@ fn readsUnknown(s: *const Sema, r: Ref, depth: u32) bool {
             .pl_op, .ty_pl, .ty, .ty_index, .br, .repeat => true,
         },
     };
-}
-
-/// A coefficient vector (`'{a, b}`, `{a, b}`, or a §3.2.2 array's name):
-/// its length, then each element as a real. False for any other argument.
-fn vectorArg(s: *Sema, b: *Block, r: Inst.Ref, out: *std.ArrayList(Ref)) Allocator.Error!bool {
-    const i = r.toIndex() orelse return false;
-    const vir = b.unit.vir;
-    switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .pattern, .concat => {
-            const elems = vir.list(Inst.Ref, decl.payloadOf(vir, Inst.Refs, i));
-            try out.append(s.arena, .fromIntern(try decl.intern(s, .{ .int = @intCast(elems.len) })));
-            for (elems) |e| try out.append(s.arena, try expr.coerce(s, b, try expr.lower(s, b, e), .real));
-            return true;
-        },
-        .decl_ref => {
-            const bind = b.unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl)) orelse return false;
-            if (bind != .array) return false;
-            const arr = bind.array;
-            try out.append(s.arena, .fromIntern(try decl.intern(s, .{ .int = @intCast(arr.slots.len) })));
-            for (arr.slots) |slot| {
-                const v = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot) } });
-                try out.append(s.arena, try expr.coerce(s, b, .{ .ref = v, .ty = arr.ty }, .real));
-            }
-            return true;
-        },
-        else => return false, // else: a select of an array: not lowered yet
-    }
 }

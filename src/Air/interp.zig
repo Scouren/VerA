@@ -11,9 +11,11 @@
 //!
 //! Contents:
 //! - `pub const Value = union(enum) { int: i64, real: f64, array: []Value }`
+//! - `pub const Observer = struct`, `pub const Slot = struct { alloc: Inst.Index, value: Value }`
 //! - `pub const Inputs = struct`
 //! - `pub const Error = error{ NoValue, LoopCap, Unsupported, OutOfMemory }`
 //! - `pub fn run(scratch: Allocator, air: Air, ip: *const InternPool, inputs: Inputs) Error!Value`
+//! - `pub fn unary(tag: Inst.Tag, a: Value) Error!Value`, `pub fn binary(tag: Inst.Tag, a: Value, b: Value) Error!Value`
 
 const std = @import("std");
 const math = std.math;
@@ -26,6 +28,19 @@ const Inst = Air.Inst;
 /// A value of a §3.2 `integer` or `real`, or a §3.2.2 array version.
 pub const Value = union(enum) { int: i64, real: f64, array: []Value };
 
+/// Sees every value a run defines, in execution order: each value
+/// instruction's result, a `block`'s result as a `br` leaves it, and each
+/// `assign`'s written value (under the `assign`). The passes' oracles read
+/// it (tests/differential/air_passes.zig); a run without one pays a branch.
+pub const Observer = struct {
+    ctx: *anyopaque,
+    seen: *const fn (ctx: *anyopaque, inst: Inst.Index, v: Value) void,
+};
+
+/// A slot's value before any `assign`, in place of §3.2's zero: a held
+/// variable's value from the previous evaluation.
+pub const Slot = struct { alloc: Inst.Index, value: Value };
+
 /// What one run reads.
 pub const Inputs = struct {
     /// One per `arg` index, of the `arg`'s type.
@@ -34,6 +49,10 @@ pub const Inputs = struct {
     probes: []const f64 = &.{},
     /// Most `repeat`s the whole run may take before `error.LoopCap`.
     loop_cap: u32,
+    /// Called with every value the run defines; see `Observer`.
+    observe: ?Observer = null,
+    /// Slots that start from a value of their own; at most a few, searched.
+    slots: []const Slot = &.{},
 };
 
 /// Why a run has no value.
@@ -93,7 +112,7 @@ const Run = struct {
                     return r.body(taken, depth + 1);
                 },
                 .br => {
-                    if (data.br.operand != .none) r.vals[@backingInt(data.br.block_inst)] = try r.get(data.br.operand);
+                    if (data.br.operand != .none) r.set(data.br.block_inst, try r.get(data.br.operand));
                     return .{ .br = data.br.block_inst };
                 },
                 .repeat => return .{ .repeat = data.repeat.loop_inst },
@@ -101,8 +120,15 @@ const Run = struct {
                     r.result = try r.get(data.un_op);
                     return .ret;
                 },
-                .assign => r.vals[@backingInt(data.bin_op.lhs.toIndex().?)] = try r.get(data.bin_op.rhs),
-                else => |tag| r.vals[i] = try r.value(tag, data),
+                .assign => {
+                    const v = try r.get(data.bin_op.rhs);
+                    r.vals[@backingInt(data.bin_op.lhs.toIndex().?)] = v;
+                    if (r.inputs.observe) |o| o.seen(o.ctx, inst, v);
+                },
+                .alloc => r.vals[i] = for (r.inputs.slots) |s| {
+                    if (s.alloc == inst) break s.value;
+                } else try zeroOf(r, data.ty),
+                else => |tag| r.set(inst, try r.value(tag, data)),
             }
         }
         unreachable; // a well-formed body ends in a noreturn tag
@@ -117,7 +143,7 @@ const Run = struct {
                 break :blk v;
             },
             .probe => .{ .real = r.inputs.probes[data.ty_index.index] },
-            .alloc => zeroOf(r, data.ty),
+            .alloc => unreachable, // `body` seeds a slot
             .load => r.vals[@backingInt(data.un_op.toIndex().?)],
             .select => blk: {
                 const bin = r.air.extraData(Air.Bin, data.pl_op.payload).data;
@@ -144,6 +170,12 @@ const Run = struct {
                 .pl_op, .ty_pl, .ty, .ty_index, .br, .repeat => unreachable, // each has its prong above or in `body`
             },
         };
+    }
+
+    /// Writes instruction `inst`'s result and shows it to the observer.
+    fn set(r: *Run, inst: Inst.Index, v: Value) void {
+        r.vals[@backingInt(inst)] = v;
+        if (r.inputs.observe) |o| o.seen(o.ctx, inst, v);
     }
 
     /// Returns the value `ref` reads.
@@ -216,27 +248,10 @@ pub fn run(scratch: Allocator, air: Air, ip: *const InternPool, inputs: Inputs) 
     return r.result;
 }
 
-// ---- private ----
-
-/// A slot or array of type `ty` before any write: §3.2's zero.
-fn zeroOf(r: *Run, ty: InternPool.Index) Error!Value {
-    return switch (r.ip.indexToKey(ty)) {
-        .array_type => |a| blk: {
-            const arr = try r.scratch.alloc(Value, a.len);
-            for (arr) |*e| e.* = try zeroOf(r, a.elem);
-            break :blk .{ .array = arr };
-        },
-        .simple_type => |s| switch (s) {
-            .real => .{ .real = 0 },
-            .integer => .{ .int = 0 },
-            .string => error.Unsupported,
-        },
-        .int_type => .{ .int = 0 },
-        .nature, .discipline, .undef, .float, .int, .str => unreachable, // Verify: a slot's type is a type
-    };
-}
-
-fn unary(tag: Inst.Tag, a: Value) Error!Value {
+/// Returns value tag `tag` (a `un_op` tag with an operand type, or
+/// `opt_barrier`/`dstop`) at `a`, as a run computes it: the Air passes'
+/// interval bounds are these values.
+pub fn unary(tag: Inst.Tag, a: Value) Error!Value {
     if (tag == .opt_barrier or tag == .dstop) return a;
     if (Air.tag_info.getPtrConst(tag).operand.? == .int) {
         const x = a.int;
@@ -284,7 +299,9 @@ fn unary(tag: Inst.Tag, a: Value) Error!Value {
     };
 }
 
-fn binary(tag: Inst.Tag, a: Value, b: Value) Error!Value {
+/// Returns value tag `tag` (a `bin_op` tag with an operand type) at `a`,
+/// `b`, as a run computes it. `error.NoValue` as `Error` says.
+pub fn binary(tag: Inst.Tag, a: Value, b: Value) Error!Value {
     if (Air.tag_info.getPtrConst(tag).operand.? == .int) return .{ .int = try intBinary(tag, a.int, b.int) };
     const x = a.real;
     const y = b.real;
@@ -311,6 +328,26 @@ fn binary(tag: Inst.Tag, a: Value, b: Value) Error!Value {
                 else => unreachable, // else: `binary` routes only real binary tags here (tag_info.operand)
             },
         },
+    };
+}
+
+// ---- private ----
+
+/// A slot or array of type `ty` before any write: §3.2's zero.
+fn zeroOf(r: *Run, ty: InternPool.Index) Error!Value {
+    return switch (r.ip.indexToKey(ty)) {
+        .array_type => |a| blk: {
+            const arr = try r.scratch.alloc(Value, a.len);
+            for (arr) |*e| e.* = try zeroOf(r, a.elem);
+            break :blk .{ .array = arr };
+        },
+        .simple_type => |s| switch (s) {
+            .real => .{ .real = 0 },
+            .integer => .{ .int = 0 },
+            .string => error.Unsupported,
+        },
+        .int_type => .{ .int = 0 },
+        .nature, .discipline, .undef, .float, .int, .str => unreachable, // Verify: a slot's type is a type
     };
 }
 

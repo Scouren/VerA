@@ -29,9 +29,11 @@
 //!
 //! Contents:
 //! - `pub const print`, `pub const Verify`, `pub const interp`: the files under `Air/`
+//! - `pub const Interval`, `pub const Float`, `pub const Legalize`, `pub const Setup`: the passes
 //! - `pub const Inst = struct` (`Index`, `Ref` (`fromIndex`, `fromIntern`, `toIndex`, `toInterned`), `Tag`, `Data`)
 //! - `pub const ExtraIndex = enum(u32)`
 //! - `pub const Block`, `pub const CondBr`, `pub const Bin`, `pub const Call`: the `extra` payloads
+//! - `pub const CallFacts = struct` (`Range`): what the passes know of a callee
 //! - `pub const Class`, `pub const Scalar`, `pub const Domain`, `pub const Relation`, `pub const Info`
 //! - `pub const tag_info: std.EnumArray(Inst.Tag, Info)`
 //! - `pub const nesting_max: u32`
@@ -54,6 +56,14 @@ pub const print = @import("Air/print.zig");
 pub const Verify = @import("Air/Verify.zig");
 /// The concrete interpreter.
 pub const interp = @import("Air/interp.zig");
+/// The passes' abstract value and its transfers.
+pub const Interval = @import("Air/Interval.zig");
+/// The float verdict and the §4.3.2 domain diagnostics.
+pub const Float = @import("Air/Float.zig");
+/// If-conversion.
+pub const Legalize = @import("Air/Legalize.zig");
+/// Solve invariance, the timepoint check, the held-slot prune.
+pub const Setup = @import("Air/Setup.zig");
 
 /// One row per instruction; `Inst.Index` `i` is row `i`.
 instructions: std.MultiArrayList(Inst).Slice,
@@ -268,6 +278,42 @@ pub const Bin = struct { lhs: Inst.Ref, rhs: Inst.Ref };
 /// `args_len` operand `Ref`s follow. `callee` is the old `src/ir/callee.zig`
 /// `Callee`'s integer until `SysFn` exists.
 pub const Call = struct { callee: u32, args_len: u32 };
+
+/// What the passes know of a callee until `SysFn` exists: the caller hands a
+/// table indexed by `Call.callee` (the old `Callee`'s integer); a callee past
+/// its end is `.{}`, an unknown call, which every pass treats as the worst.
+pub const CallFacts = struct {
+    /// The result's range, for `Float`.
+    range: Range = .unknown,
+    /// Same value at every solve, given solve-invariant arguments (`Setup`).
+    invariant: bool = false,
+    /// Same value at every Newton iteration of one timepoint (`Setup`).
+    timepoint: bool = false,
+    /// The §5.2.1/§5.10.2 first-evaluation flag: `Legalize` keeps a branch on it.
+    first_point: bool = false,
+
+    /// A call's value as `Float` bounds it.
+    pub const Range = enum(u8) {
+        /// No bound and not finite.
+        unknown,
+        /// No bound, never inf or NaN (a string, a descriptor).
+        finite,
+        /// A §3.2 integer.
+        int,
+        /// 0 or 1: a §5.10 event, `analysis()`, a first-point flag.
+        unit,
+        /// > 0 and finite: `$temperature`, `$mfactor`, argument-free `$vt`.
+        positive,
+        /// >= 0 and finite: `$abstime`, `$realtime`.
+        non_negative,
+        /// §4.5.13 `limexp(x)`: `exp(x)`'s range.
+        limexp,
+        /// §9.15 `$vt(T)` = kT/q: `T` times a positive constant.
+        vt,
+        /// §9.19 `$param_given`: an integer that names, never reads, its argument.
+        param_given,
+    };
+};
 
 /// The `Inst.Data` field a tag reads.
 pub const Class = enum(u8) { un_op, bin_op, pl_op, ty_pl, ty, ty_index, br, repeat };
@@ -618,4 +664,8 @@ test {
     _ = print;
     _ = Verify;
     _ = interp;
+    _ = Interval;
+    _ = Float;
+    _ = Legalize;
+    _ = Setup;
 }

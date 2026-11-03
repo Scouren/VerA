@@ -191,7 +191,17 @@ fn inst(l: *Lower, ins: compile.Instruction, pc: u32, repeats: u32) E!void {
         .call_timed => return l.refuse("a timed task activation"),
         .task_return => return l.refuse("a timed task return"),
         .pla_start => return l.refuse("a process of its own (PLA or event-controlled NBA)"),
-        .override_on, .override_eval, .override_off => return l.refuse("§9.3 assign/force"),
+        .override_on => |o| _ = try b.inst(.override_on, try b.extraOf(Program.Override{ .slot = o.slot, .force = o.force, .lo = o.bits.lo, .width = o.bits.width, .start = o.start, .end = o.end }), 0, scope),
+        .override_off => |o| _ = try b.inst(.override_off, try b.extraOf(Program.Override{ .slot = o.slot, .force = o.force, .lo = o.bits.lo, .width = o.bits.width, .start = 0, .end = 0 }), 0, scope),
+        .override_eval => |o| {
+            const value = if (o.slice.of != 0)
+                try l.evalFor(o.value, .{ .width = o.slice.of, .signed = false })
+            else if (o.bits.width != 0)
+                try l.evalFor(o.value, .{ .width = o.bits.width, .signed = false })
+            else
+                try l.evalFor(o.value, r.slotType(o.slot));
+            _ = try b.inst(.override_eval, try b.extraOf(Program.OverrideEval{ .slot = o.slot, .value = value, .force = o.force, .lo = o.bits.lo, .width = o.bits.width, .slice_lo = o.slice.lo, .of = o.slice.of }), 0, scope);
+        },
         .switch_ctrl => |sc| {
             const t = r.netlist.switches[sc.tran];
             const tr = @constCast(&b.p.trans[sc.tran]);
@@ -377,6 +387,9 @@ fn netlist(l: *Lower) E!void {
         };
     }
     b.p.nets = nets;
+    const slot_net = try b.arena.alloc(u32, r.values.len);
+    for (slot_net, 0..) |*sn, k| sn.* = r.netlist.slot_nets.get(@intCast(k)) orelse std.math.maxInt(u32);
+    b.p.slot_net = slot_net;
     b.p.drivers = drivers;
     b.p.driver_init = init.items;
     b.p.udps = udps.items;

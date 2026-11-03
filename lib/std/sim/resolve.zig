@@ -361,6 +361,12 @@ fn resolveJoined(s: *State, a: Allocator, start: u32) Error!void {
                 const zn = p.nets[z.net];
                 var own = net_.netPull(zn.kind);
                 for (p.list(zn.drivers)) |d| own = own.combine(contribution(s, d, z.bit));
+                // §9.3.2 a forced net drives the others across a switch as
+                // a strong driver of its forced value, and keeps it itself.
+                // ponytail: a whole-net force only, not a forced select.
+                if (s.holds_by_slot.get(zn.slot)) |o| if (o.force != null) {
+                    own = .of((try eval.read(s, a, zn.slot)).bit(z.bit), .strong, .strong);
+                };
                 acc = acc.combine(net_.crossed(own, z, y, pz));
             }
             if (acc.none()) for (group, paths) |z, pz| {

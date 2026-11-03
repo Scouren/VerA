@@ -23,7 +23,7 @@
 //! - `pub const Repeat = struct`, `pub const Fork = struct`, `pub const Sample = struct` (`Sample.Mode`)
 //! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const SWrite = struct`, `pub const Random = struct`, `pub const Dist = enum(u32)`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
 //! - `pub const Net = struct` (`Net.no_decay`), `pub const Driver = struct` (`Driver.Source`)
-//! - `pub const Tran = struct`, `pub const Path = struct`, `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
+//! - `pub const Override = struct`, `pub const OverrideEval = struct`, `pub const Tran = struct`, `pub const Path = struct`, `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
 //! - `pub fn words(width: u32) u32`
 //! - `pub fn list(p: *const Program, l: List) []const u32`
 //! - `pub fn extraData(p: *const Program, comptime T: type, at: u32) T`
@@ -145,6 +145,13 @@ pub const Inst = struct {
         copy_out,
         /// §10.3 `disable` of task `a` (a `subs` row): every activation ends.
         disable_task,
+        /// §9.3 `assign`/`force` installs its holding process: `a` an
+        /// `Override` in `extra`.
+        override_on,
+        /// §9.3 the holding process's one step: `a` an `OverrideEval`.
+        override_eval,
+        /// §9.3 `deassign`/`release`: `a` an `Override` (no range).
+        override_off,
         /// §7.6 controlled switch `a` (a `trans` row) reads its control,
         /// re-resolves both sides and is armed on the control's operands.
         switch_ctrl,
@@ -486,6 +493,16 @@ pub const ReadMem = struct {
     finish: u32,
 };
 
+/// §9.3 an assign (`force` false) or force of `slot`, or of its bits
+/// [lo, lo + width) (`width` 0: the whole slot), whose process is
+/// [start, end).
+pub const Override = struct { slot: u32, force: bool, lo: u32, width: u32, start: u32, end: u32 };
+
+/// §9.3 the holding process's write: row `value` (converted for the slot,
+/// for the held bits, or read `of` bits wide and sliced from `slice_lo`)
+/// into `slot` or its bits [lo, lo + width).
+pub const OverrideEval = struct { slot: u32, value: u32, force: bool, lo: u32, width: u32, slice_lo: u32, of: u32 };
+
 /// §17.9 one `$random`/`$dist_*` call: the distribution, the seed row and
 /// the place its inout seed is written back to (`none` for a seedless
 /// `$random`, which advances `State.random_seed`), and its two parameters.
@@ -664,6 +681,8 @@ fan_start: []const u32 = &.{},
 fan: []const u32 = &.{},
 subs: []const Sub = &.{},
 paths: []const Path = &.{},
+/// Per slot, the net it is (`none` for a variable's).
+slot_net: []const u32 = &.{},
 trans: []const Tran = &.{},
 /// Every net bit's §7.10 signal at time 0 (`Net.signal`).
 signal_init: []const net.Signal = &.{},
@@ -712,6 +731,7 @@ pub fn extraData(p: *const Program, comptime T: type, at: u32) T {
             u32 => @field(out, name) = p.extra[i],
             i32 => @field(out, name) = @bitCast(p.extra[i]),
             Ty => @field(out, name) = @bitCast(p.extra[i]),
+            bool => @field(out, name) = p.extra[i] != 0,
             List => {
                 @field(out, name) = .{ .start = p.extra[i], .len = p.extra[i + 1] };
                 i += 1;

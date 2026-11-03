@@ -111,6 +111,7 @@ pub fn extraOf(b: *Builder, value: anytype) Error!u32 {
             u32 => try b.extra.append(b.arena, x),
             i32 => try b.extra.append(b.arena, @bitCast(x)),
             Program.Ty => try b.extra.append(b.arena, @bitCast(x)),
+            bool => try b.extra.append(b.arena, @intFromBool(x)),
             Program.List => try b.extra.appendSlice(b.arena, &.{ x.start, x.len }),
             else => try b.extra.append(b.arena, @backingInt(x)), // else: a u32-backed enum
         }

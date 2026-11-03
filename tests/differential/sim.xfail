@@ -5,21 +5,12 @@
 verilog-ams/digital/vams_digital_abstime_math.v bridge: the real system function $abstime
 verilog/05_expressions/native_select_boundaries.v bridge: a vector bound past i32
 verilog/05_expressions/native_wide_index_edges.v bridge: a vector bound past i32
-verilog/09_behavioral_modeling/assignment_assign_deassign.v bridge: §9.3 assign/force
-verilog/09_behavioral_modeling/assignment_force_release.v bridge: §9.3 assign/force
-verilog/09_behavioral_modeling/concatenation_targets.v bridge: §9.3 assign/force
 verilog/09_behavioral_modeling/event_array.v bridge: a trigger of an event array element
 verilog/09_behavioral_modeling/event_array_automatic.v bridge: a timed task activation
 verilog/09_behavioral_modeling/event_array_native_automatic.v bridge: an event array select term
 verilog/09_behavioral_modeling/event_array_native_effects.v bridge: a trigger of an event array element
 verilog/09_behavioral_modeling/event_array_native_selection.v bridge: a trigger of an event array element
 verilog/09_behavioral_modeling/event_arrays.v bridge: an event array select term
-verilog/09_behavioral_modeling/force_immediate.v bridge: §9.3 assign/force
-verilog/09_behavioral_modeling/force_net_selects.v bridge: §9.3 assign/force
-verilog/09_behavioral_modeling/force_wire_array_element.v bridge: §9.3 assign/force
-verilog/09_behavioral_modeling/native_concat_targets.v bridge: §9.3 assign/force
-verilog/09_behavioral_modeling/native_force_many_selects_of_one_net.v bridge: §9.3 assign/force
-verilog/09_behavioral_modeling/native_force_net_selects.v bridge: §9.3 assign/force
 verilog/09_behavioral_modeling/native_wide_event_indices.v bridge: a trigger of an event array element
 verilog/09_behavioral_modeling/nba_event_control_region.v bridge: a process of its own (PLA or event-controlled NBA)
 verilog/09_behavioral_modeling/nba_event_control_update_region.v bridge: a process of its own (PLA or event-controlled NBA)
@@ -30,8 +21,6 @@ verilog/09_behavioral_modeling/repeat_unsigned_64bit_count.v bridge: §9.7.7 rep
 verilog/10_tasks_functions/recursive_task_fork_join.v bridge: a timed task activation
 verilog/10_tasks_functions/task_recursive_timed_automatic.v bridge: a timed task activation
 verilog/10_tasks_functions/timed_subroutine_parameters.v bridge: a timed task activation
-verilog/11_scheduling/procedural_continuous_tracks_sources.v bridge: §9.3 assign/force
-verilog/12_hierarchy/real_through_bits.v bridge: §9.3 assign/force
 verilog/14_specify_blocks/sdf_pulse_limits_override_specparam.v bridge: the system function $fopen
 verilog/14_specify_blocks/specify_timing_checks_named_by_w0251.v bridge: §15 timing checks
 verilog/15_timing_checks/conditions.v bridge: §15 timing checks
@@ -120,8 +109,6 @@ verilog/18_vcd/real_value_format.v bridge: a §18 VCD task
 verilog/18_vcd/task_function_scopes.v bridge: a §18 VCD task
 verilog/18_vcd/version_names_dumpfile_literal.v bridge: a §18 VCD task
 verilog/18_vcd/version_names_dumpfile_variable.v bridge: a §18 VCD task
-verilog/A_formal_syntax/b_A_6_2_procedural_assignments.v bridge: §9.3 assign/force
 verilog/A_formal_syntax/b_A_6_2_repeat_intra_assignment.v bridge: §9.7.7 repeat event control
-verilog/A_formal_syntax/b_A_6_4_statements.v bridge: §9.3 assign/force
 verilog/A_formal_syntax/b_A_7_1_specify_block.v bridge: §15 timing checks
 verilog/A_formal_syntax/b_A_7_5_system_timing_checks.v bridge: §15 timing checks

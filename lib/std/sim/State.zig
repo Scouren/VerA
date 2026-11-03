@@ -14,6 +14,7 @@
 //! - `pub const default_budget: u64`, `pub const default_depth: u32`
 //! - `pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!State`
 //! - `pub fn fail(s: *State, comptime f: []const u8, args: anytype) Error`
+//! - `pub fn netOf(s: *const State, slot: u32) ?u32`
 //! - `pub fn warn(s: *State, comptime f: []const u8, args: anytype) Error!void`
 //! - `pub fn store(s: *State, slot: u32, value: Literal) Error!void`
 //! - `pub fn trigger(s: *State, slot: u32) Error!void`
@@ -36,6 +37,7 @@ const Program = @import("Program.zig");
 const logic = @import("logic.zig");
 const eval = @import("eval.zig");
 const resolve = @import("resolve.zig");
+const hold = @import("holds.zig");
 const net = @import("net.zig");
 const sched = @import("scheduler.zig");
 const fmt = @import("kernels").fmt;
@@ -185,6 +187,10 @@ tran_delay: []net.Delay,
 net_resolved: []u64,
 drv_s0: []net.Strength,
 drv_s1: []net.Strength,
+/// §9.3 what holds each held slot, and whether the write in flight is a
+/// holding process's own (which the hold lets through).
+holds_by_slot: std.AutoHashMapUnmanaged(u32, hold.Layers) = .empty,
+holding: bool = false,
 /// §14.3.3 per path source slot, its last transition (`path_changed`
 /// holds whether it has one).
 path_edge: []PathEdge,
@@ -273,6 +279,13 @@ pub fn fail(s: *State, comptime f: []const u8, args: anytype) Error {
     return error.SimFailed;
 }
 
+/// The net slot `slot` is, or null for a variable's.
+pub fn netOf(s: *const State, slot: u32) ?u32 {
+    if (s.p.slot_net.len == 0) return null;
+    const n = s.p.slot_net[slot];
+    return if (n == std.math.maxInt(u32)) null else n;
+}
+
 /// Records a warning; the run goes on.
 pub fn warn(s: *State, comptime f: []const u8, args: anytype) Error!void {
     try s.warnings.append(s.arena, try std.fmt.allocPrint(s.arena, f, args));
@@ -289,9 +302,17 @@ pub fn store(s: *State, slot: u32, value: Literal) Error!void {
     const x = s.x[sl.word..][0..n];
     const before = logic.planeBit(v[0], x[0]);
     const before_words: [2]u64 = .{ v[0], x[0] };
-    const differ = !std.mem.eql(u64, v, value.values()) or !std.mem.eql(u64, x, value.unknowns());
-    const changed = if (sl.ty.real) @as(f64, @bitCast(v[0])) != @as(f64, @bitCast(value.values()[0])) else differ;
-    if (differ) {
+    // §9.3: while a hold has the slot, its own process alone writes it: an
+    // assign over a variable, a force over anything; a forced select of a
+    // net keeps its bits and the rest resolve.
+    var kept: ?bool = null;
+    if (hold.blocks(s, slot)) |o| {
+        if (o.force != null or (o.assign != null and s.netOf(slot) == null)) return;
+        if (o.parts.items.len != 0) kept = hold.keepForced(v, x, value, o.parts.items);
+    }
+    const differ = kept orelse (!std.mem.eql(u64, v, value.values()) or !std.mem.eql(u64, x, value.unknowns()));
+    const changed = if (kept != null) differ else if (sl.ty.real) @as(f64, @bitCast(v[0])) != @as(f64, @bitCast(value.values()[0])) else differ;
+    if (differ and kept == null) {
         @memcpy(v, value.values());
         @memcpy(x, value.unknowns());
     }

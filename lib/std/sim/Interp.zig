@@ -24,6 +24,7 @@ const display = @import("display.zig");
 const resolve = @import("resolve.zig");
 const calls = @import("calls.zig");
 const readmem = @import("readmem.zig");
+const holds = @import("holds.zig");
 const Error = State.Error;
 const Literal = logic.Literal;
 
@@ -234,6 +235,18 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                 pc += 1;
             },
             .switch_ctrl => return resolve.switchCtrl(s, a, d.a, pc),
+            .override_on => {
+                try holds.on(s, d.a);
+                pc += 1;
+            },
+            .override_eval => {
+                try holds.apply(s, a, d.a);
+                pc += 1;
+            },
+            .override_off => {
+                try holds.off(s, a, d.a);
+                pc += 1;
+            },
             .call => {
                 _ = try calls.call(s, a, d.a);
                 pc += 1;

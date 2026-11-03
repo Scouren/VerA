@@ -34,6 +34,9 @@ pub const module_specs = [_]struct {
     c: ?[]const u8 = null,
 }{
     .{ .name = "contract", .path = "lib/contract.zig" },
+    // The device kernels shipped once (docs/rewrite/kernels.md). `gompute_math`
+    // is the pinned Gompute dependency's `math` module (build.zig.zon), not a row.
+    .{ .name = "std_kernels", .path = "lib/std/kernels.zig", .imports = &.{ "contract", "gompute_math" } },
     // The rewrite's modules (docs/rewrite/README.md): each builds and tests
     // alone (`zig build test-<name>`), importing only std or the rows above.
     .{ .name = "vams", .path = "lib/std/vams.zig" },
@@ -85,11 +88,14 @@ pub const Graph = struct {
 };
 
 /// `module_specs` as modules, exported with `addModule` when `exported`.
+/// The import `gompute_math` is the pinned Gompute's `math` module, which
+/// takes its target from the module importing it.
 pub fn defineModules(b: *Build, target: Build.ResolvedTarget, exported: bool) []const Import {
     var created: std.ArrayList(Import) = .empty;
+    const gompute_math = b.dependency("gompute", .{}).module("math");
     for (module_specs) |spec| {
         const deps = b.allocator.alloc(Import, spec.imports.len) catch @panic("OOM");
-        for (deps, spec.imports) |*d, name| d.* = .{ .name = name, .module = byName(created.items, name) };
+        for (deps, spec.imports) |*d, name| d.* = .{ .name = name, .module = if (std.mem.eql(u8, name, "gompute_math")) gompute_math else byName(created.items, name) };
         const opts: Module.CreateOptions = .{ .root_source_file = b.path(spec.path), .target = target, .imports = deps };
         const mod = if (exported) b.addModule(spec.name, opts) else b.createModule(opts);
         if (spec.c) |c| {

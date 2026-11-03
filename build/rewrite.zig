@@ -9,7 +9,8 @@
 //! `diff-link` (link vs src/zigbuild over the same device builds),
 //! `diff-astgen` (vams AstGen/Vir vs the old compiler's per-file codes and
 //! design units), `diff-elab` (sema's elaboration vs src/elab and the
-//! digital route's), and
+//! digital route's), `diff-kernels` (std_kernels vs lib/kernels and the
+//! old kernel text; Gompute's math vs gm), and
 //! `rewrite`, which runs them and the new modules' own tests. All are in
 //! `test`. `build.zig` calls `add` once.
 //!
@@ -29,7 +30,7 @@ pub fn add(g: Graph) void {
     const mods = g.mods;
     // One description for every new module: each oracle names itself in its row below.
     const all = b.step("rewrite", "The rewrite's modules' tests (test-<module>) and every diff-* oracle below");
-    for ([_][]const u8{ "vams", "intern_pool", "air", "link", "std_sim", "sema" }) |name| {
+    for ([_][]const u8{ "vams", "intern_pool", "air", "link", "std_sim", "sema", "std_kernels" }) |name| {
         all.dependOn(&b.top_level_steps.get(b.fmt("test-{s}", .{name})).?.step);
     }
     const o = b.addOptions();
@@ -85,4 +86,26 @@ pub fn add(g: Graph) void {
         all.dependOn(&r.step);
         g.test_step.dependOn(&r.step);
     }
+    // diff-kernels: std_kernels against lib/kernels and against the old
+    // kernel text itself, which `kernels_text.zig` writes out as one file
+    // (an `h.zig`) so the oracle can compile and call it; Gompute against gm.
+    const text_gen = b.addExecutable(.{ .name = "kernels-text", .root_module = g.m.make("tests/differential/kernels_text.zig", &.{.{ .name = "device", .module = byName(mods, "device") }}) });
+    const text_run = b.addRunArtifact(text_gen);
+    const old_text = b.createModule(.{
+        .root_source_file = text_run.addOutputFileArg("old_text.zig"),
+        .target = g.m.target,
+        .optimize = g.m.optimize,
+        .imports = &.{.{ .name = "contract", .module = byName(mods, "contract") }},
+    });
+    const kmod = g.m.make("tests/differential/kernels.zig", &.{
+        .{ .name = "std_kernels", .module = byName(mods, "std_kernels") },
+        .{ .name = "kernels", .module = byName(mods, "kernels") },
+        .{ .name = "contract", .module = byName(mods, "contract") },
+        .{ .name = "gompute_math", .module = b.dependency("gompute", .{}).module("math") },
+        .{ .name = "old_text", .module = old_text },
+    });
+    const kr = testRun(b, "diff-kernels", kmod, g.runner, g.results_dir);
+    b.step("diff-kernels", "std_kernels against lib/kernels and the old kernel text, bit for bit; Gompute against gm and an f128 reference").dependOn(&kr.step);
+    all.dependOn(&kr.step);
+    g.test_step.dependOn(&kr.step);
 }

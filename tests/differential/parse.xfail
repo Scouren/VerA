@@ -1,33 +1,8 @@
 # diff-parse known differences: `<path under the fixture root> <reason>`, one per line.
 # Each fixture is one the old parser refuses by a rule that needs names, folding or a
 # position the context-free grammar does not carry; the reason names the old code.
-verilog-a/annex_a_syntax/reject_A_4_2_generate_for_integer_index.va E0238: A.4.2 a loop generate whose index is not a declared genvar: name resolution, AstGen's
-verilog-a/annex_a_syntax/reject_A_8_4_mintypmax_in_analog_expression.va E0295: A.8.4 no mintypmax inside an analog expression, a position (analog block, analog function) the expression grammar does not carry: Sema's
-verilog-a/ch04_expressions/access_three_nets_rejected.va E0207: §4.4.1 a probe takes one or two nets, and which call is a probe comes from a nature's `access` (old access_names): AstGen's
+# The rules a file judges alone (E0206, E0218, E0225, E0230, E0238, E0245, E0248, E0295) are
+# AstGen's: diff-parse counts a file as rejected when its Vir's Diag fails, and diff-astgen checks the codes.
+verilog-a/ch04_expressions/access_three_nets_rejected.va E0207: §4.4.1 a probe takes one or two nets, and which call is a probe comes from a nature's `access` (old access_names), and the nature may be in another file: Sema's
 verilog-a/ch04_expressions/concatenation_unsized_rejected.va E0216: §4.2.13 an unsized operand in a concatenation of sized literals, judged by folding: Sema's
-verilog-a/ch04_expressions/function_untyped_argument.va E0225: §4.7.1 a formal with no type declaration, which matches formals to declarations by name: AstGen's
-verilog-a/ch06_hierarchy/ansi_port_redeclared_rejected.va E0218: §6.2/§6.5.2 a port declared twice, which matches declarations to header ports by name: AstGen's
-verilog-a/ch06_hierarchy/generate_array_name_conflict_rejected.va E0230: §6.6.2 a generate block name that clashes with another declaration of its scope: name resolution, AstGen's
-verilog-a/ch06_hierarchy/generate_block_name_collision_rejected.va E0230: §6.6.2 a generate block name that clashes with another declaration of its scope: name resolution, AstGen's
-verilog-a/ch06_hierarchy/generate_block_shadows_declaration_rejected.va E0230: §6.6.2 a generate block name that clashes with another declaration of its scope: name resolution, AstGen's
-verilog-a/ch06_hierarchy/generate_undeclared_index_rejected.va E0238: A.4.2 a loop generate whose index is not a declared genvar: name resolution, AstGen's
-verilog-a/ch06_hierarchy/hierarchy_zero_generate_collision.va E0230: §6.6.2 a generate block name that clashes with another declaration of its scope: name resolution, AstGen's
-verilog-a/ch06_hierarchy/port_direction_not_a_port_rejected.va E0206: §6.5.2 a body port declaration names no header port, which matches names: AstGen's, the parser resolves none
-verilog-a/ch06_hierarchy/reject_6_4_1_paramset_access_function.va E0237: §6.4.1 no access function in a paramset, and which call is one comes from a nature's `access` (old access_names): AstGen's
-verilog/08_udp/conflicting_entries_rejected.v E0248: IEEE 1364-2005 §8.1.4 two UDP table rows that give one input combination two outputs: a table-wide check, AstGen's
-verilog/08_udp/sequential_hold_conflict_rejected.v E0248: IEEE 1364-2005 §8.1.4 two UDP table rows that give one input combination two outputs: a table-wide check, AstGen's
-verilog/08_udp/udp_conflicting_rows_rejected.v E0248: IEEE 1364-2005 §8.1.4 two UDP table rows that give one input combination two outputs: a table-wide check, AstGen's
-verilog/12_hierarchy/ansi_port_redeclared_rejected.v E0218: §6.2/§6.5.2 a port declared twice, which matches declarations to header ports by name: AstGen's
-verilog/12_hierarchy/block_name_in_two_constructs_rejected.v E0230: §6.6.2 a generate block name that clashes with another declaration of its scope: name resolution, AstGen's
-verilog/12_hierarchy/generate_and_named_block_collide_rejected.v E0230: §6.6.2 a generate block name that clashes with another declaration of its scope: name resolution, AstGen's
-verilog/12_hierarchy/output_port_without_module_port_list_rejected.v E0206: §6.5.2 a body port declaration names no header port, which matches names: AstGen's, the parser resolves none
-verilog/12_hierarchy/port_declared_twice_rejected.v E0218: §6.2/§6.5.2 a port declared twice, which matches declarations to header ports by name: AstGen's
-verilog/14_specify_blocks/destination_input_port_rejected.v E0245: §14.2 a module path rule over the module's ports, drivers or signals: AstGen's
-verilog/14_specify_blocks/destination_two_drivers_rejected.v E0245: §14.2 a module path rule over the module's ports, drivers or signals: AstGen's
-verilog/14_specify_blocks/ifnone_with_unconditional_rejected.v E0245: §14.2 a module path rule over the module's ports, drivers or signals: AstGen's
-verilog/14_specify_blocks/inconsistent_port_reference_rejected.v E0245: §14.2 a module path rule over the module's ports, drivers or signals: AstGen's
-verilog/14_specify_blocks/parallel_edge_vector_destination_rejected.v E0245: §14.2 a module path rule over the module's ports, drivers or signals: AstGen's
-verilog/14_specify_blocks/parallel_path_width_mismatch_rejected.v E0245: §14.2 a module path rule over the module's ports, drivers or signals: AstGen's
-verilog/14_specify_blocks/parallel_width_mismatch_rejected.v E0245: §14.2 a module path rule over the module's ports, drivers or signals: AstGen's
-verilog/14_specify_blocks/source_output_port_rejected.v E0245: §14.2 a module path rule over the module's ports, drivers or signals: AstGen's
-verilog/14_specify_blocks/variable_delay_rejected.v E0245: §14.2 a module path rule over the module's ports, drivers or signals: AstGen's
+verilog-a/ch06_hierarchy/reject_6_4_1_paramset_access_function.va E0237: §6.4.1 no access function in a paramset, and which call is one comes from a nature's `access` (old access_names), and the nature may be in another file: Sema's

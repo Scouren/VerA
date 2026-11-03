@@ -5,7 +5,8 @@
 //! one still disagrees). The old preprocessor makes both sides' text; a
 //! fixture it refuses is skipped and counted. Checks, in order: tokens (same
 //! starts, tags related by `expectedTag`), acceptance (the old parser reports
-//! an error iff `tree.errors` is not empty), structure (per module: name and
+//! an error iff `tree.errors` is not empty, or AstGen's per-file checks
+//! fail the tree's Vir), structure (per module: name and
 //! the counts `Shape` lists).
 //! No LRM clause: this checks VerA's rewrite against VerA.
 //!
@@ -234,7 +235,12 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8) !?Verdict {
         error.ParseError => null,
     };
     const tree = try vams.Ast.parse(arena, text, .{ .keywords = if (digital) .v1364_2005 else .vams_2023 });
-    if (old_file == null and tree.errors.len == 0) return try firstOldError(arena, bag);
+    if (old_file == null and tree.errors.len == 0) {
+        // A per-file rule the old parser judged by names is AstGen's now
+        // (docs/rewrite/astgen.md): the new frontend rejects when Vir's does.
+        const vir = try vams.AstGen.generate(arena, &tree, .{});
+        return if (vir.diag.failed()) null else try firstOldError(arena, bag);
+    }
     if (old_file != null and tree.errors.len != 0) return try newErrorText(arena, &tree);
     const file = old_file orelse return @as(Verdict, null);
     const builtins: u32 = if (digital) 0 else frontend.annex_e.spice_module_count + pp.netlist_modules;

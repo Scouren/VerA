@@ -1,0 +1,9 @@
+# diff-astgen known differences: `<path under the fixture root> <reason>`, one per line.
+# A listed fixture that agrees, or is not compared, fails the run.
+# Not listed because they agree here: the parse.xfail fixtures whose rule needs another
+# file or folding stay Sema's and report no per-file code on either side: E0207 (a probe's
+# net count, from a nature's `access` that may be in another file), E0237 (an access
+# function in a paramset, the same), E0216 (an unsized concatenation operand, by folding).
+verilog-a/ch03_data_types/aliasparam_hierarchical_read_rejected.va E0373: §3.4.7 a hierarchical read `u.alias` of a child's aliasparam names the child module's declaration, which needs the hierarchy (old alias.checkFlat after flattening): Sema's
+verilog-a/ch03_data_types/aliasparam_hierarchical_system_rejected.va E0373: §3.4.7 a hierarchical read of a child's aliasparam of a §9.18 system parameter, judged on the flattened hierarchy (old alias.checkFlat): Sema's
+verilog/12_hierarchy/listed_port_undeclared_rejected.v E0376: §6.5.2.2 a listed port with no direction; AstGen reports E0376 in every language, the old digital route refuses the same omission at elaboration with its generic E1100, which this oracle's .v side (the parse stage) does not run

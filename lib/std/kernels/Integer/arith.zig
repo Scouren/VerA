@@ -1,6 +1,6 @@
 //! IEEE 1364-2005 §5.1.5's four-state arithmetic over `Literal`s: operands
 //! in, the wrapped result literal out (`+ - * / %`, unary `-`, `**`), each
-//! reached as a `Literal` method (`integer.zig`). A result of at most 64 bits
+//! reached as a `Literal` method (`Integer.zig`). A result of at most 64 bits
 //! is one machine word; a wider one goes through `std.math.big`, which is
 //! also the oracle the word path is tested against. Every result is fresh
 //! planes from the call's `gpa`, owned by the caller; a failed allocation

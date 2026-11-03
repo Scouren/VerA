@@ -1,7 +1,7 @@
 //! IEEE 1364-2005 §5.1's four-state logic over `Literal`s: operands in, the
 //! result literal or bit out. Bitwise operators, shifts, relations,
 //! equality, reductions, the logical operators and the conditional, each
-//! reached as a `Literal` method (`integer.zig`). Each allocating operator
+//! reached as a `Literal` method (`Integer.zig`). Each allocating operator
 //! returns fresh planes from its `gpa`, owned by the caller.
 //! Cites: IEEE 1364-2005 §5.1.7-§5.1.13 (Tables 5-12 to 5-21), §5.4, §5.5.
 //!

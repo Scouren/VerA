@@ -1,6 +1,6 @@
 //! IEEE 1364-2005 integer arithmetic at any width: operands of a stated
-//! width and signedness in, the result bit pattern at that width out. Device
-//! text (`text.wide`) for every device whose analog context computes a `reg`
+//! width and signedness in, the result bit pattern at that width out, for
+//! every device whose analog context computes a `reg`
 //! wider than 32 bits; VAMS §7.3.1 gives the analog context read access to a
 //! discrete bit grouping, and a `reg` it assigns is computed with the bits
 //! IEEE 1364 gives it (`analog/wide.zig` sizes each operand).

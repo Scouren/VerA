@@ -1,7 +1,6 @@
 //! §4.5.11/§4.5.12 filters: a cascade's section coefficients, its input and
 //! its accepted history in, the filter's output (with its exact derivative)
-//! and the advanced history out. Device text (`text.filter`) for every
-//! device that uses a `laplace_*` or `zi_*` operator. Nothing allocates or
+//! and the advanced history out, for every device that uses a `laplace_*` or `zi_*` operator. Nothing allocates or
 //! reads the device: `NS` (sections) and `D` (degree) are structural
 //! constants of the flattened call, every coefficient is a run-time read of
 //! `Model`, and the histories are `Instance` slices the caller passes.

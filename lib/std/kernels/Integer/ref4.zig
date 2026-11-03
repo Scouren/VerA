@@ -1,8 +1,8 @@
 //! L3 `ref4`: a per-bit four-state evaluator written from
-//! IEEE 1364-2005 §5's tables, and the tests that hold `integer.zig`'s
+//! IEEE 1364-2005 §5's tables, and the tests that hold `Integer.zig`'s
 //! `Literal` operations to it. In: operands as `V` (one `B` per bit, a width,
 //! a signedness); out: the `V` or `B` the clause defines. It shares no code
-//! with `integer.zig`: a value is a bit array, the logic tables are the LRM's
+//! with `Integer.zig`: a value is a bit array, the logic tables are the LRM's
 //! cells as printed, and known arithmetic is Zig's u256/i256, never
 //! `std.math.big`. The one crossing is `lit`/`fromLit`, through `Literal`'s
 //! fields and its `bit` accessor, and the first test checks that crossing.
@@ -140,7 +140,7 @@ const Scratch = struct {
 };
 
 /// tests/suite.zig's `fuzz_widths`: where the one-word and multiword
-/// paths of `integer.zig` meet.
+/// paths of `Integer.zig` meet.
 const fuzz_widths = [_]u32{ 1, 2, 3, 7, 8, 13, 16, 31, 32, 33, 48, 63, 64, 65, 100, 128, 129 };
 
 // ---- private ----
@@ -418,7 +418,7 @@ fn resize(v: *const V, w: u32, sign: bool) V {
     return r;
 }
 
-/// `v` as a `Literal`, in the plane encoding `integer.zig` documents
+/// `v` as a `Literal`, in the plane encoding `Integer.zig` documents
 /// ((value, unknown) = 00/10/11/01 for 0/1/x/z), padding clear.
 fn lit(a: std.mem.Allocator, v: *const V) !Literal {
     const words = (v.w + 63) / 64;

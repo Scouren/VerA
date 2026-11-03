@@ -212,7 +212,7 @@ pub fn wrap32(x: i64) i64 {
 /// null here, E0609 from the prover when it is provable, and 0 at run time.
 ///
 /// Same three sites as `wrap32`: `binary`, `analysis.foldConst`, and
-/// codegen's `ipow_fn`, which is this function as device text.
+/// codegen's `ipow_fn`, which is this function as a device spells it.
 pub fn ipow32(b: i64, n: i64) ?i64 {
     if (n < 0) return switch (b) {
         0 => null,
@@ -358,7 +358,7 @@ pub fn math(f: MathFn, args: []const Const) ?Const {
         .abs => if (int) Const{ .int = wrapFrom(args[0].int, if (args[0].int < 0) 0 -% args[0].int else args[0].int) } else Const{ .real = @abs(x) },
         // §4.3.1 "min(x,y) is equivalent to (x < y) ? x : y", bit for bit:
         // @min/@max drop a NaN and leave a zero's sign open, and run time
-        // (kernel_text zMin/zMax) uses the conditional form.
+        // (`math.zMin`/`zMax`) uses the conditional form.
         .min => if (int) Const{ .int = @min(args[0].int, args[1].int) } else Const{ .real = if (x < y) x else y },
         .max => if (int) Const{ .int = @max(args[0].int, args[1].int) } else Const{ .real = if (x > y) x else y },
         .pow => .{ .real = math_k.pow(x, y) },

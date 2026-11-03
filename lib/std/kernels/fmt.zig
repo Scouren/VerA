@@ -4,7 +4,7 @@
 //! (`digital/display.zig`) and a native executable (`rt/`) both print
 //! through these, so the two cannot disagree about a digit. A conversion's
 //! flags, width and precision are read here too (`spec`), with which flags
-//! each conversion takes (`flagVerdict`). Host Zig, not device text.
+//! each conversion takes (`flagVerdict`). Host Zig: no device calls it.
 //! Cites: VAMS §9.4.3 Table 9-22, §9.4.7; IEEE 1364-2005 §4.8, §17.1.1.2,
 //! §17.1.1.3, §17.1.1.4, §17.1.1.7, §17.3, §17.3.2, §19.8;
 //! docs/specification/Vague_Decisions.md VD-129.

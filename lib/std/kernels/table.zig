@@ -1,7 +1,6 @@
 //! §9.21 `$table_model`: a flat row-major sample block, the lookup point and
 //! the per-dimension control in, the interpolated value with its exact
-//! gradient out. Device text (`text.table`) for every device that calls
-//! `$table_model`. Nothing allocates: `NP`, `NCOL`, `ND` and the control
+//! gradient out, for every device that calls `$table_model`. Nothing allocates: `NP`, `NCOL`, `ND` and the control
 //! characters are structural constants of the call, so every scratch array
 //! is comptime-sized and on the stack.
 //! Cites: VAMS §9.21, §9.21.1, §9.21.2, §9.21.4, Tables 9-30 and 9-31.

@@ -248,7 +248,7 @@ pub fn zSOver() noreturn {
 /// reports, and nothing reports before the statement ran (`zMonitorArm`).
 /// `m` is the site's latch in the instance the display unit runs for,
 /// written through the `*const Instance` the contract hands `display`, as
-/// `file_kernels.zFCtx` writes the table: only the display phase writes it,
+/// `file.zFCtx` writes the table: only the display phase writes it,
 /// one call per instance at a time.
 pub fn zMonitor(m: *const ZMon, vals: []const u64, text: []const u8) ?[]const u8 {
     const l: *ZMon = @constCast(m);

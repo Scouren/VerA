@@ -1,7 +1,6 @@
 //! §9.13 probabilistic distributions: a seed and a distribution's arguments
-//! in, the variate or the seed it leaves behind out. Device text
-//! (`text.rng`) for every device that calls one of Table 9-10's names, and
-//! host Zig for elaboration's literal folds (`elab/clone.zig`) and the
+//! in, the variate or the seed it leaves behind out: for every device that
+//! calls one of Table 9-10's names, and for elaboration's literal folds (`elab/clone.zig`) and the
 //! digital engine's IEEE 1364 §17.9 `$dist_*`, so every path draws the same
 //! sequence from a seed.
 //! Cites: VAMS §9.13.1-§9.13.3, Tables 9-10 and 9-26; IEEE 1364-2005

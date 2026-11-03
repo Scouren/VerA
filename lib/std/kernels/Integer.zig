@@ -3,9 +3,9 @@
 //! over them. The planes use the VPI encoding: (value, unknown) = 00/10/11/01
 //! for 0/1/X/Z. This file is the type, its accessors and its shape
 //! operations (resize, concatenation, replication); the operators live in
-//! `integer_logic.zig` and `integer_arith.zig` and the literal reader in
-//! `integer_parse.zig`, each reached as a `Literal` method or a decl here.
-//! `ref4.zig` is the per-bit reference every operation is held to.
+//! `Integer/logic.zig` and `Integer/arith.zig` and the literal reader in
+//! `Integer/parse.zig`, each reached as a `Literal` method or a decl here.
+//! `Integer/ref4.zig` is the per-bit reference every operation is held to.
 //! Cites: VAMS §2.6.1; IEEE 1364-2005 §5.1.14, §5.1.15, §5.2.1, §5.2.2,
 //! §5.5.1, §5.5.2-§5.6.
 //!
@@ -90,29 +90,29 @@ pub const Literal = struct {
         assert(@sizeOf(Literal) <= 24);
     }
 
-    /// Returns `~self` (IEEE 1364-2005 Table 5-16; `integer_logic`).
+    /// Returns `~self` (IEEE 1364-2005 Table 5-16; `Integer/logic.zig`).
     pub const bitwiseNot = logic.bitwiseNot;
-    /// Returns a §5.1.10 bitwise operator's result (`integer_logic`).
+    /// Returns a §5.1.10 bitwise operator's result (`Integer/logic.zig`).
     pub const bitwise = logic.bitwise;
-    /// Returns a §5.1.12 shift's result (`integer_logic`).
+    /// Returns a §5.1.12 shift's result (`Integer/logic.zig`).
     pub const shift = logic.shift;
-    /// Returns a §5.1.7 relation's bit (`integer_logic`).
+    /// Returns a §5.1.7 relation's bit (`Integer/logic.zig`).
     pub const relational = logic.relational;
-    /// Returns the §5.1.9 truth value (`integer_logic`).
+    /// Returns the §5.1.9 truth value (`Integer/logic.zig`).
     pub const truth = logic.truth;
-    /// Returns `&&` or `||` of two truth values (`integer_logic`).
+    /// Returns `&&` or `||` of two truth values (`Integer/logic.zig`).
     pub const logical = logic.logical;
-    /// Returns a §5.1.11 reduction's bit (`integer_logic`).
+    /// Returns a §5.1.11 reduction's bit (`Integer/logic.zig`).
     pub const reduce = logic.reduce;
-    /// Returns a §5.1.8 equality's bit (`integer_logic`).
+    /// Returns a §5.1.8 equality's bit (`Integer/logic.zig`).
     pub const equality = logic.equality;
-    /// Returns `self ? yes : no` (§5.1.13; `integer_logic`).
+    /// Returns `self ? yes : no` (§5.1.13; `Integer/logic.zig`).
     pub const conditional = logic.conditional;
-    /// Returns a §5.1.5 arithmetic operator's result (`integer_arith`).
+    /// Returns a §5.1.5 arithmetic operator's result (`Integer/arith.zig`).
     pub const arithmetic = arith.arithmetic;
-    /// Returns `-self` (§5.1.5; `integer_arith`).
+    /// Returns `-self` (§5.1.5; `Integer/arith.zig`).
     pub const negate = arith.negate;
-    /// Returns `self ** exponent` (§5.1.5; `integer_arith`).
+    /// Returns `self ** exponent` (§5.1.5; `Integer/arith.zig`).
     pub const power = arith.power;
 
     /// Returns the value plane, least significant word first. It can be

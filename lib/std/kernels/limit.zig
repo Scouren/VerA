@@ -1,6 +1,6 @@
 //! §4.5.15 SPICE voltage limiting: a Newton iterate, the previous one and the
-//! algorithm's constants in, the damped iterate out. Device text
-//! (`text.limit`) for every device that honours a `$limit` call; pure f64
+//! algorithm's constants in, the damped iterate out, for every device that
+//! honours a `$limit` call; pure f64
 //! functions, no allocation, no device state.
 //! Cites: VAMS §4.5.15, §9.17.3; ngspice `src/spicelib/devices/devsup.c`
 //! (`DEVpnjlim`, `DEVfetlim`, `DEVlimvds`), `B4SOIlimit`, hisim `limit_dx`.
@@ -153,7 +153,7 @@ fn zlSame(a: f64, b: f64) bool {
     return @as(u64, @bitCast(a)) == @as(u64, @bitCast(b));
 }
 
-/// The devices' natural log (`contract.gm.log`): one implementation on
+/// The devices' natural log (`math.log`, Gompute's): one implementation on
 /// host, NVPTX and AMDGCN, with log(0) = -inf.
 inline fn klog(x: f64) f64 {
     return @import("math.zig").log(x);

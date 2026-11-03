@@ -1,0 +1,2 @@
+# Fixtures where the vams Preprocessor may differ from lib/frontend's, one per line:
+# <path under tests/conformance/tests> <reason>. An entry that agrees fails diff-pp.

@@ -34,6 +34,7 @@
 //! - `pub fn isBuiltin(zcu: *const Zcu, d: Decl) bool`
 //! - `pub fn fmtPath(zcu: *const Zcu, i: Instance.Index) PathFormatter` (`PathFormatter.format`)
 //! - `pub fn hasCode(zcu: *const Zcu, code: Diag.Code) bool`
+//! - `pub fn answerData(zcu: *Zcu, bytes: ?[]const u8) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -75,6 +76,13 @@ net_discipline: std.AutoHashMapUnmanaged(NetKey, InternPool.String) = .empty,
 inserts: std.MultiArrayList(Insert) = .empty,
 /// Every diagnostic elaboration raised, in the order raised.
 failed: std.MultiArrayList(Failure) = .empty,
+/// §9.21/§4.6.4.3 the data files the analysis asked for, by the name the
+/// source writes, to the caller's answer: the bytes (borrowed until
+/// `deinit`), or null for "not there". Keys on `gpa`.
+data_files: std.StringHashMapUnmanaged(?[]const u8) = .empty,
+/// The data file the last `Sema.analyze` stopped on, on `gpa`, until
+/// `answerData`.
+data_want: ?[]const u8 = null,
 
 /// One source file's analysis: its path and its Vir, which the caller
 /// owns and keeps alive as long as the `Zcu`.
@@ -275,7 +283,21 @@ pub fn deinit(zcu: *Zcu) void {
     zcu.net_discipline.deinit(gpa);
     zcu.inserts.deinit(gpa);
     zcu.failed.deinit(gpa);
+    var it = zcu.data_files.keyIterator();
+    while (it.next()) |k| gpa.free(k.*);
+    zcu.data_files.deinit(gpa);
+    if (zcu.data_want) |w| gpa.free(w);
     zcu.* = undefined;
+}
+
+/// Answers `data_want` with the file's bytes (borrowed until `deinit`), or
+/// null for "not there"; `Sema.analyze` then runs again. Asserts a pending
+/// request.
+pub fn answerData(zcu: *Zcu, bytes: ?[]const u8) Allocator.Error!void {
+    const name = zcu.data_want.?;
+    try zcu.data_files.putNoClobber(zcu.gpa, name, bytes);
+    zcu.data_want = null;
+    assert(zcu.data_files.contains(name));
 }
 
 /// Adds a file whose first `builtins` modules are shipped; `vir` is

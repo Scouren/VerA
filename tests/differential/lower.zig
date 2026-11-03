@@ -210,6 +210,16 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, show: bool) !
     try Sema.elaborate(&zcu, .{ .roots = .first });
     const elab_failed = hasError(&zcu, &vir);
     var analysis: ?Sema.Analysis = if (elab_failed or zcu.instances.len == 0) null else try Sema.analyze(&zcu);
+    // A data file is answered as the old side reads one: each include
+    // directory, then the name itself.
+    while (zcu.data_want) |name| {
+        const bytes: ?[]const u8 = for ([_][]const u8{ dir, include, "" }) |base| {
+            const full = if (base.len == 0) name else try std.fs.path.join(arena, &.{ base, name });
+            break Io.Dir.cwd().readFileAlloc(io, full, arena, .unlimited) catch continue;
+        } else null;
+        try zcu.answerData(bytes);
+        analysis = try Sema.analyze(&zcu);
+    }
     defer if (analysis) |*a| a.deinit(gpa);
 
     var codes: std.ArrayList([]const u8) = .empty;

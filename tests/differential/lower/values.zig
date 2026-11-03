@@ -171,11 +171,15 @@ pub fn compareValues(arena: std.mem.Allocator, rel: []const u8, mir: *Mir, lw: *
 /// The new side's model of the host, the old interpreter's
 /// (`src/codegen/verilog/Interp.zig`'s `call`): a print or task is 0; a
 /// §4.5.7-§4.5.9 operator its settled argument; `limexp` `@exp`; the
-/// environment at a transient point (300.15 K, `$mfactor` 1). Every other
-/// call is not modelled.
+/// environment at a transient point (300.15 K, `$mfactor` 1). An analog
+/// operator, noise source, event, kernel or user call is one the old
+/// interpreter refuses, so every root its value reaches (through data or a
+/// condition) is skipped there and never compared: it is a 0 of its type, so
+/// the run reaches the roots that are. A file, random or query call is not
+/// modelled (a loop on `$feof` would never end).
 fn hostCall(ctx: *anyopaque, callee: u32, args: []const Air.interp.Value) Air.interp.Error!Air.interp.Value {
     _ = ctx;
-    if (callee > std.math.maxInt(@typeInfo(vams.SysFn.Tag).@"enum".tag_type)) return error.Unsupported;
+    if (callee > std.math.maxInt(@typeInfo(vams.SysFn.Tag).@"enum".tag_type)) return .{ .real = 0 };
     const tag: vams.SysFn.Tag = @fromBackingInt(@intCast(callee));
     switch (tag) {
         .transition, .absdelay, .slew => return args[0],
@@ -186,9 +190,11 @@ fn hostCall(ctx: *anyopaque, callee: u32, args: []const Air.interp.Value) Air.in
         .@"$vt" => return .{ .real = 1.380649e-23 * (if (args.len > 0) realOf(args[0]) else 300.15) / 1.602176634e-19 },
         else => {}, // else: by family below
     }
-    return switch (vams.SysFn.get(tag).family) {
+    const info = vams.SysFn.get(tag);
+    return switch (info.family) {
         .display, .simctl, .file_out, .string => .{ .real = 0 },
-        .math, .analog_op, .event, .query, .convert, .file_func, .random, .kernel => error.Unsupported,
+        .analog_op, .event, .kernel => if (info.ty == .int) .{ .int = 0 } else .{ .real = 0 },
+        .math, .query, .convert, .file_func, .random => error.Unsupported,
     };
 }
 

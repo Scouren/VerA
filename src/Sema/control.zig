@@ -148,7 +148,10 @@ fn stmt(s: *Sema, b: *Block, i: Inst.Index, tag: Inst.Tag) Allocator.Error!void 
         .variable => try local(s, b, i),
         .param, .event => {},
         .event_wait => try eventWait(s, b, decl.payloadOf(vir, Inst.EventWait, i), src),
-        .store_nb, .proc_assign, .force, .store_timed, .store_nb_timed, .contrib_indirect, .deassign, .release, .trigger, .disable, .wait, .delay => try s.fail(.E0512, unit.file, src, "`{t}` is not lowered by Sema yet", .{tag}),
+        .contrib_indirect => try contrib.indirect(s, b, decl.payloadOf(vir, Inst.Triple, i), src),
+        .trigger => try trigger(s, b, vir.instructions.items(.data)[@backingInt(i)].un_node.operand, src),
+        .disable => try disable(s, b, vir.instructions.items(.data)[@backingInt(i)].un_node.operand, src),
+        .store_nb, .proc_assign, .force, .store_timed, .store_nb_timed, .deassign, .release, .wait, .delay => try s.fail(.E0512, unit.file, src, "`{t}` is not lowered by Sema yet", .{tag}),
         // An expression: lowered where its statement reads it.
         .decl_ref, .str_ref, .int, .big_int, .real, .str, .pos, .neg, .not, .bit_not, .red_and, .red_nand, .red_or, .red_nor, .red_xor, .red_xnor, .add, .sub, .mul, .div, .mod, .pow, .shl, .shr, .ashl, .ashr, .lt, .gt, .lte, .gte, .eq, .neq, .case_eq, .case_neq, .bit_and, .bit_or, .bit_xor, .bit_xnor, .bool_and, .bool_or, .ternary, .mintypmax, .field, .elem, .slice, .slice_up, .slice_down, .call, .call_sys, .port_branch, .concat, .pattern, .replicate, .pattern_repl, .event_or, .posedge, .negedge, .driver_update, .step_event, .paramset_output, .range, .pulse_limits, .delay_ctl, .event_ctl, .repeat_ctl => {},
         .module, .nature, .discipline, .paramset, .primitive, .connectrules, .config, .port, .io, .net, .aliasparam, .genvar, .branch, .instance, .assign, .defparam, .analog, .analog_initial, .initial, .always, .function, .gen_for, .gen_if, .gen_case, .gen_block, .specify, .path, .timing_check, .pulse_style, .timing_event, .ps_override, .connect_resolve, .connect_insert => try s.fail(.E0512, unit.file, src, "`{t}` in an analog body", .{tag}),
@@ -162,13 +165,63 @@ fn task(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!void {
     try s.fail(.E0512, b.unit.file, i.toRef(), "a user task enable is not lowered by Sema yet", .{});
 }
 
-/// A.6.3 `begin ... end`: its locals, then its statements.
+/// A.6.3 `begin ... end`: its locals, then its statements. A named block
+/// (§5.3.2) that a `disable` leaves is an Air `block`; any other is its
+/// statements, in place (a value lowered there stays readable after it).
 fn block(s: *Sema, b: *Block, x: Inst.Block) Allocator.Error!void {
     if (x.flags.fork) return s.fail(.E0512, b.unit.file, .none, "a `fork` block in an analog body", .{});
-    const outer = b.path;
-    defer b.path = outer;
-    if (x.name != .empty) b.path = try std.fmt.allocPrint(s.arena, "{s}{s}.", .{ outer, b.unit.vir.string(x.name) });
-    try body(s, b, x.body);
+    if (x.name == .empty) return body(s, b, x.body);
+    const name = b.unit.vir.string(x.name);
+    const exit = try s.air.addInst(s.gpa, .{ .tag = .block, .data = undefined });
+    var disabled = false;
+    const label: Block.Label = .{ .name = name, .exit = exit, .up = b.label, .disabled = &disabled };
+    var inner = b.child();
+    inner.label = &label;
+    inner.path = try std.fmt.allocPrint(s.arena, "{s}{s}.", .{ b.path, name });
+    try body(s, &inner, x.body);
+    if (!disabled) {
+        try s.air.setBody(s.gpa, exit, .none, &.{});
+        try b.insts.appendSlice(s.arena, inner.insts.items);
+        b.dead = inner.dead;
+        return;
+    }
+    try br(s, &inner, exit, .none);
+    try s.air.setBody(s.gpa, exit, .none, inner.insts.items);
+    try b.insts.append(s.arena, exit);
+}
+
+/// §5.10.4 `-> ev`: the event's flag set for this evaluation. A.6.4 lists
+/// it under `analog_event_statement` only (E0434); a hierarchical event is
+/// E0235.
+fn trigger(s: *Sema, b: *Block, target: Inst.Ref, src: Inst.Ref) Allocator.Error!void {
+    const vir = b.unit.vir;
+    const i = target.toIndex() orelse return;
+    const tag = vir.instructions.items(.tag)[@backingInt(i)];
+    if (tag != .decl_ref and tag != .elem) return s.fail(.E0235, b.unit.file, src, "§5.10.4: a hierarchical named event trigger in an analog block", .{});
+    if (!b.in_event) return s.fail(.E0434, b.unit.file, src, "", .{});
+    try assignTo(s, b, target, .{ .ref = .fromIntern(.one), .ty = .integer }, src);
+}
+
+/// A.6.5 `disable blk`: leaves the enclosing named block `blk`; legal only
+/// as an event statement (E0401), naming an enclosing block (E0402).
+fn disable(s: *Sema, b: *Block, target: Inst.Ref, src: Inst.Ref) Allocator.Error!void {
+    const vir = b.unit.vir;
+    if (!b.in_event) return s.fail(.E0401, b.unit.file, src, "", .{});
+    const i = target.toIndex() orelse return;
+    const data = vir.instructions.items(.data)[@backingInt(i)];
+    const name = switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .str_ref => vir.string(data.str_tok.start),
+        .decl_ref => vir.string(decl.nameOf(vir, decl.canonical(vir, data.decl_tok.decl))),
+        else => return s.fail(.E0402, b.unit.file, src, "a hierarchical block name", .{}),
+    };
+    var l = b.label;
+    while (l) |label| : (l = label.up) if (std.mem.eql(u8, label.name, name)) {
+        label.disabled.* = true;
+        try br(s, b, label.exit, .none);
+        b.dead = true;
+        return;
+    };
+    return s.fail(.E0402, b.unit.file, src, "`{s}` names no named block in scope", .{name});
 }
 
 /// §5.10.3.1-§5.10.3.3 the shape of a monitored event's arguments (the old
@@ -214,11 +267,18 @@ fn eventArgs(s: *Sema, b: *Block, tag: vams.SysFn.Tag, args: []const Inst.Ref, s
                 if (c != .str and c.asReal() != @round(c.asReal())) try s.fail(.E0517, file, src, "`cross()` direction shall evaluate to an integer, got {d}", .{c.asReal()});
             };
             const first: usize = if (tag == .cross) 2 else 1;
+            var tol_given = false;
             for (first..@max(first, @min(first + 2, args.len))) |k| {
                 if (args[k] == .none) continue;
+                tol_given = true;
                 const c = (try decl.foldRef(s, b.unit, args[k])) orelse continue;
                 if (c != .str and c.asReal() < 0) try s.fail(.E0517, file, src, "`{t}()` tolerance shall be non-negative, got {d}", .{ tag, c.asReal() });
             }
+            // "If either or both tolerances are defined, then the direction
+            // shall also be defined"; "If expr_tol is specified, time_tol shall
+            // also be specified" (§5.10.3.1).
+            if (tag == .cross and tol_given and (args.len < 2 or args[1] == .none)) try s.fail(.E0517, file, src, "a tolerance is given but the direction slot is empty", .{});
+            if (tag == .cross and args.len > 3 and args[3] != .none and args[2] == .none) try s.fail(.E0517, file, src, "`cross()` expr_tol is given but the time_tol slot is empty", .{});
         },
         else => {}, // else: no bound to check
     }
@@ -295,6 +355,18 @@ fn eventExpr(s: *Sema, b: *Block, r: vams.Vir.Inst.Ref, src: Inst.Ref) Allocator
             try s.fail(.E0704, b.unit.file, src, "", .{});
             return null;
         },
+        // §5.10.4 a named event: its flag this evaluation.
+        .decl_ref, .elem => {
+            var base = i;
+            while (vir.instructions.items(.tag)[@backingInt(base)] == .elem) base = decl.payloadOf(vir, Inst.Bin, base).lhs.toIndex() orelse break;
+            const named = vir.instructions.items(.tag)[@backingInt(base)] == .decl_ref and
+                vir.instructions.items(.tag)[@backingInt(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(base)].decl_tok.decl))] == .event;
+            if (!named) {
+                try s.fail(.E0706, b.unit.file, src, "", .{});
+                return null;
+            }
+            return try expr.toBool(s, b, try expr.lower(s, b, r));
+        },
         else => {
             try s.fail(.E0512, b.unit.file, src, "this event expression is not lowered by Sema yet", .{});
             return null;
@@ -307,16 +379,15 @@ fn local(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!void {
     const vir = b.unit.vir;
     const v = decl.payloadOf(vir, Inst.Variable, i);
     const first = decl.canonical(vir, i);
+    try @import("variable.zig").checkRedeclared(s, b.unit, i);
     if (b.unit.binds.contains(first)) return;
-    if (v.dims.len != 0) return decl.declareArray(s, b.unit, first, v);
+    if (v.dims.len != 0) return decl.declareArray(s, b.unit, first, v.dims, decl.tyOf(v.flags.storage));
     const ty = decl.tyOf(v.flags.storage);
     const slot = try decl.addAlloc(s, ty);
     try b.unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = slot, .ty = ty } });
+    if (b.path.len != 0) try s.block_locals.put(s.arena, try std.fmt.allocPrint(s.arena, "{s}{s}{s}", .{ b.unit.prefix, b.path, vir.string(v.name) }), .{ .alloc = slot, .ty = ty });
     // §5.3.2 a held local of a named block is named by the block path.
-    if (b.path.len != 0 and b.unit.held.contains(first)) try s.device.held.append(s.gpa, .{
-        .name = try s.zcu.intern_pool.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}{s}{s}", .{ b.unit.prefix, b.path, vir.string(v.name) })),
-        .slot = slot,
-    });
+    if (b.path.len != 0 and b.unit.held.contains(first)) try @import("variable.zig").addHeld(s, try std.fmt.allocPrint(s.arena, "{s}{s}{s}", .{ b.unit.prefix, b.path, vir.string(v.name) }), b.unit.binds.get(first).?, .undef);
 }
 
 /// §5.8.1 `if (c) a else b`.

@@ -10,7 +10,7 @@
 //! Cites: VAMS-2023 §4.7, §4.7.1, §4.7.2, §4.7.2.3.
 //!
 //! Contents:
-//! - `pub fn call(s: *Sema, b: *Block, f: Inst.Index, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value`
+//! - `pub fn call(s: *Sema, b: *Block, f: Inst.Index, pre: []const Value, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -26,8 +26,10 @@ const Inst = Vir.Inst;
 const Block = Sema.Block;
 const Value = Sema.Value;
 
-/// Inlines function `f` (a `function` instruction) over `args`.
-pub fn call(s: *Sema, b: *Block, f: Inst.Index, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
+/// Inlines function `f` (a `function` instruction): its leading formals
+/// bound to `pre` (values the caller has, §9.17.3's `vnew` and `vold`), the
+/// rest to `args`.
+pub fn call(s: *Sema, b: *Block, f: Inst.Index, pre: []const Value, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
     const unit = b.unit;
     const vir = unit.vir;
     const file = unit.file;
@@ -39,19 +41,22 @@ pub fn call(s: *Sema, b: *Block, f: Inst.Index, args: []const Inst.Ref, src: Ins
     };
     if (!fd.flags.analog) try s.fail(.E0436, file, src, "`{s}`", .{name});
     const formals = vir.body(fd.formals);
-    if (formals.len != args.len) {
-        try s.fail(.E0511, file, src, "`{s}()` takes {d}, got {d}", .{ name, formals.len, args.len });
+    if (formals.len != pre.len + args.len) {
+        try s.fail(.E0511, file, src, "`{s}()` takes {d}, got {d}", .{ name, formals.len, pre.len + args.len });
         return expr.poison;
     }
     // The actuals, in the caller's scope, before any formal is bound.
     const slots = try s.arena.alloc(Sema.Slot, formals.len);
     const dirs = try s.arena.alloc(Inst.Direction, formals.len);
-    for (formals, args, slots, dirs) |formal, a, *slot, *dir| {
+    for (formals, slots, dirs, 0..) |formal, *slot, *dir, k| {
         const io = decl.payloadOf(vir, Inst.Io, formal);
         dir.* = io.flags.dir;
         const ty = formalTy(vir, fd, formal, io);
         slot.* = .{ .alloc = try decl.addAlloc(s, ty), .ty = ty };
-        const v: Air.Inst.Ref = if (dir.* == .output) zeroOf(ty) else try expr.coerce(s, b, try expr.lower(s, b, a), ty);
+        const v: Air.Inst.Ref = if (dir.* == .output)
+            zeroOf(ty)
+        else
+            try expr.coerce(s, b, if (k < pre.len) pre[k] else try expr.lower(s, b, args[k - pre.len]), ty);
         _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slot.alloc), .rhs = v } } });
     }
     const ret_ty = decl.tyOf(fd.flags.storage);
@@ -72,7 +77,7 @@ pub fn call(s: *Sema, b: *Block, f: Inst.Index, args: []const Inst.Ref, src: Ins
     try b.insts.append(s.arena, exit);
 
     const result = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(ret.alloc) } });
-    for (args, slots, dirs) |a, slot, dir| {
+    for (args, slots[pre.len..], dirs[pre.len..]) |a, slot, dir| {
         if (dir != .output and dir != .inout) continue;
         const v = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot.alloc) } });
         try control.assignTo(s, b, a, .{ .ref = v, .ty = slot.ty }, src);

@@ -15,7 +15,7 @@
 //! - `pub const Config = struct` (`Roots`, `Override`)
 //! - `pub fn elaborate(zcu: *Zcu, config: Config) Allocator.Error!void`
 //! - `pub const Analysis = struct` (`deinit`)
-//! - lowering's types: `pub const Ty`, `pub const Value`, `pub const Slot`, `pub const Bind`, `pub const Unit`, `pub const ContribKey`, `pub const Block` (`Loop`, `child`)
+//! - lowering's types: `pub const Ty`, `pub const Value`, `pub const Slot`, `pub const Bind`, `pub const Unit`, `pub const ContribKey`, `pub const Block` (`Loop`, `Label`, `restricted`, `child`)
 //! - `pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis`
 //! - `pub fn addInst(s: *Sema, b: *Block, inst: Air.Inst) Allocator.Error!Air.Inst.Ref`
 //! - `pub fn fail(s: *Sema, code: Diag.Code, file: Zcu.File.Index, src: Vir.Inst.Ref, comptime fmt: []const u8, args: anytype) Allocator.Error!void`
@@ -61,6 +61,8 @@ units: std.ArrayList(Unit) = .empty,
 node_rows: std.AutoHashMapUnmanaged(InternPool.String, Air.Device.Node.Index) = .empty,
 /// §5.4.2 a node pair to its flow unknown (contrib.zig).
 flow_rows: std.AutoHashMapUnmanaged([2]Air.Device.Node.Index, Air.Device.Node.Index) = .empty,
+/// §5.4.3 a port's row to its port flow unknown (contrib.zig).
+port_rows: std.AutoHashMapUnmanaged(Air.Device.Node.Index, Air.Device.Node.Index) = .empty,
 /// §5.6 a contribution target to its row (contrib.zig).
 contrib_rows: std.AutoHashMapUnmanaged(ContribKey, Air.Device.Contribution.Index) = .empty,
 /// Each `device.params` row's `arg` in the prologue, by row (decl.zig).
@@ -88,10 +90,15 @@ static_slots: std.AutoHashMapUnmanaged(Air.Inst.Index, void) = .empty,
 static_loads: std.AutoHashMapUnmanaged(Air.Inst.Index, void) = .empty,
 /// Assignments run at the main body's entry, after the prologue (op.zig).
 entry: std.ArrayList(Air.Inst.Index) = .empty,
+/// §5.3.2 every named block's local, by its flat name (`u1.blk.x`), for a
+/// hierarchical read (control.zig).
+block_locals: std.StringHashMapUnmanaged(Slot) = .empty,
+/// The slot ordering §9.21 array-source snapshots (table.zig).
+table_effect: ?Air.Inst.Index = null,
+/// Each `device.limit_slots` row's `limit$old` seed, by row (kernel.zig).
+limit_seeds: std.ArrayList(Air.Inst.Ref) = .empty,
 /// The user functions being inlined, outermost first (func.zig).
 inlining: std.ArrayList(Inst.Index) = .empty,
-/// Each contribution row's instance, by row (contrib.zig).
-contrib_units: std.ArrayList(Zcu.Instance.Index) = .empty,
 /// The contribution rows a reactive term was added to (contrib.zig).
 react_written: std.AutoHashMapUnmanaged(Air.Device.Contribution.Index, void) = .empty,
 
@@ -148,6 +155,8 @@ pub const Bind = union(enum) {
     slot: Slot,
     /// A §3.12 named branch.
     branch: Air.Device.Branch.Index,
+    /// A §3.12.1 port branch (`branch (<p>) pb;`): its port's node.
+    port: Air.Device.Node.Index,
     /// A §6.6.1 genvar's current value, or another name with one constant.
     constant: InternPool.Index,
     /// A §3.2.2 array: one slot per element, row-major (the last
@@ -171,6 +180,11 @@ pub const Unit = struct {
     vec_rows: std.ArrayList(Air.Device.Node.Index) = .empty,
     /// §5.10 the held variables, by declaration (held.zig).
     held: std.AutoHashMapUnmanaged(Inst.Index, @import("Sema/held.zig").Why) = .empty,
+    /// §7.3.1 the digital-owned values the analog blocks read, each a card
+    /// row (discrete.zig).
+    discrete: std.ArrayList(Inst.Index) = .empty,
+    /// Its analog blocks are lowered (decl.zig).
+    lowered: bool = false,
 };
 
 /// §5.6 what makes two contributions one row.
@@ -206,14 +220,27 @@ pub const Block = struct {
     path: []const u8 = "",
     /// Inside an inlined function: the `block` a `return` leaves (func.zig).
     function: ?Air.Inst.Index = null,
+    /// The innermost enclosing named block (control.zig).
+    label: ?*const Label = null,
 
     /// A loop's targets: the `block` a `break` leaves and the one a
     /// `continue` leaves (the step follows it).
     pub const Loop = struct { exit: Air.Inst.Index, cont: Air.Inst.Index };
+    /// A §5.3.2 named block: its name, the `block` a `disable` leaves, and
+    /// whether one does.
+    pub const Label = struct { name: []const u8, exit: Air.Inst.Index, up: ?*const Label, disabled: *bool };
+
+    /// The context §4.7.1 and §5.2.1 restrict (an analog function, an
+    /// analog initial block), or null.
+    pub fn restricted(b: *const Block) ?[]const u8 {
+        if (b.function != null) return "an analog function";
+        if (b.analog_initial) return "an analog initial block";
+        return null;
+    }
 
     /// A child of `parent`: the same instance and restrictions, no instructions.
     pub fn child(parent: *Block) Block {
-        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .runtime = parent.runtime, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path, .function = parent.function };
+        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .runtime = parent.runtime, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path, .function = parent.function, .label = parent.label };
     }
 };
 
@@ -240,9 +267,13 @@ pub fn elaborate(zcu: *Zcu, config: Config) Allocator.Error!void {
 /// Lowers the elaborated design under `zcu.instances[0]` (its first root
 /// and every instance below it) into one `Air` body and its device tables
 /// (docs/rewrite/lower.md). Diagnostics go to `zcu.failed`; null when one
-/// of them is an error. Asserts that `zcu` was elaborated.
+/// of them is an error, or when the design reads a data file not answered
+/// yet: `zcu.data_want` names it, and after `zcu.answerData` this runs
+/// again (each pass from the start, its diagnostics dropped). Asserts that
+/// `zcu` was elaborated and no request is pending.
 pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis {
     assert(zcu.instances.len != 0);
+    assert(zcu.data_want == null);
     var arena_state: std.heap.ArenaAllocator = .init(zcu.gpa);
     defer arena_state.deinit();
     var s: Sema = .{ .zcu = zcu, .gpa = zcu.gpa, .arena = arena_state.allocator(), .config = .{}, .air = try Air.Builder.init(zcu.gpa) };
@@ -250,6 +281,11 @@ pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis {
     errdefer s.device.deinit(zcu.gpa);
     const failed_before = zcu.failed.len;
     const main = try lower_decl.run(&s);
+    if (zcu.data_want != null) {
+        zcu.failed.shrinkRetainingCapacity(failed_before);
+        s.device.deinit(zcu.gpa);
+        return null;
+    }
     for (zcu.failed.items(.code)[failed_before..]) |c| if (@tagName(c)[0] == 'E') {
         s.device.deinit(zcu.gpa);
         return null;

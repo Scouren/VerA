@@ -19,8 +19,10 @@
 //! - `pub fn foldBody(s: *Sema, unit: *Sema.Unit, b: Vir.Body) Allocator.Error!?eval.Const`
 //! - `pub fn foldRef(s: *Sema, unit: *Sema.Unit, r: Inst.Ref) Allocator.Error!?eval.Const`
 //! - `pub fn intern(s: *Sema, c: eval.Const) Allocator.Error!InternPool.Index`
-//! - `pub fn declareArray(s: *Sema, unit: *Sema.Unit, first: Inst.Index, v: Inst.Variable) Allocator.Error!void`
+//! - `pub fn declareArray(s: *Sema, unit: *Sema.Unit, first: Inst.Index, dims_body: Vir.Body, ty: Sema.Ty) Allocator.Error!void`
 //! - `pub fn portDecl(vir: *const Vir, p: Inst.Index) ?Inst.Index`
+//! - `pub fn rowInstance(i: Zcu.Instance.Index) Device.Instance`
+//! - `pub fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -36,6 +38,8 @@ const syscall = @import("syscall.zig");
 const contrib = @import("contrib.zig");
 const held = @import("held.zig");
 const param = @import("param.zig");
+const discrete = @import("discrete.zig");
+const variable = @import("variable.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Device = Air.Device;
@@ -60,22 +64,29 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     try units(s);
     if (s.units.items.len == 0) return finish(s, &.{});
     try contrib.loadDisciplines(s);
+    for (s.units.items) |*u| try discrete.mark(s, u);
     try ports(s, &s.units.items[0]);
     s.device.num_ports = @intCast(s.device.nodes.len);
     for (s.units.items) |*u| try nets(s, u);
     for (s.units.items[1..]) |*u| try bindChildPorts(s, u);
     for (s.units.items) |*u| try param.declare(s, u);
+    for (s.units.items) |*u| try discrete.declare(s, u);
     for (s.units.items) |*u| try branches(s, u);
     for (s.units.items) |*u| try held.mark(s, u);
-    for (s.units.items) |*u| try variables(s, u);
+    for (s.units.items) |*u| try variable.declare(s, u);
     var main: Block = .{ .parent = null, .unit = &s.units.items[0] };
-    for (s.units.items) |*u| {
-        main.unit = u;
-        var env = try envOf(s, u);
-        defer env.deinit();
-        try items(s, &main, &env, u.module.body, 0);
-    }
+    // The old flattener's order: an instance's blocks where its instance
+    // statement stands; then any unit no statement places (an inserted
+    // connect module), in preorder.
+    try lowerUnit(s, &main, &s.units.items[0], 0);
+    for (s.units.items) |*u| if (!u.lowered) try lowerUnit(s, &main, u, 0);
     try syscall.finishDisplays(s, &main);
+    // §5.4.2 a potential or indirect row's branch current, wherever
+    // lowering minted it; a flow row's is its own value.
+    const c = s.device.contributions.slice();
+    for (c.items(.hi), c.items(.lo), c.items(.access), c.items(.kind), c.items(.flow)) |hi, lo, access, kind, *flow| {
+        flow.* = if (access == .potential or kind == .indirect) s.flow_rows.get(.{ hi, lo }) orelse .none else .none;
+    }
     assert(zcu.instances.len >= s.units.items.len);
     return finish(s, main.insts.items);
 }
@@ -168,14 +179,15 @@ pub fn portDecl(vir: *const Vir, p: Inst.Index) ?Inst.Index {
     }
 }
 
-/// §3.2.2 an array variable: a slot per element.
-pub fn declareArray(s: *Sema, unit: *Unit, first: Inst.Index, v: Inst.Variable) Allocator.Error!void {
+/// §3.2.2 an array variable (or §3.4.4 parameter) of type `ty` whose
+/// dimensions are `dims_body`: a slot per element.
+pub fn declareArray(s: *Sema, unit: *Unit, first: Inst.Index, dims_body: Vir.Body, ty: Sema.Ty) Allocator.Error!void {
     const vir = unit.vir;
     var env = try envOf(s, unit);
     defer env.deinit();
     var dims: std.ArrayList([2]i64) = .empty;
     var cells: u64 = 1;
-    for (vir.body(v.dims)) |d| {
+    for (vir.body(dims_body)) |d| {
         if (vir.instructions.items(.tag)[@backingInt(d)] != .range) continue;
         const bin = payloadOf(vir, Inst.Bin, d);
         const msb = ((try env.ref(bin.lhs)) orelse return s.fail(.E0352, unit.file, first.toRef(), "an array bound is not constant", .{})).asIntExact() orelse return;
@@ -184,10 +196,14 @@ pub fn declareArray(s: *Sema, unit: *Unit, first: Inst.Index, v: Inst.Variable) 
         cells = std.math.mul(u64, cells, @abs(msb - lsb) + 1) catch return s.fail(.E1015, unit.file, first.toRef(), "the array is too large", .{});
     }
     if (cells > array_cells_max) return s.fail(.E1015, unit.file, first.toRef(), "the array has {d} elements, past {d}", .{ cells, array_cells_max });
-    const ty = tyOf(v.flags.storage);
     const slots = try s.arena.alloc(Air.Inst.Index, @intCast(cells));
     for (slots) |*slot| slot.* = try addAlloc(s, ty);
     try unit.binds.put(s.arena, first, .{ .array = .{ .slots = slots, .dims = dims.items, .ty = ty } });
+}
+
+/// A `Zcu` instance as a device row's `instance` column.
+pub fn rowInstance(i: Zcu.Instance.Index) Device.Instance {
+    return @fromBackingInt(@backingInt(i));
 }
 
 /// The `InternPool` type of a value type.
@@ -197,6 +213,12 @@ pub fn typeIndex(ty: Sema.Ty) InternPool.Index {
         .integer => .integer_type,
         .string => .string_type,
     };
+}
+
+/// The name a declaring instruction declares (its payload's first word).
+pub fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String {
+    const at = vir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index;
+    return @fromBackingInt(vir.extra[at]);
 }
 
 // ---- private ----
@@ -243,8 +265,22 @@ fn units(s: *Sema) Allocator.Error!void {
     }
 }
 
+/// Lowers `u`'s analog blocks (and its children's, where their instance
+/// statements stand) into `main`.
+fn lowerUnit(s: *Sema, main: *Block, u: *Unit, depth: u32) Allocator.Error!void {
+    assert(!u.lowered);
+    u.lowered = true;
+    const saved = main.unit;
+    defer main.unit = saved;
+    main.unit = u;
+    var env = try envOf(s, u);
+    defer env.deinit();
+    try items(s, main, &env, u.module.body, depth);
+}
+
 /// The analog blocks of a body, in source order, generate schemes unrolled
-/// with their genvars bound (§6.6): each block lowered into `main`.
+/// with their genvars bound (§6.6): each block lowered into `main`; an
+/// instance statement lowers its instances' blocks there.
 fn items(s: *Sema, main: *Block, env: *eval.Env, body: Vir.Body, depth: u32) Allocator.Error!void {
     const unit = main.unit;
     const vir = unit.vir;
@@ -257,6 +293,14 @@ fn items(s: *Sema, main: *Block, env: *eval.Env, body: Vir.Body, depth: u32) All
             try main.insts.appendSlice(s.arena, b.insts.items);
         },
         .gen_block => try items(s, main, env, payloadOf(vir, Inst.GenBlock, i).body, depth + 1),
+        .instance => {
+            const zcu = s.zcu;
+            for (s.units.items) |*c| {
+                if (c.lowered or zcu.instances.items(.parent)[@backingInt(c.instance)] != unit.instance) continue;
+                if (zcu.instances.items(.src)[@backingInt(c.instance)] != i.toRef()) continue;
+                try lowerUnit(s, main, c, depth + 1);
+            }
+        },
         .gen_if => {
             const g = payloadOf(vir, Inst.GenIf, i);
             const c = (try env.body(g.cond)) orelse continue;
@@ -325,16 +369,27 @@ fn envOf(s: *Sema, unit: *Unit) Allocator.Error!eval.Env {
 }
 
 /// Appends a node row named `name` (or returns the row already named so).
-fn internNode(s: *Sema, name: []const u8, discipline: Vir.String, vir: *const Vir) Allocator.Error!Node.Index {
+fn internNode(s: *Sema, unit: *const Unit, name: []const u8, discipline: InternPool.String) Allocator.Error!Node.Index {
     const ip = &s.zcu.intern_pool;
     const key = try ip.getString(s.gpa, name);
     const gop = try s.node_rows.getOrPut(s.arena, key);
     if (gop.found_existing) return gop.value_ptr.*;
     const row: Node.Index = @fromBackingInt(@intCast(s.device.nodes.len));
-    try s.device.nodes.append(s.gpa, .{ .name = key, .kind = .net, .of = .none, .discipline = try ip.getString(s.gpa, vir.string(discipline)) });
+    try s.device.nodes.append(s.gpa, .{ .name = key, .kind = .net, .of = .none, .discipline = discipline, .instance = rowInstance(unit.instance) });
     gop.value_ptr.* = row;
     assert(@backingInt(row) + 1 == s.device.nodes.len);
     return row;
+}
+
+/// §3.6.2 the discipline of net `first`: its declaration's, else the one
+/// Annex F resolution gave it (`zcu.net_discipline`), else none.
+fn netDiscipline(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.Error!InternPool.String {
+    const vir = unit.vir;
+    const ip = &s.zcu.intern_pool;
+    const declared = disciplineOf(unit, first);
+    if (declared != .empty) return ip.getString(s.gpa, vir.string(declared));
+    const net = try ip.getString(s.gpa, vir.string(nameOf(vir, first)));
+    return s.zcu.net_discipline.get(.{ .instance = unit.instance, .net = net }) orelse .empty;
 }
 
 /// The discipline any declaration of `first`'s name in the module gives it.
@@ -373,12 +428,6 @@ fn ports(s: *Sema, unit: *Unit) Allocator.Error!void {
     }
 }
 
-/// The name a declaring instruction declares (its payload's first word).
-fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String {
-    const at = vir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index;
-    return @fromBackingInt(vir.extra[at]);
-}
-
 /// §3.6.3 the instance's nets: every `net` and `io` not bound yet. §3.6.4
 /// a `ground` net is the reference node. A child's port waits for
 /// `bindChildPorts`.
@@ -392,8 +441,24 @@ fn nets(s: *Sema, unit: *Unit) Allocator.Error!void {
         if (tag != .net and tag != .io) continue;
         const first = canonical(vir, i);
         if (unit.binds.contains(first) or child_ports.contains(first)) continue;
+        if (std.mem.findScalar(Inst.Index, unit.discrete.items, first) != null) continue;
         if (tag == .io and tags[@backingInt(first)] == .io and !hasNet(unit, first)) continue;
         try declareNet(s, unit, first);
+    }
+    // §6.5.4 (IEEE 1364-2005 §4.5) a name an instance connects that no
+    // declaration names is an implicit net of this instance.
+    const zcu = s.zcu;
+    for (0..zcu.instances.len) |k| {
+        if (zcu.instances.items(.parent)[k] != unit.instance) continue;
+        const list = zcu.instances.items(.ports)[k];
+        for (zcu.ports.items(.actual)[list.start..][0..list.len]) |actual| {
+            const a = actual.toIndex() orelse continue;
+            if (tags[@backingInt(a)] != .str_ref) continue;
+            const name = vir.string(vir.instructions.items(.data)[@backingInt(a)].str_tok.start);
+            const net = try zcu.intern_pool.getString(s.gpa, name);
+            const disc = zcu.net_discipline.get(.{ .instance = unit.instance, .net = net }) orelse .empty;
+            _ = try internNode(s, unit, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disc);
+        }
     }
 }
 
@@ -412,18 +477,18 @@ fn isGround(unit: *const Unit, first: Inst.Index) bool {
 fn declareNet(s: *Sema, unit: *Unit, first: Inst.Index) Allocator.Error!void {
     const vir = unit.vir;
     const name = vir.string(nameOf(vir, first));
-    const disc = disciplineOf(unit, first);
+    const disc = try netDiscipline(s, unit, first);
     if (try vectorRange(s, unit, first)) |r| {
         const at: u32 = @intCast(unit.vec_rows.items.len);
         const n: u32 = @intCast(@abs(r[0] - r[1]) + 1);
         for (0..n) |k| {
             const i: i64 = if (r[0] >= r[1]) r[0] - @as(i64, @intCast(k)) else r[0] + @as(i64, @intCast(k));
-            try unit.vec_rows.append(s.arena, try internNode(s, try std.fmt.allocPrint(s.arena, "{s}{s}[{d}]", .{ unit.prefix, name, i }), disc, vir));
+            try unit.vec_rows.append(s.arena, try internNode(s, unit, try std.fmt.allocPrint(s.arena, "{s}{s}[{d}]", .{ unit.prefix, name, i }), disc));
         }
         try unit.binds.put(s.arena, first, .{ .vector = .{ .first = at, .len = n, .msb = r[0], .lsb = r[1] } });
         return;
     }
-    const row = try internNode(s, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disc, vir);
+    const row = try internNode(s, unit, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disc);
     try unit.binds.put(s.arena, first, .{ .node = if (isGround(unit, first)) .ground else row });
 }
 
@@ -469,12 +534,20 @@ fn bindChildPorts(s: *Sema, unit: *Unit) Allocator.Error!void {
     for (zcu.ports.items(.formal)[list.start..][0..list.len], zcu.ports.items(.actual)[list.start..][0..list.len]) |formal, actual| {
         const first = portDecl(unit.vir, formal) orelse continue;
         const node: Node.Index = blk: {
-            if (actual.toIndex()) |a| if (pu.vir.instructions.items(.tag)[@backingInt(a)] == .decl_ref) {
-                const d = canonical(pu.vir, pu.vir.instructions.items(.data)[@backingInt(a)].decl_tok.decl);
-                if (pu.binds.get(d)) |b| if (b == .node) break :blk b.node;
+            if (actual.toIndex()) |a| switch (pu.vir.instructions.items(.tag)[@backingInt(a)]) {
+                .decl_ref => {
+                    const d = canonical(pu.vir, pu.vir.instructions.items(.data)[@backingInt(a)].decl_tok.decl);
+                    if (pu.binds.get(d)) |b| if (b == .node) break :blk b.node;
+                },
+                // The parent's implicit net (`nets`).
+                .str_ref => {
+                    const flat = try std.fmt.allocPrint(s.arena, "{s}{s}", .{ pu.prefix, pu.vir.string(pu.vir.instructions.items(.data)[@backingInt(a)].str_tok.start) });
+                    if (s.node_rows.get(try zcu.intern_pool.getString(s.gpa, flat))) |n| break :blk n;
+                },
+                else => {}, // else: a select or concatenation, not bound here
             };
             const name = unit.vir.string(nameOf(unit.vir, first));
-            break :blk try internNode(s, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disciplineOf(unit, first), unit.vir);
+            break :blk try internNode(s, unit, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), try netDiscipline(s, unit, first));
         };
         try unit.binds.put(s.arena, first, .{ .node = node });
     }
@@ -486,15 +559,33 @@ fn branches(s: *Sema, unit: *Unit) Allocator.Error!void {
     for (vir.body(unit.module.body)) |i| {
         if (vir.instructions.items(.tag)[@backingInt(i)] != .branch) continue;
         const br = payloadOf(vir, Inst.Branch, i);
+        if (portOfBody(unit, br.hi)) |p| {
+            try unit.binds.put(s.arena, canonical(vir, i), .{ .port = p });
+            continue;
+        }
         const hi = nodeOfBody(unit, br.hi) orelse continue;
         const lo = if (br.lo.len == 0) Node.Index.ground else nodeOfBody(unit, br.lo) orelse continue;
         try s.device.branches.append(s.gpa, .{
             .name = try s.zcu.intern_pool.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, vir.string(br.name) })),
             .hi = hi,
             .lo = lo,
+            .instance = rowInstance(unit.instance),
         });
         try unit.binds.put(s.arena, canonical(vir, i), .{ .branch = @fromBackingInt(@intCast(s.device.branches.len)) });
     }
+}
+
+/// The port node a §3.12.1 terminal body names (`<p>`), or null.
+fn portOfBody(unit: *const Unit, b: Vir.Body) ?Node.Index {
+    const vir = unit.vir;
+    const insts = vir.body(b);
+    if (insts.len == 0) return null;
+    const last = insts[insts.len - 1];
+    if (vir.instructions.items(.tag)[@backingInt(last)] != .port_branch) return null;
+    const o = vir.instructions.items(.data)[@backingInt(last)].un_node.operand.toIndex() orelse return null;
+    if (vir.instructions.items(.tag)[@backingInt(o)] != .decl_ref) return null;
+    const bind = unit.binds.get(canonical(vir, vir.instructions.items(.data)[@backingInt(o)].decl_tok.decl)) orelse return null;
+    return if (bind == .node) bind.node else null;
 }
 
 /// The node a terminal body names (a scalar net), or null.
@@ -506,26 +597,4 @@ fn nodeOfBody(unit: *const Unit, b: Vir.Body) ?Node.Index {
     if (vir.instructions.items(.tag)[@backingInt(last)] != .decl_ref) return null;
     const bind = unit.binds.get(canonical(vir, vir.instructions.items(.data)[@backingInt(last)].decl_tok.decl)) orelse return null;
     return if (bind == .node) bind.node else null;
-}
-
-/// §3.2 the instance's module-level variables: one slot each.
-fn variables(s: *Sema, unit: *Unit) Allocator.Error!void {
-    const vir = unit.vir;
-    for (vir.body(unit.module.body)) |i| {
-        if (vir.instructions.items(.tag)[@backingInt(i)] != .variable) continue;
-        const v = payloadOf(vir, Inst.Variable, i);
-        const first = canonical(vir, i);
-        if (unit.binds.contains(first)) continue;
-        if (v.dims.len != 0) {
-            try declareArray(s, unit, first, v);
-            continue;
-        }
-        const ty = tyOf(v.flags.storage);
-        const slot = try addAlloc(s, ty);
-        try unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = slot, .ty = ty } });
-        if (unit.held.contains(first)) try s.device.held.append(s.gpa, .{
-            .name = try s.zcu.intern_pool.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, vir.string(v.name) })),
-            .slot = slot,
-        });
-    }
 }

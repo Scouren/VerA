@@ -13,6 +13,8 @@
 //!
 //! Contents:
 //! - `pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value`
+//! - `pub fn noise(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value`
+//! - `pub fn vectorArg(s: *Sema, b: *Block, r: Inst.Ref, out: *std.ArrayList(Ref)) Allocator.Error!bool`
 //! - `pub fn checkPlace(s: *Sema, b: *Block, tag: SysFn.Tag, src: Inst.Ref) Allocator.Error!bool`
 //! - `pub fn isStatic(s: *const Sema, r: Air.Inst.Ref, depth: u32) bool`
 
@@ -39,13 +41,7 @@ const Ref = Air.Inst.Ref;
 pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
     const file = b.unit.file;
     if (!try checkPlace(s, b, tag, src)) return expr.poison;
-    switch (tag) {
-        .ddx, .white_noise, .flicker_noise, .noise_table, .noise_table_log, .ac_stim => {
-            try s.fail(.E0512, file, src, "`{t}` is not lowered by Sema yet", .{tag});
-            return expr.poison;
-        },
-        else => {}, // else: the operators below
-    }
+    if (tag == .ddx) return ddx(s, b, args, src);
     const min: usize = switch (tag) {
         .absdelay => 2,
         .laplace_zd, .laplace_zp, .laplace_nd, .laplace_np => 3,
@@ -56,6 +52,7 @@ pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
         try s.fail(.E0505, file, src, "`{t}()` needs {d} argument(s), got {d}", .{ tag, min, args.len });
         return expr.poison;
     }
+    try checkBounds(s, b, tag, args, src);
     const coef = switch (tag) {
         .laplace_zd, .laplace_zp, .laplace_nd, .laplace_np, .zi_zd, .zi_zp, .zi_nd, .zi_np => true,
         else => false, // else: no coefficient vector
@@ -81,12 +78,86 @@ pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
     }
 }
 
+/// §4.6.3 `ac_stim` and the §4.6.4 noise sources: a `call` of their
+/// operands (a table flattened `count, f0, p0, ...`, a label as its string),
+/// recorded in `device.noise`. Its value is 0 outside a small-signal
+/// analysis; the host reads the call.
+pub fn noise(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
+    const file = b.unit.file;
+    const vir = b.unit.vir;
+    // A.8.2 brackets only trailing optional arguments: no empty slot.
+    for (args) |a| if (a == .none) {
+        try s.fail(.E0505, file, src, "`{t}()` (A.8.2 gives the small-signal functions no empty slot)", .{tag});
+        return expr.poison;
+    };
+    const most: usize = if (tag == .ac_stim or tag == .flicker_noise) 3 else 2;
+    if (args.len > most) {
+        try s.fail(.E0506, file, src, "`{t}()` takes at most {d}, and this call passes {d}", .{ tag, most, args.len });
+        return expr.poison;
+    }
+    // A.8.2 quotes `ac_stim`'s analysis name: a string literal.
+    if (tag == .ac_stim and args.len != 0 and vir.instructions.items(.tag)[@backingInt(args[0].toIndex().?)] != .str) {
+        try s.fail(.E0521, file, src, "", .{});
+        return expr.poison;
+    }
+    // §4.6.4.2 `1/f^exp` has no default exponent.
+    if (tag == .flicker_noise and args.len < 2) {
+        try s.fail(.E0522, file, src, "got {d} argument(s)", .{args.len});
+        return expr.poison;
+    }
+    // Syntax 4-4: the optional last argument is the source's label.
+    const label_at: ?usize = switch (tag) {
+        .white_noise, .noise_table, .noise_table_log => 1,
+        .flicker_noise => 2,
+        else => null, // else: ac_stim's arguments are values
+    };
+    var label: InternPool.String = .empty;
+    if (label_at) |k| if (k < args.len) {
+        const c = try decl.foldRef(s, b.unit, args[k]);
+        if (c == null or c.? != .str) {
+            try s.fail(.E0573, file, src, "`{t}()` argument {d} is its label", .{ tag, k + 1 });
+            return expr.poison;
+        }
+        label = try s.zcu.intern_pool.getString(s.gpa, c.?.str);
+    };
+    const table = tag == .noise_table or tag == .noise_table_log;
+    var vals: std.ArrayList(Ref) = .empty;
+    for (args, 0..) |a, k| {
+        if (table and k == 0) {
+            // §4.6.4.3 a file of frequency/power pairs, read at compile time.
+            if (try decl.foldRef(s, b.unit, a)) |c| if (c == .str) {
+                const pairs = (try @import("table.zig").noiseFile(s, b, c.str, src)) orelse return expr.poison;
+                try vals.append(s.arena, .fromIntern(try decl.intern(s, .{ .int = @intCast(pairs.len) })));
+                for (pairs) |x| try vals.append(s.arena, .fromIntern(try decl.intern(s, .{ .real = x })));
+                continue;
+            };
+            if (try vectorArg(s, b, a, &vals)) continue;
+        }
+        const v = try expr.lower(s, b, a);
+        try vals.append(s.arena, if (v.ty == .string) v.ref else try expr.coerce(s, b, v, .real));
+    }
+    const r = try expr.call(s, b, @backingInt(tag), .real, vals.items);
+    try s.device.noise.append(s.gpa, .{
+        .kind = switch (tag) {
+            .white_noise => .thermal,
+            .flicker_noise => .flicker,
+            .noise_table => .table,
+            .noise_table_log => .table_log,
+            .ac_stim => .ac_stim,
+            else => unreachable, // else: the caller routes the small-signal sources here
+        },
+        .call = r.toIndex().?,
+        .name = label,
+    });
+    return .{ .ref = r, .ty = .real };
+}
+
 /// §5.8.1: an operator with state may not stand under a condition that
 /// changes during the analysis (E0514); none in a function (E0422).
 pub fn checkPlace(s: *Sema, b: *Block, tag: SysFn.Tag, src: Inst.Ref) Allocator.Error!bool {
     const historyless = tag == .ddx or tag == .limexp;
-    if (b.function != null) {
-        try s.fail(.E0422, b.unit.file, src, "not allowed in an analog function", .{});
+    if (b.restricted()) |ctx| {
+        try s.fail(.E0422, b.unit.file, src, "not allowed in {s}", .{ctx});
         return false;
     }
     if (b.runtime != 0 and !historyless) try s.fail(.E0514, b.unit.file, src, "`{t}`", .{tag});
@@ -121,11 +192,62 @@ pub fn isStatic(s: *const Sema, r: Ref, depth: u32) bool {
     };
 }
 
+/// A coefficient vector (`'{a, b}`, `{a, b}`, or a §3.2.2 array's name):
+/// its length, then each element as a real. False for any other argument.
+pub fn vectorArg(s: *Sema, b: *Block, r: Inst.Ref, out: *std.ArrayList(Ref)) Allocator.Error!bool {
+    const i = r.toIndex() orelse return false;
+    const vir = b.unit.vir;
+    switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .pattern, .concat => {
+            const elems = vir.list(Inst.Ref, decl.payloadOf(vir, Inst.Refs, i));
+            try out.append(s.arena, .fromIntern(try decl.intern(s, .{ .int = @intCast(elems.len) })));
+            for (elems) |e| try out.append(s.arena, try expr.coerce(s, b, try expr.lower(s, b, e), .real));
+            return true;
+        },
+        .decl_ref => {
+            const bind = b.unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl)) orelse return false;
+            if (bind != .array) return false;
+            const arr = bind.array;
+            try out.append(s.arena, .fromIntern(try decl.intern(s, .{ .int = @intCast(arr.slots.len) })));
+            for (arr.slots) |slot| {
+                const v = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot) } });
+                try out.append(s.arena, try expr.coerce(s, b, .{ .ref = v, .ty = arr.ty }, .real));
+            }
+            return true;
+        },
+        else => return false, // else: a select of an array: not lowered yet
+    }
+}
+
 // ---- private ----
+
+/// §4.5.14 `ddx(f, V(n))` / `ddx(f, I(br))`: a `ddx` call of `f` and the
+/// unknown's row, negated when the access spells the pair reversed; 0 when
+/// the flow it names was never read (f cannot depend on it).
+fn ddx(s: *Sema, b: *Block, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
+    const f = try expr.coerce(s, b, try expr.lower(s, b, args[0]), .real);
+    const access = (try contrib.accessCall(s, b.unit, args[1])) orelse {
+        try s.fail(.E0504, b.unit.file, src, "", .{});
+        return expr.poison;
+    };
+    const t = (try contrib.target(s, b, access.name, access.args, src)) orelse return expr.poison;
+    // §4.5.14: the potential of a scalar net or the flow through a branch;
+    // `V(p, n)` is two unknowns.
+    if (t.access == .potential and t.lo != .ground) {
+        try s.fail(.E0504, b.unit.file, src, "a potential across two nets is not one unknown", .{});
+        return expr.poison;
+    }
+    const u: Node.Index = switch (t.access) {
+        .potential => t.hi,
+        .flow => s.flow_rows.get(.{ t.hi, t.lo }) orelse return .{ .ref = .fromIntern(.zero_real), .ty = .real },
+    };
+    const d = try expr.call(s, b, @backingInt(SysFn.Tag.ddx), .real, &.{ f, .fromIntern(try decl.intern(s, .{ .int = @backingInt(u) })) });
+    return .{ .ref = if (t.neg) try expr.unOp(s, b, .fneg, d) else d, .ty = .real };
+}
 
 /// §4.5.3 `ddt(x)` outside a contribution's linear spine.
 fn ddt(s: *Sema, b: *Block, x: Ref) Allocator.Error!Ref {
-    const n = try opNode(s, "ddt");
+    const n = try opNode(s, b, "ddt");
     const v = try contrib.probe(s, n);
     try stampOpRow(s, b, n, v, x, true);
     return v;
@@ -134,7 +256,7 @@ fn ddt(s: *Sema, b: *Block, x: Ref) Allocator.Error!Ref {
 /// §4.5.4 `idt(x[, ic[, assert[, abstol]]])`.
 fn idt(s: *Sema, b: *Block, vals: []const Ref) Allocator.Error!Ref {
     const x = vals[0];
-    const n = try opNode(s, "idt");
+    const n = try opNode(s, b, "idt");
     const v = try contrib.probe(s, n);
     const ic: ?Ref = if (vals.len > 1) vals[1] else if (!readsUnknown(s, x, 0)) .fromIntern(.zero_real) else null;
     const hold: ?Ref = if (vals.len > 2) try expr.binOp(s, b, .fne, vals[2], .fromIntern(.zero_real)) else null;
@@ -152,12 +274,12 @@ fn select(s: *Sema, b: *Block, c: Ref, x: Ref, y: Ref) Allocator.Error!Ref {
 }
 
 /// A §4.5.2 operator unknown, `<op>$<k>`.
-fn opNode(s: *Sema, op: []const u8) Allocator.Error!Node.Index {
+fn opNode(s: *Sema, b: *const Block, op: []const u8) Allocator.Error!Node.Index {
     const ip = &s.zcu.intern_pool;
     const row: Node.Index = @fromBackingInt(@intCast(s.device.nodes.len));
     const name = try std.fmt.allocPrint(s.arena, "{s}${d}", .{ op, s.op_states });
     s.op_states += 1;
-    try s.device.nodes.append(s.gpa, .{ .name = try ip.getString(s.gpa, name), .kind = .op_state, .of = .none, .discipline = .empty });
+    try s.device.nodes.append(s.gpa, .{ .name = try ip.getString(s.gpa, name), .kind = .op_state, .of = .none, .discipline = .empty, .instance = decl.rowInstance(b.unit.instance) });
     return row;
 }
 
@@ -178,6 +300,47 @@ fn stampOpRow(s: *Sema, b: *Block, n: Node.Index, f: Ref, q: Ref, q_neg: bool) A
     const site = try decl.addAlloc(s, .real);
     _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(site), .rhs = q } } });
     try s.device.charge_sites.append(s.gpa, .{ .contrib = row, .sign = if (q_neg) -1.0 else 1.0, .slot = site });
+}
+
+/// §4.5.5-§4.5.10 the control arguments' bounds, judged when they fold
+/// (E0516): A.8.2 types them `analog_expression`, so one over parameters
+/// may fold and one over the solve may not.
+fn checkBounds(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!void {
+    const Bound = enum { positive, non_negative, negative };
+    const Rule = struct { i: usize, arg: []const u8, want: Bound };
+    const rules: []const Rule = switch (tag) {
+        .idtmod => &.{.{ .i = 2, .arg = "modulus", .want = .positive }},
+        .absdelay => &.{.{ .i = 1, .arg = "td", .want = .positive }},
+        .transition => &.{
+            .{ .i = 1, .arg = "td", .want = .non_negative },
+            .{ .i = 2, .arg = "rise_time", .want = .non_negative },
+            .{ .i = 3, .arg = "fall_time", .want = .non_negative },
+            .{ .i = 4, .arg = "time_tol", .want = .non_negative },
+        },
+        // On the written arguments, before §4.5.9's default negates the first.
+        .slew => &.{
+            .{ .i = 1, .arg = "max_pos_slew_rate", .want = .positive },
+            .{ .i = 2, .arg = "max_neg_slew_rate", .want = .negative },
+        },
+        else => &.{}, // else: no bounded control argument
+    };
+    for (rules) |r| {
+        if (r.i >= args.len or args[r.i] == .none) continue;
+        const c = (try decl.foldRef(s, b.unit, args[r.i])) orelse continue;
+        if (c == .str) continue;
+        const v = c.asReal();
+        const holds = switch (r.want) {
+            .positive => v > 0,
+            .non_negative => v >= 0,
+            .negative => v < 0,
+        };
+        if (!holds) try s.fail(.E0516, b.unit.file, src, "`{t}()` argument `{s}` shall be {t}, got {d}", .{ tag, r.arg, r.want, v });
+    }
+    // §4.5.10 the direction indicator is +1, -1 or 0.
+    if (tag == .last_crossing and args.len > 1 and args[1] != .none) if (try decl.foldRef(s, b.unit, args[1])) |c| {
+        const v = c.asReal();
+        if (c != .str and (v != @round(v) or @abs(v) > 1)) try s.fail(.E0516, b.unit.file, src, "`last_crossing()` direction indicator shall be +1, -1 or 0, got {d}", .{v});
+    };
 }
 
 /// Whether `r` depends on a solver unknown or a path latch.
@@ -204,20 +367,4 @@ fn readsUnknown(s: *const Sema, r: Ref, depth: u32) bool {
             .pl_op, .ty_pl, .ty, .ty_index, .br, .repeat => true,
         },
     };
-}
-
-/// A coefficient vector (`'{a, b}` or `{a, b}`): its length, then each
-/// element as a real. False for any other argument.
-fn vectorArg(s: *Sema, b: *Block, r: Inst.Ref, out: *std.ArrayList(Ref)) Allocator.Error!bool {
-    const i = r.toIndex() orelse return false;
-    const vir = b.unit.vir;
-    switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .pattern, .concat => {
-            const elems = vir.list(Inst.Ref, decl.payloadOf(vir, Inst.Refs, i));
-            try out.append(s.arena, .fromIntern(try decl.intern(s, .{ .int = @intCast(elems.len) })));
-            for (elems) |e| try out.append(s.arena, try expr.coerce(s, b, try expr.lower(s, b, e), .real));
-            return true;
-        },
-        else => return false, // else: an array name or select: not lowered yet
-    }
 }

@@ -15,7 +15,7 @@
 //!   `neg_one_real`, `two_real`, `ten_real`, `inf_real`, `zero`, `one`, `neg_one`
 //! - `pub const String = enum(u32)`
 //! - `pub const Key = union(enum)` (`SimpleType`, `IntType`, `ArrayType`, `Nature`,
-//!   `Discipline` (`Domain`), `Int` (`Storage`))
+//!   `Discipline` (`Domain`), `Int` (`Storage`), `Aggregate`)
 //! - `pub const items_max: u32`
 //! - `pub fn init(gpa: Allocator) Allocator.Error!InternPool`
 //! - `pub fn deinit(ip: *InternPool, gpa: Allocator) void`
@@ -95,6 +95,8 @@ pub const Key = union(enum) {
     int: Int,
     /// A `string` constant.
     str: String,
+    /// An array constant, or a tuple of values (`Zcu.Instance.params`).
+    aggregate: Aggregate,
 
     /// The three §3.2/§2.7 types with no parameter.
     pub const SimpleType = enum(u8) { real, integer, string };
@@ -132,6 +134,10 @@ pub const Key = union(enum) {
 
         pub const Storage = union(enum) { small: i64, big: []const u32 };
     };
+    /// `elems` are values; `ty` is their `array_type`, or `.none` for a
+    /// tuple (a §6.3 instance's folded parameters, of mixed types). The
+    /// slice `indexToKey` returns lives as `Int.big`'s does.
+    pub const Aggregate = struct { ty: Index, elems: []const Index };
 };
 
 /// Most items one pool holds: `Air.Inst.Ref` keeps the high bit for
@@ -160,6 +166,9 @@ const Tag = enum(u8) {
     int_big,
     /// `data` is the `String`.
     str,
+    /// `data` is the offset of an `AggregateHead` in `extra`, its
+    /// elements after it.
+    aggregate,
 };
 
 const Item = struct { tag: Tag, data: u32 };
@@ -167,6 +176,7 @@ const Item = struct { tag: Tag, data: u32 };
 const Bits64 = struct { lo: u32, hi: u32 };
 const IntSmall = struct { ty: Index, lo: u32, hi: u32 };
 const IntBig = struct { ty: Index, len: u32 };
+const AggregateHead = struct { ty: Index, len: u32 };
 
 const InternPool = @This();
 
@@ -275,6 +285,12 @@ pub fn get(ip: *InternPool, gpa: Allocator, key: Key) Allocator.Error!Index {
             },
         },
         .str => |s| .{ .tag = .str, .data = @backingInt(s) },
+        .aggregate => |a| blk: {
+            try ip.extra.ensureUnusedCapacity(gpa, 2 + a.elems.len);
+            const at = try ip.addExtra(gpa, AggregateHead{ .ty = a.ty, .len = @intCast(a.elems.len) });
+            ip.extra.appendSliceAssumeCapacity(@ptrCast(a.elems));
+            break :blk .{ .tag = .aggregate, .data = at };
+        },
     };
     try ip.items.append(gpa, item);
     const index: Index = @fromBackingInt(@intCast(gop.index));
@@ -307,18 +323,24 @@ pub fn indexToKey(ip: *const InternPool, index: Index) Key {
             break :blk .{ .int = .{ .ty = b.ty, .storage = .{ .big = limbs } } };
         },
         .str => .{ .str = @fromBackingInt(item.data) },
+        .aggregate => blk: {
+            const h = ip.extraData(AggregateHead, item.data);
+            const elems: []const Index = @ptrCast(ip.extra.items[item.data + 2 ..][0..h.len]);
+            break :blk .{ .aggregate = .{ .ty = h.ty, .elems = elems } };
+        },
     };
 }
 
 /// Returns the type of the value `index`: `real_type` for a float,
-/// `string_type` for a string, the named type for an int or undef. Asserts
-/// that `index` is a value, not a type, nature or discipline.
+/// `string_type` for a string, the named type for an int, undef or array.
+/// Asserts that `index` is a value, not a type, nature, discipline or tuple.
 pub fn typeOf(ip: *const InternPool, index: Index) Index {
     const ty: Index = switch (ip.indexToKey(index)) {
         .float => .real_type,
         .str => .string_type,
         .int => |int| int.ty,
         .undef => |t| t,
+        .aggregate => |a| a.ty,
         .simple_type, .int_type, .array_type, .nature, .discipline => unreachable, // a type has no type here
     };
     assert(isType(ip, ty));
@@ -366,6 +388,7 @@ pub fn keyEql(a: Key, b: Key) bool {
             .small => |v| b.int.storage == .small and b.int.storage.small == v,
             .big => |l| b.int.storage == .big and std.mem.eql(u32, l, b.int.storage.big),
         },
+        .aggregate => |x| x.ty == b.aggregate.ty and std.mem.eql(Index, x.elems, b.aggregate.elems),
         inline .simple_type, .int_type, .array_type, .nature, .discipline, .undef, .str => |v, tag| std.meta.eql(v, @field(b, @tagName(tag))),
     };
 }
@@ -382,6 +405,10 @@ fn hashKey(key: Key) u32 {
                 .small => |v| std.hash.autoHash(&h, v),
                 .big => |limbs| h.update(std.mem.sliceAsBytes(limbs)),
             }
+        },
+        .aggregate => |a| {
+            std.hash.autoHash(&h, a.ty);
+            h.update(std.mem.sliceAsBytes(a.elems));
         },
         inline .simple_type, .int_type, .array_type, .nature, .discipline, .undef, .str => |v| std.hash.autoHash(&h, v),
     }
@@ -416,6 +443,15 @@ fn assertKey(ip: *const InternPool, key: Key) void {
             }
         },
         .str => |s| ip.assertString(s),
+        .aggregate => |a| {
+            if (a.ty != .none) {
+                const t = ip.indexToKey(a.ty);
+                assert(t == .array_type);
+                assert(t.array_type.len == a.elems.len);
+            }
+            for (a.elems) |e| assert(!isType(ip, e));
+            for (a.elems) |e| assert(@backingInt(e) < ip.items.len);
+        },
     }
 }
 
@@ -427,7 +463,7 @@ fn isType(ip: *const InternPool, index: Index) bool {
     if (index == .none or @backingInt(index) >= ip.items.len) return false;
     return switch (ip.items.items(.tag)[@backingInt(index)]) {
         .simple_type, .int_type, .array_type => true,
-        .nature, .discipline, .undef, .float, .int_small, .int_big, .str => false,
+        .nature, .discipline, .undef, .float, .int_small, .int_big, .str, .aggregate => false,
     };
 }
 
@@ -604,6 +640,25 @@ test "strings: dedup, NUL inside, and the empty string" {
     try std.testing.expectEqual(String.empty, try ip.getString(gpa, ""));
     try std.testing.expectEqualStrings("a\x00b", ip.stringToSlice(b));
     try std.testing.expectEqualStrings("electrical", ip.stringToSlice(a));
+}
+
+test "aggregates: a tuple and an array dedup by type and elements, in order" {
+    // Oracle: the elements as written; order and type are part of the key.
+    const gpa = std.testing.allocator;
+    var ip = try init(gpa);
+    defer ip.deinit(gpa);
+    const tuple = try ip.get(gpa, .{ .aggregate = .{ .ty = .none, .elems = &.{ .one, .two_real } } });
+    try std.testing.expectEqual(tuple, try ip.get(gpa, .{ .aggregate = .{ .ty = .none, .elems = &.{ .one, .two_real } } }));
+    try std.testing.expect(tuple != try ip.get(gpa, .{ .aggregate = .{ .ty = .none, .elems = &.{ .two_real, .one } } }));
+    const arr_ty = try ip.get(gpa, .{ .array_type = .{ .len = 2, .elem = .real_type } });
+    const arr = try ip.get(gpa, .{ .aggregate = .{ .ty = arr_ty, .elems = &.{ .one_real, .two_real } } });
+    try std.testing.expect(arr != try ip.get(gpa, .{ .aggregate = .{ .ty = .none, .elems = &.{ .one_real, .two_real } } }));
+    try std.testing.expectEqual(arr_ty, ip.typeOf(arr));
+    const k = ip.indexToKey(tuple).aggregate;
+    try std.testing.expectEqual(Index.none, k.ty);
+    try std.testing.expectEqualSlices(Index, &.{ .one, .two_real }, k.elems);
+    const empty = try ip.get(gpa, .{ .aggregate = .{ .ty = .none, .elems = &.{} } });
+    try std.testing.expectEqual(@as(usize, 0), ip.indexToKey(empty).aggregate.elems.len);
 }
 
 test "get: allocation failure leaves the pool consistent" {

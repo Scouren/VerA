@@ -153,7 +153,7 @@ const Who = struct {
         const inst = who.ref.toIndex() orelse return switch (who.ip.indexToKey(who.ref.toInterned().?)) {
             .float => |c| w.print("the constant {d}", .{c}),
             .int => |int| if (int.storage == .small) w.print("the constant {d}", .{int.storage.small}) else w.writeAll("a constant"),
-            .undef, .str, .simple_type, .int_type, .array_type, .nature, .discipline => w.writeAll("an unknown value"),
+            .undef, .str, .aggregate, .simple_type, .int_type, .array_type, .nature, .discipline => w.writeAll("an unknown value"),
         };
         const data = who.air.instructions.items(.data)[@backingInt(inst)];
         switch (who.air.instructions.items(.tag)[@backingInt(inst)]) {
@@ -361,7 +361,7 @@ fn constFinite(ip: *const InternPool, index: InternPool.Index) bool {
     return switch (ip.indexToKey(index)) {
         .float => |c| math.isFinite(c),
         .int, .str => true,
-        .undef, .simple_type, .int_type, .array_type, .nature, .discipline => false,
+        .undef, .aggregate, .simple_type, .int_type, .array_type, .nature, .discipline => false,
     };
 }
 

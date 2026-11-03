@@ -504,8 +504,14 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
     reject/warn fixtures; 3 named, all macro locations now in the original file), `link` (diff-link:
     8/8 builds agree with zigbuild; library bytes equal at 1 and N jobs). Full `zig build test` green
     on `refactor` with all six merged.
-  - in progress: AstGen + Vir (`astgen.md`), the Air passes (`air-passes.md`), SPICE (`spice.md`).
-  - next: Zcu + Sema (after Vir), codegen, Compilation; then the switch-over and the old
+  - merged: SPICE reader (diff-spice: 66,453/66,453 netlists), AstGen + Vir (diff-astgen:
+    3,790/3,793; parse.xfail 30 -> 3), the Air passes (prove/ 9,016 -> 2,635 lines: Interval,
+    Float, Legalize, Setup; 10^7 falsification runs, 2*10^7 Legalize comparisons, four soundness
+    bugs found and fixed). Float's inherited overflow assumption is being replaced (§11.9).
+  - in progress: Zcu + elaboration (`elab.md`), the digital runtime (`sim.md`), the sound float
+    verdict with guard boxes (`float-guard.md`).
+  - next: Sema analog lowering (Vir -> Air), digital lowering (Vir -> Program), codegen (with
+    versioned units), kernels + Gompute, lib/vpi, Compilation; then the switch-over and the old
     pipeline's deletion.
 - [x] Changelog: formatC (#132) and `--jobs` (#133), issues filed.
 

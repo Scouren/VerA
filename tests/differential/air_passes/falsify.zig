@@ -118,7 +118,7 @@ const Watch = struct {
         return switch (w.ip.indexToKey(ref.toInterned().?)) {
             .float => |x| x,
             .int => |int| @floatFromInt(int.storage.small),
-            .undef, .str, .simple_type, .int_type, .array_type, .nature, .discipline => math.nan(f64),
+            .undef, .str, .aggregate, .simple_type, .int_type, .array_type, .nature, .discipline => math.nan(f64),
         };
     }
 
@@ -279,7 +279,7 @@ fn plantOverflowContract(arena: Allocator, ip: *const InternPool, air: Air, erro
             const f = if (o.toIndex()) |oi| fin[@backingInt(oi)] else switch (ip.indexToKey(o.toInterned().?)) {
                 .float => |c| math.isFinite(c),
                 .int => true,
-                .undef, .str, .simple_type, .int_type, .array_type, .nature, .discipline => false,
+                .undef, .str, .aggregate, .simple_type, .int_type, .array_type, .nature, .discipline => false,
             };
             if (!f) break false;
         } else true;

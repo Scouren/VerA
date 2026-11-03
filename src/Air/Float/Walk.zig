@@ -165,8 +165,8 @@ pub fn body(w: *Walk, insts: []const Inst.Index, depth: u32) Allocator.Error!voi
                 // the result its finiteness.
                 if (Air.tag_info.getPtrConst(tag).domain != .all and !w.check(i, tag, data)) a.nan = true;
                 // Code no input in the box reaches defines nothing: its
-                // values are vacuously finite (a larger box that reaches it
-                // must not prove more than this one).
+                // values are vacuously finite (a smaller box, which leaves
+                // more code unreached, proves at least what a larger one does).
                 if (!w.reached) a = bottom;
                 w.define(i, a);
                 w.classify(i, tag, data);
@@ -360,7 +360,7 @@ fn integral(w: *const Walk, ref: Inst.Ref) bool {
     return switch (w.ip.indexToKey(ref.toInterned().?)) {
         .float => |c| math.isFinite(c) and c == @trunc(c),
         .int => true,
-        .undef, .str, .simple_type, .int_type, .array_type, .nature, .discipline => false,
+        .undef, .str, .aggregate, .simple_type, .int_type, .array_type, .nature, .discipline => false,
     };
 }
 
@@ -377,7 +377,7 @@ fn abs(w: *const Walk, ref: Inst.Ref) Abstract {
             .big => .{ .iv = .top, .nan = false },
         },
         .str => .{ .iv = .top, .nan = false },
-        .undef => .{ .iv = .top, .nan = true },
+        .undef, .aggregate => .{ .iv = .top, .nan = true },
         .simple_type, .int_type, .array_type, .nature, .discipline => unreachable, // Verify: an operand is a value
     };
 }
@@ -501,7 +501,7 @@ fn isZero(w: *const Walk, ref: Inst.Ref) bool {
     return switch (w.ip.indexToKey(index)) {
         .float => |c| c == 0,
         .int => |int| int.storage == .small and int.storage.small == 0,
-        .undef, .str, .simple_type, .int_type, .array_type, .nature, .discipline => false,
+        .undef, .str, .aggregate, .simple_type, .int_type, .array_type, .nature, .discipline => false,
     };
 }
 
@@ -511,7 +511,7 @@ fn nanFree(w: *const Walk, ref: Inst.Ref) bool {
     const inst = ref.toIndex() orelse return switch (w.ip.indexToKey(ref.toInterned().?)) {
         .float => |c| !math.isNan(c),
         .int, .str => true,
-        .undef, .simple_type, .int_type, .array_type, .nature, .discipline => false,
+        .undef, .aggregate, .simple_type, .int_type, .array_type, .nature, .discipline => false,
     };
     const i = @backingInt(inst);
     const tag = w.tags[i];

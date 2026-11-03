@@ -51,9 +51,10 @@ The rules of the rewrite:
 | `vams` (AstGen, Vir) | `lib/std/vams/AstGen.zig` | std | `astgen.md` | merged |
 | `air` (passes) | `src/Air/{Interval,Float,Legalize,Setup}.zig` | `intern_pool` | `air-passes.md` | in progress |
 | `vams` (spice) | `lib/std/vams/spice.zig` | std | `spice.md` | merged |
-| `std_sim` | `lib/std/sim.zig` | `kernels`, `contract` | `sim.md` | in progress |
-| `sema` (Zcu, elaboration) | `src/sema.zig` | `vams`, `intern_pool`, `air`, `kernels` | `elab.md` | in progress |
-| next: Sema analog lowering (Vir -> Air), digital lowering (Vir -> Program), `codegen`, `Compilation`, then the switch-over | | | written when their inputs exist | |
+| `sema` (Zcu, elaboration) | `src/sema.zig` | `vams`, `intern_pool`, `air`, `kernels` | `elab.md` | merged (49 named, follow-up pending) |
+| `sema` (analog lowering) | `src/Sema/*`, `src/Air/Device.zig` | as above | `lower.md` | next |
+| `std_sim` | `lib/std/sim.zig` | `kernels`, `contract` | `sim.md` | merged (97 named, follow-up in progress) |
+| next: digital lowering (Vir -> Program), `codegen` (versioned units, written-element masks), `Compilation`, then the switch-over | | | written when their inputs exist | |
 
 The handle types other modules build against are fixed already:
 `InternPool.Index = enum(u32) { none = maxInt(u32), _ }` and

@@ -113,6 +113,7 @@ fn writeRef(ip: *const InternPool, w: *std.Io.Writer, r: Inst.Ref) std.Io.Writer
         },
         .str => |s| try w.print("\"{f}\"", .{std.zig.fmtString(ip.stringToSlice(s))}),
         .undef => try w.writeAll("undef"),
+        .aggregate => |agg| try w.print("({d} elements)", .{agg.elems.len}),
         .simple_type, .int_type, .array_type, .nature, .discipline => unreachable, // `typeOf` asserted a value
     }
     try w.writeByte('>');
@@ -127,7 +128,7 @@ fn writeType(ip: *const InternPool, w: *std.Io.Writer, ty: InternPool.Index) std
             try w.print("[{d}]", .{a.len});
             try writeType(ip, w, a.elem);
         },
-        .nature, .discipline, .undef, .float, .int, .str => unreachable, // a value is not a type
+        .nature, .discipline, .undef, .float, .int, .str, .aggregate => unreachable, // a value is not a type
     }
 }
 

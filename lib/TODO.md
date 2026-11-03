@@ -438,6 +438,18 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
    bit for bit over `gm`'s test corpus and the constant folds (`kernels.fold`, `prove`'s transfers), or
    each difference is bounded by both libraries' documented ulps and listed by name; host, NVPTX and
    AMDGCN still round alike (the reason `gm` exists).
+9. **The float verdict is proven, never assumed** (2026-11-03). The old prover (and the first
+   port, `src/Air/Float.zig`) assumed `+ - * /`, `%`, `hypot` on finite operands never overflow;
+   under `@setFloatMode(.optimized)` an overflow is poison, so a diverging Newton iterate could
+   come out a finite wrong number. Fast-math is a measured gain, so it stays, but: sound,
+   outward-rounded intervals with ±inf; bounds as inputs (declared parameter ranges,
+   `--unknown-bound` or a measured default for unknowns); every `.optimized` verdict carries the
+   input box it assumed, and codegen emits a **versioned unit** (an entry check of the box, then
+   the fast-math body, else the strict body), so the fast path's precondition is checked. Per-op
+   flags (`nnan`/`ninf` without `contract`/`reassoc`, which change rounding against `gm`'s
+   cross-target determinism) wait for the LLVM backend. A deliberate behaviour change: devices
+   re-baselined with §11.3's. The old pipeline keeps the unsound rule until the switch-over.
+   Spec: `docs/rewrite/float-guard.md`.
 6. **VPI runtime goes to `lib/vpi/`** (Zig's rule: what a user's program links ships in `lib/`);
    only the host driver (`src/vpi_host.zig`) and the emitter (`src/codegen/vpi.zig`) stay in `src/`.
 

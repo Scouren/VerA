@@ -11,8 +11,7 @@
 //! - tree: when the old side elaborates, every instance's hierarchical path
 //!   and module name, in order (`.va`/`.vams`: `Design.units`, one root; `.v`:
 //!   the instance scopes of `sim.digital.elaborate`'s `Run.hier`, every root,
-//!   compared as sorted sets: its scope ids follow its declaration pass, not
-//!   the depth-first order);
+//!   each root's scopes moved after it: its scope ids put every root first);
 //! - parameters (`.v`): every instance's module-level parameter the old
 //!   digital route holds as a known value of at most 64 bits (its slot in
 //!   `Run.values`, by `Run.hier.names`) equals the new instance's folded
@@ -198,12 +197,7 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8) !Outcome {
     var compared: u32 = 0;
     if (try paramsDiffer(arena, &old.params, &new.params, &compared)) |why| return .{ .verdict = .{ .why = why, .tree = false } };
     const want = old.tree orelse return .{ .verdict = .{ .why = null, .tree = false, .digital_refused = refused } };
-    var got = new.tree.?;
-    if (digital) {
-        const sorted = try arena.dupe([]const u8, got);
-        std.mem.sort([]const u8, sorted, {}, lessThan);
-        got = sorted;
-    }
+    const got = new.tree.?;
     return .{ .verdict = .{ .why = try treeDiffer(arena, want, got), .tree = true, .params = compared } };
 }
 
@@ -273,6 +267,11 @@ fn oldDigital(arena: std.mem.Allocator, source: []const u8, path: []const u8, in
     };
     const scopes = r.hier.scopes.items;
     var tree: std.ArrayList([]const u8) = .empty;
+    // Scope ids follow the declaration pass: every root first, then each
+    // root's instances depth first. Each root's rows follow it here, so
+    // the order is the depth-first preorder the new walk makes.
+    var roots: std.ArrayList([]const u8) = .empty;
+    var below: std.ArrayList([]const u8) = .empty;
     for (scopes, 0..) |sc, s| {
         if (sc.lexical) continue;
         var segs: std.ArrayList([]const u8) = .empty;
@@ -287,9 +286,14 @@ fn oldDigital(arena: std.mem.Allocator, source: []const u8, path: []const u8, in
         }
         std.mem.reverse([]const u8, segs.items);
         const module = r.file.str(r.file.modules[sc.def].name);
-        try tree.append(arena, try arena.print("{s} {s}", .{ try std.mem.join(arena, ".", segs.items), module }));
+        const line = try arena.print("{s} {s}", .{ try std.mem.join(arena, ".", segs.items), module });
+        try (if (segs.items.len == 1) &roots else &below).append(arena, line);
     }
-    std.mem.sort([]const u8, tree.items, {}, lessThan);
+    for (roots.items) |root| {
+        try tree.append(arena, root);
+        const head = root[0..std.mem.findScalar(u8, root, ' ').?];
+        for (below.items) |line| if (line.len > head.len and std.mem.startsWith(u8, line, head) and line[head.len] == '.') try tree.append(arena, line);
+    }
     var params: std.StringHashMapUnmanaged(Bits) = .empty;
     var it = r.hier.names.iterator();
     while (it.next()) |e| {

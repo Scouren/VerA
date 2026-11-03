@@ -23,6 +23,7 @@
 //! - `pub const Repeat = struct`, `pub const Fork = struct`, `pub const Sample = struct` (`Sample.Mode`)
 //! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const SWrite = struct`, `pub const Random = struct`, `pub const Dist = enum(u32)`, `pub const FileCall = struct`, `pub const FileOp = enum(u32)`, `pub const FShow = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
 //! - `pub const Net = struct` (`Net.no_decay`), `pub const Driver = struct` (`Driver.Source`)
+//! - `pub const Cond = struct` (`Cond.Op`), `pub const CheckEvent = struct`, `pub const Check = struct`
 //! - `pub const Override = struct`, `pub const OverrideEval = struct`, `pub const Tran = struct`, `pub const Path = struct`, `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
 //! - `pub fn words(width: u32) u32`
 //! - `pub fn list(p: *const Program, l: List) []const u32`
@@ -571,6 +572,44 @@ pub const Path = struct {
     err: ?u64,
 };
 
+/// §15.6 a timing check condition, analysed once: `none` (no condition),
+/// a bare expression (`plain`, true on 1), `~` of one (`invert`), or a
+/// comparison of `signal`'s least significant bit with constant `want`.
+pub const Cond = struct {
+    op: Op = .none,
+    signal: u32 = 0,
+    want: Bit = .one,
+
+    pub const Op = enum(u8) { none, plain, invert, eq, neq, case_eq, case_neq };
+};
+
+/// One event of a timing check: slot `slot` (bits [lo, lo + width) of it;
+/// width 0 the whole slot), the §15.4 transitions `mask` (0: any change),
+/// and its §15.6 condition.
+pub const CheckEvent = struct { slot: u32 = 0, lo: u32 = 0, width: u32 = 0, mask: u8 = 0, cond: Cond = .{} };
+
+/// IEEE 1364-2005 §15 one timing check of one instance: its command, its
+/// reference [0] and data [1] events, its limits in ticks (by kind, as
+/// lib/sim/digital's `tchk.Tchk.lim`), its notifier slot (`none`), its
+/// stamp- and checktime conditions, §15.3.2's flags, and §15.5.1's delays
+/// of each event's signal.
+pub const Check = struct {
+    kind: Kind,
+    ev: [2]CheckEvent,
+    lim: [2]u64,
+    notifier: u32,
+    stamp_cond: Cond,
+    check_cond: Cond,
+    event_based: bool,
+    remain_active: bool,
+    delay: [2]u64,
+    /// The select events' bits at time 0 (values, unknowns).
+    v: [2]u64,
+    x: [2]u64,
+
+    pub const Kind = enum(u8) { setup, hold, setuphold, removal, recovery, recrem, skew, timeskew, fullskew, width, period, nochange };
+};
+
 /// §10 one task or function: its body's entry pc, its storage (slots
 /// [first, first + count), set aside per activation when `automatic`), its
 /// ports' slots (a `List`), a function's result slot, and the pc ranges of
@@ -695,6 +734,11 @@ starts: []const Start = &.{},
 fan_start: []const u32 = &.{},
 fan: []const u32 = &.{},
 subs: []const Sub = &.{},
+checks: []const Check = &.{},
+/// Per slot, the checks its change reaches, each `check * 2 + event`:
+/// `check_codes[check_start[slot]..check_start[slot + 1]]`.
+check_start: []const u32 = &.{},
+check_codes: []const u32 = &.{},
 paths: []const Path = &.{},
 /// Per slot, the net it is (`none` for a variable's).
 slot_net: []const u32 = &.{},

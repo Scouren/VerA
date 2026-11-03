@@ -22,36 +22,13 @@ verilog/10_tasks_functions/recursive_task_fork_join.v bridge: a timed task activ
 verilog/10_tasks_functions/task_recursive_timed_automatic.v bridge: a timed task activation
 verilog/10_tasks_functions/timed_subroutine_parameters.v bridge: a timed task activation
 verilog/14_specify_blocks/sdf_pulse_limits_override_specparam.v bridge: $sdf_annotate
-verilog/14_specify_blocks/specify_timing_checks_named_by_w0251.v bridge: §15 timing checks
-verilog/15_timing_checks/conditions.v bridge: §15 timing checks
-verilog/15_timing_checks/fullskew_checks_both_orders.v bridge: §15 timing checks
-verilog/15_timing_checks/hold.v bridge: §15 timing checks
-verilog/15_timing_checks/negative_timing_disabled_copies_signals.v bridge: §15 timing checks
-verilog/15_timing_checks/nochange_high_window.v bridge: §15 timing checks
-verilog/15_timing_checks/notifier.v bridge: §15 timing checks
-verilog/15_timing_checks/period.v bridge: §15 timing checks
-verilog/15_timing_checks/recovery.v bridge: §15 timing checks
-verilog/15_timing_checks/recrem.v bridge: §15 timing checks
-verilog/15_timing_checks/removal.v bridge: §15 timing checks
-verilog/15_timing_checks/setup.v bridge: §15 timing checks
-verilog/15_timing_checks/setuphold.v bridge: §15 timing checks
-verilog/15_timing_checks/setuphold_delayed_args.v bridge: §15 timing checks
-verilog/15_timing_checks/setuphold_timecheck_condition.v bridge: §15 timing checks
-verilog/15_timing_checks/setuphold_timestamp_condition.v bridge: §15 timing checks
-verilog/15_timing_checks/skew_late_data_notifies.v bridge: §15 timing checks
-verilog/15_timing_checks/skew_waits_for_data_event.v bridge: §15 timing checks
-verilog/15_timing_checks/timeskew_missing_event_and_rearm.v bridge: §15 timing checks
-verilog/15_timing_checks/timeskew_remain_active.v bridge: §15 timing checks
-verilog/15_timing_checks/timing_check_forms.v bridge: §15 timing checks
-verilog/15_timing_checks/vector.v bridge: §15 timing checks
-verilog/15_timing_checks/width.v bridge: §15 timing checks
 verilog/16_sdf/sdf_absolute_path_delay.v bridge: $sdf_annotate
 verilog/16_sdf/sdf_interconnect_delay.v bridge: $sdf_annotate
 verilog/16_sdf/sdf_label_reevaluates_path.v bridge: $sdf_annotate
 verilog/16_sdf/sdf_min_typ_max_selection.v bridge: $sdf_annotate
 verilog/16_sdf/sdf_multiple_files_scoped.v bridge: $sdf_annotate
 verilog/16_sdf/sdf_ordered_increment.v bridge: $sdf_annotate
-verilog/16_sdf/sdf_timing_check_limit.v bridge: §15 timing checks
+verilog/16_sdf/sdf_timing_check_limit.v bridge: $sdf_annotate
 verilog/17_system_tasks/fmonitor.v bridge: $fmonitor
 verilog/17_system_tasks/fread.v bridge: the system function $fread
 verilog/17_system_tasks/fscanf.v bridge: the system function $fscanf
@@ -97,5 +74,3 @@ verilog/18_vcd/task_function_scopes.v bridge: a §18 VCD task
 verilog/18_vcd/version_names_dumpfile_literal.v bridge: a §18 VCD task
 verilog/18_vcd/version_names_dumpfile_variable.v bridge: a §18 VCD task
 verilog/A_formal_syntax/b_A_6_2_repeat_intra_assignment.v bridge: §9.7.7 repeat event control
-verilog/A_formal_syntax/b_A_7_1_specify_block.v bridge: §15 timing checks
-verilog/A_formal_syntax/b_A_7_5_system_timing_checks.v bridge: §15 timing checks

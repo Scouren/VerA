@@ -26,6 +26,7 @@ const calls = @import("calls.zig");
 const readmem = @import("readmem.zig");
 const holds = @import("holds.zig");
 const files = @import("files.zig");
+const tchk = @import("tchk.zig");
 const Error = State.Error;
 const Literal = logic.Literal;
 
@@ -72,6 +73,8 @@ pub fn runUntil(s: *State, limit: u64) Error!Stop {
             .net_update => |net| try resolve.netUpdate(s, net),
             .decay => |net| try resolve.decay(s, a, net),
             .tran_switch => |t| try resolve.tranSwitch(s, a, t),
+            .tchk_expiry => |t| try tchk.expired(s, t.check, t.gen),
+            .tchk_event => |t| try tchk.delivered(s, t.code, t.bit),
             .put => |w| {
                 const n = Program.words(w.width);
                 try s.store(w.slot, .{ .width = w.width, .signed = false, .sized = true, .planes = try a.dupe(u64, row.buf[0 .. 2 * n]) });

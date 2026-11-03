@@ -28,6 +28,7 @@
 //! - `pub fn retire(s: *State, id: u32) void`
 //! - `pub fn stopRange(s: *State, start: u32, end: u32) Error!bool`
 //! - `pub fn requestMonitor(s: *State) Error!void`
+//! - `pub fn termBits(s: *const State, slot: u32, lo: u32, width: u32) [2]u64`
 //! - `pub fn monitorValue(s: *State, a: Allocator, e: u32) Error![]u64`
 
 const std = @import("std");
@@ -38,6 +39,7 @@ const logic = @import("logic.zig");
 const eval = @import("eval.zig");
 const resolve = @import("resolve.zig");
 const hold = @import("holds.zig");
+const tchk = @import("tchk.zig");
 const net = @import("net.zig");
 const sched = @import("scheduler.zig");
 const kernels = @import("kernels");
@@ -72,6 +74,11 @@ pub const Pending = union(enum) {
     decay: u32,
     /// §7.6 a delayed switch reaching its target conduction.
     tran_switch: u32,
+    /// §15.3.2 a skew check's timer (or §15.3.6's deferred data event),
+    /// stale unless the check's generation is still `gen`.
+    tchk_expiry: struct { check: u32, gen: u32 },
+    /// §15.5.1 a change reaching its check through a delayed signal.
+    tchk_event: struct { code: u32, bit: u8 },
     /// §14.6 a module path destination's value landing as a plain write
     /// (`slot`, its planes the row's `buf`).
     put: struct { slot: u32, width: u32 },
@@ -196,6 +203,9 @@ drv_s1: []net.Strength,
 /// holding process's own (which the hold lets through).
 holds_by_slot: std.AutoHashMapUnmanaged(u32, hold.Layers) = .empty,
 holding: bool = false,
+/// §15 every check's run state, and the violations found.
+checks: []tchk.Run,
+violations: u64 = 0,
 /// §14.3.3 per path source slot, its last transition (`path_changed`
 /// holds whether it has one).
 path_edge: []PathEdge,
@@ -232,6 +242,7 @@ pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!Stat
         .udp_state = try arena.alloc(Bit, p.drivers.len),
         .udp_started = try arena.alloc(bool, p.drivers.len),
         .sub_active = try arena.alloc(u32, p.subs.len),
+        .checks = try arena.alloc(tchk.Run, p.checks.len),
         .tran_state = try arena.alloc(net.TranState, p.trans.len),
         .tran_target = try arena.alloc(net.TranState, p.trans.len),
         .tran_pending = try arena.alloc(?Handle, p.trans.len),
@@ -245,6 +256,7 @@ pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!Stat
         .scratch = .init(arena),
     };
     @memset(s.sub_active, 0);
+    for (p.checks, s.checks) |c, *r| r.* = .{ .v = c.v, .x = c.x };
     for (p.trans, s.tran_state, s.tran_target, s.tran_delay) |t, *st, *tg, *dl| {
         st.* = t.state;
         tg.* = t.state;
@@ -327,7 +339,10 @@ pub fn store(s: *State, slot: u32, value: Literal) Error!void {
         s.path_changed[slot] = true;
     }
     if (s.monitored[slot]) try monitorChanged(s, slot);
-    try wake(s, slot, before, logic.planeBit(v[0], x[0]));
+    const after = logic.planeBit(v[0], x[0]);
+    try wake(s, slot, before, after);
+    // §15: a timing check whose event this slot is.
+    if (s.p.checks.len != 0) try tchk.changed(s, slot, before, after);
 }
 
 /// §5.10.4 `-> e`: resume what waits on named event `slot`.
@@ -418,7 +433,7 @@ pub fn stopRange(s: *State, start: u32, end: u32) Error!bool {
             try cancel(s, row.handle);
             hit = true;
         },
-        .write, .strobe, .fstrobe, .monitor_tick, .drive, .net_update, .decay, .put, .tran_switch => {},
+        .write, .strobe, .fstrobe, .monitor_tick, .tchk_expiry, .tchk_event, .drive, .net_update, .decay, .put, .tran_switch => {},
     };
     return hit;
 }
@@ -440,6 +455,22 @@ pub fn monitorValue(s: *State, a: Allocator, e: u32) Error![]u64 {
         return out;
     }
     return (try eval.eval(s, a, e)).planes;
+}
+
+/// Bits [lo, lo + width) of `slot`, width at most 64, as (v, x) words.
+pub fn termBits(s: *const State, slot: u32, lo: u32, width: u32) [2]u64 {
+    const sl = s.p.slots.get(slot);
+    const n = Program.words(sl.ty.width);
+    assert(lo / 64 < n);
+    var out: [2]u64 = undefined;
+    for ([_][]const u64{ s.v[sl.word..][0..n], s.x[sl.word..][0..n] }, &out) |plane, *o| {
+        const w = lo / 64;
+        const sh: u6 = @intCast(lo % 64);
+        var bits = plane[w] >> sh;
+        if (sh != 0 and w + 1 < plane.len) bits |= plane[w + 1] << @intCast(64 - @as(u7, sh));
+        o.* = bits & logic.wordMask(width, 0);
+    }
+    return out;
 }
 
 // ---- private ----
@@ -519,22 +550,6 @@ fn selectChanged(s: *State, t: *Term, slot: u32) bool {
     t.v = now[0];
     t.x = now[1];
     return matches(t.edge, before, after);
-}
-
-/// Bits [lo, lo + width) of `slot`, width at most 64, as (v, x) words.
-fn termBits(s: *const State, slot: u32, lo: u32, width: u32) [2]u64 {
-    const sl = s.p.slots.get(slot);
-    const n = Program.words(sl.ty.width);
-    assert(lo / 64 < n);
-    var out: [2]u64 = undefined;
-    for ([_][]const u64{ s.v[sl.word..][0..n], s.x[sl.word..][0..n] }, &out) |plane, *o| {
-        const w = lo / 64;
-        const sh: u6 = @intCast(lo % 64);
-        var bits = plane[w] >> sh;
-        if (sh != 0 and w + 1 < plane.len) bits |= plane[w + 1] << @intCast(64 - @as(u7, sh));
-        o.* = bits & logic.wordMask(width, 0);
-    }
-    return out;
 }
 
 /// A slot the standing monitor reads changed: a loose slot, or a compared

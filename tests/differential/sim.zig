@@ -5,8 +5,9 @@
 //! replaces it: the fixture is elaborated twice by it, once to run in the old
 //! interpreter and once for the bridge (`sim/bridge.zig`) to write as a
 //! `Program`, which the new `Interp` runs. A fixture agrees when both
-//! transcripts are byte-equal and both runs end the same way (completed, or
-//! a runtime error). A known difference is a line of `sim.xfail`
+//! transcripts are byte-equal, both runs end the same way (completed, or
+//! a runtime error), the same timing checks report violations (W1199's
+//! sites), and both write the same files. A known difference is a line of `sim.xfail`
 //! (`<path under the fixture root> <reason>`); a listed fixture that agrees,
 //! or that is not in the corpus, fails the run until its line goes.
 //! Cites: IEEE 1364-2005 §9, §11, §17 (through both implementations).
@@ -27,7 +28,9 @@ const digital = sim.digital;
 const dirs = [_][]const u8{ "verilog", "verilog-ams/digital" };
 
 /// One side's run: what the oracle compares.
-const Side = struct { out: []const u8, failed: bool, why: []const u8 = "" };
+/// `sites`: the source bytes of the timing checks that reported a
+/// violation (W1199's sites), sorted, each once.
+const Side = struct { out: []const u8, failed: bool, why: []const u8 = "", sites: []const u32 = &.{} };
 
 // ---- private ----
 
@@ -172,6 +175,7 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
         var bag: diag.Bag = .init(a);
         var r = digital.elaborate(a, source, opts, &bag, &new_out.writer) catch return "the old engine refuses the design";
         var why: []const u8 = "";
+        const check_sites = try bridge.checkSites(a, &r);
         const p = bridge.program(a, &r, &why) catch |e| switch (e) {
             error.Unsupported => return std.fmt.allocPrint(a, "bridge: {s}", .{why}),
             error.OutOfMemory => return e,
@@ -189,27 +193,37 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
         }.go, .{ &s, &result });
         t.join();
         std_sim.files.closeAll(&s);
+        var sites: std.ArrayList(u32) = .empty;
+        for (s.checks, check_sites) |c, site| if (c.count != 0) try sites.append(a, site);
+        const violated = try uniqueSorted(sites.items);
         result catch |e| switch (e) {
-            error.SimFailed => break :new .{ .out = new_out.written(), .failed = true, .why = s.failure.? },
+            error.SimFailed => break :new .{ .out = new_out.written(), .failed = true, .why = s.failure.?, .sites = violated },
             error.OutOfMemory, error.WriteFailed => return e,
         };
-        break :new .{ .out = new_out.written(), .failed = false };
+        break :new .{ .out = new_out.written(), .failed = false, .sites = violated };
     };
 
     try std.process.setCurrentDir(io, old_dir.dir);
     var old_out: std.Io.Writer.Allocating = .init(a);
     const old: Side = old: {
         var bag: diag.Bag = .init(a);
-        digital.run(a, source, opts, &bag, &old_out.writer) catch |e| switch (e) {
-            error.DigitalFailed => break :old .{ .out = old_out.written(), .failed = true },
+        const failed = if (digital.run(a, source, opts, &bag, &old_out.writer)) |_| bag.failed() else |e| switch (e) {
+            error.DigitalFailed => true,
             else => return e,
         };
-        break :old .{ .out = old_out.written(), .failed = bag.failed() };
+        var sites: std.ArrayList(u32) = .empty;
+        for (0..bag.count()) |k| {
+            const d = bag.at(k);
+            if (d.code == .W1199) try sites.append(a, d.span.start);
+        }
+        break :old .{ .out = old_out.written(), .failed = failed, .sites = try uniqueSorted(sites.items) };
     };
 
     if (old.failed != new.failed)
         return std.fmt.allocPrint(a, "old run {s}, new run {s} ({s})", .{ if (old.failed) "failed" else "completed", if (new.failed) "failed" else "completed", new.why });
     if (!std.mem.eql(u8, old.out, new.out)) return textDiff(a, old.out, new.out);
+    if (!std.mem.eql(u32, old.sites, new.sites))
+        return std.fmt.allocPrint(a, "the timing checks that violated differ: old at bytes {any}, new {any}", .{ old.sites, new.sites });
     try std.process.setCurrentDir(io, home);
     return sameFiles(a, io, old_dir.dir, new_dir.dir);
 }
@@ -241,6 +255,18 @@ fn listing(a: Allocator, io: std.Io, dir: std.Io.Dir) ![]const []const u8 {
         }
     }.lt);
     return names.items;
+}
+
+/// `items` sorted with each value once, in place.
+fn uniqueSorted(items: []u32) ![]const u32 {
+    std.mem.sort(u32, items, {}, std.sort.asc(u32));
+    var n: usize = 0;
+    for (items) |v| {
+        if (n != 0 and items[n - 1] == v) continue;
+        items[n] = v;
+        n += 1;
+    }
+    return items[0..n];
 }
 
 /// The first differing byte and the text around it on each side.

@@ -10,6 +10,7 @@
 //!
 //! Contents:
 //! - `pub fn program(arena: Allocator, r: *Run, why: *[]const u8) E!Program`
+//! - `pub fn checkSites(arena: Allocator, r: *const Run) E![]const u32`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -40,12 +41,19 @@ pub fn program(arena: Allocator, r: *Run, why: *[]const u8) E!Program {
     return b.finish();
 }
 
+/// Per timing check (`Program.checks` order), the source byte its W1199
+/// report is filed at: the oracle's key for "which checks violated".
+pub fn checkSites(arena: Allocator, r: *const Run) E![]const u32 {
+    const out = try arena.alloc(u32, r.checks.rows.items.len);
+    for (r.checks.rows.items, out) |c, *o| o.* = r.starts[@min(c.tok, r.starts.len - 1)];
+    return out;
+}
+
 // ---- private ----
 
 fn build(l: *Lower) E!void {
     const r = l.r;
     const b = l.b;
-    if (r.checks.rows.items.len != 0) return l.refuse("§15 timing checks");
     if (r.opts.systf != null) return l.refuse("a PLI application");
     // Slots, by the old numbering, at their time-0 values.
     for (r.values, 0..) |v, k| {
@@ -75,6 +83,7 @@ fn build(l: *Lower) E!void {
     });
     try netlist(l);
     try subs(l);
+    try checks(l);
     const repeats: u32 = @intCast(r.rows.repeats.items.len);
     b.p.counters = repeats + @as(u32, @intCast(r.rows.joins.items.len));
     b.p.holds = @intCast(r.rows.holds.items.len);
@@ -214,6 +223,88 @@ fn inst(l: *Lower, ins: compile.Instruction, pc: u32, repeats: u32) E!void {
             _ = try b.inst(.switch_ctrl, sc.tran, 0, scope);
         },
     }
+}
+
+/// §15 every timing check as `Program.checks`, and per slot the checks its
+/// change reaches, in `tchk.arm`'s order.
+fn checks(l: *Lower) E!void {
+    const r = l.r;
+    const b = l.b;
+    const rows = r.checks.rows.items;
+    if (rows.len == 0) return;
+    const out = try b.arena.alloc(Program.Check, rows.len);
+    for (rows, out, 0..) |c, *o, i| {
+        r.scope = c.scope;
+        var ev: [2]Program.CheckEvent = undefined;
+        for (&ev, c.ev) |*e, old| e.* = .{ .slot = old.slot, .lo = old.lo, .width = old.width, .mask = old.mask, .cond = try checkCond(l, old.cond) };
+        o.* = .{
+            .kind = std.meta.stringToEnum(Program.Check.Kind, @tagName(c.kind)).?,
+            .ev = ev,
+            .lim = c.lim,
+            .notifier = c.notifier orelse std.math.maxInt(u32),
+            .stamp_cond = try checkCond(l, c.stamp_cond),
+            .check_cond = try checkCond(l, c.check_cond),
+            .event_based = c.flags.event_based,
+            .remain_active = c.flags.remain_active,
+            .delay = if (r.checks.delay.items.len != 0) r.checks.delay.items[i] else .{ 0, 0 },
+            .v = .{ c.ev[0].v, c.ev[1].v },
+            .x = .{ c.ev[0].x, c.ev[1].x },
+        };
+    }
+    b.p.checks = out;
+    // The CSR of `tchk.arm`: per slot, its codes in check order.
+    const n = r.values.len;
+    const start = try b.arena.alloc(u32, n + 1);
+    @memset(start, 0);
+    for (rows) |c| for (c.ev[0..watched(c.kind)]) |e| {
+        start[e.slot + 1] += 1;
+    };
+    for (1..n + 1) |k| start[k] += start[k - 1];
+    const fill = try l.a.dupe(u32, start[0..n]);
+    const codes = try b.arena.alloc(u32, start[n]);
+    for (rows, 0..) |c, i| for (c.ev[0..watched(c.kind)], 0..) |e, k| {
+        codes[fill[e.slot]] = @intCast(i * 2 + k);
+        fill[e.slot] += 1;
+    };
+    b.p.check_start = start;
+    b.p.check_codes = codes;
+}
+
+/// The events `tchk.arm` files: $width and $period watch the reference only.
+fn watched(kind: anytype) usize {
+    return if (kind == .width or kind == .period) 1 else 2;
+}
+
+/// §15.6 condition `e` analysed as `tchk.enabled` reads it.
+fn checkCond(l: *Lower, e: @import("frontend").Ast.ExprId) E!Program.Cond {
+    if (e == .none) return .{};
+    const r = l.r;
+    const ex = &r.file.exprs;
+    var out: Program.Cond = .{ .op = .plain };
+    var signal = e;
+    switch (ex.tag(e)) {
+        .unary => if (ex.unOp(e) == .bit_not) {
+            out.op = .invert;
+            signal = ex.lhs(e);
+        },
+        .binary => if (ex.tag(ex.rhs(e)) == .int_literal or ex.tag(ex.rhs(e)) == .logic_literal) {
+            out.op = switch (ex.binOp(e)) {
+                .eq => .eq,
+                .neq => .neq,
+                .case_eq => .case_eq,
+                .case_neq => .case_neq,
+                else => .plain, // else: any other operator is a bare expression
+            };
+            if (out.op != .plain) {
+                signal = ex.lhs(e);
+                const v = digital.for_emitter.evaluate.eval(r, l.a, ex.rhs(e), 0) catch return l.refuse("a check condition the old engine refuses");
+                out.want = @fromBackingInt(@intCast(@backingInt(v.bit(0))));
+            }
+        },
+        else => {}, // else: any other expression is a bare one
+    }
+    out.signal = try l.self_(signal, 0);
+    return out;
 }
 
 /// §10 every task and function, as `Program.subs`.

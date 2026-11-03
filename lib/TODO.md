@@ -460,7 +460,8 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
     one word instead of the array. Exact §3.2 semantics, no attribute, no undefined behaviour.
     Oracle: bit-identical device results against the memset version on every fixture with a
     scratch array, plus a codegen test that no memset is emitted; measured on bsource.va
-    (hand-deleted memset: -17%, the ceiling).
+    (hand-deleted memset: -17%, the ceiling). When it lands, tell the ESPice session (espice-8a):
+    ESPice's branch dev/bsource-uninit (d6796553) then drops the attribute and keeps the guard.
 6. **VPI runtime goes to `lib/vpi/`** (Zig's rule: what a user's program links ships in `lib/`);
    only the host driver (`src/vpi_host.zig`) and the emitter (`src/codegen/vpi.zig`) stay in `src/`.
 

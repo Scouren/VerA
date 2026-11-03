@@ -450,12 +450,21 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
 - Step 1 is folded into the steps that rewrite each subsystem: several tests that use
   `contract/mock_devices.zig` also check private declarations (`lead.region`'s signature helpers,
   `validate`'s allowlist and shape rules), so a mass move gains little; each step moves its own tests.
-- [ ] Step 2, step 3 (Config merge, read requests, `std.Build.Cache`, one zig runner), steps 4-12.
+- [x] Step 3 (part): `Compilation/Config.zig` replaces `Settings`, `Request` and `Request.Build`
+  (one flat value, same field names; `analyze` and `compile` take it). `--jobs=N` sets
+  `Config.build.jobs` on both routes. `Cli` stays the as-typed layer (Zig's `main.zig` locals);
+  its digital fields (`schedule`, `logic`, `event_budget`) join `Config` in step 7, once the `.v`
+  route goes through `Compilation` (they live in `sim`, below `vera` in `module_specs`).
+- [ ] Step 3 rest: read requests (preprocessor includes, `.hdl`, SPICE `.INCLUDE`/`.LIB`,
+  `$table_model` data, libmap), `std.Build.Cache` for `artifact_cache`, one zig-runner path.
+- [ ] Step 2, steps 4-12.
+- [ ] Changelog: two lines drafted (formatC, `--jobs`); they need their issues filed (`gh auth login`).
 
 Notes from this session:
-- The shared `.zig-cache` had manifests whose `o/` outputs were gone (9 `checking cache failed:
-  FileNotFound` steps in untouched modules, identical on reruns). A gate on a fresh cache
-  (`--cache-dir .vera-work/fresh-cache`) was green. Something deletes `o/` entries while keeping `h/`.
+- The shared `.zig-cache` had 10,349 manifests in `h/` whose `o/` outputs were deleted on
+  2026-11-02 around 16:30 (9 `checking cache failed: FileNotFound` steps). Collected: manifests
+  older than the oldest surviving `o/` entry were deleted, which costs only a recompile; a plain
+  `zig build test` is green again. A collector must delete a step's manifest with its output.
 - In zsh, `exit "${PIPESTATUS[0]}"` exits 0 (zsh spells it `pipestatus`, 1-based); gate on `$?`
   of the command itself, or run the pipeline under bash.
 

@@ -75,6 +75,7 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     for (s.units.items) |*u| try discrete.declare(s, u);
     for (s.units.items) |*u| try branches(s, u);
     for (s.units.items) |*u| try held.mark(s, u);
+    for (s.units.items) |*u| try @import("attr.zig").check(s, u);
     for (s.units.items) |*u| try variable.declare(s, u);
     var main: Block = .{ .parent = null, .unit = &s.units.items[0] };
     // The old flattener's order: an instance's blocks where its instance

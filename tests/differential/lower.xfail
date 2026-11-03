@@ -38,16 +38,10 @@ verilog-a/ch01_intro/sf_flow_on_inout.va codes: old E0360, new {}
 verilog-a/ch01_intro/sf_potential_contribution_to_input.va codes: old E0425, new {}
 verilog-a/ch01_intro/sf_potential_on_inout.va codes: old E0360, new {}
 verilog-a/ch02_lexical/attribute_block_item_and_function_port.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
-verilog-a/ch02_lexical/attribute_value_not_constant_rejected.va codes: old E0357, new {}
-verilog-a/ch02_lexical/desc_attribute_numeric_rejected.va the old side refused, the new side lowered
 verilog-a/ch02_lexical/escaped_system_identifier_rejected.va codes: old E0314, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
 verilog-a/ch02_lexical/long_digits_truncate.va codes: old {}, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
-verilog-a/ch02_lexical/multiplicity_attribute_value_rejected.va the old side refused, the new side lowered
-verilog-a/ch02_lexical/op_attribute_numeric_rejected.va the old side refused, the new side lowered
 verilog-a/ch02_lexical/operating_point_report_attributes.va tables row 3: old `param m real = 1e0`, new `contrib flow direct br0 p n`
 verilog-a/ch02_lexical/size_truncation_and_padding.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
-verilog-a/ch02_lexical/standard_attribute_domain_rejected.va the old side refused, the new side lowered
-verilog-a/ch02_lexical/units_attribute_numeric_rejected.va the old side refused, the new side lowered
 verilog-a/ch03_data_types/access_name_shadow.va codes: old {}, new E0408,E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch03_data_types/alias_identifier_collision.va codes: old E0331, new {}
 verilog-a/ch03_data_types/aliasparam_mfactor.va tables row 2: old `param m real = 1e0`, new `contrib flow direct br0 p n`
@@ -110,17 +104,14 @@ verilog-a/ch03_data_types/nature_access_as_string.va codes: old E0340, new {}
 verilog-a/ch03_data_types/nature_discipline_namespace_collision.va codes: old E0336, new {}
 verilog-a/ch03_data_types/natureless_net_behavioral.va the old side refused, the new side lowered
 verilog-a/ch03_data_types/nature_units_as_identifier.va codes: old E0340, new {}
-verilog-a/ch03_data_types/net_desc_attribute_numeric_rejected.va the old side refused, the new side lowered
 verilog-a/ch03_data_types/nodeset_hierarchical_declaration.va tables row 3: old `contrib flow direct br0 g u.w`, new `node 3 m.p net`
 verilog-a/ch03_data_types/nodeset_hierarchical_not_constant_rejected.va codes: old E0365, new {}
 verilog-a/ch03_data_types/nodeset_not_constant.va codes: old E0365, new {}
 verilog-a/ch03_data_types/nonconstant_array_dimension.va codes: old E0308,E0309, new E0352,E0512 (E0352: an array bound is not constant)
 verilog-a/ch03_data_types/nonconstant_replication_to_integral.va codes: old E0354, new E0512 (E0512: `a replication by a count known only while the device runs` is not lowered by Sema yet)
 verilog-a/ch03_data_types/nonconstant_user_attribute.va codes: old E0340, new {}
-verilog-a/ch03_data_types/output_variable_units_numeric_rejected.va the old side refused, the new side lowered
 verilog-a/ch03_data_types/parameter_assigned_at_runtime.va codes: old E0312, new E0313 (E0313: an assignment to a name that is not a variable)
 verilog-a/ch03_data_types/parameter_default_not_constant_rejected.va the old side refused, the new side lowered
-verilog-a/ch03_data_types/parameter_desc_attribute_numeric_rejected.va the old side refused, the new side lowered
 verilog-a/ch03_data_types/parameter_override_type.va tables row 0: old `param child.becomes_real real local = 4e0`, new `param child.becomes_real unspecified local = 4e0`
 verilog-a/ch03_data_types/parameter_types.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch03_data_types/parameter_units_are_documentation.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
@@ -129,13 +120,8 @@ verilog-a/ch03_data_types/range_first_expression_larger.va codes: old {}, new E0
 verilog-a/ch03_data_types/real_parameter_from_string.va codes: old E0345, new {}
 verilog-a/ch03_data_types/real_scalar_is_not_indexable_rejected.va codes: old E0309, new E0512 (E0512: a bit or part select of a scalar is not lowered by Sema yet)
 verilog-a/ch03_data_types/reject_3_6_2_5_flow_override_without_flow_nature.va codes: old E0370, new {}
-verilog-a/ch03_data_types/reject_vera_scratch_event_value.va codes: old E0536, new {}
 verilog-a/ch03_data_types/reject_vera_scratch_on_genvar.va codes: old E0535, new E0426,E0512 (E0512: an assignment to a name with no slot)
-verilog-a/ch03_data_types/reject_vera_scratch_on_net.va codes: old E0535, new {}
-verilog-a/ch03_data_types/reject_vera_scratch_on_parameter.va codes: old E0535, new {}
 verilog-a/ch03_data_types/reject_vera_scratch_parameter_value.va codes: old E0534, new {}
-verilog-a/ch03_data_types/reject_vera_scratch_uninit_initializer.va codes: old E0539, new {}
-verilog-a/ch03_data_types/reject_vera_scratch_unknown_string.va codes: old E0538, new {}
 verilog-a/ch03_data_types/replication_nonconstant_real_multiplier_rejected.va codes: old E0327, new E0512 (E0512: `a replication by a count known only while the device runs` is not lowered by Sema yet)
 verilog-a/ch03_data_types/same_nature_both_bindings.va codes: old E0338, new {}
 verilog-a/ch03_data_types/string_arrays.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
@@ -165,9 +151,6 @@ verilog-a/ch03_data_types/vector_branch_on_part_select.va codes: old {}, new E05
 verilog-a/ch03_data_types/vector_branch_part_select_reversed_rejected.va codes: old E0352, new {}
 verilog-a/ch03_data_types/vector_branch_size_mismatch.va codes: old E0353, new {}
 verilog-a/ch03_data_types/vector_range_past_65535_elements.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch03_data_types/vera_scratch_starts_each_evaluation.va tables row 4: old `held ht`, new `held st`
-verilog-a/ch03_data_types/vera_scratch_uninit_reads_nan_when_safe.va tables row 4: old `limit_slots 0`, new `held st`
-verilog-a/ch03_data_types/vera_scratch_uninit_tape.va tables row 4: old `limit_slots 0`, new `held st`
 verilog-a/ch03_data_types/wrong_access_function.va codes: old E0360, new {}
 verilog-a/ch04_expressions/13b_generic_access.va codes: old {}, new E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch04_expressions/absdelay_missing_td_rejected.va codes: old E0505, new E0506 (E0506: `absdelay` takes 2 to 3, given 1)
@@ -627,7 +610,6 @@ verilog-ams/ch03_data_types/discrete_domain_with_natures.va codes: old E0339, ne
 verilog-ams/ch03_data_types/ground_non_continuous.va codes: old E0344, new {}
 verilog-ams/ch03_data_types/mixed_port_with_connect_statement.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch03_data_types/nodeset_non_continuous.va codes: old E0366, new {}
-verilog-ams/ch03_data_types/reject_vera_scratch_analog_initial.va codes: old E0536, new {}
 verilog-ams/ch03_data_types/wire_without_discipline_in_analog_rejected.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch03_data_types/wreal_wire_port_merge.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch04_expressions/function_called_outside_analog_rejected.va codes: old E0430, new {}
@@ -823,4 +805,4 @@ verilog-ams/ch09_system_tasks/stop_in_analog_initial_rejected.va codes: old E080
 verilog-ams/ch09_system_tasks/strobe_writes_once_per_accepted_solution.va tables row 6: old `display $fopen`, new `display $fstrobe`
 verilog-ams/ch09_system_tasks/ungetc_cancelled_by_fseek_and_gap_reads_zero.va tables row 6: old `display $fopen`, new `(none)`
 verilog-ams/ch10_directives/resetall_restores_the_unconnected_drive_default.va tables row 3: old `contrib potential direct br0 mi.u.a gnd`, new `contrib flow direct br0 p mi.u.a`
-verilog/pli/analog_attributes.va tables row 2: old `param BASE integer = 10`, new `param BASE unspecified = 10`
+verilog/pli/analog_attributes.va codes: old {}, new E0357 (E0357: `variable_attr`)

@@ -19,6 +19,7 @@
 //! - `pub fn prevOf(scope: *const Scope, name: Vir.String, inst: Inst.Index) Inst.Ref`
 //! - `pub fn delayExprs(ag: *AstGen, scope: *Scope, node: Node.Index) Error!Inst.Exprs`
 //! - `pub fn strengthString(ag: *AstGen, lp: ?Ast.TokenIndex) Error!Vir.String`
+//! - `pub fn prefixAttrs(ag: *AstGen, scope: *Scope, tok: Ast.TokenIndex) Error!Vir.List(Inst.Attr)`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -32,6 +33,15 @@ const Node = Ast.Node;
 const Scope = AstGen.Scope;
 const Error = AstGen.Error;
 const full = Ast.full;
+
+/// `partitionPoint`'s predicate: an attribute node starting before `tok`.
+const MainBelow = struct {
+    tree: *const Ast,
+    tok: Ast.TokenIndex,
+    fn below(c: MainBelow, n: Node.Index) bool {
+        return c.tree.nodeMainToken(n) < c.tok;
+    }
+};
 
 /// The type words before a declaration's names, as the tree leaves them in
 /// tokens: `[discipline] [net_type|wreal|ground] [signed]
@@ -145,6 +155,7 @@ pub fn lower(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
                     .range = try exprBody(ag, scope, d.range),
                     .dims = try rangeBody(ag, scope, declaratorDims(tree, x)),
                     .init = try exprBody(ag, scope, tree.nodeData(x).extra_and_opt_node[1]),
+                    .attrs = try prefixAttrs(ag, scope, d.main_token),
                 });
             }
         },
@@ -243,6 +254,43 @@ pub fn strengthString(ag: *AstGen, lp: ?Ast.TokenIndex) Error!Vir.String {
     return ag.string(buf.items);
 }
 
+/// The §2.9 attribute specs of the instances that prefix the construct
+/// starting at token `tok` (`(* a *) (* b = 1 *) real x;`), their values
+/// lowered in `scope`. The attribute nodes are found by binary search over
+/// one source-ordered list, so a declaration costs a lookup.
+pub fn prefixAttrs(ag: *AstGen, scope: *Scope, tok: Ast.TokenIndex) Error!Vir.List(Inst.Attr) {
+    const tree = ag.tree;
+    if (tok == 0 or tree.tokenTag(tok - 1) != .asterisk_r_paren) return .empty;
+    // Back over the run of instances to the first `(*`.
+    var first = tok;
+    while (first > 0 and tree.tokenTag(first - 1) == .asterisk_r_paren) {
+        var k = first - 1;
+        while (k > 0 and tree.tokenTag(k) != .l_paren_asterisk) k -= 1;
+        first = k;
+    }
+    const nodes = ag.attr_nodes orelse blk: {
+        var list: std.ArrayList(Node.Index) = .empty;
+        for (tree.nodes.items(.tag), 0..) |tag, n| if (tag == .attribute) try list.append(ag.arena, @fromBackingInt(@as(u32, @intCast(n))));
+        std.mem.sort(Node.Index, list.items, tree, struct {
+            fn lt(t: *const Ast, a: Node.Index, b: Node.Index) bool {
+                return t.nodeMainToken(a) < t.nodeMainToken(b);
+            }
+        }.lt);
+        ag.attr_nodes = list.items;
+        break :blk list.items;
+    };
+    const lo = std.sort.partitionPoint(Node.Index, nodes, MainBelow{ .tree = tree, .tok = first }, MainBelow.below);
+    var out: std.ArrayList(Inst.Attr) = .empty;
+    for (nodes[lo..]) |n| {
+        if (tree.nodeMainToken(n) >= tok) break;
+        for (tree.extraDataSlice(tree.nodeData(n).extra_range, Node.Index)) |sp| try out.append(ag.arena, .{
+            .name = try ag.identString(tree.nodeMainToken(sp)),
+            .value = try exprBody(ag, scope, tree.nodeData(sp).opt_node),
+        });
+    }
+    return ag.addList(Inst.Attr, out.items);
+}
+
 // ---- private ----
 
 /// Whether `tag` is a keyword `typeWords` reads as part of a declaration's
@@ -316,6 +364,7 @@ fn lowerParams(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
             .dims = try rangeBody(ag, scope, tree.extraDataSlice(.{ .start = pa.dims_start, .end = pa.dims_end }, Node.Index)),
             .value = try exprBody(ag, scope, pa.value.toOptional()),
             .ranges = try ag.addList(Inst.ValueRange, ranges),
+            .attrs = try prefixAttrs(ag, scope, d.main_token),
         });
     }
 }
@@ -361,6 +410,7 @@ fn lowerIos(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
             .dims = try rangeBody(ag, scope, declaratorDims(tree, x)),
             .init = try exprBody(ag, scope, tree.nodeData(x).extra_and_opt_node[1]),
             .defaults = defaults,
+            .attrs = try prefixAttrs(ag, scope, d.main_token),
         });
     }
 }
@@ -389,6 +439,7 @@ fn lowerNets(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
             .delay = delay,
             .init = try exprBody(ag, scope, tree.nodeData(d).extra_and_opt_node[1]),
             .defaults = defaults,
+            .attrs = try prefixAttrs(ag, scope, main),
         });
     }
 }

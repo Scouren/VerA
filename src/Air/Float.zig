@@ -365,7 +365,12 @@ const Walk = struct {
                 const bin = w.air.extraData(Air.Bin, data.pl_op.payload).data;
                 break :blk joinAbs(w.abs(data.pl_op.operand), w.abs(bin.rhs));
             },
-            .call => w.call(data),
+            .call => blk: {
+                const x = w.air.extraData(Air.Call, data.ty_pl.payload);
+                const facts: Air.CallFacts = if (x.data.callee < w.in.calls.len) w.in.calls[x.data.callee] else .{};
+                const arg: Abstract = if (x.data.args_len == 1) w.abs(@fromBackingInt(w.air.extra[x.end])) else .{ .iv = .top, .finite = false };
+                break :blk Interval.call(facts.range, arg);
+            },
             .opt_barrier, .dstop => w.abs(data.un_op),
             .if_cast => .{ .iv = w.abs(data.un_op).iv, .finite = true },
             // §4.2.1.1: NaN converts to 0.
@@ -373,6 +378,18 @@ const Walk = struct {
                 const a = w.abs(data.un_op);
                 const iv = Interval.integer(.fi_cast, a.iv, .top);
                 break :blk .{ .iv = if (a.finite) iv else iv.join(.point(0)), .finite = true };
+            },
+            // §4.2.5/§4.2.7: decided where the operands' intervals decide it.
+            .flt, .fgt, .fle, .fge, .feq, .fne, .ilt, .igt, .ile, .ige, .ieq, .ine => .{ .iv = Interval.compare(
+                info.rel.?,
+                w.abs(data.bin_op.lhs).iv,
+                w.abs(data.bin_op.rhs).iv,
+                w.nanFree(data.bin_op.lhs) and w.nanFree(data.bin_op.rhs),
+                info.operand == .int,
+            ), .finite = true },
+            .lognot => blk: {
+                const x = w.abs(data.un_op).iv;
+                break :blk .{ .iv = if (x.excludesZero()) .point(0) else if (x.lo == 0 and x.hi == 0) .point(1) else .{ .lo = 0, .hi = 1 }, .finite = true };
             },
             else => switch (info.class) { // else: the rest by class
                 .un_op => if (info.int)
@@ -385,25 +402,6 @@ const Walk = struct {
                     Interval.binary(tag, w.abs(data.bin_op.lhs), w.abs(data.bin_op.rhs)),
                 .pl_op, .ty_pl, .ty, .ty_index, .br, .repeat => unreachable, // each has its prong above or in `body`
             },
-        };
-    }
-
-    /// A call's range from the caller's facts; `limexp` and `$vt` from their argument.
-    fn call(w: *Walk, data: Inst.Data) Abstract {
-        const x = w.air.extraData(Air.Call, data.ty_pl.payload);
-        const facts: Air.CallFacts = if (x.data.callee < w.in.calls.len) w.in.calls[x.data.callee] else .{};
-        const arg: Abstract = if (x.data.args_len == 1) w.abs(@fromBackingInt(w.air.extra[x.end])) else .{ .iv = .top, .finite = false };
-        return switch (facts.range) {
-            .unknown => .{ .iv = .top, .finite = false },
-            .finite => .{ .iv = .top, .finite = true },
-            .int, .param_given => .{ .iv = Interval.i64_range, .finite = true },
-            .unit => .{ .iv = .{ .lo = 0, .hi = 1 }, .finite = true },
-            .positive => .{ .iv = .{ .lo = 0, .lo_open = true, .nonzero = true }, .finite = true },
-            .non_negative => .{ .iv = .{ .lo = 0 }, .finite = true },
-            // §4.5.13: "not distinguishable from exp()".
-            .limexp => Interval.unary(.exp, arg),
-            // §9.15 kT/q: the argument's sign; only the sign matters to a proof.
-            .vt => Interval.binary(.fmul, arg, .{ .iv = .point(8.617333262145179e-5), .finite = true }),
         };
     }
 

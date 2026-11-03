@@ -41,6 +41,7 @@ const Air = @import("air");
 const InternPool = @import("intern_pool");
 const Diag = @import("vams").Diag;
 const gen = @import("air_passes/gen.zig");
+const examples = @import("air_passes/examples.zig");
 const interp = Air.interp;
 const Inst = Air.Inst;
 const Value = interp.Value;
@@ -565,6 +566,10 @@ fn heldSweep(gpa: Allocator, plant: bool, n_programs: u32, n_points: u32) !Setup
 
 fn report(name: []const u8, s: Stats) void {
     std.debug.print("air_passes {s}: {d} programs ({d} rated .optimized), {d} runs, {d} dropped (rule 3), failures: interval {d}, finite {d}, slice {d}, violation {d}\n", .{ name, s.programs, s.optimized, s.runs, s.dropped, s.failed.get(.interval), s.failed.get(.finite), s.failed.get(.slice), s.failed.get(.violation) });
+}
+
+test {
+    _ = examples;
 }
 
 test "Float: each planted bug goes red" {

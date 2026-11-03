@@ -24,6 +24,8 @@
 //! - `pub fn fromRanges(ranges: []const Range, integer: bool) Interval`
 //! - `pub fn unary(tag: Air.Inst.Tag, a: Abstract) Abstract`
 //! - `pub fn binary(tag: Air.Inst.Tag, x: Abstract, y: Abstract) Abstract`
+//! - `pub fn call(range: Air.CallFacts.Range, arg: Abstract) Abstract`
+//! - `pub fn compare(rel: Air.Relation, x: Interval, y: Interval, nan_free: bool, int: bool) Interval`
 //! - `pub fn integer(tag: Air.Inst.Tag, x: Interval, y: Interval) Interval`
 
 const std = @import("std");
@@ -263,6 +265,53 @@ pub fn binary(tag: Tag, x: Abstract, y: Abstract) Abstract {
     return out;
 }
 
+/// Returns a call's abstract value from its callee's range
+/// (`Air.CallFacts.Range`); `arg` is its one argument's, read by `limexp`
+/// and `$vt`. An unknown call is top and not finite: it costs `.strict`,
+/// never a wrong `.optimized`.
+pub fn call(range: Air.CallFacts.Range, arg: Abstract) Abstract {
+    const r: Abstract = switch (range) {
+        .unknown => .{ .iv = top, .finite = false },
+        .finite => .{ .iv = top, .finite = true },
+        .int, .param_given => .{ .iv = i64_range, .finite = true },
+        .unit => .{ .iv = .{ .lo = 0, .hi = 1 }, .finite = true },
+        .positive => .{ .iv = .{ .lo = 0, .lo_open = true, .nonzero = true }, .finite = true },
+        .non_negative => .{ .iv = .{ .lo = 0 }, .finite = true },
+        // §4.5.13: "not distinguishable from exp()".
+        .limexp => unary(.exp, arg),
+        // §9.15 kT/q: the argument's sign; only the sign matters to a proof.
+        .vt => binary(.fmul, arg, .{ .iv = .point(8.617333262145179e-5), .finite = true }),
+    };
+    if (range == .unknown) assert(!r.finite);
+    if (r.finite and (range == .limexp or range == .vt)) assert(arg.finite);
+    return r;
+}
+
+/// Returns `x REL y` as `[1, 1]`, `[0, 0]` or `[0, 1]`: decided only where
+/// every member pair agrees. A NaN operand makes every relation false but
+/// `!=`, so "always true" needs `nan_free`; an integer's interval holds a
+/// rounding past 2^53, so it decides only below that.
+pub fn compare(rel: Air.Relation, x: Interval, y: Interval, nan_free: bool, int: bool) Interval {
+    const unknown: Interval = .{ .lo = 0, .hi = 1 };
+    if (x.isEmpty() or y.isEmpty()) return unknown;
+    if (int and !(x.ge(-0x1p53) and x.le(0x1p53) and y.ge(-0x1p53) and y.le(0x1p53))) return unknown;
+    const xy = allBelow(x, y);
+    const yx = allBelow(y, x);
+    const x_le = x.hi <= y.lo;
+    const x_ge = y.hi <= x.lo;
+    const same = x.lo == x.hi and y.lo == y.hi and x.lo == y.lo;
+    const truth: ?bool = switch (rel) {
+        .lt => if (xy and nan_free) true else if (x_ge) false else null,
+        .le => if (x_le and nan_free) true else if (yx) false else null,
+        .gt => if (yx and nan_free) true else if (x_le) false else null,
+        .ge => if (x_ge and nan_free) true else if (xy) false else null,
+        .eq => if (xy or yx) false else if (same and nan_free) true else null,
+        .ne => if (xy or yx) true else if (same and nan_free) false else null,
+    };
+    const t = truth orelse return unknown;
+    return .point(@floatFromInt(@intFromBool(t)));
+}
+
 /// Returns the interval of integer-valued `tag` (`y` unused for a unary
 /// tag). The 32-bit tags wrap into `i32_range`; the rest stay in an `i64`.
 pub fn integer(tag: Tag, x: Interval, y: Interval) Interval {
@@ -399,6 +448,11 @@ fn binaryRaw(tag: Tag, x: Interval, y: Interval, f: bool, xf: bool) Abstract {
     };
 }
 
+/// Whether every member of `x` is below every member of `y`.
+fn allBelow(x: Interval, y: Interval) bool {
+    return x.hi < y.lo or (x.hi == y.lo and (x.hi_open or y.lo_open));
+}
+
 /// The tags the interpreter computes as a non-decreasing function.
 fn monotone(tag: Tag) bool {
     return switch (tag) {
@@ -501,6 +555,33 @@ fn inHi(i: Interval) f64 {
     return if (i.hi_open) math.nextAfter(f64, i.hi, -math.inf(f64)) else i.hi;
 }
 
+/// Test support: every interval with ends in `ends` (lo <= hi) and each
+/// openness in `opens`.
+fn intervals(ends: []const f64, opens: []const [2]bool, buf: []Interval) []const Interval {
+    var n: usize = 0;
+    for (ends) |lo| for (ends) |hi| {
+        if (lo > hi) continue;
+        for (opens) |o| {
+            buf[n] = .{ .lo = lo, .hi = hi, .lo_open = o[0], .hi_open = o[1] };
+            n += 1;
+        }
+    };
+    return buf[0..n];
+}
+
+/// Test support: the points of `a` a test runs at, each closed end, the
+/// double just inside each end, the midpoint, and those of `extra` inside.
+fn samplePoints(a: Interval, extra: []const f64, buf: []f64) []const f64 {
+    var n: usize = 0;
+    const inf = math.inf(f64);
+    const ends = [_]f64{ a.lo, a.hi, math.nextAfter(f64, a.lo, inf), math.nextAfter(f64, a.hi, -inf), a.lo / 2 + a.hi / 2 };
+    for ([_][]const f64{ &ends, extra }) |xs| for (xs) |x| if (!math.isNan(x) and a.contains(x) and n < buf.len) {
+        buf[n] = x;
+        n += 1;
+    };
+    return buf[0..n];
+}
+
 test "Interval: predicates, meet and join against contains" {
     // Exhaustive over a small domain (the old prover's oracle): every
     // interval with ends in `ends`, each openness and the hole, at each end,
@@ -554,4 +635,70 @@ test "fromRanges: §3.4.2 brackets decide the hole and the clipped ends" {
     // An integer never holds an infinity; a bound that does not fold is no evidence.
     try std.testing.expect(fromRanges(&.{}, true).bounded());
     try std.testing.expectEqual(top, fromRanges(&.{.{ .kind = .from, .lo = null, .hi = 1 }}, false));
+}
+
+test "unary: every value interp computes inside the operand is in the result" {
+    // The old prover's transfer oracle, with `interp` as the device: ends
+    // where rounding collapses an open bound (exp underflows below about
+    // -745, tanh saturates past about ±19.1, floor and ceil are flat).
+    const inf = math.inf(f64);
+    const ops = [_]Tag{ .exp, .expm1, .ln, .ln1p, .log10, .sqrt, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh, .asin, .acos, .atan, .sin, .cos, .floor, .ceil, .fneg, .fabs };
+    const ends = [_]f64{ -inf, -800, -20, -2, -1, -0.5, 0, 0.5, 1, 2, 20, 800, inf };
+    const extra = [_]f64{ -799, -19.9, -0.7, 0.7, 1.5, 2.5, 19.9, 799 };
+    const opens = [_][2]bool{ .{ false, false }, .{ true, false }, .{ false, true }, .{ true, true } };
+    var ivs: [ends.len * ends.len * opens.len]Interval = undefined;
+    var buf: [16]f64 = undefined;
+    for (ops) |op| for (intervals(&ends, &opens, &ivs)) |a| {
+        const out = unary(op, .{ .iv = a, .finite = true });
+        for (samplePoints(a, &extra, &buf)) |x| {
+            const y = f1(op, x);
+            if (math.isNan(y)) continue; // outside the domain: the domain check's, not the interval's
+            try std.testing.expect(out.iv.contains(y));
+            // A finite claim holds inside the domain; outside it the domain
+            // check (`Float/domain.zig`) clears it.
+            const inside = switch (Air.tag_info.get(op).domain) {
+                .positive => x > 0,
+                .gt_neg_one => x > -1,
+                .non_negative => x >= 0,
+                .unit_closed => -1 <= x and x <= 1,
+                .unit_open => -1 < x and x < 1,
+                .ge_one => x >= 1,
+                .all, .nonzero_divisor, .tan_poles, .pow_sign => true,
+            };
+            if (out.finite and inside and math.isFinite(x)) try std.testing.expect(math.isFinite(y));
+        }
+    };
+}
+
+test "binary: every value interp computes inside the operands is in the result" {
+    // 1e20 absorbs every operand below 2^14 in a sum, so an open end next to
+    // it is not open after rounding.
+    const inf = math.inf(f64);
+    const ops = [_]Tag{ .fadd, .fsub, .fmul, .fdiv, .fmod, .pow, .hypot, .atan2, .fmin, .fmax };
+    const ends = [_]f64{ -inf, -1, 0, 0.5, 1, 2, 1e20, inf };
+    const opens = [_][2]bool{ .{ false, false }, .{ true, true } };
+    const extra = [_]f64{ -0.7, 0.7, -0.0 };
+    var ivs: [ends.len * ends.len * opens.len]Interval = undefined;
+    const all = intervals(&ends, &opens, &ivs);
+    var xb: [8]f64 = undefined;
+    var yb: [8]f64 = undefined;
+    for (ops) |op| for (all) |a| for (all) |b| {
+        const out = binary(op, .{ .iv = a, .finite = true }, .{ .iv = b, .finite = true });
+        for (samplePoints(a, &extra, &xb)) |x| for (samplePoints(b, &extra, &yb)) |y| {
+            const z = (interp.binary(op, .{ .real = x }, .{ .real = y }) catch continue).real;
+            if (math.isNan(z)) continue; // 0/0, inf - inf, pow(neg, frac): no value to bound
+            try std.testing.expect(out.iv.contains(z));
+        };
+    };
+}
+
+test "integer: a 32-bit sum that fits is exact, one that may wrap is every 32-bit integer" {
+    const small: Interval = .{ .lo = -5, .hi = 5 };
+    try std.testing.expectEqual(Interval{ .lo = -10, .hi = 10 }, integer(.iadd, small, small));
+    try std.testing.expectEqual(i32_range, integer(.iadd, .{ .lo = 0, .hi = 2147483647.0 }, .point(1)));
+    try std.testing.expectEqual(Interval{ .lo = 0, .hi = 1 }, integer(.ilt, small, small));
+    // §4.2.4: |x % y| < |y|, with the dividend's sign.
+    const m = integer(.imod, .{ .lo = 0, .hi = 100 }, .{ .lo = 1, .hi = 7 });
+    try std.testing.expect(m.ge(0));
+    try std.testing.expect(m.le(7));
 }

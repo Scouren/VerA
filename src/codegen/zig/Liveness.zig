@@ -159,12 +159,10 @@ pub fn effect(air: Air, tag: Inst.Tag, data: Inst.Data) bool {
             if (callee > std.math.maxInt(@typeInfo(SysFn.Tag).@"enum".tag_type)) return false;
             return switch (SysFn.get(@fromBackingInt(@intCast(callee))).family) {
                 .random, .file_out, .file_func => true,
-                // else: a value, or a task of another phase
-                else => false,
+                else => false, // else: a value, or a task of another phase
             };
         },
-        // else: a value
-        else => false,
+        else => false, // else: a value
     };
 }
 
@@ -233,9 +231,9 @@ fn propagate(l: Liveness, air: Air) bool {
             },
             // Blocks and slots gather from their `br`s and `assign`s above.
             .block, .alloc => continue,
-            // else: integers, comparisons, casts to integer, `dstop`, the
-            // §5.6.1.2 latches, `arg`, `anew` and the control tags carry no lanes
-            else => 0,
+            // Integers, comparisons, casts to integer, `dstop`, the §5.6.1.2
+            // latches, `arg`, `anew` and the control tags carry no lanes.
+            else => 0, // else: every tag above the lanes come from
         };
         grew = l.orInto(@intCast(i), m) or grew;
     }

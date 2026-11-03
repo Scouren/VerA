@@ -31,6 +31,12 @@ pub const Card = struct {
     defaults: []const f64,
     ranges: []const []const Air.Device.Range,
     n_u: u32,
+    /// The versioned unit's guard box (every root `.optimized`), null for one
+    /// strict body; and what it reads: each card entry's `arg` index and
+    /// every `arg`'s default.
+    box: ?[]const Air.Float.Guard = null,
+    arg_of: []const u32 = &.{},
+    args: []const f64 = &.{},
 };
 
 /// The new side's outcome.
@@ -119,22 +125,29 @@ pub fn new(gpa: Allocator, arena: Allocator, io: Io, path: []const u8, source: [
             var names: std.ArrayList([:0]const u8) = .empty;
             var defaults: std.ArrayList(f64) = .empty;
             var ranges: std.ArrayList([]const Air.Device.Range) = .empty;
+            var arg_of: std.ArrayList(u32) = .empty;
+            const args = try arena.alloc(f64, a.device.params.len);
+            for (args, a.device.params.items(.default)) |*v, def| v.* = switch (if (def == InternPool.Index.undef or def == .none) InternPool.Key{ .float = 0 } else ip.indexToKey(def)) {
+                .float => |x| x,
+                .int => |i| if (i.storage == .small) @floatFromInt(i.storage.small) else 0,
+                else => 0, // else: a string or an array, which no guard reads
+            };
             for (a.device.params.items(.name), a.device.params.items(.default), a.device.params.items(.local), 0..) |n, def, local, k| {
                 // The card the old device takes: the root's own parameters.
                 if (local or std.mem.findScalar(u8, ip.stringToSlice(n), '.') != null) continue;
                 if (def == InternPool.Index.undef or def == .none) continue;
                 const x = switch (ip.indexToKey(def)) {
                     .float => |x| x,
-                    // else: an integer, a string: kept at its default
-                    else => continue,
+                    else => continue, // else: an integer, a string: kept at its default
                 };
                 try names.append(arena, try arena.dupeSentinel(u8, ip.stringToSlice(n), 0));
                 try defaults.append(arena, x);
                 try ranges.append(arena, try arena.dupe(Air.Device.Range, a.device.paramRanges(@fromBackingInt(@intCast(k)))));
+                try arg_of.append(arena, @intCast(k));
             }
             return .{ .ok = .{
                 .text = try arena.dupe(u8, out.text),
-                .card = .{ .names = names.items, .defaults = defaults.items, .ranges = ranges.items, .n_u = @intCast(a.device.nodes.len) },
+                .card = .{ .names = names.items, .defaults = defaults.items, .ranges = ranges.items, .n_u = @intCast(a.device.nodes.len), .box = try boxOf(arena, &f.verdict, strict), .arg_of = arg_of.items, .args = args },
                 .optimized = optimized,
                 .roots = @intCast(f.verdict.modes.len),
             } };
@@ -143,6 +156,19 @@ pub fn new(gpa: Allocator, arena: Allocator, io: Io, path: []const u8, source: [
 }
 
 // ---- private ----
+
+/// The box the device's versioned unit checks, read off the verdict as the
+/// spec states it (§11.9: every root `.optimized`, the union of their
+/// boxes), so a codegen that checks a different box disagrees here.
+fn boxOf(arena: Allocator, v: *const Air.Float.Verdict, strict: bool) !?[]const Air.Float.Guard {
+    if (strict or v.modes.len == 0) return null;
+    var out: std.ArrayList(Air.Float.Guard) = .empty;
+    for (v.modes, 0..) |m, r| {
+        if (m == .strict) return null;
+        try out.appendSlice(arena, v.box(r));
+    }
+    return out.items;
+}
 
 /// A parameter's `Device` ranges as `Float` reads them; a bound that does
 /// not fold proves nothing.

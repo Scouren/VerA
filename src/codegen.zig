@@ -16,7 +16,7 @@
 //! Cites: VAMS-2023 §5.6 and §5.6.1.3 (a contribution is a float unit).
 //!
 //! Contents:
-//! - `pub const zig`: the Zig backend
+//! - `pub const zig`: the Zig backend; `pub const examples`: hand-built devices (test support)
 //! - `pub const Backend = enum { zig }`
 //! - `pub const Input = struct`, `pub const Options = struct`
 //! - `pub const Result = union(enum) { ok: link.Output, fail: []u8 }`, `Result.deinit`
@@ -31,6 +31,8 @@ const InternPool = @import("intern_pool");
 const link = @import("link");
 /// The Zig backend.
 pub const zig = @import("codegen/zig.zig");
+/// Hand-built devices for shapes Sema does not lower yet (test support).
+pub const examples = @import("codegen/examples.zig");
 
 /// The language a backend writes.
 pub const Backend = enum { zig };

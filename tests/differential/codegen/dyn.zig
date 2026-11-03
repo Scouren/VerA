@@ -7,10 +7,15 @@
 //! Cites: VAMS-2023 §5.6, §5.6.1.2 (the rows and charges a host reads).
 //!
 //! Contents:
+//! - `pub const vera_validate_contract`
 //! - `pub fn exportDevice(comptime B: type, comptime name: []const u8) void`
 
 const std = @import("std");
 const contract = @import("contract");
+
+/// Every device of the bundle is held to `contract.validate` (link's shim
+/// reads this from the dyn).
+pub const vera_validate_contract = true;
 
 /// `link`'s hook: exports `Run(D).run` as `cg_<decl>` for every device `D`
 /// of bundle `B`'s `devices`, named by its `names`. `name` is the library's, unused.
@@ -78,8 +83,7 @@ fn Run(comptime D: type) type {
                     switch (@typeInfo(T)) {
                         .float => @field(m, f) = @floatCast(v),
                         .int => @field(m, f) = std.math.lossyCast(T, v),
-                        // else: a field the oracle does not draw (a string, a table)
-                        else => return false,
+                        else => return false, // else: a field the oracle does not draw (a string, a table)
                     }
                     return true;
                 }

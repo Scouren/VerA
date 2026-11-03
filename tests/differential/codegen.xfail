@@ -365,3 +365,5 @@ verilog-ams/ch12_vpi_routines/sampnhold.va codegen does not spell a potential co
 verilog-ams/ch12_vpi_routines/square_law.va codegen does not spell a call of a user function (callee 4294967295)
 verilog-ams/ch12_vpi_routines/systf_devices.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch12_vpi_routines/two_sites.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch09_system_tasks/say_ops.va §9.7.3 status sites: the old device returns zero rows once a severity task fires (a check past |V| = 10); codegen has no status protocol yet
+verilog-ams/ch09_system_tasks/say_ops.va §9.7.3 status sites: the old device returns zero rows once a severity task fires (a check past |V| = 10); codegen has no status protocol yet

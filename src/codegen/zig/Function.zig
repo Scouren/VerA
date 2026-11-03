@@ -71,6 +71,16 @@ const ipow_fn = "(struct { fn zp_f(zp_b: i64, zp_n: i64) i64 { " ++
     "while (zp_e > 0) : (zp_e >>= 1) { if (zp_e & 1 != 0) zp_r *%= zp_x; zp_x *%= zp_x; } " ++
     "return zp_r; } }.zp_f)";
 
+/// The most elements a scratch array's written-element mask covers: one word.
+const mask_elements_max = 64;
+
+const Label = struct {
+    i: u32,
+    pub fn format(l: Label, w: *std.Io.Writer) std.Io.Writer.Error!void {
+        try w.print("ld{d}", .{l.i});
+    }
+};
+
 const Function = @This();
 
 /// Writes `body`'s statements, nested bodies included. Asserts that the
@@ -97,11 +107,18 @@ fn genInst(f: *Function, inst: Inst.Index) Error!void {
                 try f.print("{s} s{d}: i64 = 0;", .{ kw, i });
             } else if (data.ty == InternPool.Index.real_type) {
                 try f.print("{s} s{d}: F.zOf(S, 0x{x}) = F.zTo(S, 0x{x}, S.con(0.0));", .{ kw, i, live.masks[i], live.masks[i] });
-            } else return f.dg.fail("a slot of type {d} (an array or a string)", .{@backingInt(data.ty)});
+            } else if (f.arrayOf(data.ty)) |a| {
+                // §11.10 a scratch array: its storage is never zeroed; the
+                // written-element mask `_m` says which elements hold a value.
+                if (a.len > mask_elements_max) return f.dg.fail("a §3.2.2 array of {d} elements, past the {d} a written-element mask covers", .{ a.len, mask_elements_max });
+                try f.print("var s{d}: [{d}]{f} = undefined; var s{d}_m: u64 = 0; _ = .{{ &s{d}, &s{d}_m }};", .{ i, a.len, f.elemText(a.elem, i), i, i, i });
+                return;
+            } else return f.dg.fail("a slot of type {d} (a string)", .{@backingInt(data.ty)});
             try f.print(" _ = &s{d};", .{i});
         },
         .assign => {
             const slot = data.bin_op.lhs.toIndex().?;
+            if (f.arrayOf(f.dg.air.typeOfIndex(f.dg.ip, slot)) != null) return f.assignArray(slot, data.bin_op.rhs);
             try f.line();
             try f.print("s{d} = ", .{@backingInt(slot)});
             try f.widened(slot, data.bin_op.rhs);
@@ -157,15 +174,95 @@ fn genInst(f: *Function, inst: Inst.Index) Error!void {
             try f.dg.genReturn(f);
         },
         .call => try f.genCall(inst, data),
-        // else: every other tag is a value: written when something reads it
-        else => {
-            if (!live.used[i]) return;
-            try f.line();
-            try f.print("const v{d} = ", .{i});
-            try f.genValue(inst, tag, data);
-            try f.print(";", .{});
-        },
+        // An array version is its slot's storage, written in place: a fresh
+        // one is the mask's reset (`assignArray`), a load names the storage.
+        .anew => {},
+        .load => if (f.arrayOf(air.typeOfIndex(f.dg.ip, inst)) == null) try f.genValueStmt(inst, tag, data),
+        .store => try f.genStore(data),
+        else => try f.genValueStmt(inst, tag, data), // else: every other tag is a value: written when something reads it
     }
+}
+
+/// `const v<i> = <value>;` when something reads instruction `inst`.
+fn genValueStmt(f: *Function, inst: Inst.Index, tag: Inst.Tag, data: Inst.Data) Error!void {
+    if (!f.dg.live.used[@backingInt(inst)]) return;
+    try f.line();
+    try f.print("const v{d} = ", .{@backingInt(inst)});
+    try f.genValue(inst, tag, data);
+    try f.print(";", .{});
+}
+
+/// §3.2.2 the array slot a version reads: a `load` of it, or a `store` made
+/// from one. Null for any other shape (a fresh `anew` read before it is
+/// stored to a slot), which this backend does not spell.
+fn rootSlot(f: *Function, ref: Ref) ?Inst.Index {
+    var r = ref;
+    // A chain of stores is as long as the body.
+    for (0..f.dg.air.instructions.len + 1) |_| {
+        const i = r.toIndex() orelse return null;
+        const data = f.dg.air.instructions.items(.data)[@backingInt(i)];
+        switch (f.dg.air.instructions.items(.tag)[@backingInt(i)]) {
+            .load => return data.un_op.toIndex(),
+            .store => r = data.pl_op.operand,
+            else => return null, // else: an `anew`, a `select` or `block` of versions
+        }
+    }
+    unreachable; // the chain walked every instruction
+}
+
+/// `slot = rhs` for an array slot: a fresh version is the per-evaluation
+/// reset, one word (§11.10: no memset); a version stored from the slot's
+/// own is already in place.
+fn assignArray(f: *Function, slot: Inst.Index, rhs: Ref) Error!void {
+    const i = rhs.toIndex() orelse return f.dg.fail("an array slot assigned a constant", .{});
+    if (f.dg.air.instructions.items(.tag)[@backingInt(i)] == .anew) {
+        try f.line();
+        return f.print("s{d}_m = 0;", .{@backingInt(slot)});
+    }
+    if (f.rootSlot(rhs) != slot) return f.dg.fail("an array version assigned to a slot it was not read from", .{});
+}
+
+/// `store`: element `index` of the version's storage set to `value`, its
+/// mask bit with it; an index outside the array writes nothing (§3.2.2).
+fn genStore(f: *Function, data: Inst.Data) Error!void {
+    const bin = f.dg.air.extraData(Air.Bin, data.pl_op.payload).data;
+    const slot = f.rootSlot(data.pl_op.operand) orelse return f.dg.fail("a store into an array version that no slot holds", .{});
+    const s = @backingInt(slot);
+    const a = f.arrayOf(f.dg.air.typeOfIndex(f.dg.ip, slot)).?;
+    try f.line();
+    try f.print("{{ const k: i64 = ", .{});
+    try f.int(bin.lhs);
+    try f.print("; if (k >= 0 and k < {d}) {{ s{d}[@intCast(k)] = ", .{ a.len, s });
+    if (isInt(f.dg.ip, a.elem)) try f.int(bin.rhs) else try f.widened(slot, bin.rhs);
+    try f.print("; s{d}_m |= @as(u64, 1) << @intCast(k); }} }}", .{s});
+}
+
+/// `fload`/`iload`: element `index` when its mask bit says it was written,
+/// else the element type's zero (§3.2.2: an unwritten element, or one
+/// outside the array, reads 0).
+fn genLoad(f: *Function, inst: Inst.Index, data: Inst.Data) Error!void {
+    const slot = f.rootSlot(data.bin_op.lhs) orelse return f.dg.fail("a load from an array version that no slot holds", .{});
+    const s = @backingInt(slot);
+    const a = f.arrayOf(f.dg.air.typeOfIndex(f.dg.ip, slot)).?;
+    try f.print("{f}: {{ const k: i64 = ", .{Label{ .i = @backingInt(inst) }});
+    try f.int(data.bin_op.rhs);
+    try f.print("; break :{f} if (k >= 0 and k < {d} and (s{d}_m >> @intCast(k)) & 1 != 0) s{d}[@intCast(k)] else ", .{ Label{ .i = @backingInt(inst) }, a.len, s, s });
+    if (isInt(f.dg.ip, a.elem)) try f.print("0; }}", .{}) else try f.print("F.zTo(S, 0x{x}, S.con(0.0)); }}", .{f.dg.live.masks[s]});
+}
+
+/// The length and element type of array type `ty`, or null.
+fn arrayOf(f: *Function, ty: InternPool.Index) ?InternPool.Key.ArrayType {
+    if (ty == .none) return null;
+    return switch (f.dg.ip.indexToKey(ty)) {
+        .array_type => |a| a,
+        else => null, // else: a scalar or a string
+    };
+}
+
+/// An array slot's element type: an `i64`, or the family value at the
+/// slot's mask.
+fn elemText(f: *Function, elem: InternPool.Index, slot: u32) TypeText {
+    return .{ .int = isInt(f.dg.ip, elem), .mask = f.dg.live.masks[slot] };
 }
 
 /// Writes a value instruction's expression.
@@ -348,9 +445,9 @@ fn genValue(f: *Function, inst: Inst.Index, tag: Inst.Tag, data: Inst.Data) Erro
             }});
         },
         .path_prev, .path_acc => return f.dg.fail("a §5.6.1.2 path latch (`{t}`)", .{tag}),
-        .anew, .fload, .iload, .store => return f.dg.fail("a §3.2.2 array version (`{t}`)", .{tag}),
-        // else: the control tags, `alloc`, `assign` and `call` are statements (`genInst`)
-        else => unreachable,
+        .fload, .iload => return f.genLoad(inst, data),
+        .anew, .store => unreachable, // `genInst` writes them as statements
+        else => unreachable, // else: the control tags, `alloc`, `assign` and `call` are statements (`genInst`)
     }
 }
 
@@ -368,8 +465,7 @@ fn genCall(f: *Function, inst: Inst.Index, data: Inst.Data) Error!void {
         // §9.4/§9.7 a print or a simulation control task is not part of a
         // residual: the device's display phase runs it.
         .display, .simctl => return if (used) f.dg.fail("the value of `{s}`", .{@tagName(tag)}),
-        // else: a value, by tag below
-        else => {},
+        else => {}, // else: a value, by tag below
     }
     if (!used and !Liveness.effect(air.*, .call, data)) return;
     try f.line();
@@ -402,8 +498,7 @@ fn genCall(f: *Function, inst: Inst.Index, data: Inst.Data) Error!void {
             try f.real(args[0]);
             try f.print(").exp()", .{});
         },
-        // else: not yet spelled by this backend
-        else => return f.dg.fail("a call of `{s}`", .{@tagName(tag)}),
+        else => return f.dg.fail("a call of `{s}`", .{@tagName(tag)}), // else: not yet spelled by this backend
     }
     try f.print(";", .{});
 }
@@ -446,8 +541,7 @@ fn real(f: *Function, ref: Ref) Error!void {
     switch (f.dg.ip.indexToKey(ref.toInterned().?)) {
         .float => |x| return f.print("S.con({f})", .{Real{ .x = x }}),
         .int => |n| return f.print("S.con({d}.0)", .{n.storage.small}),
-        // else: Verify types every real operand
-        else => return f.dg.fail("a real operand that is not a number", .{}),
+        else => return f.dg.fail("a real operand that is not a number", .{}), // else: Verify types every real operand
     }
 }
 
@@ -459,8 +553,7 @@ fn int(f: *Function, ref: Ref) Error!void {
             .small => |s| return f.print("@as(i64, {d})", .{s}),
             .big => return f.dg.fail("an integer constant wider than 64 bits", .{}),
         },
-        // else: Verify types every integer operand
-        else => return f.dg.fail("an integer operand that is not an integer", .{}),
+        else => return f.dg.fail("an integer operand that is not an integer", .{}), // else: Verify types every integer operand
     }
 }
 
@@ -478,8 +571,7 @@ fn isInt(ip: *const InternPool, ty: InternPool.Index) bool {
     if (ty == InternPool.Index.integer_type) return true;
     return switch (ip.indexToKey(ty)) {
         .int_type => true,
-        // else: a real, a string or an array
-        else => false,
+        else => false, // else: a real, a string or an array
     };
 }
 

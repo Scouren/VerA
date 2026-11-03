@@ -170,12 +170,25 @@ fn genModel(dg: *DeclGen, w: *std.Io.Writer) Error!void {
                 .small => |s| try dg.print(w, "i64 = {d},\n", .{s}),
                 .big => return dg.fail("parameter `{s}` wider than 64 bits", .{dg.ip.stringToSlice(n)}),
             },
-            // else: a string, an array or an aggregate
-            else => return dg.fail("parameter `{s}` is not a number", .{dg.ip.stringToSlice(n)}),
+            else => return dg.fail("parameter `{s}` is not a number", .{dg.ip.stringToSlice(n)}), // else: a string, an array or an aggregate
         }
     }
     try dg.print(w, "    temperature__: f64 = 300.15,\n}};\n", .{});
     try dg.print(w, "\n/// §6.3.6 the instance.\npub const Instance = struct {{\n    mfactor: f64 = 1.0,\n}};\n", .{});
+    // §3.4.1 an `integer` parameter is 32 bits; the host writes an `i64`
+    // carrier, so `derive` keeps its low 32 bits, sign-extended.
+    var ints: u32 = 0;
+    for (d.params.items(.default)) |def| {
+        if (dg.ip.indexToKey(def) == .int) ints += 1;
+    }
+    if (ints == 0) return;
+    try dg.print(w, "\n/// §3.4.1 each `integer` parameter's low 32 bits: the host writes an `i64`.\npub fn derive(comptime S: type, model: *Model) void {{\n    _ = S;\n", .{});
+    for (d.params.items(.name), d.params.items(.default)) |n, def| {
+        if (dg.ip.indexToKey(def) != .int) continue;
+        const name = std.zig.fmtId(dg.ip.stringToSlice(n));
+        try dg.print(w, "    model.{f} = @as(i32, @truncate(model.{f}));\n", .{ name, name });
+    }
+    try dg.print(w, "}}\n", .{});
 }
 
 /// The lane tables (`deriv_reads`, `jac_pattern`) and the §5.6.1.2 charge
@@ -185,7 +198,7 @@ fn genTables(dg: *DeclGen, w: *std.Io.Writer, p: stamps.Plan) Error!void {
     var all: Liveness.Mask = 0;
     for (p.pattern) |m| all |= m;
     for (d.charge_sites.items(.slot)) |slot| all |= dg.live.masks[@backingInt(slot)];
-    try dg.print(w, "\n/// The unknowns whose derivative lane the device reads.\npub const deriv_reads: u64 = 0x{x};\n", .{all});
+    try dg.print(w, "\n/// The unknowns whose derivative lane the device reads.\npub const deriv_reads: u64 = 0x{x};\n/// No §4.5.14 `ddx` reads a lane.\npub const ddx_reads: u64 = 0;\n", .{all});
     try dg.print(w, "/// §5.6 bit `c` of row `r`: d eval[r] / d x[c] may be nonzero.\npub const jac_pattern = [n_u]u64{{", .{});
     for (p.pattern) |m| try dg.print(w, " 0x{x},", .{m});
     try dg.print(w, " }};\n", .{});
@@ -218,10 +231,12 @@ fn genCore(dg: *DeclGen, w: *std.Io.Writer, uses: Function.Uses, body: []const u
         body,
     });
     const guards_opt = try dg.box();
-    try dg.print(w, "\nfn run(comptime S: type, x: *const [n_u]S.V, xs: D.zX(S), model: *const Model, inst: InstancePtr, sim: contract.SimState) Core(S) {{\n{s}", .{if (guards_opt == null) "    _ = x;\n" else ""});
-    if (guards_opt) |guards| {
+    const checked = if (guards_opt) |g| g.len != 0 else false;
+    try dg.print(w, "\nfn run(comptime S: type, x: *const [n_u]S.V, xs: D.zX(S), model: *const Model, inst: InstancePtr, sim: contract.SimState) Core(S) {{\n{s}", .{if (checked) "" else "    _ = x;\n"});
+    // An `.optimized` unit proven on the whole line needs no check.
+    const tail_mode = if (guards_opt != null and !checked) "optimized" else "strict";
+    if (guards_opt) |guards| if (checked) {
         try dg.print(w, "    if (", .{});
-        if (guards.len == 0) try dg.print(w, "true", .{});
         for (guards, 0..) |g, k| {
             if (k != 0) try dg.print(w, " and ", .{});
             try dg.print(w, "zIn(", .{});
@@ -235,9 +250,9 @@ fn genCore(dg: *DeclGen, w: *std.Io.Writer, uses: Function.Uses, body: []const u
             try dg.print(w, ", {f}, {any}, {f}, {any}, {any})", .{ Real{ .x = g.iv.lo }, g.iv.lo_open, Real{ .x = g.iv.hi }, g.iv.hi_open, g.iv.nonzero });
         }
         try dg.print(w, ") return @call(.always_inline, core, .{{ S, .optimized, xs, model, inst, sim }});\n", .{});
-    }
-    try dg.print(w, "    return @call(.always_inline, core, .{{ S, .strict, xs, model, inst, sim }});\n}}\n", .{});
-    if (guards_opt != null) try dg.print(w, "{s}", .{zin});
+    };
+    try dg.print(w, "    return @call(.always_inline, core, .{{ S, .{s}, xs, model, inst, sim }});\n}}\n", .{tail_mode});
+    if (checked) try dg.print(w, "{s}", .{zin});
 }
 
 /// The guard box of the versioned unit, or null for one strict body: every

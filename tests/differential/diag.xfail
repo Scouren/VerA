@@ -1,0 +1,6 @@
+# Fixtures whose diagnostics may render differently through the vams Diag than
+# through lib/diag, one per line: <path under tests/conformance/tests> <reason>.
+# An entry that agrees fails diff-diag.
+verilog-a/ch02_lexical/octal_escape_above_377_rejected.va two old rows, one per use of the macro argument in `CHECKI's expansion, resolve to one invocation site; a Loc is a file location, so the Wip dedupes them into one
+verilog-a/ch06_hierarchy/unnamed_generate_instance_reference_rejected.va two old rows, one per use of the macro argument in `CHECKX's expansion, resolve to one invocation site; a Loc is a file location, so the Wip dedupes them into one
+verilog-a/ch02_lexical/undefined_escape_keeps_character.va W0850 and W0149 come from one `CHECKI expansion: the old sort ordered them by preprocessed offset, the new one sees one invocation site and orders them by end, then code

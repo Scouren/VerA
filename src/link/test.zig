@@ -226,7 +226,7 @@ test "a split flush that fails returns one report and leaks the others' none" {
     }
 }
 
-test "a split flush gives the same library bytes from 1 job and from N" {
+test "a split flush gives the same library bytes from 1 job, 2 and 3" {
     // AGENTS.md: determinism is a test, 1 job and N jobs give the same bytes.
     // Oracle: the library built one child at a time.
     const gpa = std.testing.allocator;
@@ -242,8 +242,9 @@ test "a split flush gives the same library bytes from 1 job and from N" {
         \\
     ;
     var slots: [jobs_max]Server = undefined;
-    var bytes: [2][]u8 = undefined;
-    for ([_]usize{ 1, jobs_max }, &bytes, 0..) |jobs, *out, i| {
+    // 2 jobs over 3 pieces: a slot is reused while another child runs.
+    var bytes: [3][]u8 = undefined;
+    for ([_]usize{ 1, 2, jobs_max }, &bytes, 0..) |jobs, *out, i| {
         var q: Queue = .init(slots[0..jobs]);
         const work = try arena.allocator().print(".zig-cache/tmp/{s}/w{d}", .{ tmp.sub_path, i });
         const f: File = .{ .kind = .so, .work_dir = work, .name = "jobsdev", .optimize = .fast, .backend = .llvm, .modules = &mods, .split = .parts };
@@ -253,6 +254,7 @@ test "a split flush gives the same library bytes from 1 job and from N" {
     }
     try std.testing.expect(bytes[0].len > 0);
     try std.testing.expectEqualSlices(u8, bytes[0], bytes[1]);
+    try std.testing.expectEqualSlices(u8, bytes[0], bytes[2]);
 }
 
 test "cache_dir: a second work directory reuses the first's library, and a changed device misses" {

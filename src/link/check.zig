@@ -103,7 +103,8 @@ pub fn typeCheck(f: File, gpa: Allocator, io: Io, q: *Queue, device: []const u8,
     if (timed_out) {
         try err.print(
             "error: {s}: type check did not finish in {d}s and was killed. " ++
-                "The generated Zig is at {s}/{s}; run its `zig build-obj` by hand to see where it sticks.\n",
+                "The generated Zig is at {s}/{s}; run the " ++
+                "`zig build-obj` from typeCheck() by hand to see where it sticks.\n",
             .{ source_path, check_budget_s, f.work_dir, dev_name },
         );
         return .fails;

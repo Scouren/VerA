@@ -126,10 +126,10 @@ pub fn add(g: Graph) void {
 // ---- private ----
 
 /// `tests/differential/kernels_targets.zig` for each device target, ReleaseFast
-/// as a device is: every exported kernel built, and the `f64` math's
-/// assembly grepped for a fused multiply-add (exit 1: none). The grep's own
-/// canary, an `@mulAdd`, must be found on each target, so a pattern that
-/// misses a target's spelling fails instead of passing everything.
+/// as a device is: every exported kernel built, and the `f64` math's LLVM IR
+/// grepped for optional contraction (exit 1: none). The grep's own canary,
+/// an optimized-mode `a * b + c`, must be found on each target, so a pattern
+/// that misses a target's spelling fails instead of passing everything.
 fn kernelTargets(b: *Build, step: *Build.Step) void {
     const targets = [_]std.Target.Query{
         .{ .cpu_arch = .x86_64, .os_tag = .linux, .cpu_model = .{ .explicit = &std.Target.x86.cpu.x86_64_v3 } },
@@ -160,21 +160,14 @@ fn kernelTargets(b: *Build, step: *Build.Step) void {
                 step.dependOn(&obj.step);
                 continue;
             }
-            // What Zig hands LLVM: no `llvm.fma`/`fmuladd` call and no
-            // `contract` flag, on every target.
-            const ir = b.addSystemCommand(&.{ "grep", "-Eq", "llvm\\.fma|fmuladd|(fadd|fsub|fmul|fneg)[a-z ]* contract" });
+            // What Zig hands LLVM: no `llvm.fmuladd` and no `contract`/`fast`
+            // flag, on every target: contraction each target may or may not
+            // do. An explicit `@mulAdd` (`llvm.fma`) rounds once everywhere
+            // and is allowed (lib/TODO.md §11.8).
+            const ir = b.addSystemCommand(&.{ "grep", "-Eq", "fmuladd|(fadd|fsub|fmul|fdiv|fneg)[a-z ]* (contract|fast)" });
             ir.addFileArg(obj.getEmittedLlvmIr());
             ir.expectExitCode(if (part == .control) 0 else 1);
             step.dependOn(&ir.step);
-            // What the backend emits: no FMA instruction (`fmax` is a
-            // maximum). AMDGCN's own f64 division and sqrt are FMA
-            // sequences (v_div_fmas_f64) that round correctly, so there only
-            // the canary is grepped.
-            if (q.cpu_arch.? == .amdgcn and part == .math) continue;
-            const asm_ = b.addSystemCommand(&.{ "grep", "-Eiq", "fma([^x]|$)|fn?m(add|sub)|fml[as]" });
-            asm_.addFileArg(obj.getEmittedAsm());
-            asm_.expectExitCode(if (part == .control) 0 else 1);
-            step.dependOn(&asm_.step);
         }
     }
 }

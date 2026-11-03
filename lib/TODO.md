@@ -536,11 +536,10 @@ checked, the bundle smoked). ESPice bumps its pin after it.
   - merged: `std_kernels` (diff-kernels: 737 names, 68.8M comparisons bit-identical to lib/kernels
     and the old kernel text) with Gompute 2.0.0 replacing `gm` (cosh/sinh/log10 1 ulp apart, the f128
     reference sides with Gompute). Gompute is a `build.zig.zon` fetch (the user's choice; AGENTS.md
-    amended). Pending: Gompute 2.0.1 (the `atan(-0)` sign and an fma in `atan`, both reported to the
-    Gompute session), then bump the pin and drop VerA's musl `atan` workaround. With it, relax
-    `kernels-targets`: the rule is no OPTIONAL contraction in the IR (`llvm.fmuladd`, `contract`/fast
-    flags), with a canary; an explicit `@mulAdd` (one rounding everywhere, comptime included) is
-    deterministic and allowed. The old asm-level FMA ban was stricter than the property. At the switch-over,
+    amended). Gompute 2.0.1 pinned (bd8800b: `atan(±0) = ±0`, musl's scalar `atan`); VerA's own `atan`
+    copy is gone, and `kernels-targets` holds the IR to no OPTIONAL contraction (`llvm.fmuladd`,
+    `contract`/`fast` flags, with a canary): an explicit `@mulAdd` rounds once everywhere and is
+    allowed. diff-kernels unchanged on 2.0.1 (737 names, 0 failures). At the switch-over,
     `share/vera/kernels/` must ship Gompute's `math.zig`, `math_data.zig`, `math_pio2.zig`.
   - in progress: Sema analog lowering (`lower.md`), Sema digital lowering (`dlower.md`).
   - settled: no default box for parameters. A parameter's guard interval is its declared range

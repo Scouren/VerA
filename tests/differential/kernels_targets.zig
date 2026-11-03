@@ -1,13 +1,15 @@
 //! `std_kernels` on every target a device compiles for: this root exports
 //! the kernels a device body calls, so `zig build kernels-targets` builds
 //! them (ReleaseFast, as a device is) for x86_64, aarch64, NVPTX and
-//! AMDGCN. With `math_only` it exports the `f64` math alone, whose assembly
-//! the step holds to "no fused multiply-add" on each target: the bits a
-//! fold computes are the bits every target computes only while no backend
-//! fuses (lib/TODO.md §11.8). The family's derivative lanes may fuse (the
-//! contract's numerics table makes FMA optional there), so the full set is
-//! built, not grepped. `fma_control` is the probe's own canary: one
-//! `@mulAdd`, which the step requires the grep to find.
+//! AMDGCN. With `math_only` it exports the `f64` math alone, whose LLVM IR
+//! the step holds to "no optional contraction" on each target: no
+//! `llvm.fmuladd` and no `contract`/`fast` flag, which each target may fuse
+//! or not. An explicit `@mulAdd` (`llvm.fma`) rounds once everywhere, at
+//! comptime too, so it is allowed: the bits a fold computes are the bits
+//! every target computes (lib/TODO.md §11.8). The family's derivative lanes
+//! may fuse (the contract's numerics table makes FMA optional there), so the
+//! full set is built, not grepped. `fma_control` is the probe's own canary:
+//! an optimized-mode `a * b + c`, which the step requires the grep to find.
 //! Cites: VAMS §4.3 (Tables 4-14, 4-15), §4.5, §4.5.15.
 //!
 //! Contents: none public; exported symbols only.
@@ -91,5 +93,6 @@ fn kFamily(x: f64, y: f64, d: f64) callconv(.c) f64 {
 }
 
 fn fmaControl(a: f64, b: f64, c: f64) callconv(.c) f64 {
-    return @mulAdd(f64, a, b, c);
+    @setFloatMode(.optimized);
+    return a * b + c;
 }

@@ -52,12 +52,12 @@
           # nothing it is handed. Moves with build.zig.zon's pin.
           zigDeps = linkFarm "vera-zig-deps" [
             {
-              name = "gompute-2.0.0-YJVc1oQ-BwB2JI0_gqttr3Mox-1fvn4D3rL5bdaDZbfB";
+              name = "gompute-2.0.1-YJVc1qpnBwB0ErFjFeEScf2h0NWIsQXpvbxPIiqx-RZI";
               path = fetchFromGitHub {
                 owner = "OmarSiwy";
                 repo = "Gompute";
-                rev = "70b722dbccfc1c2e294ac5e4245344667f0dcb7d"; # v2.0.0
-                hash = "sha256-IY1zCqFGEHfTNxi2wyp8e1e8XYv0/I2ALXHkcCoX110=";
+                rev = "bd8800b6afcbfe6d2f6dd0e5552f16b3a69c0a01"; # v2.0.1
+                hash = "sha256-ihBuwypLwuIyvoP+r5NCeCSycDfuimUCPyxl07lvNDw=";
               };
             }
           ];

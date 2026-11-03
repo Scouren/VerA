@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.18.0-dev.349+d924f83bf",
     .dependencies = .{
         .gompute = .{
-            .url = "git+https://github.com/OmarSiwy/Gompute?ref=v2.0.0#70b722dbccfc1c2e294ac5e4245344667f0dcb7d",
-            .hash = "gompute-2.0.0-YJVc1oQ-BwB2JI0_gqttr3Mox-1fvn4D3rL5bdaDZbfB",
+            .url = "git+https://github.com/OmarSiwy/Gompute?ref=v2.0.1#bd8800b6afcbfe6d2f6dd0e5552f16b3a69c0a01",
+            .hash = "gompute-2.0.1-YJVc1qpnBwB0ErFjFeEScf2h0NWIsQXpvbxPIiqx-RZI",
         },
     },
     .paths = .{

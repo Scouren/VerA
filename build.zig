@@ -14,6 +14,7 @@ const external = @import("build/external.zig");
 const runs = @import("build/runs.zig");
 const unit = @import("build/unit.zig");
 const vpi = @import("build/vpi.zig");
+const rewrite = @import("build/rewrite.zig");
 const Build = std.Build;
 const M = common.M;
 const byName = common.byName;
@@ -89,6 +90,7 @@ pub fn build(b: *Build) void {
     const added = unit.add(g, language == .ams);
     runs.add(g, added.suite_exe, added.check, espice_path);
     vpi.add(g, vpi_host);
+    rewrite.add(g);
     if (language != .ams) return;
     devices.add(g, va_gen);
     external.add(g);

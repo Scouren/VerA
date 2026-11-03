@@ -34,6 +34,11 @@ pub const module_specs = [_]struct {
     c: ?[]const u8 = null,
 }{
     .{ .name = "contract", .path = "lib/contract.zig" },
+    // The rewrite's modules (docs/rewrite/README.md): each builds and tests
+    // alone (`zig build test-<name>`), importing only std or the rows above.
+    .{ .name = "vams", .path = "lib/std/vams.zig" },
+    .{ .name = "intern_pool", .path = "src/InternPool.zig" },
+    .{ .name = "air", .path = "src/Air.zig", .imports = &.{"intern_pool"} },
     .{ .name = "base", .path = "lib/base/root.zig" },
     .{ .name = "kernels", .path = "lib/kernels/root.zig", .imports = &.{"contract"} },
     .{ .name = "diag", .path = "lib/diag/root.zig" },

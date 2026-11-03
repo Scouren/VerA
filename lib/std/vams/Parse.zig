@@ -166,7 +166,7 @@ pub fn identLike(p: *const Parse, i: TokenIndex) bool {
     const tag = p.tokenTag(@min(i, @as(TokenIndex, @intCast(p.tokens.len - 1))));
     return switch (tag) {
         .identifier, .escaped_identifier => true,
-        else => tag.isKeyword() and p.kw_set != .vams_2023 and !keywords.reservedUnder(p.tokenText(i), p.kw_set),
+        else => tag.isKeyword() and p.kw_set != .vams_2023 and !keywords.reservedUnder(p.tokenText(i), p.kw_set), // else: a keyword the set in effect leaves free
     };
 }
 

@@ -193,7 +193,7 @@ pub fn parseSelect(p: *Parse, base: Node.Index) Error!Node.Index {
             p.tok_i += 2; // `+:` / `-:`, where `climb` stopped
             break :tag if (t == .plus) .indexed_select_up else .indexed_select_down;
         },
-        else => {
+        else => { // else: no `:`, `+:` or `-:` after the first index: a bit or element select
             _ = try p.expect(.r_bracket);
             return p.addNode(.index, lb, .{ .node_and_node = .{ base, a } });
         },

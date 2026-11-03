@@ -434,7 +434,7 @@ fn badOperator(p: *const Parse, n: Node.Index) ?TokenIndex {
     switch (p.nodes.items(.tag)[i]) {
         .unary => return switch (p.tokenTag(main)) {
             .plus, .minus => main,
-            else => badOperator(p, data.node),
+            else => badOperator(p, data.node), // else: only unary `+`/`-` are refused here; look inside the rest
         },
         .binary => return switch (p.tokenTag(main)) {
             .equal_equal, .bang_equal, .ampersand_ampersand, .pipe_pipe, .ampersand, .pipe, .caret, .tilde_caret, .caret_tilde => badOperator(p, data.node_and_node[0]) orelse badOperator(p, data.node_and_node[1]),

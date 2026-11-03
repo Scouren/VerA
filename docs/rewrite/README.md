@@ -55,6 +55,7 @@ The rules of the rewrite:
 | `sema` (analog lowering) | `src/Sema/*`, `src/Air/Device.zig` | as above | `lower.md` | in progress |
 | `std_sim` | `lib/std/sim.zig` | `kernels`, `contract` | `sim.md` | merged (815/815) |
 | `sema` (digital lowering) | `src/Sema/digital.zig` | + `std_sim` | `dlower.md` | in progress |
+| `std_kernels` | `lib/std/kernels.zig` | `contract`, Gompute | `kernels.md` | in progress |
 | next: `codegen` (versioned units §11.9, written-element masks §11.10), `Compilation`, then the switch-over | | | written when their inputs exist | |
 
 The handle types other modules build against are fixed already:

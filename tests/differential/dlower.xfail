@@ -51,7 +51,6 @@ verilog/09_behavioral_modeling/sched_implicit_event_exclusion.v lowering: the sl
 verilog/09_behavioral_modeling/sched_implicit_lhs_index.v transcript differs at byte 19 (old 21 bytes, new 21): old "first=7/0\nsecond=7/7\n" new "first=7/0\nsecond=7/0\n"
 verilog/09_behavioral_modeling/select_edge_glitch.v lowering: an event control on an expression or a select
 verilog/09_behavioral_modeling/select_edge.v lowering: an event control on an expression or a select
-verilog/09_behavioral_modeling/specify_block_specparam.v lowering: a specify block
 verilog/10_tasks_functions/constant_function_clogb2.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
 verilog/10_tasks_functions/constant_function_generate_condition.v lowering: a generate condition Sema/eval.zig does not fold
 verilog/10_tasks_functions/constant_function_named_block.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
@@ -104,55 +103,37 @@ verilog/13_configuration/default_search_order.v a library map or list (`//@ libm
 verilog/13_configuration/include_map.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/13_configuration/parent_library_by_map.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/13_configuration/resolution_order.v a library map or list (`//@ libmap`, `//@ liblist`)
-verilog/14_specify_blocks/delay_selection.v lowering: a specify block
-verilog/14_specify_blocks/edge_sensitive_paths.v lowering: a specify block
-verilog/14_specify_blocks/edge_state_dependent_paths.v lowering: a specify block
-verilog/14_specify_blocks/full_parallel_paths.v lowering: a specify block
-verilog/14_specify_blocks/ifnone.v lowering: a specify block
-verilog/14_specify_blocks/mintypmax_path_delays.v lowering: a specify block
-verilog/14_specify_blocks/module_paths.v lowering: a specify block
-verilog/14_specify_blocks/negative_pulse_showcancelled.v lowering: a specify block
-verilog/14_specify_blocks/path_and_distributed_delays.v lowering: a specify block
-verilog/14_specify_blocks/path_delay_values.v lowering: a specify block
-verilog/14_specify_blocks/polarity.v lowering: a specify block
-verilog/14_specify_blocks/pulse_default_limits.v lowering: a specify block
-verilog/14_specify_blocks/pulse_error_window_styles.v lowering: a specify block
-verilog/14_specify_blocks/pulse_path_specific_limits.v lowering: a specify block
-verilog/14_specify_blocks/sdf_pulse_limits_override_specparam.v lowering: a specify block
-verilog/14_specify_blocks/specify_path_bit_drivers.v lowering: a specify block
-verilog/14_specify_blocks/specify_path_delay_one.v lowering: a specify block
-verilog/14_specify_blocks/specify_timing_checks_named_by_w0251.v lowering: a specify block
-verilog/14_specify_blocks/state_dependent_paths.v lowering: a specify block
-verilog/14_specify_blocks/x_transition_delays.v lowering: a specify block
-verilog/15_timing_checks/conditions.v lowering: a specify block
-verilog/15_timing_checks/fullskew_checks_both_orders.v lowering: a specify block
-verilog/15_timing_checks/hold.v lowering: a specify block
-verilog/15_timing_checks/negative_timing_disabled_copies_signals.v lowering: a specify block
-verilog/15_timing_checks/nochange_high_window.v lowering: a specify block
-verilog/15_timing_checks/notifier.v lowering: a specify block
-verilog/15_timing_checks/period.v lowering: a specify block
-verilog/15_timing_checks/recovery.v lowering: a specify block
-verilog/15_timing_checks/recrem.v lowering: a specify block
-verilog/15_timing_checks/removal.v lowering: a specify block
-verilog/15_timing_checks/setuphold_delayed_args.v lowering: a specify block
-verilog/15_timing_checks/setuphold_timecheck_condition.v lowering: a specify block
-verilog/15_timing_checks/setuphold_timestamp_condition.v lowering: a specify block
-verilog/15_timing_checks/setuphold.v lowering: a specify block
-verilog/15_timing_checks/setup.v lowering: a specify block
-verilog/15_timing_checks/skew_late_data_notifies.v lowering: a specify block
-verilog/15_timing_checks/skew_waits_for_data_event.v lowering: a specify block
-verilog/15_timing_checks/timeskew_missing_event_and_rearm.v lowering: a specify block
-verilog/15_timing_checks/timeskew_remain_active.v lowering: a specify block
-verilog/15_timing_checks/timing_check_forms.v lowering: a specify block
-verilog/15_timing_checks/vector.v lowering: a specify block
-verilog/15_timing_checks/width.v lowering: a specify block
-verilog/16_sdf/sdf_absolute_path_delay.v lowering: a specify block
+verilog/14_specify_blocks/sdf_pulse_limits_override_specparam.v lowering: the system task `$sdf_annotate`
+verilog/14_specify_blocks/specify_timing_checks_named_by_w0251.v lowering: a timing check
+verilog/15_timing_checks/conditions.v lowering: a timing check
+verilog/15_timing_checks/fullskew_checks_both_orders.v lowering: a timing check
+verilog/15_timing_checks/hold.v lowering: a timing check
+verilog/15_timing_checks/negative_timing_disabled_copies_signals.v lowering: a timing check
+verilog/15_timing_checks/nochange_high_window.v lowering: a timing check
+verilog/15_timing_checks/notifier.v lowering: a timing check
+verilog/15_timing_checks/period.v lowering: a timing check
+verilog/15_timing_checks/recovery.v lowering: a timing check
+verilog/15_timing_checks/recrem.v lowering: a timing check
+verilog/15_timing_checks/removal.v lowering: a timing check
+verilog/15_timing_checks/setuphold_delayed_args.v lowering: a timing check
+verilog/15_timing_checks/setuphold_timecheck_condition.v lowering: a timing check
+verilog/15_timing_checks/setuphold_timestamp_condition.v lowering: a timing check
+verilog/15_timing_checks/setuphold.v lowering: a timing check
+verilog/15_timing_checks/setup.v lowering: a timing check
+verilog/15_timing_checks/skew_late_data_notifies.v lowering: a timing check
+verilog/15_timing_checks/skew_waits_for_data_event.v lowering: a timing check
+verilog/15_timing_checks/timeskew_missing_event_and_rearm.v lowering: a timing check
+verilog/15_timing_checks/timeskew_remain_active.v lowering: a timing check
+verilog/15_timing_checks/timing_check_forms.v lowering: a timing check
+verilog/15_timing_checks/vector.v lowering: a timing check
+verilog/15_timing_checks/width.v lowering: a timing check
+verilog/16_sdf/sdf_absolute_path_delay.v lowering: the system task `$sdf_annotate`
 verilog/16_sdf/sdf_interconnect_delay.v lowering: the system task `$sdf_annotate`
-verilog/16_sdf/sdf_label_reevaluates_path.v lowering: a specify block
-verilog/16_sdf/sdf_min_typ_max_selection.v lowering: a specify block
-verilog/16_sdf/sdf_multiple_files_scoped.v lowering: a specify block
-verilog/16_sdf/sdf_ordered_increment.v lowering: a specify block
-verilog/16_sdf/sdf_timing_check_limit.v lowering: a specify block
+verilog/16_sdf/sdf_label_reevaluates_path.v lowering: the system task `$sdf_annotate`
+verilog/16_sdf/sdf_min_typ_max_selection.v lowering: the system task `$sdf_annotate`
+verilog/16_sdf/sdf_multiple_files_scoped.v lowering: the system task `$sdf_annotate`
+verilog/16_sdf/sdf_ordered_increment.v lowering: the system task `$sdf_annotate`
+verilog/16_sdf/sdf_timing_check_limit.v lowering: a timing check
 verilog/17_system_tasks/conversions.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/17_system_tasks/native_binary_file_targets.v lowering: an event control on an expression or a select
 verilog/17_system_tasks/printtimescale_named_module.v lowering: $printtimescale of a hierarchical name
@@ -183,25 +164,18 @@ verilog/A_formal_syntax/b_A_1_1_library_text.v a library map or list (`//@ libma
 verilog/A_formal_syntax/b_A_1_3_concat_port.v lowering: a port expression (§12.3.6)
 verilog/A_formal_syntax/b_A_1_3_part_select_port.v lowering: a port expression (§12.3.6)
 verilog/A_formal_syntax/b_A_1_3_ports.v lowering: a name declared by `param` that has no slot
-verilog/A_formal_syntax/b_A_1_4_module_items.v lowering: a specify block
+verilog/A_formal_syntax/b_A_1_4_module_items.v lowering: an untyped parameter a defparam sets
 verilog/A_formal_syntax/b_A_2_3_declaration_lists.v lowering: an untyped parameter a defparam sets
 verilog/A_formal_syntax/b_A_2_4_declaration_assignments.v lowering: an untyped parameter a defparam sets
-verilog/A_formal_syntax/b_A_2_4_pathpulse_error_limit.v lowering: a specify block
-verilog/A_formal_syntax/b_A_2_4_pathpulse_mintypmax.v lowering: a specify block
 verilog/A_formal_syntax/b_A_6_2_procedural_assignments.v lowering: a procedural continuous assignment
 verilog/A_formal_syntax/b_A_6_4_statements.v lowering: a case statement
 verilog/A_formal_syntax/b_A_6_9_hierarchical_task_enable.v lowering: a hierarchical task or function name
-verilog/A_formal_syntax/b_A_7_1_specify_block.v lowering: a specify block
-verilog/A_formal_syntax/b_A_7_2_path_declarations.v lowering: a specify block
-verilog/A_formal_syntax/b_A_7_3_specify_terminals.v lowering: a specify block
-verilog/A_formal_syntax/b_A_7_4_mintypmax_path_delay.v lowering: a specify block
-verilog/A_formal_syntax/b_A_7_4_path_delays.v lowering: a specify block
-verilog/A_formal_syntax/b_A_7_5_system_timing_checks.v lowering: a specify block
+verilog/A_formal_syntax/b_A_7_1_specify_block.v lowering: a timing check
+verilog/A_formal_syntax/b_A_7_5_system_timing_checks.v lowering: a timing check
 verilog/A_formal_syntax/b_A_8_1_concatenations.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/A_formal_syntax/b_A_8_2_function_calls.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/A_formal_syntax/b_A_8_3_expressions.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/A_formal_syntax/b_A_8_4_primaries.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
-verilog/A_formal_syntax/b_A_8_6_operators.v lowering: a specify block
 verilog/A_formal_syntax/b_A_9_3_indexed_hierarchical_name.v lowering: a hierarchical name
 verilog/A_formal_syntax/grammar_nullable_statement.v lowering: a case statement
 verilog/A_formal_syntax/grammar_parameter_header.v lowering: a name declared by `param` that has no slot

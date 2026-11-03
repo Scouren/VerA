@@ -26,6 +26,7 @@ const nets = @import("nets.zig");
 const ports = @import("ports.zig");
 const sub = @import("sub.zig");
 const gates = @import("gates.zig");
+const specify = @import("specify.zig");
 const vars = @import("vars.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
@@ -201,7 +202,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
         .gen_block => try genBlock(w, f, scope, i, null, &.{}, prefix),
         .assign => try nets.assign(l, f, i),
         .function => try sub.declare(l, f, scope, i),
-        .specify => return l.refuse("a specify block"),
+        .specify => try specify.block(l, f, i),
         .defparam, .genvar, .param, .event, .port, .net => {},
         .analog, .analog_initial => return l.refuse("an analog block"),
         else => {}, // else: an expression of a range or a delay, read where it is used

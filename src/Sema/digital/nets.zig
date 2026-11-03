@@ -54,6 +54,10 @@ pub const NetRow = struct {
     strength_read: bool = false,
     /// §7.6 the pass switches with it as a terminal (`trans` rows).
     trans: Program.List = .empty,
+    /// §14.2 the module paths into it, and §14.6.4's pulse styles.
+    paths: std.ArrayList(Program.Path) = .empty,
+    ondetect: bool = false,
+    showcancelled: bool = false,
 };
 
 /// One driver of a net, compiled after the walk: what it asserts, in
@@ -289,6 +293,10 @@ pub fn finish(l: *Lower, p: *Program) Error!void {
     p.driver_init = init.items;
     try knownZ(l, p, init.items);
     const rows = try l.a.alloc(Program.Net, nets.len);
+    // §14.2 the module paths, a run per net, and the slots they start at.
+    var paths: std.ArrayList(Program.Path) = .empty;
+    const path_source = try l.a.alloc(bool, p.slots.len);
+    @memset(path_source, false);
     var resolved: std.ArrayList(u64) = .empty;
     var signals: std.ArrayList(net.Signal) = .empty;
     const init_v = try l.a.dupe(u64, p.init_v);
@@ -338,11 +346,18 @@ pub fn finish(l: *Lower, p: *Program) Error!void {
             .signal = sig_at,
             .strength_read = n.strength_read,
             .trans = n.trans,
+            .paths = .{ .start = @intCast(paths.items.len), .len = @intCast(n.paths.items.len) },
+            .ondetect = n.ondetect,
+            .showcancelled = n.showcancelled,
             .resolved = at,
-            .cold = n.delay.present or n.decay != Program.Net.no_decay,
+            .cold = n.delay.present or n.decay != Program.Net.no_decay or n.paths.items.len != 0,
         };
+        for (n.paths.items) |pp| path_source[pp.src] = true;
+        try paths.appendSlice(l.a, n.paths.items);
     }
     p.nets = rows;
+    p.paths = paths.items;
+    if (paths.items.len != 0) p.path_source = path_source;
     p.resolved_init = resolved.items;
     p.signal_init = signals.items;
     p.init_v = init_v;

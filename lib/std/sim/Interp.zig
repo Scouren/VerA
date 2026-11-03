@@ -25,6 +25,7 @@ const resolve = @import("resolve.zig");
 const calls = @import("calls.zig");
 const readmem = @import("readmem.zig");
 const holds = @import("holds.zig");
+const files = @import("files.zig");
 const Error = State.Error;
 const Literal = logic.Literal;
 
@@ -62,6 +63,7 @@ pub fn runUntil(s: *State, limit: u64) Error!Stop {
                 try eval.write(s, a, w.slot, w.sel, .{ .width = w.width, .signed = w.signed, .sized = true, .planes = planes });
             },
             .strobe => |show| try display.show(s, a, show, 0),
+            .fstrobe => |at| try files.fshow(s, a, at),
             .monitor_tick => {
                 s.monitor_pending = false;
                 if (s.monitor_hit) try display.monitorPrint(s, a);
@@ -357,6 +359,11 @@ fn task(s: *State, a: Allocator, at: u32, pc: u32) Error!Flow {
         .timeformat => try display.timeformat(s, a, t.a),
         .readmem => try readmem.readMemory(s, a, t.a),
         .swrite => try display.swrite(s, a, t.a),
+        .fshow => try files.fshow(s, a, t.a),
+        .fstrobe => try s.enqueueMonitor(.{ .fstrobe = t.a }),
+        .fclose => try files.fclose(s, a, t.a),
+        // Every write is already in its file.
+        .fflush => {},
         .finish, .stop => {
             const verbose = t.a == @backingInt(Program.Ref.none) or ((try eval.eval(s, a, t.a)).asInt() orelse 1) != 0;
             if (verbose) {

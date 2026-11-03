@@ -21,7 +21,7 @@
 //! - `pub const Math = enum(u8)`, `pub const Elem = struct`, `pub const Select = struct` (`Select.Mode`)
 //! - `pub const Piece.none_width`
 //! - `pub const Repeat = struct`, `pub const Fork = struct`, `pub const Sample = struct` (`Sample.Mode`)
-//! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const SWrite = struct`, `pub const Random = struct`, `pub const Dist = enum(u32)`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
+//! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const SWrite = struct`, `pub const Random = struct`, `pub const Dist = enum(u32)`, `pub const FileCall = struct`, `pub const FileOp = enum(u32)`, `pub const FShow = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
 //! - `pub const Net = struct` (`Net.no_decay`), `pub const Driver = struct` (`Driver.Source`)
 //! - `pub const Override = struct`, `pub const OverrideEval = struct`, `pub const Tran = struct`, `pub const Path = struct`, `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
 //! - `pub fn words(width: u32) u32`
@@ -285,6 +285,9 @@ pub const Expr = struct {
         /// §17.9 `$random`/`$dist_*`: `a` a `Random` in `extra`; the draw,
         /// 32 bits signed, in `ty` (its natural type).
         random,
+        /// §17.2 a file function: `a` a `FileCall` in `extra`; its result's
+        /// low bits in `ty` (its natural type).
+        file,
     };
 
     // One row per operator.
@@ -469,6 +472,7 @@ pub const Sample = struct {
 pub const Task = struct {
     kind: Kind,
     /// `.readmem`: a `ReadMem` in `extra`. `.swrite`: a `SWrite`.
+    /// `.fshow`, `.fstrobe`: an `FShow`. `.fclose`: the descriptor row.
     /// `.show`, `.strobe`: a `Show` index in `shows`. `.monitor`: a
     /// `Monitor` in `extra`. `.timeformat`: a `TimeFormat` in `extra`, or
     /// `none`.
@@ -476,7 +480,7 @@ pub const Task = struct {
     a: u32,
     b: List = .empty,
 
-    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem, swrite };
+    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem, swrite, fshow, fstrobe, fclose, fflush };
 };
 
 /// §17.2.9 a `$readmemb`/`$readmemh` call: the file's name (text, or the
@@ -510,6 +514,17 @@ pub const Random = struct { dist: Dist, seed: u32, place: u32, ty: Ty, x: u32, y
 
 /// §17.9's distributions.
 pub const Dist = enum(u32) { random, uniform, normal, exponential, poisson, chi_square, t, erlang };
+
+/// §17.2 one file function call: which, its argument rows `x`, `y`, `z`
+/// (`none` where absent; `$fopen` with no type is an mcd open), and the
+/// place (of type `ty`) `$fgets`/`$ferror` write their string to.
+pub const FileCall = struct { op: FileOp, x: u32, y: u32, z: u32, place: u32, ty: Ty };
+
+/// The §17.2 functions a `FileCall` runs.
+pub const FileOp = enum(u32) { fopen, fgets, ferror, fgetc, ungetc, ftell, rewind, fseek, feof };
+
+/// §17.2.2 a file output task: show row `show` to descriptor row `fd`.
+pub const FShow = struct { show: u32, fd: u32 };
 
 /// §17.2.3 `$swrite`/`$sformat`: show row `show` rendered as text and
 /// assigned, as a §3.6 string, to `place` of type `ty`.

@@ -40,7 +40,8 @@ const resolve = @import("resolve.zig");
 const hold = @import("holds.zig");
 const net = @import("net.zig");
 const sched = @import("scheduler.zig");
-const fmt = @import("kernels").fmt;
+const kernels = @import("kernels");
+const fmt = kernels.fmt;
 const Literal = logic.Literal;
 const Bit = logic.Bit;
 const Scheduler = sched.Scheduler;
@@ -59,6 +60,8 @@ pub const Pending = union(enum) {
     write: struct { slot: u32, sel: ?eval.Sel, width: u32, signed: bool },
     /// §17.1.2 one `$strobe`: show row `show`, evaluated in the monitor region.
     strobe: u32,
+    /// §17.2.2 one `$fstrobe`: the `Program.FShow` at this `extra` index.
+    fstrobe: u32,
     /// §17.1.3 the standing monitor's end-of-step check, one per step.
     monitor_tick,
     /// §6.1.3 driver `drive`'s delayed transition lands.
@@ -155,6 +158,8 @@ warnings: std.ArrayList([]const u8) = .empty,
 io: ?std.Io = null,
 /// §17.9.1 the seedless `$random`'s seed.
 random_seed: i32 = 0,
+/// §17.2 the run's descriptor table (`files.zig`).
+files: kernels.file_table.ZfTable = .{},
 /// §6.1 every driver's value now (`resolve.current`), its §7.10.2 H/L
 /// flag and its transition in flight; per net, its own transition, §3.8
 /// capacitive state and decay countdown; §8 UDP inputs and states.
@@ -413,7 +418,7 @@ pub fn stopRange(s: *State, start: u32, end: u32) Error!bool {
             try cancel(s, row.handle);
             hit = true;
         },
-        .write, .strobe, .monitor_tick, .drive, .net_update, .decay, .put, .tran_switch => {},
+        .write, .strobe, .fstrobe, .monitor_tick, .drive, .net_update, .decay, .put, .tran_switch => {},
     };
     return hit;
 }

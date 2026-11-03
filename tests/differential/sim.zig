@@ -154,8 +154,19 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
     const source = try std.Io.Dir.cwd().readFileAlloc(io, path, a, .limited(1 << 22));
     const opts = try options(a, io, source, path) orelse return "a `//@` line the cli refuses";
 
+    // Each side runs in a scratch directory of its own, so the files a
+    // fixture writes are compared too and never land in the tree.
+    var new_dir = std.testing.tmpDir(.{ .iterate = true });
+    defer new_dir.cleanup();
+    var old_dir = std.testing.tmpDir(.{ .iterate = true });
+    defer old_dir.cleanup();
+    const home = try std.Io.Dir.cwd().openDir(io, ".", .{});
+    defer home.close(io);
+    defer std.process.setCurrentDir(io, home) catch {};
+
     // The new side first: a fixture the bridge cannot express is not run by
-    // the old engine either, so no fixture's file tasks touch the disk here.
+    // the old engine either.
+    try std.process.setCurrentDir(io, new_dir.dir);
     var new_out: std.Io.Writer.Allocating = .init(a);
     const new: Side = new: {
         var bag: diag.Bag = .init(a);
@@ -177,6 +188,7 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
             }
         }.go, .{ &s, &result });
         t.join();
+        std_sim.files.closeAll(&s);
         result catch |e| switch (e) {
             error.SimFailed => break :new .{ .out = new_out.written(), .failed = true, .why = s.failure.? },
             error.OutOfMemory, error.WriteFailed => return e,
@@ -184,6 +196,7 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
         break :new .{ .out = new_out.written(), .failed = false };
     };
 
+    try std.process.setCurrentDir(io, old_dir.dir);
     var old_out: std.Io.Writer.Allocating = .init(a);
     const old: Side = old: {
         var bag: diag.Bag = .init(a);
@@ -197,7 +210,37 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
     if (old.failed != new.failed)
         return std.fmt.allocPrint(a, "old run {s}, new run {s} ({s})", .{ if (old.failed) "failed" else "completed", if (new.failed) "failed" else "completed", new.why });
     if (!std.mem.eql(u8, old.out, new.out)) return textDiff(a, old.out, new.out);
+    try std.process.setCurrentDir(io, home);
+    return sameFiles(a, io, old_dir.dir, new_dir.dir);
+}
+
+/// "" when both runs wrote the same files with the same bytes, else the
+/// first that differs.
+fn sameFiles(a: Allocator, io: std.Io, old: std.Io.Dir, new: std.Io.Dir) ![]const u8 {
+    const names_old = try listing(a, io, old);
+    const names_new = try listing(a, io, new);
+    if (names_old.len != names_new.len) return std.fmt.allocPrint(a, "the runs wrote {d} and {d} files", .{ names_old.len, names_new.len });
+    for (names_old, names_new) |x, y| {
+        if (!std.mem.eql(u8, x, y)) return std.fmt.allocPrint(a, "the runs wrote `{s}` and `{s}`", .{ x, y });
+        const bx = try old.readFileAlloc(io, x, a, .limited(1 << 24));
+        const by = try new.readFileAlloc(io, y, a, .limited(1 << 24));
+        if (!std.mem.eql(u8, bx, by)) return std.fmt.allocPrint(a, "file `{s}`: {s}", .{ x, try textDiff(a, bx, by) });
+    }
     return "";
+}
+
+/// The files under `dir`, sorted.
+fn listing(a: Allocator, io: std.Io, dir: std.Io.Dir) ![]const []const u8 {
+    var it = try dir.walk(a);
+    defer it.deinit();
+    var names: std.ArrayList([]const u8) = .empty;
+    while (try it.next(io)) |entry| if (entry.kind == .file) try names.append(a, try a.dupe(u8, entry.path));
+    std.mem.sort([]const u8, names.items, {}, struct {
+        fn lt(_: void, x: []const u8, y: []const u8) bool {
+            return std.mem.lessThan(u8, x, y);
+        }
+    }.lt);
+    return names.items;
 }
 
 /// The first differing byte and the text around it on each side.
@@ -226,7 +269,8 @@ test "diff-sim: the new runtime's transcripts equal lib/sim/digital's on every .
     var run_arena: std.heap.ArenaAllocator = .init(gpa);
     defer run_arena.deinit();
     const ra = run_arena.allocator();
-    const root = rewrite_options.fixture_root;
+    // Absolute: each run changes the working directory.
+    const root = try std.Io.Dir.cwd().realPathFileAlloc(io, rewrite_options.fixture_root, ra);
 
     const fixtures = try collect(ra, io, root);
     const xfail_path = try std.fs.path.join(ra, &.{ rewrite_options.repo_root, "tests/differential/sim.xfail" });

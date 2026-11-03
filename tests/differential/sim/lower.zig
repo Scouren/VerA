@@ -442,6 +442,31 @@ pub const Lower = struct {
             .time => try l.b.expr(.time, natural, try l.timeRow(), 0),
             .stime => try l.b.expr(.stime, natural, try l.timeRow(), 0),
             .clog2 => try l.b.expr(.clog2, Ty.int(32, true), try l.self_(args[0], 0), 0),
+            .fopen, .fgets, .ferror, .fgetc, .ungetc, .ftell, .rewind, .fseek, .feof => blk: {
+                const none = @backingInt(Program.Ref.none);
+                var c: Program.FileCall = .{ .op = std.meta.stringToEnum(Program.FileOp, @tagName(f)).?, .x = none, .y = none, .z = none, .place = none, .ty = .bit };
+                switch (f) {
+                    .fgets => {
+                        c.place = try l.place(args[0]);
+                        c.ty = try l.tyOf(try l.targetType(args[0]));
+                        c.x = try l.self_(args[1], 0);
+                    },
+                    .ferror => {
+                        c.x = try l.self_(args[0], 0);
+                        c.place = try l.place(args[1]);
+                        c.ty = try l.tyOf(try l.targetType(args[1]));
+                    },
+                    else => for (args, 0..) |arg, k| { // else: the rest take their arguments in order
+                        const row = try l.self_(arg, 0);
+                        switch (k) {
+                            0 => c.x = row,
+                            1 => c.y = row,
+                            else => c.z = row,
+                        }
+                    },
+                }
+                break :blk try l.b.expr(.file, natural, try l.b.extraOf(c), 0);
+            },
             .random, .dist_uniform, .dist_normal, .dist_exponential, .dist_poisson, .dist_chi_square, .dist_t, .dist_erlang => blk: {
                 const none = @backingInt(Program.Ref.none);
                 const dist: Program.Dist = switch (f) {

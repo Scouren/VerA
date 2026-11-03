@@ -29,7 +29,10 @@ pub fn task(l: *Lower, t: Task, args: []const ExprId, tok: u32, pc: u32) E!u32 {
     const r = l.r;
     return switch (t) {
         .show => |sh| l.b.extraOf(Program.Task{ .kind = .show, .a = try show(l, args, sh, pc) }),
-        .strobe => |sh| if (sh.file) l.refuse("$fstrobe") else l.b.extraOf(Program.Task{ .kind = .strobe, .a = try show(l, args, sh, pc) }),
+        .strobe => |sh| if (sh.file)
+            l.b.extraOf(Program.Task{ .kind = .fstrobe, .a = try fileShow(l, args, sh, pc) })
+        else
+            l.b.extraOf(Program.Task{ .kind = .strobe, .a = try show(l, args, sh, pc) }),
         .monitor => |sh| if (sh.file) l.refuse("$fmonitor") else l.b.extraOf(Program.Task{ .kind = .monitor, .a = try monitor(l, args, sh, pc) }),
         .monitor_enable => |on| l.b.extraOf(Program.Task{ .kind = if (on) .monitor_on else .monitor_off, .a = 0 }),
         .finish => |stop| blk: {
@@ -71,7 +74,9 @@ pub fn task(l: *Lower, t: Task, args: []const ExprId, tok: u32, pc: u32) E!u32 {
         },
         .queue => l.refuse("a §17.6 queue task"),
         .pla => l.refuse("a §17.5 PLA task"),
-        .fclose, .fflush, .fshow => l.refuse("a §17.2 file task"),
+        .fclose => l.b.extraOf(Program.Task{ .kind = .fclose, .a = try l.self_(args[0], 0) }),
+        .fflush => l.b.extraOf(Program.Task{ .kind = .fflush, .a = 0 }),
+        .fshow => |sh| l.b.extraOf(Program.Task{ .kind = .fshow, .a = try fileShow(l, args, sh, pc) }),
         .sshow, .sformat => blk: {
             if (args.len < 2) return l.refuse("a $swrite/$sformat with no text");
             const sh: display.Show = if (t == .sshow) t.sshow else .{ .radix = .decimal, .newline = false };
@@ -185,6 +190,16 @@ fn showOf(l: *Lower, args: []const ExprId, sh: display.Show, pc: u32, only_first
     const list = try l.b.listOf(pieces.items);
     try l.b.shows.append(l.b.arena, .{ .pieces = list, .radix = @fromBackingInt(@intCast(@backingInt(sh.radix))), .newline = sh.newline, .scope = r.scope });
     return @intCast(l.b.shows.items.len - 1);
+}
+
+/// §17.2.2 a file output task's `Program.FShow`: its descriptor, then
+/// the display of the rest.
+fn fileShow(l: *Lower, args: []const ExprId, sh: display.Show, pc: u32) E!u32 {
+    if (args.len == 0 or args[0] == .none) return l.refuse("a file task with no descriptor");
+    var plain = sh;
+    plain.file = false;
+    const fd = try l.self_(args[0], 0);
+    return l.b.extraOf(Program.FShow{ .show = try show(l, args[1..], plain, pc), .fd = fd });
 }
 
 /// An argument with no format: the task's radix, or a real's `%#g`

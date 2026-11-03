@@ -224,10 +224,26 @@ fn netlist(l: *Lower) E!void {
     const r = l.r;
     const b = l.b;
     const nets = try b.arena.alloc(Program.Net, r.netlist.nets.len);
+    var paths: std.ArrayList(Program.Path) = .empty;
+    const path_source = try b.arena.alloc(bool, r.values.len);
+    @memset(path_source, false);
     for (r.netlist.nets, nets, 0..) |n, *out, k| {
         const cold = r.netCold(n);
         if (cold.trans.len != 0) return l.refuse("§7.6 pass switches");
-        if (cold.paths.len != 0) return l.refuse("§14 module paths");
+        const first: u32 = @intCast(paths.items.len);
+        for (cold.paths) |path| {
+            path_source[path.src] = true;
+            var edge: Program.Edge = .any;
+            switch (path.edge) {
+                .none => {},
+                .posedge => edge = .posedge,
+                .negedge => edge = .negedge,
+                else => return l.refuse("a module path edge other than posedge/negedge"), // else: no other edge reaches a path
+            }
+            r.scope = path.scope;
+            const cond: u32 = if (path.cond == .none) @backingInt(Program.Ref.none) else try l.self_(path.cond, 0);
+            try paths.append(b.arena, .{ .src = path.src, .src_bit = path.src_bit, .edge = edge, .cond = cond, .ifnone = path.ifnone, .scope = path.scope, .table = path.table, .reject = path.reject, .err = path.err });
+        }
         out.* = .{
             .kind = std.meta.stringToEnum(net.NetKind, @tagName(n.kind)).?,
             .charge = @fromBackingInt(@intCast(@backingInt(n.charge))),
@@ -235,8 +251,13 @@ fn netlist(l: *Lower) E!void {
             .drivers = try b.listOf(r.netDrivers(@intCast(k))),
             .delay = delay(cold.delay),
             .decay = cold.decay orelse Program.Net.no_decay,
+            .paths = .{ .start = first, .len = @intCast(cold.paths.len) },
+            .ondetect = cold.ondetect,
+            .showcancelled = cold.showcancelled,
         };
     }
+    b.p.paths = paths.items;
+    if (paths.items.len != 0) b.p.path_source = path_source;
     var init: std.ArrayList(u64) = .empty;
     var udp_bits: std.ArrayList(logic.Bit) = .empty;
     var udps: std.ArrayList([]const net.UdpRow) = .empty;

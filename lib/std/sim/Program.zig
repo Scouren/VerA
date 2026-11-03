@@ -23,7 +23,7 @@
 //! - `pub const Repeat = struct`, `pub const Fork = struct`, `pub const Sample = struct` (`Sample.Mode`)
 //! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
 //! - `pub const Net = struct` (`Net.no_decay`), `pub const Driver = struct` (`Driver.Source`)
-//! - `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
+//! - `pub const Path = struct`, `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
 //! - `pub fn words(width: u32) u32`
 //! - `pub fn list(p: *const Program, l: List) []const u32`
 //! - `pub fn extraData(p: *const Program, comptime T: type, at: u32) T`
@@ -483,6 +483,23 @@ pub const TimeFormat = struct { units: u32, precision: u32, suffix: List, width:
 /// whose change reports without a comparison (`loose`).
 pub const Monitor = struct { show: u32, compared: List, slots: List, loose: List };
 
+/// IEEE 1364-2005 §14.2 one module path into a net: from bit `src_bit` of
+/// slot `src`, on `edge` (an edge-sensitive path) and while row `cond` is
+/// true (`none`: always; a state-dependent path), or the `ifnone` default,
+/// condition read in `scope`; `table[from][to]` its delay per transition
+/// of the destination (by `Bit`'s backing integer), and §14.6.1's limits.
+pub const Path = struct {
+    src: u32,
+    src_bit: u32,
+    edge: Edge,
+    cond: u32,
+    ifnone: bool,
+    scope: u32,
+    table: [4][4]u64,
+    reject: ?u64,
+    err: ?u64,
+};
+
 /// §10 one task or function: its body's entry pc, its storage (slots
 /// [first, first + count), set aside per activation when `automatic`), its
 /// ports' slots (a `List`), a function's result slot, and the pc ranges of
@@ -520,6 +537,11 @@ pub const Net = struct {
     drivers: List,
     delay: net.Delay,
     decay: u64,
+    /// §14 the module paths into this net: `paths[start..][0..len]`, and
+    /// §14.6.4's pulse styles.
+    paths: List = .empty,
+    ondetect: bool = false,
+    showcancelled: bool = false,
 
     pub const no_decay = std.math.maxInt(u64);
 };
@@ -589,6 +611,9 @@ starts: []const Start = &.{},
 fan_start: []const u32 = &.{},
 fan: []const u32 = &.{},
 subs: []const Sub = &.{},
+paths: []const Path = &.{},
+/// Per slot: a module path's source, whose last transition `State` keeps.
+path_source: []const bool = &.{},
 nets: []const Net = &.{},
 drivers: []const Driver = &.{},
 /// Every driver's time-0 value, `words(width)` words per plane, v then x.

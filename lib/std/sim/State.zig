@@ -10,7 +10,7 @@
 //! - `pub const Error = error{ SimFailed, OutOfMemory, WriteFailed }`
 //! - `pub const Pending = union(enum)`, `pub const Row = struct`
 //! - `pub const Susp = struct`, `pub const Term = struct`
-//! - `pub const Hold = struct`, `pub const Monitor = struct`
+//! - `pub const Hold = struct`, `pub const Monitor = struct`, `pub const PathEdge = struct`
 //! - `pub const default_budget: u64`, `pub const default_depth: u32`
 //! - `pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!State`
 //! - `pub fn fail(s: *State, comptime f: []const u8, args: anytype) Error`
@@ -18,6 +18,7 @@
 //! - `pub fn store(s: *State, slot: u32, value: Literal) Error!void`
 //! - `pub fn trigger(s: *State, slot: u32) Error!void`
 //! - `pub fn scheduleWrite(s: *State, slot: u32, sel: ?eval.Sel, value: Literal, delay: ?u64) Error!void`
+//! - `pub fn schedulePut(s: *State, slot: u32, value: Literal, delay: u64) Error!void`
 //! - `pub fn enqueue(s: *State, item: Pending, delay: ?u64, nba: bool) Error!Handle`
 //! - `pub fn enqueueMonitor(s: *State, item: Pending) Error!void`
 //! - `pub fn cancel(s: *State, h: Handle) Error!void`
@@ -63,6 +64,9 @@ pub const Pending = union(enum) {
     net_update: u32,
     /// §3.8 a trireg's charge decays to x.
     decay: u32,
+    /// §14.6 a module path destination's value landing as a plain write
+    /// (`slot`, its planes the row's `buf`).
+    put: struct { slot: u32, width: u32 },
 };
 
 /// One payload row, recycled once its event dispatches or is cancelled.
@@ -87,6 +91,10 @@ pub const Term = struct {
     v: u64 = 0,
     x: u64 = 0,
 };
+
+/// A module path source's last transition: when, and its low word before
+/// and after (values, unknowns).
+pub const PathEdge = struct { time: u64, before: [2]u64, after: [2]u64 };
 
 /// §8.5.3.3 one parked right-hand side.
 pub const Hold = struct { planes: []u64 = &.{}, width: u32 = 0, signed: bool = false };
@@ -160,6 +168,10 @@ unwind: ?u32 = null,
 /// gives the run a stack for `depth_max` of them (`default_depth`).
 depth: u32 = 0,
 depth_max: u32 = default_depth,
+/// §14.3.3 per path source slot, its last transition (`path_changed`
+/// holds whether it has one).
+path_edge: []PathEdge,
+path_changed: []bool,
 /// Per-instruction temporaries, reset before each.
 scratch: std.heap.ArenaAllocator,
 
@@ -192,9 +204,12 @@ pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!Stat
         .udp_state = try arena.alloc(Bit, p.drivers.len),
         .udp_started = try arena.alloc(bool, p.drivers.len),
         .sub_active = try arena.alloc(u32, p.subs.len),
+        .path_edge = try arena.alloc(PathEdge, if (p.path_source.len != 0) p.slots.len else 0),
+        .path_changed = try arena.alloc(bool, if (p.path_source.len != 0) p.slots.len else 0),
         .scratch = .init(arena),
     };
     @memset(s.sub_active, 0);
+    @memset(s.path_changed, false);
     for (p.drivers, s.drv_or_z, s.udp_state, s.udp_started) |d, *oz, *st, *started| {
         oz.* = d.init_or_z;
         st.* = if (d.source == .udp) d.source.udp.state else .x;
@@ -237,6 +252,7 @@ pub fn store(s: *State, slot: u32, value: Literal) Error!void {
     const v = s.v[sl.word..][0..n];
     const x = s.x[sl.word..][0..n];
     const before = logic.planeBit(v[0], x[0]);
+    const before_words: [2]u64 = .{ v[0], x[0] };
     const differ = !std.mem.eql(u64, v, value.values()) or !std.mem.eql(u64, x, value.unknowns());
     const changed = if (sl.ty.real) @as(f64, @bitCast(v[0])) != @as(f64, @bitCast(value.values()[0])) else differ;
     if (differ) {
@@ -244,6 +260,10 @@ pub fn store(s: *State, slot: u32, value: Literal) Error!void {
         @memcpy(x, value.unknowns());
     }
     if (!changed) return;
+    if (s.p.path_source.len != 0 and s.p.path_source[slot]) {
+        s.path_edge[slot] = .{ .time = s.scheduler.now, .before = before_words, .after = .{ v[0], x[0] } };
+        s.path_changed[slot] = true;
+    }
     if (s.monitored[slot]) try monitorChanged(s, slot);
     try wake(s, slot, before, logic.planeBit(v[0], x[0]));
 }
@@ -259,6 +279,12 @@ pub fn trigger(s: *State, slot: u32) Error!void {
 pub fn scheduleWrite(s: *State, slot: u32, sel: ?eval.Sel, value: Literal, delay: ?u64) Error!void {
     assert(slot < s.p.slots.len);
     _ = try s.enqueueBuf(.{ .write = .{ .slot = slot, .sel = sel, .width = value.width, .signed = value.signed } }, value.planes, delay, true);
+}
+
+/// Queues a plain write of `value` into `slot`, `delay` ticks later, in
+/// the inactive region (a §14.6 pulse's edge).
+pub fn schedulePut(s: *State, slot: u32, value: Literal, delay: u64) Error!void {
+    _ = try s.enqueueBuf(.{ .put = .{ .slot = slot, .width = value.width } }, value.planes, delay, false);
 }
 
 /// Queues `item` now (active, or NBA when `nba`) or `delay` ticks later.
@@ -330,7 +356,7 @@ pub fn stopRange(s: *State, start: u32, end: u32) Error!bool {
             try cancel(s, row.handle);
             hit = true;
         },
-        .write, .strobe, .monitor_tick, .drive, .net_update, .decay => {},
+        .write, .strobe, .monitor_tick, .drive, .net_update, .decay, .put => {},
     };
     return hit;
 }

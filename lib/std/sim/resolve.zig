@@ -36,7 +36,12 @@ pub const Inertial = struct {
     in_flight: ?Handle = null,
     target: []u64 = &.{},
     or_z: bool = false,
+    /// When the transition in flight lands (a path destination's, §14.6).
+    due: u64 = 0,
 };
+
+/// A transition's delay and §14.6.1 reject and error limits.
+const Timed = struct { ticks: u64, reject: u64, err: u64 };
 
 /// Driver `at`'s turn at pc `pc` (`.continuous`): its value now, published
 /// at once or after its delay, and the driver armed again.
@@ -162,13 +167,25 @@ pub fn resolve(s: *State, a: Allocator, net: u32) Error!void {
         logic.setBit(resolved, at, acc.collapse());
     }
     if (n.kind == .trireg) try chargeState(s, net, floating == width);
-    if (n.delay.present) {
+    // A.2.1.3's delay3 and §14's module paths delay the net's own transition.
+    if (n.delay.present or n.paths.len != 0) {
         const st = &s.net_trans[net];
-        // Timed from what is in flight to land, when something is.
+        // Timed from what is in flight to land, when something is: the
+        // edge §14.6's pulse ends with.
         const base: Literal = if (st.in_flight != null) .{ .width = width, .signed = false, .sized = true, .planes = st.target } else now;
-        const ticks = n.delay.continuous(base.truth(), resolved);
-        if (try schedule(s, now, false, resolved, false, st)) st.in_flight = try s.enqueue(.{ .net_update = net }, ticks, false);
-        return;
+        if (try transitionDelay(s, a, n, base, resolved)) |td| {
+            if (st.in_flight != null and n.paths.len != 0 and !std.mem.eql(u64, st.target, resolved.planes))
+                if (try pulse(s, net, td, resolved)) return;
+            if (try schedule(s, now, false, resolved, false, st)) {
+                st.in_flight = try s.enqueue(.{ .net_update = net }, td.ticks, false);
+                st.due = s.scheduler.now + td.ticks;
+            }
+            return;
+        }
+        // No path is active: the transition is not delayed, and one in
+        // flight is superseded.
+        if (st.in_flight) |h| try s.cancel(h);
+        st.in_flight = null;
     }
     return s.store(n.slot, resolved);
 }
@@ -242,6 +259,125 @@ fn schedule(s: *State, from: Literal, from_or_z: bool, to: Literal, to_or_z: boo
     @memcpy(st.target, to.planes);
     st.or_z = to_or_z;
     return true;
+}
+
+/// The delay of net `n`'s transition from `from` to `to`: its own delay3
+/// (§6.1.3), its module paths' (`pathDelay`), or "the larger" (§14.4);
+/// null when neither applies.
+fn transitionDelay(s: *State, a: Allocator, n: Program.Net, from: Literal, to: Literal) Error!?Timed {
+    const own: ?u64 = if (n.delay.present) n.delay.continuous(from.truth(), to) else null;
+    var path = try pathDelay(s, a, s.p.paths[n.paths.start..][0..n.paths.len], from, to);
+    if (own) |o| {
+        if (path) |*p| p.ticks = @max(o, p.ticks) else return .{ .ticks = o, .reject = o, .err = o };
+    }
+    return path;
+}
+
+/// IEEE 1364-2005 §14.6 a path destination's transition `td` while another
+/// is in flight: the pulse between the two landings is filtered (narrower
+/// than the reject limit), both land (not narrower than the error limit),
+/// or it is x between them (on-event) or from now (on-detect); a negative
+/// pulse is filtered, or x under showcancelled. Whether it scheduled.
+fn pulse(s: *State, net: u32, td: Timed, resolved: Literal) Error!bool {
+    const n = s.p.nets[net];
+    const st = &s.net_trans[net];
+    const now = s.scheduler.now;
+    const leading = st.due;
+    const trailing = now + td.ticks;
+    const xs = try logic.filled(s.arena, resolved.width, false, .x);
+    if (trailing <= leading) {
+        if (!n.showcancelled) return false;
+        try s.cancel(st.in_flight.?);
+        st.in_flight = null;
+        if (n.ondetect) try s.store(n.slot, xs) else try s.schedulePut(n.slot, xs, trailing - now);
+        try land(s, net, resolved, leading);
+        return true;
+    }
+    const width = trailing - leading;
+    if (width < td.reject) return false;
+    try s.cancel(st.in_flight.?);
+    st.in_flight = null;
+    if (width >= td.err) {
+        const target: Literal = .{ .width = resolved.width, .signed = false, .sized = true, .planes = st.target };
+        try s.schedulePut(n.slot, target, leading - now);
+    } else if (n.ondetect) {
+        try s.store(n.slot, xs);
+    } else {
+        try s.schedulePut(n.slot, xs, leading - now);
+    }
+    try land(s, net, resolved, trailing);
+    return true;
+}
+
+/// Puts `to` in flight on net `net`'s transition, landing at time `at`.
+fn land(s: *State, net: u32, to: Literal, at: u64) Error!void {
+    const st = &s.net_trans[net];
+    if (st.target.len != to.planes.len) st.target = try s.arena.alloc(u64, to.planes.len);
+    @memcpy(st.target, to.planes);
+    st.or_z = false;
+    st.in_flight = try s.enqueue(.{ .net_update = net }, at - s.scheduler.now, false);
+    st.due = at;
+}
+
+/// IEEE 1364-2005 §14.3.3: of the paths whose source transitioned most
+/// recently and whose condition holds, the smallest delay for this
+/// transition, run from the source's transition; null when none is active.
+/// ponytail: a vector destination takes the smallest delay its changed bits
+/// select, as one transition (the old engine's reading).
+fn pathDelay(s: *State, a: Allocator, paths: []const Program.Path, from: Literal, to: Literal) Error!?Timed {
+    var latest: ?u64 = null;
+    for (paths) |p| if (s.path_changed[p.src]) {
+        const t = s.path_edge[p.src].time;
+        latest = @max(latest orelse t, t);
+    };
+    const t = latest orelse return null;
+    var best: ?u64 = null;
+    var limits: [2]?u64 = .{ null, null };
+    for (paths) |p| {
+        if (!try pathActive(s, a, paths, p, t)) continue;
+        for (0..to.width) |i| {
+            const x = from.bit(@intCast(i));
+            const y = to.bit(@intCast(i));
+            if (x == y) continue;
+            const d = p.table[@backingInt(x)][@backingInt(y)];
+            if (best == null or d < best.?) limits = .{ p.reject, p.err };
+            best = @min(best orelse d, d);
+        }
+    }
+    const d = best orelse return null;
+    return .{ .ticks = (t + d) -| s.scheduler.now, .reject = limits[0] orelse d, .err = limits[1] orelse d };
+}
+
+/// Whether path `p` is active for a source transition at time `t`: an
+/// `ifnone` path only while no state-dependent path from its source is.
+fn pathActive(s: *State, a: Allocator, paths: []const Program.Path, p: Program.Path, t: u64) Error!bool {
+    if (!pathFired(s, p, t)) return false;
+    const none = @backingInt(Program.Ref.none);
+    if (p.ifnone) {
+        for (paths) |q| if (q.src == p.src and !q.ifnone and (q.cond != none or q.edge != .any) and pathFired(s, q, t) and (q.cond == none or try pathCond(s, a, q))) return false;
+        return true;
+    }
+    return p.cond == none or try pathCond(s, a, p);
+}
+
+/// Whether `p`'s source transitioned at `t`, on its edge when it has one
+/// (§14.2.3, on its least significant or selected bit).
+fn pathFired(s: *const State, p: Program.Path, t: u64) bool {
+    if (!s.path_changed[p.src]) return false;
+    const c = s.path_edge[p.src];
+    if (c.time != t) return false;
+    if (p.edge == .any or p.src_bit >= 64) return true;
+    const sh: u6 = @intCast(p.src_bit);
+    const before = logic.planeBit(c.before[0] >> sh, c.before[1] >> sh);
+    const after = logic.planeBit(c.after[0] >> sh, c.after[1] >> sh);
+    if (before == after) return false;
+    return if (p.edge == .posedge) before == .zero or after == .one else before == .one or after == .zero;
+}
+
+/// §14.2.4.1: a state-dependent path's condition now; x or z is true, and
+/// a vector's least significant bit decides.
+fn pathCond(s: *State, a: Allocator, p: Program.Path) Error!bool {
+    return (try eval.eval(s, a, p.cond)).bit(0) != .zero;
 }
 
 /// §3.8: the decay countdown restarts on each entry into the capacitive

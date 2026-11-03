@@ -68,6 +68,10 @@ pub fn runUntil(s: *State, limit: u64) Error!Stop {
             .drive => |at| try resolve.drive(s, a, at),
             .net_update => |net| try resolve.netUpdate(s, net),
             .decay => |net| try resolve.decay(s, a, net),
+            .put => |w| {
+                const n = Program.words(w.width);
+                try s.store(w.slot, .{ .width = w.width, .signed = false, .sized = true, .planes = try a.dupe(u64, row.buf[0 .. 2 * n]) });
+            },
         }
         try s.free_rows.append(s.arena, event.payload);
     }

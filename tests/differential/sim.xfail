@@ -57,26 +57,8 @@ verilog/11_scheduling/switch_x_gate.v bridge: §7.6 pass switches
 verilog/12_hierarchy/inout_net_expressions.v bridge: §7.6 pass switches
 verilog/12_hierarchy/real_through_bits.v bridge: §9.3 assign/force
 verilog/12_hierarchy/select_and_concatenation_ports.v bridge: §7.6 pass switches
-verilog/14_specify_blocks/delay_selection.v bridge: §14 module paths
-verilog/14_specify_blocks/edge_sensitive_paths.v bridge: §14 module paths
-verilog/14_specify_blocks/edge_state_dependent_paths.v bridge: §14 module paths
-verilog/14_specify_blocks/full_parallel_paths.v bridge: §14 module paths
-verilog/14_specify_blocks/ifnone.v bridge: §14 module paths
-verilog/14_specify_blocks/mintypmax_path_delays.v bridge: §14 module paths
-verilog/14_specify_blocks/module_paths.v bridge: §14 module paths
-verilog/14_specify_blocks/negative_pulse_showcancelled.v bridge: §14 module paths
-verilog/14_specify_blocks/path_and_distributed_delays.v bridge: §14 module paths
-verilog/14_specify_blocks/path_delay_values.v bridge: §14 module paths
-verilog/14_specify_blocks/polarity.v bridge: §14 module paths
-verilog/14_specify_blocks/pulse_default_limits.v bridge: §14 module paths
-verilog/14_specify_blocks/pulse_error_window_styles.v bridge: §14 module paths
-verilog/14_specify_blocks/pulse_path_specific_limits.v bridge: §14 module paths
-verilog/14_specify_blocks/sdf_pulse_limits_override_specparam.v bridge: §14 module paths
-verilog/14_specify_blocks/specify_path_bit_drivers.v bridge: §14 module paths
-verilog/14_specify_blocks/specify_path_delay_one.v bridge: §14 module paths
+verilog/14_specify_blocks/sdf_pulse_limits_override_specparam.v bridge: the system function $fopen
 verilog/14_specify_blocks/specify_timing_checks_named_by_w0251.v bridge: §15 timing checks
-verilog/14_specify_blocks/state_dependent_paths.v bridge: §14 module paths
-verilog/14_specify_blocks/x_transition_delays.v bridge: §14 module paths
 verilog/15_timing_checks/conditions.v bridge: §15 timing checks
 verilog/15_timing_checks/fullskew_checks_both_orders.v bridge: §15 timing checks
 verilog/15_timing_checks/hold.v bridge: §15 timing checks
@@ -99,12 +81,12 @@ verilog/15_timing_checks/timeskew_remain_active.v bridge: §15 timing checks
 verilog/15_timing_checks/timing_check_forms.v bridge: §15 timing checks
 verilog/15_timing_checks/vector.v bridge: §15 timing checks
 verilog/15_timing_checks/width.v bridge: §15 timing checks
-verilog/16_sdf/sdf_absolute_path_delay.v bridge: §14 module paths
+verilog/16_sdf/sdf_absolute_path_delay.v bridge: the system function $fopen
 verilog/16_sdf/sdf_interconnect_delay.v bridge: the system function $fopen
-verilog/16_sdf/sdf_label_reevaluates_path.v bridge: §14 module paths
-verilog/16_sdf/sdf_min_typ_max_selection.v bridge: §14 module paths
-verilog/16_sdf/sdf_multiple_files_scoped.v bridge: §14 module paths
-verilog/16_sdf/sdf_ordered_increment.v bridge: §14 module paths
+verilog/16_sdf/sdf_label_reevaluates_path.v bridge: the system function $fopen
+verilog/16_sdf/sdf_min_typ_max_selection.v bridge: the system function $fopen
+verilog/16_sdf/sdf_multiple_files_scoped.v bridge: the system function $fopen
+verilog/16_sdf/sdf_ordered_increment.v bridge: the system function $fopen
 verilog/16_sdf/sdf_timing_check_limit.v bridge: §15 timing checks
 verilog/17_system_tasks/append_writes_at_end.v bridge: the system function $fopen
 verilog/17_system_tasks/closed_channel_not_written.v bridge: the system function $fopen
@@ -176,9 +158,6 @@ verilog/18_vcd/task_function_scopes.v bridge: a §18 VCD task
 verilog/18_vcd/version_names_dumpfile_literal.v bridge: a §18 VCD task
 verilog/18_vcd/version_names_dumpfile_variable.v bridge: a §18 VCD task
 verilog/19_compiler_directives/no_timescale_is_1s_1s.v bridge: $printtimescale
-verilog/A_formal_syntax/b_A_2_4_declaration_assignments.v bridge: §14 module paths
-verilog/A_formal_syntax/b_A_2_4_pathpulse_error_limit.v bridge: §14 module paths
-verilog/A_formal_syntax/b_A_2_4_pathpulse_mintypmax.v bridge: §14 module paths
 verilog/A_formal_syntax/b_A_3_1_gate_instantiations.v bridge: §7.6 pass switches
 verilog/A_formal_syntax/b_A_3_1_pass_enable_delay.v bridge: §7.6 pass switches
 verilog/A_formal_syntax/b_A_3_3_bit_select_terminals.v bridge: §7.6 pass switches
@@ -188,12 +167,4 @@ verilog/A_formal_syntax/b_A_6_2_procedural_assignments.v bridge: §9.3 assign/fo
 verilog/A_formal_syntax/b_A_6_2_repeat_intra_assignment.v bridge: §9.7.7 repeat event control
 verilog/A_formal_syntax/b_A_6_4_statements.v bridge: §9.3 assign/force
 verilog/A_formal_syntax/b_A_7_1_specify_block.v bridge: §15 timing checks
-verilog/A_formal_syntax/b_A_7_2_path_declarations.v bridge: §14 module paths
-verilog/A_formal_syntax/b_A_7_3_specify_terminals.v bridge: §14 module paths
-verilog/A_formal_syntax/b_A_7_4_mintypmax_path_delay.v bridge: §14 module paths
-verilog/A_formal_syntax/b_A_7_4_path_delays.v bridge: §14 module paths
 verilog/A_formal_syntax/b_A_7_5_system_timing_checks.v bridge: §15 timing checks
-verilog/A_formal_syntax/b_A_8_1_concatenations.v bridge: §14 module paths
-verilog/A_formal_syntax/b_A_8_3_expressions.v bridge: §14 module paths
-verilog/A_formal_syntax/b_A_8_4_primaries.v bridge: §14 module paths
-verilog/A_formal_syntax/b_A_8_6_operators.v bridge: §14 module paths

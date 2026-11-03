@@ -533,6 +533,12 @@ checked, the bundle smoked). ESPice bumps its pin after it.
   - merged follow-ups: diff-sim 815/815 (sim.xfail empty; non-allocating wide `* / % **`, §9 bug 2
     done), diff-elab 3,756/3,776 (elab.xfail 49 -> 20: 15 per-instance checks for lowering, 5
     old-elaborator quirks).
+  - merged: `std_kernels` (diff-kernels: 737 names, 68.8M comparisons bit-identical to lib/kernels
+    and the old kernel text) with Gompute 2.0.0 replacing `gm` (cosh/sinh/log10 1 ulp apart, the f128
+    reference sides with Gompute). Gompute is a `build.zig.zon` fetch (the user's choice; AGENTS.md
+    amended). Pending: Gompute 2.0.1 (the `atan(-0)` sign and an fma in `atan`, both reported to the
+    Gompute session), then bump the pin and drop VerA's musl `atan` workaround; at the switch-over,
+    `share/vera/kernels/` must ship Gompute's `math.zig`, `math_data.zig`, `math_pio2.zig`.
   - in progress: Sema analog lowering (`lower.md`), Sema digital lowering (`dlower.md`).
   - settled: no default box for parameters. A parameter's guard interval is its declared range
     (§3.4.2 `from`), which the specification sets; an open-ended one (`Is from (0:inf)` times

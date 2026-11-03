@@ -50,7 +50,8 @@ The rules of the rewrite:
 | `link` | `src/link.zig` | `contract`, `dynlib` | `link.md` | merged |
 | `vams` (AstGen, Vir) | `lib/std/vams/AstGen.zig` | std | `astgen.md` | in progress |
 | `air` (passes) | `src/Air/{Interval,Float,Legalize,Setup}.zig` | `intern_pool` | `air-passes.md` | in progress |
-| `vams` (spice) | `lib/std/vams/spice.zig` | std | `spice.md` | in progress |
+| `vams` (spice) | `lib/std/vams/spice.zig` | std | `spice.md` | merged |
+| `std_sim` | `lib/std/sim.zig` | `kernels`, `contract` | `sim.md` | in progress |
 | next: `Zcu`+`Sema` (after Vir), `codegen` (after Sema), `Compilation`, then the switch-over | | | written when their inputs exist | |
 
 The handle types other modules build against are fixed already:

@@ -61,6 +61,10 @@ pub const Row = struct {
     function: bool,
     automatic: bool,
     entry: u32 = none,
+    /// §10.2.3 the out-of-line copy of a timed task that enables itself
+    /// (`none`: none), and its storage.
+    body: u32 = none,
+    body_own: Storage = .{ .frame = none, .first = 0, .count = 0, .result = none, .ports = &.{} },
     timed: ?bool = null,
     inlining: bool = false,
     ranges: std.ArrayList(u32) = .empty,
@@ -126,7 +130,14 @@ pub fn enable(l: *Lower, i: Inst.Index, depth: u32) Error!void {
         _ = try l.b.inst(.call, try callRow(l, i), 0, scope);
         return;
     }
-    if (l.subs.items[row].inlining) return l.refuse("a timed task that enables itself");
+    if (l.subs.items[row].inlining) {
+        // §10.2.3 a timed task reaching itself would inline forever: this
+        // enable, and every later one inside the body, is an activation of
+        // one out-of-line copy instead.
+        try outOfLine(l, row, depth);
+        _ = try l.b.inst(.call_timed, try callRow(l, i), 0, scope);
+        return;
+    }
     l.subs.items[row].inlining = true;
     defer l.subs.items[row].inlining = false;
     const r = l.subs.items[row];
@@ -157,6 +168,8 @@ pub fn compileBodies(l: *Lower) Error!void {
         const r = l.subs.items[k];
         assert(r.entry == none);
         l.frame = r.own.frame;
+        l.in_function = r.function;
+        defer l.in_function = false;
         l.subs.items[k].entry = @intCast(l.b.p.insts.len);
         const vir = l.virOf(r.outer);
         try stmt.body(l, Lower.payload(vir, Inst.Function, r.decl).body, 0);
@@ -178,6 +191,10 @@ pub fn finish(l: *Lower) Error!void {
             .result = r.own.result,
             .ports = try l.b.listOf(r.own.ports),
             .ranges = try l.b.listOf(r.ranges.items),
+            .body = r.body,
+            .body_first = r.body_own.first,
+            .body_count = r.body_own.count,
+            .body_ports = try l.b.listOf(r.body_own.ports),
         };
     }
     l.b.p.subs = out;
@@ -187,6 +204,29 @@ pub fn finish(l: *Lower) Error!void {
 
 fn typeOfTy(t: Program.Ty) Type {
     return .{ .width = t.width, .signed = t.signed, .real = t.real };
+}
+
+/// Task `row`'s body compiled once out of line, jumped over where it is
+/// emitted, for `call_timed`, ended by `task_return`. An automatic task gets
+/// storage of its own, which each activation fills in turn; a static one
+/// shares its one storage (§10.2.3).
+// ponytail: `disable` of the task stops its inlined copies, not these
+// activations (lib/sim/digital's reading too).
+fn outOfLine(l: *Lower, row: u32, depth: u32) Error!void {
+    if (l.subs.items[row].body != none) return;
+    const r = l.subs.items[row];
+    assert(!r.function);
+    const caller = l.frame;
+    defer l.frame = caller;
+    const st = if (r.automatic) try storage(l, r.outer, r.scope, r.decl) else r.own;
+    const skip = try l.b.inst(.jump, 0, 0, l.frames.items[caller].scope);
+    l.subs.items[row].body = @intCast(l.b.p.insts.len);
+    l.subs.items[row].body_own = st;
+    l.frame = st.frame;
+    const vir = l.virOf(r.outer);
+    try stmt.body(l, Lower.payload(vir, Inst.Function, r.decl).body, depth + 1);
+    _ = try l.b.inst(.task_return, row, 0, r.scope);
+    l.b.setInst(skip, .jump, @intCast(l.b.p.insts.len), 0);
 }
 
 /// A frame for subroutine `i` of frame `outer` in scope `scope`, its slots

@@ -15,7 +15,7 @@
 //! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
-//! - `pub const Lower = struct` (`Implicit`, `Site`, `refuse`, `refuseFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
+//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `refuse`, `refuseFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
 //! - `pub const none: u32`
 //! - `pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *[]const u8) Error!Lowered`
 
@@ -175,6 +175,12 @@ pub const Lower = struct {
     /// §8.5.3.3 the hold cells handed out so far, one per intra-assignment
     /// timing control.
     holds: u32 = 0,
+    /// A.6.5 each named block's pc range, by the frame it is compiled in and
+    /// its name (`blockKey`), and the disables waiting for every block.
+    block_ranges: std.StringHashMapUnmanaged([2]u32) = .empty,
+    disables: std.ArrayList(Disable) = .empty,
+    /// A function body is being compiled (§10.4.4: its fork runs in order).
+    in_function: bool = false,
     /// The nets, their drivers (compiled after the walk), per slot its
     /// net, and each driver's `.continuous` pc.
     nets: std.ArrayList(nets.NetRow) = .empty,
@@ -190,6 +196,9 @@ pub const Lower = struct {
     subs: std.ArrayList(sub.Row) = .empty,
     /// §4.5 the implicit nets, by their instance frame and name.
     implicit: std.AutoHashMapUnmanaged(Implicit, u32) = .empty,
+
+    /// A.6.5 a `disable` at pc `pc` of the name `name`, written in frame `frame`.
+    pub const Disable = struct { pc: u32, frame: u32, name: []const u8 };
 
     /// A child instance's `instance` instruction and the parent frame it is in.
     pub const Site = struct { frame: u32, inst: Inst.Index };

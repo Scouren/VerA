@@ -5,7 +5,6 @@
 # transcript difference. A listed fixture that agrees fails the run until its
 # line goes.
 verilog/03_lexical_conventions/ams_lexical_escaped_hierarchy.v lowering: an instance the elaboration did not make
-verilog/03_lexical_conventions/block_statement_attribute.v lowering: a fork-join block
 verilog/03_lexical_conventions/case_item_statement_attribute.v lowering: a case statement
 verilog/03_lexical_conventions/examples.v lowering: a case statement
 verilog/04_data_types/array_17_dimensions.v lowering: a continuous assignment to a net array element
@@ -23,66 +22,44 @@ verilog/06_assignments/net_array_element_selects.v lowering: a continuous assign
 verilog/06_assignments/select_bus.v lowering: a port with a net declaration assignment
 verilog/07_gate_switch_level/pull_gate_bit_select.v lowering: an inout port joined to a select, a concatenation or a net of another width
 verilog/07_gate_switch_level/tran_from_supply_undriven.v transcript differs at byte 0 (old 6 bytes, new 6): old "St1 1\n" new "HiZ z\n"
-verilog/07_gate_switch_level/unordered_delay_triples.v lowering: a fork-join block
 verilog/09_behavioral_modeling/assignment_assign_deassign.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/assignment_force_release.v lowering: a procedural continuous assignment
-verilog/09_behavioral_modeling/blocking_order_and_target.v lowering: a fork-join block
 verilog/09_behavioral_modeling/block_name_reference.v lowering: a hierarchical name
-verilog/09_behavioral_modeling/block_parameter_and_event.v lowering: a fork-join block
 verilog/09_behavioral_modeling/case_linear_search.v lowering: a case statement
 verilog/09_behavioral_modeling/concatenation_targets.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/constant_case_expression.v lowering: a case statement
 verilog/09_behavioral_modeling/control.v lowering: a case statement
 verilog/09_behavioral_modeling/dont_care_examples.v lowering: a case statement
-verilog/09_behavioral_modeling/event_array_automatic.v lowering: a timed task that enables itself
+verilog/09_behavioral_modeling/event_array_automatic.v lowering: a trigger of an event array element or a hierarchical event
 verilog/09_behavioral_modeling/event_array_native_automatic.v lowering: a named block declaring storage in an automatic subroutine
 verilog/09_behavioral_modeling/event_array_native_effects.v lowering: a trigger of an event array element or a hierarchical event
 verilog/09_behavioral_modeling/event_array_native_selection.v lowering: a trigger of an event array element or a hierarchical event
 verilog/09_behavioral_modeling/event_arrays.v lowering: an event control on an expression or a select
-verilog/09_behavioral_modeling/event_array.v lowering: a fork-join block
+verilog/09_behavioral_modeling/event_array.v lowering: a trigger of an event array element or a hierarchical event
 verilog/09_behavioral_modeling/expression_event.v lowering: an event control on an expression or a select
 verilog/09_behavioral_modeling/force_immediate.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/force_net_selects.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/force_wire_array_element.v lowering: a continuous assignment to a net array element
-verilog/09_behavioral_modeling/fork_join_is_concurrent.v lowering: a fork-join block
-verilog/09_behavioral_modeling/loop_rules.v lowering: a disable statement
-verilog/09_behavioral_modeling/named_block_reg.v lowering: a fork-join block
-verilog/09_behavioral_modeling/named_block_variables.v lowering: a disable statement
-verilog/09_behavioral_modeling/named_fork_declarations.v lowering: a fork-join block
+verilog/09_behavioral_modeling/named_fork_declarations.v lowering: a hierarchical name
 verilog/09_behavioral_modeling/native_concat_targets.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/native_force_many_selects_of_one_net.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/native_force_net_selects.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/native_real_events.v lowering: an event control on an expression or a select
 verilog/09_behavioral_modeling/native_select_events.v lowering: an event control on an expression or a select
 verilog/09_behavioral_modeling/native_wide_event_indices.v lowering: a trigger of an event array element or a hierarchical event
-verilog/09_behavioral_modeling/parallel_block_timing.v lowering: a fork-join block
 verilog/09_behavioral_modeling/sched_implicit_event_exclusion.v lowering: the slots `@*` reads in `event_wait`
 verilog/09_behavioral_modeling/sched_implicit_lhs_index.v transcript differs at byte 19 (old 21 bytes, new 21): old "first=7/0\nsecond=7/7\n" new "first=7/0\nsecond=7/0\n"
 verilog/09_behavioral_modeling/select_edge_glitch.v lowering: an event control on an expression or a select
 verilog/09_behavioral_modeling/select_edge.v lowering: an event control on an expression or a select
 verilog/09_behavioral_modeling/specify_block_specparam.v lowering: a specify block
-verilog/10_tasks_functions/automatic_activation_events.v lowering: a fork-join block
 verilog/10_tasks_functions/constant_function_clogb2.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
 verilog/10_tasks_functions/constant_function_generate_condition.v lowering: a generate condition Sema/eval.zig does not fold
 verilog/10_tasks_functions/constant_function_named_block.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/10_tasks_functions/constant_function_parameters.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/10_tasks_functions/constant_function_system_task_ignored.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
-verilog/10_tasks_functions/disable_ancestor_block.v lowering: a disable statement
-verilog/10_tasks_functions/disable_ancestor_task.v lowering: a disable statement
-verilog/10_tasks_functions/disable_block_in_function.v lowering: a disable statement
-verilog/10_tasks_functions/disable_named_block.v lowering: a disable statement
-verilog/10_tasks_functions/disable_recursive_task.v lowering: a disable statement
-verilog/10_tasks_functions/disable_self_block.v lowering: a disable statement
-verilog/10_tasks_functions/disable_sibling_block.v lowering: a disable statement
-verilog/10_tasks_functions/disable_sibling_task.v lowering: a disable statement
 verilog/10_tasks_functions/nonansi_function_port_typed_later.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
-verilog/10_tasks_functions/recursive_task_fork_join.v lowering: a fork-join block
 verilog/10_tasks_functions/static_task_item_hierarchical.v lowering: a hierarchical name
-verilog/10_tasks_functions/task_recursive_timed_automatic.v lowering: a timed task that enables itself
-verilog/10_tasks_functions/timed_subroutine_parameters.v lowering: a timed task that enables itself
 verilog/11_scheduling/procedural_continuous_tracks_sources.v lowering: a procedural continuous assignment
-verilog/11_scheduling/sched_fork_arm_chain_order.v lowering: a fork-join block
-verilog/11_scheduling/sched_fork_arm_wake_order.v lowering: a fork-join block
 verilog/12_hierarchy/defparam_absolute_inside_array_element.v lowering: an untyped parameter a defparam sets
 verilog/12_hierarchy/defparam_before_generate.v lowering: an untyped parameter a defparam sets
 verilog/12_hierarchy/defparam_inside_generate_block.v lowering: an untyped parameter a defparam sets
@@ -95,7 +72,7 @@ verilog/12_hierarchy/generate_past_65536_iterations.v lowering: a loop generate 
 verilog/12_hierarchy/generate_region_optional.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
 verilog/12_hierarchy/generate_scopes_in_names.v transcript differs at byte 87 (old 181 bytes, new 182): old "nerate_scopes_in_names.genblk02.nb2\nb_12_4_3_generate_scopes" new "nerate_scopes_in_names.genblk002.nb2\nb_12_4_3_generate_scope"
 verilog/12_hierarchy/genvar_hierarchical_index.v lowering: the slots read by `field`
-verilog/12_hierarchy/hierarchical_path_names.v lowering: a fork-join block
+verilog/12_hierarchy/hierarchical_path_names.v lowering: a hierarchical name
 verilog/12_hierarchy/hierarchical_task_call_suspends.v lowering: a hierarchical task or function name
 verilog/12_hierarchy/hierarchy_explicit_port_concat.v lowering: a port expression (§12.3.6)
 verilog/12_hierarchy/hierarchy_upward_reference.v lowering: an lvalue form
@@ -105,7 +82,7 @@ verilog/12_hierarchy/instance_array_width_product.v lowering: a hierarchical nam
 verilog/12_hierarchy/instance_select.v lowering: a hierarchical name
 verilog/12_hierarchy/internal_type_cells.v lowering: a hierarchical name
 verilog/12_hierarchy/module_header_forms.v lowering: a name declared by `param` that has no slot
-verilog/12_hierarchy/named_block_items.v lowering: a fork-join block
+verilog/12_hierarchy/named_block_items.v lowering: an lvalue form
 verilog/12_hierarchy/null_port_combinations.v lowering: a port expression (§12.3.6)
 verilog/12_hierarchy/parameter_assignment_forms.v lowering: a hierarchical name
 verilog/12_hierarchy/parameter_dependence.v lowering: an untyped parameter a defparam sets
@@ -212,10 +189,7 @@ verilog/A_formal_syntax/b_A_2_4_declaration_assignments.v lowering: an untyped p
 verilog/A_formal_syntax/b_A_2_4_pathpulse_error_limit.v lowering: a specify block
 verilog/A_formal_syntax/b_A_2_4_pathpulse_mintypmax.v lowering: a specify block
 verilog/A_formal_syntax/b_A_6_2_procedural_assignments.v lowering: a procedural continuous assignment
-verilog/A_formal_syntax/b_A_6_3_named_block_declarations.v lowering: a fork-join block
 verilog/A_formal_syntax/b_A_6_4_statements.v lowering: a case statement
-verilog/A_formal_syntax/b_A_6_5_timing_controls.v lowering: a disable statement
-verilog/A_formal_syntax/b_A_6_8_looping_statements.v lowering: a disable statement
 verilog/A_formal_syntax/b_A_6_9_hierarchical_task_enable.v lowering: a hierarchical task or function name
 verilog/A_formal_syntax/b_A_7_1_specify_block.v lowering: a specify block
 verilog/A_formal_syntax/b_A_7_2_path_declarations.v lowering: a specify block

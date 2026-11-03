@@ -24,6 +24,7 @@ const vars = @import("vars.zig");
 const nets = @import("nets.zig");
 const sub = @import("sub.zig");
 const gates = @import("gates.zig");
+const link = @import("link.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -64,7 +65,8 @@ pub fn compileAll(l: *Lower) Error!void {
         switches += 1;
     };
     for (queued.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
-    try fanout(l);
+    try link.fanout(l);
+    try link.resolveDisables(l);
     try sub.finish(l);
     l.b.p.counters = l.repeats + l.joins;
     l.b.p.holds = l.holds;
@@ -159,7 +161,25 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
         .store_timed, .store_nb_timed => try timedStore(l, i, depth),
         .case => return l.refuse("a case statement"),
         .proc_assign, .force, .deassign, .release => return l.refuse("a procedural continuous assignment"),
-        .disable => return l.refuse("a disable statement"),
+        .disable => {
+            // A.6.5 resolved once every block is compiled (`link.resolveDisables`).
+            const r = vir.instructions.items(.data)[@backingInt(i)].un_node.operand;
+            const ri = r.toIndex() orelse return l.refuse("a disable of nothing");
+            const name = switch (Lower.tag(vir, ri)) {
+                .str_ref => vir.string(vir.instructions.items(.data)[@backingInt(ri)].str_tok.start),
+                .decl_ref => blk: {
+                    const d = vir.instructions.items(.data)[@backingInt(ri)].decl_tok.decl;
+                    break :blk switch (Lower.tag(vir, d)) {
+                        .block => vir.string(Lower.payload(vir, Inst.Block, d).name),
+                        .function => vir.string(Lower.payload(vir, Inst.Function, d).name),
+                        else => return l.refuse("a disable of no block or task"),
+                    };
+                },
+                else => return l.refuse("a disable of a hierarchical name"),
+            };
+            const at = try l.b.inst(.disable_block, 0, 0, scope);
+            try l.disables.append(l.a, .{ .pc = at, .frame = l.frame, .name = name });
+        },
         .ret, .brk, .cont => return l.refuse("return, break or continue"),
         .variable, .param, .event => {},
         else => {}, // else: an expression instruction, reached from the statement that reads it
@@ -170,15 +190,7 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
 /// reached from the statements that read them; a `call_sys` no later
 /// instruction reads is a task enable).
 pub fn body(l: *Lower, b: Vir.Body, depth: u32) Error!void {
-    const vir = l.virOf(l.frame);
-    const insts = vir.body(b);
-    var used: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
-    for (insts) |i| try operands(l, vir, i, &used);
-    for (insts) |i| {
-        const tg = Lower.tag(vir, i);
-        if ((tg == .call_sys or tg == .call) and used.contains(i)) continue;
-        if (isStatement(tg)) try compileStmt(l, i, depth);
-    }
+    for (try statements(l, b)) |i| try compileStmt(l, i, depth);
 }
 
 // ---- private ----
@@ -394,7 +406,6 @@ fn levelOnly(vir: *const Vir, r: Inst.Ref) bool {
 fn block(l: *Lower, i: Inst.Index, depth: u32) Error!void {
     const vir = l.virOf(l.frame);
     const blk = Lower.payload(vir, Inst.Block, i);
-    if (blk.flags.fork) return l.refuse("a fork-join block");
     const outer = l.frame;
     defer l.frame = outer;
     const outer_scope = l.frames.items[outer].scope;
@@ -413,8 +424,47 @@ fn block(l: *Lower, i: Inst.Index, depth: u32) Error!void {
         else => {}, // else: a statement
     };
     const start = pc(l);
-    try body(l, blk.body, depth + 1);
-    if (name.len != 0) try l.b.blocks.append(l.a, .{ .scope = outer_scope, .name = try l.b.string(name), .start = start, .end = pc(l), .depth = depth });
+    if (blk.flags.fork and !l.in_function) try fork(l, blk.body, depth + 1) else try body(l, blk.body, depth + 1);
+    if (name.len == 0) return;
+    try l.b.blocks.append(l.a, .{ .scope = outer_scope, .name = try l.b.string(name), .start = start, .end = pc(l), .depth = depth });
+    try l.block_ranges.put(l.a, try link.blockKey(l, outer, name), .{ start, pc(l) });
+}
+
+/// §9.8.2 a parallel block, as lib/sim/digital compiles it: each statement
+/// an arm ending in `join_arm`; `fork` starts them all and suspends the
+/// parent until the last is back, which resumes it after the block.
+fn fork(l: *Lower, b: Vir.Body, depth: u32) Error!void {
+    const scope = l.frames.items[l.frame].scope;
+    const join = counterCell(l, .join);
+    const at = try l.b.inst(.fork, 0, 0, scope);
+    const stmts = try statements(l, b);
+    const arms = try l.a.alloc(u32, stmts.len);
+    const ends = try l.a.alloc(u32, stmts.len);
+    for (stmts, arms, ends) |s, *arm, *end| {
+        arm.* = pc(l);
+        try compileStmt(l, s, depth);
+        end.* = try l.b.inst(.join_arm, join, 0, scope);
+    }
+    const after = pc(l);
+    l.b.setInst(at, .fork, try l.b.extraOf(Program.Fork{ .arms = try l.b.listOf(arms), .join = join, .end = after }), 0);
+    for (ends) |e| l.b.setInst(e, .join_arm, join, after);
+}
+
+/// The statements of body `b`, in order (its expression instructions are
+/// reached from the statements that read them; a `call_sys` or `call` no
+/// later instruction reads is a task enable).
+fn statements(l: *Lower, b: Vir.Body) Error![]const Inst.Index {
+    const vir = l.virOf(l.frame);
+    const insts = vir.body(b);
+    var used: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
+    for (insts) |i| try operands(l, vir, i, &used);
+    var out: std.ArrayList(Inst.Index) = .empty;
+    for (insts) |i| {
+        const tg = Lower.tag(vir, i);
+        if ((tg == .call_sys or tg == .call) and used.contains(i)) continue;
+        if (isStatement(tg)) try out.append(l.a, i);
+    }
+    return out.items;
 }
 
 /// Every slot the statements of body `b` read (§9.7.5's `@*`).
@@ -483,28 +533,4 @@ fn operands(l: *Lower, vir: *const Vir, i: Inst.Index, used: *std.AutoHashMapUnm
         },
         .str_tok, .decl_tok, .int, .float, .str => {},
     }
-}
-
-/// §6.1/§7.6 per slot, the pcs of the continuous drivers and controlled
-/// pass switches that read it, drivers first.
-fn fanout(l: *Lower) Error!void {
-    const n = l.b.p.slots.len;
-    var readers: std.ArrayList(struct { pc: u32, sensitivity: Program.List }) = .empty;
-    for (l.b.p.drivers, l.driver_pcs.items) |d, at| try readers.append(l.a, .{ .pc = at, .sensitivity = d.sensitivity });
-    for (l.trans.items) |t| if (t.pc != none) try readers.append(l.a, .{ .pc = t.pc, .sensitivity = t.sensitivity });
-    const start = try l.a.alloc(u32, n + 1);
-    @memset(start, 0);
-    for (readers.items) |r| for (l.b.extra.items[r.sensitivity.start..][0..r.sensitivity.len]) |slot| {
-        start[slot + 1] += 1;
-    };
-    for (1..n + 1) |k| start[k] += start[k - 1];
-    const fill = try l.a.dupe(u32, start[0..n]);
-    const fan = try l.a.alloc(u32, start[n]);
-    for (readers.items) |r| for (l.b.extra.items[r.sensitivity.start..][0..r.sensitivity.len]) |slot| {
-        fan[fill[slot]] = r.pc;
-        fill[slot] += 1;
-    };
-    assert(std.mem.eql(u32, fill, start[1..]));
-    l.b.p.fan_start = start;
-    l.b.p.fan = fan;
 }

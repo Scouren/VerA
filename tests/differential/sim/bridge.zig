@@ -72,6 +72,7 @@ fn build(l: *Lower) E!void {
         .depth = kv.value_ptr.depth,
     });
     try netlist(l);
+    try subs(l);
     const repeats: u32 = @intCast(r.rows.repeats.items.len);
     b.p.counters = repeats + @as(u32, @intCast(r.rows.joins.items.len));
     b.p.holds = @intCast(r.rows.holds.items.len);
@@ -182,15 +183,37 @@ fn inst(l: *Lower, ins: compile.Instruction, pc: u32, repeats: u32) E!void {
         },
         .join_arm => |j| _ = try b.inst(.join_arm, repeats + j.join, j.end, scope),
         .disable_block => |d| _ = try b.inst(.disable_block, d.start, d.end, scope),
-        .call => return l.refuse("a task or function call"),
-        .copy_out => return l.refuse("a task copy-out"),
-        .disable_task => return l.refuse("a disable of a task"),
+        .call => |c| _ = try b.inst(.call, try l.call(c.sub, r.program.exprs(c.args)), 0, scope),
+        .copy_out => |c| _ = try b.inst(.copy_out, try b.extraOf(Program.CopyOut{ .place = try l.place(c.target), .slot = c.slot, .ty = try l.tyOf(try l.targetType(c.target)) }), 0, scope),
+        .disable_task => |idx| _ = try b.inst(.disable_task, idx, 0, scope),
         .call_timed => return l.refuse("a timed task activation"),
         .task_return => return l.refuse("a timed task return"),
         .pla_start => return l.refuse("a process of its own (PLA or event-controlled NBA)"),
         .override_on, .override_eval, .override_off => return l.refuse("§9.3 assign/force"),
         .switch_ctrl => return l.refuse("§7.6 a controlled switch"),
     }
+}
+
+/// §10 every task and function, as `Program.subs`.
+fn subs(l: *Lower) E!void {
+    const r = l.r;
+    const b = l.b;
+    const out = try b.arena.alloc(Program.Sub, r.routines.rows.items.len);
+    for (r.routines.rows.items, out) |sub, *o| {
+        var ranges: std.ArrayList(u32) = .empty;
+        for (sub.ranges.items) |rg| try ranges.appendSlice(l.a, &.{ rg.start, rg.end });
+        o.* = .{
+            .entry = if (sub.compiled) sub.entry else std.math.maxInt(u32),
+            .function = sub.decl.is_function,
+            .automatic = sub.decl.automatic,
+            .first = sub.frame.first,
+            .count = sub.frame.count,
+            .result = sub.frame.result,
+            .ports = try b.listOf(sub.frame.ports),
+            .ranges = try b.listOf(ranges.items),
+        };
+    }
+    b.p.subs = out;
 }
 
 /// §7.9 every net and §6.1/§7 every driver, as `Program.nets` and

@@ -23,6 +23,7 @@
 //! - `pub const Repeat = struct`, `pub const Fork = struct`, `pub const Sample = struct` (`Sample.Mode`)
 //! - `pub const Task = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
 //! - `pub const Net = struct` (`Net.no_decay`), `pub const Driver = struct` (`Driver.Source`)
+//! - `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
 //! - `pub fn words(width: u32) u32`
 //! - `pub fn list(p: *const Program, l: List) []const u32`
 //! - `pub fn extraData(p: *const Program, comptime T: type, at: u32) T`
@@ -138,6 +139,12 @@ pub const Inst = struct {
         deposit_nb,
         /// A.6.5 `disable` of a named block: pc range [a, b).
         disable_block,
+        /// §10.2.2 a task run to completion in place: `a` a `Call` in `extra`.
+        call,
+        /// §10.2.2 an inlined enable's copy-out: `a` a `CopyOut` in `extra`.
+        copy_out,
+        /// §10.3 `disable` of task `a` (a `subs` row): every activation ends.
+        disable_task,
     };
 
     // One row per pc, read by every dispatch.
@@ -262,6 +269,9 @@ pub const Expr = struct {
         /// for one argument; two-argument rows use `a` a pair in `extra`.
         math1,
         math2,
+        /// §10.4.1 a function call: `a` a `Call` in `extra`; its result
+        /// (the result slot's value) in `ty`.
+        call,
     };
 
     // One row per operator.
@@ -458,6 +468,33 @@ pub const TimeFormat = struct { units: u32, precision: u32, suffix: List, width:
 /// whose change reports without a comparison (`loose`).
 pub const Monitor = struct { show: u32, compared: List, slots: List, loose: List };
 
+/// §10 one task or function: its body's entry pc, its storage (slots
+/// [first, first + count), set aside per activation when `automatic`), its
+/// ports' slots (a `List`), a function's result slot, and the pc ranges of
+/// its inlined copies (pairs, a `List`) a §10.3 disable stops.
+pub const Sub = struct {
+    entry: u32,
+    function: bool,
+    automatic: bool,
+    first: u32,
+    count: u32,
+    result: u32,
+    ports: List,
+    ranges: List,
+};
+
+/// A call of `subs` row `sub`: per port, an `Arg` (4 words) in `args`.
+pub const Call = struct { sub: u32, args: List };
+
+/// One argument of a `Call`: the row its input value is (in the port's
+/// type; `none` for an output), the `Place` its output lands in (`none`
+/// for an input), and that place's type.
+pub const Arg = struct { in: u32, place: u32, ty: Ty, pad: u32 = 0 };
+
+/// §10.2.2 an inlined enable's copy-out: slot `slot` converted to `ty` and
+/// written to `place`.
+pub const CopyOut = struct { place: u32, slot: u32, ty: Ty };
+
 /// §7.9 one net: its type, its slot, its drivers (a `List` of `drivers`
 /// indices in `extra`), A.2.1.3's `delay3` on the resolved value, and a
 /// `trireg`'s charge strength and §3.8 decay time (`no_decay`: holds forever).
@@ -534,6 +571,7 @@ starts: []const Start = &.{},
 /// `fan[fan_start[slot]..fan_start[slot + 1]]`.
 fan_start: []const u32 = &.{},
 fan: []const u32 = &.{},
+subs: []const Sub = &.{},
 nets: []const Net = &.{},
 drivers: []const Driver = &.{},
 /// Every driver's time-0 value, `words(width)` words per plane, v then x.
@@ -572,6 +610,7 @@ pub fn extraData(p: *const Program, comptime T: type, at: u32) T {
         switch (F) {
             u32 => @field(out, name) = p.extra[i],
             i32 => @field(out, name) = @bitCast(p.extra[i]),
+            Ty => @field(out, name) = @bitCast(p.extra[i]),
             List => {
                 @field(out, name) = .{ .start = p.extra[i], .len = p.extra[i + 1] };
                 i += 1;

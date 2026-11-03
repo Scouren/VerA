@@ -4,19 +4,11 @@
 # not express yet; a listed fixture that agrees fails the run until its line goes.
 verilog-ams/digital/std_1364_ams_keywords_are_identifiers.v bridge: `//@` runner lines (more files, a library map)
 verilog-ams/digital/vams_digital_abstime_math.v bridge: a real system function
-verilog/03_lexical_conventions/attribute_positions.v bridge: a function call
-verilog/03_lexical_conventions/examples.v bridge: a function call
-verilog/03_lexical_conventions/subroutine_statement_attribute.v bridge: a function call
 verilog/04_data_types/capacitive_network_figure_4_2.v bridge: §7.6 pass switches
-verilog/04_data_types/native_real_arrays.v bridge: a real function call
 verilog/04_data_types/value_set.v bridge: a §7.6 MOS switch
 verilog/05_expressions/memory_index_out_of_range_x.v bridge: $swrite/$sformat
-verilog/05_expressions/native_real_conditionals.v bridge: a real function call
 verilog/05_expressions/native_select_boundaries.v bridge: a vector bound past i32
 verilog/05_expressions/native_wide_index_edges.v bridge: a vector bound past i32
-verilog/05_expressions/operand_forms.v bridge: a function call
-verilog/06_assignments/native_select_assignment_effects.v bridge: a function call
-verilog/06_assignments/variable_holds_value.v bridge: a task or function call
 verilog/07_gate_switch_level/bidirectional.v bridge: §7.6 pass switches
 verilog/07_gate_switch_level/charge_strength_sharing.v bridge: §7.6 pass switches
 verilog/07_gate_switch_level/every_primitive.v bridge: §7.6 pass switches
@@ -36,12 +28,9 @@ verilog/07_gate_switch_level/tran_from_supply_undriven.v bridge: §7.6 pass swit
 verilog/07_gate_switch_level/tran_instance_array.v bridge: §7.6 pass switches
 verilog/07_gate_switch_level/tran_strength_display.v bridge: §7.6 pass switches
 verilog/07_gate_switch_level/tranif0_rtranif0_weak_reduction.v bridge: §7.6 pass switches
-verilog/08_udp/multiplexer.v bridge: a function call
 verilog/09_behavioral_modeling/assignment_assign_deassign.v bridge: §9.3 assign/force
 verilog/09_behavioral_modeling/assignment_force_release.v bridge: §9.3 assign/force
-verilog/09_behavioral_modeling/case_linear_search.v bridge: a function call
 verilog/09_behavioral_modeling/concatenation_targets.v bridge: §9.3 assign/force
-verilog/09_behavioral_modeling/constant_case_expression.v bridge: a task or function call
 verilog/09_behavioral_modeling/event_array.v bridge: a trigger of an event array element
 verilog/09_behavioral_modeling/event_array_automatic.v bridge: a timed task activation
 verilog/09_behavioral_modeling/event_array_native_automatic.v bridge: an event array select term
@@ -51,11 +40,9 @@ verilog/09_behavioral_modeling/event_arrays.v bridge: an event array select term
 verilog/09_behavioral_modeling/force_immediate.v bridge: §9.3 assign/force
 verilog/09_behavioral_modeling/force_net_selects.v bridge: §9.3 assign/force
 verilog/09_behavioral_modeling/force_wire_array_element.v bridge: §9.3 assign/force
-verilog/09_behavioral_modeling/if_else_if_chain.v bridge: a function call
 verilog/09_behavioral_modeling/native_concat_targets.v bridge: §9.3 assign/force
 verilog/09_behavioral_modeling/native_force_many_selects_of_one_net.v bridge: §9.3 assign/force
 verilog/09_behavioral_modeling/native_force_net_selects.v bridge: §9.3 assign/force
-verilog/09_behavioral_modeling/native_select_timing.v bridge: a function call
 verilog/09_behavioral_modeling/native_wide_event_indices.v bridge: a trigger of an event array element
 verilog/09_behavioral_modeling/nba_event_control_region.v bridge: a process of its own (PLA or event-controlled NBA)
 verilog/09_behavioral_modeling/nba_event_control_update_region.v bridge: a process of its own (PLA or event-controlled NBA)
@@ -63,46 +50,13 @@ verilog/09_behavioral_modeling/nonblocking_event_control.v bridge: a process of 
 verilog/09_behavioral_modeling/repeat_count_any_width.v bridge: §9.7.7 repeat event control
 verilog/09_behavioral_modeling/repeat_event_control.v bridge: §9.7.7 repeat event control
 verilog/09_behavioral_modeling/repeat_unsigned_64bit_count.v bridge: §9.7.7 repeat event control
-verilog/10_tasks_functions/automatic_subroutine_parameters.v bridge: a function call
-verilog/10_tasks_functions/constant_function_clogb2.v bridge: a function call
-verilog/10_tasks_functions/constant_function_named_block.v bridge: a function call
-verilog/10_tasks_functions/constant_function_parameters.v bridge: a function call
-verilog/10_tasks_functions/disable_ancestor_task.v bridge: a disable of a task
-verilog/10_tasks_functions/disable_block_in_function.v bridge: a function call
-verilog/10_tasks_functions/disable_recursive_task.v bridge: a disable of a task
-verilog/10_tasks_functions/disable_sibling_task.v bridge: a disable of a task
-verilog/10_tasks_functions/factorial.v bridge: a function call
-verilog/10_tasks_functions/function_automatic_recursion.v bridge: a function call
-verilog/10_tasks_functions/function_call_operand.v bridge: a function call
-verilog/10_tasks_functions/function_declaration_forms.v bridge: a function call
-verilog/10_tasks_functions/function_return_variable.v bridge: a function call
-verilog/10_tasks_functions/function_return_width_is_the_boundary.v bridge: a function call
-verilog/10_tasks_functions/native_real_subroutines.v bridge: a real function call
-verilog/10_tasks_functions/nonansi_function_port_typed_later.v bridge: a function call
-verilog/10_tasks_functions/nonansi_task_output_reg_port.v bridge: a task or function call
 verilog/10_tasks_functions/nonansi_task_port_completion.v bridge: `//@` runner lines (more files, a library map)
-verilog/10_tasks_functions/nonansi_task_real_port.v bridge: a task or function call
-verilog/10_tasks_functions/real_function_return.v bridge: a real function call
-verilog/10_tasks_functions/recursion_past_1024.v bridge: a function call
-verilog/10_tasks_functions/recursive_task_copyback.v bridge: a task or function call
 verilog/10_tasks_functions/recursive_task_fork_join.v bridge: a timed task activation
-verilog/10_tasks_functions/static_task_item_hierarchical.v bridge: a task or function call
-verilog/10_tasks_functions/task_argument_passing.v bridge: a task or function call
-verilog/10_tasks_functions/task_concurrent_storage.v bridge: a task copy-out
-verilog/10_tasks_functions/task_copy_timing.v bridge: a task copy-out
-verilog/10_tasks_functions/task_declaration_forms.v bridge: a task or function call
-verilog/10_tasks_functions/task_function_distinctions.v bridge: a task copy-out
-verilog/10_tasks_functions/task_output_lifetime.v bridge: a task or function call
 verilog/10_tasks_functions/task_recursive_timed_automatic.v bridge: a timed task activation
-verilog/10_tasks_functions/task_static_lifetime.v bridge: a task or function call
-verilog/10_tasks_functions/task_storage_per_instance.v bridge: a task or function call
 verilog/10_tasks_functions/timed_subroutine_parameters.v bridge: a timed task activation
 verilog/11_scheduling/procedural_continuous_tracks_sources.v bridge: §9.3 assign/force
-verilog/11_scheduling/sched_task_copy_timing.v bridge: a task copy-out
 verilog/11_scheduling/switch_x_gate.v bridge: §7.6 pass switches
-verilog/12_hierarchy/function_in_generate_block.v bridge: a function call
 verilog/12_hierarchy/inout_net_expressions.v bridge: §7.6 pass switches
-verilog/12_hierarchy/instance_array_constant_port.v bridge: a function call
 verilog/12_hierarchy/port_input_width_extends.v bridge: `//@` runner lines (more files, a library map)
 verilog/12_hierarchy/port_output_width_truncates.v bridge: `//@` runner lines (more files, a library map)
 verilog/12_hierarchy/real_through_bits.v bridge: §9.3 assign/force
@@ -272,13 +226,13 @@ verilog/17_system_tasks/ungetc_pushback_limit.v bridge: a system function
 verilog/17_system_tasks/ungetc_read_routines.v bridge: a system function
 verilog/17_system_tasks/value_plusargs_absent.v bridge: a system function
 verilog/18_vcd/dumplimit_stops_with_comment.v bridge: a §18 VCD task
-verilog/18_vcd/dumpports_control_tasks.v bridge: a task or function call
+verilog/18_vcd/dumpports_control_tasks.v bridge: a §18.3 EVCD task
 verilog/18_vcd/dumpports_node_information.v bridge: a §18.3 EVCD task
 verilog/18_vcd/dumpportslimit_stops_with_comment.v bridge: a §18.3 EVCD task
 verilog/18_vcd/event_marker.v bridge: a §18 VCD task
-verilog/18_vcd/port_value_changes.v bridge: a task or function call
+verilog/18_vcd/port_value_changes.v bridge: a §18.3 EVCD task
 verilog/18_vcd/real_value_format.v bridge: a §18 VCD task
-verilog/18_vcd/task_function_scopes.v bridge: a task or function call
+verilog/18_vcd/task_function_scopes.v bridge: a §18 VCD task
 verilog/18_vcd/version_names_dumpfile_literal.v bridge: a §18 VCD task
 verilog/18_vcd/version_names_dumpfile_variable.v bridge: a §18 VCD task
 verilog/19_compiler_directives/ams_keywords_are_identifiers.v bridge: `//@` runner lines (more files, a library map)
@@ -294,15 +248,9 @@ verilog/28_protected_envelopes/protected_session_key_block.v bridge: `//@` runne
 verilog/28_protected_envelopes/protected_sha1_digest.v bridge: `//@` runner lines (more files, a library map)
 verilog/A_formal_syntax/b_A_1_1_incdir.v bridge: `//@` runner lines (more files, a library map)
 verilog/A_formal_syntax/b_A_1_1_library_text.v bridge: `//@` runner lines (more files, a library map)
-verilog/A_formal_syntax/b_A_1_4_module_items.v bridge: a task or function call
 verilog/A_formal_syntax/b_A_2_4_declaration_assignments.v bridge: §14 module paths
 verilog/A_formal_syntax/b_A_2_4_pathpulse_error_limit.v bridge: §14 module paths
 verilog/A_formal_syntax/b_A_2_4_pathpulse_mintypmax.v bridge: §14 module paths
-verilog/A_formal_syntax/b_A_2_6_function_declarations.v bridge: a function call
-verilog/A_formal_syntax/b_A_2_6_real_functions.v bridge: a real function call
-verilog/A_formal_syntax/b_A_2_7_task_declarations.v bridge: a task or function call
-verilog/A_formal_syntax/b_A_2_8_block_item_declarations.v bridge: a task or function call
-verilog/A_formal_syntax/b_A_2_8_event_and_parameter_items.v bridge: a task or function call
 verilog/A_formal_syntax/b_A_3_1_gate_instantiations.v bridge: §7.6 pass switches
 verilog/A_formal_syntax/b_A_3_1_pass_enable_delay.v bridge: §7.6 pass switches
 verilog/A_formal_syntax/b_A_3_3_bit_select_terminals.v bridge: §7.6 pass switches
@@ -311,9 +259,6 @@ verilog/A_formal_syntax/b_A_3_4_gate_and_switch_types.v bridge: §7.6 pass switc
 verilog/A_formal_syntax/b_A_6_2_procedural_assignments.v bridge: §9.3 assign/force
 verilog/A_formal_syntax/b_A_6_2_repeat_intra_assignment.v bridge: §9.7.7 repeat event control
 verilog/A_formal_syntax/b_A_6_4_statements.v bridge: §9.3 assign/force
-verilog/A_formal_syntax/b_A_6_5_timing_controls.v bridge: a disable of a task
-verilog/A_formal_syntax/b_A_6_9_hierarchical_task_enable.v bridge: a task or function call
-verilog/A_formal_syntax/b_A_6_9_task_enables.v bridge: a task or function call
 verilog/A_formal_syntax/b_A_7_1_specify_block.v bridge: §15 timing checks
 verilog/A_formal_syntax/b_A_7_2_path_declarations.v bridge: §14 module paths
 verilog/A_formal_syntax/b_A_7_3_specify_terminals.v bridge: §14 module paths
@@ -321,7 +266,6 @@ verilog/A_formal_syntax/b_A_7_4_mintypmax_path_delay.v bridge: §14 module paths
 verilog/A_formal_syntax/b_A_7_4_path_delays.v bridge: §14 module paths
 verilog/A_formal_syntax/b_A_7_5_system_timing_checks.v bridge: §15 timing checks
 verilog/A_formal_syntax/b_A_8_1_concatenations.v bridge: §14 module paths
-verilog/A_formal_syntax/b_A_8_2_function_calls.v bridge: a function call
 verilog/A_formal_syntax/b_A_8_3_expressions.v bridge: §14 module paths
 verilog/A_formal_syntax/b_A_8_4_primaries.v bridge: §14 module paths
 verilog/A_formal_syntax/b_A_8_6_operators.v bridge: §14 module paths

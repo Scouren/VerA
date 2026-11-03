@@ -11,6 +11,7 @@
 //! - `pub fn runUntil(s: *State, limit: u64) Error!Stop`
 //! - `pub fn delayIn(s: *State, a: Allocator, e: u32, scope: u32) Error!u64`
 //! - `pub fn step(s: *State, start: u32) Error!void`
+//! - `pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -21,6 +22,7 @@ const eval = @import("eval.zig");
 const logic = @import("logic.zig");
 const display = @import("display.zig");
 const resolve = @import("resolve.zig");
+const calls = @import("calls.zig");
 const Error = State.Error;
 const Literal = logic.Literal;
 
@@ -88,6 +90,12 @@ pub fn delayIn(s: *State, a: Allocator, e: u32, scope: u32) Error!u64 {
 
 /// Runs the process at `start` until it suspends, stops or finishes.
 pub fn step(s: *State, start: u32) Error!void {
+    return runFrom(s, &s.scratch, start);
+}
+
+/// `step` over `scratch`, reset before each instruction: a nested §10
+/// activation runs its body on a scratch of its own.
+pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!void {
     const p = s.p;
     const tags = p.insts.items(.tag);
     const datas = p.insts.items(.data);
@@ -95,8 +103,10 @@ pub fn step(s: *State, start: u32) Error!void {
     var restarted = false;
     while (true) {
         assert(pc < p.insts.len);
-        _ = s.scratch.reset(.retain_capacity);
-        const a = s.scratch.allocator();
+        // §10.3 a disabled subroutine's activations return at once.
+        if (s.unwind != null) return;
+        _ = scratch.reset(.retain_capacity);
+        const a = scratch.allocator();
         const d = datas[pc];
         switch (tags[pc]) {
             .stop => return,
@@ -217,12 +227,36 @@ pub fn step(s: *State, start: u32) Error!void {
                 try eval.put(s, a, d.b, value, tags[pc] == .deposit_nb, null);
                 pc += 1;
             },
+            .call => {
+                _ = try calls.call(s, a, d.a);
+                pc += 1;
+            },
+            .copy_out => {
+                try calls.copyOut(s, a, d.a);
+                pc += 1;
+            },
+            .disable_task => {
+                // Every inlined copy (the running one resumes after itself)
+                // and every synchronous activation, which unwind.
+                const ranges = p.list(p.subs[d.a].ranges);
+                var next = pc + 1;
+                var resumed = false;
+                var k: usize = 0;
+                while (k < ranges.len) : (k += 2) {
+                    const inside = pc >= ranges[k] and pc < ranges[k + 1];
+                    if (inside) next = ranges[k + 1];
+                    if (try disable(s, ranges[k], ranges[k + 1]) and inside) resumed = true;
+                }
+                if (s.sub_active[d.a] != 0) {
+                    s.unwind = d.a;
+                    return;
+                }
+                if (resumed) return;
+                pc = next;
+            },
             .disable_block => {
                 const inside = pc >= d.a and pc < d.b;
-                if (try s.stopRange(d.a, d.b)) {
-                    _ = try s.enqueue(.{ .run = d.b }, null, false);
-                    if (inside) return;
-                }
+                if (try disable(s, d.a, d.b) and inside) return;
                 pc = if (inside) d.b else pc + 1;
             },
         }
@@ -237,6 +271,14 @@ fn loopIteration(s: *State) Error!void {
     s.budget_used += 1;
     if (s.budget_used > s.budget)
         return s.fail("more than {d} loop iterations and events at time {d}: a loop with no delay keeps simulation time from advancing", .{ s.budget, s.scheduler.now });
+}
+
+/// §10.3 `disable` of the block [start, end): every resumption into it is
+/// dropped and, only if one was, execution resumes at `end` once.
+fn disable(s: *State, start: u32, end: u32) Error!bool {
+    if (!try s.stopRange(start, end)) return false;
+    _ = try s.enqueue(.{ .run = end }, null, false);
+    return true;
 }
 
 fn delayOf(s: *State, a: Allocator, e: u32, pc: u32) Error!u64 {

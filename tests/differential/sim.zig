@@ -126,7 +126,16 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
         };
         var s: std_sim.State = try .init(a, &p, &new_out.writer);
         s.budget = opts.event_budget;
-        std_sim.Interp.run(&s) catch |e| switch (e) {
+        // The run nests one native frame chain per §10 activation: a stack
+        // for `State.depth_max` of them, as the old engine reserves one.
+        var result: std_sim.State.Error!void = {};
+        const t = try std.Thread.spawn(.{ .stack_size = 1 << 30 }, struct {
+            fn go(st: *std_sim.State, out: *std_sim.State.Error!void) void {
+                out.* = std_sim.Interp.run(st);
+            }
+        }.go, .{ &s, &result });
+        t.join();
+        result catch |e| switch (e) {
             error.SimFailed => break :new .{ .out = new_out.written(), .failed = true, .why = s.failure.? },
             error.OutOfMemory, error.WriteFailed => return e,
         };

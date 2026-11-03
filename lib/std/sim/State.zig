@@ -11,7 +11,7 @@
 //! - `pub const Pending = union(enum)`, `pub const Row = struct`
 //! - `pub const Susp = struct`, `pub const Term = struct`
 //! - `pub const Hold = struct`, `pub const Monitor = struct`
-//! - `pub const default_budget: u64`
+//! - `pub const default_budget: u64`, `pub const default_depth: u32`
 //! - `pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!State`
 //! - `pub fn fail(s: *State, comptime f: []const u8, args: anytype) Error`
 //! - `pub fn store(s: *State, slot: u32, value: Literal) Error!void`
@@ -97,6 +97,10 @@ pub const Monitor = struct {
     values: [][]u64,
 };
 
+/// The nested activations a run allows by default: 20,000 (the old engine's
+/// 256 MiB stack held a few times more; `recursion_past_1024` needs 5,001).
+pub const default_depth: u32 = 20_000;
+
 /// Events at one tick (and untimed loop passes) before a zero-delay loop
 /// is refused by name.
 pub const default_budget: u64 = 10_000_000;
@@ -143,6 +147,14 @@ decay_event: []?Handle,
 udp_bits: []Bit,
 udp_state: []Bit,
 udp_started: []bool,
+/// §10 per `subs` row, its synchronous activations in progress; §10.3 the
+/// subroutine a `disable` is unwinding, whose activations return at once.
+sub_active: []u32,
+unwind: ?u32 = null,
+/// Nested synchronous activations now, and the most allowed: the caller
+/// gives the run a stack for `depth_max` of them (`default_depth`).
+depth: u32 = 0,
+depth_max: u32 = default_depth,
 /// Per-instruction temporaries, reset before each.
 scratch: std.heap.ArenaAllocator,
 
@@ -174,8 +186,10 @@ pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!Stat
         .udp_bits = try arena.dupe(Bit, p.udp_bits),
         .udp_state = try arena.alloc(Bit, p.drivers.len),
         .udp_started = try arena.alloc(bool, p.drivers.len),
+        .sub_active = try arena.alloc(u32, p.subs.len),
         .scratch = .init(arena),
     };
+    @memset(s.sub_active, 0);
     for (p.drivers, s.drv_or_z, s.udp_state, s.udp_started) |d, *oz, *st, *started| {
         oz.* = d.init_or_z;
         st.* = if (d.source == .udp) d.source.udp.state else .x;

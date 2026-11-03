@@ -23,6 +23,7 @@ const Allocator = std.mem.Allocator;
 const Program = @import("Program.zig");
 const State = @import("State.zig");
 const logic = @import("logic.zig");
+const calls = @import("calls.zig");
 const Literal = logic.Literal;
 const Bit = logic.Bit;
 const Error = State.Error;
@@ -199,6 +200,7 @@ pub fn eval(s: *State, a: Allocator, e: u32) Error!Literal {
             v.values()[0] = @bitCast(try real(s, a, d.a));
             break :blk normalize(a, v, w, ty.signed);
         },
+        .call => normalize(a, try calls.call(s, a, d.a), w, ty.signed),
         .clog2 => blk: {
             const v = try filled(a, 32, true, .zero);
             v.values()[0] = ceilLog2(try eval(s, a, d.a));
@@ -217,6 +219,7 @@ pub fn real(s: *State, a: Allocator, e: u32) Error!f64 {
     return switch (row.tag) {
         .real_constant => @bitCast(@as(u64, d.a) | @as(u64, d.b) << 32),
         .slot, .elem => logic.realOf(try eval(s, a, e)),
+        .call => logic.realOf(try calls.call(s, a, d.a)),
         .real_of_int => logic.realOfInt(try eval(s, a, d.a)),
         .real_neg => -(try real(s, a, d.a)),
         .real_add => try real(s, a, d.a) + try real(s, a, d.b),

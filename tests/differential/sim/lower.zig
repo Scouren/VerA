@@ -18,6 +18,8 @@
 //! - `Lower.targetType(l: *Lower, e: ExprId) E!Type`
 //! - `Lower.place(l: *Lower, e: ExprId) E!u32`
 //! - `Lower.terms(l: *Lower, e: ExprId, out: *std.ArrayList(u32)) E!void`
+//! - `Lower.call(l: *Lower, idx: u32, args: []const ExprId) E!u32`
+//! - `Lower.tyOf(l: *Lower, ty: Type) E!Ty`
 //! - `pub const E`
 
 const std = @import("std");
@@ -60,7 +62,7 @@ pub const Lower = struct {
         const r = l.r;
         const ex = &r.file.exprs;
         if (ty.real) return l.real(e);
-        const t = try tyOf(l, ty);
+        const t = try l.tyOf(ty);
         const nat = compile.typeOf(r, e);
         switch (ex.tag(e)) {
             // A literal's value in its context is pure: the old evaluator
@@ -164,7 +166,7 @@ pub const Lower = struct {
                 return l.b.expr(.replicate, t, try l.self_(ex.rhs(e), 0), count);
             },
             .sys_call => return l.sysCall(e, t, nat),
-            .call => return l.refuse("a function call"),
+            .call => return l.b.expr(.call, t, try l.call(try l.callee(e), ex.args(e)), 0),
             else => return l.refuse("an expression form"),
         }
     }
@@ -189,7 +191,7 @@ pub const Lower = struct {
         if (target.real) return l.real(e);
         const rhs = try l.self_(e, target.width);
         const rt = l.b.p.exprs.items(.ty)[rhs];
-        return l.b.expr(.convert, try tyOf(l, .{ .width = target.width, .signed = rt.signed }), rhs, 0);
+        return l.b.expr(.convert, try l.tyOf(.{ .width = target.width, .signed = rt.signed }), rhs, 0);
     }
 
     /// `evaluate.targetType(e)`.
@@ -303,12 +305,49 @@ pub const Lower = struct {
                     else => l.refuse("a real system function"), // else: the rest are not lowered yet
                 };
             },
-            .call => return l.refuse("a real function call"),
+            .call => return l.b.expr(.call, rt, try l.call(try l.callee(e), ex.args(e)), 0),
             else => return l.refuse("a real expression form"),
         }
     }
 
+    /// The `Program.Call` of subroutine `idx` with actuals `args`, in
+    /// `extra` (`activations.callSync`'s copy-in and copy-out).
+    pub fn call(l: *Lower, idx: u32, args: []const ExprId) E!u32 {
+        const r = l.r;
+        const sub = r.routines.rows.items[idx];
+        if (!sub.compiled) return l.refuse("a subroutine compiled only for a constant fold");
+        if (sub.body != null) return l.refuse("a call of a timed recursive task");
+        var words: std.ArrayList(u32) = .empty;
+        const none = @backingInt(Program.Ref.none);
+        for (sub.decl.ports, args, sub.frame.ports) |p, arg, slot| {
+            const in: u32 = if (p.direction == .output) none else try l.evalFor(arg, r.slotType(slot));
+            var out: u32 = none;
+            var ty: Ty = .bit;
+            if (p.direction != .input) {
+                out = try l.place(arg);
+                ty = try l.tyOf(try l.targetType(arg));
+            }
+            try words.appendSlice(l.a, &.{ in, out, @bitCast(ty), 0 });
+        }
+        return l.b.extraOf(Program.Call{ .sub = idx, .args = try l.b.listOf(words.items) });
+    }
+
+    /// A §5.5 type as a `Program.Ty`, refused past 2^30 bits.
+    pub fn tyOf(l: *Lower, ty: Type) E!Ty {
+        if (ty.real) return Ty.real_ty;
+        if (ty.width == 0 or ty.width > std.math.maxInt(u30)) return l.refuse("a width past 2^30 bits");
+        return Ty.int(ty.width, ty.signed);
+    }
+
     // ---- private ----
+
+    /// The subroutine function call `e` calls, in this instance.
+    fn callee(l: *Lower, e: ExprId) E!u32 {
+        const r = l.r;
+        const base = r.routines.base.get(r.instanceOf(r.scope)) orelse return l.refuse("a call with no subroutine table");
+        const k = r.routines.calls.get(e) orelse return l.refuse("an unbound function call");
+        return base + k;
+    }
 
     fn slotOf(l: *Lower, e: ExprId) E!u32 {
         return l.r.slot(e) catch l.refuse("a name the old engine cannot resolve here");
@@ -322,7 +361,7 @@ pub const Lower = struct {
     fn constant(l: *Lower, e: ExprId, ty: Type) E!u32 {
         const v = evaluate.evalContext(l.r, l.a, e, ty) catch return l.refuse("a literal the old engine refuses");
         const n = std_sim.Program.words(ty.width);
-        return l.b.constant(try tyOf(l, ty), v.values()[0..n], v.unknowns()[0..n]);
+        return l.b.constant(try l.tyOf(ty), v.values()[0..n], v.unknowns()[0..n]);
     }
 
     fn timeRow(l: *Lower) E!u32 {
@@ -391,7 +430,7 @@ pub const Lower = struct {
         const ex = &r.file.exprs;
         const f = r.typing.sys_calls[@backingInt(e)] orelse return l.refuse("an untyped system call");
         const args = ex.args(e);
-        const natural = try tyOf(l, nat);
+        const natural = try l.tyOf(nat);
         const raw: u32 = switch (f) {
             .make_signed, .make_unsigned => return l.b.expr(.convert, t, try l.self_(args[0], 0), if (f == .make_signed) 2 else 1),
             .rtoi => try l.b.expr(.rtoi, Ty.int(32, true), try l.real(args[0]), 0),
@@ -404,11 +443,3 @@ pub const Lower = struct {
         return l.b.expr(.convert, t, raw, 0);
     }
 };
-
-// ---- private ----
-
-fn tyOf(l: *Lower, ty: Type) E!Ty {
-    if (ty.real) return Ty.real_ty;
-    if (ty.width == 0 or ty.width > std.math.maxInt(u30)) return l.refuse("a width past 2^30 bits");
-    return Ty.int(ty.width, ty.signed);
-}

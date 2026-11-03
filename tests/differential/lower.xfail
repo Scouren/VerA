@@ -28,10 +28,6 @@ spice/limit_seed_explicit_beats_default.va codes: old {}, new E0512 (E0512: `$li
 spice/limit_seed_mos1_initjct.va codes: old {}, new E0512 (E0512: `$limit` is not lowered by Sema yet)
 spice/limit_vds.va codes: old {}, new E0512 (E0512: `$limit` is not lowered by Sema yet)
 spice/passive_named_ports.va codes: old {}, new E0512 (E0512: `field` is not lowered by Sema yet)
-spice/primitive_attribute_discrete_rejected.va the old side refused, the new side lowered
-spice/primitive_attribute_numeric_rejected.va the old side refused, the new side lowered
-spice/primitive_attribute_unknown_rejected.va the old side refused, the new side lowered
-spice/primitive_between_incompatible_disciplines_rejected.va the old side refused, the new side lowered
 spice/primitive_bjt.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 spice/primitive_bjt_substrate_omitted.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 spice/primitive_capacitor.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
@@ -203,7 +199,6 @@ verilog-a/ch03_data_types/implicit_net_discipline_from_connected_ports.va codes:
 verilog-a/ch03_data_types/implicit_net_solution.va tables row 1: old `node 1 implicit_link net`, new `node 1 child.b net`
 verilog-a/ch03_data_types/implicit_nets.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-a/ch03_data_types/incompatible_flow_natures_rejected.va the old side refused, the new side lowered
-verilog-a/ch03_data_types/incompatible_hierarchical_override_rejected.va the old side refused, the new side lowered
 verilog-a/ch03_data_types/incompatible_nets_access.va the old side refused, the new side lowered
 verilog-a/ch03_data_types/integer_conversion_saturates.va tables row 2: old `param big integer = 1e300`, new `param big integer = ?`
 verilog-a/ch03_data_types/integer_parameter_precision.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
@@ -231,10 +226,7 @@ verilog-a/ch03_data_types/nonconstant_user_attribute.va codes: old E0340, new {}
 verilog-a/ch03_data_types/output_variable_units_numeric_rejected.va the old side refused, the new side lowered
 verilog-a/ch03_data_types/parameter_array.va codes: old {}, new E0512 (E0512: `elem` is not lowered by Sema yet)
 verilog-a/ch03_data_types/parameter_array_exact_override.va codes: old {}, new E0512 (E0512: `elem` is not lowered by Sema yet)
-verilog-a/ch03_data_types/parameter_array_long_override_rejected.va the old side refused, the new side lowered
 verilog-a/ch03_data_types/parameter_array_resize_with_value.va codes: old {}, new E0512 (E0512: `elem` is not lowered by Sema yet)
-verilog-a/ch03_data_types/parameter_array_resize_without_value_rejected.va the old side refused, the new side lowered
-verilog-a/ch03_data_types/parameter_array_short_override_rejected.va the old side refused, the new side lowered
 verilog-a/ch03_data_types/parameter_array_untyped.va codes: old E0346, new E0512 (E0512: `elem` is not lowered by Sema yet)
 verilog-a/ch03_data_types/parameter_assigned_at_runtime.va codes: old E0312, new E0313 (E0313: an assignment to a name that is not a variable)
 verilog-a/ch03_data_types/parameter_default_not_constant_rejected.va the old side refused, the new side lowered
@@ -631,7 +623,6 @@ verilog-a/ch06_hierarchy/defparam_rhs_not_constant_rejected.va the old side refu
 verilog-a/ch06_hierarchy/defparam_upward_collect_first.va codes: old {}, new E0512 (E0512: `field` is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/defparam_upward_module_name_path.va codes: old {}, new E0512 (E0512: `field` is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/defparam_upward_value_chain_65.va codes: old {}, new E0512 (E0512: `field` is not lowered by Sema yet)
-verilog-a/ch06_hierarchy/defparam_upward_value_cycle_rejected.va the old side refused, the new side lowered
 verilog-a/ch06_hierarchy/dependent_range_and_array_override.va codes: old {}, new E0512 (E0512: `elem` is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/disable_in_a_child_instance.va codes: old {}, new E0512 (E0512: `disable` is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/duplicate_declaration_rejected.va codes: old E0362, new {}
@@ -1051,13 +1042,12 @@ verilog-ams/annex_c_analog_subset/real_value_port_accepted.va codes: old {}, new
 verilog-ams/annex_c_analog_subset/wreal_accepted.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/annex_c_analog_subset/xz_in_the_mixed_signal_context.va codes: old {}, new E0130,E0369 (E0130: the analog backend cannot execute this four-state or wide literal)
 verilog-ams/annex_f_resolution/conflicting_declarations.va the old side refused, the new side lowered
-verilog-ams/annex_f_resolution/conflicting_ooc_declarations.va the old side refused, the new side lowered
 verilog-ams/annex_f_resolution/continuous_domain_wins.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-ams/annex_f_resolution/detail_behavioral_net_stays_digital.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/annex_f_resolution/detail_step4_analog_child_beats_digital_parent.va codes: old {}, new E0512 (E0512: an access of a name with no node)
-verilog-ams/annex_f_resolution/detail_step4_behavioral_net_is_digital.va tables row 0: old `node 0 w__annex_f_d6_d2a__electrical.el net`, new `node 0 l.p net`
+verilog-ams/annex_f_resolution/detail_step4_behavioral_net_is_digital.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/annex_f_resolution/detail_top_down_parent_before_child.va codes: old {}, new E0512 (E0512: an access of a name with no node)
-verilog-ams/annex_f_resolution/digital_behavioral_net_is_digital.va tables row 0: old `node 0 w__annex_f_dw_d2a__electrical.el net`, new `node 0 l.p net`
+verilog-ams/annex_f_resolution/digital_behavioral_net_is_digital.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/annex_f_resolution/in_context_declaration_reaches_all_instances.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-ams/annex_f_resolution/net_read_by_digital_code_resolves_digital.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-ams/annex_f_resolution/out_of_context_declaration.va tables row 2: old `contrib flow direct br0 a b`, new `node 2 ca.p net`
@@ -1068,7 +1058,6 @@ verilog-ams/annex_g_change_history/forever_is_a_digital_loop.va tables row 2: ol
 verilog-ams/ch01_intro/reject_1_2_contribution_from_always_block.va codes: old E0435, new {}
 verilog-ams/ch02_lexical/attributes_on_module_items.va codes: old {}, new E0315,E0322 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch02_lexical/digital_delay_notation.va tables row 1: old `param code integer = 0`, new `contrib flow direct br0 p gnd`
-verilog-ams/ch02_lexical/digital_scaled_udp_delay_rejected.va the old side refused, the new side lowered
 verilog-ams/ch02_lexical/operating_point_report_attributes.va tables row 3: old `param m real = 1e0`, new `contrib flow direct br0 p n`
 verilog-ams/ch02_lexical/unsized_xz_extends_to_expression_size.va tables row 1: old `param x32 integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch02_lexical/xz_digit_width_and_padding.va codes: old {}, new E0130,E0369 (E0130: the analog backend cannot execute this four-state or wide literal)

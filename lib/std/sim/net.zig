@@ -17,6 +17,7 @@
 //! - `pub fn crossed(own: Signal, z: Node, y: Node, p: SwitchPath) Signal`
 //! - `pub fn reach(g: anytype, a: std.mem.Allocator, from: Node) std.mem.Allocator.Error![]const Node`
 //! - `pub fn switchPaths(g: anytype, a: std.mem.Allocator, y: Node, group: []const Node) std.mem.Allocator.Error![]const SwitchPath`
+//! - `pub fn pathTable(d: []const u64) [4][4]u64`
 //! - `pub fn netPull(kind: NetKind) Signal`
 //! - `pub fn wiredLogic(kind: NetKind) ?Wired`
 //! - `pub fn gateBit(kind: GateKind, ins: []const Bit) GateOut`
@@ -277,6 +278,47 @@ pub fn switchPaths(g: anytype, a: std.mem.Allocator, y: Node, group: []const Nod
         }
     }
     return p;
+}
+
+/// IEEE 1364-2005 §14.3.1 Table 14-2: a path's delay for each transition
+/// (`[from][to]` by `Bit`'s backing integer) from its 1, 2, 3, 6 or 12
+/// values; §14.3.2 Table 14-3's x transitions where fewer than 12 are
+/// given: to x as quickly as possible, from x as long as possible.
+pub fn pathTable(d: []const u64) [4][4]u64 {
+    assert(d.len == 1 or d.len == 2 or d.len == 3 or d.len == 6 or d.len == 12);
+    const t01, const t10, const t0z, const tz1, const t1z, const tz0 = switch (d.len) {
+        1 => .{ d[0], d[0], d[0], d[0], d[0], d[0] },
+        2 => .{ d[0], d[1], d[0], d[0], d[1], d[1] },
+        3 => .{ d[0], d[1], d[2], d[0], d[2], d[1] },
+        else => .{ d[0], d[1], d[2], d[3], d[4], d[5] }, // else: the 6 and 12 forms name these six first
+    };
+    const zero = @backingInt(Bit.zero);
+    const one = @backingInt(Bit.one);
+    const z = @backingInt(Bit.z);
+    const x = @backingInt(Bit.x);
+    var t: [4][4]u64 = @splat(@splat(0));
+    t[zero][one] = t01;
+    t[one][zero] = t10;
+    t[zero][z] = t0z;
+    t[z][one] = tz1;
+    t[one][z] = t1z;
+    t[z][zero] = tz0;
+    if (d.len == 12) {
+        t[zero][x] = d[6];
+        t[x][one] = d[7];
+        t[one][x] = d[8];
+        t[x][zero] = d[9];
+        t[x][z] = d[10];
+        t[z][x] = d[11];
+    } else {
+        t[zero][x] = @min(t0z, t01);
+        t[one][x] = @min(t1z, t10);
+        t[z][x] = @min(tz1, tz0);
+        t[x][zero] = @max(tz0, t10);
+        t[x][one] = @max(tz1, t01);
+        t[x][z] = @max(t1z, t0z);
+    }
+    return t;
 }
 
 /// §3.7/§7.9 what the net type itself contributes, at its own strength.

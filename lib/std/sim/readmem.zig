@@ -8,6 +8,7 @@
 //! Contents:
 //! - `pub fn readMemory(s: *State, a: Allocator, at: u32) Error!void`
 //! - `pub fn text(a: Allocator, v: Literal) Error!?[]const u8`
+//! - `pub fn sideFile(io: std.Io, a: Allocator, file_name: []const u8, name: []const u8) !std.Io.File`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -208,6 +209,17 @@ pub fn text(a: Allocator, v: Literal) Error!?[]const u8 {
     return out.items;
 }
 
+/// The memory file beside the design's source, else from the working
+/// directory.
+pub fn sideFile(io: std.Io, a: Allocator, file_name: []const u8, name: []const u8) !std.Io.File {
+    const cwd = std.Io.Dir.cwd();
+    if (std.Io.Dir.path.dirname(file_name)) |dir| {
+        const joined = try std.Io.Dir.path.join(a, &.{ dir, name });
+        if (cwd.openFile(io, joined, .{})) |file| return file else |_| {}
+    }
+    return cwd.openFile(io, name, .{});
+}
+
 // ---- private ----
 
 fn word(a: Allocator, token: []const u8, radix: Program.Radix, width: u32) !Literal {
@@ -252,17 +264,6 @@ fn validate(token: []const u8, radix: Program.Radix) !void {
         if (c == '_') continue;
         _ = try digitOf(c, radix);
     }
-}
-
-/// The memory file beside the design's source, else from the working
-/// directory.
-fn sideFile(io: std.Io, a: Allocator, file_name: []const u8, name: []const u8) !std.Io.File {
-    const cwd = std.Io.Dir.cwd();
-    if (std.Io.Dir.path.dirname(file_name)) |dir| {
-        const joined = try std.Io.Dir.path.join(a, &.{ dir, name });
-        if (cwd.openFile(io, joined, .{})) |file| return file else |_| {}
-    }
-    return cwd.openFile(io, name, .{});
 }
 
 test "a memory word: separators skipped, high digits truncated, a bad digit refused" {

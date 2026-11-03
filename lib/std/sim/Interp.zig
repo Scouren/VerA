@@ -26,6 +26,13 @@ const calls = @import("calls.zig");
 const readmem = @import("readmem.zig");
 const holds = @import("holds.zig");
 const files = @import("files.zig");
+const tchk = @import("tchk.zig");
+const vcd = @import("vcd.zig");
+const evcd = @import("evcd.zig");
+const sdf = @import("sdf.zig");
+const queues = @import("queues.zig");
+const pla = @import("pla.zig");
+const activations = @import("activations.zig");
 const Error = State.Error;
 const Literal = logic.Literal;
 
@@ -39,6 +46,8 @@ const Flow = enum { next, ended };
 pub fn run(s: *State) Error!void {
     const stop = try runUntil(s, std.math.maxInt(u64));
     assert(stop == .idle);
+    // §18.3.6.1 the run is over: each port dump ends.
+    try evcd.close(s);
 }
 
 /// Dispatches every event at a time <= `limit`, then returns with only later
@@ -56,7 +65,15 @@ pub fn runUntil(s: *State, limit: u64) Error!Stop {
         const row = s.rows.items[event.payload];
         const a = s.scratch.allocator();
         switch (row.item) {
-            .run => |pc| try step(s, pc),
+            .run => |pc| {
+                s.ctx = 0;
+                try step(s, pc);
+            },
+            .run_in => |x| {
+                s.ctx = x.ctx;
+                try activations.makeResident(s, x.ctx);
+                try step(s, x.pc);
+            },
             .write => |w| {
                 const n = Program.words(w.width);
                 const planes = try a.dupe(u64, row.buf[0 .. 2 * n]);
@@ -64,14 +81,21 @@ pub fn runUntil(s: *State, limit: u64) Error!Stop {
             },
             .strobe => |show| try display.show(s, a, show, 0),
             .fstrobe => |at| try files.fshow(s, a, at),
+            .vcd_tick => {
+                try vcd.tick(s, a);
+                try evcd.tick(s, a);
+            },
             .monitor_tick => {
                 s.monitor_pending = false;
                 if (s.monitor_hit) try display.monitorPrint(s, a);
+                try display.fmonitorPrint(s, a);
             },
             .drive => |at| try resolve.drive(s, a, at),
             .net_update => |net| try resolve.netUpdate(s, net),
             .decay => |net| try resolve.decay(s, a, net),
             .tran_switch => |t| try resolve.tranSwitch(s, a, t),
+            .tchk_expiry => |t| try tchk.expired(s, t.check, t.gen),
+            .tchk_event => |t| try tchk.delivered(s, t.code, t.bit),
             .put => |w| {
                 const n = Program.words(w.width);
                 try s.store(w.slot, .{ .width = w.width, .signed = false, .sized = true, .planes = try a.dupe(u64, row.buf[0 .. 2 * n]) });
@@ -128,7 +152,7 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                 pc += 1;
             },
             .delay => {
-                _ = try s.enqueue(.{ .run = pc + 1 }, try delayOf(s, a, d.a, pc), false);
+                _ = try s.enqueue(State.resumption(pc + 1, s.ctx), try delayOf(s, a, d.a, pc), false);
                 return;
             },
             .task => {
@@ -186,6 +210,10 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                 try s.trigger(d.a);
                 pc += 1;
             },
+            .trigger_elem => {
+                if (try eval.address(s, a, p.extraData(Program.Elem, d.a))) |slot| try s.trigger(slot);
+                pc += 1;
+            },
             .continuous => return resolve.continuous(s, a, d.a, pc),
             .fork => {
                 const f = p.extraData(Program.Fork, d.a);
@@ -194,13 +222,18 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                     pc = f.end;
                     continue;
                 }
-                s.counters[f.join] = arms.len;
-                for (arms) |arm| _ = try s.enqueue(.{ .run = arm }, null, false);
+                // §10.2.3 a fork inside an activation counts its own arms.
+                if (s.ctx == 0)
+                    s.counters[f.join] = arms.len
+                else
+                    try s.joins.put(s.arena, .{ .join = f.join, .ctx = s.ctx }, arms.len);
+                for (arms) |arm| _ = try s.enqueue(State.resumption(arm, s.ctx), null, false);
                 return;
             },
             .join_arm => {
-                s.counters[d.a] -= 1;
-                if (s.counters[d.a] == 0) _ = try s.enqueue(.{ .run = d.b }, null, false);
+                const left = if (s.ctx == 0) &s.counters[d.a] else s.joins.getPtr(.{ .join = d.a, .ctx = s.ctx }).?;
+                left.* -= 1;
+                if (left.* == 0) _ = try s.enqueue(State.resumption(d.b, s.ctx), null, false);
                 return;
             },
             .sample => {
@@ -220,7 +253,7 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                         pc += 1;
                     },
                     .delay => {
-                        _ = try s.enqueue(.{ .run = pc + 1 }, try delayOf(s, a, sm.timing, pc), false);
+                        _ = try s.enqueue(State.resumption(pc + 1, s.ctx), try delayOf(s, a, sm.timing, pc), false);
                         return;
                     },
                     .event => {
@@ -237,6 +270,20 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                 pc += 1;
             },
             .switch_ctrl => return resolve.switchCtrl(s, a, d.a, pc),
+            .spawn => {
+                if (d.b == 1) {
+                    // Nested, as a call's body runs: the child parks at its
+                    // wait and this process carries on.
+                    // A process of its own, outside any activation.
+                    var nested: std.heap.ArenaAllocator = .init(s.arena);
+                    defer nested.deinit();
+                    const ctx = s.ctx;
+                    s.ctx = 0;
+                    defer s.ctx = ctx;
+                    try runFrom(s, &nested, d.a);
+                } else _ = try s.enqueue(.{ .run = d.a }, null, false);
+                pc += 1;
+            },
             .override_on => {
                 try holds.on(s, d.a);
                 pc += 1;
@@ -257,6 +304,8 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                 try calls.copyOut(s, a, d.a);
                 pc += 1;
             },
+            .call_timed => pc = try activations.callTimed(s, a, d.a, pc),
+            .task_return => pc = try activations.returnTimed(s, a, d.a),
             .disable_task => {
                 // Every inlined copy (the running one resumes after itself)
                 // and every synchronous activation, which unwind.
@@ -309,9 +358,9 @@ fn delayOf(s: *State, a: Allocator, e: u32, pc: u32) Error!u64 {
 
 fn watchAll(s: *State, id: u32, terms: Program.List) Error!void {
     const words = s.p.list(terms);
-    assert(words.len % 4 == 0);
+    assert(words.len % Program.Term.words == 0);
     var k: usize = 0;
-    while (k < words.len) : (k += 4) try s.watch(id, s.p.extraData(Program.Term, terms.start + @as(u32, @intCast(k))));
+    while (k < words.len) : (k += Program.Term.words) try s.watch(id, s.p.extraData(Program.Term, terms.start + @as(u32, @intCast(k))));
 }
 
 /// §9.5: the first arm with a label matching the scrutinee; else the fallback.
@@ -364,6 +413,11 @@ fn task(s: *State, a: Allocator, at: u32, pc: u32) Error!Flow {
         .fclose => try files.fclose(s, a, t.a),
         // Every write is already in its file.
         .fflush => {},
+        .dump => try vcd.task(s, a, t.a),
+        .ports => try evcd.task(s, a, t.a),
+        .sdf => try sdf.annotate(s, a, t.a),
+        .queue => try queues.task(s, a, t.a),
+        .pla => try pla.task(s, a, t.a),
         .finish, .stop => {
             const verbose = t.a == @backingInt(Program.Ref.none) or ((try eval.eval(s, a, t.a)).asInt() orelse 1) != 0;
             if (verbose) {

@@ -23,6 +23,7 @@
 //! - `pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const Given, dps: []const Dp, file: Zcu.File.Index, src: Inst.Ref) Allocator.Error!Zcu.Hier`
 //! - `pub fn isOverridable(vir: *const Vir, p: Inst.Index) bool`
 //! - `pub fn payloadOf(vir: *const Vir, comptime T: type, i: Inst.Index) T`
+//! - `pub fn segment(arena: Allocator, name: []const u8) Allocator.Error![]const u8`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -33,6 +34,7 @@ const Sema = @import("../Sema.zig");
 const Zcu = @import("../Zcu.zig");
 const eval = @import("eval.zig");
 const paramset = @import("paramset.zig");
+const discipline = @import("discipline.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Env = eval.Env;
@@ -171,6 +173,17 @@ pub fn isOverridable(vir: *const Vir, p: Inst.Index) bool {
     return f.kind == .parameter and !f.local;
 }
 
+/// A name as one segment of a hierarchical path: as written, or, when it
+/// is no simple identifier (§2.7.1: an escaped one such as `\a.b `), with
+/// its backslash and terminating space, so a `.` in it is no separator.
+pub fn segment(arena: Allocator, name: []const u8) Allocator.Error![]const u8 {
+    assert(name.len != 0);
+    const simple = for (name, 0..) |c, k| {
+        if (!(std.ascii.isAlphanumeric(c) or c == '_' or (c == '$' and k != 0))) break false;
+    } else !std.ascii.isDigit(name[0]);
+    return if (simple) name else std.fmt.allocPrint(arena, "\\{s} ", .{name});
+}
+
 /// The payload of `pl_node` instruction `i`.
 pub fn payloadOf(vir: *const Vir, comptime T: type, i: Inst.Index) T {
     assert(Inst.dataKind(vir.instructions.items(.tag)[@backingInt(i)]) == .pl_node);
@@ -245,12 +258,14 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     const base: ?*const Zcu.Hier = if (picked.base) |*b| b else if (p.parent == .none) null else &zcu.instances.items(.hier)[@backingInt(p.parent)];
     env.hier = try hierValues(s, &env, base, w.givens.items[picked.givens.start..][0..picked.givens.len], if (picked.base == null) dps else &.{}, p.file, p.src);
     for (env.positions.keys()) |param_inst| _ = try env.param(param_inst);
+    try arraySizes(s, &env, p);
     const params = try zcu.intern_pool.get(s.gpa, .{ .aggregate = .{ .ty = .none, .elems = env.values.items } });
     const key: Instance.Key = .{ .module = picked.module, .params = params };
     if (try recursion(w, p, key)) |depth| {
         try s.fail(.E0905, p.file, p.src, "`{s}` instantiates itself with the same parameters ({d} levels deep)", .{ vir.string(row.name), depth });
         return;
     }
+    if (zcu.isBuiltin(picked.module)) try portDisciplineAttrs(s, p);
     const ports = try bindPorts(s, p, vir, m, row.name);
     try zcu.instances.append(s.gpa, .{ .module = picked.module, .parent = p.parent, .name = p.name, .params = params, .paramset = picked.paramset, .src = p.src, .hier = env.hier, .ports = ports });
     assert(zcu.instances.len == @backingInt(index) + 1);
@@ -266,6 +281,55 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     while (k > 0) {
         k -= 1;
         try w.pending.append(s.arena, w.kids.items[k]);
+    }
+}
+
+/// §3.4.4 "An array assigned to an instance of a module to override the
+/// default value of an array parameter shall be of the exact size of the
+/// parameter array", and one whose size an override changed "shall be
+/// assigned an array of the new size" (E0921 for either). A value or range
+/// that does not fold is not judged.
+fn arraySizes(s: *Sema, env: *Env, p: Pending) Allocator.Error!void {
+    assert(env.positions.count() == env.values.items.len);
+    for (env.positions.keys(), env.values.items) |q, v| {
+        const want = try env.arraySize(q) orelse continue;
+        if (v == InternPool.Index.undef or v == .none) continue;
+        const k = s.zcu.intern_pool.indexToKey(v);
+        if (k != .aggregate) continue;
+        const got = k.aggregate.elems.len;
+        if (got == want) continue;
+        const name = env.vir.string(payloadOf(env.vir, Inst.Param, q).name);
+        if (env.given.contains(q))
+            try s.fail(.E0921, p.file, p.src, "the array assigned to `{s}` has {d} elements, and its declared range has {d}", .{ name, got, want })
+        else
+            try s.fail(.E0921, p.file, p.src, "an override resized `{s}` to {d} elements, and no array of the new size was assigned to it (its default has {d})", .{ name, want, got });
+    }
+}
+
+/// Annex E.3.2.1: "The value [of `port_discipline`] shall be of type
+/// string and the value must be a valid discipline of domain continuous"
+/// (E0358), judged on an instance of a shipped analog primitive only ("for
+/// other modules ... it shall be ignored"). A valueless spec is §2.9's 1;
+/// a value that does not fold is lowering's E0357.
+fn portDisciplineAttrs(s: *Sema, p: Pending) Allocator.Error!void {
+    const i = p.src.toIndex() orelse return;
+    const vir = s.zcu.fileVir(p.file);
+    assert(vir.instructions.items(.tag)[@backingInt(i)] == .instance);
+    var env: Env = try .init(s.gpa, s.arena, &s.zcu.intern_pool, vir, &.{});
+    defer env.deinit();
+    for (vir.list(Inst.Attr, payloadOf(vir, Inst.Instance, i).attrs)) |a| {
+        if (!std.mem.eql(u8, vir.string(a.name), "port_discipline")) continue;
+        const c: eval.Const = if (a.value.len == 0) .{ .int = 1 } else (try env.body(a.value)) orelse continue;
+        if (c != .str) {
+            try s.fail(.E0358, p.file, p.src, "E.3.2.1: port_discipline requires a string naming a continuous discipline", .{});
+            continue;
+        }
+        if (!s.zcu.disciplines.contains(try s.zcu.intern_pool.getString(s.gpa, c.str))) {
+            try s.fail(.E0358, p.file, p.src, "E.3.2.1: port_discipline names an undeclared discipline `{s}`", .{c.str});
+            continue;
+        }
+        if (try discipline.domainOf(s, c.str) != .continuous)
+            try s.fail(.E0358, p.file, p.src, "E.3.2.1: port_discipline requires a continuous discipline; `{s}` is not one", .{c.str});
     }
 }
 
@@ -316,6 +380,7 @@ fn bindPorts(s: *Sema, p: Pending, vir: *const Vir, m: Inst.Module, module: Vir.
 
 /// A header port's external name: an ANSI `io`'s, or a `port`'s.
 fn portName(vir: *const Vir, f: Inst.Index) []const u8 {
+    assert(@backingInt(f) < vir.instructions.len);
     return vir.string(switch (vir.instructions.items(.tag)[@backingInt(f)]) {
         .io => payloadOf(vir, Inst.Io, f).name,
         .port => payloadOf(vir, Inst.Port, f).name,
@@ -324,6 +389,7 @@ fn portName(vir: *const Vir, f: Inst.Index) []const u8 {
 }
 
 fn portNamed(vir: *const Vir, formals: []const Inst.Index, name: []const u8) ?Inst.Index {
+    assert(name.len != 0);
     for (formals) |f| if (std.mem.eql(u8, portName(vir, f), name)) return f;
     return null;
 }
@@ -392,6 +458,9 @@ fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i:
         // A.5.4: a named UDP instance parses as a module instance, so its
         // `#( … )` is A.2.2.3's `delay2`: at most two values, in order.
         const params = vir.list(Inst.Arg, in.params);
+        // §2.6.2: a scale factor is a real literal's, and a digital delay
+        // is no real.
+        if (in.flags.scaled) try s.fail(.E0247, file, i.toRef(), "a scaled literal in `{s}`'s UDP delay", .{vir.string(in.target)});
         if (params.len > 2 or (params.len != 0 and params[0].name != .empty))
             try s.fail(.E0239, file, i.toRef(), "`{s} #(…) {s}`: {d} value(s)", .{ vir.string(in.target), vir.string(in.name), params.len });
         return;
@@ -400,11 +469,11 @@ fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i:
     const start: u32 = @intCast(w.givens.items.len);
     for (vir.list(Inst.Arg, in.params)) |a| {
         // An empty `.name()` keeps the default but still names a parameter.
-        const v = if (a.value.len == 0) InternPool.Index.none else if (try env.body(a.value)) |c| try env.intern(c) else InternPool.Index.undef;
+        const v = if (a.value.len == 0) InternPool.Index.none else try env.bodyValue(a.value);
         try w.givens.append(s.arena, .{ .name = try ip.getString(s.gpa, vir.string(a.name)), .value = v });
     }
     const givens: Run = .{ .start = start, .len = @intCast(w.givens.items.len - start) };
-    const name = vir.string(in.name);
+    const name = try segment(s.arena, vir.string(in.name));
     if (in.range.len == 0) {
         const n = try ip.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ prefix, name }));
         return w.kids.append(s.arena, .{ .parent = index, .file = file, .src = i.toRef(), .name = n, .target = try boundTarget(w, index, n, target), .givens = givens, .quiet = false });
@@ -481,6 +550,7 @@ fn genCase(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, g: 
 
 /// A body's last instruction as a `store`, or null.
 fn storeOf(vir: *const Vir, b: Vir.Body) ?Inst.Bin {
+    assert(b.start + b.len <= vir.extra.len);
     const insts = vir.body(b);
     if (insts.len == 0) return null;
     const last = insts[insts.len - 1];
@@ -490,6 +560,7 @@ fn storeOf(vir: *const Vir, b: Vir.Body) ?Inst.Bin {
 
 /// The declaration a `decl_ref` names, or null.
 fn declOf(vir: *const Vir, r: Inst.Ref) ?Inst.Index {
+    if (r.toIndex()) |i| assert(@backingInt(i) < vir.instructions.len);
     const i = r.toIndex() orelse return null;
     if (vir.instructions.items(.tag)[@backingInt(i)] != .decl_ref) return null;
     return vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl;

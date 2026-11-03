@@ -20,6 +20,9 @@
 //! - `Lower.terms(l: *Lower, e: ExprId, out: *std.ArrayList(u32)) E!void`
 //! - `Lower.call(l: *Lower, idx: u32, args: []const ExprId) E!u32`
 //! - `Lower.tyOf(l: *Lower, ty: Type) E!Ty`
+//! - `Lower.elem(l: *Lower, e: ExprId) E!u32`
+//! - `Lower.callWith(l: *Lower, idx: u32, args: []const ExprId, ports: []const u32) E!u32`
+//! - `Lower.queueCall(l: *Lower, op: Program.QueueOp, args: []const ExprId, outs: []const bool) E!u32`
 //! - `pub const E`
 
 const std = @import("std");
@@ -245,17 +248,25 @@ pub const Lower = struct {
             else => .any, // else: a name, or an expression with a hidden slot
         };
         const watched = if (edge == .any) e else ex.lhs(e);
+        const none = std.math.maxInt(u32);
         if (ex.tag(watched) == .index) {
             const c = r.chainBase(watched);
             const base = try l.slotOf(c.base);
-            if (r.decls.events.contains(base)) return l.refuse("an event array select term");
+            if (r.decls.events.contains(base)) {
+                // §9.7.3: every element, each waking only when the index
+                // names it at the occurrence.
+                const arr = r.decls.arrays.get(base).?;
+                const el = try l.elem(watched);
+                for (0..arr.count) |k| try out.appendSlice(l.a, &.{ base + @as(u32, @intCast(k)), @backingInt(Program.Edge.any), 0, 0, el });
+                return;
+            }
         }
         if (compile.selectTerm(r, watched) catch return l.refuse("a select term the old engine refuses")) |sel| {
-            return out.appendSlice(l.a, &.{ sel.slot, @backingInt(edge), sel.first, sel.count });
+            return out.appendSlice(l.a, &.{ sel.slot, @backingInt(edge), sel.first, sel.count, none });
         }
         if (r.routines.auto_terms.contains(.{ .scope = r.scope, .e = watched })) return l.refuse("an automatic expression term");
         const slot = r.termSlot(watched) catch return l.refuse("a term the old engine refuses");
-        try out.appendSlice(l.a, &.{ slot, @backingInt(edge), 0, 0 });
+        try out.appendSlice(l.a, &.{ slot, @backingInt(edge), 0, 0, none });
     }
 
     /// `evaluate.evalReal(e)` as a real row.
@@ -295,9 +306,10 @@ pub const Lower = struct {
                 const args = ex.args(e);
                 return switch (f) {
                     .realtime => l.b.expr(.realtime, rt, try l.timeRow(), 0),
-                    .itor => if (compile.typeOf(r, args[0]).real) l.refuse("$itor of a real") else l.b.expr(.real_of_int, rt, try l.self_(args[0], 0), 0),
+                    .abstime => l.b.expr(.abstime, rt, 0, 0),
+                    .itor => if (compile.typeOf(r, args[0]).real) l.b.expr(.math1, rt, try l.real(args[0]), @backingInt(Program.Math.itor)) else l.b.expr(.real_of_int, rt, try l.self_(args[0], 0), 0),
                     .bitstoreal => l.b.expr(.bitstoreal, rt, try l.self_(args[0], 64), 0),
-                    inline .ln, .log10, .exp, .sqrt, .floor, .ceil, .sin, .cos, .tan, .asin, .acos, .atan, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh => |m| l.b.expr(.math1, rt, try l.real(args[0]), @backingInt(@field(Program.Math, @tagName(m)))),
+                    inline .ln, .log10, .exp, .sqrt, .floor, .ceil, .sin, .cos, .tan, .asin, .acos, .atan, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh, .ln1p, .expm1 => |m| l.b.expr(.math1, rt, try l.real(args[0]), @backingInt(@field(Program.Math, @tagName(m)))),
                     inline .pow, .atan2, .hypot => |m| blk: {
                         const pair = try l.b.listOf(&.{ try l.real(args[0]), try l.real(args[1]) });
                         break :blk l.b.expr(.math2, rt, pair.start, @backingInt(@field(Program.Math, @tagName(m))));
@@ -317,13 +329,18 @@ pub const Lower = struct {
     /// The `Program.Call` of subroutine `idx` with actuals `args`, in
     /// `extra` (`activations.callSync`'s copy-in and copy-out).
     pub fn call(l: *Lower, idx: u32, args: []const ExprId) E!u32 {
+        const sub = l.r.routines.rows.items[idx];
+        if (!sub.compiled) return l.refuse("a subroutine compiled only for a constant fold");
+        return l.callWith(idx, args, sub.frame.ports);
+    }
+
+    /// `call` over the formals `ports` (a timed activation's frame).
+    pub fn callWith(l: *Lower, idx: u32, args: []const ExprId, ports: []const u32) E!u32 {
         const r = l.r;
         const sub = r.routines.rows.items[idx];
-        if (!sub.compiled) return l.refuse("a subroutine compiled only for a constant fold");
-        if (sub.body != null) return l.refuse("a call of a timed recursive task");
         var words: std.ArrayList(u32) = .empty;
         const none = @backingInt(Program.Ref.none);
-        for (sub.decl.ports, args, sub.frame.ports) |p, arg, slot| {
+        for (sub.decl.ports, args, ports) |p, arg, slot| {
             const in: u32 = if (p.direction == .output) none else try l.evalFor(arg, r.slotType(slot));
             var out: u32 = none;
             var ty: Ty = .bit;
@@ -334,6 +351,21 @@ pub const Lower = struct {
             try words.appendSlice(l.a, &.{ in, out, @bitCast(ty), 0 });
         }
         return l.b.extraOf(Program.Call{ .sub = idx, .args = try l.b.listOf(words.items) });
+    }
+
+    /// A §17.6 `Program.QueueCall` of `args` (`outs[k]`: argument k is
+    /// written; the rest are read), in `extra`.
+    pub fn queueCall(l: *Lower, op: Program.QueueOp, args: []const ExprId, outs: []const bool) E!u32 {
+        const none = @backingInt(Program.Ref.none);
+        var words: [8]u32 = @splat(none);
+        var tys: [4]Ty = @splat(.bit);
+        for (args, outs[0..args.len], 0..) |arg, out, k| {
+            if (out) {
+                words[4 + k] = try l.place(arg);
+                tys[k] = try l.tyOf(try l.targetType(arg));
+            } else words[k] = try l.self_(arg, 0);
+        }
+        return l.b.extraOf(Program.QueueCall{ .op = op, .scope = l.r.scope, .args = try l.b.listOf(&words), .ty1 = tys[1], .ty2 = tys[2], .ty3 = tys[3] });
     }
 
     /// A §5.5 type as a `Program.Ty`, refused past 2^30 bits.
@@ -378,23 +410,22 @@ pub const Lower = struct {
     }
 
     /// The `Program.Elem` of array element reference `e`, in `extra`.
-    fn elem(l: *Lower, e: ExprId) E!u32 {
+    pub fn elem(l: *Lower, e: ExprId) E!u32 {
         const r = l.r;
         const ex = &r.file.exprs;
         const c = r.chainBase(e);
         const base = try l.slotOf(c.base);
         const arr = r.decls.arrays.get(base).?;
-        const dims = try l.a.alloc(u32, 3 * c.depth);
+        const n = Program.Elem.dim_words;
+        const dims = try l.a.alloc(u32, n * c.depth);
         var x = e;
         var k = c.depth;
         while (k != 0) : (x = ex.lhs(x)) {
             k -= 1;
             const span: digital.Span = if (k == 0) .{ .low = arr.low, .high = arr.high } else arr.rest[k - 1];
-            const low = std.math.cast(i32, span.low) orelse return l.refuse("an array bound past i32");
-            const high = std.math.cast(i32, span.high) orelse return l.refuse("an array bound past i32");
-            dims[3 * k] = try l.self_(ex.rhs(x), 0);
-            dims[3 * k + 1] = @bitCast(low);
-            dims[3 * k + 2] = @bitCast(high);
+            const low: u64 = @bitCast(@as(i64, span.low));
+            const high: u64 = @bitCast(@as(i64, span.high));
+            dims[n * k ..][0..n].* = .{ try l.self_(ex.rhs(x), 0), @truncate(low), @truncate(low >> 32), @truncate(high), @truncate(high >> 32) };
         }
         return l.b.extraOf(Program.Elem{ .base = base, .count = arr.count, .dims = try l.b.listOf(dims) });
     }
@@ -406,8 +437,8 @@ pub const Lower = struct {
         const v = ex.lhs(e);
         const base = r.baseSlot(v) catch return l.refuse("a select base the old engine refuses");
         const range = r.vecRange(base);
-        const msb = std.math.cast(i32, range.msb) orelse return l.refuse("a vector bound past i32");
-        const lsb = std.math.cast(i32, range.lsb) orelse return l.refuse("a vector bound past i32");
+        const msb: i64 = range.msb;
+        const lsb: i64 = range.lsb;
         const el: u32 = if (ex.tag(v) == .index) try l.elem(v) else std.math.maxInt(u32);
         const rg = ex.rhs(e);
         var sel: Program.Select = .{ .slot = base, .elem = el, .msb = msb, .lsb = lsb, .mode = .bit, .index = 0, .count = 1, .first = 0 };
@@ -415,7 +446,7 @@ pub const Lower = struct {
             .range => {
                 const ps = r.typing.part_selects.get(.{ .spec = r.specOf(r.scope), .e = e }) orelse return l.refuse("an unfolded part-select");
                 sel.mode = .const_part;
-                sel.first = std.math.cast(i32, range.position(ps.lsb)) orelse return l.refuse("a part-select position past i32");
+                sel.first = std.math.cast(i64, range.position(ps.lsb)) orelse return l.refuse("a part-select position past i64");
                 sel.count = std.math.cast(u32, @abs(ps.msb - ps.lsb) + 1) orelse return l.refuse("a part-select past u32");
             },
             .indexed_range => {
@@ -442,6 +473,8 @@ pub const Lower = struct {
             .time => try l.b.expr(.time, natural, try l.timeRow(), 0),
             .stime => try l.b.expr(.stime, natural, try l.timeRow(), 0),
             .clog2 => try l.b.expr(.clog2, Ty.int(32, true), try l.self_(args[0], 0), 0),
+            // §17.10: a run is given no plusargs, so no query matches.
+            .test_plusargs, .value_plusargs => try l.b.int(natural, 0),
             .fopen, .fgets, .ferror, .fgetc, .ungetc, .ftell, .rewind, .fseek, .feof => blk: {
                 const none = @backingInt(Program.Ref.none);
                 var c: Program.FileCall = .{ .op = std.meta.stringToEnum(Program.FileOp, @tagName(f)).?, .x = none, .y = none, .z = none, .place = none, .ty = .bit };
@@ -467,6 +500,42 @@ pub const Lower = struct {
                 }
                 break :blk try l.b.expr(.file, natural, try l.b.extraOf(c), 0);
             },
+            .sscanf, .fscanf => blk: {
+                var outs: std.ArrayList(u32) = .empty;
+                for (args[2..]) |o| {
+                    const tt = try l.targetType(o);
+                    try outs.appendSlice(l.a, &.{ try l.place(o), @bitCast(try l.tyOf(tt)), tt.width });
+                }
+                // `%m`: the scope's path and the named blocks around the call.
+                var path: std.Io.Writer.Allocating = .init(l.a);
+                const saved = r.out;
+                r.out = &path.writer;
+                defer r.out = saved;
+                digital.for_emitter.display.emitScope(r) catch return l.refuse("a scan path the old engine refuses");
+                r.out = saved;
+                const c = try l.b.extraOf(Program.ScanCall{ .src = try l.self_(args[0], 0), .format = try l.self_(args[1], 0), .outs = try l.b.listOf(outs.items), .module = try l.b.string(path.written()), .scope = r.scope });
+                break :blk try l.b.expr(.scan, natural, c, @intFromBool(f == .fscanf));
+            },
+            .fread => blk: {
+                const none = @backingInt(Program.Ref.none);
+                const target = args[0];
+                var fr: Program.Fread = .{ .fd = try l.self_(args[1], 0), .place = none, .ty = .bit, .prior = none, .base = none, .low = 0, .high = 0, .start = none, .count = none };
+                const arr = if (ex.tag(target) == .ident) r.decls.arrays.get(try l.slotOf(target)) else null;
+                if (arr) |m| {
+                    fr.base = try l.slotOf(target);
+                    fr.low = m.low;
+                    fr.high = m.high;
+                    if (args.len > 2 and args[2] != .none) fr.start = try l.self_(args[2], 0);
+                    if (args.len > 3) fr.count = try l.self_(args[3], 0);
+                } else {
+                    const tt = try l.targetType(target);
+                    fr.place = try l.place(target);
+                    fr.ty = try l.tyOf(tt);
+                    fr.prior = try l.self_(target, tt.width);
+                }
+                break :blk try l.b.expr(.fread, natural, try l.b.extraOf(fr), 0);
+            },
+            .q_full => try l.b.expr(.q_full, natural, try l.queueCall(.initialize, args, &.{ false, true, false, false }), 0),
             .random, .dist_uniform, .dist_normal, .dist_exponential, .dist_poisson, .dist_chi_square, .dist_t, .dist_erlang => blk: {
                 const none = @backingInt(Program.Ref.none);
                 const dist: Program.Dist = switch (f) {

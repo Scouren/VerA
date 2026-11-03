@@ -9,6 +9,7 @@
 //! Contents:
 //! - `pub fn call(s: *State, a: Allocator, at: u32) Error!i64`
 //! - `pub fn fshow(s: *State, a: Allocator, at: u32) Error!void`
+//! - `pub fn write(s: *State, a: Allocator, d: i64, at: u32) Error!void`
 //! - `pub fn fclose(s: *State, a: Allocator, row: u32) Error!void`
 //! - `pub fn closeAll(s: *State) void`
 
@@ -90,12 +91,16 @@ pub fn call(s: *State, a: Allocator, at: u32) Error!i64 {
 /// to every channel its descriptor names.
 pub fn fshow(s: *State, a: Allocator, at: u32) Error!void {
     const f = s.p.extraData(Program.FShow, at);
-    const d = (try descriptor(s, a, f.fd)) orelse return;
+    try write(s, a, (try descriptor(s, a, f.fd)) orelse return, f.show);
+}
+
+/// Show row `show`'s text to every channel descriptor `d` names.
+pub fn write(s: *State, a: Allocator, d: i64, at: u32) Error!void {
     var buf: std.Io.Writer.Allocating = .init(a);
     const saved = s.out;
     s.out = &buf.writer;
     defer s.out = saved;
-    try display.show(s, a, f.show, 0);
+    try display.show(s, a, at, 0);
     s.out = saved;
     if (try channels(s, d, buf.written()))
         try s.warn("no file this descriptor names is open for writing: the output is not written", .{});
@@ -104,6 +109,16 @@ pub fn fshow(s: *State, a: Allocator, at: u32) Error!void {
 /// §17.2.7 `$fclose` of the descriptor row `row`.
 pub fn fclose(s: *State, a: Allocator, row: u32) Error!void {
     const d = (try descriptor(s, a, row)) orelse return;
+    // "Active $fmonitor and/or $fstrobe operations on a file descriptor or
+    // multichannel descriptor are implicitly cancelled": one on an mcd any
+    // of whose channels `d` closes stops whole, as iverilog's does.
+    const mcd = d & (1 << 31) == 0;
+    var k: usize = 0;
+    while (k < s.fmonitors.items.len) {
+        const fd = s.fmonitors.items[k].fd;
+        const hit = if (mcd and fd & (1 << 31) == 0) fd & d != 0 else fd == d;
+        if (hit) _ = s.fmonitors.orderedRemove(k) else k += 1;
+    }
     const io = s.io orelse return;
     _ = s.files.close(io, d);
 }

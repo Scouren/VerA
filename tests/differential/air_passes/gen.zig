@@ -9,7 +9,11 @@
 //! nested bodies; runs counted `while` loops (a counter slot, 1-3 trips);
 //! and returns a sum over its values and slots. A sample draws each
 //! parameter inside its range and each probe inside the host's bound, or
-//! from a wide spread of finite doubles when there is none.
+//! from a wide spread of finite doubles when there is none. A box sample
+//! (the Float oracle's) draws each input inside or outside its box: a
+//! parameter's declared range, `[-bound, bound]` for a probe. Outside
+//! reaches the overflowing magnitudes, ±inf and NaN; so does an unranged
+//! parameter's inside, which is everything.
 //! Cites: VAMS-2023 §3.4.2, §4.2.12, §4.3.1, §4.3.2, §4.4, §5.7, §5.8, §5.9.
 //!
 //! Contents:
@@ -17,6 +21,8 @@
 //! - `pub const Program = struct` (`deinit`)
 //! - `pub fn generate(gpa: Allocator, ip: *InternPool, r: std.Random) !Program`
 //! - `pub fn sample(p: *const Program, r: std.Random, args: *[params_n]interp.Value, probes: *[probes_n]f64) void`
+//! - `pub fn sampleBox(p: *const Program, r: std.Random, bound: f64, args: *[params_n]interp.Value, probes: *[probes_n]f64) void`
+//! - `pub fn admits(s: Shape, x: f64) bool`
 //! - `pub fn ranges(s: Shape) []const Interval.Range`
 
 const std = @import("std");
@@ -234,6 +240,33 @@ pub fn sample(p: *const Program, r: std.Random, args: *[params_n]interp.Value, p
     for (args) |a| assert(math.isFinite(a.real));
 }
 
+/// Writes one sample for the Float oracle: with probability 1/2 every input
+/// inside its box, else each input inside or outside it at random.
+pub fn sampleBox(p: *const Program, r: std.Random, bound: f64, args: *[params_n]interp.Value, probes: *[probes_n]f64) void {
+    assert(bound > 0);
+    const all_in = r.boolean();
+    for (args, p.shapes) |*a, s| a.* = .{ .real = if (all_in or r.boolean()) inBox(r, s) else outShape(r, s) };
+    for (probes) |*x| x.* = if (all_in or r.boolean()) inBound(r, bound) else outBound(r, bound);
+    if (all_in) for (args, p.shapes) |a, s| assert(admits(s, a.real));
+}
+
+/// Whether `x` lies in shape `s`'s §3.4.2 range, read off the shape itself
+/// (not through `Interval.fromRanges`): the oracle's own box. An unranged
+/// parameter admits everything, NaN included; `exclude 0` admits ±inf but
+/// not NaN, which fails every comparison of an entry check.
+pub fn admits(s: Shape, x: f64) bool {
+    return switch (s) {
+        .none => true,
+        .positive_open => x > 0 and x < math.inf(f64),
+        .one_to_ten => x >= 1 and x <= 10,
+        .unit_closed => x >= -1 and x <= 1,
+        .negative => x >= -10 and x <= -1,
+        .nonzero => x != 0 and !math.isNan(x),
+        .unit_open => x > -1 and x < 1,
+        .non_negative => x >= 0 and x <= 10,
+    };
+}
+
 /// Returns shape `s` as §3.4.2 ranges.
 pub fn ranges(s: Shape) []const Interval.Range {
     const inf = math.inf(f64);
@@ -259,6 +292,49 @@ fn wide(r: std.Random) f64 {
         7 => ([_]f64{ 0, 1, -1, 1e-300, -1e-300, 1e300, -1e300, math.floatMax(f64), -math.floatMax(f64), math.floatTrueMin(f64) })[r.uintLessThan(usize, 10)],
         else => r.floatNorm(f64),
     };
+}
+
+/// ±inf or NaN.
+fn special(r: std.Random) f64 {
+    return ([_]f64{ math.inf(f64), -math.inf(f64), math.nan(f64) })[r.uintLessThan(usize, 3)];
+}
+
+/// A parameter inside its box: an unranged one is sometimes ±inf or NaN.
+fn inBox(r: std.Random, s: Shape) f64 {
+    if (s == .none and r.uintLessThan(u8, 8) == 0) return special(r);
+    return inShape(r, s);
+}
+
+/// A parameter outside its box, or, for `.none` (no outside), anything.
+fn outShape(r: std.Random, s: Shape) f64 {
+    // Bound: a few draws, most of which miss a narrow range.
+    for (0..8) |_| {
+        const x = if (r.uintLessThan(u8, 4) == 0) special(r) else wide(r);
+        if (!admits(s, x)) return x;
+    }
+    return math.nan(f64);
+}
+
+/// A probe inside `[-b, b]`, often at an end.
+fn inBound(r: std.Random, b: f64) f64 {
+    if (r.uintLessThan(u8, 8) == 0) return if (r.boolean()) b else -b;
+    return (r.float(f64) * 2 - 1) * b;
+}
+
+/// A probe outside `[-b, b]`: just past it, a few times it, an overflowing
+/// magnitude, ±inf or NaN.
+fn outBound(r: std.Random, b: f64) f64 {
+    const sign: f64 = if (r.boolean()) 1 else -1;
+    const u = r.float(f64);
+    const x = switch (r.uintLessThan(u8, 6)) {
+        0 => sign * math.nextAfter(f64, b, math.inf(f64)),
+        1 => sign * b * (2 + 9 * u),
+        2 => sign * ([_]f64{ 1e300, math.floatMax(f64), math.inf(f64) })[r.uintLessThan(usize, 3)],
+        3 => math.nan(f64),
+        else => sign * b * (2 + @exp(u * 700)),
+    };
+    assert(!(@abs(x) <= b));
+    return x;
 }
 
 fn inShape(r: std.Random, s: Shape) f64 {

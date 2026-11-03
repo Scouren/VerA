@@ -20,6 +20,7 @@ const AstGen = @import("../AstGen.zig");
 const decl = @import("decl.zig");
 const expr = @import("expr.zig");
 const Token = @import("../tokenizer.zig").Token;
+const number_literal = @import("../number_literal.zig");
 const Inst = Vir.Inst;
 const Node = Ast.Node;
 const Scope = AstGen.Scope;
@@ -33,8 +34,11 @@ const no_exprs: Inst.Exprs = .{ .body = .empty, .values = .empty };
 pub fn moduleInstances(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
     const tree = ag.tree;
     const x = tree.extraData(tree.nodeData(node).extra, Node.Instantiation);
-    const params = try args(ag, scope, tree.extraDataSlice(.{ .start = x.params_start, .end = x.params_end }, Node.OptionalIndex));
+    const slots = tree.extraDataSlice(.{ .start = x.params_start, .end = x.params_end }, Node.OptionalIndex);
+    const params = try args(ag, scope, slots);
+    const scaled = scaledLiteral(tree, tree.nodeMainToken(node));
     const target = try ag.identString(tree.nodeMainToken(node));
+    const attrs = try prefixAttrs(ag, scope, tree.nodeMainToken(node));
     for (tree.extraDataSlice(.{ .start = x.items_start, .end = x.items_end }, Node.Index)) |i| {
         const inst = ag.reserved(i);
         const in = tree.extraData(tree.nodeData(i).extra, Node.Instance);
@@ -43,12 +47,14 @@ pub fn moduleInstances(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void 
             .name = name,
             .prev = decl.prevOf(scope, name, inst),
             .target = target,
-            .flags = .{ .kind = .module },
+            .flags = .{ .kind = .module, .scaled = scaled },
             .strength = .empty,
             .delay = no_exprs,
             .range = try decl.exprBody(ag, scope, in.range),
             .params = params,
             .conns = try args(ag, scope, tree.extraDataSlice(.{ .start = in.conns_start, .end = in.conns_end }, Node.OptionalIndex)),
+            .defaults = .empty,
+            .attrs = attrs,
         });
     }
 }
@@ -79,6 +85,8 @@ pub fn gateInstances(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
             .range = try decl.exprBody(ag, scope, gi.range),
             .params = .empty,
             .conns = try args(ag, scope, terms),
+            .defaults = try ag.defaultsAt(d.main_token),
+            .attrs = .empty,
         });
     }
 }
@@ -128,6 +136,54 @@ pub fn specify(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
 // ---- private ----
 
 /// A.2.2.2: whether `tag` opens a strength group.
+/// The specs of the §2.9 attribute instances directly before token `tok`
+/// (Ast.zig: an attribute prefixes the construct at the token after its
+/// `*)`), in source order. A source with none before `tok` costs one
+/// token compare; one with some, a scan of the nodes for each instance.
+fn prefixAttrs(ag: *AstGen, scope: *Scope, tok: Ast.TokenIndex) Error!Vir.List(Inst.Attr) {
+    const tree = ag.tree;
+    if (tok == 0 or tree.tokenTag(tok - 1) != .asterisk_r_paren) return .empty;
+    // Back over the run of instances to the first `(*`.
+    var first = tok;
+    while (first > 0 and tree.tokenTag(first - 1) == .asterisk_r_paren) {
+        var k = first - 1;
+        while (k > 0 and tree.tokenTag(k) != .l_paren_asterisk) k -= 1;
+        first = k;
+    }
+    var out: std.ArrayList(Inst.Attr) = .empty;
+    for (tree.nodes.items(.tag), tree.nodes.items(.main_token), 0..) |tag, main, n| {
+        if (tag != .attribute or main < first or main >= tok) continue;
+        const specs = tree.extraDataSlice(tree.nodeData(@fromBackingInt(@as(u32, @intCast(n)))).extra_range, Node.Index);
+        for (specs) |sp| try out.append(ag.arena, .{
+            .name = try ag.identString(tree.nodeMainToken(sp)),
+            .value = try decl.exprBody(ag, scope, tree.nodeData(sp).opt_node),
+        });
+    }
+    return ag.addList(Inst.Attr, out.items);
+}
+
+/// Whether the `#( ... )` after module name token `name` holds a real
+/// literal written with a Table 2-1 scale factor, anywhere in its values.
+fn scaledLiteral(tree: *const Ast, name: Ast.TokenIndex) bool {
+    if (tree.tokenTag(name + 1) != .hash or tree.tokenTag(name + 2) != .l_paren) return false;
+    var depth: u32 = 0;
+    var k = name + 2;
+    while (k < tree.tokens.len) : (k += 1) switch (tree.tokenTag(k)) {
+        .l_paren => depth += 1,
+        .r_paren => {
+            depth -= 1;
+            if (depth == 0) return false;
+        },
+        .number_literal => {
+            const text = tree.tokenSlice(k);
+            if (std.mem.findScalar(u8, text, '\'') == null and number_literal.scaleExponent(text[text.len - 1]) != null) return true;
+        },
+        .eof => return false,
+        else => {}, // else: only a number literal carries a scale factor
+    };
+    return false;
+}
+
 fn strengthWord(tag: Token.Tag) bool {
     return switch (tag) {
         .keyword_supply0, .keyword_strong0, .keyword_pull0, .keyword_weak0, .keyword_highz0, .keyword_supply1, .keyword_strong1, .keyword_pull1, .keyword_weak1, .keyword_highz1, .keyword_small, .keyword_medium, .keyword_large => true,

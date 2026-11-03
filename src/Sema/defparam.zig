@@ -152,7 +152,7 @@ pub fn collect(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index,
     const upward = (try render(w, env, lhs[lhs.len - 1].toRef(), &text)) orelse return;
     const origin: u32 = @intCast(w.origins.items.len);
     try w.origins.append(s.arena, .{ .file = file, .src = i.toRef(), .text = text.items });
-    const value = if (try env.body(a.rhs)) |c| try env.intern(c) else InternPool.Index.undef;
+    const value = try env.bodyValue(a.rhs);
     const dot = std.mem.findScalarLast(u8, text.items, '.');
     const param = if (dot) |d| text.items[d + 1 ..] else text.items;
     var rel = if (dot) |d| text.items[0..d] else "";
@@ -165,12 +165,20 @@ pub fn collect(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index,
         anchor = up;
         rel = if (head_end < rel.len and rel[head_end] == '.') rel[head_end + 1 ..] else rel[head_end..];
     };
+    // IEEE 1364-2005 §12.8.1: a defparam of its own instance's parameter
+    // whose value reads that parameter has no value to be in force first.
+    if (anchor == index and rel.len == 0) if (env.named(param)) |target| if (try env.dependsOn(a.rhs, target)) {
+        w.origins.items[origin].used = true;
+        return s.fail(.E0907, file, i.toRef(), "`{s}` is applied before its instance's parameters take their values, and its value reads `{s}` itself (IEEE 1364-2005 12.8.1)", .{ text.items, param });
+    };
     try place(w, anchor, rel, param, value, origin);
 }
 
 // ---- private ----
 
 fn later(a: Dp, b: Dp) bool {
+    assert(a.name.len != 0);
+    assert(b.name.len != 0);
     if (a.file != b.file) return @backingInt(a.file) > @backingInt(b.file);
     return @backingInt(a.src) > @backingInt(b.src);
 }
@@ -264,7 +272,7 @@ fn render(w: *Walk, env: *Env, r: Inst.Ref, out: *std.ArrayList(u8)) Allocator.E
                 else => return null, // else: a defparam's path names instances and scopes, and ends at a parameter
             };
             try out.appendSlice(arena, w.prefixes.get(d) orelse "");
-            try out.appendSlice(arena, vir.string(name));
+            try out.appendSlice(arena, try walk.segment(arena, vir.string(name)));
             return false;
         },
         .str_ref => {

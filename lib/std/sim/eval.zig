@@ -25,6 +25,10 @@ const State = @import("State.zig");
 const logic = @import("logic.zig");
 const calls = @import("calls.zig");
 const files = @import("files.zig");
+const scan = @import("scan.zig");
+const queues = @import("queues.zig");
+const time = @import("time.zig");
+const wide = @import("wide.zig");
 const Literal = logic.Literal;
 const Bit = logic.Bit;
 const Error = State.Error;
@@ -88,13 +92,30 @@ pub fn eval(s: *State, a: Allocator, e: u32) Error!Literal {
             else => .xnor_bits, // else: the sixth reduction
         }), ty),
         .truth => scalarIn(a, try truth(s, a, d.a), ty),
-        .add, .sub, .mul, .div, .mod => (try eval(s, a, d.a)).arithmetic(a, switch (row.tag) {
-            .add => .add,
-            .sub => .subtract,
-            .mul => .multiply,
-            .div => .divide,
-            else => .remainder, // else: `%`
-        }, try eval(s, a, d.b)),
+        .add, .sub => (try eval(s, a, d.a)).arithmetic(a, if (row.tag == .add) .add else .subtract, try eval(s, a, d.b)),
+        .mul, .div, .mod, .pow => blk: {
+            const x = try eval(s, a, d.a);
+            const y = try eval(s, a, d.b);
+            const op: wide.Op = switch (row.tag) {
+                .mul => .mul,
+                .div => .div,
+                .mod => .rem,
+                else => .pow, // else: `**`
+            };
+            const widest = @max(x.width, y.width);
+            if (widest > 64 and widest <= wide.max_width) {
+                const out = try filled(a, if (op == .pow) x.width else widest, if (op == .pow) x.signed else x.signed and y.signed, .zero);
+                const done = wide.arith(op, x, y, out);
+                assert(done);
+                break :blk out;
+            }
+            break :blk if (op == .pow) x.power(a, y) else x.arithmetic(a, switch (op) {
+                .mul => .multiply,
+                .div => .divide,
+                .rem => .remainder,
+                .pow => unreachable,
+            }, y);
+        },
         .bit_and, .bit_or, .bit_xor, .bit_xnor => (try eval(s, a, d.a)).bitwise(a, switch (row.tag) {
             .bit_and => .and_bits,
             .bit_or => .or_bits,
@@ -107,7 +128,6 @@ pub fn eval(s: *State, a: Allocator, e: u32) Error!Literal {
             .ashl => .arithmetic_left,
             else => .arithmetic_right, // else: `>>>`
         }, try eval(s, a, d.b)),
-        .pow => (try eval(s, a, d.a)).power(a, try eval(s, a, d.b)),
         .eq, .neq, .case_eq, .case_neq => scalarIn(a, (try eval(s, a, d.a)).equality(switch (row.tag) {
             .eq => .equal,
             .neq => .not_equal,
@@ -167,7 +187,7 @@ pub fn eval(s: *State, a: Allocator, e: u32) Error!Literal {
             break :blk normalize(a, v, w, ty.signed);
         },
         .int_of_real => normalize(a, try logic.intOfReal(a, try real(s, a, d.a)), w, ty.signed),
-        .real_of_int, .real_neg, .real_add, .real_sub, .real_mul, .real_div, .real_pow, .real_cond, .realtime, .bitstoreal, .math1, .math2 => logic.realLiteral(a, try real(s, a, e)),
+        .real_of_int, .real_neg, .real_add, .real_sub, .real_mul, .real_div, .real_pow, .real_cond, .realtime, .abstime, .bitstoreal, .math1, .math2 => logic.realLiteral(a, try real(s, a, e)),
         .real_eq, .real_neq, .real_lt, .real_le, .real_gt, .real_ge => blk: {
             const l = try real(s, a, d.a);
             const r = try real(s, a, d.b);
@@ -204,6 +224,18 @@ pub fn eval(s: *State, a: Allocator, e: u32) Error!Literal {
         .call => normalize(a, try calls.call(s, a, d.a), w, ty.signed),
         .file => blk: {
             const raw: u64 = @bitCast(try files.call(s, a, d.a));
+            const v = try filled(a, w, ty.signed, .zero);
+            v.values()[0] = if (w >= 64) raw else raw & ((@as(u64, 1) << @intCast(w)) - 1);
+            break :blk v;
+        },
+        .q_full => blk: {
+            const v = try filled(a, w, ty.signed, .zero);
+            v.values()[0] = @intCast(try queues.qFull(s, a, d.a));
+            break :blk v;
+        },
+        .scan, .fread => blk: {
+            const r = if (row.tag == .fread) try scan.fread(s, a, d.a) else if (d.b == 0) try scan.sscanf(s, a, d.a) else try scan.fscanf(s, a, d.a);
+            const raw: u64 = @bitCast(r);
             const v = try filled(a, w, ty.signed, .zero);
             v.values()[0] = if (w >= 64) raw else raw & ((@as(u64, 1) << @intCast(w)) - 1);
             break :blk v;
@@ -254,6 +286,7 @@ pub fn real(s: *State, a: Allocator, e: u32) Error!f64 {
             };
         },
         .realtime => p.times[d.a].scale.realAt(s.scheduler.now),
+        .abstime => time.secondsAt(s.scheduler.now, p.finest),
         .bitstoreal => @bitCast((try eval(s, a, d.a)).values()[0]),
         .math1 => math1(@fromBackingInt(@intCast(d.b)), try real(s, a, d.a)),
         .math2 => blk: {
@@ -297,17 +330,19 @@ pub fn read(s: *const State, a: Allocator, slot: u32) Error!Literal {
 /// index. Every index is evaluated before an out-of-range one decides.
 pub fn address(s: *State, a: Allocator, el: Program.Elem) Error!?u32 {
     const dims = s.p.list(el.dims);
-    assert(dims.len % 3 == 0);
+    const n = Program.Elem.dim_words;
+    assert(dims.len % n == 0);
     var at: u64 = 0;
     var stride: u64 = 1;
     var inside = true;
     // Row-major: the last dimension is the innermost.
-    var k = dims.len / 3;
+    var k = dims.len / n;
     while (k != 0) {
         k -= 1;
-        const idx = indexOf(try eval(s, a, dims[3 * k])) orelse return null;
-        const low: i64 = @as(i32, @bitCast(dims[3 * k + 1]));
-        const high: i64 = @as(i32, @bitCast(dims[3 * k + 2]));
+        const d = dims[n * k ..][0..n];
+        const idx = indexOf(try eval(s, a, d[0])) orelse return null;
+        const low: i64 = @bitCast(@as(u64, d[1]) | @as(u64, d[2]) << 32);
+        const high: i64 = @bitCast(@as(u64, d[3]) | @as(u64, d[4]) << 32);
         if (idx < low or idx > high) inside = false;
         if (inside) at += stride * @as(u64, @intCast(idx - low));
         stride *= @as(u64, @intCast(high - low + 1));
@@ -456,7 +491,7 @@ fn selection(s: *State, a: Allocator, sl: Program.Select) Error!?Sel {
 
 /// Storage position of declared index `i` of a `[msb:lsb]` vector.
 fn position(sl: Program.Select, i: i64) i64 {
-    return if (sl.msb >= sl.lsb) i -| sl.lsb else @as(i64, sl.lsb) -| i;
+    return if (sl.msb >= sl.lsb) i -| sl.lsb else sl.lsb -| i;
 }
 
 fn readSelect(s: *State, a: Allocator, sl: Program.Select) Error!Literal {
@@ -506,6 +541,7 @@ fn math1(f: Program.Math, x: f64) f64 {
         .atanh => std.math.atanh(x),
         .ln1p => std.math.log1p(x),
         .expm1 => std.math.expm1(x),
+        .itor => if (std.math.isFinite(@round(x))) @round(x) else 0,
         .pow, .atan2, .hypot => unreachable, // two arguments: `math2`
     };
 }

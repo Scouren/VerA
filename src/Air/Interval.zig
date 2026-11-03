@@ -1,22 +1,37 @@
 //! The Air passes' abstract value: a real interval with open or closed ends
-//! and the one hole a divisor proof needs, plus a transfer per value tag (an
-//! operand's `Abstract` in, the result's out). Pure arithmetic: no Air walk,
-//! no allocation, no diagnostics. Every transfer is sound for
-//! `Air/interp.zig`'s semantics: its bound is the value `interp` computes
-//! at the operand's bound (`interp.unary`/`binary`), and the falsification
-//! oracle (tests/differential/air_passes.zig) holds every interval against
-//! every value a run defines. An integer's interval holds `@floatFromInt`
-//! of it, which is monotone, so an integer fact closes its ends.
+//! and the one hole a divisor proof needs, a may-be-NaN bit beside it, and a
+//! transfer per value tag (an operand's `Abstract` in, the result's out).
+//! Pure arithmetic: no Air walk, no allocation, no diagnostics.
+//!
+//! Every transfer is sound for IEEE 754 round-to-nearest as
+//! `Air/interp.zig` computes it, with no overflow contract: an interval's
+//! members are the extended reals, so a sum that can pass `floatMax` reaches
+//! `inf` and is not finite, and every way an operation can make NaN from
+//! numbers (`inf - inf`, `0 * inf`, `0 / 0`, `sin(inf)`, a negative base
+//! under a fraction, an operand outside the domain) sets `nan`. A bound is
+//! the value `interp` computes at the operand's extreme member: rounding is
+//! monotone, so for `+ - * /`, `sqrt`, `floor` and `ceil` (correctly
+//! rounded) that bound is exact; the library functions are not correctly
+//! rounded and need not be monotone (`tanh` drops 1 ulp between neighbours
+//! near 0.337), so their bounds move `lib_ulps` outward and are clamped to
+//! the function's range. The falsification oracle
+//! (tests/differential/air_passes.zig) holds every interval and every NaN
+//! bit against every value a run defines. An integer's interval holds
+//! `@floatFromInt` of it, which is monotone, so an integer fact closes its
+//! ends.
 //! Cites: VAMS-2023 §3.2, §3.4.2, §4.2.1.1, §4.2.1.2, §4.2.4, §4.3.1
-//! (Table 4-14), §4.3.2 (Table 4-15); IEEE 1364-2005 §5.1.5.
+//! (Table 4-14), §4.3.2 (Table 4-15); IEEE 754-2019 §4.3, §6.1, §7.2;
+//! IEEE 1364-2005 §5.1.5.
 //!
 //! Contents:
 //! - `pub const Interval = @This()` (fields `lo`, `hi`, `lo_open`, `hi_open`, `nonzero`)
 //! - `pub const top: Interval`, `pub const i32_range: Interval`, `pub const i64_range: Interval`
-//! - `pub const Abstract = struct { iv: Interval, finite: bool }`
+//! - `pub const Abstract = struct { iv: Interval, nan: bool }` (`finite`)
 //! - `pub const Range = struct`
+//! - `pub const lib_ulps: u32`
 //! - `pub fn point(x: f64) Interval`
 //! - `pub fn bounded(i: Interval) bool`, `pub fn isEmpty(i: Interval) bool`, `pub fn excludesInf(i: Interval) bool`
+//! - `pub fn whole(i: Interval) bool`
 //! - `pub fn gt(i: Interval, k: f64) bool`, `ge`, `lt`, `le`, `pub fn excludesZero(i: Interval) bool`
 //! - `pub fn meet(a: Interval, b: Interval) Interval`, `pub fn join(a: Interval, b: Interval) Interval`
 //! - `pub fn widen(old: Interval, new: Interval) Interval`
@@ -35,12 +50,14 @@ const Air = @import("../Air.zig");
 const interp = @import("interp.zig");
 const Tag = Air.Inst.Tag;
 
-/// File-as-struct. `top` is `[-inf, inf]`, the "no evidence" element. NaN
-/// never is a bound: a NaN constant is `top`, and a transfer answers `top`
-/// for a NaN endpoint. Empty (`lo > hi`) is unreachable and satisfies every
-/// domain vacuously. A predicate is sound, not exact: `true` is a proof
-/// about every member, `false` only the absence of one. An interval says
-/// nothing about NaN: that is `Abstract.finite`'s.
+/// File-as-struct. The members are extended reals: a closed infinite end
+/// admits that infinity, an open one only the finite doubles before it.
+/// `top` is `[-inf, inf]`, the "no evidence" element. NaN never is a bound:
+/// a NaN constant is `top`, and a transfer answers `top` for a NaN
+/// endpoint. Empty (`lo > hi`) is unreachable and satisfies every domain
+/// vacuously. A predicate is sound, not exact: `true` is a proof about
+/// every member, `false` only the absence of one. An interval says nothing
+/// about NaN: that is `Abstract.nan`'s.
 pub const Interval = @This();
 
 lo: f64 = -math.inf(f64),
@@ -59,9 +76,20 @@ pub const i32_range: Interval = .{ .lo = -2147483648.0, .hi = 2147483647.0 };
 /// An `i64`, as the interpreter and the device carry an integer.
 pub const i64_range: Interval = .{ .lo = -0x1p63, .hi = 0x1p63 };
 
-/// A value's abstract state: its interval for the domain proofs, and the
-/// separate fact "is a finite double" that sets the float mode.
-pub const Abstract = struct { iv: Interval, finite: bool };
+/// A value's abstract state: the interval holding every non-NaN value it
+/// takes, and whether it may be NaN.
+pub const Abstract = struct {
+    iv: Interval,
+    nan: bool,
+
+    /// Returns whether every value is a finite double: never NaN, never
+    /// ±inf. An empty interval (an unreached value) is vacuously finite.
+    pub fn finite(a: Abstract) bool {
+        const r = !a.nan and (a.iv.isEmpty() or a.iv.excludesInf());
+        if (r) assert(!a.iv.contains(math.inf(f64)));
+        return r;
+    }
+};
 
 /// One §3.4.2 value range of a parameter, its bounds folded literally
 /// (null: a bound that does not fold, which proves nothing).
@@ -73,8 +101,16 @@ pub const Range = struct {
     hi_inclusive: bool = true,
 };
 
+/// The ulps a library function's computed bound moves outward: twice the
+/// worst drop between neighbouring doubles measured over 10^6 random points
+/// per function (`tanh`, 1 ulp; the rest of `interp`'s math, none). The
+/// move never crosses zero: near its zero no function's computed sign was
+/// wrong (2·10^6 samples each), so `ln` over `[1, x]` stays `>= 0`.
+pub const lib_ulps: u32 = 2;
+
 comptime {
     assert(@sizeOf(Interval) == 24);
+    assert(lib_ulps >= 1);
 }
 
 /// Returns `[x, x]`, or `top` for NaN.
@@ -90,6 +126,16 @@ pub fn point(x: f64) Interval {
 pub fn bounded(i: Interval) bool {
     const r = math.isFinite(i.lo) and math.isFinite(i.hi);
     if (r) assert(i.excludesInf());
+    return r;
+}
+
+/// Returns whether `i` admits every double and NaN, so an input in it needs
+/// no entry check: `[-inf, inf]` closed, with no hole. Any other interval's
+/// check (`contains`) refuses NaN.
+pub fn whole(i: Interval) bool {
+    const r = i.lo == -math.inf(f64) and i.hi == math.inf(f64) and !i.lo_open and !i.hi_open and !i.nonzero;
+    if (r) assert(i.contains(math.inf(f64)));
+    if (!r) assert(!i.contains(math.nan(f64)));
     return r;
 }
 
@@ -242,48 +288,50 @@ pub fn fromRanges(ranges: []const Range, integer_param: bool) Interval {
     return iv;
 }
 
-/// Returns real unary `tag` over `a`. A tag the interpreter computes as a
-/// non-decreasing function maps the ends; an operand straddling the
-/// function's domain edge gives `top`. Finite needs a finite operand, and a
-/// bounded result for the tags that overflow.
+/// Returns real unary `tag` over `a`: the bounds are `interp`'s values at
+/// `a`'s extreme members (moved `lib_ulps` outward for a library
+/// function), closed; an operand straddling the function's domain edge
+/// gives `top` and may be NaN, as does `sin`, `cos` or `tan` of ±inf.
 pub fn unary(tag: Tag, a: Abstract) Abstract {
-    const out = unaryRaw(tag, a.iv, a.finite);
-    if (out.finite) assert(a.finite);
-    if (out.iv.nonzero) assert(a.iv.nonzero); // only `fabs` passes the hole on
-    return out;
+    const out = unaryRaw(tag, a.iv);
+    const r: Abstract = .{ .iv = out.iv, .nan = a.nan or out.nan };
+    if (a.nan) assert(r.nan);
+    if (r.iv.nonzero) assert(a.iv.nonzero); // only `fabs` passes the hole on
+    return r;
 }
 
-/// Returns real binary `tag` over `x` and `y`. `+ - * /`, `%` and `hypot`
-/// on finite operands stay finite, a divisor that may be zero aside: the
-/// old prover's rule 3, an axiom the oracle states as a host contract (a
-/// sample where one overflows is dropped).
+/// Returns real binary `tag` over `x` and `y`, with no overflow contract:
+/// a bound past `floatMax` is ±inf, so `1e200 * 1e200` is not finite.
+/// `min`/`max` pass on only their second operand's NaN (§4.3.1: a NaN
+/// first operand picks the second).
 pub fn binary(tag: Tag, x: Abstract, y: Abstract) Abstract {
-    const f = x.finite and y.finite;
-    const out = binaryRaw(tag, x.iv, y.iv, f, x.finite);
-    if (out.finite) assert(f);
+    const out = binaryRaw(tag, x.iv, y.iv, x.nan);
+    const nan = out.nan or y.nan or (x.nan and tag != .fmin and tag != .fmax);
+    if (y.nan) assert(nan);
     if (out.iv.nonzero) assert(x.iv.nonzero or y.iv.nonzero); // only a hull (or an empty operand) keeps the hole
-    return out;
+    return .{ .iv = out.iv, .nan = nan };
 }
 
 /// Returns a call's abstract value from its callee's range
 /// (`Air.CallFacts.Range`); `arg` is its one argument's, read by `limexp`
-/// and `$vt`. An unknown call is top and not finite: it costs `.strict`,
+/// and `$vt`. An unknown call is top and may be NaN: it costs `.strict`,
 /// never a wrong `.optimized`.
 pub fn call(range: Air.CallFacts.Range, arg: Abstract) Abstract {
+    const inf = math.inf(f64);
     const r: Abstract = switch (range) {
-        .unknown => .{ .iv = top, .finite = false },
-        .finite => .{ .iv = top, .finite = true },
-        .int, .param_given => .{ .iv = i64_range, .finite = true },
-        .unit => .{ .iv = .{ .lo = 0, .hi = 1 }, .finite = true },
-        .positive => .{ .iv = .{ .lo = 0, .lo_open = true, .nonzero = true }, .finite = true },
-        .non_negative => .{ .iv = .{ .lo = 0 }, .finite = true },
+        .unknown => .{ .iv = top, .nan = true },
+        .finite => .{ .iv = .{ .lo = -inf, .hi = inf, .lo_open = true, .hi_open = true }, .nan = false },
+        .int, .param_given => .{ .iv = i64_range, .nan = false },
+        .unit => .{ .iv = .{ .lo = 0, .hi = 1 }, .nan = false },
+        .positive => .{ .iv = .{ .lo = 0, .lo_open = true, .hi_open = true, .nonzero = true }, .nan = false },
+        .non_negative => .{ .iv = .{ .lo = 0, .hi_open = true }, .nan = false },
         // §4.5.13: "not distinguishable from exp()".
         .limexp => unary(.exp, arg),
-        // §9.15 kT/q: the argument's sign; only the sign matters to a proof.
-        .vt => binary(.fmul, arg, .{ .iv = .point(8.617333262145179e-5), .finite = true }),
+        // §9.15 kT/q.
+        .vt => binary(.fmul, arg, .{ .iv = .point(8.617333262145179e-5), .nan = false }),
     };
-    if (range == .unknown) assert(!r.finite);
-    if (r.finite and (range == .limexp or range == .vt)) assert(arg.finite);
+    if (range == .unknown) assert(!r.finite());
+    if (r.finite() and (range == .limexp or range == .vt)) assert(!arg.nan);
     return r;
 }
 
@@ -357,93 +405,80 @@ pub fn integer(tag: Tag, x: Interval, y: Interval) Interval {
 
 // ---- private ----
 
-fn unaryRaw(tag: Tag, a: Interval, af: bool) Abstract {
-    if (a.isEmpty()) return .{ .iv = a, .finite = af };
-    if (monotone(tag)) {
-        const lo = f1(tag, a.lo);
-        const hi = f1(tag, a.hi);
-        // A NaN end means the operand straddles the domain edge (ln(-1),
+fn unaryRaw(tag: Tag, a: Interval) Abstract {
+    if (a.isEmpty()) return .{ .iv = a, .nan = false };
+    const may_inf = !a.excludesInf();
+    if (monotone(tag) or tag == .acos) {
+        // `acos` decreases on [-1, 1]: its bounds swap ends.
+        const rising = tag != .acos;
+        const lo = f1(tag, if (rising) inLo(a) else inHi(a));
+        const hi = f1(tag, if (rising) inHi(a) else inLo(a));
+        // A NaN end: the operand straddles the domain edge (ln(-1),
         // acosh(0.5)), and the ends then do not span the range.
-        if (math.isNan(lo) or math.isNan(hi)) return .{ .iv = top, .finite = false };
-        // An open end stays open only where rounding keeps it open: every
-        // double past an open end maps past f(end) when the next one does.
-        // ponytail: trusts the computed f to be monotone; the oracle checks.
-        const iv: Interval = .{
-            .lo = @min(lo, hi),
-            .hi = @max(lo, hi),
-            .lo_open = a.lo_open and f1(tag, math.nextAfter(f64, a.lo, math.inf(f64))) > lo,
-            .hi_open = a.hi_open and f1(tag, math.nextAfter(f64, a.hi, -math.inf(f64))) < hi,
-        };
-        const overflows = tag == .exp or tag == .expm1 or tag == .sinh;
-        return .{ .iv = iv, .finite = af and (!overflows or iv.bounded()) };
+        if (math.isNan(lo) or math.isNan(hi)) return .{ .iv = top, .nan = true };
+        const m = ulps(tag);
+        var iv: Interval = .{ .lo = down(@min(lo, hi), m), .hi = up(@max(lo, hi), m) };
+        // exp(0) = 1 exactly, and a faithfully rounded value never crosses
+        // a double its true value does not cross: exp of x >= 0 stays >= 1
+        // (the zeros of the rest are `down`'s and `up`'s).
+        if (tag == .exp and inLo(a) >= 0) iv.lo = @max(iv.lo, 1);
+        if (tag == .exp and inHi(a) <= 0) iv.hi = @min(iv.hi, 1);
+        return .{ .iv = iv.meet(codomain(tag)), .nan = false };
     }
     return switch (tag) {
-        .fneg => .{ .iv = .{ .lo = -a.hi, .hi = -a.lo, .lo_open = a.hi_open, .hi_open = a.lo_open }, .finite = af },
-        .fabs => .{ .iv = absIv(a), .finite = af },
-        // §4.3.2 acos decreases on [-1, 1].
-        .acos => blk: {
-            const lo = f1(.acos, a.hi);
-            const hi = f1(.acos, a.lo);
-            if (math.isNan(lo) or math.isNan(hi)) break :blk .{ .iv = top, .finite = false };
-            break :blk .{ .iv = .{ .lo = lo, .hi = hi }, .finite = af };
-        },
+        .fneg => .{ .iv = .{ .lo = -a.hi, .hi = -a.lo, .lo_open = a.hi_open, .hi_open = a.lo_open }, .nan = false },
+        .fabs => .{ .iv = absIv(a), .nan = false },
         // cosh is even and grows with |x|.
-        .cosh => blk: {
-            const iv: Interval = .{ .lo = 1, .hi = f1(.cosh, absIv(a).hi) };
-            break :blk .{ .iv = iv, .finite = af and iv.bounded() };
-        },
-        .sin, .cos => .{ .iv = .{ .lo = -1, .hi = 1 }, .finite = af },
+        .cosh => .{ .iv = .{ .lo = 1, .hi = up(f1(.cosh, absIv(a).hi), lib_ulps) }, .nan = false },
+        // sin(±inf) and cos(±inf) are NaN.
+        .sin, .cos => .{ .iv = .{ .lo = -1, .hi = 1 }, .nan = may_inf },
+        // tan of a finite double is finite (no double is a pole), but no
+        // bound short of the poles' neighbourhood holds.
+        .tan => .{ .iv = top, .nan = may_inf },
         // §5.6.1.2: a latch holds an earlier solve's value, which no guard here bounds.
-        .tan, .path_prev, .path_acc => .{ .iv = top, .finite = false },
+        .path_prev, .path_acc => .{ .iv = top, .nan = true },
         else => unreachable, // else: `unary` is called for the real unary value tags; the monotone ones returned above
     };
 }
 
-fn binaryRaw(tag: Tag, x: Interval, y: Interval, f: bool, xf: bool) Abstract {
-    if (x.isEmpty()) return .{ .iv = x, .finite = f };
-    if (y.isEmpty()) return .{ .iv = y, .finite = f };
+fn binaryRaw(tag: Tag, x: Interval, y: Interval, x_nan: bool) Abstract {
+    if (x.isEmpty()) return .{ .iv = x, .nan = false };
+    if (y.isEmpty()) return .{ .iv = y, .nan = false };
+    const inf = math.inf(f64);
+    const x_inf = !x.excludesInf();
+    const y_inf = !y.excludesInf();
     return switch (tag) {
-        // A sum's end is open only if the sum just inside the open ends
-        // still rounds past it: (0:1] + 1e20 is [1e20, 1e20].
-        .fadd => .{ .iv = .{
-            .lo = addLo(x.lo, y.lo),
-            .hi = addHi(x.hi, y.hi),
-            .lo_open = (x.lo_open or y.lo_open) and addLo(inLo(x), inLo(y)) > addLo(x.lo, y.lo),
-            .hi_open = (x.hi_open or y.hi_open) and addHi(inHi(x), inHi(y)) < addHi(x.hi, y.hi),
-        }, .finite = f },
-        .fsub => .{ .iv = .{
-            .lo = addLo(x.lo, -y.hi),
-            .hi = addHi(x.hi, -y.lo),
-            .lo_open = (x.lo_open or y.hi_open) and addLo(inLo(x), -inHi(y)) > addLo(x.lo, -y.hi),
-            .hi_open = (x.hi_open or y.lo_open) and addHi(inHi(x), -inLo(y)) < addHi(x.hi, -y.lo),
-        }, .finite = f },
-        .fmul => .{ .iv = combine(x, y, mulOp), .finite = f },
-        .fdiv => blk: {
-            // A divisor that may be zero gives ±inf (§4.2.4 permits it).
-            if (!y.excludesZero()) break :blk .{ .iv = top, .finite = false };
-            // Corners are sound for `/` only over a one-signed divisor; an
-            // open end at 0 divides by the zero of its own side.
-            var yd = y;
-            if (y.lt(0) and y.hi == 0) yd.hi = -0.0;
-            if (y.gt(0) and y.lo == 0) yd.lo = 0.0;
-            break :blk .{ .iv = if (y.gt(0) or y.lt(0)) combine(x, yd, divOp) else top, .finite = f };
+        // Rounding is monotone, so the sum of the extreme members bounds
+        // every sum; inf - inf is NaN.
+        .fadd => .{
+            .iv = .{ .lo = addLo(inLo(x), inLo(y)), .hi = addHi(inHi(x), inHi(y)) },
+            .nan = (x.contains(-inf) and y.contains(inf)) or (x.contains(inf) and y.contains(-inf)),
         },
-        // §4.2.4: |x % y| < |y|, with the dividend's sign; `% 0` has no value.
+        .fsub => .{
+            .iv = .{ .lo = addLo(inLo(x), -inHi(y)), .hi = addHi(inHi(x), -inLo(y)) },
+            .nan = (x.contains(inf) and y.contains(inf)) or (x.contains(-inf) and y.contains(-inf)),
+        },
+        .fmul => .{ .iv = combine(x, y, mulOp), .nan = (x.contains(0) and y_inf) or (x_inf and y.contains(0)) },
+        // A divisor that may be zero gives ±inf (§4.2.4 permits it).
+        // Corners are sound for `/` only over a one-signed divisor; its
+        // extreme members exclude 0 itself.
+        .fdiv => .{
+            .iv = if (y.gt(0) or y.lt(0)) combine(x, y, divOp) else top,
+            .nan = (x.contains(0) and y.contains(0)) or (x_inf and y_inf),
+        },
+        // §4.2.4: |x % y| < |y| and <= |x|, with the dividend's sign; `% 0`
+        // has no value, and a non-NaN result is finite.
         .fmod => blk: {
-            const m = absIv(y).hi;
-            const iv: Interval = if (math.isFinite(m)) .{ .lo = if (x.ge(0)) 0 else -m, .hi = if (x.le(0)) 0 else m } else top;
-            break :blk .{ .iv = iv, .finite = f };
+            const b = @min(absIv(y).hi, absIv(x).hi, math.floatMax(f64));
+            break :blk .{ .iv = .{ .lo = if (x.ge(0)) 0 else -b, .hi = if (x.le(0)) 0 else b }, .nan = x_inf };
         },
-        .pow => blk: {
-            const iv = powIv(x, y);
-            break :blk .{ .iv = iv, .finite = f and iv.bounded() };
-        },
-        .hypot => .{ .iv = .{ .lo = 0, .hi = addHi(absIv(x).hi, absIv(y).hi) }, .finite = f },
-        .atan2 => .{ .iv = .{ .lo = -math.pi, .hi = math.pi }, .finite = f },
+        .pow => .{ .iv = powIv(x, y), .nan = !x.ge(0) and !integerPoint(y) },
+        .hypot => .{ .iv = .{ .lo = 0, .hi = up(addHi(absIv(x).hi, absIv(y).hi), lib_ulps) }, .nan = false },
+        .atan2 => .{ .iv = .{ .lo = down(-math.pi, lib_ulps), .hi = up(math.pi, lib_ulps) }, .nan = false },
         // §4.3.1 `(x < y) ? x : y`: a NaN `x` picks `y`, so a maybe-NaN
-        // `x` (not finite) bounds the result only by the hull.
-        .fmin => .{ .iv = if (xf) .{ .lo = @min(x.lo, y.lo), .hi = @min(x.hi, y.hi) } else x.join(y), .finite = f },
-        .fmax => .{ .iv = if (xf) .{ .lo = @max(x.lo, y.lo), .hi = @max(x.hi, y.hi) } else x.join(y), .finite = f },
+        // `x` bounds the result only by the hull.
+        .fmin => .{ .iv = if (!x_nan) .{ .lo = @min(x.lo, y.lo), .hi = @min(x.hi, y.hi) } else x.join(y), .nan = false },
+        .fmax => .{ .iv = if (!x_nan) .{ .lo = @max(x.lo, y.lo), .hi = @max(x.hi, y.hi) } else x.join(y), .nan = false },
         else => unreachable, // else: `binary` is called for the real binary value tags
     };
 }
@@ -453,12 +488,53 @@ fn allBelow(x: Interval, y: Interval) bool {
     return x.hi < y.lo or (x.hi == y.lo and (x.hi_open or y.lo_open));
 }
 
-/// The tags the interpreter computes as a non-decreasing function.
+/// The tags the interpreter computes as a non-decreasing function (up to
+/// `ulps`).
 fn monotone(tag: Tag) bool {
     return switch (tag) {
         .exp, .expm1, .ln, .ln1p, .log10, .sqrt, .sinh, .tanh, .asinh, .atan, .asin, .atanh, .acosh, .floor, .ceil => true,
         else => false, // else: not monotone; `unaryRaw`'s switch has its rule
     };
+}
+
+/// The ulps a monotone tag's computed bound moves outward: none for the
+/// correctly rounded ones, `lib_ulps` for a library function.
+fn ulps(tag: Tag) u32 {
+    return switch (tag) {
+        .sqrt, .floor, .ceil => 0,
+        else => lib_ulps, // else: every other tag is a library function
+    };
+}
+
+/// The range a computed function never leaves, met after `ulps` moved a
+/// bound outward past it (exp(-inf) is 0, not one ulp below).
+fn codomain(tag: Tag) Interval {
+    return switch (tag) {
+        .exp, .acosh, .acos => .{ .lo = 0 },
+        .expm1 => .{ .lo = -1 },
+        .tanh => .{ .lo = -1, .hi = 1 },
+        else => top, // else: no range the bounds need clamping to
+    };
+}
+
+/// `x` moved `n` doubles toward -inf, never below 0 from a value at or
+/// above it; an infinity stays put.
+fn down(x: f64, n: u32) f64 {
+    var r = x;
+    for (0..n) |_| r = if (math.isFinite(r)) math.nextAfter(f64, r, -math.inf(f64)) else r;
+    if (x >= 0) r = @max(r, 0);
+    assert(!(r > x));
+    return r;
+}
+
+/// `x` moved `n` doubles toward +inf, never above 0 from a value at or
+/// below it; an infinity stays put.
+fn up(x: f64, n: u32) f64 {
+    var r = x;
+    for (0..n) |_| r = if (math.isFinite(r)) math.nextAfter(f64, r, math.inf(f64)) else r;
+    if (x <= 0) r = @min(r, 0);
+    assert(!(r < x));
+    return r;
 }
 
 /// `interp`'s value of real unary `tag` at `x`.
@@ -476,45 +552,69 @@ fn divOp(a: f64, b: f64) f64 {
     return a / b;
 }
 
-/// The hull of `f` at the box's four corners, closed. A NaN corner (0*inf,
-/// inf/inf) gives `top`. Sound when `f` is monotone in each argument over
-/// the box: `*` always, `/` over a one-signed divisor, `pow` for x >= 0.
+/// The hull of `f` at the corners of the box's extreme members, closed. A
+/// NaN corner (0*inf, inf/inf) gives `top`. Sound when `f` is monotone in
+/// each argument over the box, as computed: `*` always, `/` over a
+/// one-signed divisor, `pow` for x >= 0 (up to `lib_ulps`, which the caller
+/// adds).
 fn combine(x: Interval, y: Interval, f: *const fn (f64, f64) f64) Interval {
-    const c: @Vector(4, f64) = .{ f(x.lo, y.lo), f(x.lo, y.hi), f(x.hi, y.lo), f(x.hi, y.hi) };
+    const xl = inLo(x);
+    const xh = inHi(x);
+    const yl = inLo(y);
+    const yh = inHi(y);
+    const c: @Vector(4, f64) = .{ f(xl, yl), f(xl, yh), f(xh, yl), f(xh, yh) };
     if (@reduce(.Or, c != c)) return top;
     const r: Interval = .{ .lo = @reduce(.Min, c), .hi = @reduce(.Max, c) };
     assert(r.lo <= r.hi);
     return r;
 }
 
-/// §4.3.1 pow over a box. Corners hold only where pow is monotone in each
-/// argument: x >= 0. A base that may be negative needs one known integer
-/// exponent (an even one has its interior minimum at 0; a negative one a
-/// pole at 0, sound only for a strictly negative base).
+/// §4.3.1 pow over a box, its bounds `lib_ulps` outward. Corners hold only
+/// where pow is monotone in each argument: x >= 0. A base that may be
+/// negative needs one known integer exponent (an even one has its interior
+/// minimum at 0; a negative one a pole at 0, sound only for a strictly
+/// negative base).
 fn powIv(x: Interval, y: Interval) Interval {
-    if (x.ge(0)) {
+    // C99 F.10.4.4: pow(x, ±0) and pow(1, y) are exactly 1, NaN operands
+    // included: no ulps to add.
+    const one = (y.lo == 0 and y.hi == 0) or (x.lo == 1 and x.hi == 1);
+    const r: Interval = if (one) .point(1) else if (x.ge(0)) nonneg: {
         // A zero end may hold -0.0 (0 * -1): its corners use +0, where pow
         // is monotone, and pow(-0, -odd) = -inf joins the sign it flips.
-        var xp = x;
+        var xp: Interval = .{ .lo = inLo(x), .hi = inHi(x) };
         if (xp.lo == 0) xp.lo = 0.0;
         if (xp.hi == 0) xp.hi = 0.0;
-        var r = combine(xp, y, powOp);
-        if (x.contains(0) and !y.ge(0)) r.lo = -math.inf(f64);
-        return r;
-    }
-    const k = y.lo;
-    if (!(y.lo == y.hi and math.isFinite(k) and k == @trunc(k))) return top;
-    if (k >= 0) {
-        if (@mod(k, 2) == 0) {
-            const m = absIv(x);
-            return .{ .lo = powOp(m.lo, k), .hi = powOp(m.hi, k) };
-        }
-        return .{ .lo = powOp(x.lo, k), .hi = powOp(x.hi, k) };
-    }
-    if (!(x.hi < 0)) return top;
-    const a = powOp(x.lo, k);
-    const b = powOp(x.hi, k);
-    return .{ .lo = @min(a, b), .hi = @max(a, b) };
+        var c = outward(combine(xp, y, powOp)).meet(.{ .lo = 0 });
+        if (x.contains(0) and !y.ge(0)) c.lo = -math.inf(f64);
+        break :nonneg c;
+    } else if (!integerPoint(y))
+        top
+    else if (y.lo >= 0 and @mod(y.lo, 2) == 0) even: {
+        const m = absIv(x);
+        break :even outward(.{ .lo = powOp(m.lo, y.lo), .hi = powOp(m.hi, y.lo) });
+    } else if (y.lo >= 0)
+        outward(.{ .lo = powOp(inLo(x), y.lo), .hi = powOp(inHi(x), y.lo) })
+    else if (x.lt(0)) neg: {
+        const a = powOp(inLo(x), y.lo);
+        const b = powOp(inHi(x), y.lo);
+        break :neg outward(.{ .lo = @min(a, b), .hi = @max(a, b) });
+    } else top;
+    assert(!(r.lo > r.hi));
+    return r;
+}
+
+/// `i` with each end `lib_ulps` outward, closed.
+fn outward(i: Interval) Interval {
+    const r: Interval = .{ .lo = down(i.lo, lib_ulps), .hi = up(i.hi, lib_ulps) };
+    assert(!(r.lo > i.lo));
+    assert(!(r.hi < i.hi));
+    return r;
+}
+
+/// Whether every member of `y` is one integer: the exponent that rescues
+/// a negative base.
+fn integerPoint(y: Interval) bool {
+    return y.lo == y.hi and math.isFinite(y.lo) and y.lo == @trunc(y.lo);
 }
 
 fn absIv(a: Interval) Interval {
@@ -637,57 +737,63 @@ test "fromRanges: §3.4.2 brackets decide the hole and the clipped ends" {
     try std.testing.expectEqual(top, fromRanges(&.{.{ .kind = .from, .lo = null, .hi = 1 }}, false));
 }
 
-test "unary: every value interp computes inside the operand is in the result" {
-    // The old prover's transfer oracle, with `interp` as the device: ends
-    // where rounding collapses an open bound (exp underflows below about
-    // -745, tanh saturates past about ±19.1, floor and ceil are flat).
+test "unary: every value interp computes inside the operand is in the result, or the result may be NaN" {
+    // The old prover's transfer oracle, with `interp` as the device and no
+    // excuse for NaN or ±inf: ends where rounding collapses an open bound
+    // (exp underflows below about -745, tanh saturates past about ±19.1,
+    // floor and ceil are flat), the infinities themselves, and the doubles
+    // beside each end.
     const inf = math.inf(f64);
-    const ops = [_]Tag{ .exp, .expm1, .ln, .ln1p, .log10, .sqrt, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh, .asin, .acos, .atan, .sin, .cos, .floor, .ceil, .fneg, .fabs };
-    const ends = [_]f64{ -inf, -800, -20, -2, -1, -0.5, 0, 0.5, 1, 2, 20, 800, inf };
+    const ops = [_]Tag{ .exp, .expm1, .ln, .ln1p, .log10, .sqrt, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh, .asin, .acos, .atan, .sin, .cos, .tan, .floor, .ceil, .fneg, .fabs };
+    const ends = [_]f64{ -inf, -800, -20, -2, -1, -0.5, 0, 0.5, 1, 2, 20, 709.7, 800, inf };
     const extra = [_]f64{ -799, -19.9, -0.7, 0.7, 1.5, 2.5, 19.9, 799 };
     const opens = [_][2]bool{ .{ false, false }, .{ true, false }, .{ false, true }, .{ true, true } };
     var ivs: [ends.len * ends.len * opens.len]Interval = undefined;
     var buf: [16]f64 = undefined;
     for (ops) |op| for (intervals(&ends, &opens, &ivs)) |a| {
-        const out = unary(op, .{ .iv = a, .finite = true });
+        const out = unary(op, .{ .iv = a, .nan = false });
         for (samplePoints(a, &extra, &buf)) |x| {
             const y = f1(op, x);
-            if (math.isNan(y)) continue; // outside the domain: the domain check's, not the interval's
-            try std.testing.expect(out.iv.contains(y));
-            // A finite claim holds inside the domain; outside it the domain
-            // check (`Float/domain.zig`) clears it.
-            const inside = switch (Air.tag_info.get(op).domain) {
-                .positive => x > 0,
-                .gt_neg_one => x > -1,
-                .non_negative => x >= 0,
-                .unit_closed => -1 <= x and x <= 1,
-                .unit_open => -1 < x and x < 1,
-                .ge_one => x >= 1,
-                .all, .nonzero_divisor, .tan_poles, .pow_sign => true,
-            };
-            if (out.finite and inside and math.isFinite(x)) try std.testing.expect(math.isFinite(y));
+            if (math.isNan(y)) try std.testing.expect(out.nan) else try std.testing.expect(out.iv.contains(y));
+            if (out.finite()) try std.testing.expect(math.isFinite(y));
         }
     };
 }
 
-test "binary: every value interp computes inside the operands is in the result" {
+test "unary: tanh's computed drop between neighbours stays inside the bound" {
+    // Measured: tanh as `interp` computes it is not monotone; it drops 1
+    // ulp between two neighbours near 0.33717500785869. A bound read off
+    // the ends alone misses the low one (the merged transfer did).
+    var x: f64 = 0.3371750078586919;
+    var pts: [5]f64 = undefined;
+    for (&pts) |*p| {
+        p.* = x;
+        x = math.nextAfter(f64, x, math.inf(f64));
+    }
+    const out = unary(.tanh, .{ .iv = .{ .lo = pts[0], .hi = pts[4] }, .nan = false });
+    for (pts) |p| try std.testing.expect(out.iv.contains(f1(.tanh, p)));
+}
+
+test "binary: every value interp computes inside the operands is in the result, or the result may be NaN" {
     // 1e20 absorbs every operand below 2^14 in a sum, so an open end next to
-    // it is not open after rounding.
+    // it is not open after rounding; 1e300 and floatMax overflow a product
+    // or a sum, and nothing promises them finite.
     const inf = math.inf(f64);
+    const max = math.floatMax(f64);
     const ops = [_]Tag{ .fadd, .fsub, .fmul, .fdiv, .fmod, .pow, .hypot, .atan2, .fmin, .fmax };
-    const ends = [_]f64{ -inf, -1, 0, 0.5, 1, 2, 1e20, inf };
+    const ends = [_]f64{ -inf, -max, -1, 0, 0.5, 2, 1e20, 1e300, inf };
     const opens = [_][2]bool{ .{ false, false }, .{ true, true } };
-    const extra = [_]f64{ -0.7, 0.7, -0.0 };
+    const extra = [_]f64{ -0.7, 0.7, -0.0, 3 };
     var ivs: [ends.len * ends.len * opens.len]Interval = undefined;
     const all = intervals(&ends, &opens, &ivs);
-    var xb: [8]f64 = undefined;
-    var yb: [8]f64 = undefined;
+    var xb: [10]f64 = undefined;
+    var yb: [10]f64 = undefined;
     for (ops) |op| for (all) |a| for (all) |b| {
-        const out = binary(op, .{ .iv = a, .finite = true }, .{ .iv = b, .finite = true });
+        const out = binary(op, .{ .iv = a, .nan = false }, .{ .iv = b, .nan = false });
         for (samplePoints(a, &extra, &xb)) |x| for (samplePoints(b, &extra, &yb)) |y| {
             const z = (interp.binary(op, .{ .real = x }, .{ .real = y }) catch continue).real;
-            if (math.isNan(z)) continue; // 0/0, inf - inf, pow(neg, frac): no value to bound
-            try std.testing.expect(out.iv.contains(z));
+            if (math.isNan(z)) try std.testing.expect(out.nan) else try std.testing.expect(out.iv.contains(z));
+            if (out.finite()) try std.testing.expect(math.isFinite(z));
         };
     };
 }

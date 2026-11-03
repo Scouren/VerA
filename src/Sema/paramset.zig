@@ -84,6 +84,8 @@ pub fn resolve(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, target: InternPool
 /// each overload's target, followed while it names paramsets. Bounded by the
 /// paramset count, so a cycle ends.
 pub fn chainEnds(s: *Sema, name: InternPool.String, out: *std.AutoHashMapUnmanaged(InternPool.String, void)) Allocator.Error!void {
+    const before = out.count();
+    defer assert(out.count() >= before);
     assert(name != .empty);
     const zcu = s.zcu;
     var work: std.ArrayList(InternPool.String) = .empty;
@@ -210,6 +212,7 @@ fn admits(s: *Sema, ps: Zcu.Decl, file: Zcu.File.Index, src: Inst.Ref, givens: [
 /// `exclude` range. A bound that does not fold matches a `from` and misses
 /// an `exclude`, so it admits.
 fn inRanges(env: *Env, v: Const, ranges: []const Inst.ValueRange) Allocator.Error!bool {
+    assert(env.positions.count() == env.values.items.len);
     assert(ranges.len != 0);
     var from = false;
     var inside = false;
@@ -227,6 +230,7 @@ fn inRanges(env: *Env, v: Const, ranges: []const Inst.ValueRange) Allocator.Erro
 
 /// Whether `v` lies in `r`, or null when a bound does not fold.
 fn matches(env: *Env, v: Const, r: Inst.ValueRange) Allocator.Error!?bool {
+    assert(env.positions.count() == env.values.items.len);
     if (r.flags.set) {
         const insts = env.vir.body(r.lo);
         if (insts.len == 0) return null;
@@ -250,6 +254,7 @@ fn matches(env: *Env, v: Const, r: Inst.ValueRange) Allocator.Error!?bool {
 /// Applies one tie-breaking rule: scores each surviving candidate and keeps
 /// the minimum (a "greatest" rule negates its count).
 fn tieBreak(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, givens: []const walk.Given, live: *std.ArrayList(Zcu.Decl), rule: TieRule) Allocator.Error!void {
+    assert(live.items.len <= s.zcu.paramsets.items.len);
     assert(live.items.len > 1);
     const zcu = s.zcu;
     const scores = try s.arena.alloc(i64, live.items.len);
@@ -315,6 +320,7 @@ fn tieBreak(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, givens: []const walk.
 /// The connections of the instance instruction `src` of `file`, with the
 /// Vir they are in, or null for a root.
 fn instanceConns(zcu: *const Zcu, file: Zcu.File.Index, src: Inst.Ref) ?struct { vir: *const Vir, list: []const Inst.Arg } {
+    assert(@backingInt(file) < zcu.files.len);
     const i = src.toIndex() orelse return null;
     const vir = zcu.fileVir(file);
     assert(vir.instructions.items(.tag)[@backingInt(i)] == .instance);
@@ -323,6 +329,7 @@ fn instanceConns(zcu: *const Zcu, file: Zcu.File.Index, src: Inst.Ref) ?struct {
 
 /// A module's port names in declaration order, with the Vir they are in.
 fn portNames(s: *Sema, module: Zcu.Decl) Allocator.Error!struct { vir: *const Vir, names: []const Vir.String } {
+    assert(@backingInt(module.file) < s.zcu.files.len);
     assert(s.zcu.declRow(module).kind != .paramset);
     const vir = s.zcu.fileVir(module.file);
     const m = payloadOf(vir, Inst.Module, s.zcu.declRow(module).inst);

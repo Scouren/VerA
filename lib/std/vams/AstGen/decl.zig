@@ -54,8 +54,12 @@ pub fn typeWords(tree: *const Ast, first: Ast.TokenIndex) TypeWords {
     var i = first;
     while (i < tree.tokens.len) : (i += 1) switch (tree.tokenTag(i)) {
         .identifier, .escaped_identifier => {
-            // A discipline is a name another name follows.
-            if (t.discipline != null or !AstGen.isName(tree.tokenTag(i + 1))) return t;
+            // A discipline is a name another name follows, or a range and
+            // then a name (A.2.1.3 `discipline_identifier [range]
+            // list_of_net_identifiers`); an out-of-context name may open
+            // with `$root` (Annex F.2.1).
+            const next = tree.tokenTag(rangeEnd(tree, i + 1));
+            if (t.discipline != null or !(AstGen.isName(next) or next == .system_identifier)) return t;
             t.discipline = i;
         },
         .keyword_wire => t.net = .wire,
@@ -237,6 +241,24 @@ pub fn strengthString(ag: *AstGen, lp: ?Ast.TokenIndex) Error!Vir.String {
 }
 
 // ---- private ----
+
+/// The token after a bracketed range that opens at `i`, or `i` itself when
+/// none does. Brackets nest; the scan stops at the end of the text.
+fn rangeEnd(tree: *const Ast, i: Ast.TokenIndex) Ast.TokenIndex {
+    if (tree.tokenTag(i) != .l_bracket) return i;
+    var depth: u32 = 0;
+    var k = i;
+    while (k < tree.tokens.len) : (k += 1) switch (tree.tokenTag(k)) {
+        .l_bracket => depth += 1,
+        .r_bracket => {
+            depth -= 1;
+            if (depth == 0) return k + 1;
+        },
+        .eof => return k,
+        else => {}, // else: a range's contents
+    };
+    return i;
+}
 
 fn declare(ag: *AstGen, scope: *Scope, tag: Inst.Tag, node: Node.Index, name_tok: Ast.TokenIndex) Error!void {
     try declareNode(ag, scope, tag, node, name_tok);

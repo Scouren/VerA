@@ -430,3 +430,15 @@ test "§10.6 / IEEE 1364-2005 §19.11 keyword sets, as the old parser's tests re
         };
     }
 }
+
+test "IEEE 1364-2005 annex B: a strength keyword names no instance; a name that only starts with one does" {
+    // `small`, `medium` and `large` (A.2.2.2 charge strengths) are
+    // reserved, so `kid small ();` is no module instantiation in either
+    // keyword set; the old parser refuses it alike (lib/frontend/keyword.zig).
+    for ([_]Ast.KeywordSet{ .v1364_2005, .vams_2023 }) |set| {
+        _ = try firstError("module kid; endmodule module top; if (1) kid small (); endmodule", set);
+        _ = try firstError("module kid; endmodule module top; kid large (); endmodule", set);
+        var ok = try parseOk("module kid; endmodule module top; if (1) kid smaller (); else kid larger (); endmodule", set);
+        ok.deinit(testing.allocator);
+    }
+}

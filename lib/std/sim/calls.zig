@@ -9,6 +9,12 @@
 //! - `pub fn call(s: *State, a: Allocator, at: u32) Error!Literal`
 //! - `pub fn copyOut(s: *State, a: Allocator, at: u32) Error!void`
 //! - `pub fn convertValue(a: Allocator, v: Literal, from_real: bool, target: Program.Ty) Error!Literal`
+//! - `pub fn frameWords(s: *const State, first: u32, count: u32) usize`
+//! - `pub fn saveFrame(s: *const State, first: u32, count: u32, out: []u64) void`
+//! - `pub fn loadFrame(s: *State, first: u32, count: u32, from: []const u64) void`
+//! - `pub fn resetFrame(s: *State, first: u32, count: u32) void`
+//! - `pub fn copyIn(s: *State, inputs: []const ?Literal, ports: []const u32) void`
+//! - `pub fn copy(a: Allocator, v: Literal) Error!Literal`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -48,32 +54,11 @@ pub fn call(s: *State, a: Allocator, at: u32) Error!Literal {
     // frame is set aside, reset, and restored after.
     var saved: []u64 = &.{};
     if (sub.automatic) {
-        saved = try a.alloc(u64, 2 * frameWords(s, sub));
-        var w: usize = 0;
-        for (sub.first..sub.first + sub.count) |slot| {
-            const sl = p.slots.get(slot);
-            const n = Program.words(sl.ty.width);
-            @memcpy(saved[w..][0..n], s.v[sl.word..][0..n]);
-            @memcpy(saved[w + n ..][0..n], s.x[sl.word..][0..n]);
-            w += 2 * n;
-            // x, or 0.0 for a real.
-            @memset(s.v[sl.word..][0..n], 0);
-            @memset(s.x[sl.word..][0..n], 0);
-            if (!sl.ty.real) {
-                for (0..n) |i| {
-                    const m = logic.wordMask(sl.ty.width, i);
-                    s.v[sl.word + i] = m;
-                    s.x[sl.word + i] = m;
-                }
-            }
-        }
+        saved = try a.alloc(u64, frameWords(s, sub.first, sub.count));
+        saveFrame(s, sub.first, sub.count, saved);
+        resetFrame(s, sub.first, sub.count);
     }
-    for (inputs, ports) |in, slot| if (in) |v| {
-        const sl = p.slots.get(slot);
-        const n = Program.words(sl.ty.width);
-        @memcpy(s.v[sl.word..][0..n], v.values());
-        @memcpy(s.x[sl.word..][0..n], v.unknowns());
-    };
+    copyIn(s, inputs, ports);
     s.sub_active[c.sub] += 1;
     {
         var body: std.heap.ArenaAllocator = .init(s.arena);
@@ -87,16 +72,7 @@ pub fn call(s: *State, a: Allocator, at: u32) Error!Literal {
         const arg = p.extraData(Program.Arg, c.args.start + @as(u32, @intCast(4 * k)));
         o.* = if (arg.place != none and s.unwind == null) try copy(a, try eval.read(s, a, slot)) else null;
     }
-    if (sub.automatic) {
-        var w: usize = 0;
-        for (sub.first..sub.first + sub.count) |slot| {
-            const sl = p.slots.get(slot);
-            const n = Program.words(sl.ty.width);
-            @memcpy(s.v[sl.word..][0..n], saved[w..][0..n]);
-            @memcpy(s.x[sl.word..][0..n], saved[w + n ..][0..n]);
-            w += 2 * n;
-        }
-    }
+    if (sub.automatic) loadFrame(s, sub.first, sub.count, saved);
     for (outs, ports, 0..) |o, slot, k| if (o) |v| {
         const arg = p.extraData(Program.Arg, c.args.start + @as(u32, @intCast(4 * k)));
         try eval.put(s, a, arg.place, try convertValue(a, v, p.slots.items(.ty)[slot].real, arg.ty), false, null);
@@ -122,16 +98,71 @@ pub fn convertValue(a: Allocator, v: Literal, from_real: bool, target: Program.T
     return logic.normalize(a, i, target.width, i.signed);
 }
 
-// ---- private ----
+/// The words slots [first, first + count) take, both planes.
+pub fn frameWords(s: *const State, first: u32, count: u32) usize {
+    var n: usize = 0;
+    for (first..first + count) |slot| n += 2 * Program.words(s.p.slots.items(.ty)[slot].width);
+    return n;
+}
 
-fn copy(a: Allocator, v: Literal) Error!Literal {
+/// Slots [first, first + count) into `out`, each slot's planes in turn.
+pub fn saveFrame(s: *const State, first: u32, count: u32, out: []u64) void {
+    assert(out.len == frameWords(s, first, count));
+    var w: usize = 0;
+    for (first..first + count) |slot| {
+        const sl = s.p.slots.get(slot);
+        const n = Program.words(sl.ty.width);
+        @memcpy(out[w..][0..n], s.v[sl.word..][0..n]);
+        @memcpy(out[w + n ..][0..n], s.x[sl.word..][0..n]);
+        w += 2 * n;
+    }
+}
+
+/// `saveFrame`'s inverse.
+pub fn loadFrame(s: *State, first: u32, count: u32, from: []const u64) void {
+    assert(from.len == frameWords(s, first, count));
+    var w: usize = 0;
+    for (first..first + count) |slot| {
+        const sl = s.p.slots.get(slot);
+        const n = Program.words(sl.ty.width);
+        @memcpy(s.v[sl.word..][0..n], from[w..][0..n]);
+        @memcpy(s.x[sl.word..][0..n], from[w + n ..][0..n]);
+        w += 2 * n;
+    }
+}
+
+/// §10.2.3 slots [first, first + count) as entering their scope leaves
+/// them: x, or 0.0 for a real.
+pub fn resetFrame(s: *State, first: u32, count: u32) void {
+    for (first..first + count) |slot| {
+        const sl = s.p.slots.get(slot);
+        const n = Program.words(sl.ty.width);
+        @memset(s.v[sl.word..][0..n], 0);
+        @memset(s.x[sl.word..][0..n], 0);
+        if (sl.ty.real) continue;
+        for (0..n) |i| {
+            const m = logic.wordMask(sl.ty.width, i);
+            s.v[sl.word + i] = m;
+            s.x[sl.word + i] = m;
+        }
+    }
+}
+
+/// The evaluated inputs into their ports' slots (no change is published:
+/// an activation's formals are its own).
+pub fn copyIn(s: *State, inputs: []const ?Literal, ports: []const u32) void {
+    assert(inputs.len == ports.len);
+    for (inputs, ports) |in, slot| if (in) |v| {
+        const sl = s.p.slots.get(slot);
+        const n = Program.words(sl.ty.width);
+        @memcpy(s.v[sl.word..][0..n], v.values());
+        @memcpy(s.x[sl.word..][0..n], v.unknowns());
+    };
+}
+
+/// `v` with planes of its own.
+pub fn copy(a: Allocator, v: Literal) Error!Literal {
     var out = v;
     out.planes = try a.dupe(u64, v.planes);
     return out;
-}
-
-fn frameWords(s: *const State, sub: Program.Sub) usize {
-    var n: usize = 0;
-    for (sub.first..sub.first + sub.count) |slot| n += Program.words(s.p.slots.items(.ty)[slot].width);
-    return n;
 }

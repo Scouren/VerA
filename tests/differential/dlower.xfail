@@ -1,0 +1,607 @@
+# diff-dlower's known differences (tests/differential/dlower.zig): one fixture per
+# line, its path under tests/conformance/tests and why it does not agree yet:
+# a construct Sema's digital lowering (src/Sema/digital*) does not lower yet
+# (`lowering: ...`), a stage before it that refuses the fixture, or the first
+# transcript difference. A listed fixture that agrees fails the run until its
+# line goes.
+verilog/03_lexical_conventions/ams_lexical_escaped_hierarchy.v lowering: an instance the elaboration did not make
+verilog/03_lexical_conventions/attribute_positions.v lowering: a net
+verilog/03_lexical_conventions/block_statement_attribute.v lowering: a fork-join block
+verilog/03_lexical_conventions/case_item_statement_attribute.v lowering: a case statement
+verilog/03_lexical_conventions/delay_then_unsized_constant.v lowering: an intra-assignment timing control
+verilog/03_lexical_conventions/examples.v lowering: a net
+verilog/03_lexical_conventions/subroutine_statement_attribute.v lowering: a task or function
+verilog/04_data_types/array_17_dimensions.v lowering: a net
+verilog/04_data_types/array_declarations.v lowering: a net
+verilog/04_data_types/capacitive_network_figure_4_2.v lowering: a net
+verilog/04_data_types/charge_strength_declaration.v lowering: a net
+verilog/04_data_types/generate_block_name_space.v lowering: a net
+verilog/04_data_types/implicit_nets.v lowering: a port connection
+verilog/04_data_types/localparam_from_parameter.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/04_data_types/name_spaces.v lowering: a net
+verilog/04_data_types/native_real_arrays.v lowering: a task or function
+verilog/04_data_types/net_declaration_drive_strength.v lowering: a net
+verilog/04_data_types/net_takes_driver_value.v lowering: a net
+verilog/04_data_types/net_types.v lowering: a net
+verilog/04_data_types/net_x_before_delayed_driver.v lowering: a net
+verilog/04_data_types/parameter_range_selects.v lowering: a net
+verilog/04_data_types/parameter_types_and_ranges.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/04_data_types/parameter_widths.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/04_data_types/parameter_width.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/04_data_types/port_list_parameter_defparam.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/04_data_types/scalar_and_vector.v lowering: a net
+verilog/04_data_types/scalared_vectored.v lowering: a net
+verilog/04_data_types/specparam_module_body_delay.v lowering: a net
+verilog/04_data_types/time_parameter_is_unsigned_64.v lowering: a name declared by `param` that has no slot
+verilog/04_data_types/type_net_array.v lowering: a net
+verilog/04_data_types/type_net_resolution_tables.v lowering: a net
+verilog/04_data_types/type_uwire_single_driver.v lowering: a net
+verilog/04_data_types/unknown_bits_to_real.v lowering: a net
+verilog/04_data_types/untyped_parameter_width.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/04_data_types/uwire_per_bit_drivers.v lowering: a net
+verilog/04_data_types/value_set.v lowering: a net
+verilog/04_data_types/vector_ranges.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/05_expressions/concatenation.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
+verilog/05_expressions/conditional_ambiguous.v lowering: a net
+verilog/05_expressions/conditional_real_x.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/05_expressions/conditional_z_select.v lowering: a net
+verilog/05_expressions/constant_operands.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/05_expressions/constant_select_and_function.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/05_expressions/memory_index_out_of_range_x.v lowering: the system task `$sformat`
+verilog/05_expressions/native_array_selects.v lowering: an intra-assignment timing control
+verilog/05_expressions/native_real_conditionals.v lowering: a task or function
+verilog/05_expressions/native_wide_index_edges.v lowering: a range past 2^32 bits
+verilog/05_expressions/operand_forms.v lowering: a net
+verilog/05_expressions/reg_integer_interpretation.v lowering: a net
+verilog/06_assignments/adder_concatenation_lhs.v lowering: a net
+verilog/06_assignments/assign_delay_inertial.v lowering: a net
+verilog/06_assignments/assign_delay_rise_fall.v lowering: a net
+verilog/06_assignments/assign_delay_single.v lowering: a net
+verilog/06_assignments/assign_delay_turnoff.v lowering: a net
+verilog/06_assignments/assign_drive_strength.v lowering: a net
+verilog/06_assignments/assignment_pending_same_value.v lowering: a net
+verilog/06_assignments/assignment_select_operand.v lowering: a net
+verilog/06_assignments/assignment_variable_initializer.v lowering: a net
+verilog/06_assignments/assignment_vector_delay_unknown.v lowering: a net
+verilog/06_assignments/assignment_vector_delay.v lowering: a net
+verilog/06_assignments/assign_variable_delay.v lowering: a net
+verilog/06_assignments/assign_variable_rise_fall_delay.v lowering: a net
+verilog/06_assignments/cont_assign_reeval.v lowering: a net
+verilog/06_assignments/continuous_drive.v lowering: a net
+verilog/06_assignments/decl_assign_delay_is_one_drivers.v lowering: a net
+verilog/06_assignments/hier_delay.v lowering: a net
+verilog/06_assignments/indexed_part_select_lhs.v lowering: a net
+verilog/06_assignments/native_select_assignment_effects.v lowering: a task or function
+verilog/06_assignments/net_array_element_selects.v lowering: a net
+verilog/06_assignments/net_decl_assign_delay.v lowering: a net
+verilog/06_assignments/net_delay.v lowering: a net
+verilog/06_assignments/net_variable_delay.v lowering: a net
+verilog/06_assignments/one_bit_range_delay.v lowering: a net
+verilog/06_assignments/part_select_drive_strengths.v lowering: a net
+verilog/06_assignments/select_bus.v lowering: a net
+verilog/06_assignments/table_6_1_left_hand_forms.v lowering: a net
+verilog/06_assignments/table_6_1_select_and_concatenation_lhs.v lowering: a net
+verilog/06_assignments/variable_holds_value.v lowering: a task or function
+verilog/06_assignments/vector_net_delay.v lowering: a net
+verilog/07_gate_switch_level/ambiguous_strength_range.v lowering: a net
+verilog/07_gate_switch_level/bidirectional.v lowering: a net
+verilog/07_gate_switch_level/charge_strength_sharing.v lowering: a net
+verilog/07_gate_switch_level/drive_strength_dominance.v lowering: a net
+verilog/07_gate_switch_level/every_primitive.v lowering: a net
+verilog/07_gate_switch_level/figure_combinations.v lowering: a net
+verilog/07_gate_switch_level/gate_delays.v lowering: a net
+verilog/07_gate_switch_level/gate_identifier_delay.v lowering: a net
+verilog/07_gate_switch_level/gate_multibit_input_lsb.v lowering: a net
+verilog/07_gate_switch_level/gates_enable.v lowering: a net
+verilog/07_gate_switch_level/gates_ninput.v lowering: a net
+verilog/07_gate_switch_level/gates_noutput.v lowering: a net
+verilog/07_gate_switch_level/gates_one_input.v lowering: a net
+verilog/07_gate_switch_level/gate_variable_delay.v lowering: a net
+verilog/07_gate_switch_level/highz_half_strength.v lowering: a net
+verilog/07_gate_switch_level/instance_list_shared_spec.v lowering: a net
+verilog/07_gate_switch_level/mos_data_undriven_supply.v lowering: a net
+verilog/07_gate_switch_level/mos_instance_array.v lowering: a net
+verilog/07_gate_switch_level/optional_instance_name.v lowering: a net
+verilog/07_gate_switch_level/primitive_ambiguous_same_polarity.v lowering: a net
+verilog/07_gate_switch_level/primitive_array_broadcast.v lowering: a net
+verilog/07_gate_switch_level/primitive_pull_ignored_polarity.v lowering: a net
+verilog/07_gate_switch_level/primitive_three_delay_unknown.v lowering: a net
+verilog/07_gate_switch_level/primitive_tran_both_directions.v lowering: a net
+verilog/07_gate_switch_level/pull_gate_bit_select.v lowering: a net
+verilog/07_gate_switch_level/pull_gate_instance_array.v lowering: a net
+verilog/07_gate_switch_level/resistive_reduction_table.v lowering: a net
+verilog/07_gate_switch_level/strength_levels.v lowering: a net
+verilog/07_gate_switch_level/strength_reduction.v lowering: a net
+verilog/07_gate_switch_level/supply_net_strength.v lowering: a net
+verilog/07_gate_switch_level/supply_reduced_to_strong.v lowering: a net
+verilog/07_gate_switch_level/switch_bits_strength_delay.v lowering: a net
+verilog/07_gate_switch_level/switch_cmos.v lowering: a net
+verilog/07_gate_switch_level/switch_mos.v lowering: a net
+verilog/07_gate_switch_level/switch_strength_change.v lowering: a net
+verilog/07_gate_switch_level/switch_supply_zero.v lowering: a net
+verilog/07_gate_switch_level/three_drivers_strength_removal.v lowering: a net
+verilog/07_gate_switch_level/tran_from_supply_undriven.v lowering: a net
+verilog/07_gate_switch_level/tranif0_rtranif0_weak_reduction.v lowering: a net
+verilog/07_gate_switch_level/tran_instance_array.v lowering: a net
+verilog/07_gate_switch_level/tran_strength_display.v lowering: a net
+verilog/07_gate_switch_level/tri0_tri1_pull_strength.v lowering: a net
+verilog/07_gate_switch_level/trireg_capacitive_hold.v lowering: a net
+verilog/07_gate_switch_level/trireg_charge_decay.v lowering: a net
+verilog/07_gate_switch_level/two_named_arrays.v lowering: a net
+verilog/07_gate_switch_level/unordered_delay_triples.v lowering: a net
+verilog/07_gate_switch_level/wired_ambiguous_strength.v lowering: a net
+verilog/07_gate_switch_level/wired_equal_strength_table.v lowering: a net
+verilog/07_gate_switch_level/wired_logic_under_strength.v lowering: a net
+verilog/07_gate_switch_level/wired_unequal_strength.v lowering: a net
+verilog/08_udp/definition_placement.v lowering: a net
+verilog/08_udp/header_forms.v lowering: a net
+verilog/08_udp/initial_values.v lowering: a net
+verilog/08_udp/input_minimums.v lowering: a net
+verilog/08_udp/instance_array.v lowering: a net
+verilog/08_udp/instances.v lowering: a net
+verilog/08_udp/jk_edge_ff.v lowering: a net
+verilog/08_udp/multiplexer.v lowering: a net
+verilog/08_udp/output_bit_select.v lowering: a net
+verilog/08_udp/output_reg_initializer.v lowering: a net
+verilog/08_udp/overlapping_entries_agree.v lowering: a net
+verilog/08_udp/sequential_64_inputs.v lowering: a net
+verilog/08_udp/sequential_hold_agrees.v lowering: a net
+verilog/08_udp/table_symbols.v lowering: a net
+verilog/08_udp/two_delays.v lowering: a net
+verilog/08_udp/udp_65_inputs.v lowering: a net
+verilog/08_udp/udp_comb.v lowering: a net
+verilog/08_udp/udp_dff.v lowering: a net
+verilog/08_udp/udp_header_order.v lowering: a net
+verilog/08_udp/udp_initial_instance_delay.v lowering: a net
+verilog/08_udp/udp_latch.v lowering: a net
+verilog/08_udp/udp_potential_edges_dominance.v lowering: a net
+verilog/09_behavioral_modeling/assignment_assign_deassign.v lowering: a procedural continuous assignment
+verilog/09_behavioral_modeling/assignment_force_release.v lowering: a net
+verilog/09_behavioral_modeling/blocking_order_and_target.v lowering: a fork-join block
+verilog/09_behavioral_modeling/block_name_reference.v lowering: a hierarchical name
+verilog/09_behavioral_modeling/block_parameter_and_event.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/09_behavioral_modeling/case_linear_search.v lowering: a task or function
+verilog/09_behavioral_modeling/concatenation_targets.v lowering: a net
+verilog/09_behavioral_modeling/constant_case_expression.v lowering: a task or function
+verilog/09_behavioral_modeling/control.v lowering: a case statement
+verilog/09_behavioral_modeling/dont_care_examples.v lowering: a case statement
+verilog/09_behavioral_modeling/event_array_automatic.v lowering: a task or function
+verilog/09_behavioral_modeling/event_array_native_automatic.v lowering: a task or function
+verilog/09_behavioral_modeling/event_array_native_effects.v lowering: a task or function
+verilog/09_behavioral_modeling/event_array_native_selection.v lowering: a task or function
+verilog/09_behavioral_modeling/event_arrays.v lowering: a task or function
+verilog/09_behavioral_modeling/event_array.v lowering: a fork-join block
+verilog/09_behavioral_modeling/expression_event.v lowering: an event control on an expression or a select
+verilog/09_behavioral_modeling/force_immediate.v lowering: a net
+verilog/09_behavioral_modeling/force_net_selects.v lowering: a net
+verilog/09_behavioral_modeling/force_wire_array_element.v lowering: a net
+verilog/09_behavioral_modeling/fork_join_is_concurrent.v lowering: a fork-join block
+verilog/09_behavioral_modeling/if_else_if_chain.v lowering: a task or function
+verilog/09_behavioral_modeling/intra_assign_delay.v lowering: an intra-assignment timing control
+verilog/09_behavioral_modeling/intra_assignment_delay_blocking.v lowering: an intra-assignment timing control
+verilog/09_behavioral_modeling/intra_assignment_delay_nonblocking.v lowering: an intra-assignment timing control
+verilog/09_behavioral_modeling/intra_assignment_event_blocking.v lowering: an intra-assignment timing control
+verilog/09_behavioral_modeling/loop_rules.v lowering: a disable statement
+verilog/09_behavioral_modeling/named_block_reg.v lowering: a fork-join block
+verilog/09_behavioral_modeling/named_block_variables.v lowering: a disable statement
+verilog/09_behavioral_modeling/named_fork_declarations.v lowering: a fork-join block
+verilog/09_behavioral_modeling/native_concat_targets.v lowering: a net
+verilog/09_behavioral_modeling/native_force_many_selects_of_one_net.v lowering: a net
+verilog/09_behavioral_modeling/native_force_net_selects.v lowering: a net
+verilog/09_behavioral_modeling/native_real_events.v lowering: an event control on an expression or a select
+verilog/09_behavioral_modeling/native_real_scalar_nba.v lowering: an intra-assignment timing control
+verilog/09_behavioral_modeling/native_select_events.v lowering: a net
+verilog/09_behavioral_modeling/native_select_timing.v lowering: a task or function
+verilog/09_behavioral_modeling/native_wide_event_indices.v lowering: a trigger of an event array element or a hierarchical event
+verilog/09_behavioral_modeling/nba_event_control_region.v lowering: an intra-assignment timing control
+verilog/09_behavioral_modeling/nba_event_control_update_region.v lowering: an intra-assignment timing control
+verilog/09_behavioral_modeling/nba_index_snapshot.v lowering: an intra-assignment timing control
+verilog/09_behavioral_modeling/nba_pending_updates.v lowering: an intra-assignment timing control
+verilog/09_behavioral_modeling/nba_same_time_updates.v lowering: an intra-assignment timing control
+verilog/09_behavioral_modeling/nonblocking_event_control.v lowering: an intra-assignment timing control
+verilog/09_behavioral_modeling/nonblocking_scheduling.v lowering: an intra-assignment timing control
+verilog/09_behavioral_modeling/parallel_block_timing.v lowering: a fork-join block
+verilog/09_behavioral_modeling/real_parameter_delay.v lowering: a net
+verilog/09_behavioral_modeling/repeat_count_any_width.v lowering: an intra-assignment timing control
+verilog/09_behavioral_modeling/repeat_event_control.v lowering: an intra-assignment timing control
+verilog/09_behavioral_modeling/repeat_unsigned_64bit_count.v lowering: an intra-assignment timing control
+verilog/09_behavioral_modeling/sched_implicit_event_exclusion.v lowering: the slots `@*` reads in `event_wait`
+verilog/09_behavioral_modeling/sched_implicit_lhs_index.v transcript differs at byte 19 (old 21 bytes, new 21): old "first=7/0\nsecond=7/7\n" new "first=7/0\nsecond=7/0\n"
+verilog/09_behavioral_modeling/select_edge_glitch.v lowering: an event control on an expression or a select
+verilog/09_behavioral_modeling/select_edge.v lowering: a net
+verilog/09_behavioral_modeling/sequential_block.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/09_behavioral_modeling/specify_block_specparam.v lowering: a specify block
+verilog/10_tasks_functions/automatic_activation_events.v lowering: a task or function
+verilog/10_tasks_functions/automatic_subroutine_parameters.v lowering: a task or function
+verilog/10_tasks_functions/constant_function_clogb2.v lowering: a net
+verilog/10_tasks_functions/constant_function_generate_condition.v lowering: a task or function
+verilog/10_tasks_functions/constant_function_named_block.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/10_tasks_functions/constant_function_parameters.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/10_tasks_functions/constant_function_system_task_ignored.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/10_tasks_functions/disable_ancestor_block.v lowering: a disable statement
+verilog/10_tasks_functions/disable_ancestor_task.v lowering: a task or function
+verilog/10_tasks_functions/disable_block_in_function.v lowering: a task or function
+verilog/10_tasks_functions/disable_named_block.v lowering: a disable statement
+verilog/10_tasks_functions/disable_recursive_task.v lowering: a task or function
+verilog/10_tasks_functions/disable_self_block.v lowering: a disable statement
+verilog/10_tasks_functions/disable_sibling_block.v lowering: a disable statement
+verilog/10_tasks_functions/disable_sibling_task.v lowering: a task or function
+verilog/10_tasks_functions/factorial.v lowering: a task or function
+verilog/10_tasks_functions/function_automatic_recursion.v lowering: a task or function
+verilog/10_tasks_functions/function_call_operand.v lowering: a task or function
+verilog/10_tasks_functions/function_declaration_forms.v lowering: a task or function
+verilog/10_tasks_functions/function_return_variable.v lowering: a task or function
+verilog/10_tasks_functions/function_return_width_is_the_boundary.v lowering: a task or function
+verilog/10_tasks_functions/native_real_subroutines.v lowering: a task or function
+verilog/10_tasks_functions/nested_task_completion.v lowering: a task or function
+verilog/10_tasks_functions/nonansi_function_port_typed_later.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/10_tasks_functions/nonansi_task_output_reg_port.v lowering: a task or function
+verilog/10_tasks_functions/nonansi_task_port_completion.v lowering: a task or function
+verilog/10_tasks_functions/nonansi_task_real_port.v lowering: a task or function
+verilog/10_tasks_functions/real_function_return.v lowering: a task or function
+verilog/10_tasks_functions/recursion_past_1024.v lowering: a task or function
+verilog/10_tasks_functions/recursive_task_copyback.v lowering: a task or function
+verilog/10_tasks_functions/recursive_task_fork_join.v lowering: a task or function
+verilog/10_tasks_functions/static_task_item_hierarchical.v lowering: a task or function
+verilog/10_tasks_functions/task_argument_passing.v lowering: a task or function
+verilog/10_tasks_functions/task_concurrent_storage.v lowering: a task or function
+verilog/10_tasks_functions/task_copy_timing.v lowering: a task or function
+verilog/10_tasks_functions/task_declaration_forms.v lowering: a task or function
+verilog/10_tasks_functions/task_function_distinctions.v lowering: a task or function
+verilog/10_tasks_functions/task_output_lifetime.v lowering: a task or function
+verilog/10_tasks_functions/task_recursive_timed_automatic.v lowering: a task or function
+verilog/10_tasks_functions/task_static_lifetime.v lowering: a task or function
+verilog/10_tasks_functions/task_storage_per_instance.v lowering: a task or function
+verilog/10_tasks_functions/timed_subroutine_parameters.v lowering: a task or function
+verilog/11_scheduling/auto_state_two.v lowering: a net
+verilog/11_scheduling/procedural_continuous_tracks_sources.v lowering: a procedural continuous assignment
+verilog/11_scheduling/sched_allowed_active_race.v lowering: a net
+verilog/11_scheduling/sched_blocking_target_return.v lowering: an intra-assignment timing control
+verilog/11_scheduling/sched_constant_ports.v lowering: a net
+verilog/11_scheduling/sched_fork_arm_chain_order.v lowering: a net
+verilog/11_scheduling/sched_fork_arm_wake_order.v lowering: a fork-join block
+verilog/11_scheduling/sched_task_copy_timing.v lowering: a task or function
+verilog/11_scheduling/switch_x_gate.v lowering: a net
+verilog/11_scheduling/terminal_and_port_connections.v lowering: a net
+verilog/11_scheduling/update_events.v lowering: a net
+verilog/12_hierarchy/defparam_absolute_inside_array_element.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/12_hierarchy/defparam_before_generate.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/12_hierarchy/defparam_inside_generate_block.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/12_hierarchy/defparam_last_wins.v lowering: a net
+verilog/12_hierarchy/defparam_upward_and_indexed_paths.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/12_hierarchy/direct_nesting_and_recursion.v lowering: a net
+verilog/12_hierarchy/explicit_port_names.v lowering: a net
+verilog/12_hierarchy/external_type_cells.v lowering: a net
+verilog/12_hierarchy/extra_ordered_parameter_value_ignored.v elaboration refuses it (E0907)
+verilog/12_hierarchy/extra_ordered_value_ignored.v elaboration refuses it (E0907)
+verilog/12_hierarchy/ffnand_instances.v lowering: a net
+verilog/12_hierarchy/function_in_generate_block.v lowering: a net
+verilog/12_hierarchy/generate_block_continuous_assign.v lowering: a net
+verilog/12_hierarchy/generate_block_variables.v lowering: a name declared by `genvar` that has no slot
+verilog/12_hierarchy/generate_localparam_visible.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/12_hierarchy/generate_loop_and_case.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/12_hierarchy/generate_past_65536_iterations.v lowering: a net
+verilog/12_hierarchy/generate_region_optional.v lowering: a net
+verilog/12_hierarchy/generate_scopes_in_names.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/12_hierarchy/generate_select_per_iteration.v lowering: a net
+verilog/12_hierarchy/genvar_hierarchical_index.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/12_hierarchy/gray2bin_continuous_assign.v lowering: a net
+verilog/12_hierarchy/hierarchical_path_names.v lowering: a port connection
+verilog/12_hierarchy/hierarchical_task_call_suspends.v lowering: a task or function
+verilog/12_hierarchy/hierarchy_explicit_port_concat.v lowering: a net
+verilog/12_hierarchy/hierarchy_port_signedness.v lowering: a net
+verilog/12_hierarchy/hierarchy_upward_reference.v lowering: an lvalue form
+verilog/12_hierarchy/implicit_net_in_instance_expression.v lowering: a net
+verilog/12_hierarchy/inout_net_expressions.v lowering: a net
+verilog/12_hierarchy/instance_array_concat_port.v lowering: a net
+verilog/12_hierarchy/instance_array_constant_port.v lowering: a net
+verilog/12_hierarchy/instance_array_width_product.v lowering: a net
+verilog/12_hierarchy/instance_select.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/12_hierarchy/internal_type_cells.v lowering: a net
+verilog/12_hierarchy/module_header_forms.v lowering: a net
+verilog/12_hierarchy/module_without_process.v lowering: a net
+verilog/12_hierarchy/named_block_items.v lowering: a fork-join block
+verilog/12_hierarchy/net_type_warning.v lowering: a net
+verilog/12_hierarchy/null_port_combinations.v lowering: a net
+verilog/12_hierarchy/output_reg_inherits_port_sign.v lowering: a net
+verilog/12_hierarchy/override_type_and_range.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/12_hierarchy/parameter_assignment_forms.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/12_hierarchy/parameter_dependence.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/12_hierarchy/param_width_per_instance.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/12_hierarchy/port_ansi_output_reg.v lowering: a net
+verilog/12_hierarchy/port_concat_matching_width.v lowering: a net
+verilog/12_hierarchy/port_driver_resolution.v lowering: a net
+verilog/12_hierarchy/port_input_width_extends.v lowering: a net
+verilog/12_hierarchy/port_output_width_truncates.v lowering: a net
+verilog/12_hierarchy/port_signed_inheritance.v lowering: a net
+verilog/12_hierarchy/real_and_signed_overrides.v lowering: a net
+verilog/12_hierarchy/real_through_bits.v lowering: a net
+verilog/12_hierarchy/scope_implicit_net_lhs.v lowering: a net
+verilog/12_hierarchy/select_and_concatenation_ports.v lowering: a net
+verilog/12_hierarchy/select_sinks.v lowering: a net
+verilog/12_hierarchy/select_warning.v lowering: a net
+verilog/12_hierarchy/structural_sinks_and_expression_sources.v lowering: a net
+verilog/12_hierarchy/two_top_level_modules.v lowering: a net
+verilog/12_hierarchy/uwire_port.v lowering: a net
+verilog/12_hierarchy/variable_port_select_sinks.v lowering: a net
+verilog/13_configuration/cell_use_binds_named_cell.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/13_configuration/cfg1_default_liblist.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/cfg2_gate_first.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/cfg3_cell_use.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/cfg4_instance_liblist.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/cfg6_hierarchical.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/command_line_search_order.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/config_binding_display.v lowering: a %l or %v conversion
+verilog/13_configuration/config_named_like_module.v lowering: a %l or %v conversion
+verilog/13_configuration/config_overrides_command_line.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/default_search_order.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/empty_liblist_parent_library.v lowering: a %l or %v conversion
+verilog/13_configuration/every_instance_bound.v lowering: a %l or %v conversion
+verilog/13_configuration/every_rule_form.v lowering: a %l or %v conversion
+verilog/13_configuration/hierarchical_config.v lowering: a %l or %v conversion
+verilog/13_configuration/include_map.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/instance_use_binds_named_cell.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/13_configuration/parent_library_by_map.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/resolution_order.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/14_specify_blocks/delay_selection.v lowering: a net
+verilog/14_specify_blocks/edge_sensitive_paths.v lowering: a net
+verilog/14_specify_blocks/edge_state_dependent_paths.v lowering: a net
+verilog/14_specify_blocks/full_parallel_paths.v lowering: a net
+verilog/14_specify_blocks/ifnone.v lowering: a net
+verilog/14_specify_blocks/mintypmax_path_delays.v lowering: a net
+verilog/14_specify_blocks/module_paths.v lowering: a net
+verilog/14_specify_blocks/negative_pulse_showcancelled.v lowering: a net
+verilog/14_specify_blocks/path_and_distributed_delays.v lowering: a net
+verilog/14_specify_blocks/path_delay_values.v lowering: a net
+verilog/14_specify_blocks/polarity.v lowering: a net
+verilog/14_specify_blocks/pulse_default_limits.v lowering: a net
+verilog/14_specify_blocks/pulse_error_window_styles.v lowering: a net
+verilog/14_specify_blocks/pulse_path_specific_limits.v lowering: a net
+verilog/14_specify_blocks/sdf_pulse_limits_override_specparam.v lowering: a net
+verilog/14_specify_blocks/specify_path_bit_drivers.v lowering: a net
+verilog/14_specify_blocks/specify_path_delay_one.v lowering: a net
+verilog/14_specify_blocks/specify_timing_checks_named_by_w0251.v lowering: a net
+verilog/14_specify_blocks/state_dependent_paths.v lowering: a net
+verilog/14_specify_blocks/x_transition_delays.v lowering: a net
+verilog/15_timing_checks/conditions.v lowering: a port connection
+verilog/15_timing_checks/fullskew_checks_both_orders.v lowering: a port connection
+verilog/15_timing_checks/hold.v lowering: a port connection
+verilog/15_timing_checks/negative_timing_disabled_copies_signals.v lowering: a net
+verilog/15_timing_checks/nochange_high_window.v lowering: a port connection
+verilog/15_timing_checks/notifier.v lowering: a port connection
+verilog/15_timing_checks/period.v lowering: a port connection
+verilog/15_timing_checks/recovery.v lowering: a port connection
+verilog/15_timing_checks/recrem.v lowering: a port connection
+verilog/15_timing_checks/removal.v lowering: a port connection
+verilog/15_timing_checks/setuphold_delayed_args.v lowering: a net
+verilog/15_timing_checks/setuphold_timecheck_condition.v lowering: a port connection
+verilog/15_timing_checks/setuphold_timestamp_condition.v lowering: a port connection
+verilog/15_timing_checks/setuphold.v lowering: a port connection
+verilog/15_timing_checks/setup.v lowering: a port connection
+verilog/15_timing_checks/skew_late_data_notifies.v lowering: a port connection
+verilog/15_timing_checks/skew_waits_for_data_event.v lowering: a port connection
+verilog/15_timing_checks/timeskew_missing_event_and_rearm.v lowering: a port connection
+verilog/15_timing_checks/timeskew_remain_active.v lowering: a port connection
+verilog/15_timing_checks/timing_check_forms.v lowering: a net
+verilog/15_timing_checks/vector.v lowering: a port connection
+verilog/15_timing_checks/width.v lowering: a port connection
+verilog/16_sdf/sdf_absolute_path_delay.v lowering: a net
+verilog/16_sdf/sdf_interconnect_delay.v lowering: a net
+verilog/16_sdf/sdf_label_reevaluates_path.v lowering: a net
+verilog/16_sdf/sdf_min_typ_max_selection.v lowering: a net
+verilog/16_sdf/sdf_multiple_files_scoped.v lowering: a net
+verilog/16_sdf/sdf_ordered_increment.v lowering: a net
+verilog/16_sdf/sdf_timing_check_limit.v lowering: a port connection
+verilog/17_system_tasks/append_writes_at_end.v lowering: the system function `$fopen`
+verilog/17_system_tasks/closed_channel_not_written.v lowering: the system function `$fopen`
+verilog/17_system_tasks/conversions.v lowering: a net
+verilog/17_system_tasks/dist_nonpositive_warning.v lowering: the system function `$dist_exponential`
+verilog/17_system_tasks/dist_reference.v lowering: the system function `$dist_uniform`
+verilog/17_system_tasks/ferror.v lowering: the system function `$fopen`
+verilog/17_system_tasks/fflush.v lowering: the system function `$fopen`
+verilog/17_system_tasks/fgets.v lowering: the system function `$fopen`
+verilog/17_system_tasks/file_read_position.v lowering: the system function `$fopen`
+verilog/17_system_tasks/fmonitor.v lowering: the system function `$fopen`
+verilog/17_system_tasks/fopen_write_append_mcd.v lowering: the system function `$fopen`
+verilog/17_system_tasks/fread.v lowering: the system function `$fopen`
+verilog/17_system_tasks/fscanf_unformatted_u.v lowering: the system function `$fopen`
+verilog/17_system_tasks/fscanf.v lowering: the system function `$fopen`
+verilog/17_system_tasks/fstrobe.v lowering: the system function `$fopen`
+verilog/17_system_tasks/logic_planes.v lowering: the system task `$sync$and$array`
+verilog/17_system_tasks/native_binary_file_targets.v lowering: an event control on an expression or a select
+verilog/17_system_tasks/native_file_input_targets.v lowering: the system function `$fopen`
+verilog/17_system_tasks/native_file_scan_targets.v lowering: the system function `$fopen`
+verilog/17_system_tasks/native_nested_scan_destinations.v lowering: a task or function
+verilog/17_system_tasks/native_sformat_dynamic.v lowering: the system task `$sformat`
+verilog/17_system_tasks/pla_async_personality.v lowering: the system task `$async$and$array`
+verilog/17_system_tasks/plane_example.v lowering: the system task `$async$and$plane`
+verilog/17_system_tasks/pla_plane_ignore.v lowering: the system task `$sync$and$plane`
+verilog/17_system_tasks/pla_plane_x_worst_case.v lowering: the system task `$sync$and$plane`
+verilog/17_system_tasks/pla_sync_array_logic.v lowering: the system task `$sync$and$array`
+verilog/17_system_tasks/printtimescale_current_scope.v lowering: the system task `$printtimescale`
+verilog/17_system_tasks/printtimescale_named_module.v lowering: the system task `$printtimescale`
+verilog/17_system_tasks/printtimescale_names_parameter.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/17_system_tasks/printtimescale_prints_argument.v lowering: the system task `$printtimescale`
+verilog/17_system_tasks/q_exam_code_runtime.v lowering: the system task `$q_initialize`
+verilog/17_system_tasks/q_exam_means.v lowering: the system task `$q_initialize`
+verilog/17_system_tasks/q_exam_peak_length.v lowering: the system task `$q_initialize`
+verilog/17_system_tasks/q_exam.v lowering: the system task `$q_initialize`
+verilog/17_system_tasks/q_full.v lowering: the system task `$q_initialize`
+verilog/17_system_tasks/queue_capacity_stats.v lowering: the system task `$q_initialize`
+verilog/17_system_tasks/queue_order_payload.v lowering: the system task `$q_initialize`
+verilog/17_system_tasks/queue_status_boundaries.v lowering: the system task `$q_initialize`
+verilog/17_system_tasks/random_seed_reference.v lowering: a seeded $random
+verilog/17_system_tasks/readmem_address_outside_memory.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_address_outside_task_range.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_address_range_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_address_restart.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_address_underscore.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_address_x_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_address_zero_padding.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_binary_file_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmemb_range.v lowering: the system task `$readmemb`
+verilog/17_system_tasks/readmem_count_warning.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_edge_address_bad_digit_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_edge_address_gap_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_edge_address_overflow_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_edge_after_range_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_edge_underscore_leading_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_edge_underscore_only_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_excess_legal_neighbor.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_file_name_variable.v lowering: the system task `$readmemb`
+verilog/17_system_tasks/readmem_file_past_4mib.v lowering: the system function `$fopen`
+verilog/17_system_tasks/readmemh.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_invalid_high_binary_load_terminated.v lowering: the system task `$readmemb`
+verilog/17_system_tasks/readmem_invalid_high_hex_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_lowest_descending.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_malformed_base_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_malformed_base_wide_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_malformed_binary_digit_load_terminated.v lowering: the system task `$readmemb`
+verilog/17_system_tasks/readmem_malformed_hex_digit_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_malformed_legal_neighbors.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_malformed_punctuation_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_malformed_width_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_malformed_width_wide_load_terminated.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_overflow_rejected.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_oversized_legal.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_question_z.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_start_address_load_terminated.v lowering: the system task `$readmemb`
+verilog/17_system_tasks/readmem_start_formfeed.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_underscore_legal.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_unknown_bound_load_terminated.v lowering: the system task `$readmemb`
+verilog/17_system_tasks/readmem_variable_bounds.v lowering: the system task `$readmemb`
+verilog/17_system_tasks/readmem_warn_binary_excess_start.v lowering: the system task `$readmemb`
+verilog/17_system_tasks/readmem_warn_binary_short_start.v lowering: the system task `$readmemb`
+verilog/17_system_tasks/readmem_warn_empty.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_warn_hex_excess_down.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_warn_hex_excess_up.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_warn_hex_short_down.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/readmem_warn_hex_short_up.v lowering: the system task `$readmemh`
+verilog/17_system_tasks/read_needs_read_type.v lowering: the system function `$fopen`
+verilog/17_system_tasks/same_seed_same_value.v lowering: the system function `$dist_uniform`
+verilog/17_system_tasks/scope_unnamed_loop_generate.v lowering: a name declared by `genvar` that has no slot
+verilog/17_system_tasks/seedless_random_starts_at_seed_0.v lowering: a seeded $random
+verilog/17_system_tasks/seek_gap_and_origin.v lowering: the system function `$fopen`
+verilog/17_system_tasks/sformat_excess_argument_warning.v lowering: the system task `$sformat`
+verilog/17_system_tasks/sformat_variable_format.v lowering: the system task `$sformat`
+verilog/17_system_tasks/sscanf_conversions.v lowering: the system function `$sscanf`
+verilog/17_system_tasks/sscanf_field_rules.v lowering: the system function `$sscanf`
+verilog/17_system_tasks/sscanf_time_scaled.v lowering: the system function `$sscanf`
+verilog/17_system_tasks/sscanf_unformatted_z.v lowering: the system task `$sformat`
+verilog/17_system_tasks/sscanf_unknown_input.v lowering: the system function `$sscanf`
+verilog/17_system_tasks/strength_format.v lowering: a net
+verilog/17_system_tasks/strength_scalar.v lowering: a net
+verilog/17_system_tasks/string_output.v lowering: the system task `$swrite`
+verilog/17_system_tasks/ungetc_pushback_limit.v lowering: the system function `$fopen`
+verilog/17_system_tasks/ungetc_read_routines.v lowering: the system function `$fopen`
+verilog/18_vcd/dumpfile_default_name.v lowering: the system task `$dumpvars`
+verilog/18_vcd/dumpfile_variable_name.v lowering: the system task `$dumpfile`
+verilog/18_vcd/dumplimit_stops_with_comment.v lowering: a task or function
+verilog/18_vcd/dumpports_control_tasks.v lowering: a net
+verilog/18_vcd/dumpportslimit_stops_with_comment.v lowering: a net
+verilog/18_vcd/dumpports_node_information.v lowering: a net
+verilog/18_vcd/event_marker.v lowering: a task or function
+verilog/18_vcd/example_value_changes.v lowering: the system task `$dumpfile`
+verilog/18_vcd/port_value_changes.v lowering: a net
+verilog/18_vcd/real_value_format.v lowering: a task or function
+verilog/18_vcd/table_18_2_shortening.v lowering: the system task `$dumpfile`
+verilog/18_vcd/task_function_scopes.v lowering: a task or function
+verilog/18_vcd/var_sections.v lowering: a net
+verilog/18_vcd/vcd_dumpoff_on.v lowering: the system task `$dumpfile`
+verilog/18_vcd/vcd_dumpvars_levels.v lowering: a net
+verilog/18_vcd/vcd_dumpvars.v lowering: the system task `$dumpfile`
+verilog/18_vcd/version_names_dumpfile_literal.v lowering: a task or function
+verilog/18_vcd/version_names_dumpfile_variable.v lowering: a task or function
+verilog/19_compiler_directives/ams_keywords_are_identifiers.v lowering: a string variable
+verilog/19_compiler_directives/ams_keywords_instance_names.v lowering: a net
+verilog/19_compiler_directives/celldefine.v lowering: a net
+verilog/19_compiler_directives/default_nettype_operand_next_line.v lowering: a continuous assignment
+verilog/19_compiler_directives/default_nettype_trireg.v lowering: a continuous assignment
+verilog/19_compiler_directives/default_nettype_uwire.v lowering: a continuous assignment
+verilog/19_compiler_directives/implicit_net_types.v lowering: a port connection
+verilog/19_compiler_directives/keyword_versions.v lowering: a net
+verilog/19_compiler_directives/none_all_declared.v lowering: a net
+verilog/19_compiler_directives/no_timescale_is_1s_1s.v lowering: the system task `$printtimescale`
+verilog/19_compiler_directives/resetall_keeps_begin_keywords.v lowering: a net
+verilog/19_compiler_directives/resetall_restores_defaults.v lowering: a net
+verilog/19_compiler_directives/text_macros.v lowering: a net
+verilog/19_compiler_directives/unconnected_drive_operand_next_line.v lowering: a net
+verilog/19_compiler_directives/unconnected_drive_pull_meets_the_strength_model.v lowering: a net
+verilog/19_compiler_directives/unconnected_drive.v lowering: a port connection
+verilog/A_formal_syntax/b_A_1_1_incdir.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/A_formal_syntax/b_A_1_1_library_text.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/A_formal_syntax/b_A_1_3_concat_port.v lowering: a net
+verilog/A_formal_syntax/b_A_1_3_null_port.v lowering: a net
+verilog/A_formal_syntax/b_A_1_3_part_select_port.v lowering: a net
+verilog/A_formal_syntax/b_A_1_3_ports.v lowering: a net
+verilog/A_formal_syntax/b_A_1_4_module_items.v lowering: a net
+verilog/A_formal_syntax/b_A_2_1_1_parameter_declarations.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/A_formal_syntax/b_A_2_1_2_port_declarations.v lowering: a net
+verilog/A_formal_syntax/b_A_2_1_3_range_then_delay.v lowering: a net
+verilog/A_formal_syntax/b_A_2_1_3_type_declarations.v lowering: a net
+verilog/A_formal_syntax/b_A_2_2_1_net_and_variable_types.v lowering: a net
+verilog/A_formal_syntax/b_A_2_2_2_strengths.v lowering: a net
+verilog/A_formal_syntax/b_A_2_2_3_delays.v lowering: a net
+verilog/A_formal_syntax/b_A_2_2_3_mintypmax_delay.v lowering: a net
+verilog/A_formal_syntax/b_A_2_3_declaration_lists.v lowering: a net
+verilog/A_formal_syntax/b_A_2_4_declaration_assignments.v lowering: a net
+verilog/A_formal_syntax/b_A_2_4_pathpulse_error_limit.v lowering: a net
+verilog/A_formal_syntax/b_A_2_4_pathpulse_mintypmax.v lowering: a net
+verilog/A_formal_syntax/b_A_2_5_ranges.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/A_formal_syntax/b_A_2_6_function_declarations.v lowering: a task or function
+verilog/A_formal_syntax/b_A_2_6_real_functions.v lowering: a task or function
+verilog/A_formal_syntax/b_A_2_7_task_declarations.v lowering: a task or function
+verilog/A_formal_syntax/b_A_2_8_block_item_declarations.v lowering: a task or function
+verilog/A_formal_syntax/b_A_2_8_event_and_parameter_items.v lowering: a task or function
+verilog/A_formal_syntax/b_A_3_1_gate_instantiations.v lowering: a net
+verilog/A_formal_syntax/b_A_3_1_pass_enable_delay.v lowering: a net
+verilog/A_formal_syntax/b_A_3_2_primitive_strengths.v lowering: a net
+verilog/A_formal_syntax/b_A_3_3_bit_select_terminals.v lowering: a net
+verilog/A_formal_syntax/b_A_3_3_primitive_terminals.v lowering: a net
+verilog/A_formal_syntax/b_A_3_4_gate_and_switch_types.v lowering: a net
+verilog/A_formal_syntax/b_A_4_1_instance_array.v lowering: a net
+verilog/A_formal_syntax/b_A_4_1_module_instantiation.v lowering: a net
+verilog/A_formal_syntax/b_A_4_2_case_generate.v lowering: a net
+verilog/A_formal_syntax/b_A_4_2_generate_constructs.v lowering: a net
+verilog/A_formal_syntax/b_A_5_1_udp_declarations.v lowering: a net
+verilog/A_formal_syntax/b_A_5_3_udp_body.v lowering: a net
+verilog/A_formal_syntax/b_A_5_4_udp_instance_array.v lowering: a net
+verilog/A_formal_syntax/b_A_5_4_udp_instances.v lowering: a net
+verilog/A_formal_syntax/b_A_6_1_continuous_assignments.v lowering: a net
+verilog/A_formal_syntax/b_A_6_2_procedural_assignments.v lowering: a net
+verilog/A_formal_syntax/b_A_6_2_repeat_intra_assignment.v lowering: an intra-assignment timing control
+verilog/A_formal_syntax/b_A_6_3_named_block_declarations.v lowering: a fork-join block
+verilog/A_formal_syntax/b_A_6_4_statements.v lowering: a task or function
+verilog/A_formal_syntax/b_A_6_5_timing_controls.v lowering: an untyped integral parameter (its §12.2 type is its value expression's)
+verilog/A_formal_syntax/b_A_6_8_looping_statements.v lowering: a disable statement
+verilog/A_formal_syntax/b_A_6_9_hierarchical_task_enable.v lowering: a task or function
+verilog/A_formal_syntax/b_A_6_9_task_enables.v lowering: a task or function
+verilog/A_formal_syntax/b_A_7_1_specify_block.v lowering: a net
+verilog/A_formal_syntax/b_A_7_2_path_declarations.v lowering: a net
+verilog/A_formal_syntax/b_A_7_3_specify_terminals.v lowering: a net
+verilog/A_formal_syntax/b_A_7_4_mintypmax_path_delay.v lowering: a net
+verilog/A_formal_syntax/b_A_7_4_path_delays.v lowering: a net
+verilog/A_formal_syntax/b_A_7_5_system_timing_checks.v lowering: a net
+verilog/A_formal_syntax/b_A_8_1_concatenations.v lowering: a net
+verilog/A_formal_syntax/b_A_8_2_function_calls.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/A_formal_syntax/b_A_8_3_expressions.v lowering: a net
+verilog/A_formal_syntax/b_A_8_4_primaries.v lowering: a net
+verilog/A_formal_syntax/b_A_8_5_concatenated_lvalues.v lowering: a net
+verilog/A_formal_syntax/b_A_8_5_lvalues.v lowering: a net
+verilog/A_formal_syntax/b_A_8_6_operators.v lowering: a net
+verilog/A_formal_syntax/b_A_9_1_attributes.v lowering: a net
+verilog/A_formal_syntax/b_A_9_3_indexed_hierarchical_name.v lowering: a net
+verilog/A_formal_syntax/b_A_source_text.v lowering: a net
+verilog/A_formal_syntax/grammar_nullable_statement.v lowering: a case statement
+verilog/A_formal_syntax/grammar_parameter_header.v lowering: a name declared by `param` that has no slot
+verilog-ams/digital/digital_delay_notation.v lowering: an intra-assignment timing control
+verilog-ams/digital/digital_delay_primitive_notation.v lowering: a net
+verilog-ams/digital/realtobits_bitstoreal_bridge.v lowering: a net
+verilog-ams/digital/std_1364_ams_keywords_are_identifiers.v lowering: a net
+verilog-ams/digital/vams_digital_abstime_math.v lowering: the system function `$abstime`
+verilog-ams/digital/wreal_event_on_change.v lowering: a net
+verilog-ams/digital/wreal_port_round_trip.v lowering: a net
+verilog-ams/digital/wreal_single_driver_tracks.v lowering: a net
+verilog-ams/digital/wreal_undriven_zero.v lowering: a net
+verilog-ams/digital/wreal_wire_port_resolves_wreal.v lowering: a net
+verilog/B_keywords/b_B_keywords.v lowering: a net

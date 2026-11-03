@@ -7,6 +7,7 @@
 //! generated programs; `-Dfull-oracles` runs the nightly's full sweep),
 //! `diff-sim` (the std_sim runtime vs lib/sim/digital over every `.v`),
 //! `diff-link` (link vs src/zigbuild over the same device builds),
+//! `diff-dlower` (sema's digital lowering vs lib/sim/digital and the bridge),
 //! `diff-astgen` (vams AstGen/Vir vs the old compiler's per-file codes and
 //! design units), `diff-elab` (sema's elaboration vs src/elab and the
 //! digital route's), and
@@ -51,6 +52,7 @@ pub fn add(g: Graph) void {
         .{ .step = "diff-astgen", .root = "tests/differential/astgen.zig", .what = "vams AstGen/Vir against the old compiler's per-file codes and design units on every fixture", .imports = &.{ "vams", "frontend", "diag", "vera" } },
         .{ .step = "diff-air-passes", .root = "tests/differential/air_passes.zig", .what = "the Air passes (Interval, Float, Legalize, Setup) against Air's interpreter over generated programs", .imports = &.{ "air", "intern_pool", "vams" } },
         .{ .step = "diff-sim", .root = "tests/differential/sim.zig", .what = "the std_sim runtime against lib/sim/digital: every .v fixture's transcript, through the bridge", .imports = &.{ "std_sim", "sim", "frontend", "diag", "kernels" } },
+        .{ .step = "diff-dlower", .root = "tests/differential/dlower.zig", .what = "sema's digital lowering against lib/sim/digital: every .v fixture's transcript from source, and against the bridge's Program", .imports = &.{ "sema", "vams", "std_sim", "sim", "frontend", "diag", "kernels", "intern_pool" } },
         .{ .step = "diff-elab", .root = "tests/differential/elab.zig", .what = "sema's elaboration against src/elab and the digital route's elaboration on every fixture", .imports = &.{ "sema", "vams", "frontend", "diag", "elab", "sim" } },
         .{ .step = "diff-link", .root = "tests/differential/link.zig", .what = "link against src/zigbuild: the same devices built by both, at 1 and N jobs", .imports = &.{ "link", "zigbuild", "dynlib", "contract" }, .libc = true, .emit_zig = &.{ "tests/osdi/resistor.va", "tests/osdi/diode.va", "tests/osdi/mixed.va" } },
     };

@@ -269,6 +269,9 @@ fn resolveInstance(s: *Sema, kids: []const std.ArrayList(Instance.Index), ooc: *
         const run_ = zcu.instances.items(.ports)[@backingInt(c)];
         const cmod = zcu.instances.items(.module)[@backingInt(c)];
         const cvir = zcu.fileVir(cmod.file);
+        // E.3.2.2: a shipped primitive's `electrical` is a placeholder the
+        // net resolves, no candidate of its own.
+        if (zcu.isBuiltin(cmod)) continue;
         for (zcu.ports.items(.formal)[run_.start..][0..run_.len], zcu.ports.items(.actual)[run_.start..][0..run_.len]) |formal, actual| {
             const sig = try netName(s, vir, actual) orelse continue;
             if (decls.get(sig)) |n| if (n.discipline.len != 0) continue;
@@ -336,6 +339,12 @@ fn merge(s: *Sema, i: Instance.Index, list: []const []const u8) Allocator.Error!
             return null;
         }
         return r.result;
+    };
+    // §3.11 "It shall be an error to connect two ports or nets of the same
+    // domain with incompatible disciplines".
+    for (cands.items[1..]) |c| if (!try discipline.compatible(s, cands.items[0], c)) {
+        try s.fail(.E0355, file, .none, "a net of `{f}` joins `{s}` and `{s}`, incompatible disciplines of one domain (§3.11.1)", .{ zcu.fmtPath(i), cands.items[0], c });
+        return cands.items[0];
     };
     if (mixed) try s.fail(.E0903, file, .none, "a net of `{f}` joins {d} {t} disciplines no resolution statement resolves, and a mixed port", .{ zcu.fmtPath(i), cands.items.len, want });
     return cands.items[0];

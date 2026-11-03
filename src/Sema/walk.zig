@@ -33,6 +33,7 @@ const Sema = @import("../Sema.zig");
 const Zcu = @import("../Zcu.zig");
 const eval = @import("eval.zig");
 const paramset = @import("paramset.zig");
+const discipline = @import("discipline.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Env = eval.Env;
@@ -252,6 +253,7 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
         try s.fail(.E0905, p.file, p.src, "`{s}` instantiates itself with the same parameters ({d} levels deep)", .{ vir.string(row.name), depth });
         return;
     }
+    if (zcu.isBuiltin(picked.module)) try portDisciplineAttrs(s, p);
     const ports = try bindPorts(s, p, vir, m, row.name);
     try zcu.instances.append(s.gpa, .{ .module = picked.module, .parent = p.parent, .name = p.name, .params = params, .paramset = picked.paramset, .src = p.src, .hier = env.hier, .ports = ports });
     assert(zcu.instances.len == @backingInt(index) + 1);
@@ -289,6 +291,33 @@ fn arraySizes(s: *Sema, env: *Env, p: Pending) Allocator.Error!void {
             try s.fail(.E0921, p.file, p.src, "the array assigned to `{s}` has {d} elements, and its declared range has {d}", .{ name, got, want })
         else
             try s.fail(.E0921, p.file, p.src, "an override resized `{s}` to {d} elements, and no array of the new size was assigned to it (its default has {d})", .{ name, want, got });
+    }
+}
+
+/// Annex E.3.2.1: "The value [of `port_discipline`] shall be of type
+/// string and the value must be a valid discipline of domain continuous"
+/// (E0358), judged on an instance of a shipped analog primitive only ("for
+/// other modules ... it shall be ignored"). A valueless spec is §2.9's 1;
+/// a value that does not fold is lowering's E0357.
+fn portDisciplineAttrs(s: *Sema, p: Pending) Allocator.Error!void {
+    const i = p.src.toIndex() orelse return;
+    const vir = s.zcu.fileVir(p.file);
+    assert(vir.instructions.items(.tag)[@backingInt(i)] == .instance);
+    var env: Env = try .init(s.gpa, s.arena, &s.zcu.intern_pool, vir, &.{});
+    defer env.deinit();
+    for (vir.list(Inst.Attr, payloadOf(vir, Inst.Instance, i).attrs)) |a| {
+        if (!std.mem.eql(u8, vir.string(a.name), "port_discipline")) continue;
+        const c: eval.Const = if (a.value.len == 0) .{ .int = 1 } else (try env.body(a.value)) orelse continue;
+        if (c != .str) {
+            try s.fail(.E0358, p.file, p.src, "E.3.2.1: port_discipline requires a string naming a continuous discipline", .{});
+            continue;
+        }
+        if (!s.zcu.disciplines.contains(try s.zcu.intern_pool.getString(s.gpa, c.str))) {
+            try s.fail(.E0358, p.file, p.src, "E.3.2.1: port_discipline names an undeclared discipline `{s}`", .{c.str});
+            continue;
+        }
+        if (try discipline.domainOf(s, c.str) != .continuous)
+            try s.fail(.E0358, p.file, p.src, "E.3.2.1: port_discipline requires a continuous discipline; `{s}` is not one", .{c.str});
     }
 }
 

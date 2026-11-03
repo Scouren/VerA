@@ -27,10 +27,10 @@ const Out = struct {
 // ---- private ----
 
 fn elab(src: [:0]const u8, config: Sema.Config) !Out {
-    return elabUnder(src, config, &.{});
+    return elabUnder(src, config, &.{}, 0);
 }
 
-fn elabUnder(src: [:0]const u8, config: Sema.Config, defaults: []const vams.Preprocessor.events.DefaultDiscipline) !Out {
+fn elabUnder(src: [:0]const u8, config: Sema.Config, defaults: []const vams.Preprocessor.events.DefaultDiscipline, builtins: u32) !Out {
     const gpa = std.testing.allocator;
     var out: Out = .{ .arena = .init(gpa), .tree = "", .codes = &.{}, .keys = 0 };
     errdefer out.arena.deinit();
@@ -43,7 +43,7 @@ fn elabUnder(src: [:0]const u8, config: Sema.Config, defaults: []const vams.Prep
     defer vir.deinit(gpa);
     var zcu: Zcu = try .init(gpa);
     defer zcu.deinit();
-    _ = try zcu.addFile("test.va", vir, 0);
+    _ = try zcu.addFile("test.va", vir, builtins);
     try Sema.elaborate(&zcu, config);
     var text: std.Io.Writer.Allocating = .init(arena);
     for (0..zcu.instances.len) |k| {
@@ -63,9 +63,15 @@ fn elabUnder(src: [:0]const u8, config: Sema.Config, defaults: []const vams.Prep
 /// `expectCodes` with `default_discipline <discipline>` in force from the
 /// first byte (§10.2).
 fn expectCodesUnder(src: [:0]const u8, default: []const u8, want: []const Diag.Code) !void {
-    var o = try elabUnder(src, .{}, &.{.{ .at = 0, .qualifier = null, .discipline = default }});
+    var o = try elabUnder(src, .{}, &.{.{ .at = 0, .qualifier = null, .discipline = default }}, 0);
     defer o.deinit();
     try std.testing.expectEqualSlices(Diag.Code, want, o.codes);
+}
+
+/// `elab` with the file's first module shipped (Annex E), as the prelude's
+/// Table E.1 primitives are.
+fn elabBuiltins(src: [:0]const u8) !Out {
+    return elabUnder(src, .{}, &.{}, 1);
 }
 
 fn expectTree(src: [:0]const u8, config: Sema.Config, want: []const u8) !void {
@@ -359,4 +365,31 @@ test "§3.4.4 an array parameter's override is of its exact size, and a resize b
     ;
     try expectCodes(target ++ "module top; t #(.c('{4.0, 5.0})) a(); t #(.n(3), .c('{1.0, 2.0, 3.0})) b(); endmodule", .{}, &.{});
     try expectCodes(target ++ "module top; t #(.c('{4.0, 5.0, 6.0})) a(); t #(.c('{4.0})) b(); t #(.n(3)) c(); endmodule", .{}, &.{ .E0921, .E0921, .E0921 });
+}
+
+test "Annex E.3.2.1 port_discipline on a shipped primitive names a continuous discipline (E0358); two incompatible segments of one domain are E0355" {
+    const prelude =
+        \\nature V; units = "V"; access = V; endnature
+        \\nature R; units = "rad"; access = R; endnature
+        \\discipline electrical; potential V; enddiscipline
+        \\discipline rot; potential R; enddiscipline
+        \\discipline dd; domain discrete; enddiscipline
+        \\module resistor(p, n); inout p, n; electrical p, n; endmodule
+        \\
+    ;
+    var o = try elabBuiltins(prelude ++
+        \\module top; (* port_discipline = "rot" *) resistor a(x, y); (* port_discipline = "dd" *) resistor b(x, y);
+        \\  (* port_discipline = 3 *) resistor c(x, y); (* port_discipline = "nowhere" *) resistor d(x, y); endmodule
+    );
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{ .E0358, .E0358, .E0358 }, o.codes);
+    try expectCodes(
+        \\nature V; units = "V"; access = V; endnature
+        \\nature R; units = "rad"; access = R; endnature
+        \\discipline el; potential V; enddiscipline
+        \\discipline rot; potential R; enddiscipline
+        \\module a(x); inout x; el x; endmodule
+        \\module b(x); inout x; rot x; endmodule
+        \\module top; a u(q); b v(q); endmodule
+    , .{}, &.{.E0355});
 }

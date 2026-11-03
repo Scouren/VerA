@@ -391,7 +391,9 @@ pub const Branch = extern struct { name: String, prev: Ref, range: Body, hi: Bod
 /// A module, UDP or gate instance of `target` (a module, UDP or the gate
 /// keyword). `defaults` are the §10.2 `default_discipline`s in force at a
 /// gate or UDP instance (§3.9: a digital primitive's terminals take one);
-/// empty for a module instance.
+/// empty for a module instance. `attrs` are the §2.9 attribute specs of
+/// the attribute instances that prefix a module instantiation (E.3.2.1's
+/// `port_discipline`), shared by its instances.
 pub const Instance = extern struct {
     name: String,
     prev: Ref,
@@ -403,6 +405,7 @@ pub const Instance = extern struct {
     params: List(Arg),
     conns: List(Arg),
     defaults: List(Default),
+    attrs: List(Attr),
 };
 
 /// A parameter value or connection: named (`.name(value)`) or ordered

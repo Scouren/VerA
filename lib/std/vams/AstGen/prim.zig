@@ -35,6 +35,7 @@ pub fn moduleInstances(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void 
     const x = tree.extraData(tree.nodeData(node).extra, Node.Instantiation);
     const params = try args(ag, scope, tree.extraDataSlice(.{ .start = x.params_start, .end = x.params_end }, Node.OptionalIndex));
     const target = try ag.identString(tree.nodeMainToken(node));
+    const attrs = try prefixAttrs(ag, scope, tree.nodeMainToken(node));
     for (tree.extraDataSlice(.{ .start = x.items_start, .end = x.items_end }, Node.Index)) |i| {
         const inst = ag.reserved(i);
         const in = tree.extraData(tree.nodeData(i).extra, Node.Instance);
@@ -50,6 +51,7 @@ pub fn moduleInstances(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void 
             .params = params,
             .conns = try args(ag, scope, tree.extraDataSlice(.{ .start = in.conns_start, .end = in.conns_end }, Node.OptionalIndex)),
             .defaults = .empty,
+            .attrs = attrs,
         });
     }
 }
@@ -81,6 +83,7 @@ pub fn gateInstances(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
             .params = .empty,
             .conns = try args(ag, scope, terms),
             .defaults = try ag.defaultsAt(d.main_token),
+            .attrs = .empty,
         });
     }
 }
@@ -130,6 +133,32 @@ pub fn specify(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
 // ---- private ----
 
 /// A.2.2.2: whether `tag` opens a strength group.
+/// The specs of the §2.9 attribute instances directly before token `tok`
+/// (Ast.zig: an attribute prefixes the construct at the token after its
+/// `*)`), in source order. A source with none before `tok` costs one
+/// token compare; one with some, a scan of the nodes for each instance.
+fn prefixAttrs(ag: *AstGen, scope: *Scope, tok: Ast.TokenIndex) Error!Vir.List(Inst.Attr) {
+    const tree = ag.tree;
+    if (tok == 0 or tree.tokenTag(tok - 1) != .asterisk_r_paren) return .empty;
+    // Back over the run of instances to the first `(*`.
+    var first = tok;
+    while (first > 0 and tree.tokenTag(first - 1) == .asterisk_r_paren) {
+        var k = first - 1;
+        while (k > 0 and tree.tokenTag(k) != .l_paren_asterisk) k -= 1;
+        first = k;
+    }
+    var out: std.ArrayList(Inst.Attr) = .empty;
+    for (tree.nodes.items(.tag), tree.nodes.items(.main_token), 0..) |tag, main, n| {
+        if (tag != .attribute or main < first or main >= tok) continue;
+        const specs = tree.extraDataSlice(tree.nodeData(@fromBackingInt(@as(u32, @intCast(n)))).extra_range, Node.Index);
+        for (specs) |sp| try out.append(ag.arena, .{
+            .name = try ag.identString(tree.nodeMainToken(sp)),
+            .value = try decl.exprBody(ag, scope, tree.nodeData(sp).opt_node),
+        });
+    }
+    return ag.addList(Inst.Attr, out.items);
+}
+
 fn strengthWord(tag: Token.Tag) bool {
     return switch (tag) {
         .keyword_supply0, .keyword_strong0, .keyword_pull0, .keyword_weak0, .keyword_highz0, .keyword_supply1, .keyword_strong1, .keyword_pull1, .keyword_weak1, .keyword_highz1, .keyword_small, .keyword_medium, .keyword_large => true,

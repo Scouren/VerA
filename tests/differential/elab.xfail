@@ -1,9 +1,5 @@
 # diff-elab known differences: `<path under the fixture root> <reason>`, one per line.
 # A listed fixture that agrees, or is not compared, fails the run.
-spice/primitive_attribute_discrete_rejected.va E0358: Annex E.3.2 `port_discipline` attributes on SPICE primitive instances are not ported (attributes do not reach Vir)
-spice/primitive_attribute_numeric_rejected.va E0358: Annex E.3.2 `port_discipline` attributes on SPICE primitive instances are not ported (attributes do not reach Vir)
-spice/primitive_attribute_unknown_rejected.va E0358: Annex E.3.2 `port_discipline` attributes on SPICE primitive instances are not ported (attributes do not reach Vir)
-spice/primitive_between_incompatible_disciplines_rejected.va E0355: Annex E.3.2.2 a SPICE primitive's port discipline from its other port's net is not ported
 verilog-a/ch03_data_types/aliasparam_hierarchical_read_rejected.va E0373 on a hierarchical read of an aliasparam (`u.alias`) is expression analysis, the per-instance stage of Sema (stage 5), not built yet
 verilog-a/ch03_data_types/aliasparam_hierarchical_system_rejected.va E0373 on a hierarchical read of an aliasparam (`u.alias`) is expression analysis, the per-instance stage of Sema (stage 5), not built yet
 verilog-a/ch06_hierarchy/defparam_upward_value_cycle_rejected.va IEEE 1364-2005 §12.8.1 E0907 for a defparam whose value reads the parameter it sets through another defparam: the late-defparam re-walk converges on the value and does not see the dependency yet

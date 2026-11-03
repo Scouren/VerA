@@ -104,6 +104,7 @@ pub fn run(s: *Sema, roots: []const Zcu.Decl) Allocator.Error!defparams.Waiting 
         zcu.instance_map.clearRetainingCapacity();
         zcu.ports.shrinkRetainingCapacity(0);
         zcu.defparams.clearRetainingCapacity();
+        zcu.defparam_sources.clearRetainingCapacity();
         zcu.failed.shrinkRetainingCapacity(failed_before);
         var w: Walk = .{ .s = s, .zcu = zcu, .late = &late };
         var k = roots.len;
@@ -252,7 +253,11 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     try applyGivens(s, &env, p.file, p.src, w.givens.items[picked.givens.start..][0..picked.givens.len], p.quiet, row.name);
     // A paramset instance's defparams name the paramset's parameters.
     if (std.meta.eql(picked.paramset, Zcu.Decl.none)) try defparams.applyDefparams(s, &env, dps, row.name);
-    for (dps) |dp| try zcu.defparams.put(s.gpa, .{ .instance = index, .name = try zcu.intern_pool.getString(s.gpa, dp.name) }, dp.value);
+    for (dps) |dp| {
+        const key: Zcu.Defparam = .{ .instance = index, .name = try zcu.intern_pool.getString(s.gpa, dp.name) };
+        try zcu.defparams.put(s.gpa, key, dp.value);
+        try zcu.defparam_sources.put(s.gpa, key, .{ .file = dp.file, .src = dp.src, .writer = try zcu.intern_pool.getString(s.gpa, dp.writer) });
+    }
     // A paramset is a level of Table 9-29's composition: its statements
     // specify the module's values over the paramset level's.
     const base: ?*const Zcu.Hier = if (picked.base) |*b| b else if (p.parent == .none) null else &zcu.instances.items(.hier)[@backingInt(p.parent)];

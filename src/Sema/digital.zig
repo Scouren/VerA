@@ -161,6 +161,9 @@ pub const Lower = struct {
     /// (`site.frame` `none` for a root).
     instance_frame: []u32 = &.{},
     sites: []Site = &.{},
+    /// §12.2.1 the frame each `defparam` of each instance is written in
+    /// (a generate block's, for one inside it).
+    defparam_frames: std.AutoHashMapUnmanaged(struct { instance: u32, inst: Inst.Index }, u32) = .empty,
     /// Per instance, its `eval.Env` (its module's parameters as folded).
     envs: []eval.Env = &.{},
     /// The roots' scopes, in order.

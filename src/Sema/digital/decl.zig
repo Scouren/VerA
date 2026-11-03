@@ -203,7 +203,8 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
         .assign => try nets.assign(l, f, i),
         .function => try sub.declare(l, f, scope, i),
         .specify => try specify.block(l, f, i),
-        .defparam, .genvar, .param, .event, .port, .net => {},
+        .defparam => try l.defparam_frames.put(l.a, .{ .instance = @backingInt(l.frames.items[f].instance), .inst = i }, f),
+        .genvar, .param, .event, .port, .net => {},
         .analog, .analog_initial => return l.refuse("an analog block"),
         else => {}, // else: an expression of a range or a delay, read where it is used
     };

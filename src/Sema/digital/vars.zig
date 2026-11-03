@@ -17,6 +17,7 @@ const std = @import("std");
 const vams = @import("vams");
 const std_sim = @import("std_sim");
 const walk = @import("../walk.zig");
+const Zcu = @import("../../Zcu.zig");
 const digital = @import("../digital.zig");
 const expr = @import("expr.zig");
 const Lower = digital.Lower;
@@ -226,17 +227,45 @@ fn untypedType(l: *Lower, f: u32, i: Inst.Index) Error!Type {
     if (l.frames.items[f].parent == none and walk.isOverridable(vir, i)) {
         const k = l.frames.items[f].instance;
         const name = try l.zcu.intern_pool.getString(l.a, vir.string(p.name));
-        if (l.zcu.defparams.contains(.{ .instance = k, .name = name })) return l.refuse("an untyped parameter a defparam sets");
-        const site = l.sites[@backingInt(k)];
-        if (site.frame != none) if (overrideOf(l, site, vir, @backingInt(k), i)) |b| {
-            value = b;
-            from = site.frame;
-        };
+        if (l.zcu.defparam_sources.get(.{ .instance = k, .name = name })) |src| {
+            // §12.2.1 a defparam takes precedence: its value as written, in
+            // the instance writing it.
+            from = try writerFrame(l, src, k);
+            const wvir = l.virOf(from);
+            const di = src.src.toIndex() orelse return l.refuse("a defparam of no instruction");
+            value = Lower.payload(wvir, Inst.Assign, di).rhs;
+        } else {
+            const site = l.sites[@backingInt(k)];
+            if (site.frame != none) if (overrideOf(l, site, vir, @backingInt(k), i)) |b| {
+                value = b;
+                from = site.frame;
+            };
+        }
     }
     const b = l.virOf(from).body(value);
     if (b.len == 0) return l.refuse("an untyped parameter with no value");
     l.frame = from;
     return expr.typeOf(l, b[b.len - 1].toRef());
+}
+
+/// The frame of the instance writing defparam `src`, which the walk of
+/// instance `target` (its target) must have passed already.
+fn writerFrame(l: *Lower, src: Zcu.DefparamSource, target: Zcu.Instance.Index) Error!u32 {
+    const want = l.zcu.intern_pool.stringToSlice(src.writer);
+    for (0..@backingInt(target) + 1) |k| {
+        const path = try std.fmt.allocPrint(l.a, "{f}", .{l.zcu.fmtPath(@fromBackingInt(@intCast(k)))});
+        if (!std.mem.eql(u8, path, want)) continue;
+        const di = src.src.toIndex() orelse return l.refuse("a defparam of no instruction");
+        const f = l.defparam_frames.get(.{ .instance = @intCast(k), .inst = di }) orelse l.instance_frame[k];
+        if (l.fileOf(f) != src.file) return l.refuse("a defparam its writer's file does not hold");
+        return f;
+    }
+    // A writer walked after its target (a later root): its value's own
+    // type needs no names of it, so any frame of its file reads it; one
+    // that names something is refused there.
+    const f = l.instance_frame[@backingInt(target)];
+    if (l.fileOf(f) != src.file) return l.refuse("a defparam written in another file's instance walked after its target");
+    return f;
 }
 
 /// The value body instance `site` gives parameter `i` of instance `k`'s

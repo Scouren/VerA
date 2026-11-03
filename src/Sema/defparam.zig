@@ -36,7 +36,7 @@ const payloadOf = walk.payloadOf;
 
 /// A §6.3.1 defparam that reached the instance being made: the parameter
 /// it names, its value and where it is written.
-pub const Dp = struct { name: []const u8, value: InternPool.Index, file: Zcu.File.Index, src: Inst.Ref };
+pub const Dp = struct { name: []const u8, value: InternPool.Index, file: Zcu.File.Index, src: Inst.Ref, writer: []const u8 };
 
 /// The defparams the walk left waiting below an instance (one that names a
 /// connect module §7.8 inserts after the walk, or nothing), and every
@@ -47,10 +47,10 @@ pub const Waiting = struct { rows: []const Row, origins: []Origin };
 pub const Row = struct { anchor: Instance.Index, rel: []const u8, param: []const u8, value: InternPool.Index, origin: u32 };
 
 /// A defparam as written, for E0907 when it never reaches a parameter.
-pub const Origin = struct { file: Zcu.File.Index, src: Inst.Ref, text: []const u8, used: bool = false };
+pub const Origin = struct { file: Zcu.File.Index, src: Inst.Ref, text: []const u8, writer: []const u8, used: bool = false };
 
 /// A late defparam: its parameter, value and source, under its target's path.
-pub const Late = struct { param: []const u8, value: InternPool.Index, file: Zcu.File.Index, src: Inst.Ref };
+pub const Late = struct { param: []const u8, value: InternPool.Index, file: Zcu.File.Index, src: Inst.Ref, writer: []const u8 };
 
 /// E0907 for every defparam that reached no instance.
 pub fn reportUnused(s: *Sema, waiting: Waiting) Allocator.Error!void {
@@ -70,7 +70,7 @@ pub fn waitingFor(s: *Sema, waiting: Waiting, parent: Instance.Index, name: []co
         if (r.anchor != parent or !std.mem.eql(u8, r.rel, name)) continue;
         waiting.origins[r.origin].used = true;
         const o = waiting.origins[r.origin];
-        try keepLatest(s, &out, .{ .name = r.param, .value = r.value, .file = o.file, .src = o.src });
+        try keepLatest(s, &out, .{ .name = r.param, .value = r.value, .file = o.file, .src = o.src, .writer = o.writer });
     }
     return out.items;
 }
@@ -113,7 +113,7 @@ pub fn reaching(w: *Walk, p: Pending, index: Instance.Index) Allocator.Error![]c
             if (std.mem.eql(u8, r.rel, name)) {
                 const o = w.origins.items[r.origin];
                 try w.matched.append(s.arena, r.origin);
-                try keepLatest(s, &out, .{ .name = r.param, .value = r.value, .file = o.file, .src = o.src });
+                try keepLatest(s, &out, .{ .name = r.param, .value = r.value, .file = o.file, .src = o.src, .writer = o.writer });
             } else if (r.rel.len > name.len and std.mem.startsWith(u8, r.rel, name) and r.rel[name.len] == '.') {
                 try w.rows.append(s.arena, .{ .anchor = index, .rel = r.rel[name.len + 1 ..], .param = r.param, .value = r.value, .origin = r.origin });
             }
@@ -122,7 +122,7 @@ pub fn reaching(w: *Walk, p: Pending, index: Instance.Index) Allocator.Error![]c
     if (w.late.count() == 0) return out.items;
     const path = if (p.parent == .none) name else try std.fmt.allocPrint(s.arena, "{f}.{s}", .{ w.zcu.fmtPath(p.parent), name });
     if (w.late.get(path)) |list| for (list.items) |l|
-        try keepLatest(s, &out, .{ .name = l.param, .value = l.value, .file = l.file, .src = l.src });
+        try keepLatest(s, &out, .{ .name = l.param, .value = l.value, .file = l.file, .src = l.src, .writer = l.writer });
     return out.items;
 }
 
@@ -151,7 +151,7 @@ pub fn collect(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index,
     var text: std.ArrayList(u8) = .empty;
     const upward = (try render(w, env, lhs[lhs.len - 1].toRef(), &text)) orelse return;
     const origin: u32 = @intCast(w.origins.items.len);
-    try w.origins.append(s.arena, .{ .file = file, .src = i.toRef(), .text = text.items });
+    try w.origins.append(s.arena, .{ .file = file, .src = i.toRef(), .text = text.items, .writer = try std.fmt.allocPrint(s.arena, "{f}", .{w.zcu.fmtPath(index)}) });
     const value = try env.bodyValue(a.rhs);
     const dot = std.mem.findScalarLast(u8, text.items, '.');
     const param = if (dot) |d| text.items[d + 1 ..] else text.items;
@@ -246,7 +246,7 @@ fn lateDefparam(w: *Walk, target: Instance.Index, param: []const u8, value: Inte
         w.rerun = true;
         return;
     };
-    try gop.value_ptr.append(s.arena, .{ .param = param, .value = value, .file = o.file, .src = o.src });
+    try gop.value_ptr.append(s.arena, .{ .param = param, .value = value, .file = o.file, .src = o.src, .writer = o.writer });
     w.rerun = true;
 }
 

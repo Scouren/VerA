@@ -66,6 +66,7 @@ pub fn run(s: *Sema, kids: []const std.ArrayList(Instance.Index)) Allocator.Erro
 /// ponytail: read again per instance, linear in the module's items; a cache
 /// by module if a design's size makes it show.
 pub fn netsOf(s: *Sema, module: Zcu.Decl) Allocator.Error!std.AutoHashMapUnmanaged(String, Net) {
+    assert(@backingInt(module.file) < s.zcu.files.len);
     assert(s.zcu.declRow(module).kind != .primitive);
     const zcu = s.zcu;
     const vir = zcu.fileVir(module.file);
@@ -99,6 +100,7 @@ pub fn netsOf(s: *Sema, module: Zcu.Decl) Allocator.Error!std.AutoHashMapUnmanag
 /// The net a port connection names in `vir`: a declared net or port, or an
 /// undeclared name (§3.6.5's implicit net); null for anything else.
 pub fn netName(s: *Sema, vir: *const Vir, actual: Inst.Ref) Allocator.Error!?String {
+    if (actual.toIndex()) |i| assert(@backingInt(i) < vir.instructions.len);
     assert(vir.instructions.len != 0);
     const i = actual.toIndex() orelse return null;
     const data = vir.instructions.items(.data)[@backingInt(i)];
@@ -116,6 +118,7 @@ pub fn netName(s: *Sema, vir: *const Vir, actual: Inst.Ref) Allocator.Error!?Str
 
 /// A header port's external name: an ANSI `io`'s, or a `port`'s.
 pub fn portName(vir: *const Vir, f: Inst.Index) []const u8 {
+    assert(@backingInt(f) < vir.instructions.len);
     return vir.string(switch (vir.instructions.items(.tag)[@backingInt(f)]) {
         .io => payloadOf(vir, Inst.Io, f).name,
         .port => payloadOf(vir, Inst.Port, f).name,
@@ -126,6 +129,7 @@ pub fn portName(vir: *const Vir, f: Inst.Index) []const u8 {
 /// The net inside the child a header port connects: an ANSI `io`'s own
 /// name, a `port` expression's net, else its external name.
 pub fn internalName(vir: *const Vir, f: Inst.Index) []const u8 {
+    assert(@backingInt(f) < vir.instructions.len);
     if (vir.instructions.items(.tag)[@backingInt(f)] == .port) {
         const value = vir.body(payloadOf(vir, Inst.Port, f).value);
         if (value.len != 0) {
@@ -149,6 +153,8 @@ pub fn internalName(vir: *const Vir, f: Inst.Index) []const u8 {
 /// net or undeclared name a continuous assignment or an `initial` or
 /// `always` process reads or writes.
 fn behavioralNets(s: *Sema, module: Zcu.Decl) Allocator.Error!std.AutoHashMapUnmanaged(String, void) {
+    assert(s.zcu.declRow(module).kind != .paramset);
+    assert(@backingInt(module.file) < s.zcu.files.len);
     const zcu = s.zcu;
     const vir = zcu.fileVir(module.file);
     var out: std.AutoHashMapUnmanaged(String, void) = .empty;
@@ -184,6 +190,7 @@ fn netsNamed(s: *Sema, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapUnma
 
 /// `netsNamed` over a payload's operands and bodies, field by field.
 fn namesIn(s: *Sema, vir: *const Vir, comptime T: type, v: T, out: *std.AutoHashMapUnmanaged(String, void), depth: u32) Allocator.Error!void {
+    assert(depth < named_depth_max);
     if (T == Inst.Ref) {
         if (v.toIndex()) |o| try netsNamed(s, vir, o, out, depth);
     } else if (T == Vir.Body) {
@@ -204,6 +211,7 @@ fn namesIn(s: *Sema, vir: *const Vir, comptime T: type, v: T, out: *std.AutoHash
 /// level illegal even when compatible). A path that names no instance
 /// declares nothing.
 fn collectOoc(s: *Sema) Allocator.Error!Oocs {
+    assert(s.zcu.net_discipline.count() == 0);
     const zcu = s.zcu;
     var out: Oocs = .empty;
     var paths: std.StringHashMapUnmanaged(Instance.Index) = .empty;
@@ -312,6 +320,7 @@ fn resolveInstance(s: *Sema, kids: []const std.ArrayList(Instance.Index), ooc: *
 /// unknown, an error (E0903) when the net also joins the other domain, and
 /// insertion then reads the first candidate.
 fn merge(s: *Sema, i: Instance.Index, list: []const []const u8) Allocator.Error!?[]const u8 {
+    assert(list.len != 0);
     assert(@backingInt(i) < s.zcu.instances.len);
     assert(list.len != 0);
     var continuous = false;
@@ -353,6 +362,8 @@ fn merge(s: *Sema, i: Instance.Index, list: []const []const u8) Allocator.Error!
 /// The first §7.7.2 statement whose list holds every candidate (`exact`:
 /// and nothing else); W0950 when several do.
 fn resolution(s: *Sema, cands: []const []const u8, exact: bool, at: Zcu.File.Index) Allocator.Error!?Resolution {
+    assert(cands.len > 1);
+    assert(@backingInt(at) < s.zcu.files.len);
     const zcu = s.zcu;
     var first: ?Resolution = null;
     for (0..zcu.files.len) |f| {

@@ -40,6 +40,7 @@ const Found = struct { vir: *const Vir, decl: Inst.Discipline };
 /// continuous"). Null for no discipline of the name, and for a domainless
 /// one (no domain, no nature).
 pub fn domainOf(s: *Sema, name: []const u8) Allocator.Error!?Domain {
+    assert(name.len < std.math.maxInt(u32));
     if (std.mem.eql(u8, name, behavioral)) return .discrete;
     const d = try lookup(s, name) orelse return null;
     var natures = false;
@@ -56,6 +57,8 @@ pub fn domainOf(s: *Sema, name: []const u8) Allocator.Error!?Domain {
 /// one base nature, or of equal `units`). A name no discipline declares
 /// conflicts with nothing.
 pub fn compatible(s: *Sema, a: []const u8, b: []const u8) Allocator.Error!bool {
+    assert(a.len < std.math.maxInt(u32));
+    assert(b.len < std.math.maxInt(u32));
     if (std.mem.eql(u8, a, b)) return true;
     const da = try lookup(s, a) orelse return true;
     const db = try lookup(s, b) orelse return true;
@@ -84,6 +87,7 @@ fn lookup(s: *Sema, name: []const u8) Allocator.Error!?Found {
 
 /// The nature `d` binds to `half`, or null.
 fn natureOf(d: Found, half: ItemKind) ?[]const u8 {
+    assert(d.decl.name != .empty);
     assert(half == .potential or half == .flow);
     for (d.vir.list(Inst.DisciplineItem, d.decl.items)) |it| if (it.kind == half) return d.vir.string(it.name);
     return null;

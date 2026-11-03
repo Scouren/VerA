@@ -84,6 +84,7 @@ pub const Env = struct {
     }
 
     pub fn deinit(env: *Env) void {
+        assert(env.busy.count() == 0);
         env.positions.deinit(env.gpa);
         env.aliases.deinit(env.gpa);
         env.values.deinit(env.gpa);
@@ -96,6 +97,8 @@ pub const Env = struct {
 
     /// The value of a body: its last instruction's. Null for an empty body.
     pub fn body(env: *Env, b: Vir.Body) Allocator.Error!?Const {
+        const depth = env.depth;
+        defer assert(env.depth == depth);
         assert(b.start + b.len <= env.vir.extra.len);
         const insts = env.vir.body(b);
         if (insts.len == 0) return null;
@@ -158,6 +161,8 @@ pub const Env = struct {
 
     /// The value of `r`, or null when it has none at elaboration.
     pub fn ref(env: *Env, r: Inst.Ref) Allocator.Error!?Const {
+        const depth = env.depth;
+        defer assert(env.depth == depth);
         const i = r.toIndex() orelse return null;
         if (env.depth >= eval_depth_max) return null;
         env.depth += 1;
@@ -224,6 +229,7 @@ pub const Env = struct {
     /// The value `index` holds, or null for `undef`. A string is copied, so
     /// it outlives the pool's next string.
     pub fn toConst(env: *Env, index: InternPool.Index) ?Const {
+        assert(@backingInt(index) < env.ip.items.len);
         assert(index != .none);
         return switch (env.ip.indexToKey(index)) {
             .float => |f| .{ .real = f },
@@ -251,6 +257,7 @@ pub const Env = struct {
     // ---- private ----
 
     fn payload(env: *const Env, comptime T: type, i: Inst.Index) T {
+        assert(Inst.dataKind(env.vir.instructions.items(.tag)[@backingInt(i)]) == .pl_node);
         return env.vir.extraData(T, env.vir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index);
     }
 
@@ -293,6 +300,7 @@ pub const Env = struct {
 
     /// A name's value: a parameter's, a genvar's, or an alias's original's.
     fn declValue(env: *Env, d: Inst.Index) Allocator.Error!?Const {
+        assert(env.depth <= eval_depth_max);
         assert(@backingInt(d) < env.vir.instructions.len);
         return switch (env.vir.instructions.items(.tag)[@backingInt(d)]) {
             .param => env.param(d),
@@ -378,6 +386,7 @@ fn originalOf(vir: *const Vir, alias: Inst.Index) ?Inst.Index {
 }
 
 fn unaryOp(tag: Inst.Tag) fold.UnaryOp {
+    assert(Inst.dataKind(tag) == .un_node);
     return switch (tag) {
         .pos => .plus,
         .neg => .minus,
@@ -388,6 +397,7 @@ fn unaryOp(tag: Inst.Tag) fold.UnaryOp {
 }
 
 fn binaryOp(tag: Inst.Tag) fold.BinaryOp {
+    assert(Inst.dataKind(tag) == .pl_node);
     return switch (tag) {
         .add => .add,
         .sub => .sub,
@@ -421,6 +431,7 @@ fn binaryOp(tag: Inst.Tag) fold.BinaryOp {
 /// truncated to its size and sign-extended when signed. Null for an x, z or
 /// `?` digit or a value wider than 64 bits.
 fn bigInt(vir: *const Vir, b: Inst.BigInt) ?Const {
+    assert(b.flags.radix != 0);
     assert(b.digits != .empty);
     const digits = vir.string(b.digits);
     const radix: u8 = b.flags.radix;

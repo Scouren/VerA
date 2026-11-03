@@ -81,6 +81,7 @@ pub fn run(s: *Sema, waiting: defparam.Waiting) Allocator.Error!void {
 /// discrete port, read with its overrides. An override discipline
 /// incompatible with the side it replaces is E0915 (§3.11.1).
 fn collectRules(s: *Sema) Allocator.Error![]const Rule {
+    assert(s.zcu.instances.len != 0 or s.zcu.files.len != 0);
     const zcu = s.zcu;
     var rules: std.ArrayList(Rule) = .empty;
     for (0..zcu.files.len) |f| {
@@ -177,6 +178,7 @@ fn mixedPorts(s: *Sema, rules: []const Rule, p: Instance.Index, c: Instance.Inde
 /// §7.8.4 one mixed port or terminal: the statement that bridges it, a
 /// `Hit`; E0922 when several do, E0927 when none does.
 fn judge(s: *Sema, rules: []const Rule, at: Site, dir: Inst.Direction, sig: String, up: []const u8, low: []const u8, hits: *std.ArrayList(Hit)) Allocator.Error!void {
+    assert(sig != .empty);
     assert(at.port_name != .empty);
     assert(try discipline.domainOf(s, up) != try discipline.domainOf(s, low));
     const ip = &s.zcu.intern_pool;
@@ -274,6 +276,7 @@ fn gateTerminals(s: *Sema, rules: []const Rule, i: Instance.Index, hits: *std.Ar
 /// switch's `source`, `drain` (inout) and `gate`. Null for a UDP or an
 /// unknown keyword.
 fn terminal(ty: []const u8, k: usize, n: usize) ?struct { port: []const u8, dir: Inst.Direction, switch_: bool = false } {
+    assert(n != 0);
     assert(k < n);
     const words = std.StaticStringMap(enum { nin, nout, enable, pull, mos, cmos, pass }).initComptime(.{
         .{ "and", .nin },       .{ "nand", .nin },      .{ "or", .nin },        .{ "nor", .nin },       .{ "xor", .nin },       .{ "xnor", .nin },
@@ -299,6 +302,7 @@ fn terminal(ty: []const u8, k: usize, n: usize) ?struct { port: []const u8, dir:
 /// lane for a scalar instance. Null after E0909 when the range does not
 /// fold.
 fn laneRange(s: *Sema, vir: *const Vir, in: Inst.Instance) Allocator.Error!?struct { lo: i64, hi: i64 } {
+    assert(in.flags.kind == .gate);
     if (in.range.len == 0) return .{ .lo = 0, .hi = 0 };
     var env: eval.Env = try .init(s.gpa, s.arena, &s.zcu.intern_pool, vir, &.{});
     defer env.deinit();
@@ -312,6 +316,7 @@ fn laneRange(s: *Sema, vir: *const Vir, in: Inst.Instance) Allocator.Error!?stru
 
 /// The net a bit- or part-select names (`bus[1]`, `bus[3:2]`), or null.
 fn selectBase(vir: *const Vir, i: Inst.Index) ?[]const u8 {
+    assert(@backingInt(i) < vir.instructions.len);
     const tag = vir.instructions.items(.tag)[@backingInt(i)];
     const operand: Inst.Ref = switch (tag) {
         .elem => payloadOf(vir, Inst.Bin, i).lhs,
@@ -331,6 +336,7 @@ fn selectBase(vir: *const Vir, i: Inst.Index) ?[]const u8 {
 /// §10.2 the discipline in force for a `wire` among `defaults`: one
 /// qualified `wire`, else the unqualified one (AstGen lists those last).
 fn inForce(vir: *const Vir, defaults: []const Inst.Default) ?[]const u8 {
+    assert(defaults.len <= @typeInfo(@FieldType(@FieldType(Inst.Default, "flags"), "qualifier")).@"enum".field_names.len + 1);
     var fallback: ?[]const u8 = null;
     for (defaults) |d| {
         if (d.flags.qualified and d.flags.qualifier == .wire) return vir.string(d.discipline);
@@ -364,6 +370,7 @@ fn analogActual(s: *Sema, file: Zcu.File.Index, vir: *const Vir, c: Instance.Ind
 /// disciplines are compatible with the two and its directions carry the
 /// signal the port's way (an inout pair any way).
 fn matches(s: *Sema, r: Rule, dir: Inst.Direction, upper: []const u8, lower: []const u8) Allocator.Error!bool {
+    assert(lower.len != 0);
     assert(r.cont.port != r.disc.port);
     if (r.cont.dir == .inout and r.disc.dir == .inout) {
         const up_cont = try discipline.domainOf(s, upper) == .continuous;
@@ -386,6 +393,7 @@ fn matches(s: *Sema, r: Rule, dir: Inst.Direction, upper: []const u8, lower: []c
 }
 
 fn compat(s: *Sema, a: []const u8, b: []const u8) Allocator.Error!bool {
+    assert(a.len < std.math.maxInt(u32));
     return try discipline.domainOf(s, a) == try discipline.domainOf(s, b) and try discipline.compatible(s, a, b);
 }
 
@@ -420,6 +428,8 @@ fn insert(s: *Sema, rules: []const Rule, hits: []const Hit, waiting: defparam.Wa
 /// One connect-module instance under `parent`, its parameters folded with
 /// the statement's values (§7.7.3).
 fn bridgeInstance(s: *Sema, r: Rule, parent: Instance.Index, name: String, dps: []const defparam.Dp) Allocator.Error!Instance.Index {
+    const before = s.zcu.instances.len;
+    defer assert(s.zcu.instances.len == before + 1);
     assert(@backingInt(parent) < s.zcu.instances.len);
     assert(name != .empty);
     const zcu = s.zcu;
@@ -461,6 +471,7 @@ fn bridgeInstance(s: *Sema, r: Rule, parent: Instance.Index, name: String, dps: 
 /// children in table order, so a bridge follows its siblings' subtrees),
 /// remapping every index that names a row.
 fn preorder(s: *Sema) Allocator.Error!void {
+    assert(s.zcu.inserts.len != 0);
     const zcu = s.zcu;
     const n = zcu.instances.len;
     const parents = zcu.instances.items(.parent);

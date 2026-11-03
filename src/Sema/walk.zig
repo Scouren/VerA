@@ -380,6 +380,7 @@ fn bindPorts(s: *Sema, p: Pending, vir: *const Vir, m: Inst.Module, module: Vir.
 
 /// A header port's external name: an ANSI `io`'s, or a `port`'s.
 fn portName(vir: *const Vir, f: Inst.Index) []const u8 {
+    assert(@backingInt(f) < vir.instructions.len);
     return vir.string(switch (vir.instructions.items(.tag)[@backingInt(f)]) {
         .io => payloadOf(vir, Inst.Io, f).name,
         .port => payloadOf(vir, Inst.Port, f).name,
@@ -388,6 +389,7 @@ fn portName(vir: *const Vir, f: Inst.Index) []const u8 {
 }
 
 fn portNamed(vir: *const Vir, formals: []const Inst.Index, name: []const u8) ?Inst.Index {
+    assert(name.len != 0);
     for (formals) |f| if (std.mem.eql(u8, portName(vir, f), name)) return f;
     return null;
 }
@@ -548,6 +550,7 @@ fn genCase(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, g: 
 
 /// A body's last instruction as a `store`, or null.
 fn storeOf(vir: *const Vir, b: Vir.Body) ?Inst.Bin {
+    assert(b.start + b.len <= vir.extra.len);
     const insts = vir.body(b);
     if (insts.len == 0) return null;
     const last = insts[insts.len - 1];
@@ -557,6 +560,7 @@ fn storeOf(vir: *const Vir, b: Vir.Body) ?Inst.Bin {
 
 /// The declaration a `decl_ref` names, or null.
 fn declOf(vir: *const Vir, r: Inst.Ref) ?Inst.Index {
+    if (r.toIndex()) |i| assert(@backingInt(i) < vir.instructions.len);
     const i = r.toIndex() orelse return null;
     if (vir.instructions.items(.tag)[@backingInt(i)] != .decl_ref) return null;
     return vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl;

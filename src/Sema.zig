@@ -77,6 +77,7 @@ pub fn elaborate(zcu: *Zcu, config: Config) Allocator.Error!void {
 
 /// Appends a diagnostic to `zcu.failed`.
 pub fn fail(s: *Sema, code: Diag.Code, file: Zcu.File.Index, src: Inst.Ref, comptime fmt: []const u8, args: anytype) Allocator.Error!void {
+    assert(@backingInt(file) < s.zcu.files.len);
     const text = try std.fmt.allocPrint(s.arena, fmt, args);
     const message = try s.zcu.intern_pool.getString(s.gpa, text);
     const before = s.zcu.failed.len;
@@ -88,6 +89,8 @@ pub fn fail(s: *Sema, code: Diag.Code, file: Zcu.File.Index, src: Inst.Ref, comp
 /// root configuration (§13.3.1.6: an `instance` clause first, then a
 /// `cell` clause), else `cell`.
 pub fn bound(s: *Sema, cell: InternPool.String, path: []const u8) InternPool.String {
+    assert(cell != .empty);
+    assert(path.len != 0);
     if (s.uses.count() == 0) return cell;
     if (s.uses.get(path)) |c| return c;
     return s.uses.get(s.zcu.intern_pool.stringToSlice(cell)) orelse cell;
@@ -163,6 +166,8 @@ fn ruleWords(s: *Sema, text: []const u8) Allocator.Error![]const []const u8 {
 
 /// `lib.cell[:config]`'s cell.
 fn cellOf(text: []const u8) []const u8 {
+    assert(text.len != 0);
+    defer assert(text.len != 0);
     const end = std.mem.findScalar(u8, text, ':') orelse text.len;
     const dot = std.mem.findScalarLast(u8, text[0..end], '.');
     return if (dot) |d| text[d + 1 .. end] else text[0..end];

@@ -177,6 +177,8 @@ pub fn collect(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index,
 // ---- private ----
 
 fn later(a: Dp, b: Dp) bool {
+    assert(a.name.len != 0);
+    assert(b.name.len != 0);
     if (a.file != b.file) return @backingInt(a.file) > @backingInt(b.file);
     return @backingInt(a.src) > @backingInt(b.src);
 }

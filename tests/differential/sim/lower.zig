@@ -302,7 +302,11 @@ pub const Lower = struct {
                         const pair = try l.b.listOf(&.{ try l.real(args[0]), try l.real(args[1]) });
                         break :blk l.b.expr(.math2, rt, pair.start, @backingInt(@field(Program.Math, @tagName(m))));
                     },
-                    else => l.refuse("a real system function"), // else: the rest are not lowered yet
+                    else => blk: {
+                        // else: the rest are not lowered yet
+                        l.why = try std.fmt.allocPrint(l.a, "the real system function ${t}", .{f});
+                        break :blk error.Unsupported;
+                    },
                 };
             },
             .call => return l.b.expr(.call, rt, try l.call(try l.callee(e), ex.args(e)), 0),
@@ -438,7 +442,11 @@ pub const Lower = struct {
             .time => try l.b.expr(.time, natural, try l.timeRow(), 0),
             .stime => try l.b.expr(.stime, natural, try l.timeRow(), 0),
             .clog2 => try l.b.expr(.clog2, Ty.int(32, true), try l.self_(args[0], 0), 0),
-            else => return l.refuse("a system function"), // else: not lowered yet
+            else => {
+                // else: not lowered yet
+                l.why = try std.fmt.allocPrint(l.a, "the system function ${t}", .{f});
+                return error.Unsupported;
+            },
         };
         return l.b.expr(.convert, t, raw, 0);
     }

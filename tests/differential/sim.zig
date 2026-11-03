@@ -92,18 +92,59 @@ fn readXfail(arena: Allocator, io: std.Io, path: []const u8) !std.StringHashMapU
     return map;
 }
 
-/// The settings `vera --run` gives a fixture: its path, `//! event-budget`.
-/// Null for a fixture with `//@` runner lines (more files, a library map),
-/// which the bridge does not take yet.
-fn options(source: []const u8, path: []const u8, io: std.Io) ?digital.Options {
+/// The settings `vera --run` gives a fixture (`tests/suite/Digital.zig`'s
+/// `runnerArgs`, then `src/cli/digital.zig`'s `libraries`): its path, its
+/// `//! event-budget`, and its `//@` lines (`std`, `files`, `libmap`,
+/// `liblist`, `protect-keys`), relative to its directory. Null when the
+/// lines name something the cli itself would refuse.
+fn options(a: Allocator, io: std.Io, source: []const u8, path: []const u8) !?digital.Options {
     var opts: digital.Options = .{ .file_name = path, .io = io };
+    const dir = std.fs.path.dirname(path).?;
+    var paths: std.ArrayList([]const u8) = .empty;
+    try paths.append(a, path);
+    var maps: std.ArrayList([]const u8) = .empty;
+    var search: std.ArrayList([]const u8) = .empty;
     var lines = std.mem.splitScalar(u8, source, '\n');
     while (lines.next()) |raw| {
         const line = std.mem.trim(u8, raw, " \t\r");
-        if (std.mem.startsWith(u8, line, "//@")) return null;
         if (std.mem.cutPrefix(u8, line, "//! event-budget")) |rest|
             opts.event_budget = std.fmt.parseInt(u64, std.mem.trim(u8, rest, " \t"), 10) catch return null;
+        if (!std.mem.startsWith(u8, line, "//@")) continue;
+        var words = std.mem.tokenizeAny(u8, line["//@".len..], " \t");
+        const key = words.next() orelse return null;
+        if (std.mem.eql(u8, key, "std")) {
+            opts.language = frontend.keyword.KeywordSet.fromSpecifier(words.next() orelse return null) orelse return null;
+        } else if (std.mem.eql(u8, key, "libmap")) {
+            try maps.append(a, try std.fs.path.join(a, &.{ dir, words.next() orelse return null }));
+        } else if (std.mem.eql(u8, key, "protect-keys")) {
+            const text = std.Io.Dir.cwd().readFileAlloc(io, try std.fs.path.join(a, &.{ dir, words.next() orelse return null }), a, .limited(1 << 22)) catch return null;
+            opts.protect_keys = frontend.protect.parseKeys(a, text) catch return null;
+        } else if (std.mem.eql(u8, key, "liblist")) {
+            while (words.next()) |lib| try search.append(a, lib);
+        } else if (std.mem.eql(u8, key, "files")) {
+            while (words.next()) |f| try paths.append(a, try std.fs.path.join(a, &.{ dir, f }));
+        } else return null;
     }
+    var bag: diag.Bag = .init(a);
+    const map = frontend.libmap.load(a, io, &bag, maps.items) catch return null;
+    const libs = try a.alloc([]const u8, paths.items.len);
+    for (paths.items, libs) |p, *lib| {
+        const real = std.Io.Dir.cwd().realPathFileAlloc(io, p, a) catch return null;
+        lib.* = switch (map.libraryOf(real)) {
+            .lib => |l| l,
+            .ambiguous => return null,
+        };
+    }
+    const more = try a.alloc(digital.Unit, paths.items.len - 1);
+    for (paths.items[1..], libs[1..], more) |p, l, *u| u.* = .{
+        .name = p,
+        .text = std.Io.Dir.cwd().readFileAlloc(io, p, a, .limited(1 << 22)) catch return null,
+        .lib = l,
+    };
+    opts.lib = libs[0];
+    opts.more = more;
+    if (map.incdirs.len != 0) opts.include_dirs = map.incdirs;
+    opts.search = if (search.items.len != 0) search.items else try map.order(a);
     return opts;
 }
 
@@ -111,7 +152,7 @@ fn options(source: []const u8, path: []const u8, io: std.Io) ?digital.Options {
 fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const u8 {
     const path = try std.fs.path.join(a, &.{ root, rel });
     const source = try std.Io.Dir.cwd().readFileAlloc(io, path, a, .limited(1 << 22));
-    const opts = options(source, path, io) orelse return "bridge: `//@` runner lines (more files, a library map)";
+    const opts = try options(a, io, source, path) orelse return "a `//@` line the cli refuses";
 
     // The new side first: a fixture the bridge cannot express is not run by
     // the old engine either, so no fixture's file tasks touch the disk here.

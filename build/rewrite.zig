@@ -23,7 +23,7 @@ const testRun = common.testRun;
 pub fn add(g: Graph) void {
     const b = g.b;
     const mods = g.mods;
-    const all = b.step("rewrite", "The rewrite's modules and their oracles: test-vams, test-intern_pool, test-air, test-link, diff-parse, diff-pp, diff-diag, diff-air, diff-link, diff-astgen");
+    const all = b.step("rewrite", "The rewrite's modules and their oracles: test-vams, test-intern_pool, test-air, test-link, diff-parse, diff-pp, diff-diag, diff-air, diff-spice, diff-link, diff-astgen");
     for ([_][]const u8{ "vams", "intern_pool", "air", "link" }) |name| {
         all.dependOn(&b.top_level_steps.get(b.fmt("test-{s}", .{name})).?.step);
     }

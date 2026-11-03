@@ -186,6 +186,8 @@ pub const Lower = struct {
     /// filed at.
     checks: std.ArrayList(Program.Check) = .empty,
     check_sites: std.ArrayList(u32) = .empty,
+    /// §18.1 a dump task was lowered: the catalog is written at the end.
+    dumps: bool = false,
     /// A function body is being compiled (§10.4.4: its fork runs in order).
     in_function: bool = false,
     /// The nets, their drivers (compiled after the walk), per slot its

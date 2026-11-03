@@ -20,6 +20,7 @@ const kernels = @import("kernels");
 const digital = @import("../digital.zig");
 const expr = @import("expr.zig");
 const place = @import("place.zig");
+const vcd = @import("vcd.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const none = digital.none;
@@ -28,7 +29,7 @@ const Vir = vams.Vir;
 const Inst = Vir.Inst;
 
 const Show = struct { radix: Program.Radix, newline: bool };
-const Kind = union(enum) { show: Show, strobe: Show, monitor: Show, monitor_on, monitor_off, finish, stop, timeformat, fshow: Show, fstrobe: Show, fmonitor: Show, swrite: Show, sformat, readmem: Program.Radix, fclose, fflush, queue: Program.QueueOp, printtimescale };
+const Kind = union(enum) { show: Show, strobe: Show, monitor: Show, monitor_on, monitor_off, finish, stop, timeformat, fshow: Show, fstrobe: Show, fmonitor: Show, swrite: Show, sformat, readmem: Program.Radix, fclose, fflush, queue: Program.QueueOp, printtimescale, dump: Program.DumpOp, ports: Program.PortsOp };
 
 const tasks = std.StaticStringMap(Kind).initComptime(.{
     .{ "$display", Kind{ .show = .{ .radix = .decimal, .newline = true } } },
@@ -82,6 +83,19 @@ const tasks = std.StaticStringMap(Kind).initComptime(.{
     .{ "$q_remove", Kind{ .queue = .remove } },
     .{ "$q_exam", Kind{ .queue = .exam } },
     .{ "$printtimescale", Kind.printtimescale },
+    .{ "$dumpports", Kind{ .ports = .ports } },
+    .{ "$dumpportsoff", Kind{ .ports = .off } },
+    .{ "$dumpportson", Kind{ .ports = .on } },
+    .{ "$dumpportsall", Kind{ .ports = .all } },
+    .{ "$dumpportslimit", Kind{ .ports = .limit } },
+    .{ "$dumpportsflush", Kind{ .ports = .flush } },
+    .{ "$dumpfile", Kind{ .dump = .file } },
+    .{ "$dumpvars", Kind{ .dump = .vars } },
+    .{ "$dumpoff", Kind{ .dump = .off } },
+    .{ "$dumpon", Kind{ .dump = .on } },
+    .{ "$dumpall", Kind{ .dump = .all } },
+    .{ "$dumplimit", Kind{ .dump = .limit } },
+    .{ "$dumpflush", Kind{ .dump = .flush } },
 });
 
 /// Appends the `.task` instruction of system task call `i`.
@@ -148,6 +162,8 @@ pub fn task(l: *Lower, i: Inst.Index) Error!void {
             break :blk .{ .kind = .queue, .a = try queueCall(l, op, args, outs) };
         },
         .printtimescale => .{ .kind = .show, .a = try printTimescale(l, args) },
+        .dump => |op| .{ .kind = .dump, .a = try vcd.task(l, i, op, args) },
+        .ports => |op| .{ .kind = .ports, .a = try vcd.ports(l, i, op, args) },
         .monitor_on => .{ .kind = .monitor_on, .a = 0 },
         .monitor_off => .{ .kind = .monitor_off, .a = 0 },
         .finish, .stop => blk: {

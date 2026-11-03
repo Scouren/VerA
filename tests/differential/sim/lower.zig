@@ -467,6 +467,41 @@ pub const Lower = struct {
                 }
                 break :blk try l.b.expr(.file, natural, try l.b.extraOf(c), 0);
             },
+            .sscanf, .fscanf => blk: {
+                var outs: std.ArrayList(u32) = .empty;
+                for (args[2..]) |o| {
+                    const tt = try l.targetType(o);
+                    try outs.appendSlice(l.a, &.{ try l.place(o), @bitCast(try l.tyOf(tt)), tt.width });
+                }
+                // `%m`: the scope's path and the named blocks around the call.
+                var path: std.Io.Writer.Allocating = .init(l.a);
+                const saved = r.out;
+                r.out = &path.writer;
+                defer r.out = saved;
+                digital.for_emitter.display.emitScope(r) catch return l.refuse("a scan path the old engine refuses");
+                r.out = saved;
+                const c = try l.b.extraOf(Program.ScanCall{ .src = try l.self_(args[0], 0), .format = try l.self_(args[1], 0), .outs = try l.b.listOf(outs.items), .module = try l.b.string(path.written()), .scope = r.scope });
+                break :blk try l.b.expr(.scan, natural, c, @intFromBool(f == .fscanf));
+            },
+            .fread => blk: {
+                const none = @backingInt(Program.Ref.none);
+                const target = args[0];
+                var fr: Program.Fread = .{ .fd = try l.self_(args[1], 0), .place = none, .ty = .bit, .prior = none, .base = none, .low = 0, .high = 0, .start = none, .count = none };
+                const arr = if (ex.tag(target) == .ident) r.decls.arrays.get(try l.slotOf(target)) else null;
+                if (arr) |m| {
+                    fr.base = try l.slotOf(target);
+                    fr.low = std.math.cast(i32, m.low) orelse return l.refuse("an array bound past i32");
+                    fr.high = std.math.cast(i32, m.high) orelse return l.refuse("an array bound past i32");
+                    if (args.len > 2 and args[2] != .none) fr.start = try l.self_(args[2], 0);
+                    if (args.len > 3) fr.count = try l.self_(args[3], 0);
+                } else {
+                    const tt = try l.targetType(target);
+                    fr.place = try l.place(target);
+                    fr.ty = try l.tyOf(tt);
+                    fr.prior = try l.self_(target, tt.width);
+                }
+                break :blk try l.b.expr(.fread, natural, try l.b.extraOf(fr), 0);
+            },
             .random, .dist_uniform, .dist_normal, .dist_exponential, .dist_poisson, .dist_chi_square, .dist_t, .dist_erlang => blk: {
                 const none = @backingInt(Program.Ref.none);
                 const dist: Program.Dist = switch (f) {

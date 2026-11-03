@@ -22,14 +22,9 @@ verilog/10_tasks_functions/recursive_task_fork_join.v bridge: a timed task activ
 verilog/10_tasks_functions/task_recursive_timed_automatic.v bridge: a timed task activation
 verilog/10_tasks_functions/timed_subroutine_parameters.v bridge: a timed task activation
 verilog/17_system_tasks/fmonitor.v bridge: $fmonitor
-verilog/17_system_tasks/fread.v bridge: the system function $fread
-verilog/17_system_tasks/fscanf.v bridge: the system function $fscanf
-verilog/17_system_tasks/fscanf_unformatted_u.v bridge: the system function $fscanf
 verilog/17_system_tasks/itor_real_argument_converts.v bridge: $itor of a real
 verilog/17_system_tasks/logic_planes.v bridge: a §17.5 PLA task
-verilog/17_system_tasks/native_binary_file_targets.v bridge: the system function $fread
-verilog/17_system_tasks/native_file_scan_targets.v bridge: the system function $fscanf
-verilog/17_system_tasks/native_nested_scan_destinations.v bridge: the system function $sscanf
+verilog/17_system_tasks/native_binary_file_targets.v bridge: an array bound past i32
 verilog/17_system_tasks/native_sformat_dynamic.v bridge: a $sformat format held in a variable
 verilog/17_system_tasks/pla_async_personality.v bridge: a §17.5 PLA task
 verilog/17_system_tasks/pla_plane_ignore.v bridge: a §17.5 PLA task
@@ -47,12 +42,6 @@ verilog/17_system_tasks/queue_order_payload.v bridge: a §17.6 queue task
 verilog/17_system_tasks/queue_status_boundaries.v bridge: a §17.6 queue task
 verilog/17_system_tasks/sformat_excess_argument_warning.v bridge: a $sformat format held in a variable
 verilog/17_system_tasks/sformat_variable_format.v bridge: a $sformat format held in a variable
-verilog/17_system_tasks/sscanf_conversions.v bridge: the system function $sscanf
-verilog/17_system_tasks/sscanf_field_rules.v bridge: the system function $sscanf
-verilog/17_system_tasks/sscanf_time_scaled.v bridge: the system function $sscanf
-verilog/17_system_tasks/sscanf_unformatted_z.v bridge: the system function $sscanf
-verilog/17_system_tasks/sscanf_unknown_input.v bridge: the system function $sscanf
 verilog/17_system_tasks/test_plusargs_absent.v bridge: the system function $test_plusargs
-verilog/17_system_tasks/ungetc_read_routines.v bridge: the system function $fscanf
 verilog/17_system_tasks/value_plusargs_absent.v bridge: the system function $value_plusargs
 verilog/A_formal_syntax/b_A_6_2_repeat_intra_assignment.v bridge: §9.7.7 repeat event control

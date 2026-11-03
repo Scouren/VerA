@@ -21,7 +21,7 @@
 //! - `pub const Math = enum(u8)`, `pub const Elem = struct`, `pub const Select = struct` (`Select.Mode`)
 //! - `pub const Piece.none_width`
 //! - `pub const Repeat = struct`, `pub const Fork = struct`, `pub const Sample = struct` (`Sample.Mode`)
-//! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const SWrite = struct`, `pub const Random = struct`, `pub const Dist = enum(u32)`, `pub const FileCall = struct`, `pub const FileOp = enum(u32)`, `pub const FShow = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
+//! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const SWrite = struct`, `pub const Random = struct`, `pub const Dist = enum(u32)`, `pub const FileCall = struct`, `pub const ScanCall = struct`, `pub const Fread = struct`, `pub const FileOp = enum(u32)`, `pub const FShow = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
 //! - `pub const Net = struct` (`Net.no_decay`), `pub const Driver = struct` (`Driver.Source`)
 //! - `pub const Cond = struct` (`Cond.Op`), `pub const CheckEvent = struct`, `pub const Check = struct`
 //! - `pub const Vcd = struct` (`Vcd.VcdScope`, `Vcd.Var`), `pub const DumpCall = struct`, `pub const DumpOp = enum(u32)`
@@ -292,6 +292,11 @@ pub const Expr = struct {
         /// §17.2 a file function: `a` a `FileCall` in `extra`; its result's
         /// low bits in `ty` (its natural type).
         file,
+        /// §17.2.4.3 `$sscanf` (`b` 0) or `$fscanf` (`b` 1): `a` a
+        /// `ScanCall` in `extra`; the count in `ty`.
+        scan,
+        /// §17.2.4.4 `$fread`: `a` an `Fread` in `extra`; the bytes read in `ty`.
+        fread,
     };
 
     // One row per operator.
@@ -578,6 +583,17 @@ pub const FileCall = struct { op: FileOp, x: u32, y: u32, z: u32, place: u32, ty
 
 /// The §17.2 functions a `FileCall` runs.
 pub const FileOp = enum(u32) { fopen, fgets, ferror, fgetc, ungetc, ftell, rewind, fseek, feof };
+
+/// §17.2.4.3 a scan: the input (a string row, or the descriptor row), the
+/// format row, the outputs (triples: place, its `Ty` bits, its width), the
+/// `%m` path text, and the scope whose time unit `%t` reads.
+pub const ScanCall = struct { src: u32, format: u32, outs: List, module: List, scope: u32 };
+
+/// §17.2.4.4 `$fread`: the descriptor row; into a variable (`place` of
+/// type `ty`, whose value now is row `prior`), or (`base` not `none`) a
+/// memory's elements `base..` over declared [low, high] from row `start`
+/// for at most row `count` words (`none`: the defaults).
+pub const Fread = struct { fd: u32, place: u32, ty: Ty, prior: u32, base: u32, low: i32, high: i32, start: u32, count: u32 };
 
 /// §17.2.2 a file output task: show row `show` to descriptor row `fd`.
 pub const FShow = struct { show: u32, fd: u32 };

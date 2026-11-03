@@ -25,6 +25,7 @@ const State = @import("State.zig");
 const logic = @import("logic.zig");
 const calls = @import("calls.zig");
 const files = @import("files.zig");
+const scan = @import("scan.zig");
 const Literal = logic.Literal;
 const Bit = logic.Bit;
 const Error = State.Error;
@@ -204,6 +205,13 @@ pub fn eval(s: *State, a: Allocator, e: u32) Error!Literal {
         .call => normalize(a, try calls.call(s, a, d.a), w, ty.signed),
         .file => blk: {
             const raw: u64 = @bitCast(try files.call(s, a, d.a));
+            const v = try filled(a, w, ty.signed, .zero);
+            v.values()[0] = if (w >= 64) raw else raw & ((@as(u64, 1) << @intCast(w)) - 1);
+            break :blk v;
+        },
+        .scan, .fread => blk: {
+            const r = if (row.tag == .fread) try scan.fread(s, a, d.a) else if (d.b == 0) try scan.sscanf(s, a, d.a) else try scan.fscanf(s, a, d.a);
+            const raw: u64 = @bitCast(r);
             const v = try filled(a, w, ty.signed, .zero);
             v.values()[0] = if (w >= 64) raw else raw & ((@as(u64, 1) << @intCast(w)) - 1);
             break :blk v;

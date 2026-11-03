@@ -113,6 +113,7 @@ fn build(l: *Lower) E!void {
     b.p.holds = @intCast(r.rows.holds.items.len);
     for (r.program.code.items, r.program.scope_of.items, 0..) |ins, scope, pc| {
         r.scope = scope;
+        r.pc = @intCast(pc);
         try inst(l, ins, @intCast(pc), repeats);
     }
     b.p.fan_start = r.waits.fan_start;

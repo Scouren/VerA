@@ -278,8 +278,18 @@ fn scheme(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8) Error
     const vir = l.virOf(f);
     if (Lower.tag(vir, i) == .gen_case) return genCase(w, f, scope, Lower.payload(vir, Inst.GenCase, i), prefix);
     const g = Lower.payload(vir, Inst.GenIf, i);
-    const c = (try (try l.envAt(f)).body(g.cond)) orelse return l.refuse("a generate condition Sema/eval.zig does not fold");
-    try armBlock(w, f, scope, if (c.isTrue()) g.then else g.@"else", prefix);
+    const env = try l.envAt(f);
+    const taken = if (try env.body(g.cond)) |c| c.isTrue() else blk: {
+        // The IEEE 1364 mode: a constant function, an x/z bit.
+        const cb = vir.body(g.cond);
+        if (cb.len == 0) return l.refuse("a generate condition with no expression");
+        const v = (try eval.v1364.value(env, cb[cb.len - 1].toRef())) orelse return l.refuse("a generate condition Sema/eval.zig does not fold");
+        break :blk switch (v) {
+            .int => |x| x.truth() == .one,
+            .real => |x| x != 0,
+        };
+    };
+    try armBlock(w, f, scope, if (taken) g.then else g.@"else", prefix);
 }
 
 /// A generate arm: its `gen_block`, a conditional scheme nested directly
@@ -301,7 +311,8 @@ fn genBlock(w: *Walk, f: u32, scope: u32, b: Inst.Index, index: ?i64, genvars: [
     const blk = Lower.payload(vir, Inst.GenBlock, b);
     const name = vir.string(blk.name);
     const inner_scope = try newScope(l, scope, name, index, l.b.times.items[scope], l.srcOffset(f, b), true);
-    const inner = try newFrame(l, f, l.frames.items[f].instance, inner_scope, genvars);
+    // §12.4 a conditional arm's block sees the genvars of the iteration around it.
+    const inner = try newFrame(l, f, l.frames.items[f].instance, inner_scope, if (index == null) l.frames.items[f].genvars else genvars);
     _ = try l.bind(f, b, .{ .kind = .scope, .slot = inner_scope });
     // §12.4.1 the iteration's genvar reads as a localparam integer.
     if (index) |v| {

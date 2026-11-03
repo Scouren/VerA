@@ -162,7 +162,7 @@ fn options(a: Allocator, io: std.Io, source: []const u8, path: []const u8) !?dig
 /// Preprocesses, parses, AstGens, elaborates and lowers fixture `path`
 /// (with its `//@ files` units) as the new pipeline does.
 fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, opts: digital.Options) !Compiled {
-    if (std.mem.find(u8, source, "//@ libmap") != null or std.mem.find(u8, source, "//@ liblist") != null) return .{ .refused = "a library map or list (`//@ libmap`, `//@ liblist`)" };
+    if (std.mem.find(u8, source, "//@ libmap") != null or std.mem.find(u8, source, "//@ liblist") != null) return .{ .refused = "Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads" };
     // IEEE 1364-2005 §28.2 the keys, read with the vams reader.
     var keys: vams.Preprocessor.protect.Keys = .{};
     var lines = std.mem.splitScalar(u8, source, '\n');

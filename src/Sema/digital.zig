@@ -309,7 +309,11 @@ pub const Lower = struct {
 
     /// The folded integer `r` is in frame `f`, refused when it has none.
     pub fn intOf(l: *Lower, f: u32, r: Inst.Ref) Error!i64 {
-        const c = (try l.constOf(f, r)) orelse return l.refuse("a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)");
+        const c = (try l.constOf(f, r)) orelse {
+            // The IEEE 1364 mode: x/z bits, past 64 bits, selects, constant functions.
+            if (try eval.v1364.int(try l.envAt(f), r)) |v| return v;
+            return l.refuse("a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)");
+        };
         return switch (c) {
             .int => |v| v,
             .real => |v| if (std.math.isFinite(v)) @intFromFloat(@round(v)) else l.refuse("a non-finite real where an integer constant is required"),

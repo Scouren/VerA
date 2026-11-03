@@ -19,6 +19,7 @@ const std = @import("std");
 const vams = @import("vams");
 const std_sim = @import("std_sim");
 const walk = @import("../walk.zig");
+const eval = @import("../eval.zig");
 const Zcu = @import("../../Zcu.zig");
 const digital = @import("../digital.zig");
 const expr = @import("expr.zig");
@@ -318,6 +319,19 @@ fn lateParam(l: *Lower, f: u32, i: Inst.Index) Error!u32 {
     }
     n.slot = try slots(l, n.ty, 1, if (n.ty.real) .zero else .x);
     const fv = try finalValue(l, f, i);
+    // The IEEE 1364 mode folds x/z bits, wide values and constant
+    // functions; only what it cannot is evaluated by the run at the end.
+    if (!n.ty.real) if (try eval.v1364.value(try l.envAt(fv.frame), fv.value)) |v| if (v == .int) {
+        const fitted = v.int.resize(l.a, n.ty.width, if (v.int.signed) .sign else .zero) catch |e| switch (e) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.ZeroSize => unreachable,
+        };
+        const word = l.b.p.slots.items(.word)[n.slot];
+        const words = Program.words(n.ty.width);
+        @memcpy(l.b.init_v.items[word..][0..words], fitted.values()[0..words]);
+        @memcpy(l.b.init_x.items[word..][0..words], fitted.unknowns()[0..words]);
+        return l.bind(f, i, n);
+    };
     try l.late_params.append(l.a, .{ .slot = n.slot, .ty = n.ty, .frame = fv.frame, .value = fv.value });
     return l.bind(f, i, n);
 }

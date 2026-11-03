@@ -424,6 +424,21 @@ fn nets(s: *Sema, unit: *Unit) Allocator.Error!void {
         if (tag == .io and tags[@backingInt(first)] == .io and !hasNet(unit, first)) continue;
         try declareNet(s, unit, first);
     }
+    // §6.5.4 (IEEE 1364-2005 §4.5) a name an instance connects that no
+    // declaration names is an implicit net of this instance.
+    const zcu = s.zcu;
+    for (0..zcu.instances.len) |k| {
+        if (zcu.instances.items(.parent)[k] != unit.instance) continue;
+        const list = zcu.instances.items(.ports)[k];
+        for (zcu.ports.items(.actual)[list.start..][0..list.len]) |actual| {
+            const a = actual.toIndex() orelse continue;
+            if (tags[@backingInt(a)] != .str_ref) continue;
+            const name = vir.string(vir.instructions.items(.data)[@backingInt(a)].str_tok.start);
+            const net = try zcu.intern_pool.getString(s.gpa, name);
+            const disc = zcu.net_discipline.get(.{ .instance = unit.instance, .net = net }) orelse .empty;
+            _ = try internNode(s, unit, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disc);
+        }
+    }
 }
 
 /// §3.6.4 whether any declaration of `first`'s name is `ground`.
@@ -498,9 +513,17 @@ fn bindChildPorts(s: *Sema, unit: *Unit) Allocator.Error!void {
     for (zcu.ports.items(.formal)[list.start..][0..list.len], zcu.ports.items(.actual)[list.start..][0..list.len]) |formal, actual| {
         const first = portDecl(unit.vir, formal) orelse continue;
         const node: Node.Index = blk: {
-            if (actual.toIndex()) |a| if (pu.vir.instructions.items(.tag)[@backingInt(a)] == .decl_ref) {
-                const d = canonical(pu.vir, pu.vir.instructions.items(.data)[@backingInt(a)].decl_tok.decl);
-                if (pu.binds.get(d)) |b| if (b == .node) break :blk b.node;
+            if (actual.toIndex()) |a| switch (pu.vir.instructions.items(.tag)[@backingInt(a)]) {
+                .decl_ref => {
+                    const d = canonical(pu.vir, pu.vir.instructions.items(.data)[@backingInt(a)].decl_tok.decl);
+                    if (pu.binds.get(d)) |b| if (b == .node) break :blk b.node;
+                },
+                // The parent's implicit net (`nets`).
+                .str_ref => {
+                    const flat = try std.fmt.allocPrint(s.arena, "{s}{s}", .{ pu.prefix, pu.vir.string(pu.vir.instructions.items(.data)[@backingInt(a)].str_tok.start) });
+                    if (s.node_rows.get(try zcu.intern_pool.getString(s.gpa, flat))) |n| break :blk n;
+                },
+                else => {}, // else: a select or concatenation, not bound here
             };
             const name = unit.vir.string(nameOf(unit.vir, first));
             break :blk try internNode(s, unit, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), try netDiscipline(s, unit, first));

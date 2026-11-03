@@ -343,6 +343,7 @@ fn task(s: *State, a: Allocator, at: u32, pc: u32) Error!Flow {
         .monitor_off => s.monitor_on = false,
         .timeformat => try display.timeformat(s, a, t.a),
         .readmem => try readmem.readMemory(s, a, t.a),
+        .swrite => try display.swrite(s, a, t.a),
         .finish, .stop => {
             const verbose = t.a == @backingInt(Program.Ref.none) or ((try eval.eval(s, a, t.a)).asInt() orelse 1) != 0;
             if (verbose) {

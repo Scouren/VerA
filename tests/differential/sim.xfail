@@ -3,12 +3,8 @@
 # Every line is a construct the bridge (tests/differential/sim/bridge.zig) does
 # not express yet; a listed fixture that agrees fails the run until its line goes.
 verilog-ams/digital/vams_digital_abstime_math.v bridge: the real system function $abstime
-verilog/05_expressions/memory_index_out_of_range_x.v bridge: $swrite/$sformat
 verilog/05_expressions/native_select_boundaries.v bridge: a vector bound past i32
 verilog/05_expressions/native_wide_index_edges.v bridge: a vector bound past i32
-verilog/07_gate_switch_level/mos_data_undriven_supply.v bridge: %v
-verilog/07_gate_switch_level/tran_from_supply_undriven.v bridge: %v
-verilog/07_gate_switch_level/tran_strength_display.v bridge: %v
 verilog/09_behavioral_modeling/assignment_assign_deassign.v bridge: §9.3 assign/force
 verilog/09_behavioral_modeling/assignment_force_release.v bridge: §9.3 assign/force
 verilog/09_behavioral_modeling/concatenation_targets.v bridge: §9.3 assign/force
@@ -69,8 +65,6 @@ verilog/16_sdf/sdf_ordered_increment.v bridge: the system function $fopen
 verilog/16_sdf/sdf_timing_check_limit.v bridge: §15 timing checks
 verilog/17_system_tasks/append_writes_at_end.v bridge: the system function $fopen
 verilog/17_system_tasks/closed_channel_not_written.v bridge: the system function $fopen
-verilog/17_system_tasks/dist_nonpositive_warning.v bridge: the system function $dist_exponential
-verilog/17_system_tasks/dist_reference.v bridge: the system function $dist_uniform
 verilog/17_system_tasks/ferror.v bridge: the system function $fopen
 verilog/17_system_tasks/fflush.v bridge: the system function $fopen
 verilog/17_system_tasks/fgets.v bridge: the system function $fopen
@@ -87,17 +81,13 @@ verilog/17_system_tasks/native_binary_file_targets.v bridge: the system function
 verilog/17_system_tasks/native_file_input_targets.v bridge: the system function $fopen
 verilog/17_system_tasks/native_file_scan_targets.v bridge: the system function $fopen
 verilog/17_system_tasks/native_nested_scan_destinations.v bridge: the system function $sscanf
-verilog/17_system_tasks/native_sformat_dynamic.v bridge: $swrite/$sformat
+verilog/17_system_tasks/native_sformat_dynamic.v bridge: a $sformat format held in a variable
 verilog/17_system_tasks/pla_async_personality.v bridge: a §17.5 PLA task
 verilog/17_system_tasks/pla_plane_ignore.v bridge: a §17.5 PLA task
 verilog/17_system_tasks/pla_plane_x_worst_case.v bridge: a §17.5 PLA task
 verilog/17_system_tasks/pla_sync_array_logic.v bridge: a §17.5 PLA task
 verilog/17_system_tasks/plane_example.v bridge: a §17.5 PLA task
 verilog/17_system_tasks/plusargs_variable_query.v bridge: the system function $test_plusargs
-verilog/17_system_tasks/printtimescale_current_scope.v bridge: $printtimescale
-verilog/17_system_tasks/printtimescale_named_module.v bridge: $printtimescale
-verilog/17_system_tasks/printtimescale_names_parameter.v bridge: $printtimescale
-verilog/17_system_tasks/printtimescale_prints_argument.v bridge: $printtimescale
 verilog/17_system_tasks/q_exam.v bridge: a §17.6 queue task
 verilog/17_system_tasks/q_exam_code_runtime.v bridge: a §17.6 queue task
 verilog/17_system_tasks/q_exam_means.v bridge: a §17.6 queue task
@@ -106,22 +96,16 @@ verilog/17_system_tasks/q_full.v bridge: a §17.6 queue task
 verilog/17_system_tasks/queue_capacity_stats.v bridge: a §17.6 queue task
 verilog/17_system_tasks/queue_order_payload.v bridge: a §17.6 queue task
 verilog/17_system_tasks/queue_status_boundaries.v bridge: a §17.6 queue task
-verilog/17_system_tasks/random_seed_reference.v bridge: the system function $random
 verilog/17_system_tasks/read_needs_read_type.v bridge: the system function $fopen
 verilog/17_system_tasks/readmem_file_past_4mib.v bridge: the system function $fopen
-verilog/17_system_tasks/same_seed_same_value.v bridge: the system function $dist_uniform
-verilog/17_system_tasks/seedless_random_starts_at_seed_0.v bridge: the system function $random
 verilog/17_system_tasks/seek_gap_and_origin.v bridge: the system function $fopen
-verilog/17_system_tasks/sformat_excess_argument_warning.v bridge: $swrite/$sformat
-verilog/17_system_tasks/sformat_variable_format.v bridge: $swrite/$sformat
+verilog/17_system_tasks/sformat_excess_argument_warning.v bridge: a $sformat format held in a variable
+verilog/17_system_tasks/sformat_variable_format.v bridge: a $sformat format held in a variable
 verilog/17_system_tasks/sscanf_conversions.v bridge: the system function $sscanf
 verilog/17_system_tasks/sscanf_field_rules.v bridge: the system function $sscanf
 verilog/17_system_tasks/sscanf_time_scaled.v bridge: the system function $sscanf
-verilog/17_system_tasks/sscanf_unformatted_z.v bridge: $swrite/$sformat
+verilog/17_system_tasks/sscanf_unformatted_z.v bridge: the system function $sscanf
 verilog/17_system_tasks/sscanf_unknown_input.v bridge: the system function $sscanf
-verilog/17_system_tasks/strength_format.v bridge: %v
-verilog/17_system_tasks/strength_scalar.v bridge: %v
-verilog/17_system_tasks/string_output.v bridge: $swrite/$sformat
 verilog/17_system_tasks/test_plusargs_absent.v bridge: the system function $test_plusargs
 verilog/17_system_tasks/ungetc_pushback_limit.v bridge: the system function $fopen
 verilog/17_system_tasks/ungetc_read_routines.v bridge: the system function $fopen
@@ -136,7 +120,6 @@ verilog/18_vcd/real_value_format.v bridge: a §18 VCD task
 verilog/18_vcd/task_function_scopes.v bridge: a §18 VCD task
 verilog/18_vcd/version_names_dumpfile_literal.v bridge: a §18 VCD task
 verilog/18_vcd/version_names_dumpfile_variable.v bridge: a §18 VCD task
-verilog/19_compiler_directives/no_timescale_is_1s_1s.v bridge: $printtimescale
 verilog/A_formal_syntax/b_A_6_2_procedural_assignments.v bridge: §9.3 assign/force
 verilog/A_formal_syntax/b_A_6_2_repeat_intra_assignment.v bridge: §9.7.7 repeat event control
 verilog/A_formal_syntax/b_A_6_4_statements.v bridge: §9.3 assign/force

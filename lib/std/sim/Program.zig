@@ -21,7 +21,7 @@
 //! - `pub const Math = enum(u8)`, `pub const Elem = struct`, `pub const Select = struct` (`Select.Mode`)
 //! - `pub const Piece.none_width`
 //! - `pub const Repeat = struct`, `pub const Fork = struct`, `pub const Sample = struct` (`Sample.Mode`)
-//! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
+//! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const SWrite = struct`, `pub const Random = struct`, `pub const Dist = enum(u32)`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
 //! - `pub const Net = struct` (`Net.no_decay`), `pub const Driver = struct` (`Driver.Source`)
 //! - `pub const Tran = struct`, `pub const Path = struct`, `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
 //! - `pub fn words(width: u32) u32`
@@ -275,6 +275,9 @@ pub const Expr = struct {
         /// §10.4.1 a function call: `a` a `Call` in `extra`; its result
         /// (the result slot's value) in `ty`.
         call,
+        /// §17.9 `$random`/`$dist_*`: `a` a `Random` in `extra`; the draw,
+        /// 32 bits signed, in `ty` (its natural type).
+        random,
     };
 
     // One row per operator.
@@ -348,9 +351,11 @@ pub const Piece = struct {
     width: u32 = none_width,
     precision: i32 = -1,
     /// `.text`, `.lib`: the first byte in `string_bytes` (`width` bytes).
-    /// `.spec`, `.bare`, `.bare_real`: the argument row. `.scope`: the pc
-    /// whose named blocks `%m` names.
+    /// `.spec`, `.bare`, `.bare_real`, `.strength`: the argument row.
+    /// `.scope`: the pc whose named blocks `%m` names.
     a: u32 = 0,
+    /// `.strength`: the net the argument names (`none`: not a net).
+    b: u32 = std.math.maxInt(u32),
 
     pub const none_width = std.math.maxInt(u32);
 
@@ -370,6 +375,9 @@ pub const Piece = struct {
         scope,
         /// §13.6 `%l`: text `a` (the `List` in `string_bytes`).
         lib,
+        /// §17.1.1.5 `%v`: the strength of scalar net `b`, or of argument
+        /// `a`'s value at strong strength.
+        strength,
     };
 };
 
@@ -453,7 +461,7 @@ pub const Sample = struct {
 /// §17 one system task call (`Inst.task`).
 pub const Task = struct {
     kind: Kind,
-    /// `.readmem`: a `ReadMem` in `extra`.
+    /// `.readmem`: a `ReadMem` in `extra`. `.swrite`: a `SWrite`.
     /// `.show`, `.strobe`: a `Show` index in `shows`. `.monitor`: a
     /// `Monitor` in `extra`. `.timeformat`: a `TimeFormat` in `extra`, or
     /// `none`.
@@ -461,7 +469,7 @@ pub const Task = struct {
     a: u32,
     b: List = .empty,
 
-    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem };
+    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem, swrite };
 };
 
 /// §17.2.9 a `$readmemb`/`$readmemh` call: the file's name (text, or the
@@ -477,6 +485,18 @@ pub const ReadMem = struct {
     start: u32,
     finish: u32,
 };
+
+/// §17.9 one `$random`/`$dist_*` call: the distribution, the seed row and
+/// the place its inout seed is written back to (`none` for a seedless
+/// `$random`, which advances `State.random_seed`), and its two parameters.
+pub const Random = struct { dist: Dist, seed: u32, place: u32, ty: Ty, x: u32, y: u32 };
+
+/// §17.9's distributions.
+pub const Dist = enum(u32) { random, uniform, normal, exponential, poisson, chi_square, t, erlang };
+
+/// §17.2.3 `$swrite`/`$sformat`: show row `show` rendered as text and
+/// assigned, as a §3.6 string, to `place` of type `ty`.
+pub const SWrite = struct { show: u32, place: u32, ty: Ty };
 
 /// §17.3.2 `$timeformat`'s four arguments, or none for the reset.
 pub const TimeFormat = struct { units: u32, precision: u32, suffix: List, width: u32, scope: u32 };
@@ -664,6 +684,8 @@ udp_bits: []const Bit = &.{},
 counters: u32 = 0,
 /// §8.5.3.3 hold cells, one per intra-assignment timing control.
 holds: u32 = 0,
+/// §17.9.1 the seedless `$random`'s seed at time 0.
+random_seed: i32 = 0,
 
 const Program = @This();
 

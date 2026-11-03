@@ -9,6 +9,7 @@
 //! - `pub fn show(s: *State, a: Allocator, at: u32, pc: u32) Error!void`
 //! - `pub fn install(s: *State, a: Allocator, at: u32) Error!void`
 //! - `pub fn monitorPrint(s: *State, a: Allocator) Error!void`
+//! - `pub fn swrite(s: *State, a: Allocator, at: u32) Error!void`
 //! - `pub fn timeformat(s: *State, a: Allocator, at: u32) Error!void`
 //! - `pub fn real(out: *std.Io.Writer, gpa: Allocator, r: f64, conv: u8, flags: u8, precision: i64, width: ?u64) Error!void`
 
@@ -25,6 +26,7 @@ const logic = @import("logic.zig");
 const Error = State.Error;
 const Literal = logic.Literal;
 const Piece = Program.Piece;
+const net = @import("net.zig");
 
 /// How a non-real field's C flag reshapes its padded text (iverilog's).
 const Fill = enum { zero, left };
@@ -63,6 +65,21 @@ pub fn monitorPrint(s: *State, a: Allocator) Error!void {
     if (!s.monitor_on and !s.monitor_hit) return;
     try show(s, a, m.m.show, 0);
     s.monitor_hit = false;
+}
+
+/// §17.2.3 `$swrite`/`$sformat` (`Program.SWrite` at `at`): the show's
+/// text assigned to its place as a string.
+pub fn swrite(s: *State, a: Allocator, at: u32) Error!void {
+    const w = s.p.extraData(Program.SWrite, at);
+    var buf: std.Io.Writer.Allocating = .init(a);
+    const saved = s.out;
+    s.out = &buf.writer;
+    defer s.out = saved;
+    try show(s, a, w.show, 0);
+    s.out = saved;
+    const v = try logic.stringLiteral(a, buf.written());
+    const value = if (w.ty.real) try logic.realLiteral(a, logic.realOfInt(v)) else try logic.normalize(a, v, w.ty.width, v.signed);
+    try eval.put(s, a, w.place, value, false, null);
 }
 
 /// §17.3.2 `$timeformat` with the arguments at `at` in `extra` (a
@@ -111,6 +128,17 @@ fn piece(s: *State, a: Allocator, sh: Program.Show, pc_: Piece) Error!void {
         .text, .lib => try out.writeAll(p.str(.{ .start = pc_.a, .len = pc_.width })),
         .space => try out.writeByte(' '),
         .scope => try scopeName(s, sh.scope, pc_.a),
+        .strength => {
+            const none = @backingInt(Program.Ref.none);
+            const sig: net.Signal = if (pc_.b == none)
+                .of((try eval.eval(s, a, pc_.a)).bit(0), .strong, .strong)
+            else blk: {
+                const n = p.nets[pc_.b];
+                // §7.6: a pass switch drives a net with no driver of its own.
+                break :blk if (n.drivers.len == 0 and n.trans.len == 0) net.netPull(n.kind) else s.signals[n.signal];
+            };
+            try strength(out, sig);
+        },
         .bare => try fmt.value(out, a, try eval.eval(s, a, pc_.a), @fromBackingInt(@intCast(@backingInt(sh.radix))), null),
         .bare_real => {
             const r = try eval.real(s, a, pc_.a);
@@ -183,6 +211,20 @@ fn path(s: *State, scope: u32) Error!void {
     }
     try s.out.writeAll(s.p.str(sc.name));
     if (sc.index) |i| try s.out.print("[{d}]", .{i});
+}
+
+/// §17.1.1.5 `%v` of signal `sig`: a Table 17-5 mnemonic and a Table 17-4
+/// value, or the two levels as digits where a range spans several.
+fn strength(out: *std.Io.Writer, sig: net.Signal) Error!void {
+    const names = [_][]const u8{ "Hi", "Sm", "Me", "We", "La", "Pu", "St", "Su" };
+    const lo: u8 = @abs(sig.lo);
+    const hi: u8 = @abs(sig.hi);
+    if (sig.lo == 0 and sig.hi == 0) return out.writeAll("HiZ");
+    if (sig.lo >= 0 and sig.hi > 0 and sig.lo != 0) return if (lo == hi) out.print("{s}1", .{names[hi]}) else out.print("{d}{d}1", .{ hi, lo });
+    if (sig.hi <= 0 and sig.lo < 0 and sig.hi != 0) return if (lo == hi) out.print("{s}0", .{names[lo]}) else out.print("{d}{d}0", .{ lo, hi });
+    if (sig.lo == 0) return out.print("{s}H", .{names[hi]});
+    if (sig.hi == 0) return out.print("{s}L", .{names[lo]});
+    return if (lo == hi) out.print("{s}X", .{names[lo]}) else out.print("{d}{d}X", .{ lo, hi });
 }
 
 fn fieldFill(sp: fmt.Spec, conv: u8) ?Fill {

@@ -442,6 +442,29 @@ pub const Lower = struct {
             .time => try l.b.expr(.time, natural, try l.timeRow(), 0),
             .stime => try l.b.expr(.stime, natural, try l.timeRow(), 0),
             .clog2 => try l.b.expr(.clog2, Ty.int(32, true), try l.self_(args[0], 0), 0),
+            .random, .dist_uniform, .dist_normal, .dist_exponential, .dist_poisson, .dist_chi_square, .dist_t, .dist_erlang => blk: {
+                const none = @backingInt(Program.Ref.none);
+                const dist: Program.Dist = switch (f) {
+                    .random => .random,
+                    .dist_uniform => .uniform,
+                    .dist_normal => .normal,
+                    .dist_exponential => .exponential,
+                    .dist_poisson => .poisson,
+                    .dist_chi_square => .chi_square,
+                    .dist_t => .t,
+                    else => .erlang, // else: the last distribution
+                };
+                const seeded = args.len != 0;
+                const rnd = try l.b.extraOf(Program.Random{
+                    .dist = dist,
+                    .seed = if (seeded) try l.self_(args[0], 0) else none,
+                    .place = if (seeded) try l.place(args[0]) else none,
+                    .ty = if (seeded) try l.tyOf(try l.targetType(args[0])) else .bit,
+                    .x = if (args.len > 1) try l.self_(args[1], 0) else none,
+                    .y = if (args.len > 2) try l.self_(args[2], 0) else none,
+                });
+                break :blk try l.b.expr(.random, natural, rnd, 0);
+            },
             else => {
                 // else: not lowered yet
                 l.why = try std.fmt.allocPrint(l.a, "the system function ${t}", .{f});

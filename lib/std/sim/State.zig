@@ -151,6 +151,8 @@ failure: ?[]const u8 = null,
 warnings: std.ArrayList([]const u8) = .empty,
 /// What §17.2.9 reads files through; without it a load warns and ends.
 io: ?std.Io = null,
+/// §17.9.1 the seedless `$random`'s seed.
+random_seed: i32 = 0,
 /// §6.1 every driver's value now (`resolve.current`), its §7.10.2 H/L
 /// flag and its transition in flight; per net, its own transition, §3.8
 /// capacitive state and decay countdown; §8 UDP inputs and states.
@@ -258,6 +260,7 @@ pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!Stat
     @memset(s.holds, .{});
     @memset(s.monitored, false);
     s.time_format = .{ .units = p.finest };
+    s.random_seed = p.random_seed;
     for (p.starts) |st| _ = try s.enqueue(.{ .run = st.pc }, null, false);
     assert(s.scheduler.now == 0);
     return s;

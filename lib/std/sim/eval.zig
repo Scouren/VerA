@@ -201,6 +201,12 @@ pub fn eval(s: *State, a: Allocator, e: u32) Error!Literal {
             break :blk normalize(a, v, w, ty.signed);
         },
         .call => normalize(a, try calls.call(s, a, d.a), w, ty.signed),
+        .random => blk: {
+            const raw: u32 = @bitCast(try random(s, a, p.extraData(Program.Random, d.a)));
+            const v = try filled(a, w, ty.signed, .zero);
+            v.values()[0] = if (w >= 64) raw else raw & ((@as(u64, 1) << @intCast(w)) - 1);
+            break :blk v;
+        },
         .clog2 => blk: {
             const v = try filled(a, 32, true, .zero);
             v.values()[0] = ceilLog2(try eval(s, a, d.a));
@@ -350,6 +356,60 @@ pub fn write(s: *State, a: Allocator, slot: u32, sel: ?Sel, value: Literal) Erro
 }
 
 // ---- private ----
+
+/// §17.9 one draw: the seed read and written back (an inout argument), or
+/// the seedless `$random`'s own; a non-positive mean or degree draws 0 and
+/// keeps the seed (a warning).
+fn random(s: *State, a: Allocator, r: Program.Random) Error!i32 {
+    const none = @backingInt(Program.Ref.none);
+    if (r.seed == none) {
+        const d = dist(.random, s.random_seed, 0, 0).?;
+        s.random_seed = d.seed;
+        return d.value;
+    }
+    const seed = try long(s, a, r.seed);
+    const x = if (r.x != none) try long(s, a, r.x) else 0;
+    const y = if (r.y != none) try long(s, a, r.y) else 0;
+    const d = dist(r.dist, seed, x, y) orelse {
+        try s.warn("a $dist_ mean, degree of freedom or k_stage is not positive: the result is 0 and the seed is unchanged", .{});
+        return 0;
+    };
+    const lit = try filled(a, 64, true, .zero);
+    lit.values()[0] = @bitCast(@as(i64, d.seed));
+    try put(s, a, r.place, try calls.convertValue(a, lit, false, r.ty), false, null);
+    return d.value;
+}
+
+fn long(s: *State, a: Allocator, e: u32) Error!i32 {
+    return @truncate((try eval(s, a, e)).asInt() orelse 0);
+}
+
+/// The §17.9.3 listing's draw and its next seed; null for a bad parameter.
+fn dist(f: Program.Dist, seed: i32, x_: i32, y_: i32) ?struct { value: i32, seed: i32 } {
+    const rng = @import("kernels").rng_kernels;
+    const bad = switch (f) {
+        .random, .uniform, .normal => false,
+        .exponential, .poisson, .chi_square, .t => x_ <= 0,
+        .erlang => x_ <= 0 or y_ <= 0,
+    };
+    if (bad) return null;
+    const sd: i64 = seed;
+    const x: f64 = @floatFromInt(x_);
+    const y: f64 = @floatFromInt(y_);
+    const r: f64, const next: f64 = switch (f) {
+        .random => .{ rng.zRngRand(sd), rng.zRngRandNext(sd) },
+        .uniform => .{ rng.zRngIUniform(sd, x, y), rng.zRngIUniformNext(sd, x, y) },
+        .normal => .{ rng.zRngNormal(sd, x, y), rng.zRngNormalNext(sd, x, y) },
+        .exponential => .{ rng.zRngExponential(sd, x), rng.zRngExponentialNext(sd, x) },
+        .poisson => .{ rng.zRngPoisson(sd, x), rng.zRngPoissonNext(sd, x) },
+        .chi_square => .{ rng.zRngChiSquare(sd, x), rng.zRngChiSquareNext(sd, x) },
+        .t => .{ rng.zRngT(sd, x), rng.zRngTNext(sd, x) },
+        .erlang => .{ rng.zRngErlang(sd, x, y), rng.zRngErlangNext(sd, x, y) },
+    };
+    // The listing's `(long)(r + 0.5)`, mirrored for a negative r.
+    const m = @trunc(@abs(r) + 0.5);
+    return .{ .value = std.math.lossyCast(i32, if (r >= 0) m else -m), .seed = @intFromFloat(next) };
+}
 
 fn land(s: *State, a: Allocator, slot: u32, sel: ?Sel, value: Literal, nba: bool, delay: ?u64) Error!void {
     if (nba) return s.scheduleWrite(slot, sel, value, delay);

@@ -72,8 +72,24 @@ pub fn task(l: *Lower, t: Task, args: []const ExprId, tok: u32, pc: u32) E!u32 {
         .queue => l.refuse("a §17.6 queue task"),
         .pla => l.refuse("a §17.5 PLA task"),
         .fclose, .fflush, .fshow => l.refuse("a §17.2 file task"),
-        .sshow, .sformat => l.refuse("$swrite/$sformat"),
-        .printtimescale => l.refuse("$printtimescale"),
+        .sshow, .sformat => blk: {
+            if (args.len < 2) return l.refuse("a $swrite/$sformat with no text");
+            const sh: display.Show = if (t == .sshow) t.sshow else .{ .radix = .decimal, .newline = false };
+            const at = try showOf(l, args[1..], sh, pc, t == .sformat);
+            const w = try l.b.extraOf(Program.SWrite{ .show = at, .place = try l.place(args[0]), .ty = try l.tyOf(try l.targetType(args[0])) });
+            break :blk l.b.extraOf(Program.Task{ .kind = .swrite, .a = w });
+        },
+        .printtimescale => blk: {
+            // Its text is fixed at elaboration: the old engine writes it here.
+            var text: std.Io.Writer.Allocating = .init(l.a);
+            const saved = r.out;
+            r.out = &text.writer;
+            defer r.out = saved;
+            display.printTimescale(r, args) catch return l.refuse("a $printtimescale the old engine refuses");
+            const piece = try add(l, .{ .kind = .text, .a = (try l.b.string(text.written())).start, .width = @intCast(text.written().len) });
+            try l.b.shows.append(l.b.arena, .{ .pieces = try l.b.listOf(&.{piece}), .radix = .decimal, .newline = false, .scope = r.scope });
+            break :blk l.b.extraOf(Program.Task{ .kind = .show, .a = @intCast(l.b.shows.items.len - 1) });
+        },
         .sdf_annotate => l.refuse("$sdf_annotate"),
         .dump => l.refuse("a §18 VCD task"),
         .ports => l.refuse("a §18.3 EVCD task"),
@@ -86,12 +102,20 @@ pub fn task(l: *Lower, t: Task, args: []const ExprId, tok: u32, pc: u32) E!u32 {
 /// The `Program.Show` of `args` (`display.walk`), whose `%m` names the
 /// blocks around `pc`.
 fn show(l: *Lower, args: []const ExprId, sh: display.Show, pc: u32) E!u32 {
+    return showOf(l, args, sh, pc, false);
+}
+
+/// `show`; `only_first`: §17.2.3's `$sformat`, whose first argument alone
+/// is a format (a variable one is not bridged), with no argument left over.
+fn showOf(l: *Lower, args: []const ExprId, sh: display.Show, pc: u32, only_first: bool) E!u32 {
     const r = l.r;
     const ex = &r.file.exprs;
     var pieces: std.ArrayList(u32) = .empty;
     var arg: usize = 0;
     while (arg < args.len) : (arg += 1) {
         const e = args[arg];
+        if (only_first and arg != 0) return l.refuse("a $sformat argument its format leaves over");
+        if (only_first and ex.tag(e) != .str_literal) return l.refuse("a $sformat format held in a variable");
         if (e == .none) {
             try pieces.append(l.a, try add(l, .{ .kind = .space }));
             continue;
@@ -132,7 +156,17 @@ fn show(l: *Lower, args: []const ExprId, sh: display.Show, pc: u32) E!u32 {
                     try pieces.append(l.a, try add(l, .{ .kind = .lib, .a = s.start, .width = s.len }));
                     continue;
                 },
-                'v' => return l.refuse("%v"),
+                'v' => {
+                    arg += 1;
+                    if (arg == args.len or args[arg] == .none) return l.refuse("a format with a missing argument");
+                    const v = args[arg];
+                    var net: u32 = @backingInt(Program.Ref.none);
+                    if (ex.tag(v) == .ident) if (r.netlist.slot_nets.get(r.slot(v) catch return l.refuse("a %v name the old engine refuses"))) |k| {
+                        net = k;
+                    };
+                    try pieces.append(l.a, try add(l, .{ .kind = .strength, .a = try l.self_(v, 0), .b = net }));
+                    continue;
+                },
                 else => {},
             }
             arg += 1;

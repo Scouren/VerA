@@ -63,6 +63,7 @@ fn build(l: *Lower) E!void {
         try b.scopes.append(b.arena, .{ .parent = s.parent, .name = try b.string(r.file.str(s.name)), .index = index, .time = @intCast(k) });
     }
     b.p.finest = r.time.finest;
+    b.p.random_seed = r.tasks.random_seed;
     b.p.file_name = try b.string(r.file_name);
     var blocks = r.program.blocks.iterator();
     while (blocks.next()) |kv| try b.blocks.append(b.arena, .{

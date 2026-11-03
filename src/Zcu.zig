@@ -22,8 +22,8 @@
 //! (the last cell of a name).
 //!
 //! Contents:
-//! - fields `gpa`, `intern_pool`, `files`, `modules`, `paramsets`, `disciplines`, `natures`, `instances`, `instance_map`, `ports`, `defparams`, `net_discipline`, `inserts`, `failed`
-//! - `pub const File` (`File.Index`), `pub const Decl` (`none`), `pub const Instance` (`Index`, `Key`), `pub const Port`, `pub const Defparam`, `pub const NetKey`, `pub const Insert`, `pub const Failure`
+//! - fields `gpa`, `intern_pool`, `files`, `modules`, `paramsets`, `disciplines`, `natures`, `instances`, `instance_map`, `ports`, `defparams`, `defparam_sources`, `net_discipline`, `inserts`, `failed`
+//! - `pub const File` (`File.Index`), `pub const Decl` (`none`), `pub const Instance` (`Index`, `Key`), `pub const Port`, `pub const Defparam`, `pub const DefparamSource`, `pub const NetKey`, `pub const Insert`, `pub const Failure`
 //! - `pub const SystemParam` (`fromName`, `initial`, `allows`, `domain`), `pub const Hier`, `pub const PathFormatter`
 //! - `pub const instances_max: u32`
 //! - `pub fn init(gpa: Allocator) Allocator.Error!Zcu`
@@ -68,6 +68,9 @@ ports: std.MultiArrayList(Port) = .empty,
 /// §6.3.1: every defparam that set a parameter, by the instance and the
 /// parameter's name, to the value it set.
 defparams: std.AutoArrayHashMapUnmanaged(Defparam, InternPool.Index) = .empty,
+/// The source of each of `defparams`: where it is written and the path of
+/// the instance that writes it (whose names its value reads).
+defparam_sources: std.AutoArrayHashMapUnmanaged(Defparam, DefparamSource) = .empty,
 /// Annex F: the discipline every port-connected net of every instance
 /// resolved to (declared, or from the segments below it), by name.
 net_discipline: std.AutoHashMapUnmanaged(NetKey, InternPool.String) = .empty,
@@ -206,6 +209,10 @@ pub const Hier = std.EnumArray(SystemParam, InternPool.Index);
 /// A §6.3.1 defparam's target: an instance and one of its parameters.
 pub const Defparam = struct { instance: Instance.Index, name: InternPool.String };
 
+/// A §6.3.1 defparam as written: its `defparam` instruction `src` of file
+/// `file`, and the hierarchical path of the instance writing it.
+pub const DefparamSource = struct { file: File.Index, src: Vir.Inst.Ref, writer: InternPool.String };
+
 /// A net of an instance, by name.
 pub const NetKey = struct { instance: Instance.Index, net: InternPool.String };
 
@@ -284,6 +291,7 @@ pub fn deinit(zcu: *Zcu) void {
     zcu.instance_map.deinit(gpa);
     zcu.ports.deinit(gpa);
     zcu.defparams.deinit(gpa);
+    zcu.defparam_sources.deinit(gpa);
     zcu.net_discipline.deinit(gpa);
     zcu.inserts.deinit(gpa);
     zcu.failed.deinit(gpa);

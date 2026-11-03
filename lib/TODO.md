@@ -1397,3 +1397,22 @@ src/
     main.zig
         
 ```
+
+- **Zero `.xfail` (user, 2026-11-03):** "I want 100% green, no xfails." Every
+  `tests/differential/*.xfail` is empty before the switch-over, and an agent is
+  done only with its file empty. A difference ends as built code, as a stage
+  that owns the check (a stage-ownership table for diagnostic codes), or as an
+  old-side bug that an independent tiebreaker settles (an f128 reference, or an
+  `//! lrm` fixture). Never as a line. `docs/rewrite/README.md` rule 3.
+
+- **`--check` scratch per invocation (ESPice espice-8a, 2026-11-03; v0.30.0 only, no v0.23.1):**
+  the old `src/zigbuild/check.zig` writes `.zig-cache/vera-check/<model>.check.zig`
+  at a fixed path, so two builds that share a `.zig-cache` symlink read each
+  other's half-written file ("contract requires `pub U`"). `link.check` takes
+  `f.work_dir` from its caller. The rewrite's driver (rw-comp) gives each
+  invocation its own directory: under the `-o` output's directory, or a
+  mkdtemp-style name with a random suffix, removed afterwards. It never uses a
+  fixed path under the cwd, and a cache-relative path is not enough, because
+  the caches are shared on purpose. Oracle: one model, one cwd, N concurrent
+  `vera --emit-zig --check` runs in a test, all of which succeed. Tell
+  espice-8a the tag when v0.30.0 ships.

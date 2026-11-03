@@ -11,7 +11,9 @@
 //! `diff-astgen` (vams AstGen/Vir vs the old compiler's per-file codes and
 //! design units), `diff-elab` (sema's elaboration vs src/elab and the
 //! digital route's), `diff-lower` (sema's analog lowering vs src/analog,
-//! values by the old MIR interpreter against Air's), `diff-kernels`
+//! values by the old MIR interpreter against Air's), `diff-codegen`
+//! (codegen's Zig backend against src/codegen/device, both devices built
+//! and run), `diff-kernels`
 //! (std_kernels vs lib/kernels and the old kernel text; Gompute's math vs
 //! gm), and
 //! `rewrite`, which runs them and the new modules' own tests. All are in
@@ -33,7 +35,7 @@ pub fn add(g: Graph) void {
     const mods = g.mods;
     // One description for every new module: each oracle names itself in its row below.
     const all = b.step("rewrite", "The rewrite's modules' tests (test-<module>) and every diff-* oracle below");
-    for ([_][]const u8{ "vams", "intern_pool", "air", "link", "std_sim", "sema", "std_kernels" }) |name| {
+    for ([_][]const u8{ "vams", "intern_pool", "air", "link", "std_sim", "sema", "std_kernels", "codegen" }) |name| {
         all.dependOn(&b.top_level_steps.get(b.fmt("test-{s}", .{name})).?.step);
     }
     const o = b.addOptions();
@@ -43,6 +45,11 @@ pub fn add(g: Graph) void {
     // The merge tier runs a generated-program oracle at a size inside its
     // budget; the nightly passes `-Dfull-oracles` for the whole sweep.
     o.addOption(bool, "full_oracles", b.option(bool, "full-oracles", "diff-air-passes: the nightly's full sweep (10^4 programs x 10^3 points) instead of the merge tier's") orelse false);
+    o.addOption([]const u8, "codegen_filter", b.option([]const u8, "codegen-filter", "diff-codegen: only the fixtures whose path holds this") orelse "");
+    o.addOption(bool, "codegen_keep", b.option(bool, "codegen-keep", "diff-codegen: keep the built devices under zig-out/codegen-work") orelse false);
+    o.addOption(bool, "codegen_versioned", b.option(bool, "codegen-versioned", "diff-codegen: the new devices' units versioned by the float verdict instead of forced strict") orelse false);
+    // diff-codegen builds devices that import std_kernels, which imports Gompute's math.
+    o.addOptionPath("gompute_math", b.dependency("gompute", .{}).module("math").root_source_file.?);
     // `libc`: the root loads libraries (`dynlib` needs glibc on Linux).
     // `emit_zig`: fixtures whose `vera --emit-zig` text the root reads from
     // the directory `rewrite_options.emitted`, as `<stem>.zig`.
@@ -62,6 +69,7 @@ pub fn add(g: Graph) void {
         .{ .step = "diff-dlower", .root = "tests/differential/dlower.zig", .what = "sema's digital lowering against lib/sim/digital: every .v fixture's transcript from source, and against the bridge's Program", .imports = &.{ "sema", "vams", "std_sim", "sim", "frontend", "diag", "kernels", "intern_pool" } },
         .{ .step = "diff-elab", .root = "tests/differential/elab.zig", .what = "sema's elaboration against src/elab and the digital route's elaboration on every fixture", .imports = &.{ "sema", "vams", "frontend", "diag", "elab", "sim" } },
         .{ .step = "diff-lower", .root = "tests/differential/lower.zig", .what = "sema's analog lowering against src/analog: tables, codes, and every contribution's value by both interpreters", .imports = &.{ "sema", "air", "intern_pool", "vams", "frontend", "diag", "elab", "analog", "ir", "old_interp" } },
+        .{ .step = "diff-codegen", .root = "tests/differential/codegen.zig", .what = "codegen's Zig backend against src/codegen/device: both devices built and run, rows, Jacobians and charges bit for bit", .imports = &.{ "sema", "air", "intern_pool", "vams", "codegen", "link", "dynlib", "frontend", "diag", "vera", "contract" }, .libc = true },
         .{ .step = "diff-link", .root = "tests/differential/link.zig", .what = "link against src/zigbuild: the same devices built by both, at 1 and N jobs", .imports = &.{ "link", "zigbuild", "dynlib", "contract" }, .libc = true, .emit_zig = &.{ "tests/osdi/resistor.va", "tests/osdi/diode.va", "tests/osdi/mixed.va" } },
     };
     for (diffs) |d| {
@@ -88,10 +96,13 @@ pub fn add(g: Graph) void {
             break :emitted own;
         };
         mod.addOptions("rewrite_options", opts);
+        if (std.mem.eql(u8, d.step, "diff-codegen")) mod.addImport("scratch_device", scratchDevice(g));
         const r = testRun(b, d.step, mod, g.runner, g.results_dir);
         // Reads the fixture tree at run time.
         r.has_side_effects = true;
-        b.step(d.step, d.what).dependOn(&r.step);
+        const step = b.step(d.step, d.what);
+        step.dependOn(&r.step);
+        if (std.mem.eql(u8, d.step, "diff-codegen")) codegenHosts(g, step);
         all.dependOn(&r.step);
         g.test_step.dependOn(&r.step);
     }
@@ -124,6 +135,61 @@ pub fn add(g: Graph) void {
 }
 
 // ---- private ----
+
+/// The contract's behavioural hosts (`tests/host/*_host.zig`) run on the
+/// new devices of their fixtures, where diff-codegen agrees on the fixture
+/// and the host reads only what the Zig backend writes.
+fn codegenHosts(g: Graph, step: *Build.Step) void {
+    const b = g.b;
+    const Host = struct { host: []const u8, va: []const u8 };
+    const hosts = [_]Host{
+        .{ .host = "tests/host/integer_param_host.zig", .va = "tests/conformance/tests/verilog-a/ch03_data_types/integer_param_low32.va" },
+    };
+    const names = [_][]const u8{ "sema", "air", "intern_pool", "vams", "codegen", "frontend", "diag", "vera" };
+    var imports: [names.len]Build.Module.Import = undefined;
+    for (&imports, names) |*i, n| i.* = .{ .name = n, .module = byName(g.mods, n) };
+    const gen = b.addExecutable(.{ .name = "codegen-device", .root_module = g.m.make("tests/differential/codegen/device_gen.zig", &imports) });
+    for (hosts) |h| {
+        const run = b.addRunArtifact(gen);
+        run.addFileArg(b.path(h.va));
+        run.addArg(pathFromRoot(b, "tests/conformance/tests/include"));
+        const device = b.createModule(.{
+            .root_source_file = run.addOutputFileArg("device.zig"),
+            .target = g.m.target,
+            .optimize = g.m.optimize,
+            .imports = &.{
+                .{ .name = "contract", .module = byName(g.mods, "contract") },
+                .{ .name = "std_kernels", .module = byName(g.mods, "std_kernels") },
+            },
+        });
+        const host = g.m.make(h.host, &.{
+            .{ .name = "contract", .module = byName(g.mods, "contract") },
+            .{ .name = "device", .module = device },
+        });
+        step.dependOn(&testRun(b, b.fmt("codegen-{s}", .{std.fs.path.stem(h.host)}), host, g.runner, g.results_dir).step);
+    }
+}
+
+/// diff-codegen's scratch-array device (`codegen.examples.stack`, the
+/// bsource.va stack of lib/TODO.md §11.10), written by a generator so the
+/// oracle compiles it and holds it to `Air.interp`.
+fn scratchDevice(g: Graph) *Build.Module {
+    const b = g.b;
+    const gen = b.addExecutable(.{ .name = "codegen-scratch", .root_module = g.m.make("tests/differential/codegen/scratch_gen.zig", &.{
+        .{ .name = "codegen", .module = byName(g.mods, "codegen") },
+        .{ .name = "intern_pool", .module = byName(g.mods, "intern_pool") },
+    }) });
+    const run = b.addRunArtifact(gen);
+    return b.createModule(.{
+        .root_source_file = run.addOutputFileArg("scratch_device.zig"),
+        .target = g.m.target,
+        .optimize = g.m.optimize,
+        .imports = &.{
+            .{ .name = "contract", .module = byName(g.mods, "contract") },
+            .{ .name = "std_kernels", .module = byName(g.mods, "std_kernels") },
+        },
+    });
+}
 
 /// `tests/differential/kernels_targets.zig` for each device target, ReleaseFast
 /// as a device is: every exported kernel built, and the `f64` math's LLVM IR

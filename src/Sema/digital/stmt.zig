@@ -10,6 +10,7 @@
 //! - `pub fn compileAll(l: *Lower) Error!void`
 //! - `pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void`
 //! - `pub fn body(l: *Lower, b: Vir.Body, depth: u32) Error!void`
+//! - `pub fn isStatement(tg: Inst.Tag) bool`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -26,6 +27,10 @@ const sub = @import("sub.zig");
 const gates = @import("gates.zig");
 const link = @import("link.zig");
 const tchk = @import("tchk.zig");
+const vcd = @import("vcd.zig");
+const sdf = @import("sdf.zig");
+const holds = @import("holds.zig");
+const order_ = @import("order.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -46,18 +51,20 @@ const depth_max: u32 = 1 << 12;
 pub fn compileAll(l: *Lower) Error!void {
     var early: std.ArrayList(u32) = .empty;
     var queued: std.ArrayList(u32) = .empty;
+    try vars.compileParams(l);
     try nets.compileDrivers(l);
     try gates.compileTrans(l);
     try sub.compileBodies(l);
-    const order = try processOrder(l);
+    const order = try order_.processOrder(l);
     for (order) |s| {
         const procs = l.scopes.items[s].procs.items;
         for ([_]bool{ true, false }) |inits| for (procs) |p| {
             if ((p.kind == .init_var) != inits) continue;
             const start = try process(l, p);
-            if (p.kind == .always and try levelControlled(l, p)) try early.append(l.a, start) else try queued.append(l.a, start);
+            if (p.kind == .always and try order_.levelControlled(l, p)) try early.append(l.a, start) else try queued.append(l.a, start);
         };
     }
+    for (l.term_starts.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
     for (early.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
     for (l.driver_pcs.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
     var switches: usize = 0;
@@ -69,10 +76,12 @@ pub fn compileAll(l: *Lower) Error!void {
     try link.fanout(l);
     try link.resolveDisables(l);
     try tchk.finish(l);
+    try vcd.catalog(l);
+    try sdf.scopes(l);
     try sub.finish(l);
     l.b.p.counters = l.repeats + l.joins;
     l.b.p.holds = l.holds;
-    assert(l.b.starts.items.len == early.items.len + l.driver_pcs.items.len + switches + queued.items.len);
+    assert(l.b.starts.items.len == l.term_starts.items.len + early.items.len + l.driver_pcs.items.len + switches + queued.items.len);
 }
 
 /// Appends statement `i`'s instructions, compiled in `Lower.frame`.
@@ -154,15 +163,22 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
         },
         .trigger => {
             const r = vir.instructions.items(.data)[@backingInt(i)].un_node.operand;
-            const n = (try expr.nameOf(l, r)) orelse return l.refuse("a trigger of an event array element or a hierarchical event");
+            // §9.7.3 an element of an event array, chosen when it runs.
+            if (r.toIndex()) |ri| if (Lower.tag(vir, ri) == .elem) {
+                const s = try place.selectOf(l, ri);
+                if (s.name.kind != .event or !s.whole_elem) return l.refuse("§5.10.4 `->` of a variable or net");
+                _ = try l.b.inst(.trigger_elem, try place.elemRow(l, s), 0, scope);
+                return;
+            };
+            const n = (try expr.nameOf(l, r)) orelse return l.refuse("a trigger of no named event");
             if (n.kind != .event) return l.refuse("§5.10.4 `->` of a variable or net");
             _ = try l.b.inst(.trigger, n.slot, 0, scope);
         },
         .call_sys => try task.task(l, i),
         .call => try sub.enable(l, i, depth),
         .store_timed, .store_nb_timed => try timedStore(l, i, depth),
-        .case => return l.refuse("a case statement"),
-        .proc_assign, .force, .deassign, .release => return l.refuse("a procedural continuous assignment"),
+        .case => try caseStmt(l, i, depth),
+        .proc_assign, .force, .deassign, .release => try holds.statement(l, i),
         .disable => {
             // A.6.5 resolved once every block is compiled (`link.resolveDisables`).
             const r = vir.instructions.items(.data)[@backingInt(i)].un_node.operand;
@@ -193,6 +209,13 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
 /// instruction reads is a task enable).
 pub fn body(l: *Lower, b: Vir.Body, depth: u32) Error!void {
     for (try statements(l, b)) |i| try compileStmt(l, i, depth);
+}
+
+pub fn isStatement(tg: Inst.Tag) bool {
+    return switch (tg) {
+        .block, .condbr, .case, .loop, .repeat, .wait, .delay, .event_wait, .store, .store_nb, .proc_assign, .force, .store_timed, .store_nb_timed, .deassign, .release, .trigger, .disable, .ret, .brk, .cont, .call_sys, .call, .contrib, .contrib_indirect => true,
+        else => false, // else: a declaration or an expression
+    };
 }
 
 // ---- private ----
@@ -276,10 +299,10 @@ fn timedStore(l: *Lower, i: Inst.Index, depth: u32) Error!void {
         const counter = counterCell(l, .repeat);
         const start = try l.b.inst(.repeat_start, try expr.self_(l, count, 0), 0, scope);
         const body_pc = pc(l);
-        try waitIntra(l, event, t.rhs);
+        try waitIntra(l, event, t.rhs, t.lhs);
         _ = try l.b.inst(.repeat_next, counter, body_pc, scope);
         l.b.setInst(start, .repeat_start, l.b.p.insts.items(.data)[start].a, try l.b.extraOf(Program.Repeat{ .counter = counter, .end = pc(l) }));
-    } else try waitIntra(l, event, t.rhs);
+    } else try waitIntra(l, event, t.rhs, t.lhs);
     _ = try l.b.inst(if (nb) .deposit_nb else .deposit, hold, try place.place(l, t.lhs), scope);
     if (nb) {
         _ = try l.b.inst(.stop, 0, 0, scope);
@@ -289,16 +312,62 @@ fn timedStore(l: *Lower, i: Inst.Index, depth: u32) Error!void {
 }
 
 /// An intra-assignment event control's wait: on `event`, or for `@*` on
-/// every slot the assigned value reads.
-fn waitIntra(l: *Lower, event: Inst.Ref, value: Inst.Ref) Error!void {
+/// every slot the assigned value and the target's indices read.
+fn waitIntra(l: *Lower, event: Inst.Ref, value: Inst.Ref, target: Inst.Ref) Error!void {
     const scope = l.frames.items[l.frame].scope;
     var terms: std.ArrayList(u32) = .empty;
     if (event == .none) {
         var slots: std.ArrayList(u32) = .empty;
         try expr.reads(l, value, &slots);
+        try indexReads(l, target, &slots);
         for (slots.items) |s| try terms.appendSlice(l.a, &.{ s, @backingInt(Program.Edge.any), 0, 0, none });
     } else try place.terms(l, event, &terms);
     _ = try l.b.inst(.wait_event, try l.b.extraOf(.{ .l = try l.b.listOf(terms.items) }), 0, scope);
+}
+
+/// §9.5 a case statement, as lib/sim/digital compiles it: one
+/// `case_select` over the scrutinee and labels in their common type, each
+/// arm at a pc of its own ending in a jump past the last, the default arm
+/// (else the end) the fallback.
+fn caseStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
+    const vir = l.virOf(l.frame);
+    const scope = l.frames.items[l.frame].scope;
+    const c = Lower.payload(vir, Inst.Case, i);
+    const arms = vir.list(Inst.Arm, c.arms);
+    if (arms.len == 0) return l.refuse("§9.5 a case statement with no item");
+    var ty = try expr.typeValue(l, c.operand);
+    for (arms) |arm| for (vir.list(Inst.Ref, arm.values)) |v| {
+        ty = expr.common(ty, try expr.typeValue(l, v));
+    };
+    const scrutinee = try expr.ctx(l, c.operand, ty);
+    var rows: std.ArrayList(u32) = .empty;
+    for (arms) |arm| {
+        var labels: std.ArrayList(u32) = .empty;
+        for (vir.list(Inst.Ref, arm.values)) |v| try labels.append(l.a, try expr.ctx(l, v, ty));
+        try rows.append(l.a, (try l.b.listOf(labels.items)).start);
+        try rows.append(l.a, @intCast(labels.items.len));
+    }
+    const dispatch = try l.b.inst(.case_select, 0, 0, scope);
+    const targets = try l.a.alloc(u32, arms.len);
+    const exits = try l.a.alloc(u32, arms.len);
+    var fallback: u32 = none;
+    for (arms, targets, exits) |arm, *t, *e| {
+        t.* = pc(l);
+        if (arm.flags.default or arm.values.len == 0) fallback = pc(l);
+        try body(l, arm.body, depth + 1);
+        e.* = try l.b.inst(.jump, 0, 0, scope);
+    }
+    const end = pc(l);
+    for (exits) |e| patch(l, e, end);
+    var arm_rows: std.ArrayList(u32) = .empty;
+    for (targets, 0..) |t, k| try arm_rows.append(l.a, try l.b.extraOf(Program.Arm{ .labels = .{ .start = rows.items[2 * k], .len = rows.items[2 * k + 1] }, .target = t }));
+    const kind: Program.Case.Kind = switch (c.flags.kind) {
+        .case => .normal,
+        .casez => .casez,
+        .casex => .casex,
+    };
+    const row = try l.b.extraOf(Program.Case{ .kind = kind, .scrutinee = scrutinee, .arms = try l.b.listOf(arm_rows.items), .fallback = if (fallback == none) end else fallback });
+    l.b.setInst(dispatch, .case_select, row, 0);
 }
 
 /// A repeat or fork-join counter cell.
@@ -342,67 +411,6 @@ fn process(l: *Lower, p: Proc) Error!u32 {
     return start;
 }
 
-/// §9.9 the order processes are queued in: the scope tree depth first from
-/// each root, each scope's children (by source position) before itself.
-fn processOrder(l: *Lower) Error![]const u32 {
-    const n = l.scopes.items.len;
-    const children = try l.a.alloc(std.ArrayList(u32), n);
-    @memset(children, .empty);
-    for (l.b.scopes.items, 0..) |s, k| if (s.parent != k and l.scopes.items[k].queued) try children[s.parent].append(l.a, @intCast(k));
-    for (children) |c| std.sort.block(u32, c.items, l, struct {
-        fn less(ll: *Lower, x: u32, y: u32) bool {
-            return ll.scopes.items[x].at < ll.scopes.items[y].at;
-        }
-    }.less);
-    var out: std.ArrayList(u32) = .empty;
-    var stack: std.ArrayList([2]u32) = .empty;
-    for (l.roots.items) |root| {
-        try stack.append(l.a, .{ root, 0 });
-        var steps: usize = 0;
-        while (stack.items.len != 0) : (steps += 1) {
-            assert(steps <= 2 * n);
-            const top = &stack.items[stack.items.len - 1];
-            const kids = children[top[0]].items;
-            if (top[1] < kids.len) {
-                const c = kids[top[1]];
-                top[1] += 1;
-                try stack.append(l.a, .{ c, 0 });
-                continue;
-            }
-            try out.append(l.a, top[0]);
-            _ = stack.pop();
-        }
-    }
-    return out.items;
-}
-
-/// Whether `always` process `p` starts with an event control on levels
-/// only (`@(a or b)`, `@*`): VerA starts these first at time 0, so they see
-/// the time-0 changes the others make (iverilog's order).
-fn levelControlled(l: *Lower, p: Proc) Error!bool {
-    const vir = l.virOf(p.frame);
-    const b = vir.body(Lower.payload(vir, Inst.Process, p.inst).body);
-    var first: ?Inst.Index = null;
-    for (b) |i| if (isStatement(Lower.tag(vir, i))) {
-        first = i;
-        break;
-    };
-    const s = first orelse return false;
-    if (Lower.tag(vir, s) != .event_wait) return false;
-    const e = Lower.payload(vir, Inst.EventWait, s).event;
-    return e == .none or levelOnly(vir, e);
-}
-
-fn levelOnly(vir: *const Vir, r: Inst.Ref) bool {
-    const i = r.toIndex() orelse return true;
-    return switch (Lower.tag(vir, i)) {
-        .event_or => levelOnly(vir, Lower.payload(vir, Inst.Bin, i).lhs) and levelOnly(vir, Lower.payload(vir, Inst.Bin, i).rhs),
-        .posedge, .negedge, .driver_update => false,
-        .decl_ref => Lower.tag(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl) != .event,
-        else => true, // else: an expression term
-    };
-}
-
 /// A.6.3 a block: a named one is a scope of its own (§12.5) whose pc range
 /// `%m` and `disable` read; its declarations bind in a frame of its own.
 fn block(l: *Lower, i: Inst.Index, depth: u32) Error!void {
@@ -413,14 +421,7 @@ fn block(l: *Lower, i: Inst.Index, depth: u32) Error!void {
     const outer_scope = l.frames.items[outer].scope;
     const name = vir.string(blk.name);
     if (name.len != 0) {
-        const s = try decl.newScope(l, outer_scope, name, null, l.b.times.items[outer_scope], l.srcOffset(outer, i), false);
-        l.frame = try decl.newFrame(l, outer, l.frames.items[outer].instance, s, l.frames.items[outer].genvars);
-        // §10.2.1 an automatic subroutine's block items are per activation,
-        // which its storage (laid out at its declaration) does not hold.
-        l.frames.items[l.frame].automatic = l.frames.items[outer].automatic;
-        const slots_before = l.b.p.slots.len;
-        try vars.locals(l, l.frame, blk.body);
-        if (l.frames.items[outer].automatic and l.b.p.slots.len != slots_before) return l.refuse("a named block declaring storage in an automatic subroutine");
+        l.frame = try decl.blockFrame(l, outer, i);
     } else for (vir.body(blk.body)) |x| switch (Lower.tag(vir, x)) {
         .variable, .param, .event => return l.refuse("a declaration in an unnamed block"),
         else => {}, // else: a statement
@@ -470,10 +471,36 @@ fn statements(l: *Lower, b: Vir.Body) Error![]const Inst.Index {
 }
 
 /// Every slot the statements of body `b` read (§9.7.5's `@*`).
+/// The slots the index expressions of lvalue `r` read (not its targets).
+fn indexReads(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
+    const vir = l.virOf(l.frame);
+    const i = r.toIndex() orelse return;
+    switch (Lower.tag(vir, i)) {
+        .elem => {
+            const b = Lower.payload(vir, Inst.Bin, i);
+            try indexReads(l, b.lhs, out);
+            try expr.reads(l, b.rhs, out);
+        },
+        .slice, .slice_up, .slice_down => {
+            const t = Lower.payload(vir, Inst.Triple, i);
+            try indexReads(l, t.a, out);
+            try expr.reads(l, t.b, out);
+            try expr.reads(l, t.c, out);
+        },
+        .concat => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |x| try indexReads(l, x, out),
+        else => {}, // else: a name, whose slot is written, not read
+    }
+}
+
 fn bodyReads(l: *Lower, b: Vir.Body, out: *std.ArrayList(u32)) Error!void {
     const vir = l.virOf(l.frame);
     for (vir.body(b)) |i| switch (Lower.tag(vir, i)) {
-        .store, .store_nb => try expr.reads(l, Lower.payload(vir, Inst.Bin, i).rhs, out),
+        .store, .store_nb => {
+            const s = Lower.payload(vir, Inst.Bin, i);
+            try expr.reads(l, s.rhs, out);
+            // §9.7.5 the target's index expressions are read too.
+            try indexReads(l, s.lhs, out);
+        },
         .condbr => {
             const c = Lower.payload(vir, Inst.CondBr, i);
             try expr.reads(l, c.cond, out);
@@ -481,15 +508,16 @@ fn bodyReads(l: *Lower, b: Vir.Body, out: *std.ArrayList(u32)) Error!void {
             try bodyReads(l, c.@"else", out);
         },
         .block => try bodyReads(l, Lower.payload(vir, Inst.Block, i).body, out),
+        .case => {
+            const c = Lower.payload(vir, Inst.Case, i);
+            try expr.reads(l, c.operand, out);
+            for (vir.list(Inst.Arm, c.arms)) |arm| {
+                for (vir.list(Inst.Ref, arm.values)) |v| try expr.reads(l, v, out);
+                try bodyReads(l, arm.body, out);
+            }
+        },
         .call_sys => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.SysCall, i).args)) |a| try expr.reads(l, a, out),
         else => if (isStatement(Lower.tag(vir, i))) return l.refuseFmt("the slots `@*` reads in `{t}`", .{Lower.tag(vir, i)}),
-    };
-}
-
-fn isStatement(tg: Inst.Tag) bool {
-    return switch (tg) {
-        .block, .condbr, .case, .loop, .repeat, .wait, .delay, .event_wait, .store, .store_nb, .proc_assign, .force, .store_timed, .store_nb_timed, .deassign, .release, .trigger, .disable, .ret, .brk, .cont, .call_sys, .call, .contrib, .contrib_indirect => true,
-        else => false, // else: a declaration or an expression
     };
 }
 

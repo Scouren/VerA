@@ -27,6 +27,7 @@ const vars = @import("vars.zig");
 const expr = @import("expr.zig");
 const place = @import("place.zig");
 const stmt = @import("stmt.zig");
+const hier = @import("hier.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -313,6 +314,19 @@ fn callee(l: *Lower, i: Inst.Index) Error!u32 {
     const vir = l.virOf(l.frame);
     const c = Lower.payload(vir, Inst.Call, i);
     const ci = c.callee.toIndex() orelse return l.refuse("a call of no subroutine");
+    if (Lower.tag(vir, ci) == .field) {
+        // §12.5 a hierarchical name: the subroutine of that name the scope
+        // the rest of the name reaches declares.
+        const fd = Lower.payload(vir, Inst.Field, ci);
+        const s = try hier.scopeOf(l, fd.operand);
+        const want = vir.string(fd.name);
+        for (l.subs.items, 0..) |r, k| {
+            if (l.b.scopes.items[r.scope].parent != s) continue;
+            const rvir = l.virOf(r.outer);
+            if (std.mem.eql(u8, rvir.string(Lower.payload(rvir, Inst.Function, r.decl).name), want)) return @intCast(k);
+        }
+        return l.refuse("a hierarchical name of a task or function its scope does not declare");
+    }
     if (Lower.tag(vir, ci) != .decl_ref) return l.refuse("a hierarchical task or function name");
     const d = vir.instructions.items(.data)[@backingInt(ci)].decl_tok.decl;
     var f = l.frame;

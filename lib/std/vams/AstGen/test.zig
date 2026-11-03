@@ -122,6 +122,30 @@ test "IEEE 1364-2005 §12.4.3 an unnamed generate block is genblk<n>, zero-padde
     try std.testing.expectEqualStrings("genblk02", names.items[1]);
 }
 
+test "IEEE 1364-2005 §12.4.3 every arm of one generate construct shares its genblk<n>" {
+    // Oracle: the LRM's example (and iverilog): `genblk02` names the `if`
+    // and the `else` arm alike, the zeros added past the explicit
+    // `genblk2` only, never past a sibling arm's own name.
+    const gpa = std.testing.allocator;
+    var vir = try gen(
+        \\module m;
+        \\  parameter genblk2 = 0;
+        \\  if (1) begin wire a; end
+        \\  if (genblk2) begin wire b; end else begin wire c; end
+        \\endmodule
+    );
+    defer vir.deinit(gpa);
+    var names: std.ArrayList([]const u8) = .empty;
+    defer names.deinit(gpa);
+    for (vir.instructions.items(.tag), vir.instructions.items(.data)) |t, d| if (t == .gen_block) {
+        try names.append(gpa, vir.string(vir.extraData(Vir.Inst.GenBlock, d.pl_node.payload_index).name));
+    };
+    try std.testing.expectEqual(@as(usize, 3), names.items.len);
+    try std.testing.expectEqualStrings("genblk1", names.items[0]);
+    try std.testing.expectEqualStrings("genblk02", names.items[1]);
+    try std.testing.expectEqualStrings("genblk02", names.items[2]);
+}
+
 test "§6.5.2 E0218 a port declared twice, E0206 a declaration of no header port, E0376 a port with no direction" {
     try expectCodes("module m(a, b); input a; output a; input c; endmodule", &.{ .E0376, .E0218, .E0206 });
     try expectCodes("module m(input a); wire a; endmodule", &.{.E0218});

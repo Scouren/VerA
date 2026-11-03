@@ -30,6 +30,19 @@ The rules of the rewrite:
    oracle has a `tests/differential/<name>.xfail` file: one line per fixture
    path that may differ, with the reason. A listed fixture that now agrees fails
    the run until its line goes (AGENTS.md: an unexpected pass fails).
+   **An `.xfail` line is a debt, not a result: an agent is done when its
+   `.xfail` file is empty.** A line is temporary work in flight; nothing
+   ships with one. Each difference ends one of three ways, never as a line:
+   - **the new code is missing something:** build it;
+   - **the check belongs to a later stage** (a parse oracle expecting a code
+     Sema raises): the oracle compares only the codes its stage owns, read
+     from one stage-ownership table. The end-to-end oracle still demands every
+     code;
+   - **the old code is wrong:** the oracle asks an independent tiebreaker and
+     passes when the new side agrees with it. The tiebreaker is the f128 or
+     60-digit reference for a number, or a fixture whose `//! lrm` clause
+     states the expected result for a ruling. The oracle prints each case as
+     an old-side bug and names it in the report.
 4. **Data first.** Answer the six data questions (the `data-oriented-design`
    skill) before code: SoA (`std.MultiArrayList`), typed `u32` handles with a
    sentinel, narrowest widths, an `extra: []u32` side array for variable-length
@@ -119,6 +132,8 @@ Load these skills first (Skill tool): `zig`, `data-oriented-design`,
 
 Commit on your branch, in steps that each pass their tests (one commit per
 coherent piece; message: what and why, the oracle, the numbers). Do not push,
-do not merge, do not touch `main`. Report: what exists, the oracle and its
-result (fixtures compared, agreed, listed in `.xfail` and why), line counts,
+do not merge, do not touch `main`. Finish only with your `.xfail` empty; a
+checkpoint report while lines remain names each one and its plan. Report:
+what exists, the oracle and its result (fixtures compared, agreed, every
+old-side bug the tiebreaker settled), line counts,
 and every decision the spec left open and how you took it.

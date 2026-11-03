@@ -2,3 +2,7 @@
 //! Placeholder of the rewrite scaffold: docs/rewrite/parse.md specifies it.
 //!
 //! Contents: none yet.
+
+test {
+    _ = @import("Parse/keywords.zig");
+}

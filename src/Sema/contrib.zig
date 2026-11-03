@@ -176,6 +176,7 @@ pub fn indirect(s: *Sema, b: *Block, x: Inst.Triple, src: Inst.Ref) Allocator.Er
         .react = try decl.addAlloc(s, .real),
         .wrote = try decl.addAlloc(s, .real),
         .instance = decl.rowInstance(unit.instance),
+        .flow = .none,
     });
     const slots = s.device.contributions.get(@backingInt(row));
     _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slots.resist), .rhs = v } } });
@@ -238,6 +239,7 @@ pub fn rowOf(s: *Sema, b: *const Block, t: Target) Allocator.Error!Device.Contri
         .react = try decl.addAlloc(s, .real),
         .wrote = try decl.addAlloc(s, .real),
         .instance = decl.rowInstance(b.unit.instance),
+        .flow = .none,
     });
     gop.value_ptr.* = row;
     return row;
@@ -440,6 +442,7 @@ fn flowUnknown(s: *Sema, unit: *const Sema.Unit, hi: Node.Index, lo: Node.Index)
     const name = try std.fmt.allocPrint(s.arena, "flow({s},{s})", .{ nodeName(s, hi), nodeName(s, lo) });
     const row: Node.Index = @fromBackingInt(@intCast(s.device.nodes.len));
     try s.device.nodes.append(s.gpa, .{ .name = try ip.getString(s.gpa, name), .kind = .branch_flow, .of = hi, .discipline = .empty, .instance = decl.rowInstance(unit.instance) });
+    try s.device.flows.append(s.gpa, .{ .unknown = row, .hi = hi, .lo = lo, .kind = .branch });
     gop.value_ptr.* = row;
     return row;
 }
@@ -501,6 +504,7 @@ fn portFlow(s: *Sema, b: *Block, name: []const u8, p: Node.Index, src: Inst.Ref)
         gop.value_ptr.* = @fromBackingInt(@intCast(s.device.nodes.len));
         const ip = &s.zcu.intern_pool;
         try s.device.nodes.append(s.gpa, .{ .name = try ip.getString(s.gpa, try std.fmt.allocPrint(s.arena, "flow(<{s}>)", .{nodeName(s, p)})), .kind = .port_flow, .of = p, .discipline = .empty, .instance = decl.rowInstance(b.unit.instance) });
+        try s.device.flows.append(s.gpa, .{ .unknown = gop.value_ptr.*, .hi = p, .lo = .ground, .kind = .port });
     }
     return .{ .ref = try probe(s, gop.value_ptr.*), .ty = .real };
 }

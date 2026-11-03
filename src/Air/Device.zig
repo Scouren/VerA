@@ -26,9 +26,9 @@
 //! §5.6.7, §5.10, §9.4, §9.17.3.
 //!
 //! Contents:
-//! - fields `nodes`, `num_ports`, `branches`, `params`, `ranges`, `contributions`, `charge_sites`, `held`, `limit_slots`, `table_samples`, `noise`, `kernel`, `displays`
+//! - fields `nodes`, `num_ports`, `branches`, `params`, `ranges`, `contributions`, `charge_sites`, `held`, `limit_slots`, `flows`, `table_samples`, `noise`, `kernel`, `displays`
 //! - `pub const Instance`, `pub const Node` (`Index`, `Kind`), `pub const Branch` (`Index`), `pub const Param` (`Index`, `Type`), `pub const Range`
-//! - `pub const Access`, `pub const Contribution` (`Index`, `Kind`), `pub const ChargeSite`, `pub const Held`, `pub const LimitSlot`, `pub const Noise` (`Kind`), `pub const Kernel`, `pub const Display`
+//! - `pub const Access`, `pub const Contribution` (`Index`, `Kind`), `pub const ChargeSite`, `pub const Held`, `pub const Flow` (`Kind`), `pub const LimitSlot`, `pub const Noise` (`Kind`), `pub const Kernel`, `pub const Display`
 //! - `pub const rows_max: u32`
 //! - `pub fn deinit(d: *Device, gpa: Allocator) void`
 //! - `pub fn paramRanges(d: *const Device, p: Param.Index) []const Range`
@@ -62,6 +62,8 @@ charge_sites: std.MultiArrayList(ChargeSite) = .empty,
 held: std.MultiArrayList(Held) = .empty,
 /// §9.17.3 one row per access function a user-function `$limit` limits.
 limit_slots: std.MultiArrayList(LimitSlot) = .empty,
+/// §5.4.2.1/§5.4.3 every flow unknown and what it measures, in minting order.
+flows: std.MultiArrayList(Flow) = .empty,
 /// §9.21.1 each array-source `$table_model` site's sample count (its
 /// `site` operand is the row's ordinal plus one).
 table_samples: std.ArrayList(u32) = .empty,
@@ -119,6 +121,10 @@ pub const Param = struct {
     ranges_start: u32,
     ranges_len: u32,
     instance: Instance,
+    /// Its default as an expression over earlier rows' `arg`s (its
+    /// instructions in the body's prologue), for a host that moves a row
+    /// it depends on; `.none` when the default reads no parameter.
+    derive: Air.Inst.Ref,
 
     /// A `params` row: the `arg` index the body reads it by.
     pub const Index = enum(u32) { _ };
@@ -154,6 +160,9 @@ pub const Contribution = struct {
     wrote: Air.Inst.Index,
     /// The instance whose `<+` opened the row (§5.4.1: whose branch it is).
     instance: Instance,
+    /// §5.4.2 the unknown carrying the branch's current (a potential or
+    /// indirect row's), `.none` when lowering minted none.
+    flow: Node.Index,
 
     pub const Index = enum(u32) { _ };
     /// A `<+` or a §5.6.7 indirect assignment.
@@ -166,8 +175,21 @@ pub const ChargeSite = struct { contrib: Contribution.Index, sign: f64, slot: Ai
 
 /// §5.10 a variable kept between evaluations and its slot.
 /// A §3.2.2 array is one row: `count` consecutive slots from `slot`, its
-/// elements in declaration order (a scalar's `count` is 1).
-pub const Held = struct { name: String, slot: Air.Inst.Index, count: u32 };
+/// elements in declaration order (a scalar's `count` is 1). `init` is the
+/// §3.2 declaration initializer the host seeds before the first evaluation
+/// (`.undef` when there is none or it does not fold; the slot's zero then).
+pub const Held = struct { name: String, slot: Air.Inst.Index, count: u32, init: InternPool.Index };
+
+/// §5.4.2/§5.4.3 one flow unknown: a branch's (`hi`, `lo`) or a port's
+/// (`hi` the port, `lo` ground).
+pub const Flow = struct {
+    unknown: Node.Index,
+    hi: Node.Index,
+    lo: Node.Index,
+    kind: Kind,
+
+    pub const Kind = enum(u8) { branch, port };
+};
 
 /// §9.17.3 one limited access function: `label` as the source spells it
 /// (`V(g,s)`), its target, and `slot`, the value the last site returned this
@@ -233,6 +255,7 @@ pub fn deinit(d: *Device, gpa: Allocator) void {
     d.held.deinit(gpa);
     d.limit_slots.deinit(gpa);
     d.noise.deinit(gpa);
+    d.flows.deinit(gpa);
     d.table_samples.deinit(gpa);
     d.displays.deinit(gpa);
     d.* = undefined;

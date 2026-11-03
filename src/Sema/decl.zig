@@ -23,8 +23,6 @@
 //! - `pub fn portDecl(vir: *const Vir, p: Inst.Index) ?Inst.Index`
 //! - `pub fn rowInstance(i: Zcu.Instance.Index) Device.Instance`
 //! - `pub fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String`
-//! - `pub fn addHeld(s: *Sema, name: []const u8, bind: Sema.Bind) Allocator.Error!void`
-//! - `pub fn checkRedeclared(s: *Sema, unit: *const Unit, i: Inst.Index) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -41,6 +39,7 @@ const contrib = @import("contrib.zig");
 const held = @import("held.zig");
 const param = @import("param.zig");
 const discrete = @import("discrete.zig");
+const variable = @import("variable.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Device = Air.Device;
@@ -74,7 +73,7 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     for (s.units.items) |*u| try discrete.declare(s, u);
     for (s.units.items) |*u| try branches(s, u);
     for (s.units.items) |*u| try held.mark(s, u);
-    for (s.units.items) |*u| try variables(s, u);
+    for (s.units.items) |*u| try variable.declare(s, u);
     var main: Block = .{ .parent = null, .unit = &s.units.items[0] };
     for (s.units.items) |*u| {
         main.unit = u;
@@ -83,6 +82,12 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
         try items(s, &main, &env, u.module.body, 0);
     }
     try syscall.finishDisplays(s, &main);
+    // §5.4.2 a potential or indirect row's branch current, wherever
+    // lowering minted it; a flow row's is its own value.
+    const c = s.device.contributions.slice();
+    for (c.items(.hi), c.items(.lo), c.items(.access), c.items(.kind), c.items(.flow)) |hi, lo, access, kind, *flow| {
+        flow.* = if (access == .potential or kind == .indirect) s.flow_rows.get(.{ hi, lo }) orelse .none else .none;
+    }
     assert(zcu.instances.len >= s.units.items.len);
     return finish(s, main.insts.items);
 }
@@ -215,32 +220,6 @@ pub fn typeIndex(ty: Sema.Ty) InternPool.Index {
 pub fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String {
     const at = vir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index;
     return @fromBackingInt(vir.extra[at]);
-}
-
-/// §6.8 "one identifier declares one item in a scope": a variable whose
-/// name a variable, parameter or net declared first is E0362 (a port's
-/// direction then its type is one item).
-pub fn checkRedeclared(s: *Sema, unit: *const Unit, i: Inst.Index) Allocator.Error!void {
-    const vir = unit.vir;
-    const first = canonical(vir, i);
-    if (first == i) return;
-    switch (vir.instructions.items(.tag)[@backingInt(first)]) {
-        .variable, .param, .net => try s.fail(.E0362, unit.file, i.toRef(), "`{s}`", .{vir.string(nameOf(vir, i))}),
-        else => {}, // else: a port's direction, or a formal
-    }
-}
-
-/// A §5.10 held row named `name` for a variable's (or array's) slots.
-pub fn addHeld(s: *Sema, name: []const u8, bind: Sema.Bind) Allocator.Error!void {
-    const slots: []const Air.Inst.Index = switch (bind) {
-        .slot => |x| &.{x.alloc},
-        .array => |a| a.slots,
-        else => return,
-    };
-    if (slots.len == 0) return;
-    // `declareArray` mints the slots back to back.
-    assert(@backingInt(slots[slots.len - 1]) - @backingInt(slots[0]) == slots.len - 1);
-    try s.device.held.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .slot = slots[0], .count = @intCast(slots.len) });
 }
 
 // ---- private ----
@@ -574,31 +553,4 @@ fn nodeOfBody(unit: *const Unit, b: Vir.Body) ?Node.Index {
     if (vir.instructions.items(.tag)[@backingInt(last)] != .decl_ref) return null;
     const bind = unit.binds.get(canonical(vir, vir.instructions.items(.data)[@backingInt(last)].decl_tok.decl)) orelse return null;
     return if (bind == .node) bind.node else null;
-}
-
-/// §3.2 the instance's module-level variables: one slot each. §5.10.4 a
-/// named event is an integer flag (one per element of an event array), 0 at
-/// entry to every evaluation.
-fn variables(s: *Sema, unit: *Unit) Allocator.Error!void {
-    const vir = unit.vir;
-    for (vir.body(unit.module.body)) |i| {
-        if (vir.instructions.items(.tag)[@backingInt(i)] == .event) {
-            const first = canonical(vir, i);
-            if (unit.binds.contains(first)) continue;
-            const dims = payloadOf(vir, Inst.Name, i).dims;
-            if (dims.len != 0) try declareArray(s, unit, first, dims, .integer) else try unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = try addAlloc(s, .integer), .ty = .integer } });
-            const bind = unit.binds.get(first) orelse continue;
-            const slots: []const Air.Inst.Index = if (bind == .array) bind.array.slots else &.{bind.slot.alloc};
-            for (slots) |slot| try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slot), .rhs = .fromIntern(.zero) } } }));
-            continue;
-        }
-        if (vir.instructions.items(.tag)[@backingInt(i)] != .variable) continue;
-        const v = payloadOf(vir, Inst.Variable, i);
-        const first = canonical(vir, i);
-        try checkRedeclared(s, unit, i);
-        if (unit.binds.contains(first)) continue;
-        const ty = tyOf(v.flags.storage);
-        if (v.dims.len != 0) try declareArray(s, unit, first, v.dims, ty) else try unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = try addAlloc(s, ty), .ty = ty } });
-        if (unit.held.contains(first)) try addHeld(s, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, vir.string(v.name) }), unit.binds.get(first) orelse continue);
-    }
 }

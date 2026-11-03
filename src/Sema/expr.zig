@@ -4,7 +4,7 @@
 //! by the operands' types (§4.2.1, the old `analog/expr_op.zig`); an
 //! operation whose operands are all constants is folded at emit time by
 //! `kernels.fold`, the kernel the old MIR's run-time ops share, so a folded
-//! value is the value the old interpreter computes. `?:`, `&&` and `||`
+//! value is the value the old interpreter computes (fold.zig). `?:`, `&&` and `||`
 //! evaluate their arms only when taken (a `block` and a `cond_br`).
 //! Cites: VAMS-2023 §2.6, §2.7, §3.2, §4.2, §4.2.1.1, §4.2.1.2, §4.2.4,
 //! §4.2.5, §4.2.7-§4.2.12, §4.3 (Tables 4-14, 4-15); IEEE 1364-2005 Table 5-6.
@@ -27,6 +27,7 @@ const vams = @import("vams");
 const InternPool = @import("intern_pool");
 const Air = @import("air");
 const fold = @import("kernels").fold;
+const sema_fold = @import("fold.zig");
 const Sema = @import("../Sema.zig");
 const decl = @import("decl.zig");
 const contrib = @import("contrib.zig");
@@ -49,106 +50,8 @@ pub const user_callee: u32 = std.math.maxInt(u32);
 /// The value a refused operand stands for after its diagnostic.
 pub const poison: Value = .{ .ref = .fromIntern(.zero_real), .ty = .real };
 
-/// The old `src/ir/opcode.zig` fold rows, per Air tag: which kernel, over
-/// which operand type, wrapped to §3.2's 32 bits or not.
-const FoldRow = union(enum) {
-    none,
-    to_real,
-    to_int,
-    unary: struct { f: fold.UnaryOp, int: bool = false, wrap: bool = false },
-    binary: struct { f: fold.BinaryOp, int: bool = false },
-    math: struct { f: fold.MathFn, int: bool = false, wrap: bool = false },
-};
-
-const fold_rows = std.EnumArray(Air.Inst.Tag, FoldRow).init(.{
-    .fadd = .{ .binary = .{ .f = .add } },
-    .fsub = .{ .binary = .{ .f = .sub } },
-    .fmul = .{ .binary = .{ .f = .mul } },
-    .fdiv = .{ .binary = .{ .f = .div } },
-    .fmod = .{ .binary = .{ .f = .mod } },
-    .fneg = .{ .unary = .{ .f = .minus } },
-    .iadd = .{ .binary = .{ .f = .add, .int = true } },
-    .isub = .{ .binary = .{ .f = .sub, .int = true } },
-    .imul = .{ .binary = .{ .f = .mul, .int = true } },
-    .idiv = .{ .binary = .{ .f = .div, .int = true } },
-    .imod = .{ .binary = .{ .f = .mod, .int = true } },
-    .ineg = .{ .unary = .{ .f = .minus, .int = true, .wrap = true } },
-    .flt = .{ .binary = .{ .f = .lt } },
-    .fgt = .{ .binary = .{ .f = .gt } },
-    .fle = .{ .binary = .{ .f = .le } },
-    .fge = .{ .binary = .{ .f = .ge } },
-    .feq = .{ .binary = .{ .f = .eq } },
-    .fne = .{ .binary = .{ .f = .neq } },
-    .ilt = .{ .binary = .{ .f = .lt, .int = true } },
-    .igt = .{ .binary = .{ .f = .gt, .int = true } },
-    .ile = .{ .binary = .{ .f = .le, .int = true } },
-    .ige = .{ .binary = .{ .f = .ge, .int = true } },
-    .ieq = .{ .binary = .{ .f = .eq, .int = true } },
-    .ine = .{ .binary = .{ .f = .neq, .int = true } },
-    .logand = .{ .binary = .{ .f = .logical_and } },
-    .logor = .{ .binary = .{ .f = .logical_or } },
-    .lognot = .{ .unary = .{ .f = .logical_not } },
-    .bitand = .{ .binary = .{ .f = .bit_and, .int = true } },
-    .bitor = .{ .binary = .{ .f = .bit_or, .int = true } },
-    .bitxor = .{ .binary = .{ .f = .bit_xor, .int = true } },
-    .bitxnor = .{ .binary = .{ .f = .bit_xnor, .int = true } },
-    .bitnot = .{ .unary = .{ .f = .bit_not, .int = true } },
-    .shl = .{ .binary = .{ .f = .shl, .int = true } },
-    .shr = .{ .binary = .{ .f = .shr, .int = true } },
-    .sqrt = .{ .math = .{ .f = .sqrt } },
-    .exp = .{ .math = .{ .f = .exp } },
-    .expm1 = .{ .math = .{ .f = .expm1 } },
-    .ln = .{ .math = .{ .f = .ln } },
-    .ln1p = .{ .math = .{ .f = .ln1p } },
-    .log10 = .{ .math = .{ .f = .log } },
-    .pow = .{ .math = .{ .f = .pow } },
-    .hypot = .{ .math = .{ .f = .hypot } },
-    .floor = .{ .math = .{ .f = .floor } },
-    .ceil = .{ .math = .{ .f = .ceil } },
-    .fabs = .{ .math = .{ .f = .abs } },
-    .fmin = .{ .math = .{ .f = .min } },
-    .fmax = .{ .math = .{ .f = .max } },
-    .iabs = .{ .math = .{ .f = .abs, .int = true, .wrap = true } },
-    .imin = .{ .math = .{ .f = .min, .int = true } },
-    .imax = .{ .math = .{ .f = .max, .int = true } },
-    .ipow = .{ .binary = .{ .f = .pow, .int = true } },
-    .sin = .{ .math = .{ .f = .sin } },
-    .cos = .{ .math = .{ .f = .cos } },
-    .tan = .{ .math = .{ .f = .tan } },
-    .asin = .{ .math = .{ .f = .asin } },
-    .acos = .{ .math = .{ .f = .acos } },
-    .atan = .{ .math = .{ .f = .atan } },
-    .atan2 = .{ .math = .{ .f = .atan2 } },
-    .sinh = .{ .math = .{ .f = .sinh } },
-    .cosh = .{ .math = .{ .f = .cosh } },
-    .tanh = .{ .math = .{ .f = .tanh } },
-    .asinh = .{ .math = .{ .f = .asinh } },
-    .acosh = .{ .math = .{ .f = .acosh } },
-    .atanh = .{ .math = .{ .f = .atanh } },
-    .fi_cast = .to_int,
-    .if_cast = .to_real,
-    .opt_barrier = .none,
-    .dstop = .none,
-    .path_prev = .none,
-    .path_acc = .none,
-    .select = .none,
-    .anew = .none,
-    .fload = .none,
-    .iload = .none,
-    .store = .none,
-    .call = .none,
-    .arg = .none,
-    .probe = .none,
-    .alloc = .none,
-    .load = .none,
-    .assign = .none,
-    .block = .none,
-    .br = .none,
-    .cond_br = .none,
-    .loop = .none,
-    .repeat = .none,
-    .ret = .none,
-});
+/// The longest string a constant replication folds to.
+const concat_bytes_max: u64 = 1 << 20;
 
 /// Lowers `r` and returns its value. A construct lowering refuses is
 /// reported to `zcu.failed` and stands for `poison`.
@@ -188,14 +91,14 @@ pub fn toBool(s: *Sema, b: *Block, v: Value) Allocator.Error!Ref {
 /// Appends value tag `tag` over `a`, or its folded constant.
 pub fn unOp(s: *Sema, b: *Block, tag: Air.Inst.Tag, a: Ref) Allocator.Error!Ref {
     assert(Air.tag_info.getPtrConst(tag).class == .un_op);
-    if (constOf(s, a)) |c| if (foldTag(tag, &.{c})) |r| return .fromIntern(try decl.intern(s, r));
+    if (constOf(s, a)) |c| if (sema_fold.tag(tag, &.{c})) |r| return .fromIntern(try decl.intern(s, r));
     return s.addInst(b, .{ .tag = tag, .data = .{ .un_op = a } });
 }
 
 /// Appends value tag `tag` over `x`, `y`, or its folded constant.
 pub fn binOp(s: *Sema, b: *Block, tag: Air.Inst.Tag, x: Ref, y: Ref) Allocator.Error!Ref {
     assert(Air.tag_info.getPtrConst(tag).class == .bin_op);
-    if (constOf(s, x)) |cx| if (constOf(s, y)) |cy| if (foldTag(tag, &.{ cx, cy })) |r| return .fromIntern(try decl.intern(s, r));
+    if (constOf(s, x)) |cx| if (constOf(s, y)) |cy| if (sema_fold.tag(tag, &.{ cx, cy })) |r| return .fromIntern(try decl.intern(s, r));
     return s.addInst(b, .{ .tag = tag, .data = .{ .bin_op = .{ .lhs = x, .rhs = y } } });
 }
 
@@ -263,7 +166,8 @@ fn inst(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!Value {
             break :blk array.load(s, b, e);
         },
         .field => hierRead(s, b, src),
-        .str_ref, .slice, .slice_up, .slice_down, .concat, .pattern, .replicate, .pattern_repl, .port_branch, .event_or, .posedge, .negedge, .driver_update, .step_event, .paramset_output, .range, .pulse_limits => refuse(s, b, src, @tagName(tag)),
+        .concat, .replicate => concat(s, b, i, src),
+        .str_ref, .slice, .slice_up, .slice_down, .pattern, .pattern_repl, .port_branch, .event_or, .posedge, .negedge, .driver_update, .step_event, .paramset_output, .range, .pulse_limits => refuse(s, b, src, @tagName(tag)),
         .module, .nature, .discipline, .paramset, .primitive, .connectrules, .config, .port, .io, .net, .variable, .param, .aliasparam, .genvar, .event, .branch, .instance, .assign, .defparam, .analog, .analog_initial, .initial, .always, .function, .gen_for, .gen_if, .gen_case, .gen_block, .specify, .path, .timing_check, .pulse_style, .timing_event, .ps_override, .connect_resolve, .connect_insert, .block, .condbr, .case, .loop, .repeat, .wait, .delay, .event_wait, .store, .store_nb, .contrib, .proc_assign, .force, .store_timed, .store_nb_timed, .contrib_indirect, .deassign, .release, .trigger, .disable, .ret, .brk, .cont, .delay_ctl, .event_ctl, .repeat_ctl => unreachable, // AstGen: an operand is an expression
     };
 }
@@ -344,6 +248,52 @@ fn bindValue(s: *Sema, b: *Block, bind: Sema.Bind, src: Inst.Ref) Allocator.Erro
             return poison;
         },
     };
+}
+
+/// §3.3 Table 3-3 `{s1, s2}` and `{n{s}}` over string constants: the
+/// joined string, folded as the old lowering folds it (E0326 for an empty
+/// list, E0327 for a count that is negative or no integer). Any other
+/// operand (a sized integer, a string known only while the device runs) is
+/// not lowered yet.
+fn concat(s: *Sema, b: *Block, i: Inst.Index, src: Inst.Ref) Allocator.Error!Value {
+    const vir = b.unit.vir;
+    const repl = vir.instructions.items(.tag)[@backingInt(i)] == .replicate;
+    var copies: i64 = 1;
+    var list = i;
+    if (repl) {
+        const x = decl.payloadOf(vir, Inst.Bin, i);
+        const n = (try decl.foldRef(s, b.unit, x.lhs)) orelse return refuse(s, b, src, "a replication by a count known only while the device runs");
+        copies = n.asIntExact() orelse {
+            try s.fail(.E0327, b.unit.file, src, "a replication constant shall be a finite integer after conversion, got {d}", .{n.asReal()});
+            return poison;
+        };
+        if (copies < 0) {
+            try s.fail(.E0327, b.unit.file, src, "a replication constant shall be non-negative, got {d}", .{copies});
+            return poison;
+        }
+        list = x.rhs.toIndex() orelse return poison;
+        if (vir.instructions.items(.tag)[@backingInt(list)] != .concat) return refuse(s, b, src, "replicate");
+    }
+    const elems = vir.list(Inst.Ref, decl.payloadOf(vir, Inst.Refs, list));
+    if (elems.len == 0) {
+        try s.fail(.E0326, b.unit.file, src, "", .{});
+        return poison;
+    }
+    var out: std.ArrayList(u8) = .empty;
+    for (elems) |el| {
+        const v = try lower(s, b, el);
+        const c = constOf(s, v.ref) orelse return refuse(s, b, src, "concat");
+        if (c != .str) return refuse(s, b, src, "concat");
+        try out.appendSlice(s.arena, c.str);
+    }
+    const one = out.items;
+    // N copies of "" are "", never counted out.
+    if (one.len == 0 or copies == 1) return constant(s, .{ .str = one });
+    if (std.math.mul(u64, one.len, @intCast(copies)) catch std.math.maxInt(u64) > concat_bytes_max)
+        return refuse(s, b, src, "a replication past the bytes folded here");
+    var all: std.ArrayList(u8) = .empty;
+    for (0..@intCast(copies)) |_| try all.appendSlice(s.arena, one);
+    return constant(s, .{ .str = all.items });
 }
 
 /// §2.7: a string constant as its characters' integer; anything else as is.
@@ -515,38 +465,4 @@ fn callExpr(s: *Sema, b: *Block, c: Inst.Call, src: Inst.Ref) Allocator.Error!Va
         },
         else => return refuse(s, b, src, "a call"),
     }
-}
-
-/// `tag` over constant operands, as the old MIR's `opcode.fold` computes
-/// it; null when it has no value there (it is then left to run time).
-fn foldTag(tag: Air.Inst.Tag, args: []const fold.Const) ?fold.Const {
-    for (args) |a| if (a == .str) return null;
-    return switch (fold_rows.get(tag)) {
-        .none => null,
-        .to_real => .{ .real = args[0].asReal() },
-        .to_int => .{ .int = std.math.lossyCast(i64, @round(args[0].asReal())) },
-        .unary => |k| wrapped(k.wrap, fold.unary(k.f, as(k.int, args[0]))),
-        .binary => |k| fold.binary(k.f, as(k.int, args[0]), as(k.int, args[1]), null),
-        .math => |k| blk: {
-            var buf: [fold.MathFn.arity_max]fold.Const = undefined;
-            for (args, buf[0..args.len]) |a, *o| o.* = as(k.int, a);
-            break :blk wrapped(k.wrap, fold.math(k.f, buf[0..args.len]));
-        },
-    };
-}
-
-fn as(int: bool, c: fold.Const) fold.Const {
-    if (!int) return .{ .real = c.asReal() };
-    return .{
-        .int = switch (c) {
-            .int => |i| i,
-            .real => |r| std.math.lossyCast(i64, @round(r)),
-            .str => unreachable, // `foldTag` returned for a string
-        },
-    };
-}
-
-fn wrapped(wrap: bool, r: ?fold.Const) ?fold.Const {
-    const c = r orelse return null;
-    return if (wrap and c == .int) .{ .int = fold.wrap32(c.int) } else c;
 }

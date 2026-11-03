@@ -379,7 +379,7 @@ fn local(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!void {
     const vir = b.unit.vir;
     const v = decl.payloadOf(vir, Inst.Variable, i);
     const first = decl.canonical(vir, i);
-    try decl.checkRedeclared(s, b.unit, i);
+    try @import("variable.zig").checkRedeclared(s, b.unit, i);
     if (b.unit.binds.contains(first)) return;
     if (v.dims.len != 0) return decl.declareArray(s, b.unit, first, v.dims, decl.tyOf(v.flags.storage));
     const ty = decl.tyOf(v.flags.storage);
@@ -387,7 +387,7 @@ fn local(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!void {
     try b.unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = slot, .ty = ty } });
     if (b.path.len != 0) try s.block_locals.put(s.arena, try std.fmt.allocPrint(s.arena, "{s}{s}{s}", .{ b.unit.prefix, b.path, vir.string(v.name) }), .{ .alloc = slot, .ty = ty });
     // §5.3.2 a held local of a named block is named by the block path.
-    if (b.path.len != 0 and b.unit.held.contains(first)) try decl.addHeld(s, try std.fmt.allocPrint(s.arena, "{s}{s}{s}", .{ b.unit.prefix, b.path, vir.string(v.name) }), b.unit.binds.get(first).?);
+    if (b.path.len != 0 and b.unit.held.contains(first)) try @import("variable.zig").addHeld(s, try std.fmt.allocPrint(s.arena, "{s}{s}{s}", .{ b.unit.prefix, b.path, vir.string(v.name) }), b.unit.binds.get(first).?, .undef);
 }
 
 /// §5.8.1 `if (c) a else b`.

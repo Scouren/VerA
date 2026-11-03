@@ -348,3 +348,31 @@ test "§9.4.1 an unconditional print is a row in source order, minted after the 
         \\
     );
 }
+
+test "§3.2 a variable no evaluation writes reads its declaration initializer" {
+    var o = try lower(
+        \\module m(p); inout p; electrical p;
+        \\  integer count = 3; real gain = 2.5;
+        \\  analog I(p) <+ count * gain * V(p);
+        \\endmodule
+    );
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{}, o.codes);
+    // 3 * 2.5 * 1.0, exact in binary.
+    try std.testing.expectEqual(@as(f64, 7.5), try o.value(0, 0, &.{1.0}));
+}
+
+test "§3.4 a default over another parameter keeps its expression for the host (Param.derive)" {
+    var o = try lower(
+        \\module m(p); inout p; electrical p;
+        \\  parameter real a = 2.0; parameter real b = a * 3.0;
+        \\  analog I(p) <+ b * V(p);
+        \\endmodule
+    );
+    defer o.deinit();
+    const d = o.analysis.?.device.params.items(.derive);
+    try std.testing.expectEqual(Air.Inst.Ref.none, d[0]);
+    // b's derive is a * 3.0 over a's arg: an fmul, not the folded 6.0.
+    const i = d[1].toIndex().?;
+    try std.testing.expectEqual(Air.Inst.Tag.fmul, o.analysis.?.air.instructions.items(.tag)[@backingInt(i)]);
+}

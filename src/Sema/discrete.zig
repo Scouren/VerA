@@ -97,6 +97,7 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
             .ranges_start = @intCast(s.device.ranges.items.len),
             .ranges_len = 0,
             .instance = decl.rowInstance(unit.instance),
+            .derive = .none,
         });
         const vty: Sema.Ty = if (ty == .real) .real else .integer;
         const arg = try s.air.addInst(s.gpa, .{ .tag = .arg, .data = .{ .ty_index = .{ .ty = decl.typeIndex(vty), .index = @backingInt(row) } } });

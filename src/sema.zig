@@ -5,15 +5,19 @@
 //! Contents:
 //! - `pub const Zcu`
 //! - `pub const Sema`
+//! - `pub const digital`
 
 /// The compilation unit's tables.
 pub const Zcu = @import("Zcu.zig");
 /// Elaboration over a `Zcu`.
 pub const Sema = @import("Sema.zig");
+/// The digital lowering: the elaborated design as one `std_sim.Program`.
+pub const digital = @import("Sema/digital.zig");
 
 test {
     _ = Zcu;
     _ = Sema;
+    _ = digital;
     _ = @import("Sema/eval.zig");
     _ = @import("Sema/walk.zig");
     _ = @import("Sema/defparam.zig");

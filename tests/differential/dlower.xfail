@@ -1,0 +1,160 @@
+# diff-dlower's known differences (tests/differential/dlower.zig): one fixture per
+# line, its path under tests/conformance/tests and why it does not agree yet:
+# a construct Sema's digital lowering (src/Sema/digital*) does not lower yet
+# (`lowering: ...`), a stage before it that refuses the fixture, or the first
+# transcript difference. A listed fixture that agrees fails the run until its
+# line goes.
+verilog/03_lexical_conventions/ams_lexical_escaped_hierarchy.v lowering: an instance the elaboration did not make
+verilog/03_lexical_conventions/case_item_statement_attribute.v lowering: a case statement
+verilog/03_lexical_conventions/examples.v lowering: a case statement
+verilog/04_data_types/array_17_dimensions.v lowering: a continuous assignment to a net array element
+verilog/04_data_types/name_spaces.v lowering: an upward or absolute hierarchical name
+verilog/04_data_types/parameter_width.v lowering: an untyped parameter a defparam sets
+verilog/04_data_types/port_list_parameter_defparam.v lowering: a name declared by `param` that has no slot
+verilog/04_data_types/time_parameter_is_unsigned_64.v lowering: a name declared by `param` that has no slot
+verilog/04_data_types/type_net_array.v lowering: a continuous assignment to a net array element
+verilog/05_expressions/concatenation.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
+verilog/05_expressions/conditional_real_x.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/05_expressions/constant_operands.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/05_expressions/constant_select_and_function.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/05_expressions/native_wide_index_edges.v lowering: a range past 2^32 bits
+verilog/06_assignments/net_array_element_selects.v lowering: a continuous assignment to a net array element
+verilog/06_assignments/select_bus.v lowering: a port with a net declaration assignment
+verilog/07_gate_switch_level/pull_gate_bit_select.v lowering: an inout port joined to a select, a concatenation or a net of another width
+verilog/07_gate_switch_level/tran_from_supply_undriven.v transcript differs at byte 0 (old 6 bytes, new 6): old "St1 1\n" new "HiZ z\n"
+verilog/09_behavioral_modeling/assignment_assign_deassign.v lowering: a procedural continuous assignment
+verilog/09_behavioral_modeling/assignment_force_release.v lowering: a procedural continuous assignment
+verilog/09_behavioral_modeling/block_name_reference.v lowering: an upward or absolute hierarchical name
+verilog/09_behavioral_modeling/case_linear_search.v lowering: a case statement
+verilog/09_behavioral_modeling/concatenation_targets.v lowering: a procedural continuous assignment
+verilog/09_behavioral_modeling/constant_case_expression.v lowering: a case statement
+verilog/09_behavioral_modeling/control.v lowering: a case statement
+verilog/09_behavioral_modeling/dont_care_examples.v lowering: a case statement
+verilog/09_behavioral_modeling/event_array_automatic.v lowering: a trigger of an event array element or a hierarchical event
+verilog/09_behavioral_modeling/event_array_native_automatic.v lowering: a named block declaring storage in an automatic subroutine
+verilog/09_behavioral_modeling/event_array_native_effects.v lowering: a trigger of an event array element or a hierarchical event
+verilog/09_behavioral_modeling/event_array_native_selection.v lowering: a trigger of an event array element or a hierarchical event
+verilog/09_behavioral_modeling/event_arrays.v lowering: an event control on an expression or a select
+verilog/09_behavioral_modeling/event_array.v lowering: a trigger of an event array element or a hierarchical event
+verilog/09_behavioral_modeling/expression_event.v lowering: an event control on an expression or a select
+verilog/09_behavioral_modeling/force_immediate.v lowering: a procedural continuous assignment
+verilog/09_behavioral_modeling/force_net_selects.v lowering: a procedural continuous assignment
+verilog/09_behavioral_modeling/force_wire_array_element.v lowering: a continuous assignment to a net array element
+verilog/09_behavioral_modeling/named_fork_declarations.v lowering: an upward or absolute hierarchical name
+verilog/09_behavioral_modeling/native_concat_targets.v lowering: a procedural continuous assignment
+verilog/09_behavioral_modeling/native_force_many_selects_of_one_net.v lowering: a procedural continuous assignment
+verilog/09_behavioral_modeling/native_force_net_selects.v lowering: a procedural continuous assignment
+verilog/09_behavioral_modeling/native_real_events.v lowering: an event control on an expression or a select
+verilog/09_behavioral_modeling/native_select_events.v lowering: an event control on an expression or a select
+verilog/09_behavioral_modeling/native_wide_event_indices.v lowering: a trigger of an event array element or a hierarchical event
+verilog/09_behavioral_modeling/sched_implicit_event_exclusion.v lowering: the slots `@*` reads in `event_wait`
+verilog/09_behavioral_modeling/sched_implicit_lhs_index.v transcript differs at byte 19 (old 21 bytes, new 21): old "first=7/0\nsecond=7/7\n" new "first=7/0\nsecond=7/0\n"
+verilog/09_behavioral_modeling/select_edge_glitch.v lowering: an event control on an expression or a select
+verilog/09_behavioral_modeling/select_edge.v lowering: an event control on an expression or a select
+verilog/10_tasks_functions/constant_function_clogb2.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
+verilog/10_tasks_functions/constant_function_generate_condition.v lowering: a generate condition Sema/eval.zig does not fold
+verilog/10_tasks_functions/constant_function_named_block.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/10_tasks_functions/constant_function_parameters.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/10_tasks_functions/constant_function_system_task_ignored.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/10_tasks_functions/nonansi_function_port_typed_later.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/10_tasks_functions/static_task_item_hierarchical.v lowering: a hierarchical name whose head is no instance
+verilog/11_scheduling/procedural_continuous_tracks_sources.v lowering: a procedural continuous assignment
+verilog/12_hierarchy/defparam_absolute_inside_array_element.v lowering: an untyped parameter a defparam sets
+verilog/12_hierarchy/defparam_before_generate.v lowering: an untyped parameter a defparam sets
+verilog/12_hierarchy/defparam_inside_generate_block.v lowering: an untyped parameter a defparam sets
+verilog/12_hierarchy/defparam_last_wins.v lowering: an untyped parameter a defparam sets
+verilog/12_hierarchy/defparam_upward_and_indexed_paths.v lowering: an untyped parameter a defparam sets
+verilog/12_hierarchy/extra_ordered_parameter_value_ignored.v elaboration refuses it (E0907)
+verilog/12_hierarchy/extra_ordered_value_ignored.v elaboration refuses it (E0907)
+verilog/12_hierarchy/generate_block_variables.v lowering: an upward or absolute hierarchical name
+verilog/12_hierarchy/generate_past_65536_iterations.v lowering: a loop generate scheme past 65536 iterations
+verilog/12_hierarchy/generate_region_optional.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
+verilog/12_hierarchy/generate_scopes_in_names.v transcript differs at byte 87 (old 181 bytes, new 182): old "nerate_scopes_in_names.genblk02.nb2\nb_12_4_3_generate_scopes" new "nerate_scopes_in_names.genblk002.nb2\nb_12_4_3_generate_scope"
+verilog/12_hierarchy/genvar_hierarchical_index.v lowering: an upward or absolute hierarchical name
+verilog/12_hierarchy/hierarchical_path_names.v lowering: an upward or absolute hierarchical name
+verilog/12_hierarchy/hierarchical_task_call_suspends.v lowering: a hierarchical task or function name
+verilog/12_hierarchy/hierarchy_explicit_port_concat.v lowering: a port expression (§12.3.6)
+verilog/12_hierarchy/hierarchy_upward_reference.v lowering: an upward or absolute hierarchical name
+verilog/12_hierarchy/inout_net_expressions.v lowering: an inout port joined to a select, a concatenation or a net of another width
+verilog/12_hierarchy/instance_array_concat_port.v lowering: an output port connected to a select or an expression
+verilog/12_hierarchy/instance_array_width_product.v lowering: an upward or absolute hierarchical name
+verilog/12_hierarchy/instance_select.v lowering: an upward or absolute hierarchical name
+verilog/12_hierarchy/module_header_forms.v lowering: a name declared by `param` that has no slot
+verilog/12_hierarchy/named_block_items.v lowering: an upward or absolute hierarchical name
+verilog/12_hierarchy/null_port_combinations.v lowering: a port expression (§12.3.6)
+verilog/12_hierarchy/parameter_dependence.v lowering: an untyped parameter a defparam sets
+verilog/12_hierarchy/real_and_signed_overrides.v lowering: an untyped parameter a defparam sets
+verilog/12_hierarchy/real_through_bits.v lowering: a port with a net declaration assignment
+verilog/12_hierarchy/select_and_concatenation_ports.v lowering: a port expression (§12.3.6)
+verilog/12_hierarchy/select_sinks.v lowering: an output port connected to a select or an expression
+verilog/12_hierarchy/select_warning.v lowering: an output port connected to a select or an expression
+verilog/12_hierarchy/two_top_level_modules.v lowering: an untyped parameter a defparam sets
+verilog/12_hierarchy/variable_port_select_sinks.v lowering: an output port connected to a select or an expression
+verilog/13_configuration/cfg1_default_liblist.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/cfg2_gate_first.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/cfg3_cell_use.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/cfg4_instance_liblist.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/cfg6_hierarchical.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/command_line_search_order.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/config_overrides_command_line.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/default_search_order.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/include_map.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/parent_library_by_map.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/13_configuration/resolution_order.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/14_specify_blocks/sdf_pulse_limits_override_specparam.v lowering: the system task `$sdf_annotate`
+verilog/16_sdf/sdf_absolute_path_delay.v lowering: the system task `$sdf_annotate`
+verilog/16_sdf/sdf_interconnect_delay.v lowering: the system task `$sdf_annotate`
+verilog/16_sdf/sdf_label_reevaluates_path.v lowering: the system task `$sdf_annotate`
+verilog/16_sdf/sdf_min_typ_max_selection.v lowering: the system task `$sdf_annotate`
+verilog/16_sdf/sdf_multiple_files_scoped.v lowering: the system task `$sdf_annotate`
+verilog/16_sdf/sdf_ordered_increment.v lowering: the system task `$sdf_annotate`
+verilog/16_sdf/sdf_timing_check_limit.v lowering: the system task `$sdf_annotate`
+verilog/17_system_tasks/conversions.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/17_system_tasks/native_binary_file_targets.v lowering: an event control on an expression or a select
+verilog/17_system_tasks/printtimescale_named_module.v lowering: $printtimescale of a hierarchical name
+verilog/17_system_tasks/printtimescale_names_parameter.v lowering: $printtimescale of a hierarchical name
+verilog/17_system_tasks/printtimescale_prints_argument.v lowering: $printtimescale of a scope
+verilog/18_vcd/dumpfile_default_name.v lowering: the system task `$dumpvars`
+verilog/18_vcd/dumpfile_variable_name.v lowering: the system task `$dumpfile`
+verilog/18_vcd/dumplimit_stops_with_comment.v lowering: the system task `$dumpfile`
+verilog/18_vcd/dumpports_control_tasks.v lowering: the system task `$dumpports`
+verilog/18_vcd/dumpportslimit_stops_with_comment.v lowering: the system task `$dumpports`
+verilog/18_vcd/dumpports_node_information.v lowering: the system task `$dumpports`
+verilog/18_vcd/event_marker.v lowering: the system task `$dumpfile`
+verilog/18_vcd/example_value_changes.v lowering: the system task `$dumpfile`
+verilog/18_vcd/port_value_changes.v lowering: the system task `$dumpports`
+verilog/18_vcd/real_value_format.v lowering: the system task `$dumpfile`
+verilog/18_vcd/table_18_2_shortening.v lowering: the system task `$dumpfile`
+verilog/18_vcd/task_function_scopes.v lowering: the system task `$dumpfile`
+verilog/18_vcd/var_sections.v lowering: the system task `$dumpfile`
+verilog/18_vcd/vcd_dumpoff_on.v lowering: the system task `$dumpfile`
+verilog/18_vcd/vcd_dumpvars_levels.v lowering: the system task `$dumpfile`
+verilog/18_vcd/vcd_dumpvars.v lowering: the system task `$dumpfile`
+verilog/18_vcd/version_names_dumpfile_literal.v lowering: the system task `$dumpfile`
+verilog/18_vcd/version_names_dumpfile_variable.v lowering: the system task `$dumpfile`
+verilog/19_compiler_directives/ams_keywords_are_identifiers.v lowering: a string variable
+verilog/A_formal_syntax/b_A_1_1_incdir.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/A_formal_syntax/b_A_1_1_library_text.v a library map or list (`//@ libmap`, `//@ liblist`)
+verilog/A_formal_syntax/b_A_1_3_concat_port.v lowering: a port expression (§12.3.6)
+verilog/A_formal_syntax/b_A_1_3_part_select_port.v lowering: a port expression (§12.3.6)
+verilog/A_formal_syntax/b_A_1_3_ports.v lowering: a name declared by `param` that has no slot
+verilog/A_formal_syntax/b_A_1_4_module_items.v lowering: an untyped parameter a defparam sets
+verilog/A_formal_syntax/b_A_2_3_declaration_lists.v lowering: an untyped parameter a defparam sets
+verilog/A_formal_syntax/b_A_2_4_declaration_assignments.v lowering: an untyped parameter a defparam sets
+verilog/A_formal_syntax/b_A_6_2_procedural_assignments.v lowering: a procedural continuous assignment
+verilog/A_formal_syntax/b_A_6_4_statements.v lowering: a case statement
+verilog/A_formal_syntax/b_A_6_9_hierarchical_task_enable.v lowering: a hierarchical task or function name
+verilog/A_formal_syntax/b_A_8_1_concatenations.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/A_formal_syntax/b_A_8_2_function_calls.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/A_formal_syntax/b_A_8_3_expressions.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/A_formal_syntax/b_A_8_4_primaries.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
+verilog/A_formal_syntax/b_A_9_3_indexed_hierarchical_name.v lowering: an upward or absolute hierarchical name
+verilog/A_formal_syntax/grammar_nullable_statement.v lowering: a case statement
+verilog/A_formal_syntax/grammar_parameter_header.v lowering: a name declared by `param` that has no slot
+verilog-ams/digital/realtobits_bitstoreal_bridge.v lowering: a wreal net
+verilog-ams/digital/vams_digital_abstime_math.v lowering: the system function `$abstime`
+verilog-ams/digital/wreal_event_on_change.v lowering: a wreal net
+verilog-ams/digital/wreal_port_round_trip.v lowering: a wreal net
+verilog-ams/digital/wreal_single_driver_tracks.v lowering: a wreal net
+verilog-ams/digital/wreal_undriven_zero.v lowering: a wreal net
+verilog-ams/digital/wreal_wire_port_resolves_wreal.v lowering: a wreal net

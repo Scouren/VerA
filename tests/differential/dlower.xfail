@@ -22,7 +22,6 @@ verilog/12_hierarchy/extra_ordered_parameter_value_ignored.v elaboration refuses
 verilog/12_hierarchy/extra_ordered_value_ignored.v elaboration refuses it (E0907)
 verilog/12_hierarchy/generate_past_65536_iterations.v lowering: a loop generate scheme past 65536 iterations
 verilog/12_hierarchy/generate_region_optional.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
-verilog/12_hierarchy/hierarchical_task_call_suspends.v lowering: a hierarchical task or function name
 verilog/12_hierarchy/hierarchy_explicit_port_concat.v lowering: a port expression (§12.3.6)
 verilog/12_hierarchy/inout_net_expressions.v lowering: an inout port joined to a select, a concatenation or a net of another width
 verilog/12_hierarchy/null_port_combinations.v lowering: a port expression (§12.3.6)
@@ -40,15 +39,11 @@ verilog/13_configuration/include_map.v a library map or list (`//@ libmap`, `//@
 verilog/13_configuration/parent_library_by_map.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/13_configuration/resolution_order.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/17_system_tasks/conversions.v lowering: a port with a net declaration assignment
-verilog/17_system_tasks/printtimescale_named_module.v lowering: $printtimescale of a hierarchical name
-verilog/17_system_tasks/printtimescale_names_parameter.v lowering: $printtimescale of a hierarchical name
-verilog/17_system_tasks/printtimescale_prints_argument.v lowering: $printtimescale of a scope
 verilog/19_compiler_directives/ams_keywords_are_identifiers.v lowering: a string variable
 verilog/A_formal_syntax/b_A_1_1_incdir.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/A_formal_syntax/b_A_1_1_library_text.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/A_formal_syntax/b_A_1_3_concat_port.v lowering: a port expression (§12.3.6)
 verilog/A_formal_syntax/b_A_1_3_part_select_port.v lowering: a port expression (§12.3.6)
-verilog/A_formal_syntax/b_A_6_9_hierarchical_task_enable.v lowering: a hierarchical task or function name
 verilog-ams/digital/realtobits_bitstoreal_bridge.v lowering: a wreal net
 verilog-ams/digital/vams_digital_abstime_math.v lowering: the system function `$abstime`
 verilog-ams/digital/wreal_event_on_change.v lowering: a wreal net

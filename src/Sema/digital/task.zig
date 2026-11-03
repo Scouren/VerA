@@ -22,6 +22,7 @@ const expr = @import("expr.zig");
 const place = @import("place.zig");
 const vcd = @import("vcd.zig");
 const sdf = @import("sdf.zig");
+const hier = @import("hier.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const none = digital.none;
@@ -229,22 +230,34 @@ pub fn scopePath(l: *Lower, scope: u32, out: *std.ArrayList(u8), depth: u32) Err
 /// instance (or the local object the argument names) and its module's time
 /// unit and precision.
 fn printTimescale(l: *Lower, args: []const Inst.Ref) Error!u32 {
-    const scope = l.frames.items[l.rootFrame(l.frame)].scope;
-    var text: std.ArrayList(u8) = .empty;
-    try text.appendSlice(l.a, "Time scale of (");
-    try scopePath(l, scope, &text, 0);
     if (args.len > 1) return l.refuse("$printtimescale with more than one argument");
+    var scope = l.frames.items[l.rootFrame(l.frame)].scope;
+    var leaf: []const u8 = "";
     if (args.len == 1) {
         const vir = l.virOf(l.frame);
         const i = args[0].toIndex() orelse return l.refuse("$printtimescale of an omitted argument");
-        if (Lower.tag(vir, i) != .decl_ref) return l.refuse("$printtimescale of a hierarchical name");
-        const d = vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl;
-        switch (Lower.tag(vir, d)) {
-            .variable, .net, .param, .io, .event => {},
-            else => return l.refuse("$printtimescale of a scope"),
+        const d: ?Inst.Index = if (Lower.tag(vir, i) == .decl_ref) vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl else null;
+        const object = if (d) |x| switch (Lower.tag(vir, x)) {
+            .variable, .net, .param, .io, .event => true,
+            else => false, // else: an instance, block or generate block names a scope
+        } else false;
+        if (object) {
+            leaf = vir.string(declName(vir, d.?));
+        } else if (hier.scopeOf(l, args[0])) |s| {
+            // §17.3.1 a scope: an instance (or named block) by its name.
+            scope = s;
+        } else |e| {
+            if (e != error.Unsupported or Lower.tag(vir, i) != .field) return e;
+            // §17.3.1 an object a hierarchical name reaches, and its scope.
+            const fd = Lower.payload(vir, Inst.Field, i);
+            scope = try hier.scopeOf(l, fd.operand);
+            leaf = vir.string(fd.name);
         }
-        try text.print(l.a, ".{s}", .{vir.string(declName(vir, d))});
     }
+    var text: std.ArrayList(u8) = .empty;
+    try text.appendSlice(l.a, "Time scale of (");
+    try scopePath(l, scope, &text, 0);
+    if (leaf.len != 0) try text.print(l.a, ".{s}", .{leaf});
     const t = l.b.times.items[scope];
     const prec_exp = t.unit_exp - @as(i32, std.math.log10_int(@as(u64, t.scale.local_per_unit)));
     var w: std.Io.Writer.Allocating = .init(l.a);

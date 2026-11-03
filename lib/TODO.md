@@ -429,6 +429,15 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
    results via `br` stay for expression merges (`?:`, `&&`, `||`). Sema needs no SSA builder
    (Appendix A.3's `Sema/Ssa.zig`, ~1,060 lines, disappears); the float pass joins slot states at a
    block's exit and widens at a loop. A slot is a `var` in the emitted Zig, which LLVM promotes.
+8. **The hand-written math kernels become Gompute 2.0.0** (`git@github.com:OmarSiwy/Gompute.git`,
+   tag `v2.0.0`, commit `70b722d`; its `gompute.math` is device-safe math), when the kernels become
+   a shipped module (step 9). In scope: `lib/contract/gm.zig` + `gm/` (fma-free exp/log/pow and the
+   musl/ARM ports, 1,906 lines) and the math half of the spliced kernel text (`kernel_text/math.zig`).
+   Pinned in `build.zig.zon` by commit and content hash (AGENTS.md). The contract is installed for
+   hosts, so ESPice resolves the same Gompute. Oracle before the swap: Gompute's results equal `gm`'s
+   bit for bit over `gm`'s test corpus and the constant folds (`kernels.fold`, `prove`'s transfers), or
+   each difference is bounded by both libraries' documented ulps and listed by name; host, NVPTX and
+   AMDGCN still round alike (the reason `gm` exists).
 6. **VPI runtime goes to `lib/vpi/`** (Zig's rule: what a user's program links ships in `lib/`);
    only the host driver (`src/vpi_host.zig`) and the emitter (`src/codegen/vpi.zig`) stay in `src/`.
 
@@ -471,9 +480,14 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
   oracle over the whole fixture corpus (`zig build diff-*`, `build/rewrite.zig`). The old pipeline
   stays the product until the new one matches it, then is deleted. `docs/rewrite/` is the contract
   every module's author reads: `README.md` (rules, references, build), one spec per module.
-  - in progress: `vams` tokenizer/Ast/Parse (`parse.md`), `vams` Preprocessor (`preprocess.md`),
-    `intern_pool` + `air` (`core-ir.md`).
-  - specs ready: `link` (`link.md`), `vams` Diag (`diag.md`).
+  - merged: `intern_pool` + `air` (diff-air: 68 opcodes, 7,008,886 operand sets, 4 named ulp
+    differences; it found three accuracy bugs in Zig's own `std.math.acosh`, `std.math.pow` and
+    `@log10`), `vams` Preprocessor (diff-pp: 4,243/4,243 fixtures byte-equal, empty xfail).
+    Preprocessor follow-ups: each `run` restarts from the top and replays earlier answers, quadratic
+    in include depth (`ponytail:`, fix: an explicit scan stack); a synthesized SPICE netlist runs as
+    an ordinary unit after the `-D` defines, where the old code ran it before them as shipped text.
+  - in progress: `vams` tokenizer/Ast/Parse (`parse.md`), `link` (`link.md`).
+  - spec ready: `vams` Diag (`diag.md`).
   - next: AstGen + Vir (after Ast), Zcu + Sema (after Vir, InternPool, Air), the Air passes,
     codegen, Compilation; then the switch-over and the old pipeline's deletion.
 - [ ] Changelog: two lines drafted (formatC, `--jobs`); they need their issues filed (`gh auth login`).

@@ -247,7 +247,7 @@ fn unary(tag: Inst.Tag, a: Value) Error!Value {
                 .bitnot => ~x,
                 .iabs => w32(if (x < 0) 0 -% x else x),
                 .if_cast => return .{ .real = @floatFromInt(x) },
-                else => unreachable, // the int unary tags are listed
+                else => unreachable, // else: `unary` routes only int unary tags here (tag_info.operand)
             },
         };
     }
@@ -279,7 +279,7 @@ fn unary(tag: Inst.Tag, a: Value) Error!Value {
             .acosh => if (x < 1) math.nan(f64) else math.acosh(x),
             .atanh => math.atanh(x),
             .fi_cast => return .{ .int = roundToInt(x) },
-            else => unreachable, // the real unary tags are listed
+            else => unreachable, // else: `unary` routes only real unary tags here (tag_info.operand)
         },
     };
 }
@@ -295,7 +295,7 @@ fn binary(tag: Inst.Tag, a: Value, b: Value) Error!Value {
         .fge => .{ .int = @intFromBool(x >= y) },
         .feq => .{ .int = @intFromBool(x == y) },
         .fne => .{ .int = @intFromBool(x != y) },
-        else => .{
+        else => .{ // else: the real comparisons are above; the rest are real arithmetic
             .real = switch (tag) {
                 .fadd => x + y,
                 .fsub => x - y,
@@ -308,7 +308,7 @@ fn binary(tag: Inst.Tag, a: Value, b: Value) Error!Value {
                 .fmin => if (x < y) x else y,
                 .fmax => if (x > y) x else y,
                 .atan2 => math.atan2(x, y),
-                else => unreachable, // the real binary tags are listed
+                else => unreachable, // else: `binary` routes only real binary tags here (tag_info.operand)
             },
         },
     };
@@ -338,7 +338,7 @@ fn intBinary(tag: Inst.Tag, x: i64, y: i64) Error!i64 {
         .imax => @max(x, y),
         .ipow => ipow(x, y),
         .shl, .shr => if (y < 0 or y > 63) error.NoValue else shift(tag, x, @intCast(y)),
-        else => unreachable, // the int binary tags are listed
+        else => unreachable, // else: `binary` routes only int binary tags here (tag_info.operand)
     };
 }
 

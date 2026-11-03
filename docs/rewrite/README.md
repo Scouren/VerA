@@ -45,9 +45,9 @@ The rules of the rewrite:
 | module | root | imports | spec | status |
 |---|---|---|---|---|
 | `vams` | `lib/std/vams.zig` | std | `parse.md` (tokenizer, Ast, Parse), `preprocess.md` (Preprocessor) | in progress |
-| `intern_pool` | `src/InternPool.zig` | std | `core-ir.md` | in progress |
-| `air` | `src/Air.zig` | `intern_pool` | `core-ir.md` | in progress |
-| `link` | `src/link.zig` | `contract`, `dynlib` | `link.md` | spec ready |
+| `intern_pool` | `src/InternPool.zig` | std | `core-ir.md` | merged |
+| `air` | `src/Air.zig` | `intern_pool` | `core-ir.md` | merged |
+| `link` | `src/link.zig` | `contract`, `dynlib` | `link.md` | in progress |
 | `vams` (`Diag`) | `lib/std/vams/Diag.zig` | std | `diag.md` | spec ready |
 | next: `AstGen`+`Vir` (after Ast), `Zcu`+`Sema` (after Vir, InternPool, Air), Air passes, `codegen`, `Compilation` | | | written when their inputs exist | |
 
@@ -75,8 +75,9 @@ The handle types other modules build against are fixed already:
   (share the warm cache) and `git submodule update --init tests/conformance` (the fixtures).
 - The loop: `nix develop -c zig build test-<module> -j4`, then your oracle
   `nix develop -c zig build diff-<name> -j4`. Before you finish:
-  `zig build check`, `zig build rewrite`, `python3 tools/check_style.py <your files>`,
-  `zig fmt --check <your files>`.
+  `zig build check`, `zig build rewrite`, `zig build test-unit` (the repo-wide guards
+  over every file, e.g. an `else =>` over an enum needs `// else: <reason>`),
+  `python3 tools/check_style.py <your files>`, `zig fmt --check <your files>`.
 - The machine is shared (other agents, another project's GPU builds): pass
   `-j4`, run one build at a time, and never run the whole `zig build test`
   (the lead runs it when merging).

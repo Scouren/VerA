@@ -52,9 +52,10 @@ The rules of the rewrite:
 | `air` (passes) | `src/Air/{Interval,Float,Legalize,Setup}.zig` | `intern_pool` | `air-passes.md` | in progress |
 | `vams` (spice) | `lib/std/vams/spice.zig` | std | `spice.md` | merged |
 | `sema` (Zcu, elaboration) | `src/sema.zig` | `vams`, `intern_pool`, `air`, `kernels` | `elab.md` | merged (49 named, follow-up pending) |
-| `sema` (analog lowering) | `src/Sema/*`, `src/Air/Device.zig` | as above | `lower.md` | next |
-| `std_sim` | `lib/std/sim.zig` | `kernels`, `contract` | `sim.md` | merged (97 named, follow-up in progress) |
-| next: digital lowering (Vir -> Program), `codegen` (versioned units §11.9, written-element masks §11.10), `Compilation`, then the switch-over | | | written when their inputs exist | |
+| `sema` (analog lowering) | `src/Sema/*`, `src/Air/Device.zig` | as above | `lower.md` | in progress |
+| `std_sim` | `lib/std/sim.zig` | `kernels`, `contract` | `sim.md` | merged (815/815) |
+| `sema` (digital lowering) | `src/Sema/digital.zig` | + `std_sim` | `dlower.md` | in progress |
+| next: `codegen` (versioned units §11.9, written-element masks §11.10), `Compilation`, then the switch-over | | | written when their inputs exist | |
 
 The handle types other modules build against are fixed already:
 `InternPool.Index = enum(u32) { none = maxInt(u32), _ }` and

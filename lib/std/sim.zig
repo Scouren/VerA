@@ -6,7 +6,7 @@
 //!
 //! Contents:
 //! - `pub const Program`, `pub const Builder`, `pub const State`, `pub const Interp`
-//! - `pub const eval`, `pub const display`, `pub const logic`, `pub const net`, `pub const resolve`, `pub const calls`, `pub const readmem`, `pub const holds`, `pub const files`, `pub const tchk`, `pub const vcd`, `pub const evcd`
+//! - `pub const eval`, `pub const display`, `pub const logic`, `pub const net`, `pub const resolve`, `pub const calls`, `pub const readmem`, `pub const holds`, `pub const files`, `pub const tchk`, `pub const vcd`, `pub const evcd`, `pub const sdf`, `pub const sdf_text`
 //! - `pub const scheduler`, `pub const time`
 
 pub const Program = @import("sim/Program.zig");
@@ -25,6 +25,8 @@ pub const files = @import("sim/files.zig");
 pub const tchk = @import("sim/tchk.zig");
 pub const vcd = @import("sim/vcd.zig");
 pub const evcd = @import("sim/evcd.zig");
+pub const sdf = @import("sim/sdf.zig");
+pub const sdf_text = @import("sim/sdf_text.zig");
 pub const scheduler = @import("sim/scheduler.zig");
 pub const time = @import("sim/time.zig");
 
@@ -45,6 +47,8 @@ test {
     _ = tchk;
     _ = vcd;
     _ = evcd;
+    _ = sdf;
+    _ = sdf_text;
     _ = scheduler;
     _ = time;
     _ = @import("sim/test.zig");

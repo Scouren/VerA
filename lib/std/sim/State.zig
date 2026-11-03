@@ -215,6 +215,10 @@ dumped: []bool,
 port_files: std.ArrayList(evcd.File) = .empty,
 ports_at: ?u64 = null,
 port_slots: []bool,
+/// The module paths and drivers' delays as §16 annotation leaves them
+/// (elaboration's until a `$sdf_annotate` changes them).
+paths: []Program.Path,
+drv_delay: []net.Delay,
 /// §15 every check's run state, and the violations found.
 checks: []tchk.Run,
 violations: u64 = 0,
@@ -255,6 +259,8 @@ pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!Stat
         .udp_started = try arena.alloc(bool, p.drivers.len),
         .sub_active = try arena.alloc(u32, p.subs.len),
         .checks = try arena.alloc(tchk.Run, p.checks.len),
+        .paths = try arena.dupe(Program.Path, p.paths),
+        .drv_delay = try arena.alloc(net.Delay, p.drivers.len),
         .dumped = try arena.alloc(bool, p.slots.len),
         .port_slots = try arena.alloc(bool, p.slots.len),
         .tran_state = try arena.alloc(net.TranState, p.trans.len),
@@ -270,7 +276,8 @@ pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!Stat
         .scratch = .init(arena),
     };
     @memset(s.sub_active, 0);
-    for (p.checks, s.checks) |c, *r| r.* = .{ .v = c.v, .x = c.x };
+    for (p.checks, s.checks) |c, *r| r.* = .{ .v = c.v, .x = c.x, .lim = c.lim };
+    for (p.drivers, s.drv_delay) |d, *dl| dl.* = d.delay;
     for (p.trans, s.tran_state, s.tran_target, s.tran_delay) |t, *st, *tg, *dl| {
         st.* = t.state;
         tg.* = t.state;

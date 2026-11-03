@@ -95,7 +95,16 @@ pub fn task(l: *Lower, t: Task, args: []const ExprId, tok: u32, pc: u32) E!u32 {
             try l.b.shows.append(l.b.arena, .{ .pieces = try l.b.listOf(&.{piece}), .radix = .decimal, .newline = false, .scope = r.scope });
             break :blk l.b.extraOf(Program.Task{ .kind = .show, .a = @intCast(l.b.shows.items.len - 1) });
         },
-        .sdf_annotate => l.refuse("$sdf_annotate"),
+        .sdf_annotate => blk: {
+            try @import("bridge.zig").sdfScopes(l);
+            const none = @backingInt(Program.Ref.none);
+            const scope = if (args.len > 1 and args[1] != .none) switch (digital.for_emitter.vcd.target(r, args[1]) catch return l.refuse("an $sdf_annotate scope the old engine refuses")) {
+                .scope => |sc| sc,
+                .slot => return l.refuse("an $sdf_annotate scope that names a variable"),
+            } else r.instanceOf(r.scope);
+            const call = try l.b.extraOf(Program.SdfCall{ .name = try l.self_(args[0], 0), .scope = scope, .mtm = if (args.len > 4 and args[4] != .none) try l.self_(args[4], 0) else none });
+            break :blk l.b.extraOf(Program.Task{ .kind = .sdf, .a = call });
+        },
         .dump => |op| blk: {
             const vcd = digital.for_emitter.vcd;
             try catalog(l);

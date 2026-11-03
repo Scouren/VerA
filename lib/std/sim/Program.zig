@@ -26,6 +26,7 @@
 //! - `pub const Cond = struct` (`Cond.Op`), `pub const CheckEvent = struct`, `pub const Check = struct`
 //! - `pub const Vcd = struct` (`Vcd.VcdScope`, `Vcd.Var`), `pub const DumpCall = struct`, `pub const DumpOp = enum(u32)`
 //! - `pub const EvcdPort = struct`, `pub const PortDir = enum(u8)`, `pub const DumpPorts = struct`, `pub const PortsCall = struct`, `pub const PortsOp = enum(u32)`
+//! - `pub const SdfScope = struct`, `pub const SdfCall = struct`
 //! - `pub const Override = struct`, `pub const OverrideEval = struct`, `pub const Tran = struct`, `pub const Path = struct`, `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
 //! - `pub fn words(width: u32) u32`
 //! - `pub fn list(p: *const Program, l: List) []const u32`
@@ -476,7 +477,7 @@ pub const Task = struct {
     kind: Kind,
     /// `.readmem`: a `ReadMem` in `extra`. `.swrite`: a `SWrite`.
     /// `.fshow`, `.fstrobe`: an `FShow`. `.fclose`: the descriptor row.
-    /// `.dump`: a `DumpCall`. `.ports`: a `PortsCall`.
+    /// `.dump`: a `DumpCall`. `.ports`: a `PortsCall`. `.sdf`: an `SdfCall`.
     /// `.show`, `.strobe`: a `Show` index in `shows`. `.monitor`: a
     /// `Monitor` in `extra`. `.timeformat`: a `TimeFormat` in `extra`, or
     /// `none`.
@@ -484,7 +485,7 @@ pub const Task = struct {
     a: u32,
     b: List = .empty,
 
-    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem, swrite, fshow, fstrobe, fclose, fflush, dump, ports };
+    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem, swrite, fshow, fstrobe, fclose, fflush, dump, ports, sdf };
 };
 
 /// §17.2.9 a `$readmemb`/`$readmemh` call: the file's name (text, or the
@@ -553,6 +554,15 @@ pub const PortsCall = struct { op: PortsOp, ports: u32, name: u32, size: u32 };
 /// §18.3's tasks.
 pub const PortsOp = enum(u32) { ports, off, on, all, limit, flush };
 
+/// §16 what an annotation matches per scope: its module's name, whether it
+/// is lexical, and its ports and specparams as triples (name start, name
+/// length, slot; `none` for an unbound port) in `extra`.
+pub const SdfScope = struct { module: List, lexical: bool, ports: List, specparams: List };
+
+/// §17.2.10 one `$sdf_annotate` call: the file name row, the annotation
+/// scope, and the mtm_spec row (`none`: TYPICAL).
+pub const SdfCall = struct { name: u32, scope: u32, mtm: u32 };
+
 /// §17.9 one `$random`/`$dist_*` call: the distribution, the seed row and
 /// the place its inout seed is written back to (`none` for a seedless
 /// `$random`, which advances `State.random_seed`), and its two parameters.
@@ -615,6 +625,9 @@ pub const Path = struct {
     table: [4][4]u64,
     reject: ?u64,
     err: ?u64,
+    /// The A.7.4 delay rows `table` was folded from, which a §16.2.3 LABEL
+    /// re-folds (a `List` in `extra`).
+    delays: List = .empty,
 };
 
 /// §15.6 a timing check condition, analysed once: `none` (no condition),
@@ -640,6 +653,8 @@ pub const CheckEvent = struct { slot: u32 = 0, lo: u32 = 0, width: u32 = 0, mask
 /// of each event's signal.
 pub const Check = struct {
     kind: Kind,
+    /// The instance whose specify block wrote it.
+    scope: u32 = 0,
     ev: [2]CheckEvent,
     lim: [2]u64,
     notifier: u32,
@@ -706,6 +721,9 @@ pub const Net = struct {
     strength_read: bool = false,
     /// A switch-joined net's first word in `resolved_init` (v then x).
     resolved: u32 = 0,
+    /// It had a delay, a switch or a path at elaboration (§16 PATHPULSE
+    /// with no ports annotates every such net's paths).
+    cold: bool = false,
 
     pub const no_decay = std.math.maxInt(u64);
 };
@@ -727,6 +745,9 @@ pub const Driver = struct {
     init: u32,
     init_or_z: bool,
     source: Source,
+    /// The slots whose change re-evaluates it (§16.2.4's INTERCONNECT
+    /// annotates the drivers reading a load port).
+    sensitivity: List = .empty,
 
     pub const Source = union(enum) {
         /// A.6.1 an expression row, in the net's type; with `slice`, read
@@ -782,6 +803,8 @@ subs: []const Sub = &.{},
 checks: []const Check = &.{},
 vcd: Vcd = .{},
 evcd_ports: []const EvcdPort = &.{},
+/// Per scope, what §16 annotation matches; empty with no `$sdf_annotate`.
+sdf_scopes: []const SdfScope = &.{},
 /// Per slot, the checks its change reaches, each `check * 2 + event`:
 /// `check_codes[check_start[slot]..check_start[slot + 1]]`.
 check_start: []const u32 = &.{},

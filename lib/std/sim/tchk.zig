@@ -67,6 +67,8 @@ pub const Run = struct {
     x: [2]u64 = .{ 0, 0 },
     /// The violations this check reported.
     count: u32 = 0,
+    /// Its limits now: elaboration's, until §16 annotation changes them.
+    lim: [2]u64 = .{ 0, 0 },
 };
 
 /// `State.store` changed `slot`, whose least significant bit went from
@@ -97,7 +99,7 @@ pub fn delivered(s: *State, code: u32, bit: u8) Error!void {
 /// or a data event retired generation `gen`), or §15.3.6's deferred data
 /// event of a $nochange.
 pub fn expired(s: *State, i: u32, gen: u32) Error!void {
-    const c = s.p.checks[i];
+    const c = current(s, i);
     const st = &s.checks[i];
     if (c.kind == .nochange) return noChange(s, i, s.scheduler.now);
     if (!st.active or st.gen != gen) return;
@@ -106,6 +108,13 @@ pub fn expired(s: *State, i: u32, gen: u32) Error!void {
 }
 
 // ---- private ----
+
+/// Check `i` with its limits as they stand now.
+fn current(s: *const State, i: u32) Check {
+    var c = s.p.checks[i];
+    c.lim = s.checks[i].lim;
+    return c;
+}
 
 /// Transition bits 0..5 (01, 0x, 10, 1x, x0, x1), z read as x; 0 for none.
 fn transition(from: Bit, to: Bit) u8 {
@@ -169,7 +178,7 @@ fn enabled(s: *State, c: Program.Cond) Error!bool {
 /// Check `i`'s event `k` occurred if its edges name `bit` and its
 /// condition holds: judge the check.
 fn judge(s: *State, i: u32, k: usize, bit: u8) Error!void {
-    const c = s.p.checks[i];
+    const c = current(s, i);
     const st = &s.checks[i];
     const now = s.scheduler.now;
     switch (c.kind) {
@@ -222,7 +231,7 @@ fn judge(s: *State, i: u32, k: usize, bit: u8) Error!void {
 /// the latest earlier data event, and a simultaneous pair whose data event
 /// came first.
 fn reference(s: *State, i: u32, now: u64) Error!void {
-    const c = s.p.checks[i];
+    const c = current(s, i);
     const st = &s.checks[i];
     if (try enabled(s, c.stamp_cond)) st.at[0].note(now);
     if (!try enabled(s, c.check_cond)) return;
@@ -235,7 +244,7 @@ fn reference(s: *State, i: u32, now: u64) Error!void {
 
 /// A data event at `now`: the window after the latest reference event.
 fn data(s: *State, i: u32, now: u64) Error!void {
-    const c = s.p.checks[i];
+    const c = current(s, i);
     const st = &s.checks[i];
     if (try enabled(s, c.stamp_cond)) st.at[1].note(now);
     if (!try enabled(s, c.check_cond)) return;
@@ -259,7 +268,7 @@ fn simultaneous(c: Check) bool {
 /// §15.3.1-§15.3.3 event `k` of skew check `i` at `now`: a timestamp
 /// event opens a window, a timecheck event violates past the limit.
 fn skew(s: *State, i: u32, k: usize, now: u64) Error!void {
-    const c = s.p.checks[i];
+    const c = current(s, i);
     const st = &s.checks[i];
     if (st.active and k != st.first) {
         const ts = st.at[0].last.?;
@@ -284,7 +293,7 @@ fn sleep(st: *Run) void {
 
 /// §15.3.6 data event at `d` against $nochange `i`'s latest level.
 fn noChange(s: *State, i: u32, d: u64) Error!void {
-    const c = s.p.checks[i];
+    const c = current(s, i);
     const st = &s.checks[i];
     const lead = st.at[0].last orelse return;
     const start: i64 = @bitCast(c.lim[0]);
@@ -299,7 +308,7 @@ fn noChange(s: *State, i: u32, d: u64) Error!void {
 /// Check `i` violated between `stamp` and `check`: counted, warned, and its
 /// notifier toggled (Table 15-13: 0 -> 1, 1 -> 0, z stays, x -> 1).
 fn violation(s: *State, i: u32, stamp: u64, check: u64) Error!void {
-    const c = s.p.checks[i];
+    const c = current(s, i);
     s.violations += 1;
     s.checks[i].count +|= 1;
     try s.warn("timing check {d} violated: timestamp event at {d}, timecheck event at {d}", .{ i, stamp, check });

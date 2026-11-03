@@ -74,7 +74,7 @@ const Timed = struct { ticks: u64, reject: u64, err: u64 };
 pub fn continuous(s: *State, a: Allocator, at: u32, pc: u32) Error!void {
     const p = s.p;
     const d = p.drivers[at];
-    const timing = try timingOf(s, a, d);
+    const timing = try timingOf(s, a, at);
     var or_z = false;
     const value: Literal = switch (d.source) {
         .expr => |x| if (x.slice) blk: {
@@ -407,9 +407,10 @@ fn joined(s: *const State, n: u32) Literal {
 }
 
 /// The delay a driver schedules with: its constant one, or its rows read now.
-fn timingOf(s: *State, a: Allocator, d: Program.Driver) Error!net_.Delay {
+fn timingOf(s: *State, a: Allocator, at: u32) Error!net_.Delay {
+    const d = s.p.drivers[at];
     const none = @backingInt(Program.Ref.none);
-    if (d.delay_rows[0] == none) return d.delay;
+    if (d.delay_rows[0] == none) return s.drv_delay[at];
     var out: net_.Delay = .{ .present = true };
     out.rise = try delayIn(s, a, d.delay_rows[0], d.scope);
     out.fall = if (d.delay_rows[1] != none) try delayIn(s, a, d.delay_rows[1], d.scope) else out.rise;
@@ -440,7 +441,7 @@ fn schedule(s: *State, from: Literal, from_or_z: bool, to: Literal, to_or_z: boo
 /// null when neither applies.
 fn transitionDelay(s: *State, a: Allocator, n: Program.Net, from: Literal, to: Literal) Error!?Timed {
     const own: ?u64 = if (n.delay.present) n.delay.continuous(from.truth(), to) else null;
-    var path = try pathDelay(s, a, s.p.paths[n.paths.start..][0..n.paths.len], from, to);
+    var path = try pathDelay(s, a, s.paths[n.paths.start..][0..n.paths.len], from, to);
     if (own) |o| {
         if (path) |*p| p.ticks = @max(o, p.ticks) else return .{ .ticks = o, .reject = o, .err = o };
     }

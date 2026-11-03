@@ -11,6 +11,7 @@
 //! Contents:
 //! - `pub fn program(arena: Allocator, r: *Run, why: *[]const u8) E!Program`
 //! - `pub fn checkSites(arena: Allocator, r: *const Run) E![]const u32`
+//! - `pub fn sdfScopes(l: *Lower) E!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -47,6 +48,29 @@ pub fn checkSites(arena: Allocator, r: *const Run) E![]const u32 {
     const out = try arena.alloc(u32, r.checks.rows.items.len);
     for (r.checks.rows.items, out) |c, *o| o.* = r.starts[@min(c.tok, r.starts.len - 1)];
     return out;
+}
+
+/// §16 per scope what an annotation matches by name (`Program.SdfScope`).
+pub fn sdfScopes(l: *Lower) E!void {
+    const r = l.r;
+    const b = l.b;
+    if (b.p.sdf_scopes.len != 0) return;
+    const out = try b.arena.alloc(Program.SdfScope, r.hier.scopes.items.len);
+    for (r.hier.scopes.items, out, 0..) |info, *o, sc| {
+        const m = &r.file.modules[info.def];
+        var ports: std.ArrayList(u32) = .empty;
+        for (m.ports) |port| {
+            const name = try b.string(r.file.str(port.name));
+            try ports.appendSlice(l.a, &.{ name.start, name.len, r.hier.names.get(.{ .scope = @intCast(sc), .str = port.name }) orelse std.math.maxInt(u32) });
+        }
+        var specs: std.ArrayList(u32) = .empty;
+        for (m.params) |param| if (param.is_spec) if (r.hier.names.get(.{ .scope = @intCast(sc), .str = param.name })) |at| {
+            const name = try b.string(r.file.str(param.name));
+            try specs.appendSlice(l.a, &.{ name.start, name.len, at });
+        };
+        o.* = .{ .module = try b.string(r.file.str(m.name)), .lexical = info.lexical, .ports = try b.listOf(ports.items), .specparams = try b.listOf(specs.items) };
+    }
+    b.p.sdf_scopes = out;
 }
 
 // ---- private ----
@@ -239,6 +263,7 @@ fn checks(l: *Lower) E!void {
         for (&ev, c.ev) |*e, old| e.* = .{ .slot = old.slot, .lo = old.lo, .width = old.width, .mask = old.mask, .cond = try checkCond(l, old.cond) };
         o.* = .{
             .kind = std.meta.stringToEnum(Program.Check.Kind, @tagName(c.kind)).?,
+            .scope = c.scope,
             .ev = ev,
             .lim = c.lim,
             .notifier = c.notifier orelse std.math.maxInt(u32),
@@ -358,7 +383,9 @@ fn netlist(l: *Lower) E!void {
             }
             r.scope = path.scope;
             const cond: u32 = if (path.cond == .none) @backingInt(Program.Ref.none) else try l.self_(path.cond, 0);
-            try paths.append(b.arena, .{ .src = path.src, .src_bit = path.src_bit, .edge = edge, .cond = cond, .ifnone = path.ifnone, .scope = path.scope, .table = path.table, .reject = path.reject, .err = path.err });
+            var delays: std.ArrayList(u32) = .empty;
+            for (path.delays) |d| try delays.append(l.a, try l.selfOrReal(d));
+            try paths.append(b.arena, .{ .src = path.src, .src_bit = path.src_bit, .edge = edge, .cond = cond, .ifnone = path.ifnone, .scope = path.scope, .table = path.table, .reject = path.reject, .err = path.err, .delays = try b.listOf(delays.items) });
         }
         out.* = .{
             .kind = std.meta.stringToEnum(net.NetKind, @tagName(n.kind)).?,
@@ -374,6 +401,7 @@ fn netlist(l: *Lower) E!void {
             .signal = n.signal,
             .strength_read = n.strength_read,
             .resolved = resolved_at,
+            .cold = n.cold != digital.for_emitter.net.no_cold,
         };
     }
     b.p.resolved_init = resolved.items;
@@ -475,6 +503,7 @@ fn netlist(l: *Lower) E!void {
             .init = at,
             .init_or_z = d.or_z,
             .source = source,
+            .sensitivity = try b.listOf(d.sensitivity),
         };
     }
     b.p.nets = nets;

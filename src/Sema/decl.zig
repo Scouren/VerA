@@ -369,17 +369,27 @@ fn envOf(s: *Sema, unit: *Unit) Allocator.Error!eval.Env {
 }
 
 /// Appends a node row named `name` (or returns the row already named so).
-fn internNode(s: *Sema, unit: *const Unit, name: []const u8, discipline: Vir.String) Allocator.Error!Node.Index {
-    const vir = unit.vir;
+fn internNode(s: *Sema, unit: *const Unit, name: []const u8, discipline: InternPool.String) Allocator.Error!Node.Index {
     const ip = &s.zcu.intern_pool;
     const key = try ip.getString(s.gpa, name);
     const gop = try s.node_rows.getOrPut(s.arena, key);
     if (gop.found_existing) return gop.value_ptr.*;
     const row: Node.Index = @fromBackingInt(@intCast(s.device.nodes.len));
-    try s.device.nodes.append(s.gpa, .{ .name = key, .kind = .net, .of = .none, .discipline = try ip.getString(s.gpa, vir.string(discipline)), .instance = rowInstance(unit.instance) });
+    try s.device.nodes.append(s.gpa, .{ .name = key, .kind = .net, .of = .none, .discipline = discipline, .instance = rowInstance(unit.instance) });
     gop.value_ptr.* = row;
     assert(@backingInt(row) + 1 == s.device.nodes.len);
     return row;
+}
+
+/// §3.6.2 the discipline of net `first`: its declaration's, else the one
+/// Annex F resolution gave it (`zcu.net_discipline`), else none.
+fn netDiscipline(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.Error!InternPool.String {
+    const vir = unit.vir;
+    const ip = &s.zcu.intern_pool;
+    const declared = disciplineOf(unit, first);
+    if (declared != .empty) return ip.getString(s.gpa, vir.string(declared));
+    const net = try ip.getString(s.gpa, vir.string(nameOf(vir, first)));
+    return s.zcu.net_discipline.get(.{ .instance = unit.instance, .net = net }) orelse .empty;
 }
 
 /// The discipline any declaration of `first`'s name in the module gives it.
@@ -452,7 +462,7 @@ fn isGround(unit: *const Unit, first: Inst.Index) bool {
 fn declareNet(s: *Sema, unit: *Unit, first: Inst.Index) Allocator.Error!void {
     const vir = unit.vir;
     const name = vir.string(nameOf(vir, first));
-    const disc = disciplineOf(unit, first);
+    const disc = try netDiscipline(s, unit, first);
     if (try vectorRange(s, unit, first)) |r| {
         const at: u32 = @intCast(unit.vec_rows.items.len);
         const n: u32 = @intCast(@abs(r[0] - r[1]) + 1);
@@ -514,7 +524,7 @@ fn bindChildPorts(s: *Sema, unit: *Unit) Allocator.Error!void {
                 if (pu.binds.get(d)) |b| if (b == .node) break :blk b.node;
             };
             const name = unit.vir.string(nameOf(unit.vir, first));
-            break :blk try internNode(s, unit, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disciplineOf(unit, first));
+            break :blk try internNode(s, unit, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), try netDiscipline(s, unit, first));
         };
         try unit.binds.put(s.arena, first, .{ .node = node });
     }

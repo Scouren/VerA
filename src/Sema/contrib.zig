@@ -256,15 +256,19 @@ pub fn target(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src
     }
     if (args.len == 1) if (try branchOf(s, b, args[0], src)) |br| {
         const row = s.device.branches.get(@backingInt(br) - 1);
-        return canonical(accessOn(s, name, global, row.hi, row.lo), row.hi, row.lo, br);
+        const a = accessOn(s, name, global, row.hi, row.lo);
+        if (!try accessMatches(s, b, name, a, row.hi, src)) return null;
+        return canonical(a, row.hi, row.lo, br);
     };
     const hi = (try nodeOf(s, b, args[0], src)) orelse return null;
     const lo: Node.Index = if (args.len == 1) .ground else (try nodeOf(s, b, args[1], src)) orelse return null;
+    const a = accessOn(s, name, global, hi, lo);
+    if (!try accessMatches(s, b, name, a, hi, src)) return null;
     if (args.len == 2 and hi == lo and hi != .ground) {
         try s.fail(.E0315, unit.file, src, "`{s}` names one signal twice", .{name});
         return null;
     }
-    return canonical(accessOn(s, name, global, hi, lo), hi, lo, .unnamed);
+    return canonical(a, hi, lo, .unnamed);
 }
 
 /// The access function call `r` is (`V(a, b)`, `I(<p>)`): its name and its
@@ -308,7 +312,14 @@ fn natureAccess(s: *Sema, name: []const u8, depth: u32) Allocator.Error!?[]const
         };
     }
     if (n.parent == .empty) return null;
-    return natureAccess(s, vir.string(n.parent), depth + 1);
+    if (n.flags.parent_kind == .none) return natureAccess(s, vir.string(n.parent), depth + 1);
+    // `nature n : disc.potential`: the discipline's nature of that half.
+    const dd = zcu.disciplines.get(try zcu.intern_pool.getString(s.gpa, vir.string(n.parent))) orelse return null;
+    const dvir = zcu.fileVir(dd.file);
+    const want: @FieldType(Inst.DisciplineItem, "kind") = if (n.flags.parent_kind == .potential) .potential else .flow;
+    for (dvir.list(Inst.DisciplineItem, decl.payloadOf(dvir, Inst.Discipline, zcu.declRow(dd).inst).items)) |item|
+        if (item.kind == want) return natureAccess(s, dvir.string(item.name), depth + 1);
+    return null;
 }
 
 /// The named branch `r` names (`br`, or §6.7's `x1.br`), or null.
@@ -514,6 +525,28 @@ fn indirectProbe(s: *Sema, unit: *const Sema.Unit, r: Inst.Ref) Allocator.Error!
     if (!std.mem.eql(u8, name, "ddt") and !std.mem.eql(u8, name, "idt") and !std.mem.eql(u8, name, "idtmod")) return false;
     const args = vir.list(Inst.Ref, c.args);
     return args.len != 0 and try accessCall(s, unit, args[0]) != null;
+}
+
+/// §4.4 `name` is the access its node's discipline binds for `a` (or the
+/// generic `potential`/`flow`): E0501 when the discipline binds no such
+/// nature or another name.
+/// ponytail: a node with no discipline is not judged (the old E0337): a
+/// `default_discipline` directive gives one Sema does not see yet.
+fn accessMatches(s: *Sema, b: *Block, name: []const u8, a: Device.Access, node: Node.Index, src: Inst.Ref) Allocator.Error!bool {
+    if (node == .ground) return true;
+    // A Table E.1 primitive reads its ports with Annex D's names, whatever
+    // the source binds `electrical` to.
+    if (s.zcu.isBuiltin(s.zcu.instances.items(.module)[@backingInt(b.unit.instance)])) return true;
+    const dname = s.zcu.intern_pool.stringToSlice(s.device.nodes.items(.discipline)[@backingInt(node)]);
+    if (dname.len == 0) return true;
+    const pair = s.disc_access.get(dname) orelse return true;
+    // A discipline that binds no nature is judged nowhere (the old side
+    // keeps no access table for it).
+    if (pair[0].len == 0 and pair[1].len == 0) return true;
+    const want = pair[@backingInt(a)];
+    if (std.mem.eql(u8, want, name) or std.mem.eql(u8, name, "potential") or std.mem.eql(u8, name, "flow")) return true;
+    try s.fail(.E0501, b.unit.file, src, "`{s}` is not an access function of `{s}`", .{ name, nodeName(s, node) });
+    return false;
 }
 
 /// Whether this instance has a potential source on `t`'s branch.

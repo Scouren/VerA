@@ -260,7 +260,7 @@ fn unary(tag: Inst.Tag, a: Value) Error!Value {
             .expm1 => math.expm1(x),
             .ln => @log(x),
             .ln1p => math.log1p(x),
-            .log10 => @log10(x),
+            .log10 => log10(x),
             .floor => @floor(x),
             .ceil => @ceil(x),
             .fabs => @abs(x),
@@ -274,7 +274,9 @@ fn unary(tag: Inst.Tag, a: Value) Error!Value {
             .cosh => math.cosh(x),
             .tanh => math.tanh(x),
             .asinh => math.asinh(x),
-            .acosh => math.acosh(x),
+            // `std.math.acosh` answers a finite number for x <= -2 (it reads
+            // |x|'s exponent); Table 4-15 gives x < 1 no value, IEEE NaN.
+            .acosh => if (x < 1) math.nan(f64) else math.acosh(x),
             .atanh => math.atanh(x),
             .fi_cast => return .{ .int = roundToInt(x) },
             else => unreachable, // the real unary tags are listed
@@ -300,7 +302,7 @@ fn binary(tag: Inst.Tag, a: Value, b: Value) Error!Value {
                 .fmul => x * y,
                 .fdiv => x / y,
                 .fmod => if (y == 0) return error.NoValue else @rem(x, y),
-                .pow => math.pow(f64, x, y),
+                .pow => pow(x, y),
                 .hypot => math.hypot(x, y),
                 // §4.3.1: "min(x,y) is equivalent to (x < y) ? x : y".
                 .fmin => if (x < y) x else y,
@@ -338,6 +340,28 @@ fn intBinary(tag: Inst.Tag, x: i64, y: i64) Error!i64 {
         .shl, .shr => if (y < 0 or y > 63) error.NoValue else shift(tag, x, @intCast(y)),
         else => unreachable, // the int binary tags are listed
     };
+}
+
+/// x^y: `std.math.pow`'s special cases (C99 F.10.4.4), and for a finite
+/// nonzero x and a finite y the magnitude in f128: `std.math.pow` is off by
+/// hundreds of ulps on a huge or tiny result (diff-air found it against
+/// `contract.gm.pow`, and a 60-digit model agreed with the fold).
+fn pow(x: f64, y: f64) f64 {
+    const r = math.pow(f64, x, y);
+    if (!math.isFinite(x) or x == 0 or !math.isFinite(y)) return r;
+    const int_y = @floor(y) == y;
+    if (x < 0 and !int_y) return r; // NaN: a negative base under a fraction
+    const mag: f64 = @floatCast(@exp(@as(f128, y) * @log(@as(f128, @abs(x)))));
+    const odd = int_y and @abs(y) < 0x1p53 and @mod(y, 2) != 0;
+    return if (x < 0 and odd) -mag else mag;
+}
+
+/// log10(x). `@log10` is off by up to 1e-10 relative on a subnormal
+/// (diff-air found it against `contract.gm.log10` and Python's
+/// `math.log10`), so a subnormal is scaled into the normal range first.
+fn log10(x: f64) f64 {
+    if (x > 0 and x < math.floatMin(f64)) return @log10(x * 0x1p54) - 16.25561976585498454154190031512262316; // 54·log10(2)
+    return @log10(x);
 }
 
 /// §3.2: the low 32 bits, sign-extended.

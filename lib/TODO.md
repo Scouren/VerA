@@ -467,6 +467,12 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
 
 ## 12. Progress (branch `refactor`)
 
+**Target: the rewrite ships as v0.30.0.** It lands on `main` through one gated pull request once
+the new pipeline compiles the conformance suite end to end (6818/6818), the goldens re-baselined
+for §11.3/§11.9/§11.10 are reviewed, and the old pipeline is deleted. The release follows
+`CONTRIBUTING.md` (release-prep: the measured changelog, every target built, every artifact
+checked, the bundle smoked). ESPice bumps its pin after it.
+
 - [x] Step 0, bug 1: `formatC` printed reals through `std.fmt.float`. Red first: the new
   `tests/printf_reference.zig` test "the host's formatC = snprintf" failed 16,306 of 92,432
   conversions. Fix: `str_real.zig` moved into the contract (a leaf module, so no cycle with

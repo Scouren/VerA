@@ -200,7 +200,14 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, show: bool) !
     var tree = try vams.Ast.parse(gpa, text, .{ .keywords = .vams_2023 });
     defer tree.deinit(gpa);
     if (tree.errors.len != 0) return .new_refused;
-    var vir = try vams.AstGen.generate(gpa, &tree, .{});
+    // The old preprocessor's §10.2 events, as the new AstGen reads them.
+    const defaults = try arena.alloc(vams.Preprocessor.events.DefaultDiscipline, pp.directives.disciplines.len);
+    for (pp.directives.disciplines, defaults) |e, *d| d.* = .{
+        .at = e.at,
+        .qualifier = if (e.qualifier) |q| std.meta.stringToEnum(vams.Preprocessor.events.Qualifier, @tagName(q)).? else null,
+        .discipline = e.discipline,
+    };
+    var vir = try vams.AstGen.generate(gpa, &tree, .{ .directives = .{ .disciplines = defaults } });
     defer vir.deinit(gpa);
     var zcu: Zcu = try .init(gpa);
     defer zcu.deinit();
@@ -227,6 +234,7 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, show: bool) !
     for (vir.diag.messages()) |m| try codes.append(arena, @tagName(vir.diag.message(m).tag.code));
     const new_codes = try lowerCodes(arena, codes.items);
     if (show) std.debug.print("== {s}\nold codes: {s}\nnew codes: {s}\n", .{ rel, try join(arena, old.codes), try join(arena, new_codes) });
+    if (show) for (zcu.failed.items(.code), zcu.failed.items(.message)) |c, m| std.debug.print("  new {t}: {s}\n", .{ c, zcu.intern_pool.stringToSlice(m) });
     if (!sameLines(old.codes, new_codes))
         return .{ .verdict = .{ .why = try arena.print("codes: old {s}, new {s}{s}", .{ try join(arena, old.codes), try join(arena, new_codes), try firstMessage(arena, &zcu) }) } };
     const lw = old.lw orelse return .{ .verdict = .{ .why = if (analysis != null) "the old side refused, the new side lowered" else null } };

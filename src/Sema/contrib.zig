@@ -533,16 +533,18 @@ fn indirectProbe(s: *Sema, unit: *const Sema.Unit, r: Inst.Ref) Allocator.Error!
 
 /// §4.4 `name` is the access its node's discipline binds for `a` (or the
 /// generic `potential`/`flow`): E0501 when the discipline binds no such
-/// nature or another name.
-/// ponytail: a node with no discipline is not judged (the old E0337): a
-/// `default_discipline` directive gives one Sema does not see yet.
+/// nature or another name; E0337 when the node has none (§3.6.2.4 reads a
+/// net with no discipline in behavioral code as discrete).
 fn accessMatches(s: *Sema, b: *Block, name: []const u8, a: Device.Access, node: Node.Index, src: Inst.Ref) Allocator.Error!bool {
     if (node == .ground) return true;
     // A Table E.1 primitive reads its ports with Annex D's names, whatever
     // the source binds `electrical` to.
     if (s.zcu.isBuiltin(s.zcu.instances.items(.module)[@backingInt(b.unit.instance)])) return true;
     const dname = s.zcu.intern_pool.stringToSlice(s.device.nodes.items(.discipline)[@backingInt(node)]);
-    if (dname.len == 0) return true;
+    if (dname.len == 0) {
+        try s.fail(.E0337, b.unit.file, src, "`{s}` has no discipline, so `{s}` names nothing on it", .{ nodeName(s, node), name });
+        return false;
+    }
     const pair = s.disc_access.get(dname) orelse return true;
     // A discipline that binds no nature is judged nowhere (the old side
     // keeps no access table for it).

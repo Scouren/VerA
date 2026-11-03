@@ -59,7 +59,10 @@ pub fn typeWords(tree: *const Ast, first: Ast.TokenIndex) TypeWords {
             // list_of_net_identifiers`); an out-of-context name may open
             // with `$root` (Annex F.2.1).
             const next = tree.tokenTag(rangeEnd(tree, i + 1));
-            if (t.discipline != null or !(AstGen.isName(next) or next == .system_identifier)) return t;
+            // A keyword the §10.6 set frees is a name here too (`electrical
+            // sin;` under 1364-2005): the parser took it as one.
+            const freed = next.isKeyword() and !isTypeWord(next);
+            if (t.discipline != null or !(AstGen.isName(next) or next == .system_identifier or freed)) return t;
             t.discipline = i;
         },
         .keyword_wire => t.net = .wire,
@@ -241,6 +244,15 @@ pub fn strengthString(ag: *AstGen, lp: ?Ast.TokenIndex) Error!Vir.String {
 }
 
 // ---- private ----
+
+/// Whether `tag` is a keyword `typeWords` reads as part of a declaration's
+/// type (so never a freed name).
+fn isTypeWord(tag: Token.Tag) bool {
+    return switch (tag) {
+        .keyword_wire, .keyword_tri, .keyword_tri0, .keyword_tri1, .keyword_wand, .keyword_triand, .keyword_wor, .keyword_trior, .keyword_trireg, .keyword_uwire, .keyword_supply0, .keyword_supply1, .keyword_wreal, .keyword_ground, .keyword_signed, .keyword_vectored, .keyword_scalared, .keyword_reg, .keyword_integer, .keyword_real, .keyword_realtime, .keyword_time, .keyword_string, .keyword_input, .keyword_output, .keyword_inout, .keyword_parameter, .keyword_localparam, .keyword_specparam, .keyword_automatic => true,
+        else => false, // else: every other keyword names no type
+    };
+}
 
 /// The token after a bracketed range that opens at `i`, or `i` itself when
 /// none does. Brackets nest; the scan stops at the end of the text.

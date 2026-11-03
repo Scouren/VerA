@@ -9,7 +9,7 @@
 //! - `pub const Preprocessor`
 //! - `pub const Diag`
 //! - `pub const spice`
-//! - `pub const Vir`, `pub const AstGen`
+//! - `pub const Vir`, `pub const AstGen`, `pub const SysFn`
 
 pub const tokenizer = @import("vams/tokenizer.zig");
 pub const number_literal = @import("vams/number_literal.zig");
@@ -19,6 +19,7 @@ pub const Diag = @import("vams/Diag.zig");
 pub const spice = @import("vams/spice.zig");
 pub const Vir = @import("vams/Vir.zig");
 pub const AstGen = @import("vams/AstGen.zig");
+pub const SysFn = @import("vams/SysFn.zig");
 pub const Token = tokenizer.Token;
 pub const Tokenizer = tokenizer.Tokenizer;
 
@@ -31,4 +32,5 @@ test {
     _ = spice;
     _ = Vir;
     _ = AstGen;
+    _ = SysFn;
 }

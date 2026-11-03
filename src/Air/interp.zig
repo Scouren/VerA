@@ -12,7 +12,7 @@
 //! Contents:
 //! - `pub const Value = union(enum) { int: i64, real: f64, array: []Value }`
 //! - `pub const Observer = struct`, `pub const Slot = struct { alloc: Inst.Index, value: Value }`
-//! - `pub const Inputs = struct`
+//! - `pub const Calls = struct`, `pub const Inputs = struct`
 //! - `pub const Error = error{ NoValue, LoopCap, Unsupported, OutOfMemory }`
 //! - `pub fn run(scratch: Allocator, air: Air, ip: *const InternPool, inputs: Inputs) Error!Value`
 //! - `pub fn unary(tag: Inst.Tag, a: Value) Error!Value`, `pub fn binary(tag: Inst.Tag, a: Value, b: Value) Error!Value`
@@ -41,6 +41,14 @@ pub const Observer = struct {
 /// variable's value from the previous evaluation.
 pub const Slot = struct { alloc: Inst.Index, value: Value };
 
+/// Answers the `call`s a run cannot compute (a simulator query, a task):
+/// the value of `callee` (`Air.Call.callee`) over `args`, or
+/// `error.Unsupported`. An oracle's model of the host.
+pub const Calls = struct {
+    ctx: *anyopaque,
+    value: *const fn (ctx: *anyopaque, callee: u32, args: []const Value) Error!Value,
+};
+
 /// What one run reads.
 pub const Inputs = struct {
     /// One per `arg` index, of the `arg`'s type.
@@ -53,6 +61,11 @@ pub const Inputs = struct {
     observe: ?Observer = null,
     /// Slots that start from a value of their own; at most a few, searched.
     slots: []const Slot = &.{},
+    /// The `call`s' answers; null makes every `call` `error.Unsupported`.
+    calls: ?Calls = null,
+    /// §5.6.1.2 the path latches at their first evaluation: `path_prev` and
+    /// `path_acc` read 0 instead of `error.Unsupported`.
+    paths_zero: bool = false,
 };
 
 /// Why a run has no value.
@@ -163,7 +176,19 @@ const Run = struct {
                 if (k >= 0 and k < arr.len) arr[@intCast(k)] = try r.get(bin.rhs);
                 break :blk .{ .array = arr };
             },
-            .call, .path_prev, .path_acc => error.Unsupported,
+            .call => blk: {
+                const c = r.inputs.calls orelse break :blk error.Unsupported;
+                const x = r.air.extraData(Air.Call, data.ty_pl.payload);
+                const refs: []const Inst.Ref = @ptrCast(r.air.extra[x.end..][0..x.data.args_len]);
+                const args = try r.scratch.alloc(Value, refs.len);
+                // A string operand (a format) reaches the hook as 0.
+                for (refs, args) |a, *v| v.* = r.get(a) catch |e| switch (e) {
+                    error.Unsupported => .{ .int = 0 },
+                    else => return e,
+                };
+                break :blk c.value(c.ctx, x.data.callee, args);
+            },
+            .path_prev, .path_acc => if (r.inputs.paths_zero) .{ .real = 0 } else error.Unsupported,
             else => switch (Air.tag_info.getPtrConst(tag).class) {
                 .un_op => unary(tag, try r.get(data.un_op)),
                 .bin_op => binary(tag, try r.get(data.bin_op.lhs), try r.get(data.bin_op.rhs)),

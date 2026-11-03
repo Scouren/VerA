@@ -23,4 +23,15 @@ test {
     _ = @import("Sema/connect.zig");
     _ = @import("Sema/resolve.zig");
     _ = @import("Sema/test.zig");
+    _ = @import("Sema/decl.zig");
+    _ = @import("Sema/expr.zig");
+    _ = @import("Sema/control.zig");
+    _ = @import("Sema/contrib.zig");
+    _ = @import("Sema/syscall.zig");
+    _ = @import("Sema/held.zig");
+    _ = @import("Sema/func.zig");
+    _ = @import("Sema/op.zig");
+    _ = @import("Sema/param.zig");
+    _ = @import("Sema/array.zig");
+    _ = @import("Sema/lower_test.zig");
 }

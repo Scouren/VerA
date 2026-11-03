@@ -105,7 +105,67 @@ pub fn add(g: Graph) void {
         .{ .name = "old_text", .module = old_text },
     });
     const kr = testRun(b, "diff-kernels", kmod, g.runner, g.results_dir);
-    b.step("diff-kernels", "std_kernels against lib/kernels and the old kernel text, bit for bit; Gompute against gm and an f128 reference").dependOn(&kr.step);
-    all.dependOn(&kr.step);
-    g.test_step.dependOn(&kr.step);
+    const kt = b.step("kernels-targets", "std_kernels built for x86_64, aarch64, NVPTX and AMDGCN, its f64 math held to no fused multiply-add on each");
+    kernelTargets(b, kt);
+    const kd = b.step("diff-kernels", "std_kernels against lib/kernels and the old kernel text, bit for bit; Gompute against gm and an f128 reference; kernels-targets");
+    kd.dependOn(&kr.step);
+    kd.dependOn(kt);
+    all.dependOn(kd);
+    g.test_step.dependOn(kd);
+}
+
+// ---- private ----
+
+/// `tests/differential/kernels_targets.zig` for each device target, ReleaseFast
+/// as a device is: every exported kernel built, and the `f64` math's
+/// assembly grepped for a fused multiply-add (exit 1: none). The grep's own
+/// canary, an `@mulAdd`, must be found on each target, so a pattern that
+/// misses a target's spelling fails instead of passing everything.
+fn kernelTargets(b: *Build, step: *Build.Step) void {
+    const targets = [_]std.Target.Query{
+        .{ .cpu_arch = .x86_64, .os_tag = .linux, .cpu_model = .{ .explicit = &std.Target.x86.cpu.x86_64_v3 } },
+        .{ .cpu_arch = .aarch64, .os_tag = .linux },
+        .{ .cpu_arch = .nvptx64, .os_tag = .cuda, .cpu_model = .{ .explicit = &std.Target.nvptx.cpu.sm_80 } },
+        .{ .cpu_arch = .amdgcn, .os_tag = .amdhsa, .cpu_model = .{ .explicit = &std.Target.amdgcn.cpu.gfx1100 } },
+    };
+    const gompute_math = b.dependency("gompute", .{}).module("math");
+    for (targets) |q| {
+        const t = b.resolveTargetQuery(q);
+        const contract = b.createModule(.{ .root_source_file = b.path("lib/contract.zig"), .target = t, .optimize = .ReleaseFast });
+        const kernels = b.createModule(.{ .root_source_file = b.path("lib/std/kernels.zig"), .target = t, .optimize = .ReleaseFast, .imports = &.{
+            .{ .name = "contract", .module = contract },
+            .{ .name = "gompute_math", .module = gompute_math },
+        } });
+        const Part = enum { all, math, control };
+        for ([_]Part{ .all, .math, .control }) |part| {
+            const o = b.addOptions();
+            o.addOption(bool, "math_only", part == .math);
+            o.addOption(bool, "control", part == .control);
+            const root = b.createModule(.{ .root_source_file = b.path("tests/differential/kernels_targets.zig"), .target = t, .optimize = .ReleaseFast, .imports = &.{
+                .{ .name = "std_kernels", .module = kernels },
+                .{ .name = "contract", .module = contract },
+            } });
+            root.addOptions("kernels_targets_options", o);
+            const obj = b.addObject(.{ .name = b.fmt("kernels-{s}-{s}", .{ @tagName(q.cpu_arch.?), @tagName(part) }), .root_module = root });
+            if (part == .all) {
+                step.dependOn(&obj.step);
+                continue;
+            }
+            // What Zig hands LLVM: no `llvm.fma`/`fmuladd` call and no
+            // `contract` flag, on every target.
+            const ir = b.addSystemCommand(&.{ "grep", "-Eq", "llvm\\.fma|fmuladd|(fadd|fsub|fmul|fneg)[a-z ]* contract" });
+            ir.addFileArg(obj.getEmittedLlvmIr());
+            ir.expectExitCode(if (part == .control) 0 else 1);
+            step.dependOn(&ir.step);
+            // What the backend emits: no FMA instruction (`fmax` is a
+            // maximum). AMDGCN's own f64 division and sqrt are FMA
+            // sequences (v_div_fmas_f64) that round correctly, so there only
+            // the canary is grepped.
+            if (q.cpu_arch.? == .amdgcn and part == .math) continue;
+            const asm_ = b.addSystemCommand(&.{ "grep", "-Eiq", "fma([^x]|$)|fn?m(add|sub)|fml[as]" });
+            asm_.addFileArg(obj.getEmittedAsm());
+            asm_.expectExitCode(if (part == .control) 0 else 1);
+            step.dependOn(&asm_.step);
+        }
+    }
 }

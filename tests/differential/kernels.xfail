@@ -6,23 +6,21 @@
 # the run: remove it. Every difference below is the gm -> Gompute 2.0.0
 # swap (lib/TODO.md §11.8); every other port is bit-identical.
 #
+# Not here because they agree bit for bit: exp, log, pow (scalar and the
+# 4-lane vector forms), sin, cos, tan, tanh, expm1, log1p, asinh, acosh,
+# atanh, and atan/atan2, which stay musl's (std's scalar body): Gompute's
+# atan is std's vector body, @mulAdd (not fma-free), 1.235 ulp and +0 at -0.
+#
 # Gompute against gm (`math.zig`), judged by the f128 reference:
-atan 1 Gompute's atan is std's VECTOR body on every target (gm: std's scalar body on the host); 20771/100676 differ; f128 sides with gm (old max 0.678 ulp, new max 1.235 ulp, old closer 20769 times)
-atan2 2 via atan; 12312/100676 differ; f128 sides with gm (old max 1.311, new max 1.951 ulp, old closer 10271 times, new 2041)
-cosh 1 Gompute's softCosh, not std's cosh64; 8276/100676 differ; f128 sides with Gompute (old max 1.146, new max 0.964 ulp, new closer 8197 times)
+cosh 1 Gompute's softCosh, not std's cosh64; 8276/100676 differ; f128 sides with Gompute (old max 1.146, new max 0.964 ulp, new closer 8197 times, old 79)
 sinh 1 Gompute's softSinh near overflow (|x| ~ 710); 5/100676 differ; f128 sides with Gompute (old max 0.871, new max 0.654 ulp, new closer 3 of 5)
-log10 1 Gompute's log10 (log's hi/lo pair times 1/ln10 as a double-double), not musl's e_log10; 2/100676 differ; f128 sides with Gompute (old max 0.505, new max 0.496 ulp)
-# The kernels over them (old text and lib/kernels called gm or std.math):
-math.zDevAtan 1 = atan
+log10 1 Gompute's log10 (log's hi/lo pair times 1/ln10), not musl's e_log10; 2/100676 differ; f128 sides with Gompute (old max 0.505, new max 0.496 ulp); still exact at every power of ten (math.zig's test)
+# The kernels over them (the old text and lib/kernels called gm or std.math):
 math.zDevSinh 1 = sinh
 math.zDevCosh 1 = cosh
-math.zAtan2 2 = atan2 (the value; its lanes are unchanged)
-math.zLog10 1 = log10
+math.zLog10 1 = log10 (the value; its lane is unchanged)
 math.zLog10D 1 = log10
-fold.math.atan 2 = atan (the fold's old atan was std.math.atan's scalar body)
-fold.math.atan2 2 = atan2
 fold.math.cosh 1 = cosh
 fold.math.log 1 = log10 (VAMS `log` is base 10)
-ac.Ac.atan 1 = atan
 ac.Ac.sinh 2 = sinh's value, and cosh in its lanes (each lane is a product with cosh)
 ac.Ac.cosh 2 = cosh's value, and sinh in its lanes

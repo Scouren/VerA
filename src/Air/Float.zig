@@ -32,7 +32,7 @@
 //! square law, BSIM-like softplus rational, `tanh` limiter):
 //!
 //!   B (V or A)              1        10       100      1e3      1e4
-//!   generated (2,000)       38.5%    36.6%    36.6%    35.1%    35.1%
+//!   generated (2,000)       38.4%    36.6%    36.6%    35.1%    35.1%
 //!   devices (8)             7        5        4        4        4
 //!
 //! 1 proves the junctions, but a node voltage past 1 V is everyday; 10 is

@@ -417,7 +417,12 @@ fn unaryRaw(tag: Tag, a: Interval) Abstract {
         // acosh(0.5)), and the ends then do not span the range.
         if (math.isNan(lo) or math.isNan(hi)) return .{ .iv = top, .nan = true };
         const m = ulps(tag);
-        const iv: Interval = .{ .lo = down(@min(lo, hi), m), .hi = up(@max(lo, hi), m) };
+        var iv: Interval = .{ .lo = down(@min(lo, hi), m), .hi = up(@max(lo, hi), m) };
+        // exp(0) = 1 exactly, and a faithfully rounded value never crosses
+        // a double its true value does not cross: exp of x >= 0 stays >= 1
+        // (the zeros of the rest are `down`'s and `up`'s).
+        if (tag == .exp and inLo(a) >= 0) iv.lo = @max(iv.lo, 1);
+        if (tag == .exp and inHi(a) <= 0) iv.hi = @min(iv.hi, 1);
         return .{ .iv = iv.meet(codomain(tag)), .nan = false };
     }
     return switch (tag) {
@@ -570,7 +575,10 @@ fn combine(x: Interval, y: Interval, f: *const fn (f64, f64) f64) Interval {
 /// minimum at 0; a negative one a pole at 0, sound only for a strictly
 /// negative base).
 fn powIv(x: Interval, y: Interval) Interval {
-    const r: Interval = if (x.ge(0)) nonneg: {
+    // C99 F.10.4.4: pow(x, ±0) and pow(1, y) are exactly 1, NaN operands
+    // included: no ulps to add.
+    const one = (y.lo == 0 and y.hi == 0) or (x.lo == 1 and x.hi == 1);
+    const r: Interval = if (one) .point(1) else if (x.ge(0)) nonneg: {
         // A zero end may hold -0.0 (0 * -1): its corners use +0, where pow
         // is monotone, and pow(-0, -odd) = -inf joins the sign it flips.
         var xp: Interval = .{ .lo = inLo(x), .hi = inHi(x) };

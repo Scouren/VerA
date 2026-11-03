@@ -314,6 +314,35 @@ test "Float: an error never rests on the default bound, only on the host's" {
     }
 }
 
+test "Float: an overflowed value is inf, a number: its guard decides the arm; x % V keeps x's sign and size" {
+    // `if (exp(1e300) > 0.5) 0 else acosh(0.5)`: exp(1e300) is +inf, which
+    // compares as a number, so the else arm never runs and its violation
+    // is not reported (§4.2.3); the merged prover took "not finite" for
+    // "maybe NaN", kept the arm and reported E0607. `acosh(-1 % V)`: §4.2.4
+    // |x % y| <= |x| with x's sign, so the remainder is in [-1, 0] for every
+    // V and acosh has no value there: E0607 (the merged prover bounded `%`
+    // only by an unbounded divisor and said nothing).
+    const gpa = testing.allocator;
+    for ([_]bool{ false, true }) |rem| {
+        var t = try T.init(gpa);
+        defer t.deinit();
+        const r = if (rem) try t.un(&t.main, .acosh, try t.bin(&t.main, .fmod, try t.real(-1), try t.probe(&t.main, 0))) else blk: {
+            const c = try t.bin(&t.main, .fgt, try t.un(&t.main, .exp, try t.real(1e300)), try t.real(0.5));
+            var then: std.ArrayList(Inst.Index) = .empty;
+            defer then.deinit(gpa);
+            var els: std.ArrayList(Inst.Index) = .empty;
+            defer els.deinit(gpa);
+            const bad = try t.un(&els, .acosh, try t.real(0.5));
+            break :blk try t.ifElse(&t.main, .real_type, c, &then, try t.real(0), &els, bad);
+        };
+        var air = try t.finish(r);
+        defer air.deinit(gpa);
+        var o = try analyze(&t, air, .{ .roots = &.{.{ .refs = &.{r} }} });
+        defer o.f.deinit(gpa);
+        try testing.expectEqual(rem, o.has(.E0607));
+    }
+}
+
 test "Float: a loop widens its counter and keeps its sign; a constant-false arm reports nothing" {
     // s = 0; k = 0; while (k < 3) { s = s + 1; k = k + 1 }; ln(s + 1): s >= 0
     // after widening, so s + 1 >= 1 > 0. Widening pushes s's upper end to

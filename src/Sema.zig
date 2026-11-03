@@ -80,6 +80,8 @@ access_both: std.StringHashMapUnmanaged(void) = .empty,
 deferred: std.ArrayList(@import("Sema/syscall.zig").Deferred) = .empty,
 /// The target of the `<+` whose right-hand side is being lowered (contrib.zig).
 contrib_target: ?@import("Sema/contrib.zig").Target = null,
+/// The user functions being inlined, outermost first (func.zig).
+inlining: std.ArrayList(Inst.Index) = .empty,
 /// Each contribution row's instance, by row (contrib.zig).
 contrib_units: std.ArrayList(Zcu.Instance.Index) = .empty,
 /// The contribution rows a reactive term was added to (contrib.zig).
@@ -189,6 +191,8 @@ pub const Block = struct {
     in_event: bool = false,
     /// The enclosing named blocks' names, each with a `.` (§5.3.2).
     path: []const u8 = "",
+    /// Inside an inlined function: the `block` a `return` leaves (func.zig).
+    function: ?Air.Inst.Index = null,
 
     /// A loop's targets: the `block` a `break` leaves and the one a
     /// `continue` leaves (the step follows it).
@@ -196,7 +200,7 @@ pub const Block = struct {
 
     /// A child of `parent`: the same instance and restrictions, no instructions.
     pub fn child(parent: *Block) Block {
-        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path };
+        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path, .function = parent.function };
     }
 };
 

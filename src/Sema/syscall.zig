@@ -66,6 +66,7 @@ pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Erro
                 try s.fail(.E0512, b.unit.file, src, "`{s}` is not lowered by Sema yet", .{name});
                 return expr.poison;
             }
+            if (tag == .@"$port_connected") return portConnected(s, b, args, src);
             const ty: Sema.Ty = switch (info.ty) {
                 .real => .real,
                 .int => .integer,
@@ -97,8 +98,19 @@ pub fn task(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error
             return;
         },
     }
-    if (info.family != .display and info.family != .file_out) {
+    // The old `systask`: a task that takes a format, and §9.7's simulation
+    // controls, are rows of `displays`.
+    const row_kind = switch (tag) {
+        .@"$monitoron", .@"$monitoroff", .@"$fclose", .@"$fflush" => false,
+        else => info.family == .display or info.family == .file_out or info.family == .simctl,
+    };
+    if (!row_kind) {
         _ = try expr.call(s, b, @backingInt(tag), null, try lowerArgs(s, b, args));
+        return;
+    }
+    if (info.family == .simctl) {
+        const r = try expr.call(s, b, @backingInt(tag), null, try lowerArgs(s, b, args));
+        try s.device.displays.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .call = r.toIndex().? });
         return;
     }
     const row: u32 = @intCast(s.device.displays.len);
@@ -166,6 +178,31 @@ fn readsFlow(s: *Sema, unit: *const Sema.Unit, r: Inst.Ref, depth: u32) bool {
         },
         else => return false, // else: a leaf reads no flow
     }
+}
+
+/// §9.19 `$port_connected(p)`: the root's port is the host's bit (a call
+/// on its ordinal); a child's is known here, from its connection.
+fn portConnected(s: *Sema, b: *Block, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
+    const unit = b.unit;
+    const vir = unit.vir;
+    const a = if (args.len == 1) args[0].toIndex() else null;
+    const port: ?Inst.Index = if (a) |i| if (vir.instructions.items(.tag)[@backingInt(i)] == .decl_ref) decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl) else null else null;
+    const ordinal: ?u32 = if (port) |p| for (vir.body(unit.module.ports), 0..) |f, k| {
+        if (decl.portDecl(vir, f) == p) break @intCast(k);
+    } else null else null;
+    const k = ordinal orelse {
+        try s.fail(.E0822, unit.file, src, "$port_connected requires a port identifier", .{});
+        return expr.poison;
+    };
+    if (unit.prefix.len == 0) return .{ .ref = try expr.call(s, b, @backingInt(SysFn.Tag.@"$port_connected"), .integer, &.{.fromIntern(try decl.intern(s, .{ .int = k }))}), .ty = .integer };
+    const zcu = s.zcu;
+    const list = zcu.instances.items(.ports)[@backingInt(unit.instance)];
+    const formals = zcu.ports.items(.formal)[list.start..][0..list.len];
+    const actuals = zcu.ports.items(.actual)[list.start..][0..list.len];
+    const connected = for (formals, actuals) |f, act| {
+        if (decl.portDecl(vir, f) == port.?) break act != .none;
+    } else false;
+    return .{ .ref = .fromIntern(if (connected) .one else .zero), .ty = .integer };
 }
 
 /// Each argument lowered, in order; an omitted one is a real 0.

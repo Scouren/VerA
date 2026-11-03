@@ -17,6 +17,7 @@
 //! - `pub fn tyOf(storage: Inst.Storage) Sema.Ty`
 //! - `pub fn foldBody(s: *Sema, unit: *Sema.Unit, b: Vir.Body) Allocator.Error!?eval.Const`
 //! - `pub fn intern(s: *Sema, c: eval.Const) Allocator.Error!InternPool.Index`
+//! - `pub fn portDecl(vir: *const Vir, p: Inst.Index) ?Inst.Index`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -38,6 +39,11 @@ const Node = Device.Node;
 const Unit = Sema.Unit;
 const Block = Sema.Block;
 
+/// The most passes one loop generate scheme unrolls (the walk's bound).
+const gen_loop_max: u32 = 1 << 16;
+/// The deepest generate nesting followed.
+const gen_depth_max: u32 = 1 << 10;
+
 /// Lowers the design under `zcu.instances[0]` and returns the main body,
 /// its `ret` included. Asserts that nothing was lowered before.
 pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
@@ -58,14 +64,9 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     var main: Block = .{ .parent = null, .unit = &s.units.items[0] };
     for (s.units.items) |*u| {
         main.unit = u;
-        for (u.vir.body(u.module.body)) |i| {
-            const tag = u.vir.instructions.items(.tag)[@backingInt(i)];
-            if (tag != .analog and tag != .analog_initial) continue;
-            var b = main.child();
-            b.analog_initial = tag == .analog_initial;
-            try control.body(s, &b, payloadOf(u.vir, Inst.Process, i).body);
-            try main.insts.appendSlice(s.arena, b.insts.items);
-        }
+        var env = try envOf(s, u);
+        defer env.deinit();
+        try items(s, &main, &env, u.module.body, 0);
     }
     try syscall.finishDisplays(s, &main);
     assert(zcu.instances.len >= s.units.items.len);
@@ -129,6 +130,24 @@ pub fn intern(s: *Sema, c: eval.Const) Allocator.Error!InternPool.Index {
     return index;
 }
 
+/// The declaration a header port names: an ANSI `io` itself, or the net a
+/// non-ANSI port expression names. Null for a null or concatenated port.
+pub fn portDecl(vir: *const Vir, p: Inst.Index) ?Inst.Index {
+    const tags = vir.instructions.items(.tag);
+    switch (tags[@backingInt(p)]) {
+        .io => return canonical(vir, p),
+        .port => {
+            const port = payloadOf(vir, Inst.Port, p);
+            const b = vir.body(port.value);
+            if (b.len == 0) return null;
+            const last = b[b.len - 1];
+            if (tags[@backingInt(last)] != .decl_ref) return null;
+            return canonical(vir, vir.instructions.items(.data)[@backingInt(last)].decl_tok.decl);
+        },
+        else => return null, // else: a header holds only ports and directions
+    }
+}
+
 // ---- private ----
 
 fn typeIndex(ty: Sema.Ty) InternPool.Index {
@@ -177,6 +196,75 @@ fn units(s: *Sema) Allocator.Error!void {
             .prefix = prefix,
         });
     }
+}
+
+/// The analog blocks of a body, in source order, generate schemes unrolled
+/// with their genvars bound (§6.6): each block lowered into `main`.
+fn items(s: *Sema, main: *Block, env: *eval.Env, body: Vir.Body, depth: u32) Allocator.Error!void {
+    const unit = main.unit;
+    const vir = unit.vir;
+    if (depth > gen_depth_max) return;
+    for (vir.body(body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .analog, .analog_initial => |tag| {
+            var b = main.child();
+            b.analog_initial = tag == .analog_initial;
+            try control.body(s, &b, payloadOf(vir, Inst.Process, i).body);
+            try main.insts.appendSlice(s.arena, b.insts.items);
+        },
+        .gen_block => try items(s, main, env, payloadOf(vir, Inst.GenBlock, i).body, depth + 1),
+        .gen_if => {
+            const g = payloadOf(vir, Inst.GenIf, i);
+            const c = (try env.body(g.cond)) orelse continue;
+            try items(s, main, env, if (c.isTrue()) g.then else g.@"else", depth + 1);
+        },
+        .gen_case => {
+            const g = payloadOf(vir, Inst.GenCase, i);
+            const operand = (try env.body(g.operand)) orelse continue;
+            var arm_body: ?Vir.Body = null;
+            for (vir.list(Inst.Arm, g.arms)) |arm| {
+                if (arm.flags.default and arm_body == null) arm_body = arm.body;
+                for (vir.list(Inst.Ref, arm.values)) |l| {
+                    const label = (try env.ref(l)) orelse continue;
+                    const eq = @import("kernels").fold.binary(.eq, operand, label, null) orelse continue;
+                    if (eq.isTrue()) {
+                        arm_body = arm.body;
+                        break;
+                    }
+                } else continue;
+                break;
+            }
+            if (arm_body) |ab| try items(s, main, env, ab, depth + 1);
+        },
+        .gen_for => {
+            const g = payloadOf(vir, Inst.GenFor, i);
+            const init = lastStore(vir, g.init) orelse continue;
+            const step = lastStore(vir, g.step) orelse continue;
+            const gvi = init.lhs.toIndex() orelse continue;
+            if (vir.instructions.items(.tag)[@backingInt(gvi)] != .decl_ref) continue;
+            const gv = canonical(vir, vir.instructions.items(.data)[@backingInt(gvi)].decl_tok.decl);
+            var v = ((try env.ref(init.rhs)) orelse continue).asIntExact() orelse continue;
+            defer _ = env.genvars.remove(gv);
+            defer _ = unit.binds.remove(gv);
+            for (0..gen_loop_max) |_| {
+                try env.genvars.put(s.gpa, gv, v);
+                try unit.binds.put(s.arena, gv, .{ .constant = try intern(s, .{ .int = v }) });
+                const c = (try env.body(g.cond)) orelse break;
+                if (!c.isTrue()) break;
+                try items(s, main, env, g.body, depth + 1);
+                v = ((try env.ref(step.rhs)) orelse break).asIntExact() orelse break;
+            }
+        },
+        else => {}, // else: not an analog block or a generate scheme
+    };
+}
+
+/// A body's last instruction as a `store`, or null.
+fn lastStore(vir: *const Vir, b: Vir.Body) ?Inst.Bin {
+    const insts = vir.body(b);
+    if (insts.len == 0) return null;
+    const last = insts[insts.len - 1];
+    if (vir.instructions.items(.tag)[@backingInt(last)] != .store) return null;
+    return payloadOf(vir, Inst.Bin, last);
 }
 
 /// An evaluator over `unit`'s module with the instance's folded parameters.
@@ -242,24 +330,6 @@ fn ports(s: *Sema, unit: *Unit) Allocator.Error!void {
     }
 }
 
-/// The declaration a header port names: an ANSI `io` itself, or the net a
-/// non-ANSI port expression names. Null for a null or concatenated port.
-fn portDecl(vir: *const Vir, p: Inst.Index) ?Inst.Index {
-    const tags = vir.instructions.items(.tag);
-    switch (tags[@backingInt(p)]) {
-        .io => return canonical(vir, p),
-        .port => {
-            const port = payloadOf(vir, Inst.Port, p);
-            const b = vir.body(port.value);
-            if (b.len == 0) return null;
-            const last = b[b.len - 1];
-            if (tags[@backingInt(last)] != .decl_ref) return null;
-            return canonical(vir, vir.instructions.items(.data)[@backingInt(last)].decl_tok.decl);
-        },
-        else => return null, // else: a header holds only ports and directions
-    }
-}
-
 /// The name a declaring instruction declares (its payload's first word).
 fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String {
     const at = vir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index;
@@ -280,13 +350,10 @@ fn nets(s: *Sema, unit: *Unit) Allocator.Error!void {
         const first = canonical(vir, i);
         if (unit.binds.contains(first) or child_ports.contains(first)) continue;
         if (tag == .io and tags[@backingInt(first)] == .io and !hasNet(unit, first)) continue;
-        if (isGround(unit, first)) {
-            try unit.binds.put(s.arena, first, .{ .node = .ground });
-            continue;
-        }
         const name = vir.string(nameOf(vir, first));
         const row = try internNode(s, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disciplineOf(unit, first), vir);
-        try unit.binds.put(s.arena, first, .{ .node = row });
+        // §3.6.4 a `ground` net keeps its row, and its name reads the reference node.
+        try unit.binds.put(s.arena, first, .{ .node = if (isGround(unit, first)) .ground else row });
     }
 }
 

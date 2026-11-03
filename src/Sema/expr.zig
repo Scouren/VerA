@@ -464,7 +464,11 @@ fn callExpr(s: *Sema, b: *Block, c: Inst.Call, src: Inst.Ref) Allocator.Error!Va
             if (try contrib.accessOf(s, b, name)) |_| return contrib.access(s, b, name, vir.list(Inst.Ref, c.args), src);
             return refuse(s, b, src, name);
         },
-        .decl_ref => return refuse(s, b, src, "a user function call"),
+        .decl_ref => {
+            const f = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(callee)].decl_tok.decl);
+            if (vir.instructions.items(.tag)[@backingInt(f)] != .function) return refuse(s, b, src, "a call of a name that is no function");
+            return @import("func.zig").call(s, b, f, vir.list(Inst.Ref, c.args), src);
+        },
         else => return refuse(s, b, src, "a call"),
     }
 }

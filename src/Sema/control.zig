@@ -13,6 +13,7 @@
 //! - `pub fn body(s: *Sema, b: *Block, vb: Vir.Body) Allocator.Error!void`
 //! - `pub fn br(s: *Sema, b: *Block, target: Air.Inst.Index, operand: Air.Inst.Ref) Allocator.Error!void`
 //! - `pub fn ifElse(s: *Sema, b: *Block, cond: Air.Inst.Ref, then_b: *Block, else_b: *Block) Allocator.Error!void`
+//! - `pub fn assignTo(s: *Sema, b: *Block, lhs_ref: Inst.Ref, v: Sema.Value, src: Inst.Ref) Allocator.Error!void`
 //! - `pub fn operands(s: *Sema, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void`
 
 const std = @import("std");
@@ -94,6 +95,18 @@ pub fn operands(s: *Sema, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapU
     }
 }
 
+/// §5.7 `lhs = v` to a variable's slot.
+pub fn assignTo(s: *Sema, b: *Block, lhs_ref: Inst.Ref, v: Sema.Value, src: Inst.Ref) Allocator.Error!void {
+    const vir = b.unit.vir;
+    const lhs = lhs_ref.toIndex() orelse return;
+    if (vir.instructions.items(.tag)[@backingInt(lhs)] != .decl_ref)
+        return s.fail(.E0512, b.unit.file, src, "an assignment to a select is not lowered by Sema yet", .{});
+    const first = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(lhs)].decl_tok.decl);
+    const bind = b.unit.binds.get(first) orelse return s.fail(.E0512, b.unit.file, src, "an assignment to a name with no slot", .{});
+    if (bind != .slot) return s.fail(.E0313, b.unit.file, src, "an assignment to a name that is not a variable", .{});
+    const r = try expr.coerce(s, b, v, bind.slot.ty);
+    _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(bind.slot.alloc), .rhs = r } } });
+}
 // ---- private ----
 
 fn stmt(s: *Sema, b: *Block, i: Inst.Index, tag: Inst.Tag) Allocator.Error!void {
@@ -106,7 +119,17 @@ fn stmt(s: *Sema, b: *Block, i: Inst.Index, tag: Inst.Tag) Allocator.Error!void 
         .case => try case(s, b, decl.payloadOf(vir, Inst.Case, i)),
         .loop => try loop(s, b, decl.payloadOf(vir, Inst.Loop, i)),
         .repeat => try repeat(s, b, decl.payloadOf(vir, Inst.Repeat, i)),
-        .store => try store(s, b, decl.payloadOf(vir, Inst.Bin, i), src),
+        .store => {
+            const x = decl.payloadOf(vir, Inst.Bin, i);
+            try assignTo(s, b, x.lhs, try expr.lower(s, b, x.rhs), src);
+        },
+        .ret => {
+            const target = b.function orelse return s.fail(.E0512, unit.file, src, "`return` outside a function", .{});
+            const r = vir.instructions.items(.data)[@backingInt(i)].un_node.operand;
+            if (r != .none) try s.fail(.E0512, unit.file, src, "`return` with a value is not lowered by Sema yet", .{});
+            try br(s, b, target, .none);
+            b.dead = true;
+        },
         .contrib => try contrib.contribute(s, b, decl.payloadOf(vir, Inst.Bin, i), src),
         .brk, .cont => {
             const l = b.loop orelse return s.fail(.E0512, unit.file, src, "`{s}` outside a loop", .{if (tag == .brk) "break" else "continue"});
@@ -117,7 +140,7 @@ fn stmt(s: *Sema, b: *Block, i: Inst.Index, tag: Inst.Tag) Allocator.Error!void 
         .variable => try local(s, b, i),
         .param, .event => {},
         .event_wait => try eventWait(s, b, decl.payloadOf(vir, Inst.EventWait, i), src),
-        .store_nb, .proc_assign, .force, .store_timed, .store_nb_timed, .contrib_indirect, .deassign, .release, .trigger, .disable, .ret, .wait, .delay => try s.fail(.E0512, unit.file, src, "`{t}` is not lowered by Sema yet", .{tag}),
+        .store_nb, .proc_assign, .force, .store_timed, .store_nb_timed, .contrib_indirect, .deassign, .release, .trigger, .disable, .wait, .delay => try s.fail(.E0512, unit.file, src, "`{t}` is not lowered by Sema yet", .{tag}),
         // An expression: lowered where its statement reads it.
         .decl_ref, .str_ref, .int, .big_int, .real, .str, .pos, .neg, .not, .bit_not, .red_and, .red_nand, .red_or, .red_nor, .red_xor, .red_xnor, .add, .sub, .mul, .div, .mod, .pow, .shl, .shr, .ashl, .ashr, .lt, .gt, .lte, .gte, .eq, .neq, .case_eq, .case_neq, .bit_and, .bit_or, .bit_xor, .bit_xnor, .bool_and, .bool_or, .ternary, .mintypmax, .field, .elem, .slice, .slice_up, .slice_down, .call, .call_sys, .port_branch, .concat, .pattern, .replicate, .pattern_repl, .event_or, .posedge, .negedge, .driver_update, .step_event, .paramset_output, .range, .pulse_limits, .delay_ctl, .event_ctl, .repeat_ctl => {},
         .module, .nature, .discipline, .paramset, .primitive, .connectrules, .config, .port, .io, .net, .aliasparam, .genvar, .branch, .instance, .assign, .defparam, .analog, .analog_initial, .initial, .always, .function, .gen_for, .gen_if, .gen_case, .gen_block, .specify, .path, .timing_check, .pulse_style, .timing_event, .ps_override, .connect_resolve, .connect_insert => try s.fail(.E0512, unit.file, src, "`{t}` in an analog body", .{tag}),
@@ -335,18 +358,4 @@ fn repeat(s: *Sema, b: *Block, x: Inst.Repeat) Allocator.Error!void {
     try s.air.setBody(s.gpa, lp, .none, head.insts.items);
     try s.air.setBody(s.gpa, exit, .none, &.{lp});
     try b.insts.append(s.arena, exit);
-}
-
-/// §5.7 `lhs = rhs` to a variable's slot.
-fn store(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Error!void {
-    const vir = b.unit.vir;
-    const lhs = x.lhs.toIndex() orelse return;
-    if (vir.instructions.items(.tag)[@backingInt(lhs)] != .decl_ref)
-        return s.fail(.E0512, b.unit.file, src, "an assignment to a select is not lowered by Sema yet", .{});
-    const first = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(lhs)].decl_tok.decl);
-    const bind = b.unit.binds.get(first) orelse return s.fail(.E0512, b.unit.file, src, "an assignment to a name with no slot", .{});
-    if (bind != .slot) return s.fail(.E0313, b.unit.file, src, "an assignment to a name that is not a variable", .{});
-    const v = try expr.lower(s, b, x.rhs);
-    const r = try expr.coerce(s, b, v, bind.slot.ty);
-    _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(bind.slot.alloc), .rhs = r } } });
 }

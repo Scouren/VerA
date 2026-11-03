@@ -28,4 +28,5 @@ test {
     _ = @import("Sema/contrib.zig");
     _ = @import("Sema/syscall.zig");
     _ = @import("Sema/held.zig");
+    _ = @import("Sema/func.zig");
 }

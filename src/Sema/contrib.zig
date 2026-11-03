@@ -106,6 +106,7 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
     const callee = c.callee.toIndex() orelse return;
     if (vir.instructions.items(.tag)[@backingInt(callee)] != .str_ref) return s.fail(.E0408, file, src, "", .{});
     const name = vir.string(vir.instructions.items(.data)[@backingInt(callee)].str_tok.start);
+    if (b.function != null) return s.fail(.E0405, file, src, "not allowed in an analog function", .{});
     if (b.in_event) return s.fail(.E0406, file, src, "", .{});
     if (b.loop != null) return s.fail(.E0426, file, src, "", .{});
     const t = (try target(s, b, name, vir.list(Inst.Ref, c.args), src)) orelse return;

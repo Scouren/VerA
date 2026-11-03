@@ -25,6 +25,7 @@ const nets = @import("nets.zig");
 const sub = @import("sub.zig");
 const gates = @import("gates.zig");
 const link = @import("link.zig");
+const tchk = @import("tchk.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -67,6 +68,7 @@ pub fn compileAll(l: *Lower) Error!void {
     for (queued.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
     try link.fanout(l);
     try link.resolveDisables(l);
+    try tchk.finish(l);
     try sub.finish(l);
     l.b.p.counters = l.repeats + l.joins;
     l.b.p.holds = l.holds;

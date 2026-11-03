@@ -32,6 +32,7 @@ const digital = @import("../digital.zig");
 const place = @import("place.zig");
 const sysfn = @import("sysfn.zig");
 const sub = @import("sub.zig");
+const hier = @import("hier.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -68,7 +69,7 @@ pub fn typeOf(l: *Lower, r: Inst.Ref) Error!Type {
         .big_int => (try bigLiteral(l, vir, i)).ty,
         .str => .{ .width = @intCast(@max(1, data.str.len) * 8), .signed = false },
         .real => Type.real_type,
-        .decl_ref, .str_ref => blk: {
+        .decl_ref, .str_ref, .field => blk: {
             const n = try leafName(l, i);
             if (n.kind == .event) return l.refuse("a named event read as a value");
             if (n.kind == .sub or n.kind == .scope) return l.refuse("a task, function or scope read as a value");
@@ -137,7 +138,6 @@ pub fn typeOf(l: *Lower, r: Inst.Ref) Error!Type {
         },
         .call_sys => sysfn.sysType(l, i),
         .call => sub.resultType(l, i),
-        .field => l.refuse("a hierarchical name"),
         else => l.refuseFmt("the expression form `{t}`", .{Lower.tag(vir, i)}),
     };
 }
@@ -157,7 +157,7 @@ pub fn ctx(l: *Lower, r: Inst.Ref, ty: Type) Error!u32 {
     if (nat.real) return l.b.expr(.int_of_real, t, try real(l, r), 0);
     const data = vir.instructions.items(.data)[@backingInt(i)];
     switch (tg) {
-        .decl_ref, .str_ref => {
+        .decl_ref, .str_ref, .field => {
             const n = try leafName(l, i);
             if (n.dims.len != 0) return l.refuse("a whole unpacked array read");
             return l.b.expr(.slot, t, n.slot, 0);
@@ -300,7 +300,7 @@ pub fn real(l: *Lower, r: Inst.Ref) Error!u32 {
             const bits: u64 = @bitCast(data.float);
             return l.b.expr(.real_constant, rt, @truncate(bits), @truncate(bits >> 32));
         },
-        .decl_ref, .str_ref => {
+        .decl_ref, .str_ref, .field => {
             const n = try leafName(l, i);
             if (n.dims.len != 0) return l.refuse("a whole unpacked array read");
             return l.b.expr(.slot, rt, n.slot, 0);
@@ -341,7 +341,7 @@ pub fn reads(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
     const vir = l.virOf(l.frame);
     const data = vir.instructions.items(.data)[@backingInt(i)];
     switch (Lower.tag(vir, i)) {
-        .decl_ref, .str_ref => {
+        .decl_ref, .str_ref, .field => {
             const n = try leafName(l, i);
             switch (n.kind) {
                 .variable, .net, .param, .genvar, .event => for (0..n.count) |k| try addSlot(l, out, n.slot + @as(u32, @intCast(k))),
@@ -373,7 +373,7 @@ pub fn reads(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
 pub fn nameOf(l: *Lower, r: Inst.Ref) Error!?Name {
     const i = r.toIndex() orelse return null;
     const vir = l.virOf(l.frame);
-    if (Lower.tag(vir, i) != .decl_ref and Lower.tag(vir, i) != .str_ref) return null;
+    if (Lower.tag(vir, i) != .decl_ref and Lower.tag(vir, i) != .str_ref and Lower.tag(vir, i) != .field) return null;
     return try leafName(l, i);
 }
 
@@ -401,12 +401,14 @@ pub fn declName(l: *Lower, d: Inst.Index) Error!Name {
     return l.names.items[n];
 }
 
-/// The name leaf `i` (a `decl_ref`, or a `str_ref` naming a §4.5 implicit
-/// net of its instance) is bound to from `Lower.frame`.
+/// The name leaf `i` (a `decl_ref`, a `str_ref` naming a §4.5 implicit
+/// net of its instance, or a §12.5 hierarchical `field`) is bound to from
+/// `Lower.frame`.
 pub fn leafName(l: *Lower, i: Inst.Index) Error!Name {
     const vir = l.virOf(l.frame);
     const data = vir.instructions.items(.data)[@backingInt(i)];
     if (Lower.tag(vir, i) == .decl_ref) return declName(l, data.decl_tok.decl);
+    if (Lower.tag(vir, i) == .field) return hier.field(l, i);
     assert(Lower.tag(vir, i) == .str_ref);
     const n = l.implicit.get(.{ .frame = l.rootFrame(l.frame), .name = data.str_tok.start }) orelse return l.refuse("a hierarchical name");
     return l.names.items[n];

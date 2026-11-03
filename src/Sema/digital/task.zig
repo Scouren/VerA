@@ -502,7 +502,7 @@ fn comparable(vir: *const Vir, e: Inst.Ref) bool {
     const i = e.toIndex() orelse return true;
     const data = vir.instructions.items(.data)[@backingInt(i)];
     return switch (Lower.tag(vir, i)) {
-        .int, .big_int, .str, .real, .decl_ref, .str_ref => true,
+        .int, .big_int, .str, .real, .decl_ref, .str_ref, .field => true,
         .pos, .neg, .not, .bit_not, .red_and, .red_nand, .red_or, .red_nor, .red_xor, .red_xnor => comparable(vir, data.un_node.operand),
         .add, .sub, .mul, .div, .mod, .pow, .shl, .shr, .ashl, .ashr, .lt, .gt, .lte, .gte, .eq, .neq, .case_eq, .case_neq, .bit_and, .bit_or, .bit_xor, .bit_xnor, .bool_and, .bool_or, .elem, .replicate => blk: {
             const b = Lower.payload(vir, Inst.Bin, i);

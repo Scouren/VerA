@@ -81,6 +81,9 @@ pub fn declareNet(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Inde
     // §12.3 a port joined to one whole net of its width is that net.
     if (conn) |c| if (c.actual != .none) if (try wholeNet(l, c)) |outer| if (outer.ty.width == width) {
         if (decl_net) |dn| if (dn.init.len != 0) return l.refuse("a port with a net declaration assignment");
+        // §12.3.10.1 the merged net takes the dominating type (a `tri0`
+        // inside a `wire` stays a tri0 and reads 0 undriven).
+        if (nets.internalDominates(nk, l.nets.items[outer.net].kind)) try nets.retype(l, outer.net, nk);
         var joined = outer;
         joined.ty.signed = signed;
         _ = try l.bind(f, first, joined);

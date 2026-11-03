@@ -13,6 +13,8 @@
 //!   `pub const Sink = struct`
 //! - `pub fn netKind(k: Inst.NetKind) ?std_sim.net.NetKind`
 //! - `pub fn mintNet(l: *Lower, kind: std_sim.net.NetKind, width: u32, signed: bool) Error!u32`
+//! - `pub fn retype(l: *Lower, n: u32, kind: net.NetKind) Error!void`
+//! - `pub fn internalDominates(internal: net.NetKind, external: net.NetKind) bool`
 //! - `pub fn strengths(text: []const u8) [2]std_sim.net.Strength`
 //! - `pub fn delay3(l: *Lower, f: u32, d: Inst.Exprs) Error!Delay3`
 //! - `pub fn assign(l: *Lower, f: u32, i: Inst.Index) Error!void`
@@ -113,25 +115,47 @@ pub fn netKind(k: Inst.NetKind) ?net.NetKind {
 /// A new net of `kind`, `width` bits, on a slot of its own holding §4.2.1's
 /// undriven value. Returns its `nets` row.
 pub fn mintNet(l: *Lower, kind: net.NetKind, width: u32, signed: bool) Error!u32 {
-    const fill: Bit = switch (kind) {
-        .supply0, .tri0 => .zero,
-        .supply1, .tri1 => .one,
-        .trireg => .x,
-        .wire, .tri, .triand, .trior, .wand, .wor, .uwire, .wreal => .z,
-    };
     if (kind == .wreal) return l.refuse("a wreal net");
     const t = try l.tyOf(.{ .width = width, .signed = signed });
     const words = Program.words(width);
-    const v = try l.a.alloc(u64, words);
-    const x = try l.a.alloc(u64, words);
-    const value = try std_sim.logic.filled(l.a, width, signed, fill);
-    @memcpy(v, value.values());
-    @memcpy(x, value.unknowns());
-    const slot = try l.b.slot(t, v, x);
+    const value = try std_sim.logic.filled(l.a, width, signed, undriven(kind));
+    const slot = try l.b.slot(t, try l.a.dupe(u64, value.values()[0..words]), try l.a.dupe(u64, value.unknowns()[0..words]));
     const at: u32 = @intCast(l.nets.items.len);
     try l.nets.append(l.a, .{ .kind = kind, .slot = slot, .width = width });
     try l.slot_net.put(l.a, slot, at);
     return at;
+}
+
+/// §12.3.10.1 net `n` takes type `kind` (a port's that dominates it), and
+/// that type's undriven value at time 0.
+pub fn retype(l: *Lower, n: u32, kind: net.NetKind) Error!void {
+    const row = &l.nets.items[n];
+    row.kind = kind;
+    const word = l.b.p.slots.items(.word)[row.slot];
+    const words = Program.words(row.width);
+    const value = try std_sim.logic.filled(l.a, row.width, false, undriven(kind));
+    @memcpy(l.b.init_v.items[word..][0..words], value.values()[0..words]);
+    @memcpy(l.b.init_x.items[word..][0..words], value.unknowns()[0..words]);
+}
+
+/// §12.3.10 Table 12-1's "int" cells: whether a port net of type
+/// `internal` joined to a net of type `external` gives the merged net its
+/// own type.
+pub fn internalDominates(internal: net.NetKind, external: net.NetKind) bool {
+    const wire = external == .wire or external == .tri;
+    return switch (internal) {
+        .wire, .tri, .wreal => false,
+        .wand, .triand, .wor, .trior, .trireg => wire,
+        .tri0, .tri1 => wire or external == .trireg,
+        .uwire => wire or switch (external) {
+            .wand, .triand, .wor, .trior, .trireg, .tri0, .tri1 => true,
+            else => false, // else: uwire, the supplies and wreal are "ext" in the uwire row
+        },
+        .supply0, .supply1 => switch (external) {
+            .supply0, .supply1, .wreal => false,
+            else => true, // else: every non-supply column of the supply rows is "int"
+        },
+    };
 }
 
 /// A.2.2.2 a strength group's words (`strong0,pull1`; empty: strong).
@@ -374,7 +398,7 @@ pub fn sink(l: *Lower, r: Inst.Ref) Error!Sink {
     const vir = l.virOf(l.frame);
     const i = r.toIndex() orelse return l.refuse("an omitted net lvalue");
     switch (Lower.tag(vir, i)) {
-        .decl_ref, .str_ref => {
+        .decl_ref, .str_ref, .field => {
             const n = (try expr.nameOf(l, r)) orelse return l.refuse("a continuous assignment to a hierarchical net");
             if (n.kind != .net) return l.refuse("a continuous assignment to a variable");
             if (n.dims.len != 0) return l.refuse("a continuous assignment to a whole net array");
@@ -438,6 +462,16 @@ pub fn delayOf(l: *Lower, d: Delay3, rows: *[3]u32) Error!net.Delay {
 }
 
 // ---- private ----
+
+/// §4.2.1 a net type's value with no driver.
+fn undriven(kind: net.NetKind) Bit {
+    return switch (kind) {
+        .supply0, .tri0 => .zero,
+        .supply1, .tri1 => .one,
+        .trireg => .x,
+        .wire, .tri, .triand, .trior, .wand, .wor, .uwire, .wreal => .z,
+    };
+}
 
 /// The bits of each driver no operand value can make other than z are z
 /// from the start (iverilog's reading): each driver's value is computed

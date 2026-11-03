@@ -179,6 +179,10 @@ pub const Lower = struct {
     /// its name (`blockKey`), and the disables waiting for every block.
     block_ranges: std.StringHashMapUnmanaged([2]u32) = .empty,
     disables: std.ArrayList(Disable) = .empty,
+    /// §15 the timing checks, and per check the byte its W1199 report is
+    /// filed at.
+    checks: std.ArrayList(Program.Check) = .empty,
+    check_sites: std.ArrayList(u32) = .empty,
     /// A function body is being compiled (§10.4.4: its fork runs in order).
     in_function: bool = false,
     /// The nets, their drivers (compiled after the walk), per slot its
@@ -342,7 +346,7 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *[]const u8) Er
         return e;
     };
     assert(program.inst_scope.len == program.insts.len);
-    return .{ .program = program };
+    return .{ .program = program, .check_sites = l.check_sites.items };
 }
 
 // ---- private ----

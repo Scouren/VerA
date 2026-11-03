@@ -1,11 +1,11 @@
 //! Specify blocks of the digital lowering: a `specify` of frame `f` in; its
-//! specparams bound to slots, and per module path one `Program.Path` row
-//! per source on each destination net, with §14.6's pulse limits and pulse
-//! styles, out (`nets.finish` lays the rows out per net). As
-//! lib/sim/digital builds them: a destination's select is read as its whole
-//! net and a parallel path as a full one; a variable output port's path
-//! times the net its §12.3.3 bridge drives.
-//! Cites: IEEE 1364-2005 §14.2, §14.3, §14.6.
+//! specparams bound to slots, per module path one `Program.Path` row per
+//! source on each destination net, with §14.6's pulse limits and pulse
+//! styles (`nets.finish` lays the rows out per net), and its timing checks
+//! (`tchk.zig`), out. As lib/sim/digital builds them: a destination's
+//! select is read as its whole net and a parallel path as a full one; a
+//! variable output port's path times the net its §12.3.3 bridge drives.
+//! Cites: IEEE 1364-2005 §14.2, §14.3, §14.6, §15.
 //!
 //! Contents:
 //! - `pub fn block(l: *Lower, f: u32, i: Inst.Index) Error!void`
@@ -18,6 +18,7 @@ const digital = @import("../digital.zig");
 const expr = @import("expr.zig");
 const place = @import("place.zig");
 const vars = @import("vars.zig");
+const tchk = @import("tchk.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const none = digital.none;
@@ -30,7 +31,7 @@ const Inst = Vir.Inst;
 const pathpulse = "PATHPULSE$";
 
 /// Specify block `i` of frame `f`: its specparams, then its module paths
-/// and pulse style declarations. Timing checks are refused for now.
+/// and pulse style declarations, then its timing checks.
 pub fn block(l: *Lower, f: u32, i: Inst.Index) Error!void {
     const vir = l.virOf(f);
     const items = vir.body(Lower.payload(vir, Inst.Process, i).body);
@@ -42,7 +43,7 @@ pub fn block(l: *Lower, f: u32, i: Inst.Index) Error!void {
     };
     for (items) |d| switch (Lower.tag(vir, d)) {
         .path => try path(l, f, items, d),
-        .timing_check => return l.refuse("a timing check"),
+        .timing_check => try tchk.check(l, f, d),
         else => {}, // else: a specparam (above), a pulse style (below), an expression
     };
     for (items) |d| if (Lower.tag(vir, d) == .pulse_style) try pulseStyle(l, vir, d);

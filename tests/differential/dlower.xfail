@@ -5,8 +5,6 @@
 # transcript difference. A listed fixture that agrees fails the run until its
 # line goes.
 verilog/03_lexical_conventions/ams_lexical_escaped_hierarchy.v lowering: an instance the elaboration did not make
-verilog/03_lexical_conventions/case_item_statement_attribute.v lowering: a case statement
-verilog/03_lexical_conventions/examples.v lowering: a case statement
 verilog/04_data_types/array_17_dimensions.v lowering: a continuous assignment to a net array element
 verilog/04_data_types/port_list_parameter_defparam.v lowering: a name declared by `param` that has no slot
 verilog/04_data_types/time_parameter_is_unsigned_64.v lowering: a name declared by `param` that has no slot
@@ -19,10 +17,6 @@ verilog/05_expressions/native_wide_index_edges.v lowering: a range past 2^32 bit
 verilog/06_assignments/net_array_element_selects.v lowering: a continuous assignment to a net array element
 verilog/06_assignments/select_bus.v lowering: a port with a net declaration assignment
 verilog/07_gate_switch_level/pull_gate_bit_select.v lowering: an inout port joined to a select, a concatenation or a net of another width
-verilog/09_behavioral_modeling/case_linear_search.v lowering: a case statement
-verilog/09_behavioral_modeling/constant_case_expression.v lowering: a case statement
-verilog/09_behavioral_modeling/control.v lowering: a case statement
-verilog/09_behavioral_modeling/dont_care_examples.v lowering: a case statement
 verilog/09_behavioral_modeling/event_array_automatic.v lowering: a trigger of an event array element or a hierarchical event
 verilog/09_behavioral_modeling/event_array_native_automatic.v lowering: a named block declaring storage in an automatic subroutine
 verilog/09_behavioral_modeling/event_array_native_effects.v lowering: a trigger of an event array element or a hierarchical event
@@ -88,13 +82,11 @@ verilog/A_formal_syntax/b_A_1_1_library_text.v a library map or list (`//@ libma
 verilog/A_formal_syntax/b_A_1_3_concat_port.v lowering: a port expression (§12.3.6)
 verilog/A_formal_syntax/b_A_1_3_part_select_port.v lowering: a port expression (§12.3.6)
 verilog/A_formal_syntax/b_A_1_3_ports.v lowering: a name declared by `param` that has no slot
-verilog/A_formal_syntax/b_A_6_4_statements.v lowering: a case statement
 verilog/A_formal_syntax/b_A_6_9_hierarchical_task_enable.v lowering: a hierarchical task or function name
 verilog/A_formal_syntax/b_A_8_1_concatenations.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/A_formal_syntax/b_A_8_2_function_calls.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/A_formal_syntax/b_A_8_3_expressions.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/A_formal_syntax/b_A_8_4_primaries.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
-verilog/A_formal_syntax/grammar_nullable_statement.v lowering: a case statement
 verilog/A_formal_syntax/grammar_parameter_header.v lowering: a name declared by `param` that has no slot
 verilog-ams/digital/realtobits_bitstoreal_bridge.v lowering: a wreal net
 verilog-ams/digital/vams_digital_abstime_math.v lowering: the system function `$abstime`

@@ -28,6 +28,7 @@ const files = @import("files.zig");
 const scan = @import("scan.zig");
 const queues = @import("queues.zig");
 const time = @import("time.zig");
+const wide = @import("wide.zig");
 const Literal = logic.Literal;
 const Bit = logic.Bit;
 const Error = State.Error;
@@ -91,13 +92,30 @@ pub fn eval(s: *State, a: Allocator, e: u32) Error!Literal {
             else => .xnor_bits, // else: the sixth reduction
         }), ty),
         .truth => scalarIn(a, try truth(s, a, d.a), ty),
-        .add, .sub, .mul, .div, .mod => (try eval(s, a, d.a)).arithmetic(a, switch (row.tag) {
-            .add => .add,
-            .sub => .subtract,
-            .mul => .multiply,
-            .div => .divide,
-            else => .remainder, // else: `%`
-        }, try eval(s, a, d.b)),
+        .add, .sub => (try eval(s, a, d.a)).arithmetic(a, if (row.tag == .add) .add else .subtract, try eval(s, a, d.b)),
+        .mul, .div, .mod, .pow => blk: {
+            const x = try eval(s, a, d.a);
+            const y = try eval(s, a, d.b);
+            const op: wide.Op = switch (row.tag) {
+                .mul => .mul,
+                .div => .div,
+                .mod => .rem,
+                else => .pow, // else: `**`
+            };
+            const widest = @max(x.width, y.width);
+            if (widest > 64 and widest <= wide.max_width) {
+                const out = try filled(a, if (op == .pow) x.width else widest, if (op == .pow) x.signed else x.signed and y.signed, .zero);
+                const done = wide.arith(op, x, y, out);
+                assert(done);
+                break :blk out;
+            }
+            break :blk if (op == .pow) x.power(a, y) else x.arithmetic(a, switch (op) {
+                .mul => .multiply,
+                .div => .divide,
+                .rem => .remainder,
+                .pow => unreachable,
+            }, y);
+        },
         .bit_and, .bit_or, .bit_xor, .bit_xnor => (try eval(s, a, d.a)).bitwise(a, switch (row.tag) {
             .bit_and => .and_bits,
             .bit_or => .or_bits,
@@ -110,7 +128,6 @@ pub fn eval(s: *State, a: Allocator, e: u32) Error!Literal {
             .ashl => .arithmetic_left,
             else => .arithmetic_right, // else: `>>>`
         }, try eval(s, a, d.b)),
-        .pow => (try eval(s, a, d.a)).power(a, try eval(s, a, d.b)),
         .eq, .neq, .case_eq, .case_neq => scalarIn(a, (try eval(s, a, d.a)).equality(switch (row.tag) {
             .eq => .equal,
             .neq => .not_equal,

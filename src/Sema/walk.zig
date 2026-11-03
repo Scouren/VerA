@@ -23,6 +23,7 @@
 //! - `pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const Given, dps: []const Dp, file: Zcu.File.Index, src: Inst.Ref) Allocator.Error!Zcu.Hier`
 //! - `pub fn isOverridable(vir: *const Vir, p: Inst.Index) bool`
 //! - `pub fn payloadOf(vir: *const Vir, comptime T: type, i: Inst.Index) T`
+//! - `pub fn segment(arena: Allocator, name: []const u8) Allocator.Error![]const u8`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -170,6 +171,17 @@ pub fn isOverridable(vir: *const Vir, p: Inst.Index) bool {
     assert(vir.instructions.items(.tag)[@backingInt(p)] == .param);
     const f = payloadOf(vir, Inst.Param, p).flags;
     return f.kind == .parameter and !f.local;
+}
+
+/// A name as one segment of a hierarchical path: as written, or, when it
+/// is no simple identifier (§2.7.1: an escaped one such as `\a.b `), with
+/// its backslash and terminating space, so a `.` in it is no separator.
+pub fn segment(arena: Allocator, name: []const u8) Allocator.Error![]const u8 {
+    assert(name.len != 0);
+    const simple = for (name, 0..) |c, k| {
+        if (!(std.ascii.isAlphanumeric(c) or c == '_' or (c == '$' and k != 0))) break false;
+    } else !std.ascii.isDigit(name[0]);
+    return if (simple) name else std.fmt.allocPrint(arena, "\\{s} ", .{name});
 }
 
 /// The payload of `pl_node` instruction `i`.
@@ -444,6 +456,9 @@ fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i:
         // A.5.4: a named UDP instance parses as a module instance, so its
         // `#( … )` is A.2.2.3's `delay2`: at most two values, in order.
         const params = vir.list(Inst.Arg, in.params);
+        // §2.6.2: a scale factor is a real literal's, and a digital delay
+        // is no real.
+        if (in.flags.scaled) try s.fail(.E0247, file, i.toRef(), "a scaled literal in `{s}`'s UDP delay", .{vir.string(in.target)});
         if (params.len > 2 or (params.len != 0 and params[0].name != .empty))
             try s.fail(.E0239, file, i.toRef(), "`{s} #(…) {s}`: {d} value(s)", .{ vir.string(in.target), vir.string(in.name), params.len });
         return;
@@ -456,7 +471,7 @@ fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i:
         try w.givens.append(s.arena, .{ .name = try ip.getString(s.gpa, vir.string(a.name)), .value = v });
     }
     const givens: Run = .{ .start = start, .len = @intCast(w.givens.items.len - start) };
-    const name = vir.string(in.name);
+    const name = try segment(s.arena, vir.string(in.name));
     if (in.range.len == 0) {
         const n = try ip.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ prefix, name }));
         return w.kids.append(s.arena, .{ .parent = index, .file = file, .src = i.toRef(), .name = n, .target = try boundTarget(w, index, n, target), .givens = givens, .quiet = false });

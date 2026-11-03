@@ -398,7 +398,9 @@ pub const Instance = extern struct {
     name: String,
     prev: Ref,
     target: String,
-    flags: packed struct(u32) { kind: enum(u2) { module, udp, gate }, _: u30 = 0 },
+    /// `scaled`: a `#()` value is a real literal with a Table 2-1 scale
+    /// factor (`#(1k)`), which a UDP's delay may not hold (§2.6.2).
+    flags: packed struct(u32) { kind: enum(u2) { module, udp, gate }, scaled: bool = false, _: u29 = 0 },
     strength: String,
     delay: Exprs,
     range: Body,

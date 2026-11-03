@@ -11,7 +11,7 @@
 //!
 //! Contents:
 //! - `pub const Const`
-//! - `pub const Env = struct` (`init`, `deinit`, `body`, `bodyValue`, `ref`, `param`, `named`, `systemNamed`, `toConst`, `intern`, `arraySize`)
+//! - `pub const Env = struct` (`init`, `deinit`, `body`, `bodyValue`, `ref`, `param`, `named`, `systemNamed`, `toConst`, `intern`, `arraySize`, `dependsOn`)
 //! - `pub const eval_depth_max: u32`
 
 const std = @import("std");
@@ -59,6 +59,8 @@ pub const Env = struct {
     genvars: std.AutoHashMapUnmanaged(Inst.Index, i64) = .empty,
     /// Parameters being folded: a read of one of these closes a cycle.
     busy: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty,
+    /// A read of a `busy` parameter happened (`dependsOn`).
+    cycled: bool = false,
     /// §9.18 this instance's hierarchical system parameters, once known.
     hier: Zcu.Hier = .initFill(.undef),
     depth: u32 = 0,
@@ -137,6 +139,23 @@ pub const Env = struct {
         return n;
     }
 
+    /// Whether folding `b` reads parameter `target`, directly or through
+    /// the defaults of the parameters it reads: every cached value is
+    /// folded again with `target` busy, then restored.
+    pub fn dependsOn(env: *Env, b: Vir.Body, target: Inst.Index) Allocator.Error!bool {
+        assert(env.vir.instructions.items(.tag)[@backingInt(target)] == .param);
+        assert(!env.busy.contains(target));
+        const saved = try env.arena.dupe(InternPool.Index, env.values.items);
+        defer @memcpy(env.values.items, saved);
+        @memset(env.values.items, .none);
+        try env.busy.put(env.gpa, target, {});
+        defer _ = env.busy.remove(target);
+        env.cycled = false;
+        _ = try env.body(b);
+        defer env.cycled = false;
+        return env.cycled;
+    }
+
     /// The value of `r`, or null when it has none at elaboration.
     pub fn ref(env: *Env, r: Inst.Ref) Allocator.Error!?Const {
         const i = r.toIndex() orelse return null;
@@ -152,7 +171,10 @@ pub const Env = struct {
         assert(env.vir.instructions.items(.tag)[@backingInt(p)] == .param);
         const pos = env.positions.get(p);
         if (pos) |k| if (env.values.items[k] != .none) return env.toConst(env.values.items[k]);
-        if (env.busy.contains(p)) return null;
+        if (env.busy.contains(p)) {
+            env.cycled = true;
+            return null;
+        }
         try env.busy.put(env.gpa, p, {});
         defer _ = env.busy.remove(p);
         const decl = env.payload(Inst.Param, p);

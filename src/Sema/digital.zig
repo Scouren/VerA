@@ -337,6 +337,9 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *[]const u8) Er
 
 fn spine(l: *Lower) Error!void {
     if (l.zcu.instances.len == 0) return l.refuse("a design with no instance");
+    // §17.2.1/§17.2.9 a relative data file is looked for beside the design.
+    const pp = l.options.sources[0].pp;
+    if (pp.files.len != 0) l.b.p.file_name = try l.b.string(pp.files[0].name);
     try timeScales(l);
     try decl.declare(l);
     try stmt.compileAll(l);

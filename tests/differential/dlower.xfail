@@ -20,16 +20,13 @@ verilog/05_expressions/concatenation.v lowering: a constant expression Sema/eval
 verilog/05_expressions/conditional_real_x.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/05_expressions/constant_operands.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
 verilog/05_expressions/constant_select_and_function.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
-verilog/05_expressions/memory_index_out_of_range_x.v lowering: the system task `$sformat`
 verilog/05_expressions/native_array_selects.v lowering: an intra-assignment timing control
 verilog/05_expressions/native_wide_index_edges.v lowering: a range past 2^32 bits
 verilog/06_assignments/native_select_assignment_effects.v lowering: an intra-assignment timing control
 verilog/06_assignments/net_array_element_selects.v lowering: a continuous assignment to a net array element
 verilog/06_assignments/select_bus.v lowering: a port with a net declaration assignment
-verilog/07_gate_switch_level/mos_data_undriven_supply.v lowering: a %l or %v conversion
 verilog/07_gate_switch_level/pull_gate_bit_select.v lowering: an inout port joined to a select, a concatenation or a net of another width
-verilog/07_gate_switch_level/tran_from_supply_undriven.v lowering: a %l or %v conversion
-verilog/07_gate_switch_level/tran_strength_display.v lowering: a %l or %v conversion
+verilog/07_gate_switch_level/tran_from_supply_undriven.v transcript differs at byte 0 (old 6 bytes, new 6): old "St1 1\n" new "HiZ z\n"
 verilog/07_gate_switch_level/unordered_delay_triples.v lowering: a fork-join block
 verilog/09_behavioral_modeling/assignment_assign_deassign.v lowering: a procedural continuous assignment
 verilog/09_behavioral_modeling/assignment_force_release.v lowering: a procedural continuous assignment
@@ -140,23 +137,15 @@ verilog/12_hierarchy/select_sinks.v lowering: an output port connected to a sele
 verilog/12_hierarchy/select_warning.v lowering: an output port connected to a select or an expression
 verilog/12_hierarchy/two_top_level_modules.v lowering: an untyped parameter a defparam sets
 verilog/12_hierarchy/variable_port_select_sinks.v lowering: an output port connected to a select or an expression
-verilog/13_configuration/cell_use_binds_named_cell.v lowering: a %l or %v conversion
 verilog/13_configuration/cfg1_default_liblist.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/13_configuration/cfg2_gate_first.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/13_configuration/cfg3_cell_use.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/13_configuration/cfg4_instance_liblist.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/13_configuration/cfg6_hierarchical.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/13_configuration/command_line_search_order.v a library map or list (`//@ libmap`, `//@ liblist`)
-verilog/13_configuration/config_binding_display.v lowering: a %l or %v conversion
-verilog/13_configuration/config_named_like_module.v lowering: a %l or %v conversion
 verilog/13_configuration/config_overrides_command_line.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/13_configuration/default_search_order.v a library map or list (`//@ libmap`, `//@ liblist`)
-verilog/13_configuration/empty_liblist_parent_library.v lowering: a %l or %v conversion
-verilog/13_configuration/every_instance_bound.v lowering: a %l or %v conversion
-verilog/13_configuration/every_rule_form.v lowering: a %l or %v conversion
-verilog/13_configuration/hierarchical_config.v lowering: a %l or %v conversion
 verilog/13_configuration/include_map.v a library map or list (`//@ libmap`, `//@ liblist`)
-verilog/13_configuration/instance_use_binds_named_cell.v lowering: a %l or %v conversion
 verilog/13_configuration/parent_library_by_map.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/13_configuration/resolution_order.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/14_specify_blocks/delay_selection.v lowering: a specify block
@@ -202,113 +191,17 @@ verilog/15_timing_checks/timing_check_forms.v lowering: a specify block
 verilog/15_timing_checks/vector.v lowering: a specify block
 verilog/15_timing_checks/width.v lowering: a specify block
 verilog/16_sdf/sdf_absolute_path_delay.v lowering: a specify block
-verilog/16_sdf/sdf_interconnect_delay.v lowering: the system function `$fopen`
+verilog/16_sdf/sdf_interconnect_delay.v lowering: the system task `$sdf_annotate`
 verilog/16_sdf/sdf_label_reevaluates_path.v lowering: a specify block
 verilog/16_sdf/sdf_min_typ_max_selection.v lowering: a specify block
 verilog/16_sdf/sdf_multiple_files_scoped.v lowering: a specify block
 verilog/16_sdf/sdf_ordered_increment.v lowering: a specify block
 verilog/16_sdf/sdf_timing_check_limit.v lowering: a specify block
-verilog/17_system_tasks/append_writes_at_end.v lowering: the system function `$fopen`
-verilog/17_system_tasks/closed_channel_not_written.v lowering: the system function `$fopen`
 verilog/17_system_tasks/conversions.v lowering: a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)
-verilog/17_system_tasks/dist_nonpositive_warning.v lowering: the system function `$dist_exponential`
-verilog/17_system_tasks/dist_reference.v lowering: the system function `$dist_uniform`
-verilog/17_system_tasks/ferror.v lowering: the system function `$fopen`
-verilog/17_system_tasks/fflush.v lowering: the system function `$fopen`
-verilog/17_system_tasks/fgets.v lowering: the system function `$fopen`
-verilog/17_system_tasks/file_read_position.v lowering: the system function `$fopen`
-verilog/17_system_tasks/fmonitor.v lowering: the system function `$fopen`
-verilog/17_system_tasks/fopen_write_append_mcd.v lowering: the system function `$fopen`
-verilog/17_system_tasks/fread.v lowering: the system function `$fopen`
-verilog/17_system_tasks/fscanf_unformatted_u.v lowering: the system function `$fopen`
-verilog/17_system_tasks/fscanf.v lowering: the system function `$fopen`
-verilog/17_system_tasks/fstrobe.v lowering: the system function `$fopen`
-verilog/17_system_tasks/logic_planes.v lowering: the system task `$sync$and$array`
 verilog/17_system_tasks/native_binary_file_targets.v lowering: an event control on an expression or a select
-verilog/17_system_tasks/native_file_input_targets.v lowering: the system function `$fopen`
-verilog/17_system_tasks/native_file_scan_targets.v lowering: the system function `$fopen`
-verilog/17_system_tasks/native_nested_scan_destinations.v lowering: the system function `$sscanf`
-verilog/17_system_tasks/native_sformat_dynamic.v lowering: the system task `$sformat`
-verilog/17_system_tasks/pla_async_personality.v lowering: the system task `$async$and$array`
-verilog/17_system_tasks/plane_example.v lowering: the system task `$async$and$plane`
-verilog/17_system_tasks/pla_plane_ignore.v lowering: the system task `$sync$and$plane`
-verilog/17_system_tasks/pla_plane_x_worst_case.v lowering: the system task `$sync$and$plane`
-verilog/17_system_tasks/pla_sync_array_logic.v lowering: the system task `$sync$and$array`
-verilog/17_system_tasks/printtimescale_current_scope.v lowering: the system task `$printtimescale`
-verilog/17_system_tasks/printtimescale_named_module.v lowering: the system task `$printtimescale`
-verilog/17_system_tasks/printtimescale_names_parameter.v lowering: the system task `$printtimescale`
-verilog/17_system_tasks/printtimescale_prints_argument.v lowering: the system task `$printtimescale`
-verilog/17_system_tasks/q_exam_code_runtime.v lowering: the system task `$q_initialize`
-verilog/17_system_tasks/q_exam_means.v lowering: the system task `$q_initialize`
-verilog/17_system_tasks/q_exam_peak_length.v lowering: the system task `$q_initialize`
-verilog/17_system_tasks/q_exam.v lowering: the system task `$q_initialize`
-verilog/17_system_tasks/q_full.v lowering: the system task `$q_initialize`
-verilog/17_system_tasks/queue_capacity_stats.v lowering: the system task `$q_initialize`
-verilog/17_system_tasks/queue_order_payload.v lowering: the system task `$q_initialize`
-verilog/17_system_tasks/queue_status_boundaries.v lowering: the system task `$q_initialize`
-verilog/17_system_tasks/random_seed_reference.v lowering: a seeded $random
-verilog/17_system_tasks/readmem_address_outside_memory.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_address_outside_task_range.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_address_range_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_address_restart.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_address_underscore.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_address_x_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_address_zero_padding.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_binary_file_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmemb_range.v lowering: the system task `$readmemb`
-verilog/17_system_tasks/readmem_count_warning.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_edge_address_bad_digit_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_edge_address_gap_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_edge_address_overflow_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_edge_after_range_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_edge_underscore_leading_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_edge_underscore_only_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_excess_legal_neighbor.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_file_name_variable.v lowering: the system task `$readmemb`
-verilog/17_system_tasks/readmem_file_past_4mib.v lowering: the system function `$fopen`
-verilog/17_system_tasks/readmemh.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_invalid_high_binary_load_terminated.v lowering: the system task `$readmemb`
-verilog/17_system_tasks/readmem_invalid_high_hex_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_lowest_descending.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_malformed_base_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_malformed_base_wide_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_malformed_binary_digit_load_terminated.v lowering: the system task `$readmemb`
-verilog/17_system_tasks/readmem_malformed_hex_digit_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_malformed_legal_neighbors.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_malformed_punctuation_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_malformed_width_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_malformed_width_wide_load_terminated.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_overflow_rejected.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_oversized_legal.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_question_z.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_start_address_load_terminated.v lowering: the system task `$readmemb`
-verilog/17_system_tasks/readmem_start_formfeed.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_underscore_legal.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_unknown_bound_load_terminated.v lowering: the system task `$readmemb`
-verilog/17_system_tasks/readmem_variable_bounds.v lowering: the system task `$readmemb`
-verilog/17_system_tasks/readmem_warn_binary_excess_start.v lowering: the system task `$readmemb`
-verilog/17_system_tasks/readmem_warn_binary_short_start.v lowering: the system task `$readmemb`
-verilog/17_system_tasks/readmem_warn_empty.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_warn_hex_excess_down.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_warn_hex_excess_up.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_warn_hex_short_down.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/readmem_warn_hex_short_up.v lowering: the system task `$readmemh`
-verilog/17_system_tasks/read_needs_read_type.v lowering: the system function `$fopen`
-verilog/17_system_tasks/same_seed_same_value.v lowering: the system function `$dist_uniform`
-verilog/17_system_tasks/seedless_random_starts_at_seed_0.v lowering: a seeded $random
-verilog/17_system_tasks/seek_gap_and_origin.v lowering: the system function `$fopen`
-verilog/17_system_tasks/sformat_excess_argument_warning.v lowering: the system task `$sformat`
-verilog/17_system_tasks/sformat_variable_format.v lowering: the system task `$sformat`
-verilog/17_system_tasks/sscanf_conversions.v lowering: the system function `$sscanf`
-verilog/17_system_tasks/sscanf_field_rules.v lowering: the system function `$sscanf`
-verilog/17_system_tasks/sscanf_time_scaled.v lowering: the system function `$sscanf`
-verilog/17_system_tasks/sscanf_unformatted_z.v lowering: the system task `$sformat`
-verilog/17_system_tasks/sscanf_unknown_input.v lowering: the system function `$sscanf`
-verilog/17_system_tasks/strength_format.v lowering: a %l or %v conversion
-verilog/17_system_tasks/strength_scalar.v lowering: a %l or %v conversion
-verilog/17_system_tasks/string_output.v lowering: the system task `$swrite`
-verilog/17_system_tasks/ungetc_pushback_limit.v lowering: the system function `$fopen`
-verilog/17_system_tasks/ungetc_read_routines.v lowering: the system function `$fopen`
+verilog/17_system_tasks/printtimescale_named_module.v lowering: $printtimescale of a hierarchical name
+verilog/17_system_tasks/printtimescale_names_parameter.v lowering: $printtimescale of a hierarchical name
+verilog/17_system_tasks/printtimescale_prints_argument.v lowering: $printtimescale of a scope
 verilog/18_vcd/dumpfile_default_name.v lowering: the system task `$dumpvars`
 verilog/18_vcd/dumpfile_variable_name.v lowering: the system task `$dumpfile`
 verilog/18_vcd/dumplimit_stops_with_comment.v lowering: the system task `$dumpfile`
@@ -328,7 +221,6 @@ verilog/18_vcd/vcd_dumpvars.v lowering: the system task `$dumpfile`
 verilog/18_vcd/version_names_dumpfile_literal.v lowering: the system task `$dumpfile`
 verilog/18_vcd/version_names_dumpfile_variable.v lowering: the system task `$dumpfile`
 verilog/19_compiler_directives/ams_keywords_are_identifiers.v lowering: a string variable
-verilog/19_compiler_directives/no_timescale_is_1s_1s.v lowering: the system task `$printtimescale`
 verilog/19_compiler_directives/unconnected_drive_pull_meets_the_strength_model.v lowering: a hierarchical name
 verilog/A_formal_syntax/b_A_1_1_incdir.v a library map or list (`//@ libmap`, `//@ liblist`)
 verilog/A_formal_syntax/b_A_1_1_library_text.v a library map or list (`//@ libmap`, `//@ liblist`)

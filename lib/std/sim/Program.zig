@@ -21,7 +21,7 @@
 //! - `pub const Math = enum(u8)`, `pub const Elem = struct`, `pub const Select = struct` (`Select.Mode`)
 //! - `pub const Piece.none_width`
 //! - `pub const Repeat = struct`, `pub const Fork = struct`, `pub const Sample = struct` (`Sample.Mode`)
-//! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const SWrite = struct`, `pub const Random = struct`, `pub const Dist = enum(u32)`, `pub const FileCall = struct`, `pub const ScanCall = struct`, `pub const Fread = struct`, `pub const FileOp = enum(u32)`, `pub const FShow = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
+//! - `pub const Task = struct`, `pub const ReadMem = struct`, `pub const SWrite = struct`, `pub const Random = struct`, `pub const Dist = enum(u32)`, `pub const FileCall = struct`, `pub const QueueCall = struct`, `pub const QueueOp = enum(u32)`, `pub const ScanCall = struct`, `pub const Fread = struct`, `pub const FileOp = enum(u32)`, `pub const FShow = struct`, `pub const TimeFormat = struct`, `pub const Monitor = struct`
 //! - `pub const Net = struct` (`Net.no_decay`), `pub const Driver = struct` (`Driver.Source`)
 //! - `pub const Cond = struct` (`Cond.Op`), `pub const CheckEvent = struct`, `pub const Check = struct`
 //! - `pub const Vcd = struct` (`Vcd.VcdScope`, `Vcd.Var`), `pub const DumpCall = struct`, `pub const DumpOp = enum(u32)`
@@ -297,6 +297,8 @@ pub const Expr = struct {
         scan,
         /// §17.2.4.4 `$fread`: `a` an `Fread` in `extra`; the bytes read in `ty`.
         fread,
+        /// §17.6.4 `$q_full`: `a` a `QueueCall` in `extra`; 1 when full, in `ty`.
+        q_full,
     };
 
     // One row per operator.
@@ -483,6 +485,7 @@ pub const Task = struct {
     /// `.readmem`: a `ReadMem` in `extra`. `.swrite`: a `SWrite`.
     /// `.fshow`, `.fstrobe`: an `FShow`. `.fclose`: the descriptor row.
     /// `.dump`: a `DumpCall`. `.ports`: a `PortsCall`. `.sdf`: an `SdfCall`.
+    /// `.queue`: a `QueueCall`.
     /// `.show`, `.strobe`: a `Show` index in `shows`. `.monitor`: a
     /// `Monitor` in `extra`. `.timeformat`: a `TimeFormat` in `extra`, or
     /// `none`.
@@ -490,7 +493,7 @@ pub const Task = struct {
     a: u32,
     b: List = .empty,
 
-    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem, swrite, fshow, fstrobe, fclose, fflush, dump, ports, sdf };
+    pub const Kind = enum(u32) { show, strobe, monitor, monitor_on, monitor_off, finish, stop, timeformat, readmem, swrite, fshow, fstrobe, fclose, fflush, dump, ports, sdf, queue };
 };
 
 /// §17.2.9 a `$readmemb`/`$readmemh` call: the file's name (text, or the
@@ -594,6 +597,14 @@ pub const ScanCall = struct { src: u32, format: u32, outs: List, module: List, s
 /// memory's elements `base..` over declared [low, high] from row `start`
 /// for at most row `count` words (`none`: the defaults).
 pub const Fread = struct { fd: u32, place: u32, ty: Ty, prior: u32, base: u32, low: i32, high: i32, start: u32, count: u32 };
+
+/// §17.6 a queue task or `$q_full`: which, the scope whose time unit
+/// times the jobs, the arguments (4 value rows, then 4 places; `none`
+/// where an argument is not that kind) and the output places' types.
+pub const QueueCall = struct { op: QueueOp, scope: u32, args: List, ty1: Ty, ty2: Ty, ty3: Ty };
+
+/// §17.6's four tasks (`$q_full` is `q_full`, an expression).
+pub const QueueOp = enum(u32) { initialize, add, remove, exam };
 
 /// §17.2.2 a file output task: show row `show` to descriptor row `fd`.
 pub const FShow = struct { show: u32, fd: u32 };

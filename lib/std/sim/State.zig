@@ -40,6 +40,7 @@ const eval = @import("eval.zig");
 const resolve = @import("resolve.zig");
 const hold = @import("holds.zig");
 const tchk = @import("tchk.zig");
+const queue = @import("queues.zig");
 const vcd = @import("vcd.zig");
 const evcd = @import("evcd.zig");
 const net = @import("net.zig");
@@ -167,6 +168,8 @@ failure: ?[]const u8 = null,
 warnings: std.ArrayList([]const u8) = .empty,
 /// What §17.2.9 reads files through; without it a load warns and ends.
 io: ?std.Io = null,
+/// §17.6 the stochastic queues, by `q_id`.
+queues: queue.Queues = .empty,
 /// §17.9.1 the seedless `$random`'s seed.
 random_seed: i32 = 0,
 /// §17.2 the run's descriptor table (`files.zig`).

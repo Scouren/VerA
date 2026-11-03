@@ -20,6 +20,7 @@
 //! - `Lower.terms(l: *Lower, e: ExprId, out: *std.ArrayList(u32)) E!void`
 //! - `Lower.call(l: *Lower, idx: u32, args: []const ExprId) E!u32`
 //! - `Lower.tyOf(l: *Lower, ty: Type) E!Ty`
+//! - `Lower.queueCall(l: *Lower, op: Program.QueueOp, args: []const ExprId, outs: []const bool) E!u32`
 //! - `pub const E`
 
 const std = @import("std");
@@ -336,6 +337,21 @@ pub const Lower = struct {
         return l.b.extraOf(Program.Call{ .sub = idx, .args = try l.b.listOf(words.items) });
     }
 
+    /// A §17.6 `Program.QueueCall` of `args` (`outs[k]`: argument k is
+    /// written; the rest are read), in `extra`.
+    pub fn queueCall(l: *Lower, op: Program.QueueOp, args: []const ExprId, outs: []const bool) E!u32 {
+        const none = @backingInt(Program.Ref.none);
+        var words: [8]u32 = @splat(none);
+        var tys: [4]Ty = @splat(.bit);
+        for (args, outs[0..args.len], 0..) |arg, out, k| {
+            if (out) {
+                words[4 + k] = try l.place(arg);
+                tys[k] = try l.tyOf(try l.targetType(arg));
+            } else words[k] = try l.self_(arg, 0);
+        }
+        return l.b.extraOf(Program.QueueCall{ .op = op, .scope = l.r.scope, .args = try l.b.listOf(&words), .ty1 = tys[1], .ty2 = tys[2], .ty3 = tys[3] });
+    }
+
     /// A §5.5 type as a `Program.Ty`, refused past 2^30 bits.
     pub fn tyOf(l: *Lower, ty: Type) E!Ty {
         if (ty.real) return Ty.real_ty;
@@ -502,6 +518,7 @@ pub const Lower = struct {
                 }
                 break :blk try l.b.expr(.fread, natural, try l.b.extraOf(fr), 0);
             },
+            .q_full => try l.b.expr(.q_full, natural, try l.queueCall(.initialize, args, &.{ false, true, false, false }), 0),
             .random, .dist_uniform, .dist_normal, .dist_exponential, .dist_poisson, .dist_chi_square, .dist_t, .dist_erlang => blk: {
                 const none = @backingInt(Program.Ref.none);
                 const dist: Program.Dist = switch (f) {

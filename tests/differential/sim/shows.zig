@@ -72,7 +72,16 @@ pub fn task(l: *Lower, t: Task, args: []const ExprId, tok: u32, pc: u32) E!u32 {
             });
             break :blk l.b.extraOf(Program.Task{ .kind = .readmem, .a = rm });
         },
-        .queue => l.refuse("a §17.6 queue task"),
+        .queue => |op| blk: {
+            // Which arguments each task writes (§17.6.1-§17.6.5).
+            const outs: []const bool = switch (op) {
+                .initialize, .add => &.{ false, false, false, true },
+                .remove => &.{ false, true, true, true },
+                .exam => &.{ false, false, true, true },
+            };
+            const q = try l.queueCall(@fromBackingInt(@intCast(@backingInt(op))), args, outs);
+            break :blk l.b.extraOf(Program.Task{ .kind = .queue, .a = q });
+        },
         .pla => l.refuse("a §17.5 PLA task"),
         .fclose => l.b.extraOf(Program.Task{ .kind = .fclose, .a = try l.self_(args[0], 0) }),
         .fflush => l.b.extraOf(Program.Task{ .kind = .fflush, .a = 0 }),

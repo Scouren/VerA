@@ -32,14 +32,6 @@ verilog/17_system_tasks/pla_plane_x_worst_case.v bridge: a §17.5 PLA task
 verilog/17_system_tasks/pla_sync_array_logic.v bridge: a §17.5 PLA task
 verilog/17_system_tasks/plane_example.v bridge: a §17.5 PLA task
 verilog/17_system_tasks/plusargs_variable_query.v bridge: the system function $test_plusargs
-verilog/17_system_tasks/q_exam.v bridge: a §17.6 queue task
-verilog/17_system_tasks/q_exam_code_runtime.v bridge: a §17.6 queue task
-verilog/17_system_tasks/q_exam_means.v bridge: a §17.6 queue task
-verilog/17_system_tasks/q_exam_peak_length.v bridge: a §17.6 queue task
-verilog/17_system_tasks/q_full.v bridge: a §17.6 queue task
-verilog/17_system_tasks/queue_capacity_stats.v bridge: a §17.6 queue task
-verilog/17_system_tasks/queue_order_payload.v bridge: a §17.6 queue task
-verilog/17_system_tasks/queue_status_boundaries.v bridge: a §17.6 queue task
 verilog/17_system_tasks/sformat_excess_argument_warning.v bridge: a $sformat format held in a variable
 verilog/17_system_tasks/sformat_variable_format.v bridge: a $sformat format held in a variable
 verilog/17_system_tasks/test_plusargs_absent.v bridge: the system function $test_plusargs

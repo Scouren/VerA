@@ -30,6 +30,7 @@ const tchk = @import("tchk.zig");
 const vcd = @import("vcd.zig");
 const evcd = @import("evcd.zig");
 const sdf = @import("sdf.zig");
+const queues = @import("queues.zig");
 const Error = State.Error;
 const Literal = logic.Literal;
 
@@ -379,6 +380,7 @@ fn task(s: *State, a: Allocator, at: u32, pc: u32) Error!Flow {
         .dump => try vcd.task(s, a, t.a),
         .ports => try evcd.task(s, a, t.a),
         .sdf => try sdf.annotate(s, a, t.a),
+        .queue => try queues.task(s, a, t.a),
         .finish, .stop => {
             const verbose = t.a == @backingInt(Program.Ref.none) or ((try eval.eval(s, a, t.a)).asInt() orelse 1) != 0;
             if (verbose) {

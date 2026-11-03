@@ -30,6 +30,7 @@
 //! Contents:
 //! - `pub const print`, `pub const Verify`, `pub const interp`: the files under `Air/`
 //! - `pub const Interval`, `pub const Float`, `pub const Legalize`, `pub const Setup`: the passes
+//! - `pub const Device`: the device tables beside a body
 //! - `pub const Inst = struct` (`Index`, `Ref` (`fromIndex`, `fromIntern`, `toIndex`, `toInterned`), `Tag`, `Data`)
 //! - `pub const ExtraIndex = enum(u32)`
 //! - `pub const Block`, `pub const CondBr`, `pub const Bin`, `pub const Call`: the `extra` payloads
@@ -64,6 +65,8 @@ pub const Float = @import("Air/Float.zig");
 pub const Legalize = @import("Air/Legalize.zig");
 /// Solve invariance, the timepoint check, the held-slot prune.
 pub const Setup = @import("Air/Setup.zig");
+/// The device tables Sema writes beside a body.
+pub const Device = @import("Air/Device.zig");
 
 /// One row per instruction; `Inst.Index` `i` is row `i`.
 instructions: std.MultiArrayList(Inst).Slice,
@@ -668,4 +671,5 @@ test {
     _ = Float;
     _ = Legalize;
     _ = Setup;
+    _ = Device;
 }

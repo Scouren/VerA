@@ -22,4 +22,9 @@ test {
     _ = @import("Sema/discipline.zig");
     _ = @import("Sema/connect.zig");
     _ = @import("Sema/test.zig");
+    _ = @import("Sema/decl.zig");
+    _ = @import("Sema/expr.zig");
+    _ = @import("Sema/control.zig");
+    _ = @import("Sema/contrib.zig");
+    _ = @import("Sema/syscall.zig");
 }

@@ -14,6 +14,10 @@
 //! Contents:
 //! - `pub const Config = struct` (`Roots`, `Override`)
 //! - `pub fn elaborate(zcu: *Zcu, config: Config) Allocator.Error!void`
+//! - `pub const Analysis = struct` (`deinit`)
+//! - lowering's types: `pub const Ty`, `pub const Value`, `pub const Slot`, `pub const Bind`, `pub const Unit`, `pub const ContribKey`, `pub const Block` (`Loop`, `child`)
+//! - `pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis`
+//! - `pub fn addInst(s: *Sema, b: *Block, inst: Air.Inst) Allocator.Error!Air.Inst.Ref`
 //! - `pub fn fail(s: *Sema, code: Diag.Code, file: Zcu.File.Index, src: Vir.Inst.Ref, comptime fmt: []const u8, args: anytype) Allocator.Error!void`
 //! - `pub fn bound(s: *Sema, cell: InternPool.String, path: []const u8) InternPool.String`
 
@@ -22,12 +26,14 @@ const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const vams = @import("vams");
 const InternPool = @import("intern_pool");
+const Air = @import("air");
 const Zcu = @import("Zcu.zig");
 const walk = @import("Sema/walk.zig");
 const paramset = @import("Sema/paramset.zig");
 const checks = @import("Sema/checks.zig");
 const connect = @import("Sema/connect.zig");
 const defparam = @import("Sema/defparam.zig");
+const lower_decl = @import("Sema/decl.zig");
 const Vir = vams.Vir;
 const Diag = vams.Diag;
 const Inst = Vir.Inst;
@@ -41,6 +47,44 @@ config: Config,
 /// instance paths and cell names to the cell each binds instead.
 uses: std.StringHashMapUnmanaged(InternPool.String) = .empty,
 
+// ---- analog lowering (`analyze`): each table's one writer is a file under `Sema/` ----
+/// The body being written.
+air: Air.Builder = .{},
+/// The device tables beside it.
+device: Air.Device = .{},
+/// The main body's slots, placed ahead of its statements so every body
+/// below may read them (decl.zig).
+prologue: std.ArrayList(Air.Inst.Index) = .empty,
+/// One per instance lowered, in `zcu.instances` order (decl.zig).
+units: std.ArrayList(Unit) = .empty,
+/// A net's flat name to its `device.nodes` row (decl.zig).
+node_rows: std.AutoHashMapUnmanaged(InternPool.String, Air.Device.Node.Index) = .empty,
+/// §5.4.2 a node pair to its flow unknown (contrib.zig).
+flow_rows: std.AutoHashMapUnmanaged([2]Air.Device.Node.Index, Air.Device.Node.Index) = .empty,
+/// §5.6 a contribution target to its row (contrib.zig).
+contrib_rows: std.AutoHashMapUnmanaged(ContribKey, Air.Device.Contribution.Index) = .empty,
+/// Each `device.params` row's `arg` in the prologue, by row (decl.zig).
+param_args: std.ArrayList(Value) = .empty,
+/// How deep the expression being lowered nests (expr.zig).
+expr_depth: u32 = 0,
+/// Each node row's one `probe`, in the prologue (contrib.zig).
+probes: std.AutoHashMapUnmanaged(Air.Device.Node.Index, Air.Inst.Ref) = .empty,
+/// §3.6.2 every access function name and the quantity it reads under a
+/// discipline that binds it; each discipline's two names (contrib.zig).
+access_kind: std.StringHashMapUnmanaged(Air.Device.Access) = .empty,
+disc_access: std.StringHashMapUnmanaged([2][]const u8) = .empty,
+disciplines_loaded: bool = false,
+/// Access names more than one discipline binds, to different quantities.
+access_both: std.StringHashMapUnmanaged(void) = .empty,
+/// §9.4.1 the unconditional prints, minted at the end (syscall.zig).
+deferred: std.ArrayList(@import("Sema/syscall.zig").Deferred) = .empty,
+/// The target of the `<+` whose right-hand side is being lowered (contrib.zig).
+contrib_target: ?@import("Sema/contrib.zig").Target = null,
+/// Each contribution row's instance, by row (contrib.zig).
+contrib_units: std.ArrayList(Zcu.Instance.Index) = .empty,
+/// The contribution rows a reactive term was added to (contrib.zig).
+react_written: std.AutoHashMapUnmanaged(Air.Device.Contribution.Index, void) = .empty,
+
 /// What elaboration reads besides the files.
 pub const Config = struct {
     roots: Roots = .all,
@@ -53,6 +97,101 @@ pub const Config = struct {
     pub const Roots = enum { first, all };
     /// A root parameter's value given on the command line.
     pub const Override = struct { name: []const u8, value: InternPool.Index };
+};
+
+/// One analysed analog design: its body and its device tables. The caller
+/// frees both with `deinit`.
+pub const Analysis = struct {
+    air: Air,
+    device: Air.Device,
+
+    pub fn deinit(a: *Analysis, gpa: Allocator) void {
+        a.air.deinit(gpa);
+        a.device.deinit(gpa);
+        a.* = undefined;
+    }
+};
+
+/// A §3.2 value type as lowering tracks it (the `Air` operand types plus
+/// §2.7 strings, which only system tasks read).
+pub const Ty = enum(u8) { real, integer, string };
+
+/// A lowered expression: its operand and its type.
+pub const Value = struct {
+    ref: Air.Inst.Ref,
+    ty: Ty,
+};
+
+/// A variable's slot: its `alloc` and its type.
+pub const Slot = struct { alloc: Air.Inst.Index, ty: Ty };
+
+/// What a declaration of an analysed module stands for in one instance.
+pub const Bind = union(enum) {
+    /// A scalar net or port: its node row (or `ground`).
+    node: Air.Device.Node.Index,
+    /// A §3.6.3 vector net: `len` rows from `first` in `Unit.vec_rows`,
+    /// declaration order (msb first).
+    vector: struct { first: u32, len: u32, msb: i64, lsb: i64 },
+    /// A §3.4 parameter: its card row.
+    param: Air.Device.Param.Index,
+    /// A §3.2 variable.
+    slot: Slot,
+    /// A §3.12 named branch.
+    branch: Air.Device.Branch.Index,
+    /// A §6.6.1 genvar's current value, or another name with one constant.
+    constant: InternPool.Index,
+};
+
+/// One instance being lowered: its module's file and Vir, the flat-name
+/// prefix the old flattener gave its declarations (`u1.`), and what each
+/// of its declarations binds to.
+pub const Unit = struct {
+    instance: Zcu.Instance.Index,
+    file: Zcu.File.Index,
+    vir: *const Vir,
+    module: Inst.Module,
+    /// "" for the root; else the instance path below it and a `.`.
+    prefix: []const u8,
+    /// Keyed by a declaration's first instruction (its `prev` chain's root).
+    binds: std.AutoHashMapUnmanaged(Inst.Index, Bind) = .empty,
+    /// The rows of every vector net (`Bind.vector`).
+    vec_rows: std.ArrayList(Air.Device.Node.Index) = .empty,
+};
+
+/// §5.6 what makes two contributions one row.
+pub const ContribKey = struct {
+    access: Air.Device.Access,
+    branch: Air.Device.Branch.Index,
+    hi: Air.Device.Node.Index,
+    lo: Air.Device.Node.Index,
+};
+
+/// The context one body is lowered in (Zig's `Sema.Block`): the
+/// instructions it collects, the instance it reads, and what the statements
+/// around it restrict. A child is made for each nested body and dropped
+/// when it closes, so nothing is restored by hand.
+pub const Block = struct {
+    parent: ?*Block,
+    unit: *Unit,
+    /// The body's instructions, in order.
+    insts: std.ArrayList(Air.Inst.Index) = .empty,
+    /// The innermost `loop` around this body (control.zig).
+    loop: ?Loop = null,
+    /// How many runtime conditions enclose this body (§5.8.1).
+    conditional: u32 = 0,
+    /// Inside an `analog initial` block (§5.2.1).
+    analog_initial: bool = false,
+    /// A `break` or `continue` ended the body: nothing more is appended.
+    dead: bool = false,
+
+    /// A loop's targets: the `block` a `break` leaves and the one a
+    /// `continue` leaves (the step follows it).
+    pub const Loop = struct { exit: Air.Inst.Index, cont: Air.Inst.Index };
+
+    /// A child of `parent`: the same instance and restrictions, no instructions.
+    pub fn child(parent: *Block) Block {
+        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .analog_initial = parent.analog_initial };
+    }
 };
 
 const Sema = @This();
@@ -73,6 +212,36 @@ pub fn elaborate(zcu: *Zcu, config: Config) Allocator.Error!void {
     try connect.run(&s, waiting);
     try defparam.reportUnused(&s, waiting);
     assert(zcu.instances.len >= roots.len);
+}
+
+/// Lowers the elaborated design under `zcu.instances[0]` (its first root
+/// and every instance below it) into one `Air` body and its device tables
+/// (docs/rewrite/lower.md). Diagnostics go to `zcu.failed`; null when one
+/// of them is an error. Asserts that `zcu` was elaborated.
+pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis {
+    assert(zcu.instances.len != 0);
+    var arena_state: std.heap.ArenaAllocator = .init(zcu.gpa);
+    defer arena_state.deinit();
+    var s: Sema = .{ .zcu = zcu, .gpa = zcu.gpa, .arena = arena_state.allocator(), .config = .{}, .air = try Air.Builder.init(zcu.gpa) };
+    defer s.air.deinit(zcu.gpa);
+    errdefer s.device.deinit(zcu.gpa);
+    const failed_before = zcu.failed.len;
+    const main = try lower_decl.run(&s);
+    for (zcu.failed.items(.code)[failed_before..]) |c| if (@tagName(c)[0] == 'E') {
+        s.device.deinit(zcu.gpa);
+        return null;
+    };
+    const air = try s.air.finish(zcu.gpa, main);
+    assert(air.mainBody().len == main.len);
+    return .{ .air = air, .device = s.device };
+}
+
+/// Appends `inst` to `b`'s body and returns it as an operand.
+pub fn addInst(s: *Sema, b: *Block, inst: Air.Inst) Allocator.Error!Air.Inst.Ref {
+    const i = try s.air.addInst(s.gpa, inst);
+    try b.insts.append(s.arena, i);
+    assert(b.insts.items[b.insts.items.len - 1] == i);
+    return .fromIndex(i);
 }
 
 /// Appends a diagnostic to `zcu.failed`.

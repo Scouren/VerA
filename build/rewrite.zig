@@ -8,7 +8,8 @@
 //! over every `.v`), `diff-link` (link vs src/zigbuild over the same device
 //! builds), `diff-astgen` (vams AstGen/Vir vs the old compiler's per-file
 //! codes and design units), `diff-elab` (sema's elaboration vs src/elab and
-//! the digital route's), and
+//! the digital route's), `diff-lower` (sema's analog lowering vs
+//! src/analog, values by the old MIR interpreter against Air's), and
 //! `rewrite`, which runs them and the new modules' own tests. All are in
 //! `test`. `build.zig` calls `add` once.
 //!
@@ -34,9 +35,13 @@ pub fn add(g: Graph) void {
     const o = b.addOptions();
     o.addOption([]const u8, "fixture_root", pathFromRoot(b, "tests/conformance/tests"));
     o.addOption([]const u8, "repo_root", pathFromRoot(b, "."));
+    o.addOption([]const u8, "lower_dump", b.option([]const u8, "lower-dump", "diff-lower: print both sides' tables of the fixtures whose path holds this") orelse "");
     // `libc`: the root loads libraries (`dynlib` needs glibc on Linux).
     // `emit_zig`: fixtures whose `vera --emit-zig` text the root reads from
     // the directory `rewrite_options.emitted`, as `<stem>.zig`.
+    // `old_interp`: `src/codegen/verilog/Interp.zig` as a module of its
+    // own, the old concrete MIR interpreter diff-lower holds Air's against.
+    const old_interp = g.m.make("src/codegen/verilog/Interp.zig", &.{.{ .name = "ir", .module = byName(mods, "ir") }});
     const Diff = struct { step: []const u8, root: []const u8, what: []const u8, imports: []const []const u8, libc: bool = false, emit_zig: []const []const u8 = &.{} };
     const diffs = [_]Diff{
         .{ .step = "diff-parse", .root = "tests/differential/parse.zig", .what = "vams tokenizer/Ast/Parse against lib/frontend's lexer and parser on every fixture", .imports = &.{ "vams", "frontend", "diag", "base" } },
@@ -48,11 +53,12 @@ pub fn add(g: Graph) void {
         .{ .step = "diff-air-passes", .root = "tests/differential/air_passes.zig", .what = "the Air passes (Interval, Float, Legalize, Setup) against Air's interpreter over generated programs", .imports = &.{ "air", "intern_pool", "vams" } },
         .{ .step = "diff-sim", .root = "tests/differential/sim.zig", .what = "the std_sim runtime against lib/sim/digital: every .v fixture's transcript, through the bridge", .imports = &.{ "std_sim", "sim", "frontend", "diag", "kernels" } },
         .{ .step = "diff-elab", .root = "tests/differential/elab.zig", .what = "sema's elaboration against src/elab and the digital route's elaboration on every fixture", .imports = &.{ "sema", "vams", "frontend", "diag", "elab", "sim" } },
+        .{ .step = "diff-lower", .root = "tests/differential/lower.zig", .what = "sema's analog lowering against src/analog: tables, codes, and every contribution's value by both interpreters", .imports = &.{ "sema", "air", "intern_pool", "vams", "frontend", "diag", "elab", "analog", "ir", "old_interp" } },
         .{ .step = "diff-link", .root = "tests/differential/link.zig", .what = "link against src/zigbuild: the same devices built by both, at 1 and N jobs", .imports = &.{ "link", "zigbuild", "dynlib", "contract" }, .libc = true, .emit_zig = &.{ "tests/osdi/resistor.va", "tests/osdi/diode.va", "tests/osdi/mixed.va" } },
     };
     for (diffs) |d| {
         const imports = b.allocator.alloc(Build.Module.Import, d.imports.len) catch @panic("OOM");
-        for (imports, d.imports) |*i, name| i.* = .{ .name = name, .module = byName(mods, name) };
+        for (imports, d.imports) |*i, name| i.* = .{ .name = name, .module = if (std.mem.eql(u8, name, "old_interp")) old_interp else byName(mods, name) };
         const mod = g.m.make(d.root, imports);
         if (d.libc and g.m.target.result.os.tag == .linux) mod.link_libc = true;
         const opts = if (d.emit_zig.len == 0) o else emitted: {

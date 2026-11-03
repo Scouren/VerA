@@ -12,12 +12,6 @@
 //! - `pub fn declare(l: *Lower) Error!void`
 //! - `pub fn newScope(l: *Lower, parent: u32, name: []const u8, index: ?i64, time: Program.Time, at: u32, queued: bool) Error!u32`
 //! - `pub fn newFrame(l: *Lower, parent: u32, instance: Zcu.Instance.Index, scope: u32, genvars: []const Frame.Genvar) Error!u32`
-//! - `pub fn locals(l: *Lower, f: u32, body: Vir.Body) Error!void`
-//! - `pub fn variable(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Index) Error!u32`
-//! - `pub fn param(l: *Lower, f: u32, i: Inst.Index) Error!u32`
-//! - `pub fn event(l: *Lower, f: u32, i: Inst.Index) Error!u32`
-//! - `pub fn rangeOf(l: *Lower, f: u32, range: Vir.Body) Error!struct { msb: i64, lsb: i64, width: u32 }`
-//! - `pub fn slots(l: *Lower, ty: Type, count: u32, fill: enum { x, zero }) Error!u32`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -32,13 +26,11 @@ const nets = @import("nets.zig");
 const ports = @import("ports.zig");
 const sub = @import("sub.zig");
 const gates = @import("gates.zig");
+const vars = @import("vars.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Name = digital.Name;
-const Type = digital.Type;
-const Span = digital.Span;
 const Frame = digital.Frame;
-const Proc = digital.Proc;
 const none = digital.none;
 const Program = std_sim.Program;
 const Vir = vams.Vir;
@@ -47,10 +39,7 @@ const Inst = Vir.Inst;
 /// The most iterations one loop generate scheme unrolls (`walk.zig`'s).
 const loop_max: u32 = 1 << 16;
 
-/// The most slots one array declares.
-const array_max: u32 = 1 << 24;
-
-const Placement = struct { scope: u32 = none, frame: u32 = none, index: ?i64 = null, at: u32 = 0, name: []const u8 = "" };
+const Placement = struct { scope: u32 = none, frame: u32 = none, inst: Inst.Index = undefined, index: ?i64 = null, at: u32 = 0, name: []const u8 = "" };
 const Child = struct { parent: u32, name: InternPool.String };
 
 const Walk = struct {
@@ -73,6 +62,7 @@ pub fn declare(l: *Lower) Error!void {
     const zcu = l.zcu;
     const n = zcu.instances.len;
     l.instance_frame = try l.a.alloc(u32, n);
+    l.sites = try l.a.alloc(Lower.Site, n);
     l.envs = try l.a.alloc(eval.Env, n);
     // Where each child instance is declared: its parent scope, set as the
     // parent's walk reaches its `instance` instruction.
@@ -109,179 +99,6 @@ pub fn newFrame(l: *Lower, parent: u32, instance_index: Zcu.Instance.Index, scop
     return f;
 }
 
-/// Binds the block- or subroutine-local declarations of `body` (variables,
-/// parameters, events) in frame `f`, each a slot of its own.
-pub fn locals(l: *Lower, f: u32, body: Vir.Body) Error!void {
-    const vir = l.virOf(f);
-    for (vir.body(body)) |i| switch (Lower.tag(vir, i)) {
-        .variable => {
-            const v = Lower.payload(vir, Inst.Variable, i);
-            if (v.init.len != 0) return l.refuse("an initialized block-local variable");
-            _ = try variable(l, f, i, &.{i});
-        },
-        .param => _ = try param(l, f, i),
-        .event => _ = try event(l, f, i),
-        else => {}, // else: a statement or an expression declares nothing
-    };
-}
-
-/// A §4.2 variable (a `reg`, `integer`, `time`, `real` or `realtime`, an
-/// array of them included) bound to fresh slots, x (a real 0.0) at time 0.
-pub fn variable(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Index) Error!u32 {
-    const vir = l.virOf(f);
-    var storage: Inst.Storage = .reg;
-    var signed = false;
-    var range: Vir.Body = .empty;
-    var dims: Vir.Body = .empty;
-    for (decls) |d| switch (Lower.tag(vir, d)) {
-        .io => {
-            const io = Lower.payload(vir, Inst.Io, d);
-            if (io.flags.storage != .none) storage = io.flags.storage;
-            signed = signed or io.flags.signed;
-            if (range.len == 0) range = io.range;
-            if (dims.len == 0) dims = io.dims;
-        },
-        .variable => {
-            const v = Lower.payload(vir, Inst.Variable, d);
-            if (v.flags.storage != .none) storage = v.flags.storage;
-            signed = signed or v.flags.signed;
-            if (range.len == 0) range = v.range;
-            if (dims.len == 0) dims = v.dims;
-        },
-        else => unreachable, // else: `signal` passes only these two
-    };
-    var n: Name = .{ .kind = .variable };
-    switch (storage) {
-        .real, .realtime => n.ty = Type.real_type,
-        .integer => n.ty = .{ .width = 32, .signed = true },
-        .time => n.ty = .{ .width = 64, .signed = false },
-        .string => return l.refuse("a string variable"),
-        .reg, .none => n.ty = .{ .width = 1, .signed = signed },
-    }
-    if (range.len != 0) {
-        if (n.ty.real) return l.refuse("a real with a range");
-        const r = try rangeOf(l, f, range);
-        n.msb = r.msb;
-        n.lsb = r.lsb;
-        n.ty.width = r.width;
-    } else {
-        n.msb = @as(i64, n.ty.width) - 1;
-        n.scalar = storage == .reg or storage == .none;
-    }
-    if (storage == .integer or storage == .time) n.scalar = false;
-    try arrayOf(l, f, dims, &n);
-    n.slot = try slots(l, n.ty, n.count, if (n.ty.real) .zero else .x);
-    return l.bind(f, first, n);
-}
-
-/// A §4.10 parameter (or specparam, or localparam) of frame `f`: one slot
-/// holding its folded value, in its §12.2 type.
-pub fn param(l: *Lower, f: u32, i: Inst.Index) Error!u32 {
-    const vir = l.virOf(f);
-    const p = Lower.payload(vir, Inst.Param, i);
-    if (p.dims.len != 0) return l.refuse("a parameter array");
-    const env = try l.envAt(f);
-    const value = (try env.param(i)) orelse return l.refuse("a parameter value Sema/eval.zig does not fold (an x/z bit or past 64 bits)");
-    var n: Name = .{ .kind = .param };
-    if (p.range.len != 0) {
-        const r = try rangeOf(l, f, p.range);
-        n.ty = .{ .width = r.width, .signed = p.flags.signed };
-        n.msb = r.msb;
-        n.lsb = r.lsb;
-    } else switch (p.flags.storage) {
-        .integer => n.ty = .{ .width = 32, .signed = true },
-        .time => n.ty = .{ .width = 64, .signed = false },
-        .real, .realtime => n.ty = Type.real_type,
-        .string => return l.refuse("a string parameter"),
-        .none, .reg => n.ty = switch (value) {
-            .real => Type.real_type,
-            .int => |v| .{ .width = if (std.math.cast(i32, v) != null) 32 else 64, .signed = true },
-            .str => |s| .{ .width = @intCast(@max(1, s.len) * 8), .signed = false },
-        },
-    }
-    if (p.flags.signed and !n.ty.real) n.ty.signed = true;
-    if (p.range.len == 0) n.msb = @as(i64, n.ty.width) - 1;
-    if (p.range.len == 0 and p.flags.storage == .none and value == .int) return l.refuse("an untyped integral parameter (its §12.2 type is its value expression's)");
-    const words = Program.words(n.ty.width);
-    const v = try l.a.alloc(u64, words);
-    const x = try l.a.alloc(u64, words);
-    @memset(v, 0);
-    @memset(x, 0);
-    switch (value) {
-        .int => |iv| {
-            if (n.ty.real) {
-                v[0] = @bitCast(@as(f64, @floatFromInt(iv)));
-            } else {
-                const bits: u64 = @bitCast(iv);
-                v[0] = bits;
-                if (n.ty.width < 64) v[0] &= (@as(u64, 1) << @intCast(n.ty.width)) - 1;
-                if (words > 1 and iv < 0 and n.ty.signed) for (v[1..]) |*word| {
-                    word.* = std.math.maxInt(u64);
-                };
-                if (words > 1 and n.ty.width % 64 != 0) v[words - 1] &= (@as(u64, 1) << @intCast(n.ty.width % 64)) - 1;
-            }
-        },
-        .real => |rv| {
-            if (!n.ty.real) return l.refuse("a real value of an integral parameter");
-            v[0] = @bitCast(rv);
-        },
-        .str => |s| {
-            if (n.ty.real) return l.refuse("a string value of a real parameter");
-            // §3.6: packed ASCII, the last character in the low byte.
-            for (0..@min(s.len, words * 8)) |k| {
-                const byte = s[s.len - 1 - k];
-                v[k / 8] |= @as(u64, byte) << @intCast((k % 8) * 8);
-            }
-        },
-    }
-    n.slot = try l.b.slot(try l.tyOf(n.ty), v, x);
-    return l.bind(f, i, n);
-}
-
-/// §5.10.4 a named event (an array of them included): one 1-bit slot per
-/// element, x.
-pub fn event(l: *Lower, f: u32, i: Inst.Index) Error!u32 {
-    const vir = l.virOf(f);
-    const e = Lower.payload(vir, Inst.Name, i);
-    var n: Name = .{ .kind = .event };
-    try arrayOf(l, f, e.dims, &n);
-    n.slot = try slots(l, n.ty, n.count, .x);
-    return l.bind(f, i, n);
-}
-
-/// The declared `[msb:lsb]` of a range body, folded.
-pub fn rangeOf(l: *Lower, f: u32, range: Vir.Body) Error!struct { msb: i64, lsb: i64, width: u32 } {
-    const vir = l.virOf(f);
-    const r = vir.body(range);
-    const bin = Lower.payload(vir, Inst.Bin, r[r.len - 1]);
-    const msb = try l.intOf(f, bin.lhs);
-    const lsb = try l.intOf(f, bin.rhs);
-    const width = std.math.cast(u32, @abs(@as(i128, msb) - lsb) + 1) orelse return l.refuse("a range past 2^32 bits");
-    return .{ .msb = msb, .lsb = lsb, .width = width };
-}
-
-/// `count` fresh slots of type `ty`, every bit `fill` (x, or 0).
-pub fn slots(l: *Lower, ty: Type, count: u32, fill: enum { x, zero }) Error!u32 {
-    const t = try l.tyOf(ty);
-    const words = Program.words(t.width);
-    const v = try l.a.alloc(u64, words);
-    const x = try l.a.alloc(u64, words);
-    @memset(v, 0);
-    @memset(x, 0);
-    if (fill == .x) {
-        @memset(v, std.math.maxInt(u64));
-        @memset(x, std.math.maxInt(u64));
-        if (t.width % 64 != 0) {
-            const mask = (@as(u64, 1) << @intCast(t.width % 64)) - 1;
-            v[words - 1] &= mask;
-            x[words - 1] &= mask;
-        }
-    }
-    const first: u32 = @intCast(l.b.p.slots.len);
-    for (0..count) |_| _ = try l.b.slot(t, v, x);
-    return first;
-}
-
 // ---- private ----
 
 /// One instance: its env (its module's parameters as `Zcu` folded them),
@@ -313,6 +130,7 @@ fn instance(w: *Walk, k: u32) Error!void {
     };
     const f = try newFrame(l, none, @fromBackingInt(k), scope, &.{});
     l.instance_frame[k] = f;
+    l.sites[k] = if (parent == .none) .{ .frame = none, .inst = row.inst } else .{ .frame = w.placed[k].frame, .inst = w.placed[k].inst };
     w.index = k;
     w.conns.clearRetainingCapacity();
     // §12.3 each port's connection, by the declaration it names inside; a
@@ -365,8 +183,8 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
     try l.wires.appendSlice(l.a, w.deferred.items);
     try ports.implicitNets(l, f, all);
     for (all) |i| switch (Lower.tag(vir, i)) {
-        .param => _ = try param(l, f, i),
-        .event => _ = try event(l, f, i),
+        .param => _ = try vars.param(l, f, i),
+        .event => _ = try vars.event(l, f, i),
         else => {}, // else: declared above or below
     };
     for (all) |i| switch (Lower.tag(vir, i)) {
@@ -378,12 +196,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
             try l.scopes.items[scope].procs.append(l.a, .{ .kind = .init_var, .inst = i, .frame = f });
         },
         .instance => try childInstance(w, f, scope, i, prefix),
-        .gen_if => {
-            const g = Lower.payload(vir, Inst.GenIf, i);
-            const c = (try (try l.envAt(f)).body(g.cond)) orelse return l.refuse("a generate condition Sema/eval.zig does not fold");
-            try armBlock(w, f, scope, if (c.isTrue()) g.then else g.@"else", prefix);
-        },
-        .gen_case => try genCase(w, f, scope, Lower.payload(vir, Inst.GenCase, i), prefix),
+        .gen_if, .gen_case => try scheme(w, f, scope, i, prefix),
         .gen_for => try genFor(w, f, scope, Lower.payload(vir, Inst.GenFor, i), prefix),
         .gen_block => try genBlock(w, f, scope, i, null, &.{}, prefix),
         .assign => try nets.assign(l, f, i),
@@ -395,10 +208,26 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
     };
 }
 
-/// A generate arm: its `gen_block`, or nothing.
+/// §12.4.2 a conditional generate scheme: the arm its condition (or case
+/// operand) picks.
+fn scheme(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8) Error!void {
+    const l = w.l;
+    const vir = l.virOf(f);
+    if (Lower.tag(vir, i) == .gen_case) return genCase(w, f, scope, Lower.payload(vir, Inst.GenCase, i), prefix);
+    const g = Lower.payload(vir, Inst.GenIf, i);
+    const c = (try (try l.envAt(f)).body(g.cond)) orelse return l.refuse("a generate condition Sema/eval.zig does not fold");
+    try armBlock(w, f, scope, if (c.isTrue()) g.then else g.@"else", prefix);
+}
+
+/// A generate arm: its `gen_block`, a conditional scheme nested directly
+/// in it (§12.4.2, no scope of its own), or nothing.
 fn armBlock(w: *Walk, f: u32, scope: u32, arm: Vir.Body, prefix: []const u8) Error!void {
     const vir = w.l.virOf(f);
-    for (vir.body(arm)) |b| if (Lower.tag(vir, b) == .gen_block) try genBlock(w, f, scope, b, null, &.{}, prefix);
+    for (vir.body(arm)) |b| switch (Lower.tag(vir, b)) {
+        .gen_block => try genBlock(w, f, scope, b, null, &.{}, prefix),
+        .gen_if, .gen_case => try scheme(w, f, scope, b, prefix),
+        else => {}, // else: the arm's condition expressions
+    };
 }
 
 /// A generate block (`index`: a loop scheme's iteration): a scope and a
@@ -504,21 +333,21 @@ fn childInstance(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8
     if (in.flags.kind == .udp) return l.refuse("a UDP instance of no primitive");
     const name = vir.string(in.name);
     const at = l.srcOffset(f, i);
-    if (in.range.len == 0) return place(w, f, scope, prefix, name, null, at);
+    if (in.range.len == 0) return place(w, f, scope, i, prefix, name, null, at);
     const r = vir.body(in.range);
     const bin = Lower.payload(vir, Inst.Bin, r[r.len - 1]);
     const msb = try l.intOf(f, bin.lhs);
     const lsb = try l.intOf(f, bin.rhs);
     var k: i64 = @min(msb, lsb);
-    while (k <= @max(msb, lsb)) : (k += 1) try place(w, f, scope, prefix, name, k, at);
+    while (k <= @max(msb, lsb)) : (k += 1) try place(w, f, scope, i, prefix, name, k, at);
 }
 
-fn place(w: *Walk, f: u32, scope: u32, prefix: []const u8, name: []const u8, index: ?i64, at: u32) Error!void {
+fn place(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8, name: []const u8, index: ?i64, at: u32) Error!void {
     const l = w.l;
     const full = if (index) |k| try std.fmt.allocPrint(l.a, "{s}{s}[{d}]", .{ prefix, name, k }) else try std.fmt.allocPrint(l.a, "{s}{s}", .{ prefix, name });
     const key: Child = .{ .parent = w.index, .name = try l.zcu.intern_pool.getString(l.a, full) };
     const child = w.children.get(key) orelse return l.refuse("an instance the elaboration did not make");
-    w.placed[child] = .{ .scope = scope, .frame = f, .index = index, .at = at, .name = name };
+    w.placed[child] = .{ .scope = scope, .frame = f, .inst = i, .index = index, .at = at, .name = name };
 }
 
 /// A variable, net or port, from its first declaration `first` and the
@@ -544,31 +373,11 @@ fn signal(w: *Walk, f: u32, first: Inst.Index, decls: []const Inst.Index, conn: 
         for (decls) |d| if (Lower.tag(vir, d) != .variable) try only.append(l.a, d);
         return ports.declareNet(l, f, first, only.items, conn, &w.deferred);
     }
-    const at = try variable(l, f, first, decls);
+    const at = try vars.variable(l, f, first, decls);
     const c = conn orelse return;
     if (dir != .output) {
         if (c.actual == .none) return;
         return l.refuse("§12.3.3 an input or inout port declared as a variable");
     }
     try ports.outputVariable(l, f, l.names.items[at], c, &w.deferred);
-}
-
-/// §4.9 the unpacked dimensions of a dims body, outermost first, into `n`.
-fn arrayOf(l: *Lower, f: u32, dims: Vir.Body, n: *Name) Error!void {
-    if (dims.len == 0) return;
-    const vir = l.virOf(f);
-    var spans: std.ArrayList(Span) = .empty;
-    var count: u64 = 1;
-    for (vir.body(dims)) |d| {
-        if (Lower.tag(vir, d) != .range) continue;
-        const bin = Lower.payload(vir, Inst.Bin, d);
-        const hi = try l.intOf(f, bin.lhs);
-        const lo = try l.intOf(f, bin.rhs);
-        const span: Span = .{ .low = @min(lo, hi), .high = @max(lo, hi) };
-        count *= std.math.cast(u64, @as(i128, span.high) - span.low + 1) orelse return l.refuse("an array past 2^24 elements");
-        if (count > array_max) return l.refuse("an array past 2^24 elements");
-        try spans.append(l.a, span);
-    }
-    n.dims = spans.items;
-    n.count = @intCast(count);
 }

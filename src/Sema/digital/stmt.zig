@@ -20,6 +20,7 @@ const expr = @import("expr.zig");
 const place = @import("place.zig");
 const task = @import("task.zig");
 const decl = @import("decl.zig");
+const vars = @import("vars.zig");
 const nets = @import("nets.zig");
 const sub = @import("sub.zig");
 const gates = @import("gates.zig");
@@ -314,7 +315,7 @@ fn block(l: *Lower, i: Inst.Index, depth: u32) Error!void {
         // which its storage (laid out at its declaration) does not hold.
         l.frames.items[l.frame].automatic = l.frames.items[outer].automatic;
         const slots_before = l.b.p.slots.len;
-        try decl.locals(l, l.frame, blk.body);
+        try vars.locals(l, l.frame, blk.body);
         if (l.frames.items[outer].automatic and l.b.p.slots.len != slots_before) return l.refuse("a named block declaring storage in an automatic subroutine");
     } else for (vir.body(blk.body)) |x| switch (Lower.tag(vir, x)) {
         .variable, .param, .event => return l.refuse("a declaration in an unnamed block"),

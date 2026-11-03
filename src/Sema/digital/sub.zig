@@ -23,6 +23,7 @@ const vams = @import("vams");
 const std_sim = @import("std_sim");
 const digital = @import("../digital.zig");
 const decl = @import("decl.zig");
+const vars = @import("vars.zig");
 const expr = @import("expr.zig");
 const place = @import("place.zig");
 const stmt = @import("stmt.zig");
@@ -222,13 +223,13 @@ fn storage(l: *Lower, outer: u32, scope: u32, i: Inst.Index) Error!Storage {
         if (!gop.found_existing) gop.value_ptr.* = .empty;
         try gop.value_ptr.append(l.a, d);
     }
-    for (later.keys(), later.values()) |d, decls| _ = try decl.variable(l, f, d, decls.items);
+    for (later.keys(), later.values()) |d, decls| _ = try vars.variable(l, f, d, decls.items);
     for (all) |d| if (Lower.tag(vir, d) == .event) {
-        _ = try decl.event(l, f, d);
+        _ = try vars.event(l, f, d);
     };
     const count: u32 = @as(u32, @intCast(l.b.p.slots.len)) - first;
     for (all) |d| if (Lower.tag(vir, d) == .param) {
-        _ = try decl.param(l, f, d);
+        _ = try vars.param(l, f, d);
     };
     const formals = vir.body(s.formals);
     const ports = try l.a.alloc(u32, formals.len);
@@ -253,7 +254,7 @@ fn resultName(l: *Lower, outer: u32, s: Inst.Function) Error!Name {
     }
     if (s.range.len != 0) {
         if (n.ty.real) return l.refuse("a real with a range");
-        const r = try decl.rangeOf(l, outer, s.range);
+        const r = try vars.rangeOf(l, outer, s.range);
         n.msb = r.msb;
         n.lsb = r.lsb;
         n.ty.width = r.width;
@@ -261,7 +262,7 @@ fn resultName(l: *Lower, outer: u32, s: Inst.Function) Error!Name {
         n.msb = @as(i64, n.ty.width) - 1;
         n.scalar = s.flags.storage == .reg or s.flags.storage == .none;
     }
-    n.slot = try decl.slots(l, n.ty, 1, if (n.ty.real) .zero else .x);
+    n.slot = try vars.slots(l, n.ty, 1, if (n.ty.real) .zero else .x);
     return n;
 }
 

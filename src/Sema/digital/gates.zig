@@ -20,7 +20,7 @@ const vams = @import("vams");
 const std_sim = @import("std_sim");
 const Zcu = @import("../../Zcu.zig");
 const digital = @import("../digital.zig");
-const decl = @import("decl.zig");
+const vars = @import("vars.zig");
 const expr = @import("expr.zig");
 const nets = @import("nets.zig");
 const Lower = digital.Lower;
@@ -52,7 +52,7 @@ pub fn instance(l: *Lower, f: u32, i: Inst.Index) Error!void {
     l.frame = f;
     const t = try terminals(l, vir, in);
     if (t.len == 0) return l.refuse("a gate with no terminal");
-    const lanes: u32 = if (in.range.len == 0) 1 else (try decl.rangeOf(l, f, in.range)).width;
+    const lanes: u32 = if (in.range.len == 0) 1 else (try vars.rangeOf(l, f, in.range)).width;
     const arrayed = in.range.len != 0;
     const text = vir.string(in.strength);
     const d = try nets.delay3(l, f, in.delay);
@@ -102,7 +102,7 @@ pub fn udp(l: *Lower, f: u32, i: Inst.Index, d: Zcu.Decl) Error!void {
     const table = try tableOf(l, d, pvir, prim);
     const state = try initial(l, pvir, prim);
     const out = try nets.sink(l, t[0]);
-    const lanes: u32 = if (in.range.len == 0) 1 else (try decl.rangeOf(l, f, in.range)).width;
+    const lanes: u32 = if (in.range.len == 0) 1 else (try vars.rangeOf(l, f, in.range)).width;
     if (out.width != 1 and out.width != lanes) return l.refuse("§8.6 a UDP output terminal neither one bit nor one per instance of an array");
     const wide = l.nets.items[out.net].width != 1;
     const s = nets.strengths(vir.string(in.strength));

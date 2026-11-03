@@ -15,7 +15,7 @@
 //! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
-//! - `pub const Lower = struct` (`Implicit`, `refuse`, `refuseFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
+//! - `pub const Lower = struct` (`Implicit`, `Site`, `refuse`, `refuseFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
 //! - `pub const none: u32`
 //! - `pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *[]const u8) Error!Lowered`
 
@@ -157,8 +157,10 @@ pub const Lower = struct {
     names: std.ArrayList(Name) = .empty,
     frames: std.ArrayList(Frame) = .empty,
     scopes: std.ArrayList(ScopeInfo) = .empty,
-    /// Per instance, its frame.
+    /// Per instance, its frame, and where its parent instantiates it
+    /// (`site.frame` `none` for a root).
     instance_frame: []u32 = &.{},
+    sites: []Site = &.{},
     /// Per instance, its `eval.Env` (its module's parameters as folded).
     envs: []eval.Env = &.{},
     /// The roots' scopes, in order.
@@ -185,6 +187,9 @@ pub const Lower = struct {
     subs: std.ArrayList(sub.Row) = .empty,
     /// §4.5 the implicit nets, by their instance frame and name.
     implicit: std.AutoHashMapUnmanaged(Implicit, u32) = .empty,
+
+    /// A child instance's `instance` instruction and the parent frame it is in.
+    pub const Site = struct { frame: u32, inst: Inst.Index };
 
     /// An implicit net's key: the instance frame it is declared in and its
     /// name (a `Vir.String` of that instance's file).

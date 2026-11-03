@@ -423,6 +423,12 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
 5. **`Contents:` lists stay** (AGENTS.md house style). The LOC estimates in the maps that counted
    deleting them (~593 lines in analog+ir, ~834 in `lib/sim/digital`, more elsewhere) are therefore
    high by roughly 2,000-3,000 lines; the target is ~150k, not ~148k.
+7. **Air variables are slots, not phis** (2026-11-03, from building `Air`): structured Air with
+   no phis cannot carry a variable across loop iterations or merge several out of an if/else, so,
+   as in Zig's Air, a variable is a slot: `alloc` (its type), `load`, `assign` (no result). Block
+   results via `br` stay for expression merges (`?:`, `&&`, `||`). Sema needs no SSA builder
+   (Appendix A.3's `Sema/Ssa.zig`, ~1,060 lines, disappears); the float pass joins slot states at a
+   block's exit and widens at a loop. A slot is a `var` in the emitted Zig, which LLVM promotes.
 6. **VPI runtime goes to `lib/vpi/`** (Zig's rule: what a user's program links ships in `lib/`);
    only the host driver (`src/vpi_host.zig`) and the emitter (`src/codegen/vpi.zig`) stay in `src/`.
 

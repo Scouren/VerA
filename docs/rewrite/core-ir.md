@@ -35,6 +35,9 @@ per-thread shards); keep `items: MultiArrayList{ tag, data: u32 }`, `extra: []u3
   (Z/Air.zig:1371). `Inst.Ref = enum(u32)`: an interned `InternPool.Index`, or an
   instruction index with the high bit set (Z/Air.zig:1234-1254). The instruction
   index IS its value: no separate value table, no result column.
+- **Variables are slots** (`lib/TODO.md` §11.7): `alloc` (the slot's type),
+  `load`, `assign` (no result); a loop carries and an if/else merges variables
+  through slots.
 - **Structured control flow, no CFG, no phis:** `block` (a body in `extra`, a
   result), `br` (leave a block with a value), `cond_br` (two bodies), `loop` (a
   body re-entered by `repeat`), `select` (a value-level if). Dominance is nesting.

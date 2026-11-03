@@ -56,7 +56,6 @@ verilog-a/ch03_data_types/ground_reference_solution.va codegen does not spell a 
 verilog-a/ch03_data_types/idt_nature_related_overrides.va codegen does not spell a call of `op$static`
 verilog-a/ch03_data_types/idt_nature_self_reference.va codegen does not spell a call of `op$static`
 verilog-a/ch03_data_types/integer_parameter_precision_control.va codegen does not spell a call of `absdelay`
-verilog-a/ch03_data_types/integer_real_variables.va Sema drops the §3.2 declaration initializer (`integer count = 3` reads 0); the old device starts at it (asked of rw-lower)
 verilog-a/ch03_data_types/local_parameter.va a parameter whose value reads another parameter: Air has no derive body, so moving the base parameter leaves it at its folded default (asked of rw-lower: Param.derive)
 verilog-a/ch03_data_types/nature_compatibility_rules.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch03_data_types/natureless_domainless_port_compatibility.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
@@ -367,3 +366,254 @@ verilog-ams/ch12_vpi_routines/systf_devices.va codegen does not spell a potentia
 verilog-ams/ch12_vpi_routines/two_sites.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch09_system_tasks/say_ops.va §9.7.3 status sites: the old device returns zero rows once a severity task fires (a check past |V| = 10); codegen has no status protocol yet
 verilog-ams/ch09_system_tasks/say_ops.va §9.7.3 status sites: the old device returns zero rows once a severity task fires (a check past |V| = 10); codegen has no status protocol yet
+netlist/hdl/a09_limit_root_transient.assets/a09_limit_ramp.va a §9.17.3 `$limit`
+netlist/hdl/veriloga_limit.assets/va_limit.va a §9.17.3 `$limit`
+netlist/hdl/veriloga_limit.assets/va_limit_state.va a §9.17.3 `$limit`
+netlist/hdl/veriloga_table_snapshot.assets/va_table_snapshot.va a call of `$table_model`
+netlist/noise/va_noise.assets/coeff_res.va a call of `white_noise`
+netlist/noise/va_noise.assets/corr_res.va a call of `white_noise`
+netlist/noise/va_noise.assets/ground_res.va a call of `white_noise`
+netlist/noise/va_noise.assets/ntab_card.va a call of `noise_table`
+netlist/noise/va_noise.assets/ntab_lin.va a call of `noise_table`
+netlist/noise/va_noise.assets/ntab_log.va a call of `noise_table_log`
+netlist/noise/va_noise.assets/vseries_res.va a call of `white_noise`
+spice/limit_fet.va a call of `$limit`
+spice/limit_pnj.va a call of `$limit`
+spice/limit_pnjlimds_bsim_pmos_von_at_old.va a call of `$limit`
+spice/limit_pnjlimds_bulk_rung.va a call of `$limit`
+spice/limit_pnjlimds_dangling_returns_probe.va a call of `$limit`
+spice/limit_seed_bsim3_pmos_initjct.va a call of `$limit`
+spice/limit_seed_conditional_on_card.va a call of `$limit`
+spice/limit_seed_explicit_beats_default.va a call of `$limit`
+spice/limit_seed_mos1_initjct.va a call of `$limit`
+spice/limit_vds.va a call of `$limit`
+spice/primitive_capacitor.va a call of `op$static`
+spice/primitive_iexp.va a call of `analysis`
+spice/primitive_inductor.va a call of `op$static`
+spice/primitive_ipulse.va a call of `analysis`
+spice/primitive_ipwl.va a call of `analysis`
+spice/primitive_isine.va a call of `analysis`
+spice/primitive_mixed_discipline_override.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+spice/primitive_source_scale_factor.va a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+spice/primitive_vcvs.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+spice/primitive_vexp.va a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+spice/primitive_vpulse.va a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+spice/primitive_vpwl.va a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+spice/primitive_vsine.va a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+spice/spice_network_primitives.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+spice/spice_source_primitives.va a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+spice/vsine_dc_is_the_operating_point_value.va a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/annex_a_syntax/indirect_contribution.va a §5.6.7 indirect contribution
+verilog-a/annex_g_change_history/real_array_range_after_name.va a §5.10 held variable
+verilog-a/ch01_intro/signal_flow_bound_to_conservative_node.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch03_data_types/dependent_control_host.va a device with no unknowns
+verilog-a/ch03_data_types/dynamic_multidim_numeric.va a §5.10 held variable
+verilog-a/ch03_data_types/multiple_aliases_point_to_one_parameter.va a device with no unknowns
+verilog-a/ch03_data_types/parameter_array_exact_override.va a device with no unknowns
+verilog-a/ch03_data_types/parameter_array_resize_with_value.va a device with no unknowns
+verilog-a/ch04_expressions/absdelay_vera_interp_quadratic.va a call of `absdelay`
+verilog-a/ch04_expressions/absdelay_vera_interp_quadratic_uneven.va a call of `absdelay`
+verilog-a/ch04_expressions/ac_stim.va a call of `ac_stim`
+verilog-a/ch04_expressions/ac_stim_ac_analysis.va a call of `ac_stim`
+verilog-a/ch04_expressions/ac_stim_dynamic_magnitude.va a call of `ac_stim`
+verilog-a/ch04_expressions/ac_stim_long_node_names.va a call of `ac_stim`
+verilog-a/ch04_expressions/ac_stim_noise_analysis.va a call of `ac_stim`
+verilog-a/ch04_expressions/ac_stim_quadrature.va a call of `ac_stim`
+verilog-a/ch04_expressions/correlated_noise.va a call of `white_noise`
+verilog-a/ch04_expressions/ddx.va a call of `ddx`
+verilog-a/ch04_expressions/ddx_flow_column_in_eval.va a call of `ddx`
+verilog-a/ch04_expressions/ddx_in_noise_power.va a call of `ddx`
+verilog-a/ch04_expressions/ddx_runtime_indexed_array_element.va a §5.10 held variable
+verilog-a/ch04_expressions/diode_noise_sources_in_dc.va a call of `white_noise`
+verilog-a/ch04_expressions/discontinuity_real_degree.va a call of `$simparam`
+verilog-a/ch04_expressions/filter_parameter_arrays.va a call of `laplace_nd`
+verilog-a/ch04_expressions/flicker_noise_topology.va a call of `flicker_noise`
+verilog-a/ch04_expressions/flicker_psd_frequency.va a call of `flicker_noise`
+verilog-a/ch04_expressions/laplace_nd_zero_padded_coefficients.va a call of `laplace_nd`
+verilog-a/ch04_expressions/laplace_np_parameter_roots_unpaired_is_nan.va a call of `laplace_np`
+verilog-a/ch04_expressions/laplace_zp_parameter_roots_ac.va a call of `laplace_zp`
+verilog-a/ch04_expressions/laplace_zp_parameter_roots_step.va a call of `laplace_zp`
+verilog-a/ch04_expressions/modulo_integer_dynamic.va a call of `$rtoi`
+verilog-a/ch04_expressions/noise_anticorrelated_coefficient.va a call of `white_noise`
+verilog-a/ch04_expressions/noise_coefficient_beside_a_loop.va a call of `white_noise`
+verilog-a/ch04_expressions/noise_coefficient_through_a_conditional.va a call of `white_noise`
+verilog-a/ch04_expressions/noise_correlated_scale.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch04_expressions/noise_kinds_in_ternary.va a call of `white_noise`
+verilog-a/ch04_expressions/noise_psd_beside_a_held_history.va a §5.10 held variable
+verilog-a/ch04_expressions/noise_source_name.va a call of `white_noise`
+verilog-a/ch04_expressions/noise_source_through_variable.va a call of `white_noise`
+verilog-a/ch04_expressions/noise_sources.va a call of `white_noise`
+verilog-a/ch04_expressions/noise_table_array_parameter.va a call of `noise_table`
+verilog-a/ch04_expressions/noise_table_card_knots.va a call of `noise_table`
+verilog-a/ch04_expressions/noise_table_linear_device.va a call of `noise_table`
+verilog-a/ch04_expressions/noise_table_log_device.va a call of `noise_table_log`
+verilog-a/ch04_expressions/noise_table_log_topology.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch04_expressions/noise_table_sorts_pairs.va a call of `noise_table`
+verilog-a/ch04_expressions/noise_table_topology.va a call of `noise_table`
+verilog-a/ch04_expressions/parameterized_dimension_override.va a §5.10 held variable
+verilog-a/ch04_expressions/partially_correlated_noise.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch04_expressions/psd_bias_dependent.va a call of `white_noise`
+verilog-a/ch04_expressions/psd_white_flicker_export.va a call of `white_noise`
+verilog-a/ch04_expressions/small_signal_linearization.va a call of `ac_stim`
+verilog-a/ch04_expressions/spice_noise_rc_white.va a call of `white_noise`
+verilog-a/ch04_expressions/spice_noise_series_resistor.va a call of `white_noise`
+verilog-a/ch04_expressions/spice_noise_shared_pair.va a call of `white_noise`
+verilog-a/ch04_expressions/status_site_beside_noise.va a call of `white_noise`
+verilog-a/ch04_expressions/white_noise_declaration_initializer.va a call of `white_noise`
+verilog-a/ch04_expressions/white_noise_topology.va a call of `white_noise`
+verilog-a/ch05_analog_behavior/absdelay_short_delay.va a call of `absdelay`
+verilog-a/ch05_analog_behavior/analog_signals_nets_branches_contributions.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch05_analog_behavior/child_named_branch_potential_and_flow_access.va a flow contribution to a potential source's branch
+verilog-a/ch05_analog_behavior/disable_inner_versus_outer_named_block.va a §5.10 held variable
+verilog-a/ch05_analog_behavior/disable_keeps_contributions_already_made.va a call of `initial_step`
+verilog-a/ch05_analog_behavior/disable_resumes_after_the_named_block.va a §5.10 held variable
+verilog-a/ch05_analog_behavior/held_array_after_a_pruned_held_scalar.va a §5.10 held variable
+verilog-a/ch05_analog_behavior/held_array_element_between_events.va a §5.10 held variable
+verilog-a/ch05_analog_behavior/held_counter_advances_outside_its_event.va a §5.10 held variable
+verilog-a/ch05_analog_behavior/hierarchical_access_unsupported.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch05_analog_behavior/hierarchical_contribution_creates_a_new_branch.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch05_analog_behavior/hierarchical_contribution_unsupported.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch05_analog_behavior/hierarchical_net_reference_probes_solve.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch05_analog_behavior/indirect_and_direct_on_different_pairs.va a §5.6.7 indirect contribution
+verilog-a/ch05_analog_behavior/indirect_contribution.va a §5.6.7 indirect contribution
+verilog-a/ch05_analog_behavior/indirect_equation_lhs_tolerance.va a §5.6.7 indirect contribution
+verilog-a/ch05_analog_behavior/multiple_indirect.va a §5.6.7 indirect contribution
+verilog-a/ch05_analog_behavior/simprobe_reads_a_sibling_output_variable.va a call of a user function (callee 4294967295)
+verilog-a/ch05_analog_behavior/simprobe_scope_is_the_parent.va a call of a user function (callee 4294967295)
+verilog-a/ch05_analog_behavior/spice_sine_source.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch05_analog_behavior/static_switch_port_probe.va a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch05_analog_behavior/timer_body_index_controls.va a §5.10 held variable
+verilog-a/ch05_analog_behavior/vera_reject_step_retry.va a §5.10 held variable
+verilog-a/ch05_analog_behavior/vera_timepoint_cache.va a §5.10 held variable
+verilog-a/ch05_analog_behavior/vera_timepoint_held_history.va a §5.10 held variable
+verilog-a/ch06_hierarchy/disable_in_a_child_instance.va a §5.10 held variable
+verilog-a/ch06_hierarchy/elaboration_parameter_and_connectivity_binding.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch06_hierarchy/inherited_flow_tolerance_minimum.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch06_hierarchy/mfactor_divides_a_flow_probe.va a flow contribution to a potential source's branch
+verilog-a/ch06_hierarchy/mfactor_divides_named_branch_potential_noise_power.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch06_hierarchy/mfactor_divides_potential_noise_power.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch06_hierarchy/mfactor_flow_noise.va a call of `white_noise`
+verilog-a/ch06_hierarchy/mfactor_multiplies_flow_noise_power.va a call of `white_noise`
+verilog-a/ch06_hierarchy/mfactor_multiplies_named_branch_flow_noise_power.va a call of `white_noise`
+verilog-a/ch06_hierarchy/mfactor_potential_noise.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch06_hierarchy/oomr_branch_probe_two_levels.va a flow contribution to a potential source's branch
+verilog-a/ch06_hierarchy/paramset_hidden_output_variable_takes_the_fallback.va a call of a user function (callee 4294967295)
+verilog-a/ch08_scheduling/absdelta_d2a_discards_pending.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch09_system_tasks/control_default_filling.va a call of `$table_model`
+verilog-a/ch09_system_tasks/cubic_spline_constant_ends.va a call of `$table_model`
+verilog-a/ch09_system_tasks/cubic_spline_mixed_ends.va a call of `$table_model`
+verilog-a/ch09_system_tasks/cubic_spline_natural_ends.va a call of `$table_model`
+verilog-a/ch09_system_tasks/duplicate_points.va a call of `$table_model`
+verilog-a/ch09_system_tasks/error_extrapolation_inside_is_legal.va a call of `$table_model`
+verilog-a/ch09_system_tasks/error_extrapolation_is_fatal.va a call of `$table_model`
+verilog-a/ch09_system_tasks/finish_in_rejected_iteration_has_no_effect.va a call of `$simparam`
+verilog-a/ch09_system_tasks/ignored_column_and_selector.va a call of `$table_model`
+verilog-a/ch09_system_tasks/kernel_control_tasks_together.va a call of `initial_step`
+verilog-a/ch09_system_tasks/limit.va a call of `$limit`
+verilog-a/ch09_system_tasks/limit_constant_history.va a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_fetlim_with_vth.va a call of `$limit`
+verilog-a/ch09_system_tasks/limit_flow_probe_returns_probe.va a call of `$limit`
+verilog-a/ch09_system_tasks/limit_initialize_limiting.va a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_named.va a call of `$limit`
+verilog-a/ch09_system_tasks/limit_newton_convergence.va a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_omitted_algorithm_neighbour.va a call of `$limit`
+verilog-a/ch09_system_tasks/limit_pnjlim_internal_node_honoured.va a call of `$limit`
+verilog-a/ch09_system_tasks/limit_polarity_sign_argument_honoured.va a call of `$limit`
+verilog-a/ch09_system_tasks/limit_steplim_internal_node_honoured.va a call of `$limit`
+verilog-a/ch09_system_tasks/limit_too_few_arguments_returns_probe.va a call of `$limit`
+verilog-a/ch09_system_tasks/limit_too_many_arguments_returns_probe.va a call of `$limit`
+verilog-a/ch09_system_tasks/limit_under_if_returns_probe.va a call of `$limit`
+verilog-a/ch09_system_tasks/limit_unknown_algorithm_returns_probe.va a call of `$limit`
+verilog-a/ch09_system_tasks/limit_user_function.va a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_user_function_multiple_sites.va a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_user_function_previous_iterate.va a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_veto_after_correction.va a call of `$simparam`
+verilog-a/ch09_system_tasks/limit_with_derivative.va a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/mixed_interpolation_dimensions.va a call of `$table_model`
+verilog-a/ch09_system_tasks/port_connected_controls_analog_operator.va a call of `transition`
+verilog-a/ch09_system_tasks/quadratic_spline.va a call of `$table_model`
+verilog-a/ch09_system_tasks/severity_in_rejected_iteration_has_no_effect.va a call of `$simparam`
+verilog-a/ch09_system_tasks/simprobe_string_parameter_name_resolves.va a call of a user function (callee 4294967295)
+verilog-a/ch09_system_tasks/spline_derivative_reaches_the_solver.va a call of `$table_model`
+verilog-a/ch09_system_tasks/status_ops.va a call of `white_noise`
+verilog-a/ch09_system_tasks/table_capture_rejected_step_recaptures.va a §5.10 held variable
+verilog-a/ch09_system_tasks/table_model_array_control.va a call of `$table_model`
+verilog-a/ch09_system_tasks/table_model_assignment_pattern_arrays.va a call of `$table_model`
+verilog-a/ch09_system_tasks/table_model_discrete.va a call of `$table_model`
+verilog-a/ch09_system_tasks/table_model_lrm_sample_set.va a call of `$table_model`
+verilog-a/ch09_system_tasks/table_snapshot.va a §5.10 held variable
+verilog-a/ch09_system_tasks/table_snapshot_collapse.va a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch09_system_tasks/table_snapshot_per_instance.va a call of `$table_model`
+verilog-a/ch09_system_tasks/table_status.va a call of `$table_model`
+verilog-a/ch10_directives/compact_modeling_nonlin_res_example.va a call of `ddx`
+verilog-a/ch10_directives/predefined_compact_modeling.va a call of `ddx`
+verilog-a/combined/limit_and_discontinuity.va a call of `$limit`
+verilog-a/combined/named_limiter_nonlinear.va a call of `$limit`
+verilog-a/combined/noise_and_analysis.va a call of `analysis`
+verilog-a/combined/noise_temperature_analysis.va a call of `analysis`
+verilog-a/exhaustive/indirect_contribution.va a §5.6.7 indirect contribution
+verilog-ams/annex_a_syntax/named_event_trigger.va a §5.10 held variable
+verilog-ams/annex_c_analog_subset/named_event_in_subset.va a §5.10 held variable
+verilog-ams/ch03_data_types/discrete_disciplines_compatible.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch03_data_types/wire_without_discipline_is_discrete.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch05_analog_behavior/absdelta_direction_change.va a call of `final_step`
+verilog-ams/ch05_analog_behavior/absdelta_dynamic_controls.va a call of `final_step`
+verilog-ams/ch05_analog_behavior/absdelta_enable_transitions.va a call of `final_step`
+verilog-ams/ch05_analog_behavior/absdelta_interpolated_events.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch05_analog_behavior/absdelta_self_disable.va a call of `final_step`
+verilog-ams/ch05_analog_behavior/absdelta_time_tol_below_precision.va a call of `final_step`
+verilog-ams/ch05_analog_behavior/absdelta_time_tol_filters.va a call of `final_step`
+verilog-ams/ch05_analog_behavior/cross_expr_tol_and_time_tol_both_hold.va a §5.10 held variable
+verilog-ams/ch05_analog_behavior/event_array_index_change_is_not_an_event.va a §5.10 held variable
+verilog-ams/ch05_analog_behavior/indirect_equation_lhs_tolerance.va a §5.6.7 indirect contribution
+verilog-ams/ch05_analog_behavior/named_event_has_no_time_duration.va a §5.10 held variable
+verilog-ams/ch05_analog_behavior/named_event_unsupported.va a §5.10 held variable
+verilog-ams/ch05_analog_behavior/timer_body_index_controls.va a §5.10 held variable
+verilog-ams/ch06_hierarchy/hierarchical_analog_probes_from_digital.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/a2d_tick_quantization.va a §5.10 held variable
+verilog-ams/ch07_mixed_signal/absdelta_interpolated_a2d.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/absdelta_runtime_default_tolerances.va a call of `final_step`
+verilog-ams/ch07_mixed_signal/absdelta_runtime_disable_in_body.va a call of `final_step`
+verilog-ams/ch07_mixed_signal/absdelta_runtime_dynamic_controls.va a call of `final_step`
+verilog-ams/ch07_mixed_signal/absdelta_runtime_enable.va a call of `final_step`
+verilog-ams/ch07_mixed_signal/absdelta_runtime_reversal.va a call of `final_step`
+verilog-ams/ch07_mixed_signal/absdelta_runtime_time_precision.va a call of `final_step`
+verilog-ams/ch07_mixed_signal/absdelta_runtime_time_tol.va a call of `final_step`
+verilog-ams/ch07_mixed_signal/analog_probe_in_a_digital_expression.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/child_always_block_in_a_mixed_design.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/closely_spaced_crossings.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/cross_enable_and_dir_disable_the_event.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/cross_time_tol_below_time_resolution.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/dc_time_zero_settle.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/digital_value_has_zero_derivative.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/event_bounds_mixed_legal.va a call of `final_step`
+verilog-ams/ch07_mixed_signal/implicit_d2a_bus.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/macro_process_runs_after_nba.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/mixed_long_net_names.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/mixed_top_with_an_analog_child.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/named_event_from_analog_reaches_digital.va a call of `timer`
+verilog-ams/ch07_mixed_signal/onebit_dac_reads_a_discrete_wire.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/rejected_trials_deliver_once.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/timer_runtime_body_period.va a call of `timer`
+verilog-ams/ch07_mixed_signal/timer_runtime_controls.va a call of `timer`
+verilog-ams/ch07_mixed_signal/timer_runtime_drift.va a call of `timer`
+verilog-ams/ch07_mixed_signal/timer_runtime_enable.va a call of `timer`
+verilog-ams/ch07_mixed_signal/zero_delay_settles_before_the_macro_process.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch08_scheduling/absdelta_d2a_discards_pending.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch08_scheduling/macro_process_one_solve_for_coincident_events.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch08_scheduling/monitor_after_macro_process.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch08_scheduling/one_solve_consumes_simultaneous_d2a.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch08_scheduling/strobe_after_macro_process.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch09_system_tasks/pla_array_in_digital_context.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch09_system_tasks/status_ops.va a call of `white_noise`
+verilog-ams/ch09_system_tasks/table_status.va a call of `$table_model`
+verilog-ams/ch09_system_tasks/timescale_tasks_in_digital_context.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch12_vpi_routines/rc_ac.va a call of `ac_stim`
+verilog-a/annex_a_syntax/expressions.va the old device's entry returned -3
+verilog-a/annex_a_syntax/pattern_every_element_written.va the old device's entry returned -3
+verilog-a/ch02_lexical/duplicate_attribute_last_value_wins.va differs: point 0: d row 0: old 1.951411553231091e1, new 3.103778838143179e1
+verilog-a/ch03_data_types/parameter_default_over_parameter.va the new device does not build: n23.zig:76: unused local constant
+verilog-a/ch03_data_types/parameter_array.va the old device's entry returned -3
+verilog-a/ch04_expressions/assignment_pattern.va the old device's entry returned -3
+verilog-a/ch04_expressions/ddx_vera_nodiff_assignment.va differs: point 0: d row 0: old 3.069199822529498e-2, new -3.592690991994424e-1
+verilog-a/ch04_expressions/zi_np_parameter_roots_dc_gain.va the old device's entry returned -3

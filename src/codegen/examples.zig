@@ -132,9 +132,9 @@ pub fn stack(gpa: Allocator, ip: *InternPool) Allocator.Error!Example {
 
     var d: Air.Device = .{ .num_ports = 3 };
     errdefer d.deinit(gpa);
-    for ([_][]const u8{ "p", "n", "m" }) |name| try d.nodes.append(gpa, .{ .name = try ip.getString(gpa, name), .kind = .net, .of = .none, .discipline = .empty });
-    try d.contributions.append(gpa, .{ .access = .flow, .kind = .direct, .branch = .unnamed, .hi = @fromBackingInt(0), .lo = @fromBackingInt(1), .resist = resist, .react = react, .wrote = wrote });
-    try d.contributions.append(gpa, .{ .access = .flow, .kind = .direct, .branch = .unnamed, .hi = @fromBackingInt(2), .lo = .ground, .resist = resist2, .react = react2, .wrote = wrote2 });
+    for ([_][]const u8{ "p", "n", "m" }) |name| try d.nodes.append(gpa, .{ .name = try ip.getString(gpa, name), .kind = .net, .of = .none, .discipline = .empty, .instance = .none });
+    try d.contributions.append(gpa, .{ .access = .flow, .kind = .direct, .branch = .unnamed, .hi = @fromBackingInt(0), .lo = @fromBackingInt(1), .resist = resist, .react = react, .wrote = wrote, .instance = .none, .flow = .none });
+    try d.contributions.append(gpa, .{ .access = .flow, .kind = .direct, .branch = .unnamed, .hi = @fromBackingInt(2), .lo = .ground, .resist = resist2, .react = react2, .wrote = wrote2, .instance = .none, .flow = .none });
     assert(d.nodes.len == 3);
     return .{ .air = air, .device = d };
 }

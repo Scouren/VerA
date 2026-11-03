@@ -486,10 +486,15 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
     Preprocessor follow-ups: each `run` restarts from the top and replays earlier answers, quadratic
     in include depth (`ponytail:`, fix: an explicit scan stack); a synthesized SPICE netlist runs as
     an ordinary unit after the `-D` defines, where the old code ran it before them as shipped text.
-  - in progress: `vams` tokenizer/Ast/Parse (`parse.md`), `link` (`link.md`).
-  - spec ready: `vams` Diag (`diag.md`).
-  - next: AstGen + Vir (after Ast), Zcu + Sema (after Vir, InternPool, Air), the Air passes,
-    codegen, Compilation; then the switch-over and the old pipeline's deletion.
+  - merged: `vams` tokenizer/Ast/Parse (diff-parse: 4,140/4,170 agree on tokens, acceptance and
+    structure; 30 named refusals that need names, folding or another file move to AstGen/Sema),
+    `vams` Diag (diff-diag: 511 codes and `--explain` byte-equal, 21k scripted rows, 972/975
+    reject/warn fixtures; 3 named, all macro locations now in the original file), `link` (diff-link:
+    8/8 builds agree with zigbuild; library bytes equal at 1 and N jobs). Full `zig build test` green
+    on `refactor` with all six merged.
+  - in progress: AstGen + Vir (`astgen.md`), the Air passes (`air-passes.md`), SPICE (`spice.md`).
+  - next: Zcu + Sema (after Vir), codegen, Compilation; then the switch-over and the old
+    pipeline's deletion.
 - [ ] Changelog: two lines drafted (formatC, `--jobs`); they need their issues filed (`gh auth login`).
 
 Notes from this session:

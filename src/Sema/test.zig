@@ -27,6 +27,10 @@ const Out = struct {
 // ---- private ----
 
 fn elab(src: [:0]const u8, config: Sema.Config) !Out {
+    return elabUnder(src, config, &.{});
+}
+
+fn elabUnder(src: [:0]const u8, config: Sema.Config, defaults: []const vams.Preprocessor.events.DefaultDiscipline) !Out {
     const gpa = std.testing.allocator;
     var out: Out = .{ .arena = .init(gpa), .tree = "", .codes = &.{}, .keys = 0 };
     errdefer out.arena.deinit();
@@ -35,7 +39,7 @@ fn elab(src: [:0]const u8, config: Sema.Config) !Out {
     defer ast.deinit(gpa);
     if (ast.errors.len != 0) std.debug.print("parse error {t} at token {d}\n", .{ ast.errors[0].tag, ast.errors[0].token });
     try std.testing.expectEqual(@as(usize, 0), ast.errors.len);
-    var vir = try vams.AstGen.generate(gpa, &ast, .{});
+    var vir = try vams.AstGen.generate(gpa, &ast, .{ .directives = .{ .disciplines = defaults } });
     defer vir.deinit(gpa);
     var zcu: Zcu = try .init(gpa);
     defer zcu.deinit();
@@ -54,6 +58,14 @@ fn elab(src: [:0]const u8, config: Sema.Config) !Out {
     out.codes = try arena.dupe(Diag.Code, zcu.failed.items(.code));
     out.keys = zcu.instance_map.count();
     return out;
+}
+
+/// `expectCodes` with `default_discipline <discipline>` in force from the
+/// first byte (§10.2).
+fn expectCodesUnder(src: [:0]const u8, default: []const u8, want: []const Diag.Code) !void {
+    var o = try elabUnder(src, .{}, &.{.{ .at = 0, .qualifier = null, .discipline = default }});
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, want, o.codes);
 }
 
 fn expectTree(src: [:0]const u8, config: Sema.Config, want: []const u8) !void {
@@ -299,4 +311,15 @@ test "IEEE 1364-2005 §12.8.1 a defparam of the module's own parameter is in for
         \\module kid; endmodule
         \\module top; parameter n = 1; if (n == 2) kid k(); defparam n = 2; endmodule
     , .{}, "top top\ntop.genblk1.k kid\n");
+}
+
+test "§7.8.5.1 a gate terminal on a continuous vector net gets no bridge (E0929)" {
+    try expectCodesUnder(
+        \\nature V; access = V; endnature
+        \\discipline el; potential V; enddiscipline
+        \\discipline dd; domain discrete; enddiscipline
+        \\connectmodule a2d(e, c); input e; output c; el e; dd c; endmodule
+        \\module top; el [1:0] a; wire [1:0] y; reg [1:0] b; and g[1:0] (y, a, b); endmodule
+        \\connectrules r; connect a2d split; endconnectrules
+    , "dd", &.{.E0929});
 }

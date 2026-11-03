@@ -389,7 +389,9 @@ pub const Name = extern struct { name: String, prev: Ref, dims: Body };
 pub const Branch = extern struct { name: String, prev: Ref, range: Body, hi: Body, lo: Body };
 
 /// A module, UDP or gate instance of `target` (a module, UDP or the gate
-/// keyword).
+/// keyword). `defaults` are the §10.2 `default_discipline`s in force at a
+/// gate or UDP instance (§3.9: a digital primitive's terminals take one);
+/// empty for a module instance.
 pub const Instance = extern struct {
     name: String,
     prev: Ref,
@@ -400,6 +402,7 @@ pub const Instance = extern struct {
     range: Body,
     params: List(Arg),
     conns: List(Arg),
+    defaults: List(Default),
 };
 
 /// A parameter value or connection: named (`.name(value)`) or ordered

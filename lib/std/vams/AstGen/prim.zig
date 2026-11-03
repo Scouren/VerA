@@ -49,6 +49,7 @@ pub fn moduleInstances(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void 
             .range = try decl.exprBody(ag, scope, in.range),
             .params = params,
             .conns = try args(ag, scope, tree.extraDataSlice(.{ .start = in.conns_start, .end = in.conns_end }, Node.OptionalIndex)),
+            .defaults = .empty,
         });
     }
 }
@@ -79,6 +80,7 @@ pub fn gateInstances(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
             .range = try decl.exprBody(ag, scope, gi.range),
             .params = .empty,
             .conns = try args(ag, scope, terms),
+            .defaults = try ag.defaultsAt(d.main_token),
         });
     }
 }

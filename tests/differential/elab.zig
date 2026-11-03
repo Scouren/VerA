@@ -187,8 +187,16 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8) !Outcome {
         // Compared on nothing, but the new side must still elaborate.
         break :blk .{ .tree = null, .codes = &.{} };
     } else (try oldAnalog(arena, pp, bag)) orelse return .old_refused;
-    const new = (try newSide(arena, path, text, digital, builtins)) orelse return .new_refused;
-    const again = (try newSide(arena, path, text, digital, builtins)).?;
+    // The old preprocessor's §10.2 events, as the new AstGen reads them.
+    const defaults = try arena.alloc(vams.Preprocessor.events.DefaultDiscipline, pp.directives.disciplines.len);
+    for (pp.directives.disciplines, defaults) |e, *d| d.* = .{
+        .at = e.at,
+        .qualifier = if (e.qualifier) |q| std.meta.stringToEnum(vams.Preprocessor.events.Qualifier, @tagName(q)).? else null,
+        .discipline = e.discipline,
+    };
+    const directives: vams.Preprocessor.Directives = .{ .disciplines = defaults };
+    const new = (try newSide(arena, path, text, digital, builtins, directives)) orelse return .new_refused;
+    const again = (try newSide(arena, path, text, digital, builtins, directives)).?;
     const refused = digital and old.tree == null;
     if (!sameLines(new.codes, again.codes) or !sameLines(new.tree.?, again.tree.?))
         return .{ .verdict = .{ .why = "determinism: two elaborations differ", .tree = false, .digital_refused = refused } };
@@ -343,12 +351,12 @@ fn paramsDiffer(arena: std.mem.Allocator, old: *const std.StringHashMapUnmanaged
 
 /// The new side: parse, AstGen, elaborate. Null when the new parser
 /// refuses the text.
-fn newSide(arena: std.mem.Allocator, path: []const u8, text: [:0]const u8, digital: bool, builtins: u32) !?Side {
+fn newSide(arena: std.mem.Allocator, path: []const u8, text: [:0]const u8, digital: bool, builtins: u32, directives: vams.Preprocessor.Directives) !?Side {
     const gpa = std.heap.smp_allocator;
     var tree = try vams.Ast.parse(gpa, text, .{ .keywords = if (digital) .v1364_2005 else .vams_2023 });
     defer tree.deinit(gpa);
     if (tree.errors.len != 0) return null;
-    var vir = try vams.AstGen.generate(gpa, &tree, .{});
+    var vir = try vams.AstGen.generate(gpa, &tree, .{ .directives = directives });
     defer vir.deinit(gpa);
     var zcu: Zcu = try .init(gpa);
     defer zcu.deinit();

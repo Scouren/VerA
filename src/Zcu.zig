@@ -197,8 +197,11 @@ pub const NetKey = struct { instance: Instance.Index, net: InternPool.String };
 
 /// One §7.8.4 insertion: port `port` (a header port of the instance's
 /// module) of `instance`, re-pointed at the connect-module instance
-/// `bridge`, a child of `instance`'s parent.
-pub const Insert = struct { instance: Instance.Index, port: Vir.Inst.Index, bridge: Instance.Index };
+/// `bridge`, a child of `instance`'s parent. For a §7.8.5.1 primitive
+/// terminal, `instance` is the one whose module holds the primitive,
+/// `port` its `instance` instruction, `terminal` the terminal's position,
+/// and the bridge `instance`'s child.
+pub const Insert = struct { instance: Instance.Index, port: Vir.Inst.Index, bridge: Instance.Index, terminal: u32 = 0 };
 
 /// One diagnostic: its code, the file and instruction it is about (none
 /// when it is about the design as a whole) and its message.

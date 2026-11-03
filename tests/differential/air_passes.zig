@@ -324,6 +324,9 @@ test "Float: each planted bug goes red" {
     const inward = try falsify.sweep(gpa, .inward, planted_programs, planted_points);
     falsify.report("planted inward", inward);
     try std.testing.expect(inward.failed.get(.interval) != 0);
+    const wide = try falsify.sweep(gpa, .wide_box, planted_programs, planted_points);
+    falsify.report("planted wide_box", wide);
+    try std.testing.expect(wide.failed.get(.slice) != 0);
 }
 
 test "Float: sound on generated programs (falsification)" {

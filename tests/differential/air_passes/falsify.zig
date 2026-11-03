@@ -39,14 +39,17 @@ pub const Kind = enum { interval, finite, slice, violation };
 pub const Stats = struct {
     programs: u64 = 0,
     runs: u64 = 0,
-    /// Runs inside the whole input box, and inside the root's guard box.
+    /// Runs inside the whole input box.
     inside: u64 = 0,
-    inside_root: u64 = 0,
+    /// Runs of an `.optimized` root inside its guard box (the fast body
+    /// would run) and outside it (the strict body would).
+    fast: u64 = 0,
+    guarded_out: u64 = 0,
     /// Runs where `+ - * /`, `%` or `hypot` made ±inf or NaN from finite
-    /// operands (the old oracle dropped them), and those of them inside the
-    /// root's guard box.
+    /// operands (the old oracle dropped them), and those of them where the
+    /// fast body would run.
     overflowed: u64 = 0,
-    overflowed_inside_root: u64 = 0,
+    overflowed_fast: u64 = 0,
     optimized: u64 = 0,
     failed: std.EnumArray(Kind, u64) = .initFill(0),
     /// The tags an example was printed for, per kind: one example each.
@@ -54,7 +57,7 @@ pub const Stats = struct {
 };
 
 /// What a planted bug claims instead of `Float`'s answer.
-pub const Plant = enum { none, all_finite, all_optimized, point_iv, all_violated, overflow_contract, inward };
+pub const Plant = enum { none, all_finite, all_optimized, point_iv, all_violated, overflow_contract, inward, wide_box };
 
 /// What a falsification run holds a run against.
 const Claims = struct {
@@ -62,6 +65,8 @@ const Claims = struct {
     finite: []const bool,
     domain: []const Float.Domain,
     optimized: bool,
+    /// The root's guard box: the slice claim holds where every guard admits.
+    box: []const Float.Guard,
 };
 
 /// One run's observer: holds every value against the claims.
@@ -168,7 +173,7 @@ pub fn sweep(gpa: Allocator, plant: Plant, n_programs: u32, n_points: u32) !Stat
         const a = arena.allocator();
         const finite = try a.alloc(bool, f.nan.len);
         for (finite, 0..) |*x, i| x.* = f.finite(@intCast(i));
-        var claims: Claims = .{ .iv = f.iv, .finite = finite, .domain = f.domain, .optimized = f.modes[0] == .optimized };
+        var claims: Claims = .{ .iv = f.iv, .finite = finite, .domain = f.domain, .optimized = f.verdict.modes[0] == .optimized, .box = f.verdict.box(0) };
         switch (plant) {
             .none => {},
             .all_finite => {
@@ -186,23 +191,24 @@ pub fn sweep(gpa: Allocator, plant: Plant, n_programs: u32, n_points: u32) !Stat
                 claims.domain = try a.alloc(Float.Domain, f.domain.len);
                 @memset(@constCast(claims.domain), .violated);
             },
-            .overflow_contract, .inward => {},
+            .overflow_contract, .inward, .wide_box => {},
         }
         const slice = try oracleSlice(a, p.air, p.root);
         switch (plant) {
             .none, .all_finite, .all_optimized, .point_iv, .all_violated => {},
             .overflow_contract => claims.optimized = try plantOverflowContract(a, &ip, p.air, f.error_count, slice, &claims),
             .inward => claims.iv = try plantInward(a, p.air, f.iv),
+            .wide_box => claims.box = try plantWideBox(a, claims.box),
         }
         stats.programs += 1;
         stats.optimized += @intFromBool(claims.optimized);
-        try falsify(gpa, &ip, &p, claims, slice, p.bound orelse 1e3, r, n_points, &stats);
+        try falsify(gpa, &ip, &p, claims, slice, p.bound orelse Float.default_unknown_bound, r, n_points, &stats);
     }
     return stats;
 }
 
 pub fn report(name: []const u8, s: Stats) void {
-    std.debug.print("air_passes {s}: {d} programs ({d} rated .optimized), {d} runs ({d} inside the box, {d} inside the root's guard box), {d} overflowed ({d} inside the guard box), failures: interval {d}, finite {d}, slice {d}, violation {d}\n", .{ name, s.programs, s.optimized, s.runs, s.inside, s.inside_root, s.overflowed, s.overflowed_inside_root, s.failed.get(.interval), s.failed.get(.finite), s.failed.get(.slice), s.failed.get(.violation) });
+    std.debug.print("air_passes {s}: {d} programs ({d} rated .optimized), {d} runs ({d} inside the box; of .optimized roots {d} inside the guard box, {d} outside), {d} overflowed ({d} on the fast path), failures: interval {d}, finite {d}, slice {d}, violation {d}\n", .{ name, s.programs, s.optimized, s.runs, s.inside, s.fast, s.guarded_out, s.overflowed, s.overflowed_fast, s.failed.get(.interval), s.failed.get(.finite), s.failed.get(.slice), s.failed.get(.violation) });
 }
 
 // ---- private ----
@@ -224,7 +230,13 @@ fn falsify(gpa: Allocator, ip: *const InternPool, p: *const gen.Program, claims:
         } else for (probes) |x| {
             if (!(@abs(x) <= bound)) break false;
         } else true;
-        const inside_root = inside;
+        const inside_root = for (claims.box) |g| {
+            const x = switch (g.leaf) {
+                .arg => args[g.index].real,
+                .probe => probes[g.index],
+            };
+            if (!g.admits(x)) break false;
+        } else true;
         var w: Watch = .{ .air = p.air, .ip = ip, .claims = claims, .slice = slice, .last = last, .inside = inside, .inside_root = inside_root };
         _ = interp.run(run_arena.allocator(), p.air, ip, .{ .args = &args, .probes = &probes, .loop_cap = loop_cap, .observe = .{ .ctx = &w, .seen = Watch.seen } }) catch |e| switch (e) {
             error.NoValue, error.LoopCap => {},
@@ -232,9 +244,10 @@ fn falsify(gpa: Allocator, ip: *const InternPool, p: *const gen.Program, claims:
         };
         stats.runs += 1;
         stats.inside += @intFromBool(inside);
-        stats.inside_root += @intFromBool(inside_root);
+        stats.fast += @intFromBool(claims.optimized and inside_root);
+        stats.guarded_out += @intFromBool(claims.optimized and !inside_root);
         stats.overflowed += @intFromBool(w.overflow);
-        stats.overflowed_inside_root += @intFromBool(w.overflow and inside_root);
+        stats.overflowed_fast += @intFromBool(w.overflow and claims.optimized and inside_root);
         const f = w.failure orelse continue;
         stats.failed.getPtr(f.kind).* += 1;
         const printed = stats.printed.getPtr(f.kind);
@@ -278,6 +291,17 @@ fn plantOverflowContract(arena: Allocator, ip: *const InternPool, air: Air, erro
     claims.iv = iv;
     for (slice, 0..) |m, i| if (m and air.typeOfIndex(ip, @fromBackingInt(@intCast(i))) != .none and !fin[i]) return false;
     return errors == 0;
+}
+
+/// A box wider than the one the proof assumed: every probe guard a
+/// thousand times wider, every parameter guard dropped.
+fn plantWideBox(arena: Allocator, box: []const Float.Guard) ![]const Float.Guard {
+    var out: std.ArrayList(Float.Guard) = .empty;
+    for (box) |g| {
+        if (g.leaf == .arg) continue;
+        try out.append(arena, .{ .iv = .{ .lo = g.iv.lo * 1e3, .hi = g.iv.hi * 1e3 }, .index = g.index, .leaf = .probe });
+    }
+    return out.items;
 }
 
 /// Every finite end of a real transfer's interval (a `+ - * /` or math

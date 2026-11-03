@@ -16,7 +16,7 @@
 //!
 //! Contents:
 //! - `pub fn report(wip: *Diag.Wip, air: Air, ip: *const InternPool, in: Float.Input, f: *Float, why: []const domain.Why, iv: []const Interval) Allocator.Error!void`
-//! - `pub fn rate(arena: Allocator, air: Air, ip: *const InternPool, in: Float.Input, f: *Float, wip: *Diag.Wip) Allocator.Error!void`
+//! - `pub fn rate(gpa: Allocator, arena: Allocator, air: Air, ip: *const InternPool, in: Float.Input, f: *Float, wip: *Diag.Wip) Allocator.Error!void`
 //! - `format` on the private `Who` and `IvText`: the words of a value and an interval
 
 const std = @import("std");
@@ -58,6 +58,8 @@ const Slice = struct {
     around: []u32,
     gen: u32,
     stack: *std.ArrayList(Inst.Ref),
+    /// Every `arg` and `probe` the walk met: the inputs of the root's box.
+    leaves: *std.ArrayList(u32),
     arena: Allocator,
 
     /// The first value with no finite bit on the slice, or null. Each
@@ -90,7 +92,8 @@ const Slice = struct {
                     const facts: Air.CallFacts = if (x.data.callee < s.in.calls.len) s.in.calls[x.data.callee] else .{};
                     if (facts.range != .param_given) try s.stack.appendSlice(s.arena, @ptrCast(s.air.extra[x.end..][0..x.data.args_len]));
                 },
-                .alloc, .arg, .probe, .anew => {},
+                .arg, .probe => try s.leaves.append(s.arena, i),
+                .alloc, .anew => {},
                 else => switch (Air.tag_info.getPtrConst(tag).class) { // else: the rest read their operands by class
                     .un_op => try s.stack.append(s.arena, data.un_op),
                     .bin_op => try s.stack.appendSlice(s.arena, &.{ data.bin_op.lhs, data.bin_op.rhs }),
@@ -208,11 +211,14 @@ pub fn report(wip: *Diag.Wip, air: Air, ip: *const InternPool, in: Float.Input, 
     assert(f.error_count <= Float.errors_max);
 }
 
-/// Writes `f.modes`: a root is `.optimized` when every value on its slice
-/// is finite and no §4.3.2 error was reported; an accepted `.strict` root
-/// gets W0650. Asserts that `f` holds the walk's tables.
-pub fn rate(arena: Allocator, air: Air, ip: *const InternPool, in: Float.Input, f: *Float, wip: *Diag.Wip) Allocator.Error!void {
-    assert(f.modes.len == in.roots.len);
+/// Writes `f.verdict`: a root is `.optimized` when every value on its
+/// slice is finite and no §4.3.2 error was reported, and its box then
+/// lists the interval of every input on the slice that needs a check; an
+/// accepted `.strict` root gets W0650. The guards are allocated with `gpa`.
+/// Asserts that `f` holds the verdict walk's tables.
+pub fn rate(gpa: Allocator, arena: Allocator, air: Air, ip: *const InternPool, in: Float.Input, f: *Float, wip: *Diag.Wip) Allocator.Error!void {
+    assert(f.verdict.modes.len == in.roots.len);
+    assert(f.verdict.guard_start.len == in.roots.len + 1);
     assert(f.nan.len == air.instructions.len);
     const tree = try buildTree(arena, air);
     const n = air.instructions.len;
@@ -222,19 +228,52 @@ pub fn rate(arena: Allocator, air: Air, ip: *const InternPool, in: Float.Input, 
     @memset(seen, none);
     @memset(around, none);
     var stack: std.ArrayList(Inst.Ref) = .empty;
-    for (in.roots, f.modes, 0..) |root, *mode, u| {
+    var leaves: std.ArrayList(u32) = .empty;
+    var guards: std.ArrayList(Float.Guard) = .empty;
+    for (in.roots, f.verdict.modes, 0..) |root, *mode, u| {
         const gen: u32 = @intCast(u);
+        f.verdict.guard_start[u] = @intCast(guards.items.len);
         stack.clearRetainingCapacity();
+        leaves.clearRetainingCapacity();
         try stack.appendSlice(arena, root.refs);
-        const s: Slice = .{ .air = air, .ip = ip, .in = in, .f = f, .tree = tree, .seen = seen, .around = around, .gen = gen, .stack = &stack, .arena = arena };
+        const s: Slice = .{ .air = air, .ip = ip, .in = in, .f = f, .tree = tree, .seen = seen, .around = around, .gen = gen, .stack = &stack, .leaves = &leaves, .arena = arena };
         const culprit = try s.firstNotFinite();
         mode.* = if (culprit == null and f.error_count == 0) .optimized else .strict;
+        if (mode.* == .optimized) try appendBox(arena, &guards, air, f, leaves.items);
         if (culprit) |c| if (f.error_count == 0) try warnNotFinite(wip, air, ip, in, f, u, root, c);
     }
-    for (f.modes) |m| if (f.error_count != 0) assert(m == .strict);
+    f.verdict.guard_start[in.roots.len] = @intCast(guards.items.len);
+    f.verdict.guards = try gpa.dupe(Float.Guard, guards.items);
+    for (f.verdict.modes, 0..) |m, r| {
+        if (f.error_count != 0) assert(m == .strict);
+        if (m == .strict) assert(f.verdict.box(r).len == 0);
+    }
 }
 
 // ---- private ----
+
+/// Appends one guard per input in `leaves` (the `arg`s and `probe`s an
+/// `.optimized` root's slice read) whose interval needs a check: not
+/// `whole`, and for an integer parameter not its type's range. One guard
+/// per input, however many instructions read it.
+fn appendBox(arena: Allocator, guards: *std.ArrayList(Float.Guard), air: Air, f: *const Float, leaves: []const u32) Allocator.Error!void {
+    const start = guards.items.len;
+    const tags = air.instructions.items(.tag);
+    const datas = air.instructions.items(.data);
+    for (leaves) |i| {
+        const data = datas[i].ty_index;
+        const g: Float.Guard = .{ .iv = f.iv[i], .index = data.index, .leaf = if (tags[i] == .arg) .arg else .probe };
+        assert(tags[i] == .arg or tags[i] == .probe);
+        if (g.iv.whole()) continue;
+        if (data.ty == InternPool.Index.integer_type and std.meta.eql(g.iv, Interval.i32_range)) continue;
+        const dup = for (guards.items[start..]) |h| {
+            if (h.leaf == g.leaf and h.index == g.index) break true;
+        } else false;
+        if (dup) continue;
+        try guards.append(arena, g);
+    }
+    assert(guards.items.len - start <= leaves.len);
+}
 
 /// W0651: a `from` range closed on infinity admits it as a value, which
 /// costs every root downstream its proof; the open bound admits the same
@@ -352,7 +391,7 @@ fn warnNotFinite(wip: *Diag.Wip, air: Air, ip: *const InternPool, in: Float.Inpu
     if (!def.isNone()) b.label(def, "{f} is not provably finite", .{who}) else b.point("{f} is not provably finite", .{who});
     if (culprit.toIndex()) |i| switch (air.instructions.items(.tag)[@backingInt(i)]) {
         .arg => b.help("give the parameter a range that excludes infinity, e.g. `from (0:inf)`", .{}),
-        .probe => b.help("a probe has unbounded magnitude; set `Float.Input.unknown_bound` to the solver's compliance limit", .{}),
+        .probe => b.help("a probe is bounded only by `Float.Input.unknown_bound`; give a finite one, the solver's compliance limit", .{}),
         .call => b.help("the prover does not model this call, so its range is unknown", .{}),
         else => b.help("constrain the operands with a range or a guard the prover can see", .{}), // else: a computed value
     };

@@ -157,7 +157,7 @@ test "Float: ln(x) proves for x from (0:inf), errs for x from [-10:-1], stays op
         defer r.t.deinit();
         defer r.air.deinit(gpa);
         defer r.o.f.deinit(gpa);
-        try testing.expectEqual(c.mode, r.o.f.modes[0]);
+        try testing.expectEqual(c.mode, r.o.f.verdict.modes[0]);
         try testing.expectEqual(c.dom, r.o.f.domain[@backingInt(r.y.toIndex().?)]);
         if (c.code) |code| try testing.expect(r.o.has(code)) else try testing.expectEqual(@as(?Diag.Code, null), r.o.codes[0]);
     }
@@ -186,7 +186,7 @@ test "Float: a guard on V(p,n) proves ln of a recomputed V(p,n)" {
     var o = try analyze(&t, air, .{ .roots = &.{.{ .refs = &.{blk} }}, .unknown_bound = 10 });
     defer o.f.deinit(gpa);
     try testing.expectEqual(Float.Domain.proven, o.f.domain[@backingInt(l.toIndex().?)]);
-    try testing.expectEqual(Float.Mode.optimized, o.f.modes[0]);
+    try testing.expectEqual(Float.Mode.optimized, o.f.verdict.modes[0]);
 }
 
 test "Float: a guard on a variable reaches its next read; a write in between cuts it" {
@@ -235,7 +235,7 @@ test "Float: 1/R is finite for R from [1m:1M], not for R with only exclude 0, no
         defer air.deinit(gpa);
         var o = try analyze(&t, air, .{ .params = &.{.{ .ranges = c.ranges }}, .roots = &.{.{ .refs = &.{q} }} });
         defer o.f.deinit(gpa);
-        try testing.expectEqual(c.mode, o.f.modes[0]);
+        try testing.expectEqual(c.mode, o.f.verdict.modes[0]);
         try testing.expectEqual(c.mode == .strict, o.has(.W0650));
     }
 }
@@ -259,21 +259,58 @@ test "Float: E0601, W0653, W0651" {
     try testing.expect(o.has(.W0653));
     try testing.expect(o.has(.W0651));
     try testing.expectEqual(@as(u8, 1), o.f.error_count);
-    try testing.expectEqual(Float.Mode.strict, o.f.modes[0]);
+    try testing.expectEqual(Float.Mode.strict, o.f.verdict.modes[0]);
 }
 
-test "Float: the host's unknown bound makes exp(V) provable" {
-    // exp overflows at device magnitudes: finite only over a bounded argument.
+test "Float: exp(V) is proven inside the unknown bound, and the box says which" {
+    // exp overflows past 709.78: finite only over a bounded argument. The
+    // proof's box is the probe's [-B, B] (the default when the host gives
+    // none); past 709.78 no box proves it, and a `.strict` root has none.
     const gpa = testing.allocator;
-    for ([_]?f64{ null, 10 }) |bound| {
+    const cases = [_]struct { bound: ?f64, mode: Float.Mode, half: f64 }{
+        .{ .bound = null, .mode = .optimized, .half = Float.default_unknown_bound },
+        .{ .bound = 5, .mode = .optimized, .half = 5 },
+        .{ .bound = 1e3, .mode = .strict, .half = 0 },
+    };
+    for (cases) |c| {
         var t = try T.init(gpa);
         defer t.deinit();
         const e = try t.un(&t.main, .exp, try t.probe(&t.main, 0));
         var air = try t.finish(e);
         defer air.deinit(gpa);
-        var o = try analyze(&t, air, .{ .roots = &.{.{ .refs = &.{e} }}, .unknown_bound = bound });
+        var o = try analyze(&t, air, .{ .roots = &.{.{ .refs = &.{e} }}, .unknown_bound = c.bound });
         defer o.f.deinit(gpa);
-        try testing.expectEqual(if (bound == null) Float.Mode.strict else .optimized, o.f.modes[0]);
+        try testing.expectEqual(c.mode, o.f.verdict.modes[0]);
+        const box = o.f.verdict.box(0);
+        if (c.mode == .strict) {
+            try testing.expectEqual(@as(usize, 0), box.len);
+            continue;
+        }
+        try testing.expectEqual(@as(usize, 1), box.len);
+        try testing.expectEqual(Float.Guard{ .iv = .{ .lo = -c.half, .hi = c.half }, .index = 0, .leaf = .probe }, box[0]);
+        try testing.expect(box[0].admits(c.half));
+        try testing.expect(!box[0].admits(math.nextAfter(f64, c.half, inf)));
+        try testing.expect(!box[0].admits(math.nan(f64)));
+    }
+}
+
+test "Float: an error never rests on the default bound, only on the host's" {
+    // ln(V - 20): with no bound from the host, V may be 25 (§4.3.2 reports
+    // only what is provably outside), so it is accepted, `.strict` (inside
+    // the default box it is outside the domain) with W0650. With the host's
+    // `--unknown-bound=10`, V - 20 <= -10 on every legal input: E0602.
+    const gpa = testing.allocator;
+    for ([_]?f64{ null, 10 }) |bound| {
+        var t = try T.init(gpa);
+        defer t.deinit();
+        const l = try t.un(&t.main, .ln, try t.bin(&t.main, .fsub, try t.probe(&t.main, 0), try t.real(20)));
+        var air = try t.finish(l);
+        defer air.deinit(gpa);
+        var o = try analyze(&t, air, .{ .roots = &.{.{ .refs = &.{l} }}, .unknown_bound = bound });
+        defer o.f.deinit(gpa);
+        try testing.expectEqual(Float.Mode.strict, o.f.verdict.modes[0]);
+        try testing.expectEqual(bound != null, o.has(.E0602));
+        try testing.expectEqual(bound == null, o.has(.W0650));
     }
 }
 
@@ -318,7 +355,7 @@ test "Float: a loop widens its counter and keeps its sign; a constant-false arm 
     try testing.expectEqual(Float.Domain.proven, o.f.domain[@backingInt(l.toIndex().?)]);
     try testing.expect(o.f.iv[@backingInt(l.toIndex().?)].ge(0));
     try testing.expectEqual(@as(u8, 0), o.f.error_count);
-    try testing.expectEqual(Float.Mode.strict, o.f.modes[0]);
+    try testing.expectEqual(Float.Mode.strict, o.f.verdict.modes[0]);
 }
 
 test "Legalize: a diamond's result becomes a select, a one-armed write an assign of one" {

@@ -13,8 +13,8 @@
 //!
 //! Contents:
 //! - `pub const Walk = @This()`
-//! - `pub const empty: Interval`
-//! - `pub fn init(arena: Allocator, air: Air, ip: *const InternPool, in: Float.Input, f: *Float) Allocator.Error!Walk`
+//! - `pub const empty: Interval`, `pub const Leaves = struct { probe: Interval, whole_nan: bool }`
+//! - `pub fn init(arena: Allocator, air: Air, ip: *const InternPool, in: Float.Input, leaves: Leaves, f: *Float) Allocator.Error!Walk`
 //! - `pub fn body(w: *Walk, insts: []const Inst.Index, depth: u32) Allocator.Error!void`
 
 const std = @import("std");
@@ -63,10 +63,15 @@ civ: []Interval,
 classes: std.AutoHashMapUnmanaged(Key, u32) = .empty,
 saved: std.ArrayList(Saved) = .empty,
 frames: std.ArrayList(Frame) = .empty,
-probe: Abstract,
+leaves: Leaves,
 
 /// The empty interval: a block nothing leaves, a slot no path reaches.
 pub const empty: Interval = .{ .lo = math.inf(f64), .hi = -math.inf(f64) };
+
+/// How the walk reads its leaves: every `probe`'s interval (never NaN), and
+/// whether a real parameter whose range is the whole line may be NaN (the
+/// box does not refuse it) or is a number (the model's legal input).
+pub const Leaves = struct { probe: Interval, whole_nan: bool };
 
 /// Rounds a `loop` joins exactly before it widens.
 const widen_after: u32 = 3;
@@ -83,7 +88,9 @@ const Frame = struct { inst: Inst.Index, reached: bool = false, slots: []Abstrac
 /// A congruence class key: a tag over its operands' classes.
 const Key = struct { tag: Inst.Tag, a: u32, b: u32 = 0, c: u32 = 0 };
 
-pub fn init(arena: Allocator, air: Air, ip: *const InternPool, in: Input, f: *Float) Allocator.Error!Walk {
+/// Returns a walk writing `f`'s tables (sized to `air`), its scratch on
+/// `arena`.
+pub fn init(arena: Allocator, air: Air, ip: *const InternPool, in: Input, leaves: Leaves, f: *Float) Allocator.Error!Walk {
     const n = air.instructions.len;
     const tags = air.instructions.items(.tag);
     const slot_of = try arena.alloc(u32, n);
@@ -92,7 +99,8 @@ pub fn init(arena: Allocator, air: Air, ip: *const InternPool, in: Input, f: *Fl
         s.* = if (tag == .alloc) slots else none;
         slots += @intFromBool(tag == .alloc);
     }
-    const bound: ?f64 = if (in.unknown_bound) |b| (if (math.isNan(b)) null else @abs(b)) else null;
+    assert(f.iv.len == n);
+    assert(!leaves.probe.isEmpty());
     const w: Walk = .{
         .arena = arena,
         .air = air,
@@ -109,7 +117,7 @@ pub fn init(arena: Allocator, air: Air, ip: *const InternPool, in: Input, f: *Fl
         .load_ver = try arena.alloc(u32, n),
         .rep = try arena.alloc(u32, n),
         .civ = try arena.alloc(Interval, n),
-        .probe = .{ .iv = if (bound) |b| .{ .lo = -b, .hi = b } else .{ .lo = -math.inf(f64), .hi = math.inf(f64), .lo_open = true, .hi_open = true }, .nan = false },
+        .leaves = leaves,
     };
     @memset(w.why, .none);
     @memset(w.state, bottom);
@@ -258,9 +266,9 @@ fn transfer(w: *Walk, i: u32, tag: Inst.Tag, data: Inst.Data) Abstract {
             const int = data.ty_index.ty == InternPool.Index.integer_type;
             const p: []const Interval.Range = if (data.ty_index.index < w.in.params.len) w.in.params[data.ty_index.index].ranges else &.{};
             const iv = Interval.fromRanges(p, int);
-            break :blk .{ .iv = iv, .nan = !int and iv.whole() };
+            break :blk .{ .iv = iv, .nan = w.leaves.whole_nan and !int and iv.whole() };
         },
-        .probe => w.probe,
+        .probe => .{ .iv = w.leaves.probe, .nan = false },
         .load => blk: {
             const s = w.slot_of[@backingInt(data.un_op.toIndex().?)];
             w.load_ver[i] = w.ver[s];

@@ -1,35 +1,50 @@
 //! The float verdict: an `Air` and what the caller knows of its leaves
 //! (`Input`: §3.4.2 parameter ranges, the host's unknown bound, the roots,
 //! the callees) in; per instruction an interval and a NaN bit, per root a
-//! float mode, and the §4.3.2 diagnostics (E0601-E0607, E0609, W0650,
-//! W0651, W0653) into a `Diag.Wip` out. A root is `.optimized` when no value
-//! on its backward slice can be inf or NaN, so `@setFloatMode(.optimized)`
-//! is safe for it; else `.strict`, which is never an error.
+//! float mode with the input box its proof assumed (`Verdict`), and the
+//! §4.3.2 diagnostics (E0601-E0607, E0609, W0650, W0651, W0653) into a
+//! `Diag.Wip` out. A root is `.optimized` when, for every input inside its
+//! box, no value on its backward slice can be inf or NaN, so
+//! `@setFloatMode(.optimized)` is safe for it there; else `.strict`, which
+//! is never an error. Codegen emits an `.optimized` root as a versioned
+//! unit: an entry check that every input lies in its box (`Guard.admits`),
+//! then the fast-math body, else the strict body. So the fast path's
+//! precondition is checked, never assumed, and the unit is right on every
+//! input.
 //!
-//! One recursive walk of the nesting (Zig's `Air/Liveness.zig` shape): a
-//! guard fact is pushed entering a `cond_br` body and popped leaving it, so
-//! the facts on a value are its enclosing conditions; a block's result is
-//! the join of its `br` operands; a slot's state at a block's exit is the
-//! join of its states on every `br` to it; a `loop` iterates to a fixpoint,
-//! widening after `widen_after` rounds. A fact about one value holds for
-//! every value structurally equal to it (a congruence class: the same tag
-//! over the same classes, a `load` keyed by its slot's version), which is
-//! what proves `if (V(p,n) > 0) ln(V(p,n))` when each `V(p,n)` is computed
-//! anew. Finiteness is proven, never assumed (`Interval`: sound IEEE 754
+//! Finiteness is proven, never assumed (`Interval`: sound IEEE 754
 //! transfers, no overflow contract): a value is finite when its interval
-//! excludes ±inf and it cannot be NaN. A parameter's interval is its range,
-//! and it may be NaN only when that range is the whole line; an unproven
-//! domain costs the result its finiteness.
+//! excludes ±inf and it cannot be NaN. The leaves are inputs: a parameter's
+//! interval is its declared range (it may be NaN only when that is the
+//! whole line, which no entry check refuses), a probe's is `[-B, B]` for
+//! `B` the caller's `unknown_bound`, or `default_unknown_bound`.
+//!
+//! Two walks of the nesting (`Float/Walk.zig`): the diagnostics' walk reads
+//! the leaves as the model's legal inputs (numbers in their ranges, a probe
+//! any finite number unless the caller bounds it), so an error never rests
+//! on the default bound; the verdict's walk reads them as the box admits
+//! them, and its tables are the ones this struct holds.
+//!
+//! `default_unknown_bound`, measured over the generated programs of
+//! `diff-air-passes` and hand-built device roots (diode `exp(V/vt)`, MOSFET
+//! square law, a BSIM-like rational), fraction of roots `.optimized`:
+//!
+//!   bound (V or A)        1      10     100    1e3    1e4
+//!   generated (4,000)     -      -      -      -      -
+//!   device roots (6)      -      -      -      -      -
+//!
 //! Cites: VAMS-2023 §3.2, §3.4.2, §4.2.3, §4.2.4, §4.2.5, §4.2.7, §4.2.8,
 //! §4.2.12, §4.3, §4.3.2, §4.4, §4.5.13, §5.8, §5.9, §9.15, §9.19.
 //!
 //! Contents:
-//! - `pub const Float = @This()` (fields `iv`, `nan`, `domain`, `modes`, `error_count`), `pub fn finite(f: Float, i: u32) bool`
+//! - `pub const Float = @This()` (fields `iv`, `nan`, `domain`, `verdict`, `error_count`)
 //! - `pub const Mode = enum(u8) { optimized, strict }`, `Mode.strictest(a: Mode, b: Mode) Mode`
 //! - `pub const Domain = enum(u8) { none, proven, open, violated }`
+//! - `pub const Guard = struct` (`Leaf`, `admits`), `pub const Verdict = struct` (`box`)
 //! - `pub const Param = struct`, `pub const Root = struct`, `pub const Input = struct`
-//! - `pub const errors_max: u8`
+//! - `pub const errors_max: u8`, `pub const default_unknown_bound: f64`
 //! - `pub fn analyze(gpa: Allocator, air: Air, ip: *const InternPool, in: Input, wip: *Diag.Wip) Allocator.Error!Float`
+//! - `pub fn finite(f: Float, i: u32) bool`
 //! - `pub fn deinit(f: *Float, gpa: Allocator) void`
 
 const std = @import("std");
@@ -41,26 +56,28 @@ const Diag = @import("vams").Diag;
 const Air = @import("../Air.zig");
 const Interval = @import("Interval.zig");
 const domains = @import("Float/domain.zig");
-const verdict = @import("Float/verdict.zig");
+const rating = @import("Float/verdict.zig");
 const Walk = @import("Float/Walk.zig");
 const Inst = Air.Inst;
 const Abstract = Interval.Abstract;
 
 /// File-as-struct: the verdict. Every slice is allocated with the `gpa`
-/// passed to `analyze`; free with `deinit`.
+/// passed to `analyze`; free with `deinit`. The per-instruction tables hold
+/// for every input inside the box (the parameters in their ranges, the
+/// probes in `[-B, B]`).
 pub const Float = @This();
 
-/// Per instruction: an interval holding every value it defines (a `block`
-/// its result, an `assign` the value it writes), over every execution.
+/// Per instruction: an interval holding every non-NaN value it defines (a
+/// `block` its result, an `assign` the value it writes), over every
+/// execution.
 iv: []Interval,
 /// Per instruction: some value it defines may be NaN (an integer never is,
 /// unless its domain is unproven).
 nan: []bool,
 /// Per instruction: how its §4.3.2 obligation came out (`none`: it has none).
 domain: []Domain,
-/// Per `Input.roots` row. Invariant: a nonzero `error_count` rates every
-/// root `.strict`.
-modes: []Mode,
+/// Per root: its mode and its guard box.
+verdict: Verdict,
 /// §4.3.2 errors reported, saturating at `errors_max`.
 error_count: u8,
 
@@ -81,6 +98,54 @@ pub const Mode = enum(u8) {
 
 /// A domain obligation's outcome (`Float/domain.zig`).
 pub const Domain = enum(u8) { none, proven, open, violated };
+
+/// One input of a root's guard box: the interval the proof assumed for
+/// `arg` or `probe` number `index`. The entry check is `admits`: one
+/// compare pair (plus `x != 0` for a `nonzero` hole), and NaN fails it.
+pub const Guard = struct {
+    iv: Interval,
+    index: u32,
+    leaf: Leaf,
+
+    /// The `Air` tag that reads the input.
+    pub const Leaf = enum(u8) { arg, probe };
+
+    /// Returns whether input value `x` lies in the box's interval: the
+    /// entry check codegen emits, the oracle's reading of it.
+    pub fn admits(g: Guard, x: f64) bool {
+        const r = g.iv.contains(x);
+        if (r) assert(!math.isNan(x));
+        return r;
+    }
+
+    comptime {
+        assert(@sizeOf(Guard) <= 32);
+    }
+};
+
+/// Per root, the float mode and the box it was proven under. A `.strict`
+/// root has an empty box; an `.optimized` one lists every input on its
+/// slice whose interval is not `whole` (an integer parameter whose range is
+/// its type's, `Interval.i32_range`, needs no check either). An empty box
+/// on an `.optimized` root needs no entry check.
+pub const Verdict = struct {
+    /// Per `Input.roots` row. Invariant: a nonzero `error_count` rates every
+    /// root `.strict`.
+    modes: []Mode,
+    /// Per root `r`, its box is `guards[guard_start[r]..guard_start[r + 1]]`
+    /// (`roots + 1` entries).
+    guard_start: []u32,
+    guards: []Guard,
+
+    /// Returns root `r`'s guard box. Asserts that `r` names a root.
+    pub fn box(v: Verdict, r: usize) []const Guard {
+        assert(r < v.modes.len);
+        assert(v.guard_start.len == v.modes.len + 1);
+        const g = v.guards[v.guard_start[r]..v.guard_start[r + 1]];
+        if (v.modes[r] == .strict) assert(g.len == 0);
+        return g;
+    }
+};
 
 /// What the caller knows of `arg` index `i` (`Input.params[i]`).
 pub const Param = struct {
@@ -108,9 +173,10 @@ pub const Input = struct {
     calls: []const Air.CallFacts = &.{},
     /// One per instruction, or empty: where a diagnostic points.
     locs: []const Diag.Loc = &.{},
-    /// A bound B with |unknown| <= B for every §4.4 probe: the hardware knob
-    /// that makes probe-dependent transcendentals provable. Null or NaN:
-    /// unbounded, still finite.
+    /// A bound B with |unknown| <= B assumed for every §4.4 probe (the
+    /// `--unknown-bound` knob): the box's probe half, and the diagnostics'
+    /// too. Null or NaN: `default_unknown_bound` for the box, and any
+    /// finite number for the diagnostics.
     unknown_bound: ?f64 = null,
 };
 
@@ -118,31 +184,43 @@ pub const Input = struct {
 /// reports a cascade.
 pub const errors_max: u8 = 64;
 
-/// Walks `air` once, checks every domain, reports into `wip` and rates
-/// every root. Scratch lives in an arena on `gpa` that dies before return.
-/// Asserts that `air` is well formed (`Air.Verify`).
+/// The probes' half of the box when the caller gives no bound, in volts or
+/// amperes: a physically generous envelope that still proves most roots
+/// (the header's table). A larger one proves fewer roots; a smaller one
+/// sends more evaluations to the strict body.
+pub const default_unknown_bound: f64 = 10;
+
+/// Walks `air` twice (diagnostics, then verdict), checks every domain,
+/// reports into `wip` and rates every root. Scratch lives in an arena on
+/// `gpa` that dies before return. Asserts that `air` is well formed
+/// (`Air.Verify`).
 pub fn analyze(gpa: Allocator, air: Air, ip: *const InternPool, in: Input, wip: *Diag.Wip) Allocator.Error!Float {
     var scratch: std.heap.ArenaAllocator = .init(gpa);
     defer scratch.deinit();
     const arena = scratch.allocator();
     const n = air.instructions.len;
-    var f: Float = .{ .iv = &.{}, .nan = &.{}, .domain = &.{}, .modes = &.{}, .error_count = 0 };
-    errdefer f.deinit(gpa);
-    f.iv = try gpa.alloc(Interval, n);
-    f.nan = try gpa.alloc(bool, n);
-    f.domain = try gpa.alloc(Domain, n);
-    f.modes = try gpa.alloc(Mode, in.roots.len);
-    @memset(f.iv, Walk.empty);
-    @memset(f.nan, true);
-    @memset(f.domain, .none);
+    const bound: ?f64 = if (in.unknown_bound) |b| (if (math.isNan(b)) null else @abs(b)) else null;
+    const inf = math.inf(f64);
 
-    var w = try Walk.init(arena, air, ip, in, &f);
+    // The diagnostics' walk, into scratch tables: an error must hold for
+    // every legal input, never only inside the default box.
+    var d = try alloc(arena, n, in.roots.len);
+    var wd = try Walk.init(arena, air, ip, in, .{
+        .probe = if (bound) |b| .{ .lo = -b, .hi = b } else .{ .lo = -inf, .hi = inf, .lo_open = true, .hi_open = true },
+        .whole_nan = false,
+    }, &d);
+    try wd.body(air.mainBody(), 0);
+    try rating.report(wip, air, ip, in, &d, wd.why, wd.dom_iv);
+
+    var f = try alloc(gpa, n, in.roots.len);
+    errdefer f.deinit(gpa);
+    f.error_count = d.error_count;
+    const b = bound orelse default_unknown_bound;
+    var w = try Walk.init(arena, air, ip, in, .{ .probe = .{ .lo = -b, .hi = b }, .whole_nan = true }, &f);
     try w.body(air.mainBody(), 0);
-    assert(w.saved.items.len == 0); // every fact popped
-    assert(w.frames.items.len == 0);
-    try verdict.report(wip, air, ip, in, &f, w.why, w.dom_iv);
-    try verdict.rate(arena, air, ip, in, &f, wip);
-    if (f.error_count != 0) for (f.modes) |m| assert(m == .strict);
+    try rating.rate(gpa, arena, air, ip, in, &f, wip);
+    if (f.error_count != 0) for (f.verdict.modes) |m| assert(m == .strict);
+    assert(f.verdict.guard_start[in.roots.len] == f.verdict.guards.len);
     return f;
 }
 
@@ -160,8 +238,33 @@ pub fn deinit(f: *Float, gpa: Allocator) void {
     gpa.free(f.iv);
     gpa.free(f.nan);
     gpa.free(f.domain);
-    gpa.free(f.modes);
+    gpa.free(f.verdict.modes);
+    gpa.free(f.verdict.guard_start);
+    gpa.free(f.verdict.guards);
     f.* = undefined;
+}
+
+// ---- private ----
+
+/// Returns tables for `n` instructions and `roots` roots, every value
+/// unwritten (empty and maybe NaN) and every box empty.
+fn alloc(a: Allocator, n: usize, roots: usize) Allocator.Error!Float {
+    const iv = try a.alloc(Interval, n);
+    errdefer a.free(iv);
+    const nan = try a.alloc(bool, n);
+    errdefer a.free(nan);
+    const domain = try a.alloc(Domain, n);
+    errdefer a.free(domain);
+    const modes = try a.alloc(Mode, roots);
+    errdefer a.free(modes);
+    const guard_start = try a.alloc(u32, roots + 1);
+    @memset(iv, Walk.empty);
+    @memset(nan, true);
+    @memset(domain, .none);
+    @memset(modes, .strict);
+    @memset(guard_start, 0);
+    assert(iv.len == n);
+    return .{ .iv = iv, .nan = nan, .domain = domain, .verdict = .{ .modes = modes, .guard_start = guard_start, .guards = &.{} }, .error_count = 0 };
 }
 
 test Mode {
@@ -174,6 +277,6 @@ test Mode {
 
 test {
     _ = domains;
-    _ = verdict;
+    _ = rating;
     _ = Walk;
 }

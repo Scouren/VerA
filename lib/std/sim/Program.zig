@@ -152,6 +152,13 @@ pub const Inst = struct {
         copy_out,
         /// §10.3 `disable` of task `a` (a `subs` row): every activation ends.
         disable_task,
+        /// §10.2.3 a new timed activation of a task that reaches itself:
+        /// `a` a `Call` in `extra` (over the body's frame); the process goes
+        /// on at the task's `Sub.body` and comes back after this pc.
+        call_timed,
+        /// The end of a `call_timed` activation of task `a`: the outputs
+        /// copied back, the caller's activation resumed.
+        task_return,
         /// §9.3 `assign`/`force` installs its holding process: `a` an
         /// `Override` in `extra`.
         override_on,
@@ -739,7 +746,10 @@ pub const Check = struct {
 /// §10 one task or function: its body's entry pc, its storage (slots
 /// [first, first + count), set aside per activation when `automatic`), its
 /// ports' slots (a `List`), a function's result slot, and the pc ranges of
-/// its inlined copies (pairs, a `List`) a §10.3 disable stops.
+/// its inlined copies (pairs, a `List`) a §10.3 disable stops. A timed task
+/// that reaches itself has its body once more out of line at `body`
+/// (`none`: no such body), over a frame of its own: slots [body_first,
+/// body_first + body_count), its ports `body_ports` (§10.2.3).
 pub const Sub = struct {
     entry: u32,
     function: bool,
@@ -749,6 +759,10 @@ pub const Sub = struct {
     result: u32,
     ports: List,
     ranges: List,
+    body: u32 = std.math.maxInt(u32),
+    body_first: u32 = 0,
+    body_count: u32 = 0,
+    body_ports: List = .empty,
 };
 
 /// A call of `subs` row `sub`: per port, an `Arg` (4 words) in `args`.
@@ -855,6 +869,10 @@ string_bytes: []const u8 = &.{},
 file_name: List = .empty,
 scopes: []const Scope = &.{},
 times: []const Time = &.{},
+/// §10.2.3 per slot, the automatic task whose timed activations each own a
+/// copy of it (`none`: one copy), so a change in one activation wakes no
+/// waiter of another; empty when no task has a timed activation.
+slot_act: []const u32 = &.{},
 /// §17.3.2's default `units_number`, the finest precision's exponent.
 finest: i32 = 0,
 blocks: []const Block = &.{},

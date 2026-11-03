@@ -6,7 +6,7 @@
 //!
 //! Contents:
 //! - `pub const Program`, `pub const Builder`, `pub const State`, `pub const Interp`
-//! - `pub const eval`, `pub const display`, `pub const logic`, `pub const net`, `pub const resolve`, `pub const calls`, `pub const readmem`, `pub const holds`, `pub const files`, `pub const tchk`, `pub const vcd`, `pub const evcd`, `pub const sdf`, `pub const sdf_text`, `pub const scan`, `pub const queues`, `pub const pla`
+//! - `pub const eval`, `pub const display`, `pub const logic`, `pub const net`, `pub const resolve`, `pub const calls`, `pub const readmem`, `pub const holds`, `pub const files`, `pub const tchk`, `pub const vcd`, `pub const evcd`, `pub const sdf`, `pub const sdf_text`, `pub const scan`, `pub const queues`, `pub const pla`, `pub const activations`
 //! - `pub const scheduler`, `pub const time`
 
 pub const Program = @import("sim/Program.zig");
@@ -30,6 +30,7 @@ pub const sdf_text = @import("sim/sdf_text.zig");
 pub const scan = @import("sim/scan.zig");
 pub const queues = @import("sim/queues.zig");
 pub const pla = @import("sim/pla.zig");
+pub const activations = @import("sim/activations.zig");
 pub const scheduler = @import("sim/scheduler.zig");
 pub const time = @import("sim/time.zig");
 
@@ -55,6 +56,7 @@ test {
     _ = scan;
     _ = queues;
     _ = pla;
+    _ = activations;
     _ = scheduler;
     _ = time;
     _ = @import("sim/test.zig");

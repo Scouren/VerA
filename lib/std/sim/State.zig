@@ -9,7 +9,7 @@
 //! Contents:
 //! - `pub const Error = error{ SimFailed, OutOfMemory, WriteFailed }`
 //! - `pub const Pending = union(enum)`, `pub const Row = struct`
-//! - `pub const Susp = struct`, `pub const Term = struct`
+//! - `pub const Susp = struct`, `pub const Act = struct`, `pub const Term = struct`
 //! - `pub const Hold = struct`, `pub const Monitor = struct`, `pub const PathEdge = struct`
 //! - `pub const default_budget: u64`, `pub const default_depth: u32`
 //! - `pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!State`
@@ -27,7 +27,8 @@
 //! - `pub fn watch(s: *State, id: u32, t: Program.Term) Error!void`
 //! - `pub fn retire(s: *State, id: u32) void`
 //! - `pub fn stopRange(s: *State, start: u32, end: u32) Error!bool`
-//! - `pub fn requestMonitor(s: *State) Error!void`
+//! - `pub fn resumption(pc: u32, ctx: u32) Pending`
+//! - `pub fn requestMonitor(s: *State, file: bool) Error!void`
 //! - `pub fn termBits(s: *const State, slot: u32, lo: u32, width: u32) [2]u64`
 //! - `pub fn monitorValue(s: *State, a: Allocator, e: u32) Error![]u64`
 
@@ -40,6 +41,7 @@ const eval = @import("eval.zig");
 const resolve = @import("resolve.zig");
 const hold = @import("holds.zig");
 const tchk = @import("tchk.zig");
+const activations = @import("activations.zig");
 const queue = @import("queues.zig");
 const vcd = @import("vcd.zig");
 const evcd = @import("evcd.zig");
@@ -60,6 +62,8 @@ pub const Error = error{ SimFailed, OutOfMemory, WriteFailed };
 pub const Pending = union(enum) {
     /// Run the process continuing at this pc.
     run: u32,
+    /// Run the process continuing at `pc` inside timed activation `ctx`.
+    run_in: struct { pc: u32, ctx: u32 },
     /// §9.2.2 a nonblocking update landing in `slot` (its `sel` bits only);
     /// the value is the row's own `buf`.
     write: struct { slot: u32, sel: ?eval.Sel, width: u32, signed: bool },
@@ -98,7 +102,12 @@ pub const Row = struct {
 
 /// A process suspended on an event control: where it resumes. Its terms
 /// name this row and go stale together when `gen` moves on.
-pub const Susp = struct { pc: u32, gen: u32, alive: bool };
+pub const Susp = struct { pc: u32, gen: u32, alive: bool, ctx: u32 = 0 };
+
+/// §10.2.3 one timed activation of a task that reaches itself: where its
+/// caller resumes and in which activation, its `Program.Call`, and its own
+/// storage while another activation of the same automatic task is resident.
+pub const Act = struct { sub: u32, ret_pc: u32, ret_ctx: u32, call: u32, storage: []u64 = &.{} };
 
 /// One term of a suspension, filed under the slot it watches. A select term
 /// (`width != 0`) remembers its bits when last tested (`v`, `x`).
@@ -198,6 +207,15 @@ udp_started: []bool,
 /// subroutine a `disable` is unwinding, whose activations return at once.
 sub_active: []u32,
 unwind: ?u32 = null,
+/// §10.2.3 the timed activations: the one the running process is in (0:
+/// none), every one (row 0 unused), the rows free for reuse, per `subs`
+/// row the activation its frame holds now, and the `fork` counters of the
+/// forks inside an activation.
+ctx: u32 = 0,
+acts: std.ArrayList(Act) = .empty,
+free_acts: std.ArrayList(u32) = .empty,
+resident: []u32,
+joins: std.AutoHashMapUnmanaged(struct { join: u32, ctx: u32 }, u64) = .empty,
 /// Nested synchronous activations now, and the most allowed: the caller
 /// gives the run a stack for `depth_max` of them (`default_depth`).
 depth: u32 = 0,
@@ -269,6 +287,7 @@ pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!Stat
         .udp_state = try arena.alloc(Bit, p.drivers.len),
         .udp_started = try arena.alloc(bool, p.drivers.len),
         .sub_active = try arena.alloc(u32, p.subs.len),
+        .resident = try arena.alloc(u32, p.subs.len),
         .checks = try arena.alloc(tchk.Run, p.checks.len),
         .paths = try arena.dupe(Program.Path, p.paths),
         .drv_delay = try arena.alloc(net.Delay, p.drivers.len),
@@ -287,6 +306,7 @@ pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!Stat
         .scratch = .init(arena),
     };
     @memset(s.sub_active, 0);
+    @memset(s.resident, 0);
     for (p.checks, s.checks) |c, *r| r.* = .{ .v = c.v, .x = c.x, .lim = c.lim };
     for (p.drivers, s.drv_delay) |d, *dl| dl.* = d.delay;
     for (p.trans, s.tran_state, s.tran_target, s.tran_delay) |t, *st, *tg, *dl| {
@@ -430,6 +450,7 @@ pub fn park(s: *State, pc: u32) Error!u32 {
     const su = &s.susps.items[id];
     assert(!su.alive);
     su.pc = pc;
+    su.ctx = s.ctx;
     su.alive = true;
     return id;
 }
@@ -469,9 +490,18 @@ pub fn stopRange(s: *State, start: u32, end: u32) Error!bool {
             try cancel(s, row.handle);
             hit = true;
         },
+        .run_in => |x| if (x.pc >= start and x.pc < end and s.scheduler.payloadOf(row.handle) != null) {
+            try cancel(s, row.handle);
+            hit = true;
+        },
         .write, .strobe, .fstrobe, .monitor_tick, .vcd_tick, .tchk_expiry, .tchk_event, .drive, .net_update, .decay, .put, .tran_switch => {},
     };
     return hit;
+}
+
+/// Where a process continues at `pc`: inside timed activation `ctx`, if any.
+pub fn resumption(pc: u32, ctx: u32) Pending {
+    return if (ctx == 0) .{ .run = pc } else .{ .run_in = .{ .pc = pc, .ctx = ctx } };
 }
 
 /// §17.1.3 one end-of-step monitor check, however many values moved; an
@@ -551,12 +581,18 @@ fn wake(s: *State, slot: u32, before: Bit, after: Bit) Error!void {
         _ = try enqueue(s, .{ .run = pc }, null, false);
     };
     const list = &s.terms[slot];
+    const none = @backingInt(Program.Ref.none);
+    // §10.2.1 an automatic task's variables and events are each
+    // activation's own: a change in one is none in another.
+    const owner = if (p.slot_act.len != 0) p.slot_act[slot] else none;
+    const here = if (owner != none) activations.context(s, owner, s.ctx) else 0;
     var keep: usize = 0;
     for (list.items, 0..) |t, i| {
         assert(keep <= i);
         const su = &s.susps.items[t.susp];
         if (su.gen != t.gen) continue;
-        const hit = if (t.width != 0) selectChanged(s, &list.items[i], slot) else matches(t.edge, before, after) and try selected(s, t, slot);
+        const mine = owner == none or here == activations.context(s, owner, su.ctx);
+        const hit = mine and if (t.width != 0) selectChanged(s, &list.items[i], slot) else matches(t.edge, before, after) and try selected(s, t, su.ctx, slot);
         // The select's evaluation can satisfy another term of this
         // suspension (an index function's write).
         if (su.gen != t.gen) continue;
@@ -566,18 +602,22 @@ fn wake(s: *State, slot: u32, before: Bit, after: Bit) Error!void {
             continue;
         }
         const pc = su.pc;
+        const ctx = su.ctx;
         retire(s, t.susp);
-        _ = try enqueue(s, .{ .run = pc }, null, false);
+        _ = try enqueue(s, resumption(pc, ctx), null, false);
     }
     list.shrinkRetainingCapacity(keep);
 }
 
-/// §9.7.3 an event array term wakes only when its index names `slot` now.
-fn selected(s: *State, t: Term, slot: u32) Error!bool {
+/// §9.7.3 an event array term wakes only when its index names `slot` now,
+/// read in the waiter's activation `ctx`.
+fn selected(s: *State, t: Term, ctx: u32, slot: u32) Error!bool {
     if (t.select == std.math.maxInt(u32)) return true;
     var tmp: std.heap.ArenaAllocator = .init(s.arena);
     defer tmp.deinit();
+    try activations.makeResident(s, ctx);
     const at = try eval.address(s, tmp.allocator(), s.p.extraData(Program.Elem, t.select));
+    try activations.makeResident(s, s.ctx);
     return at != null and at.? == slot;
 }
 

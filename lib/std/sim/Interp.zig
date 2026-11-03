@@ -32,6 +32,7 @@ const evcd = @import("evcd.zig");
 const sdf = @import("sdf.zig");
 const queues = @import("queues.zig");
 const pla = @import("pla.zig");
+const activations = @import("activations.zig");
 const Error = State.Error;
 const Literal = logic.Literal;
 
@@ -64,7 +65,15 @@ pub fn runUntil(s: *State, limit: u64) Error!Stop {
         const row = s.rows.items[event.payload];
         const a = s.scratch.allocator();
         switch (row.item) {
-            .run => |pc| try step(s, pc),
+            .run => |pc| {
+                s.ctx = 0;
+                try step(s, pc);
+            },
+            .run_in => |x| {
+                s.ctx = x.ctx;
+                try activations.makeResident(s, x.ctx);
+                try step(s, x.pc);
+            },
             .write => |w| {
                 const n = Program.words(w.width);
                 const planes = try a.dupe(u64, row.buf[0 .. 2 * n]);
@@ -143,7 +152,7 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                 pc += 1;
             },
             .delay => {
-                _ = try s.enqueue(.{ .run = pc + 1 }, try delayOf(s, a, d.a, pc), false);
+                _ = try s.enqueue(State.resumption(pc + 1, s.ctx), try delayOf(s, a, d.a, pc), false);
                 return;
             },
             .task => {
@@ -213,13 +222,18 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                     pc = f.end;
                     continue;
                 }
-                s.counters[f.join] = arms.len;
-                for (arms) |arm| _ = try s.enqueue(.{ .run = arm }, null, false);
+                // §10.2.3 a fork inside an activation counts its own arms.
+                if (s.ctx == 0)
+                    s.counters[f.join] = arms.len
+                else
+                    try s.joins.put(s.arena, .{ .join = f.join, .ctx = s.ctx }, arms.len);
+                for (arms) |arm| _ = try s.enqueue(State.resumption(arm, s.ctx), null, false);
                 return;
             },
             .join_arm => {
-                s.counters[d.a] -= 1;
-                if (s.counters[d.a] == 0) _ = try s.enqueue(.{ .run = d.b }, null, false);
+                const left = if (s.ctx == 0) &s.counters[d.a] else s.joins.getPtr(.{ .join = d.a, .ctx = s.ctx }).?;
+                left.* -= 1;
+                if (left.* == 0) _ = try s.enqueue(State.resumption(d.b, s.ctx), null, false);
                 return;
             },
             .sample => {
@@ -239,7 +253,7 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                         pc += 1;
                     },
                     .delay => {
-                        _ = try s.enqueue(.{ .run = pc + 1 }, try delayOf(s, a, sm.timing, pc), false);
+                        _ = try s.enqueue(State.resumption(pc + 1, s.ctx), try delayOf(s, a, sm.timing, pc), false);
                         return;
                     },
                     .event => {
@@ -260,8 +274,12 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                 if (d.b == 1) {
                     // Nested, as a call's body runs: the child parks at its
                     // wait and this process carries on.
+                    // A process of its own, outside any activation.
                     var nested: std.heap.ArenaAllocator = .init(s.arena);
                     defer nested.deinit();
+                    const ctx = s.ctx;
+                    s.ctx = 0;
+                    defer s.ctx = ctx;
                     try runFrom(s, &nested, d.a);
                 } else _ = try s.enqueue(.{ .run = d.a }, null, false);
                 pc += 1;
@@ -286,6 +304,8 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                 try calls.copyOut(s, a, d.a);
                 pc += 1;
             },
+            .call_timed => pc = try activations.callTimed(s, a, d.a, pc),
+            .task_return => pc = try activations.returnTimed(s, a, d.a),
             .disable_task => {
                 // Every inlined copy (the running one resumes after itself)
                 // and every synchronous activation, which unwind.

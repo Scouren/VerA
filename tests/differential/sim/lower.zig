@@ -21,6 +21,7 @@
 //! - `Lower.call(l: *Lower, idx: u32, args: []const ExprId) E!u32`
 //! - `Lower.tyOf(l: *Lower, ty: Type) E!Ty`
 //! - `Lower.elem(l: *Lower, e: ExprId) E!u32`
+//! - `Lower.callWith(l: *Lower, idx: u32, args: []const ExprId, ports: []const u32) E!u32`
 //! - `Lower.queueCall(l: *Lower, op: Program.QueueOp, args: []const ExprId, outs: []const bool) E!u32`
 //! - `pub const E`
 
@@ -328,13 +329,18 @@ pub const Lower = struct {
     /// The `Program.Call` of subroutine `idx` with actuals `args`, in
     /// `extra` (`activations.callSync`'s copy-in and copy-out).
     pub fn call(l: *Lower, idx: u32, args: []const ExprId) E!u32 {
+        const sub = l.r.routines.rows.items[idx];
+        if (!sub.compiled) return l.refuse("a subroutine compiled only for a constant fold");
+        return l.callWith(idx, args, sub.frame.ports);
+    }
+
+    /// `call` over the formals `ports` (a timed activation's frame).
+    pub fn callWith(l: *Lower, idx: u32, args: []const ExprId, ports: []const u32) E!u32 {
         const r = l.r;
         const sub = r.routines.rows.items[idx];
-        if (!sub.compiled) return l.refuse("a subroutine compiled only for a constant fold");
-        if (sub.body != null) return l.refuse("a call of a timed recursive task");
         var words: std.ArrayList(u32) = .empty;
         const none = @backingInt(Program.Ref.none);
-        for (sub.decl.ports, args, sub.frame.ports) |p, arg, slot| {
+        for (sub.decl.ports, args, ports) |p, arg, slot| {
             const in: u32 = if (p.direction == .output) none else try l.evalFor(arg, r.slotType(slot));
             var out: u32 = none;
             var ty: Ty = .bit;

@@ -3,11 +3,15 @@
 //! that is not an instruction. The solver unknowns (`nodes`, ports first),
 //! the named branches, the model card (`params`, one `arg` each), the
 //! contributions with the slots that accumulate them, the §5.6.1.2 charge
-//! sites, the §5.10 held slots, the §9.17.3 limit slots and the §9.4
-//! display calls. Every row is appended by Sema's lowering, which owns
-//! every write; a later stage reads them through `*const Device`. Every
-//! name is an `InternPool.String`; every slot is the `alloc` instruction in
-//! the `Air` body that holds the value.
+//! sites, the §5.10 held slots, the §9.17.3 limit slots, the §4.6 noise
+//! sources, the §9.17 kernel-control slots and the §9.4 display calls.
+//! Every row is appended by Sema's lowering, which owns every write; a
+//! later stage reads them through `*const Device`. Every name is an
+//! `InternPool.String`; every slot is the `alloc` instruction in the `Air`
+//! body that holds the value. The design is lowered flat (one body for the
+//! instance tree), so each unknown, parameter, branch and contribution row
+//! keeps the `Instance` it was declared in: codegen and VPI recover the
+//! hierarchy from it, never by splitting a name.
 //!
 //! The data, by `data-oriented-design`'s six questions:
 //! 1. In: Sema's lowering of one design. Out: these rows, read by codegen.
@@ -22,9 +26,9 @@
 //! §5.6.7, §5.10, §9.4, §9.17.3.
 //!
 //! Contents:
-//! - fields `nodes`, `num_ports`, `branches`, `params`, `ranges`, `contributions`, `charge_sites`, `held`, `limit_slots`, `displays`
-//! - `pub const Node` (`Index`, `Kind`), `pub const Branch` (`Index`), `pub const Param` (`Index`, `Type`), `pub const Range`
-//! - `pub const Access`, `pub const Contribution` (`Index`, `Kind`), `pub const ChargeSite`, `pub const Held`, `pub const LimitSlot`, `pub const Display`
+//! - fields `nodes`, `num_ports`, `branches`, `params`, `ranges`, `contributions`, `charge_sites`, `held`, `limit_slots`, `noise`, `kernel`, `displays`
+//! - `pub const Instance`, `pub const Node` (`Index`, `Kind`), `pub const Branch` (`Index`), `pub const Param` (`Index`, `Type`), `pub const Range`
+//! - `pub const Access`, `pub const Contribution` (`Index`, `Kind`), `pub const ChargeSite`, `pub const Held`, `pub const LimitSlot`, `pub const Noise` (`Kind`), `pub const Kernel`, `pub const Display`
 //! - `pub const rows_max: u32`
 //! - `pub fn deinit(d: *Device, gpa: Allocator) void`
 //! - `pub fn paramRanges(d: *const Device, p: Param.Index) []const Range`
@@ -56,10 +60,18 @@ contributions: std.MultiArrayList(Contribution) = .empty,
 charge_sites: std.MultiArrayList(ChargeSite) = .empty,
 /// §5.10 the variables that keep their value between evaluations.
 held: std.MultiArrayList(Held) = .empty,
-/// §9.17.3 one row per `$limit` access function call site.
+/// §9.17.3 one row per access function a user-function `$limit` limits.
 limit_slots: std.MultiArrayList(LimitSlot) = .empty,
+/// §4.6.4 every noise source call and §4.6.3 `ac_stim`, in source order.
+noise: std.MultiArrayList(Noise) = .empty,
+/// §9.17 the kernel-control slots the host reads after an accepted step.
+kernel: Kernel = .{},
 /// §9.4 the display and file tasks, in source order.
 displays: std.MultiArrayList(Display) = .empty,
+
+/// The `Zcu.Instance.Index` a row was declared in, by its backing integer
+/// (`Air` sits below the `Zcu`); `none` for a row no instance declares.
+pub const Instance = enum(u32) { none = std.math.maxInt(u32), _ };
 
 /// One solver unknown.
 pub const Node = struct {
@@ -70,6 +82,9 @@ pub const Node = struct {
     of: Index,
     /// §3.6.2 its discipline's name, `.empty` when undeclared.
     discipline: String,
+    /// The instance that declared it (a flow or operator unknown: the one
+    /// whose access or operator minted it).
+    instance: Instance,
 
     /// A row of `nodes`; `ground` is the reference node, never a row.
     pub const Index = enum(u32) { ground = std.math.maxInt(u32) - 1, none = std.math.maxInt(u32), _ };
@@ -83,6 +98,7 @@ pub const Branch = struct {
     name: String,
     hi: Node.Index,
     lo: Node.Index,
+    instance: Instance,
 
     /// 0 is the unnamed branch of a node pair; `i + 1` is `branches` row `i`.
     pub const Index = enum(u32) { unnamed = 0, _ };
@@ -99,6 +115,7 @@ pub const Param = struct {
     /// Its run of `ranges`.
     ranges_start: u32,
     ranges_len: u32,
+    instance: Instance,
 
     /// A `params` row: the `arg` index the body reads it by.
     pub const Index = enum(u32) { _ };
@@ -132,6 +149,8 @@ pub const Contribution = struct {
     resist: Air.Inst.Index,
     react: Air.Inst.Index,
     wrote: Air.Inst.Index,
+    /// The instance whose `<+` opened the row (§5.4.1: whose branch it is).
+    instance: Instance,
 
     pub const Index = enum(u32) { _ };
     /// A `<+` or a §5.6.7 indirect assignment.
@@ -145,8 +164,44 @@ pub const ChargeSite = struct { contrib: Contribution.Index, sign: f64, slot: Ai
 /// §5.10 a variable kept between evaluations and its slot.
 pub const Held = struct { name: String, slot: Air.Inst.Index };
 
-/// §9.17.3 one `$limit` call site's state slot.
-pub const LimitSlot = struct { label: String, slot: Air.Inst.Index };
+/// §9.17.3 one limited access function: `label` as the source spells it
+/// (`V(g,s)`), its target, and `slot`, the value the last site returned this
+/// evaluation (seeded at entry with the previous iterate's, a `limit$old`
+/// call on the row's ordinal).
+pub const LimitSlot = struct {
+    label: String,
+    access: Access,
+    branch: Branch.Index,
+    hi: Node.Index,
+    lo: Node.Index,
+    /// The source spelled the pair reversed (§1.3.1.2).
+    neg: bool,
+    slot: Air.Inst.Index,
+};
+
+/// §4.6.4 one noise generator (one call is one generator, §4.6.4.6), or
+/// §4.6.3's `ac_stim`: its kind, its `call` (the PSD operands are its
+/// arguments, a table flattened `count, f0, p0, ...`), and its label (`.empty`
+/// when none). Which contributions carry it, and by what factor, is read
+/// off the body: the call's value reaches their sums.
+pub const Noise = struct {
+    kind: Kind,
+    call: Air.Inst.Index,
+    name: String,
+
+    pub const Kind = enum(u8) { thermal, flicker, table, table_log, ac_stim };
+};
+
+/// §9.17 each running request's slot, null when the design makes none:
+/// `$bound_step`'s smallest step and `$discontinuity`'s smallest degree
+/// (+inf when no call ran), VerA's `$vera_reject_step` retry time (+inf),
+/// and `$discontinuity(-1)`'s reject-the-iteration flag (0 or 1).
+pub const Kernel = struct {
+    bound_step: ?Air.Inst.Index = null,
+    discontinuity: ?Air.Inst.Index = null,
+    reject_step: ?Air.Inst.Index = null,
+    reject_iteration: ?Air.Inst.Index = null,
+};
 
 /// §9.4 one display or file task: its name and its `call`.
 pub const Display = struct { name: String, call: Air.Inst.Index };
@@ -172,6 +227,7 @@ pub fn deinit(d: *Device, gpa: Allocator) void {
     d.charge_sites.deinit(gpa);
     d.held.deinit(gpa);
     d.limit_slots.deinit(gpa);
+    d.noise.deinit(gpa);
     d.displays.deinit(gpa);
     d.* = undefined;
 }

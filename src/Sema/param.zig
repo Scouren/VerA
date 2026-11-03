@@ -53,6 +53,7 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
             .default = elems[at],
             .ranges_start = ranges_start,
             .ranges_len = @intCast(s.device.ranges.items.len - ranges_start),
+            .instance = decl.rowInstance(unit.instance),
         });
         try unit.binds.put(s.arena, decl.canonical(vir, i), .{ .param = row });
         try checkRange(s, unit, i, p, elems[at]);

@@ -204,9 +204,13 @@ pub const Tag = enum(u8) {
     @"$table_model",
     @"$vera_reject_step",
     // VerA-synthetic, never a source spelling: §4.5.4 `idt`'s static-point
-    // flag and its held form.
+    // flag and its held form; §9.17.3 a limit slot's previous-iterate value
+    // (on the slot's ordinal) and a limited value (the access function's
+    // value, the limiter's result).
     @"op$static",
     @"idt$hold",
+    @"limit$old",
+    @"limit$uf",
 
     /// The tag `spelling` names, or null for a user system function.
     pub fn fromName(spelling: []const u8) ?Tag {
@@ -473,6 +477,8 @@ pub const table = std.EnumArray(Tag, Info).init(.{
     .@"$vera_reject_step" = .{ .ty = .none, .args = .exactly(1), .family = .kernel, .context = .analog },
     .@"op$static" = .{ .ty = .int, .args = .exactly(0), .family = .query, .context = .analog },
     .@"idt$hold" = .{ .ty = .real, .args = .exactly(3), .family = .analog_op, .context = .analog },
+    .@"limit$old" = .{ .ty = .real, .args = .exactly(1), .family = .kernel, .context = .analog },
+    .@"limit$uf" = .{ .ty = .real, .args = .exactly(2), .family = .kernel, .context = .analog },
 });
 
 const display: Info = .{ .ty = .none, .family = .display };

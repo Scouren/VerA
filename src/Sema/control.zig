@@ -312,6 +312,7 @@ fn local(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!void {
     const ty = decl.tyOf(v.flags.storage);
     const slot = try decl.addAlloc(s, ty);
     try b.unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = slot, .ty = ty } });
+    if (b.path.len != 0) try s.block_locals.put(s.arena, try std.fmt.allocPrint(s.arena, "{s}{s}{s}", .{ b.unit.prefix, b.path, vir.string(v.name) }), .{ .alloc = slot, .ty = ty });
     // §5.3.2 a held local of a named block is named by the block path.
     if (b.path.len != 0 and b.unit.held.contains(first)) try s.device.held.append(s.gpa, .{
         .name = try s.zcu.intern_pool.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}{s}{s}", .{ b.unit.prefix, b.path, vir.string(v.name) })),

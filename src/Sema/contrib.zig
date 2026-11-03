@@ -17,6 +17,9 @@
 //! - `pub fn probe(s: *Sema, n: Node.Index) Allocator.Error!Air.Inst.Ref`
 //! - `pub fn loadDisciplines(s: *Sema) Allocator.Error!void`
 //! - `pub fn rowOf(s: *Sema, b: *const Block, t: Target) Allocator.Error!Device.Contribution.Index`
+//! - `pub fn target(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!?Target`
+//! - `pub const AccessCall`, `pub fn accessCall(s: *Sema, unit: *const Sema.Unit, r: Inst.Ref) Allocator.Error!?AccessCall`
+//! - `pub fn nodeName(s: *const Sema, n: Node.Index) []const u8`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -27,6 +30,7 @@ const Air = @import("air");
 const Sema = @import("../Sema.zig");
 const decl = @import("decl.zig");
 const expr = @import("expr.zig");
+const hier = @import("hier.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Device = Air.Device;
@@ -34,6 +38,9 @@ const Node = Device.Node;
 const Block = Sema.Block;
 const Value = Sema.Value;
 const Ref = Air.Inst.Ref;
+
+/// An access function call's name and arguments (`accessCall`).
+pub const AccessCall = struct { name: []const u8, args: []const Inst.Ref };
 
 /// What an access names: the quantity, the branch and its ordered pair,
 /// and whether the source spelled the pair reversed.
@@ -90,7 +97,7 @@ pub fn access(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src
                 const v = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot) } });
                 return .{ .ref = if (t.neg) try expr.unOp(s, b, .fneg, v) else v, .ty = .real };
             };
-            const u = try flowUnknown(s, t.hi, t.lo);
+            const u = try flowUnknown(s, b.unit, t.hi, t.lo);
             const v = try probe(s, u);
             return .{ .ref = if (t.neg) try expr.unOp(s, b, .fneg, v) else v, .ty = .real };
         },
@@ -188,10 +195,55 @@ pub fn rowOf(s: *Sema, b: *const Block, t: Target) Allocator.Error!Device.Contri
         .resist = try decl.addAlloc(s, .real),
         .react = try decl.addAlloc(s, .real),
         .wrote = try decl.addAlloc(s, .real),
+        .instance = decl.rowInstance(b.unit.instance),
     });
-    try s.contrib_units.append(s.arena, b.unit.instance);
     gop.value_ptr.* = row;
     return row;
+}
+
+/// What `name(args)` names, ordered (`canonical`); null after a diagnostic.
+pub fn target(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!?Target {
+    const unit = b.unit;
+    const global = (try accessOf(s, b, name)) orelse {
+        try s.fail(.E0501, unit.file, src, "`{s}`", .{name});
+        return null;
+    };
+    if (args.len == 0 or args.len > 2) {
+        try s.fail(.E0512, unit.file, src, "`{s}` with {d} arguments", .{ name, args.len });
+        return null;
+    }
+    if (args.len == 1) if (try branchOf(s, b, args[0], src)) |br| {
+        const row = s.device.branches.get(@backingInt(br) - 1);
+        return canonical(accessOn(s, name, global, row.hi, row.lo), row.hi, row.lo, br);
+    };
+    const hi = (try nodeOf(s, b, args[0], src)) orelse return null;
+    const lo: Node.Index = if (args.len == 1) .ground else (try nodeOf(s, b, args[1], src)) orelse return null;
+    if (args.len == 2 and hi == lo and hi != .ground) {
+        try s.fail(.E0315, unit.file, src, "`{s}` names one signal twice", .{name});
+        return null;
+    }
+    return canonical(accessOn(s, name, global, hi, lo), hi, lo, .unnamed);
+}
+
+/// The access function call `r` is (`V(a, b)`, `I(<p>)`): its name and its
+/// arguments, or null for any other expression.
+pub fn accessCall(s: *Sema, unit: *const Sema.Unit, r: Inst.Ref) Allocator.Error!?AccessCall {
+    const vir = unit.vir;
+    const i = r.toIndex() orelse return null;
+    if (vir.instructions.items(.tag)[@backingInt(i)] != .call) return null;
+    const c = decl.payloadOf(vir, Inst.Call, i);
+    const callee = c.callee.toIndex() orelse return null;
+    if (vir.instructions.items(.tag)[@backingInt(callee)] != .str_ref) return null;
+    const name = vir.string(vir.instructions.items(.data)[@backingInt(callee)].str_tok.start);
+    try loadDisciplines(s);
+    if (s.access_kind.get(name) == null) return null;
+    return .{ .name = name, .args = vir.list(Inst.Ref, c.args) };
+}
+
+/// A node row's name; `gnd` for the reference node.
+pub fn nodeName(s: *const Sema, n: Node.Index) []const u8 {
+    if (n == .ground) return "gnd";
+    return s.zcu.intern_pool.stringToSlice(s.device.nodes.items(.name)[@backingInt(n)]);
 }
 
 // ---- private ----
@@ -217,36 +269,25 @@ fn natureAccess(s: *Sema, name: []const u8, depth: u32) Allocator.Error!?[]const
     return natureAccess(s, vir.string(n.parent), depth + 1);
 }
 
-/// What `name(args)` names, ordered (`canonical`); null after a diagnostic.
-fn target(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!?Target {
-    const unit = b.unit;
-    const vir = unit.vir;
-    const global = (try accessOf(s, b, name)) orelse {
-        try s.fail(.E0501, unit.file, src, "`{s}`", .{name});
-        return null;
+/// The named branch `r` names (`br`, or §6.7's `x1.br`), or null.
+fn branchOf(s: *Sema, b: *Block, r: Inst.Ref, src: Inst.Ref) Allocator.Error!?Device.Branch.Index {
+    const vir = b.unit.vir;
+    const i = r.toIndex() orelse return null;
+    return switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .decl_ref => if (b.unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl))) |x| (if (x == .branch) x.branch else null) else null,
+        .field => blk: {
+            if (!try hier.isBranch(s, b, r)) break :blk null;
+            const hit = (try hier.resolve(s, b, r, src)) orelse break :blk null;
+            break :blk hit.bind.bind.branch;
+        },
+        else => null, // else: a terminal, not a branch
     };
-    if (args.len == 0 or args.len > 2) {
-        try s.fail(.E0512, unit.file, src, "`{s}` with {d} arguments", .{ name, args.len });
-        return null;
-    }
-    if (args.len == 1) if (args[0].toIndex()) |a| if (vir.instructions.items(.tag)[@backingInt(a)] == .decl_ref) {
-        if (unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(a)].decl_tok.decl))) |bind| if (bind == .branch) {
-            const row = s.device.branches.get(@backingInt(bind.branch) - 1);
-            return canonical(accessOn(s, name, global, row.hi, row.lo), row.hi, row.lo, bind.branch);
-        };
-    };
-    const hi = (try nodeOf(s, unit, args[0], src)) orelse return null;
-    const lo: Node.Index = if (args.len == 1) .ground else (try nodeOf(s, unit, args[1], src)) orelse return null;
-    if (args.len == 2 and hi == lo and hi != .ground) {
-        try s.fail(.E0315, unit.file, src, "`{s}` names one signal twice", .{name});
-        return null;
-    }
-    return canonical(accessOn(s, name, global, hi, lo), hi, lo, .unnamed);
 }
 
-/// The node a terminal names: a scalar net, or an element of a vector by
-/// a constant index (§3.6.3); null after a diagnostic.
-fn nodeOf(s: *Sema, unit: *Sema.Unit, r: Inst.Ref, src: Inst.Ref) Allocator.Error!?Node.Index {
+/// The bind a terminal's name has (`p`, or §6.7's `x1.p`) and the unit it
+/// is in; null after a diagnostic.
+fn terminalBind(s: *Sema, b: *Block, r: Inst.Ref, src: Inst.Ref) Allocator.Error!?struct { Sema.Bind, *Sema.Unit } {
+    const unit = b.unit;
     const vir = unit.vir;
     const i = r.toIndex() orelse return null;
     switch (vir.instructions.items(.tag)[@backingInt(i)]) {
@@ -255,47 +296,65 @@ fn nodeOf(s: *Sema, unit: *Sema.Unit, r: Inst.Ref, src: Inst.Ref) Allocator.Erro
                 try s.fail(.E0512, unit.file, src, "an access of a name with no node", .{});
                 return null;
             };
-            switch (bind) {
-                .node => |n| return n,
-                .vector => {
-                    try s.fail(.E0512, unit.file, src, "an access of a whole vector", .{});
-                    return null;
-                },
-                else => {
-                    try s.fail(.E0512, unit.file, src, "an access of a name with no node", .{});
-                    return null;
-                },
-            }
+            return .{ bind, unit };
         },
-        .elem => {
-            const x = decl.payloadOf(vir, Inst.Bin, i);
-            const base = x.lhs.toIndex() orelse return null;
-            if (vir.instructions.items(.tag)[@backingInt(base)] != .decl_ref) {
-                try s.fail(.E0512, unit.file, src, "an access of a select of a select", .{});
+        .field => {
+            const hit = (try hier.resolve(s, b, r, src)) orelse return null;
+            if (hit != .bind) {
+                try s.fail(.E0512, unit.file, src, "an access of a name with no node", .{});
                 return null;
             }
-            const bind = unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(base)].decl_tok.decl)) orelse return null;
-            if (bind != .vector) {
-                try s.fail(.E0351, unit.file, src, "the net was not declared with a range", .{});
-                return null;
-            }
-            const v = bind.vector;
-            const k = ((try decl.foldRef(s, unit, x.rhs)) orelse {
-                try s.fail(.E0512, unit.file, src, "an access of a vector element at a run-time index", .{});
-                return null;
-            }).asIntExact() orelse return null;
-            if (k < @min(v.msb, v.lsb) or k > @max(v.msb, v.lsb)) {
-                try s.fail(.E0352, unit.file, src, "{d} is not an element of [{d}:{d}]", .{ k, v.msb, v.lsb });
-                return null;
-            }
-            const off: u32 = @intCast(if (v.msb >= v.lsb) v.msb - k else k - v.msb);
-            return unit.vec_rows.items[v.first + off];
+            return .{ hit.bind.bind, hit.bind.unit };
         },
         else => {
             try s.fail(.E0512, unit.file, src, "an access of a select or a hierarchical name is not lowered by Sema yet", .{});
             return null;
         },
     }
+}
+
+/// The node a terminal names: a scalar net, or an element of a vector by
+/// a constant index (§3.6.3); null after a diagnostic.
+fn nodeOf(s: *Sema, b: *Block, r: Inst.Ref, src: Inst.Ref) Allocator.Error!?Node.Index {
+    const unit = b.unit;
+    const vir = unit.vir;
+    const i = r.toIndex() orelse return null;
+    if (vir.instructions.items(.tag)[@backingInt(i)] != .elem) {
+        const bind, _ = (try terminalBind(s, b, r, src)) orelse return null;
+        switch (bind) {
+            .node => |n| return n,
+            .vector => {
+                try s.fail(.E0512, unit.file, src, "an access of a whole vector", .{});
+                return null;
+            },
+            else => {
+                try s.fail(.E0512, unit.file, src, "an access of a name with no node", .{});
+                return null;
+            },
+        }
+    }
+    const x = decl.payloadOf(vir, Inst.Bin, i);
+    const base_tag = if (x.lhs.toIndex()) |base| vir.instructions.items(.tag)[@backingInt(base)] else .str_ref;
+    if (base_tag != .decl_ref and base_tag != .field) {
+        try s.fail(.E0512, unit.file, src, "an access of a select of a select", .{});
+        return null;
+    }
+    const bind, const owner = (try terminalBind(s, b, x.lhs, src)) orelse return null;
+    if (bind != .vector) {
+        try s.fail(.E0351, unit.file, src, "the net was not declared with a range", .{});
+        return null;
+    }
+    const v = bind.vector;
+    const k = ((try decl.foldRef(s, unit, x.rhs)) orelse {
+        try s.fail(.E0512, unit.file, src, "an access of a vector element at a run-time index", .{});
+        return null;
+    }).asIntExact() orelse return null;
+    if (k < @min(v.msb, v.lsb) or k > @max(v.msb, v.lsb)) {
+        try s.fail(.E0352, unit.file, src, "{d} is not an element of [{d}:{d}]", .{ k, v.msb, v.lsb });
+        return null;
+    }
+    const off: u32 = @intCast(if (v.msb >= v.lsb) v.msb - k else k - v.msb);
+    return owner.vec_rows.items[v.first + off];
 }
 
 /// §3.6.2 the access `name` is on the discipline of the pair's non-ground node.
@@ -321,13 +380,13 @@ fn canonical(a: Device.Access, hi: Node.Index, lo: Node.Index, br: Device.Branch
 
 /// §5.4.2 the unknown carrying branch (hi, lo)'s current, spelled
 /// `flow(hi,lo)`; one per pair.
-fn flowUnknown(s: *Sema, hi: Node.Index, lo: Node.Index) Allocator.Error!Node.Index {
+fn flowUnknown(s: *Sema, unit: *const Sema.Unit, hi: Node.Index, lo: Node.Index) Allocator.Error!Node.Index {
     const gop = try s.flow_rows.getOrPut(s.arena, .{ hi, lo });
     if (gop.found_existing) return gop.value_ptr.*;
     const ip = &s.zcu.intern_pool;
     const name = try std.fmt.allocPrint(s.arena, "flow({s},{s})", .{ nodeName(s, hi), nodeName(s, lo) });
     const row: Node.Index = @fromBackingInt(@intCast(s.device.nodes.len));
-    try s.device.nodes.append(s.gpa, .{ .name = try ip.getString(s.gpa, name), .kind = .branch_flow, .of = hi, .discipline = .empty });
+    try s.device.nodes.append(s.gpa, .{ .name = try ip.getString(s.gpa, name), .kind = .branch_flow, .of = hi, .discipline = .empty, .instance = decl.rowInstance(unit.instance) });
     gop.value_ptr.* = row;
     return row;
 }
@@ -335,12 +394,7 @@ fn flowUnknown(s: *Sema, hi: Node.Index, lo: Node.Index) Allocator.Error!Node.In
 /// Whether this instance has a potential source on `t`'s branch.
 fn potentialSourceHere(s: *const Sema, b: *const Block, t: Target) bool {
     const row = s.contrib_rows.get(.{ .access = .potential, .branch = t.branch, .hi = t.hi, .lo = t.lo }) orelse return false;
-    return s.contrib_units.items[@backingInt(row)] == b.unit.instance;
-}
-
-fn nodeName(s: *const Sema, n: Node.Index) []const u8 {
-    if (n == .ground) return "gnd";
-    return s.zcu.intern_pool.stringToSlice(s.device.nodes.items(.name)[@backingInt(n)]);
+    return s.device.contributions.items(.instance)[@backingInt(row)] == decl.rowInstance(b.unit.instance);
 }
 
 /// The old `reactive.splitTerm`: a sum's terms, each a linear `ddt` term

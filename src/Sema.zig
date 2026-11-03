@@ -88,10 +88,13 @@ static_slots: std.AutoHashMapUnmanaged(Air.Inst.Index, void) = .empty,
 static_loads: std.AutoHashMapUnmanaged(Air.Inst.Index, void) = .empty,
 /// Assignments run at the main body's entry, after the prologue (op.zig).
 entry: std.ArrayList(Air.Inst.Index) = .empty,
+/// §5.3.2 every named block's local, by its flat name (`u1.blk.x`), for a
+/// hierarchical read (control.zig).
+block_locals: std.StringHashMapUnmanaged(Slot) = .empty,
+/// Each `device.limit_slots` row's `limit$old` seed, by row (kernel.zig).
+limit_seeds: std.ArrayList(Air.Inst.Ref) = .empty,
 /// The user functions being inlined, outermost first (func.zig).
 inlining: std.ArrayList(Inst.Index) = .empty,
-/// Each contribution row's instance, by row (contrib.zig).
-contrib_units: std.ArrayList(Zcu.Instance.Index) = .empty,
 /// The contribution rows a reactive term was added to (contrib.zig).
 react_written: std.AutoHashMapUnmanaged(Air.Device.Contribution.Index, void) = .empty,
 

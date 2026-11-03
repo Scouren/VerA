@@ -21,6 +21,8 @@
 //! - `pub fn intern(s: *Sema, c: eval.Const) Allocator.Error!InternPool.Index`
 //! - `pub fn declareArray(s: *Sema, unit: *Sema.Unit, first: Inst.Index, v: Inst.Variable) Allocator.Error!void`
 //! - `pub fn portDecl(vir: *const Vir, p: Inst.Index) ?Inst.Index`
+//! - `pub fn rowInstance(i: Zcu.Instance.Index) Device.Instance`
+//! - `pub fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -190,6 +192,11 @@ pub fn declareArray(s: *Sema, unit: *Unit, first: Inst.Index, v: Inst.Variable) 
     try unit.binds.put(s.arena, first, .{ .array = .{ .slots = slots, .dims = dims.items, .ty = ty } });
 }
 
+/// A `Zcu` instance as a device row's `instance` column.
+pub fn rowInstance(i: Zcu.Instance.Index) Device.Instance {
+    return @fromBackingInt(@backingInt(i));
+}
+
 /// The `InternPool` type of a value type.
 pub fn typeIndex(ty: Sema.Ty) InternPool.Index {
     return switch (ty) {
@@ -197,6 +204,12 @@ pub fn typeIndex(ty: Sema.Ty) InternPool.Index {
         .integer => .integer_type,
         .string => .string_type,
     };
+}
+
+/// The name a declaring instruction declares (its payload's first word).
+pub fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String {
+    const at = vir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index;
+    return @fromBackingInt(vir.extra[at]);
 }
 
 // ---- private ----
@@ -325,13 +338,14 @@ fn envOf(s: *Sema, unit: *Unit) Allocator.Error!eval.Env {
 }
 
 /// Appends a node row named `name` (or returns the row already named so).
-fn internNode(s: *Sema, name: []const u8, discipline: Vir.String, vir: *const Vir) Allocator.Error!Node.Index {
+fn internNode(s: *Sema, unit: *const Unit, name: []const u8, discipline: Vir.String) Allocator.Error!Node.Index {
+    const vir = unit.vir;
     const ip = &s.zcu.intern_pool;
     const key = try ip.getString(s.gpa, name);
     const gop = try s.node_rows.getOrPut(s.arena, key);
     if (gop.found_existing) return gop.value_ptr.*;
     const row: Node.Index = @fromBackingInt(@intCast(s.device.nodes.len));
-    try s.device.nodes.append(s.gpa, .{ .name = key, .kind = .net, .of = .none, .discipline = try ip.getString(s.gpa, vir.string(discipline)) });
+    try s.device.nodes.append(s.gpa, .{ .name = key, .kind = .net, .of = .none, .discipline = try ip.getString(s.gpa, vir.string(discipline)), .instance = rowInstance(unit.instance) });
     gop.value_ptr.* = row;
     assert(@backingInt(row) + 1 == s.device.nodes.len);
     return row;
@@ -373,12 +387,6 @@ fn ports(s: *Sema, unit: *Unit) Allocator.Error!void {
     }
 }
 
-/// The name a declaring instruction declares (its payload's first word).
-fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String {
-    const at = vir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index;
-    return @fromBackingInt(vir.extra[at]);
-}
-
 /// §3.6.3 the instance's nets: every `net` and `io` not bound yet. §3.6.4
 /// a `ground` net is the reference node. A child's port waits for
 /// `bindChildPorts`.
@@ -418,12 +426,12 @@ fn declareNet(s: *Sema, unit: *Unit, first: Inst.Index) Allocator.Error!void {
         const n: u32 = @intCast(@abs(r[0] - r[1]) + 1);
         for (0..n) |k| {
             const i: i64 = if (r[0] >= r[1]) r[0] - @as(i64, @intCast(k)) else r[0] + @as(i64, @intCast(k));
-            try unit.vec_rows.append(s.arena, try internNode(s, try std.fmt.allocPrint(s.arena, "{s}{s}[{d}]", .{ unit.prefix, name, i }), disc, vir));
+            try unit.vec_rows.append(s.arena, try internNode(s, unit, try std.fmt.allocPrint(s.arena, "{s}{s}[{d}]", .{ unit.prefix, name, i }), disc));
         }
         try unit.binds.put(s.arena, first, .{ .vector = .{ .first = at, .len = n, .msb = r[0], .lsb = r[1] } });
         return;
     }
-    const row = try internNode(s, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disc, vir);
+    const row = try internNode(s, unit, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disc);
     try unit.binds.put(s.arena, first, .{ .node = if (isGround(unit, first)) .ground else row });
 }
 
@@ -474,7 +482,7 @@ fn bindChildPorts(s: *Sema, unit: *Unit) Allocator.Error!void {
                 if (pu.binds.get(d)) |b| if (b == .node) break :blk b.node;
             };
             const name = unit.vir.string(nameOf(unit.vir, first));
-            break :blk try internNode(s, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disciplineOf(unit, first), unit.vir);
+            break :blk try internNode(s, unit, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disciplineOf(unit, first));
         };
         try unit.binds.put(s.arena, first, .{ .node = node });
     }
@@ -492,6 +500,7 @@ fn branches(s: *Sema, unit: *Unit) Allocator.Error!void {
             .name = try s.zcu.intern_pool.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, vir.string(br.name) })),
             .hi = hi,
             .lo = lo,
+            .instance = rowInstance(unit.instance),
         });
         try unit.binds.put(s.arena, canonical(vir, i), .{ .branch = @fromBackingInt(@intCast(s.device.branches.len)) });
     }

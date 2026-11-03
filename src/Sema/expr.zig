@@ -262,7 +262,8 @@ fn inst(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!Value {
             const e = (try array.element(s, b, src, src)) orelse break :blk poison;
             break :blk array.load(s, b, e);
         },
-        .str_ref, .field, .slice, .slice_up, .slice_down, .concat, .pattern, .replicate, .pattern_repl, .port_branch, .event_or, .posedge, .negedge, .driver_update, .step_event, .paramset_output, .range, .pulse_limits => refuse(s, b, src, @tagName(tag)),
+        .field => hierRead(s, b, src),
+        .str_ref, .slice, .slice_up, .slice_down, .concat, .pattern, .replicate, .pattern_repl, .port_branch, .event_or, .posedge, .negedge, .driver_update, .step_event, .paramset_output, .range, .pulse_limits => refuse(s, b, src, @tagName(tag)),
         .module, .nature, .discipline, .paramset, .primitive, .connectrules, .config, .port, .io, .net, .variable, .param, .aliasparam, .genvar, .event, .branch, .instance, .assign, .defparam, .analog, .analog_initial, .initial, .always, .function, .gen_for, .gen_if, .gen_case, .gen_block, .specify, .path, .timing_check, .pulse_style, .timing_event, .ps_override, .connect_resolve, .connect_insert, .block, .condbr, .case, .loop, .repeat, .wait, .delay, .event_wait, .store, .store_nb, .contrib, .proc_assign, .force, .store_timed, .store_nb_timed, .contrib_indirect, .deassign, .release, .trigger, .disable, .ret, .brk, .cont, .delay_ctl, .event_ctl, .repeat_ctl => unreachable, // AstGen: an operand is an expression
     };
 }
@@ -296,6 +297,32 @@ fn bigInt(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!Value {
 fn declRef(s: *Sema, b: *Block, d: Inst.Index, src: Inst.Ref) Allocator.Error!Value {
     const first = decl.canonical(b.unit.vir, d);
     const bind = b.unit.binds.get(first) orelse return refuse(s, b, src, "a name with no analog binding");
+    return bindValue(s, b, bind, src);
+}
+
+/// §6.7 a hierarchical name read as a value: a parameter, a named block's
+/// local, a §5.5.3 nature attribute (a real, or a string). §6.7.1: "It
+/// shall be an error to access analog variables hierarchically" (E0910).
+fn hierRead(s: *Sema, b: *Block, src: Inst.Ref) Allocator.Error!Value {
+    const hit = (try @import("hier.zig").resolve(s, b, src, src)) orelse return poison;
+    switch (hit) {
+        .attr => |c| return switch (c) {
+            .real, .int => constant(s, .{ .real = c.asReal() }),
+            .str => constant(s, c),
+        },
+        .local => |slot| return .{ .ref = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot.alloc) } }), .ty = slot.ty },
+        .bind => |x| {
+            if (x.bind == .slot or x.bind == .array) {
+                try s.fail(.E0910, b.unit.file, src, "a variable read through a hierarchical name", .{});
+                return poison;
+            }
+            return bindValue(s, b, x.bind, src);
+        },
+    }
+}
+
+/// What a name's binding reads as a value.
+fn bindValue(s: *Sema, b: *Block, bind: Sema.Bind, src: Inst.Ref) Allocator.Error!Value {
     return switch (bind) {
         .param => |p| s.param_args.items[@backingInt(p)],
         .slot => |slot| blk: {
@@ -484,7 +511,7 @@ fn callExpr(s: *Sema, b: *Block, c: Inst.Call, src: Inst.Ref) Allocator.Error!Va
         .decl_ref => {
             const f = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(callee)].decl_tok.decl);
             if (vir.instructions.items(.tag)[@backingInt(f)] != .function) return refuse(s, b, src, "a call of a name that is no function");
-            return @import("func.zig").call(s, b, f, vir.list(Inst.Ref, c.args), src);
+            return @import("func.zig").call(s, b, f, &.{}, vir.list(Inst.Ref, c.args), src);
         },
         else => return refuse(s, b, src, "a call"),
     }

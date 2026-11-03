@@ -51,6 +51,11 @@ pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Erro
     };
     const info = SysFn.get(tag);
     if (try refuseContext(s, b, tag, src)) return expr.poison;
+    // Each of these judges its own argument list, with its clause's codes.
+    switch (tag) {
+        .white_noise, .flicker_noise, .noise_table, .noise_table_log, .ac_stim => return @import("op.zig").noise(s, b, tag, args, src),
+        else => if (info.family == .kernel) return @import("kernel.zig").lower(s, b, tag, args, src),
+    }
     if (!info.args.admits(args.len)) {
         try s.fail(.E0506, b.unit.file, src, "`{s}` takes {d} to {d}, given {d}", .{ name, info.args.min, info.args.max, args.len });
         return expr.poison;
@@ -62,7 +67,8 @@ pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Erro
             return .{ .ref = .fromIntern(.zero_real), .ty = .real };
         },
         .analog_op => return @import("op.zig").lower(s, b, tag, args, src),
-        .event, .kernel => {
+        .kernel => unreachable, // routed above
+        .event => {
             try s.fail(.E0512, b.unit.file, src, "`{s}` is not lowered by Sema yet", .{name});
             return expr.poison;
         },

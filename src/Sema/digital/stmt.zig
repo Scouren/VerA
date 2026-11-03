@@ -27,6 +27,7 @@ const gates = @import("gates.zig");
 const link = @import("link.zig");
 const tchk = @import("tchk.zig");
 const vcd = @import("vcd.zig");
+const holds = @import("holds.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -164,7 +165,7 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
         .call => try sub.enable(l, i, depth),
         .store_timed, .store_nb_timed => try timedStore(l, i, depth),
         .case => return l.refuse("a case statement"),
-        .proc_assign, .force, .deassign, .release => return l.refuse("a procedural continuous assignment"),
+        .proc_assign, .force, .deassign, .release => try holds.statement(l, i),
         .disable => {
             // A.6.5 resolved once every block is compiled (`link.resolveDisables`).
             const r = vir.instructions.items(.data)[@backingInt(i)].un_node.operand;

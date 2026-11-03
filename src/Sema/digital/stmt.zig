@@ -20,6 +20,7 @@ const expr = @import("expr.zig");
 const place = @import("place.zig");
 const task = @import("task.zig");
 const decl = @import("decl.zig");
+const nets = @import("nets.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -40,6 +41,7 @@ const depth_max: u32 = 1 << 12;
 pub fn compileAll(l: *Lower) Error!void {
     var early: std.ArrayList(u32) = .empty;
     var queued: std.ArrayList(u32) = .empty;
+    try nets.compileDrivers(l);
     const order = try processOrder(l);
     for (order) |s| {
         const procs = l.scopes.items[s].procs.items;
@@ -50,10 +52,11 @@ pub fn compileAll(l: *Lower) Error!void {
         };
     }
     for (early.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
+    for (l.driver_pcs.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
     for (queued.items) |at| try l.b.starts.append(l.a, .{ .pc = at });
     try fanout(l);
     l.b.p.counters = l.repeats + l.joins;
-    assert(l.b.starts.items.len == early.items.len + queued.items.len);
+    assert(l.b.starts.items.len == early.items.len + l.driver_pcs.items.len + queued.items.len);
 }
 
 /// Appends statement `i`'s instructions, compiled in `Lower.frame`.
@@ -201,10 +204,16 @@ fn process(l: *Lower, p: Proc) Error!u32 {
     const start = pc(l);
     switch (p.kind) {
         .init_var => {
-            const n = l.names.items[l.lookup(p.frame, p.inst) orelse return l.refuse("an initialized declaration with no slot")];
+            // The name is bound to its first declaration (`output q; reg q = 1;`).
+            const prev, const init_body = switch (Lower.tag(vir, p.inst)) {
+                .variable => .{ Lower.payload(vir, Inst.Variable, p.inst).prev, Lower.payload(vir, Inst.Variable, p.inst).init },
+                .io => .{ Lower.payload(vir, Inst.Io, p.inst).prev, Lower.payload(vir, Inst.Io, p.inst).init },
+                else => unreachable, // else: `declare.items` records these two
+            };
+            const n = l.names.items[l.lookup(p.frame, prev.toIndex() orelse p.inst) orelse return l.refuse("an initialized declaration with no slot")];
             if (n.dims.len != 0) return l.refuse("an initialized array");
-            const v = Lower.payload(vir, Inst.Variable, p.inst);
-            const init = vir.body(v.init);
+            if (n.kind != .variable) return l.refuse("an initialized net port");
+            const init = vir.body(init_body);
             _ = try l.b.inst(.init_var, n.slot, try expr.evalFor(l, init[init.len - 1].toRef(), n.ty), scope);
             _ = try l.b.inst(.stop, 0, 0, scope);
         },
@@ -369,11 +378,22 @@ fn operands(l: *Lower, vir: *const Vir, i: Inst.Index, used: *std.AutoHashMapUnm
     }
 }
 
-/// §6.1 per slot, the continuous drivers' pcs that read it (none yet).
+/// §6.1 per slot, the continuous drivers' pcs that read it.
 fn fanout(l: *Lower) Error!void {
     const n = l.b.p.slots.len;
     const start = try l.a.alloc(u32, n + 1);
     @memset(start, 0);
+    const drivers = l.b.p.drivers;
+    for (drivers) |d| for (l.b.extra.items[d.sensitivity.start..][0..d.sensitivity.len]) |slot| {
+        start[slot + 1] += 1;
+    };
+    for (1..n + 1) |k| start[k] += start[k - 1];
+    const fill = try l.a.dupe(u32, start[0..n]);
+    const fan = try l.a.alloc(u32, start[n]);
+    for (drivers, l.driver_pcs.items) |d, pc_at| for (l.b.extra.items[d.sensitivity.start..][0..d.sensitivity.len]) |slot| {
+        fan[fill[slot]] = pc_at;
+        fill[slot] += 1;
+    };
     l.b.p.fan_start = start;
-    l.b.p.fan = &.{};
+    l.b.p.fan = fan;
 }

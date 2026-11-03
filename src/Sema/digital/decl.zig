@@ -23,6 +23,8 @@ const kernels = @import("kernels");
 const Zcu = @import("../../Zcu.zig");
 const eval = @import("../eval.zig");
 const digital = @import("../digital.zig");
+const nets = @import("nets.zig");
+const ports = @import("ports.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Name = digital.Name;
@@ -41,7 +43,7 @@ const loop_max: u32 = 1 << 16;
 /// The most slots one array declares.
 const array_max: u32 = 1 << 24;
 
-const Placement = struct { scope: u32 = none, index: ?i64 = null, at: u32 = 0, name: []const u8 = "" };
+const Placement = struct { scope: u32 = none, frame: u32 = none, index: ?i64 = null, at: u32 = 0, name: []const u8 = "" };
 const Child = struct { parent: u32, name: InternPool.String };
 
 const Walk = struct {
@@ -50,6 +52,10 @@ const Walk = struct {
     children: *const std.AutoHashMapUnmanaged(Child, u32),
     /// The instance being walked.
     index: u32 = 0,
+    /// Its ports' connections, by each port's first declaration.
+    conns: std.AutoHashMapUnmanaged(Inst.Index, ports.Conn) = .empty,
+    /// Its ports' drivers, appended after its net declarations' own.
+    deferred: std.ArrayList(nets.Wire) = .empty,
 };
 
 /// Walks every instance in `Zcu.instances` order: its scope, its frame, its
@@ -144,11 +150,26 @@ fn instance(w: *Walk, k: u32) Error!void {
     const f = try newFrame(l, none, @fromBackingInt(k), scope, &.{});
     l.instance_frame[k] = f;
     w.index = k;
-    if (m.ports.len != 0 and !m.flags.ansi) for (vir.body(m.ports)) |p| {
-        if (Lower.tag(vir, p) != .port) continue;
-        const port = Lower.payload(vir, Inst.Port, p);
-        if (port.value.len > 1) return l.refuse("a port expression (§12.3.6)");
-    };
+    w.conns.clearRetainingCapacity();
+    // §12.3 each port's connection, by the declaration it names inside; a
+    // root's ports are open.
+    const rows = zcu.instances.items(.ports)[k];
+    const formals = vir.body(m.ports);
+    for (formals, 0..) |formal, at| {
+        const actual: Inst.Ref = if (rows.len == 0) .none else zcu.ports.items(.actual)[rows.start + at];
+        const inner: Inst.Index = switch (Lower.tag(vir, formal)) {
+            .io => formal,
+            .port => blk: {
+                const port = Lower.payload(vir, Inst.Port, formal);
+                const value = vir.body(port.value);
+                if (value.len == 0) continue;
+                if (value.len > 1 or Lower.tag(vir, value[0]) != .decl_ref) return l.refuse("a port expression (§12.3.6)");
+                break :blk vir.instructions.items(.data)[@backingInt(value[0])].decl_tok.decl;
+            },
+            else => continue, // else: a header holds only ports and port declarations
+        };
+        try w.conns.put(l.a, inner, .{ .actual = actual, .frame = if (actual == .none) none else w.placed[k].frame });
+    }
     try items(w, f, scope, if (m.flags.ansi) m.ports else .empty, m.body, "");
 }
 
@@ -174,7 +195,11 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
         if (!gop.found_existing) gop.value_ptr.* = .empty;
         try gop.value_ptr.append(l.a, i);
     }
-    for (later.keys(), later.values()) |first, decls| try signal(l, f, first, decls.items);
+    const top = l.frames.items[f].parent == none;
+    w.deferred.clearRetainingCapacity();
+    for (later.keys(), later.values()) |first, decls| try signal(w, f, first, decls.items, if (top) w.conns.get(first) else null);
+    try l.wires.appendSlice(l.a, w.deferred.items);
+    try ports.implicitNets(l, f, all);
     for (all) |i| switch (Lower.tag(vir, i)) {
         .param => _ = try param(l, f, i),
         .event => _ = try event(l, f, i),
@@ -183,6 +208,9 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
     for (all) |i| switch (Lower.tag(vir, i)) {
         .initial, .always => try l.scopes.items[scope].procs.append(l.a, .{ .kind = if (Lower.tag(vir, i) == .initial) .initial else .always, .inst = i, .frame = f }),
         .variable => if (Lower.payload(vir, Inst.Variable, i).init.len != 0) {
+            try l.scopes.items[scope].procs.append(l.a, .{ .kind = .init_var, .inst = i, .frame = f });
+        },
+        .io => if (Lower.payload(vir, Inst.Io, i).init.len != 0) {
             try l.scopes.items[scope].procs.append(l.a, .{ .kind = .init_var, .inst = i, .frame = f });
         },
         .instance => try childInstance(w, f, scope, i, prefix),
@@ -194,14 +222,10 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
         .gen_case => try genCase(w, f, scope, Lower.payload(vir, Inst.GenCase, i), prefix),
         .gen_for => try genFor(w, f, scope, Lower.payload(vir, Inst.GenFor, i), prefix),
         .gen_block => try genBlock(w, f, scope, i, null, &.{}, prefix),
-        .net => {
-            const n = Lower.payload(vir, Inst.Net, i);
-            if (n.init.len != 0) return l.refuse("a net declaration assignment");
-        },
-        .assign => return l.refuse("a continuous assignment"),
+        .assign => try nets.assign(l, f, i),
         .function => return l.refuse("a task or function"),
         .specify => return l.refuse("a specify block"),
-        .defparam, .genvar, .io, .param, .event, .port => {},
+        .defparam, .genvar, .param, .event, .port, .net => {},
         .analog, .analog_initial => return l.refuse("an analog block"),
         else => {}, // else: an expression of a range or a delay, read where it is used
     };
@@ -223,6 +247,14 @@ fn genBlock(w: *Walk, f: u32, scope: u32, b: Inst.Index, index: ?i64, genvars: [
     const inner_scope = try newScope(l, scope, name, index, l.b.times.items[scope], l.srcOffset(f, b), true);
     const inner = try newFrame(l, f, l.frames.items[f].instance, inner_scope, genvars);
     _ = try l.bind(f, b, .{ .kind = .scope, .slot = inner_scope });
+    // §12.4.1 the iteration's genvar reads as a localparam integer.
+    if (index) |v| {
+        const gv = genvars[genvars.len - 1];
+        const n: Name = .{ .kind = .genvar, .ty = .{ .width = 32, .signed = true }, .msb = 31 };
+        var value = n;
+        value.slot = try l.b.slot(Program.Ty.int(32, true), &.{@as(u32, @truncate(@as(u64, @bitCast(v))))}, &.{0});
+        _ = try l.bind(inner, gv.decl, value);
+    }
     const path = if (index) |k| try std.fmt.allocPrint(l.a, "{s}{s}[{d}].", .{ prefix, name, k }) else try std.fmt.allocPrint(l.a, "{s}{s}.", .{ prefix, name });
     try items(w, inner, inner_scope, .empty, blk.body, path);
 }
@@ -306,7 +338,6 @@ fn childInstance(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8
     }
     const target = try l.zcu.intern_pool.getString(l.a, vir.string(in.target));
     if (l.zcu.modules.get(target)) |d| if (l.zcu.declRow(d).kind == .primitive) return l.refuse("a UDP instance");
-    for (vir.list(Inst.Arg, in.conns)) |c| if (c.value.len != 0) return l.refuse("a port connection");
     const name = vir.string(in.name);
     const at = l.srcOffset(f, i);
     if (in.range.len == 0) return place(w, f, scope, prefix, name, null, at);
@@ -320,29 +351,42 @@ fn childInstance(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8
 
 fn place(w: *Walk, f: u32, scope: u32, prefix: []const u8, name: []const u8, index: ?i64, at: u32) Error!void {
     const l = w.l;
-    _ = f;
     const full = if (index) |k| try std.fmt.allocPrint(l.a, "{s}{s}[{d}]", .{ prefix, name, k }) else try std.fmt.allocPrint(l.a, "{s}{s}", .{ prefix, name });
     const key: Child = .{ .parent = w.index, .name = try l.zcu.intern_pool.getString(l.a, full) };
     const child = w.children.get(key) orelse return l.refuse("an instance the elaboration did not make");
-    w.placed[child] = .{ .scope = scope, .index = index, .at = at, .name = name };
+    w.placed[child] = .{ .scope = scope, .frame = f, .index = index, .at = at, .name = name };
 }
 
 /// A variable, net or port, from its first declaration `first` and the
-/// later ones `decls` that complete it (`first` included).
-fn signal(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Index) Error!void {
+/// later ones `decls` that complete it (`first` included); `conn` is a
+/// port's connection.
+fn signal(w: *Walk, f: u32, first: Inst.Index, decls: []const Inst.Index, conn: ?ports.Conn) Error!void {
+    const l = w.l;
     const vir = l.virOf(f);
     var storage: Inst.Storage = .none;
+    var dir: Inst.Direction = .none;
     for (decls) |d| switch (Lower.tag(vir, d)) {
         .io => {
             const io = Lower.payload(vir, Inst.Io, d);
             if (io.flags.storage != .none) storage = io.flags.storage;
+            dir = io.flags.dir;
         },
         .net => {},
         .variable => storage = Lower.payload(vir, Inst.Variable, d).flags.storage,
         else => unreachable, // else: `items` groups only these three
     };
-    if (storage == .none) return l.refuse("a net");
-    _ = try variable(l, f, first, decls);
+    if (storage == .none) {
+        var only: std.ArrayList(Inst.Index) = .empty;
+        for (decls) |d| if (Lower.tag(vir, d) != .variable) try only.append(l.a, d);
+        return ports.declareNet(l, f, first, only.items, conn, &w.deferred);
+    }
+    const at = try variable(l, f, first, decls);
+    const c = conn orelse return;
+    if (dir != .output) {
+        if (c.actual == .none) return;
+        return l.refuse("§12.3.3 an input or inout port declared as a variable");
+    }
+    try ports.outputVariable(l, f, l.names.items[at], c, &w.deferred);
 }
 
 /// A §4.2 variable (a `reg`, `integer`, `time`, `real` or `realtime`, an

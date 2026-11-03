@@ -57,8 +57,8 @@ pub fn targetType(l: *Lower, r: Inst.Ref) Error!Type {
             for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |x| width += (try targetType(l, x)).width;
             return .{ .width = width, .signed = false };
         },
-        .decl_ref => {
-            const n = try expr.declName(l, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl);
+        .decl_ref, .str_ref => {
+            const n = try expr.leafName(l, i);
             try writable(l, n);
             return n.ty;
         },
@@ -83,8 +83,8 @@ pub fn place(l: *Lower, r: Inst.Ref) Error!u32 {
             const list = try l.b.listOf(parts.items);
             return l.b.extraOf(Program.Place{ .kind = .concat, .a = try l.b.extraOf(.{ .l = list }) });
         },
-        .decl_ref => {
-            const n = try expr.declName(l, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl);
+        .decl_ref, .str_ref => {
+            const n = try expr.leafName(l, i);
             try writable(l, n);
             if (n.dims.len != 0) return l.refuse("an assignment to a whole unpacked array");
             return l.b.extraOf(Program.Place{ .kind = .slot, .a = n.slot });
@@ -120,8 +120,8 @@ pub fn terms(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
     const watched = if (edge == .any) r else vir.instructions.items(.data)[@backingInt(i)].un_node.operand;
     const w = watched.toIndex() orelse return l.refuse("an omitted event expression");
     switch (Lower.tag(vir, w)) {
-        .decl_ref => {
-            const n = try expr.declName(l, vir.instructions.items(.data)[@backingInt(w)].decl_tok.decl);
+        .decl_ref, .str_ref => {
+            const n = try expr.leafName(l, w);
             if (n.dims.len != 0) return l.refuse("an event control on a whole array");
             return out.appendSlice(l.a, &.{ n.slot, @backingInt(edge), 0, 0, none });
         },
@@ -145,8 +145,8 @@ pub fn selectOf(l: *Lower, i: Inst.Index) Error!Sel {
         x = b.lhs;
     }
     const base = x.toIndex().?;
-    if (Lower.tag(vir, base) != .decl_ref) return l.refuse("a select of a hierarchical name or an expression");
-    const n = try expr.declName(l, vir.instructions.items(.data)[@backingInt(base)].decl_tok.decl);
+    if (Lower.tag(vir, base) != .decl_ref and Lower.tag(vir, base) != .str_ref) return l.refuse("a select of a hierarchical name or an expression");
+    const n = try expr.leafName(l, base);
     if (n.kind == .sub or n.kind == .scope) return l.refuse("a select of a task, function or scope");
     const dims = n.dims.len;
     if (indices.items.len < dims) return l.refuse("a select of a whole array dimension");

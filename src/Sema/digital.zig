@@ -15,7 +15,7 @@
 //! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
-//! - `pub const Lower = struct` (`refuse`, `refuseFmt`, `lookup`, `bind`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
+//! - `pub const Lower = struct` (`Implicit`, `refuse`, `refuseFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
 //! - `pub const none: u32`
 //! - `pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *[]const u8) Error!Lowered`
 
@@ -29,6 +29,7 @@ const Zcu = @import("../Zcu.zig");
 const eval = @import("eval.zig");
 const decl = @import("digital/decl.zig");
 const stmt = @import("digital/stmt.zig");
+const nets = @import("digital/nets.zig");
 const Program = std_sim.Program;
 const Builder = std_sim.Builder;
 const Vir = vams.Vir;
@@ -165,6 +166,18 @@ pub const Lower = struct {
     /// Repeat and fork-join counters handed out so far.
     repeats: u32 = 0,
     joins: u32 = 0,
+    /// The nets, their drivers (compiled after the walk), per slot its
+    /// net, and each driver's `.continuous` pc.
+    nets: std.ArrayList(nets.NetRow) = .empty,
+    wires: std.ArrayList(nets.Wire) = .empty,
+    slot_net: std.AutoHashMapUnmanaged(u32, u32) = .empty,
+    driver_pcs: std.ArrayList(u32) = .empty,
+    /// §4.5 the implicit nets, by their instance frame and name.
+    implicit: std.AutoHashMapUnmanaged(Implicit, u32) = .empty,
+
+    /// An implicit net's key: the instance frame it is declared in and its
+    /// name (a `Vir.String` of that instance's file).
+    pub const Implicit = struct { frame: u32, name: Vir.String };
 
     /// Records `why` and fails.
     pub fn refuse(l: *Lower, comptime why: []const u8) error{Unsupported} {
@@ -197,6 +210,17 @@ pub const Lower = struct {
         const at: u32 = @intCast(l.names.items.len);
         try l.names.append(l.a, n);
         try l.frames.items[f].names.put(l.a, d, at);
+        return at;
+    }
+
+    /// The instance frame at the end of frame `f`'s chain.
+    pub fn rootFrame(l: *const Lower, f: u32) u32 {
+        var at = f;
+        var steps: u32 = 0;
+        while (l.frames.items[at].parent != none) : (at = l.frames.items[at].parent) {
+            steps += 1;
+            assert(steps <= l.frames.items.len);
+        }
         return at;
     }
 
@@ -284,7 +308,11 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *[]const u8) Er
         why.* = l.why;
         return e;
     };
-    const program = b.finish();
+    var program = b.finish();
+    nets.finish(&l, &program) catch |e| {
+        why.* = l.why;
+        return e;
+    };
     assert(program.inst_scope.len == program.insts.len);
     return .{ .program = program };
 }

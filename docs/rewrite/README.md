@@ -44,12 +44,14 @@ The rules of the rewrite:
 
 | module | root | imports | spec | status |
 |---|---|---|---|---|
-| `vams` | `lib/std/vams.zig` | std | `parse.md` (tokenizer, Ast, Parse), `preprocess.md` (Preprocessor) | in progress |
+| `vams` | `lib/std/vams.zig` | std | `parse.md` (tokenizer, Ast, Parse), `preprocess.md` (Preprocessor), `diag.md` (Diag) | merged |
 | `intern_pool` | `src/InternPool.zig` | std | `core-ir.md` | merged |
 | `air` | `src/Air.zig` | `intern_pool` | `core-ir.md` | merged |
-| `link` | `src/link.zig` | `contract`, `dynlib` | `link.md` | in progress |
-| `vams` (`Diag`) | `lib/std/vams/Diag.zig` | std | `diag.md` | spec ready |
-| next: `AstGen`+`Vir` (after Ast), `Zcu`+`Sema` (after Vir, InternPool, Air), Air passes, `codegen`, `Compilation` | | | written when their inputs exist | |
+| `link` | `src/link.zig` | `contract`, `dynlib` | `link.md` | merged |
+| `vams` (AstGen, Vir) | `lib/std/vams/AstGen.zig` | std | `astgen.md` | in progress |
+| `air` (passes) | `src/Air/{Interval,Float,Legalize,Setup}.zig` | `intern_pool` | `air-passes.md` | in progress |
+| `vams` (spice) | `lib/std/vams/spice.zig` | std | `spice.md` | in progress |
+| next: `Zcu`+`Sema` (after Vir), `codegen` (after Sema), `Compilation`, then the switch-over | | | written when their inputs exist | |
 
 The handle types other modules build against are fixed already:
 `InternPool.Index = enum(u32) { none = maxInt(u32), _ }` and

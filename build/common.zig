@@ -41,6 +41,7 @@ pub const module_specs = [_]struct {
     .{ .name = "air", .path = "src/Air.zig", .imports = &.{"intern_pool"} },
     .{ .name = "base", .path = "lib/base/root.zig" },
     .{ .name = "kernels", .path = "lib/kernels/root.zig", .imports = &.{"contract"} },
+    .{ .name = "sema", .path = "src/sema.zig", .imports = &.{ "vams", "intern_pool", "air", "kernels" } },
     .{ .name = "diag", .path = "lib/diag/root.zig" },
     .{ .name = "dynlib", .path = "src/dynlib.zig" },
     .{ .name = "link", .path = "src/link.zig", .imports = &.{ "contract", "dynlib" } },

@@ -1,0 +1,2 @@
+# diff-elab known differences: `<path under the fixture root> <reason>`, one per line.
+# A listed fixture that agrees, or is not compared, fails the run.

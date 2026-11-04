@@ -106,6 +106,10 @@ pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool) ![]const u8 {
     const b = try codes(arena, new.stderr);
     if (try earliestUnmatched(arena, a, b)) |c| return ownerOf(c, digital);
     if (std.mem.find(u8, new.stderr, "codegen refused") != null or std.mem.find(u8, new.stderr, "does not compile") != null) return "rw-codegen (codegen)";
+    // A testbench transcript with lines missing and nothing else changed:
+    // the device's §9.4 display phase (`$strobe`), which the Zig device
+    // backend has not got yet.
+    if (!digital and old.status == new.status and dropped(old.stderr, new.stderr)) return "rw-codegen (display phase)";
     if (a.len != 0 and !std.mem.eql(u8, old.stderr, new.stderr)) return try std.fmt.allocPrint(arena, "{s} {s}", .{ ownerOf(a[0], digital), part(old.stderr, new.stderr) });
     return if (digital) "rw-dlower (digital lowering)" else "rw-lower (analog lowering)";
 }
@@ -132,6 +136,20 @@ fn earliestUnmatched(arena: Allocator, a: []const []const u8, b: []const []const
         best = y;
     };
     return best;
+}
+
+/// Whether `b` differs from `a` only by lines `a` has and `b` lacks: `b`'s
+/// lines are a subsequence of `a`'s.
+fn dropped(a: []const u8, b: []const u8) bool {
+    if (std.mem.eql(u8, a, b)) return false;
+    var la = std.mem.splitScalar(u8, a, '\n');
+    var lb = std.mem.splitScalar(u8, b, '\n');
+    while (lb.next()) |y| {
+        while (la.next()) |x| {
+            if (std.mem.eql(u8, x, y)) break;
+        } else return false;
+    }
+    return true;
 }
 
 fn earlier(code: []const u8, than: ?[]const u8) bool {

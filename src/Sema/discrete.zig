@@ -34,6 +34,7 @@ pub fn mark(s: *Sema, unit: *Unit) Allocator.Error!void {
     assert(unit.discrete.items.len == 0);
     const vir = unit.vir;
     if (!try isMixed(s, unit)) return;
+    s.mixed = true;
     var owned: std.ArrayList(Inst.Index) = .empty;
     for (vir.body(unit.module.body)) |i| if (vir.instructions.items(.tag)[@backingInt(i)] == .assign) {
         const a = decl.payloadOf(vir, Inst.Assign, i);

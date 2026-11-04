@@ -89,8 +89,7 @@ pub fn analogBackend(comp: *Compilation) !?Job {
 pub fn codegen(comp: *Compilation, b: Compilation.Backend) !?Job {
     const c = comp.config;
     switch (b) {
-        .zig => {},
-        .exe => return notBuilt(comp, b, "the analog testbench (--emit-exe, --run)"),
+        .zig, .exe => {},
         .verilog => return notBuilt(comp, b, "the behavioural Verilog backend (--emit-verilog)"),
         .osdi => return notBuilt(comp, b, "the OSDI backend (--emit-osdi)"),
         .rtlil => return notBuilt(comp, b, "the RTLIL backend (--emit-rtlil)"),
@@ -99,6 +98,9 @@ pub fn codegen(comp: *Compilation, b: Compilation.Backend) !?Job {
         .libmap => unreachable, // Refused before preprocessing.
     }
     const an = &comp.analysis.?;
+    // ponytail: the §8 runner (a digital `std_sim.Program` beside the
+    // device, lib/sim/mixed ported to std_sim) is not written yet.
+    if (b == .exe and an.mixed) return notBuilt(comp, b, "the mixed-signal testbench (VAMS §8, a design with a digital half)");
     var r = try codegen_mod.generate(comp.gpa, .zig, .{
         .air = &an.air,
         .ip = &comp.zcu.intern_pool,
@@ -115,6 +117,7 @@ pub fn codegen(comp: *Compilation, b: Compilation.Backend) !?Job {
         },
         .ok => |out| comp.device = out,
     }
+    if (b == .exe) return testbench(comp);
     if (c.check or c.target == .check) return .{ .link = .check };
     if (c.target == .so) return .{ .link = .so };
     try writeText(comp);
@@ -269,6 +272,57 @@ fn engineModules(a: Allocator, contract: []const u8) ![3]link_mod.Module {
         .{ .name = "std_kernels", .root = try std.fs.path.join(a, &.{ tree, "lib", "std", "kernels.zig" }), .deps = &.{ "contract", "gompute_math" } },
         .{ .name = "gompute_math", .root = try std.fs.path.join(a, &.{ tree, "gompute", "math.zig" }) },
     };
+}
+
+/// `--emit-exe`/`--run`: the runner over the device (`codegen.bench`),
+/// built beside it through `link` as the old spine did (under
+/// `--work-dir`, default `.zig-cache/vera-tb`, named for the top module);
+/// `main` prints the binary's path or runs it.
+fn testbench(comp: *Compilation) !?Job {
+    const c = comp.config;
+    const a = comp.arena();
+    const bench = codegen_mod.bench;
+    const spec = &comp.bench.?;
+    const an = &comp.analysis.?;
+    if (bench.gridEvent(&an.air)) |i| {
+        const s = an.srcs[@backingInt(i)];
+        const loc: vams.Diag.Loc = if (s.src == .none) .none else errors.instLoc(comp.pp.output(), &comp.units.items[@backingInt(s.file)], s.src);
+        try comp.wip.add(.codegen, .W0750, loc, "the testbench inserts no timepoint at it", .{});
+        // `--deny=W0750` refuses before anything is built.
+        if (comp.wip.failed()) return null;
+    }
+    var facts = try bench.facts(a, &an.device);
+    facts.validate_contract = c.validate_contract;
+    var runner: Io.Writer.Allocating = .init(a);
+    bench.writeRunner(&runner.writer, a, std.fs.path.stem(c.paths[0]), &spec.bench, facts) catch |e| switch (e) {
+        error.TooManyPoints => return refuse(comp, 2, try a.print("error: {s}: `//!` directive: the sweeps expand to more than {d} points\n", .{ c.paths[0], bench.points_max })),
+        error.OutOfMemory, error.WriteFailed => return error.OutOfMemory,
+    };
+    const slots = try a.alloc(link_mod.Server, c.thread_limit);
+    var q: link_mod.Queue = .init(slots);
+    const engine = try engineModules(a, c.contract.?);
+    const top = comp.zcu.intern_pool.stringToSlice(comp.zcu.instances.items(.name)[0]);
+    const f: link_mod.File = .{ .kind = .exe, .work_dir = c.work_dir orelse ".zig-cache/vera-tb", .name = top, .optimize = c.optimize, .modules = &engine, .zig_exe = c.zig_exe, .debug_info = c.debug_info, .out_path = c.out_path };
+    var built = link_mod.buildExe(f, comp.gpa, comp.io, &q, comp.device.?.text, runner.written()) catch |e| {
+        try comp.outputs.err.print(a, "error: {s}: building the testbench failed: {t}\n", .{ c.paths[0], e });
+        comp.outputs.status = 1;
+        return null;
+    };
+    defer built.deinit(comp.gpa);
+    switch (built) {
+        .ok => |p| {
+            comp.outputs.exe = try a.dupe(u8, p);
+            comp.outputs.plusargs = spec.harness.plusargs;
+        },
+        .failed => |bundle| {
+            try comp.outputs.err.print(a, "error: {s}: the generated testbench does not compile — this is an engine bug, not a problem with the model:\n", .{c.paths[0]});
+            var w: Io.Writer.Allocating = .init(a);
+            try bundle.renderToWriter(.{}, &w.writer);
+            try comp.outputs.err.appendSlice(a, w.written());
+            comp.outputs.status = 1;
+        },
+    }
+    return null;
 }
 
 fn refuse(comp: *Compilation, status: u8, line: []const u8) !?Job {

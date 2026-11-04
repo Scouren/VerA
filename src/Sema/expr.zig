@@ -215,6 +215,7 @@ fn hierRead(s: *Sema, b: *Block, src: Inst.Ref) Allocator.Error!Value {
             .str => constant(s, c),
         },
         .local => |slot| return .{ .ref = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot.alloc) } }), .ty = slot.ty },
+        .alias => unreachable, // `resolve` reports an aliasparam (E0373)
         .bind => |x| {
             if (x.bind == .slot or x.bind == .array) {
                 try s.fail(.E0910, b.unit.file, src, "a variable read through a hierarchical name", .{});

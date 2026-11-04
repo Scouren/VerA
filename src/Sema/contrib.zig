@@ -359,6 +359,12 @@ fn terminalBind(s: *Sema, b: *Block, r: Inst.Ref, src: Inst.Ref) Allocator.Error
                 try s.fail(.E0512, unit.file, src, "an access of a name with no node", .{});
                 return null;
             }
+            // §6.7 a child's net no discipline reaches (an uncoerced implicit
+            // net) is no analog node a path can name.
+            if (hit.bind.bind == .node) if (hit.bind.bind.node != .ground and s.device.nodes.items(.discipline)[@backingInt(hit.bind.bind.node)] == .empty) {
+                try s.fail(.E0901, unit.file, src, "the path names a net with no discipline, no analog node", .{});
+                return null;
+            };
             return .{ hit.bind.bind, hit.bind.unit };
         },
         else => {

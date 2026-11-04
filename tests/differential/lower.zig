@@ -50,13 +50,12 @@ const Lowered = ir.Lowered;
 const Device = Air.Device;
 const values = @import("lower/values.zig");
 const tables = @import("lower/tables.zig");
+/// The codes elaboration owns (`stages.zig`): diff-elab compares them, so
+/// this oracle leaves them out and demands every other.
+const elab_codes = @import("stages.zig").elab_codes;
 
 /// One fixture's verdict: null `why` when every check agrees.
 pub const Verdict = struct { why: ?[]const u8, tables: bool = false, roots: u32 = 0, values: u64 = 0, values_libm: u64 = 0, skipped: u32 = 0 };
-
-/// Every code the old `src/elab` reports (diff-elab's list): elaboration's
-/// oracle compares them, so this one leaves them out.
-const elab_codes = [_][]const u8{ "E0235", "E0237", "E0239", "E0247", "E0337", "E0347", "E0355", "E0358", "E0363", "E0371", "E0373", "E0375", "E0376", "E0501", "E0816", "E0890", "E0901", "E0902", "E0903", "E0904", "E0905", "E0906", "E0907", "E0908", "E0909", "E0911", "E0914", "E0915", "E0916", "E0917", "E0921", "E0922", "E0923", "E0927", "E0929", "E0952", "E0982", "E0997", "W0252", "W0950", "W0951", "W1152" };
 
 const Tally = struct {
     compared: u32 = 0,

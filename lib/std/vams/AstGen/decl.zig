@@ -34,15 +34,6 @@ const Scope = AstGen.Scope;
 const Error = AstGen.Error;
 const full = Ast.full;
 
-/// `partitionPoint`'s predicate: an attribute node starting before `tok`.
-const MainBelow = struct {
-    tree: *const Ast,
-    tok: Ast.TokenIndex,
-    fn below(c: MainBelow, n: Node.Index) bool {
-        return c.tree.nodeMainToken(n) < c.tok;
-    }
-};
-
 /// The type words before a declaration's names, as the tree leaves them in
 /// tokens: `[discipline] [net_type|wreal|ground] [signed]
 /// [reg|integer|...] [signed]`, a strength group, `vectored`/`scalared`.
@@ -55,6 +46,15 @@ pub const TypeWords = struct {
     scalared: bool = false,
     /// The `(` of a strength group.
     strength: ?Ast.TokenIndex = null,
+};
+
+/// `partitionPoint`'s predicate: an attribute node starting before `tok`.
+const MainBelow = struct {
+    tree: *const Ast,
+    tok: Ast.TokenIndex,
+    fn below(c: MainBelow, n: Node.Index) bool {
+        return c.tree.nodeMainToken(n) < c.tok;
+    }
 };
 
 /// Reads the type words starting at `first`, up to a range, a delay or the

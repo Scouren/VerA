@@ -33,6 +33,8 @@ pub const Hit = union(enum) {
     local: Sema.Slot,
     /// A §5.5.3 nature attribute's value.
     attr: eval.Const,
+    /// A §3.4.7 aliasparam (no value: E0373 at the read).
+    alias,
 };
 
 /// The deepest `field` chain followed (a path's length).
@@ -47,8 +49,17 @@ pub fn resolve(s: *Sema, b: *Block, r: Inst.Ref, src: Inst.Ref) Allocator.Error!
         try s.fail(.E0512, unit.file, src, "a hierarchical name of this shape is not lowered by Sema yet", .{});
         return null;
     }
+    const failed = s.zcu.failed.len;
     if (try natureAttr(s, b, parts.items, src)) |hit| return hit;
-    if (try find(s, unit, parts.items)) |hit| return hit;
+    if (s.zcu.failed.len != failed) return null;
+    if (try find(s, unit, parts.items)) |hit| {
+        // §3.4.7 "an aliasparam ... shall not be used in an expression".
+        if (hit == .alias) {
+            try s.fail(.E0373, unit.file, src, "`{s}` is an alias; reference the original parameter", .{try std.mem.join(s.arena, ".", parts.items)});
+            return null;
+        }
+        return hit;
+    }
     try s.fail(.E0901, unit.file, src, "`{s}` names nothing in the elaborated design", .{try std.mem.join(s.arena, ".", parts.items)});
     return null;
 }
@@ -134,6 +145,7 @@ fn lookup(s: *Sema, flat: []const u8) Allocator.Error!?Hit {
     for (s.units.items) |*u| {
         if (!std.mem.eql(u8, u.prefix, prefix)) continue;
         const d = findDecl(u, name) orelse return null;
+        if (u.vir.instructions.items(.tag)[@backingInt(d)] == .aliasparam) return .alias;
         const bind = u.binds.get(d) orelse return null;
         return .{ .bind = .{ .unit = u, .bind = bind } };
     }
@@ -145,7 +157,7 @@ fn findDecl(unit: *const Unit, name: []const u8) ?Inst.Index {
     const vir = unit.vir;
     for ([_]Vir.Body{ unit.module.ports, unit.module.body }) |body| for (vir.body(body)) |i| {
         switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-            .io, .net, .variable, .param, .branch, .instance, .gen_block => {},
+            .io, .net, .variable, .param, .aliasparam, .branch, .instance, .gen_block => {},
             else => continue, // else: declares no name a path reaches
         }
         if (std.mem.eql(u8, vir.string(decl.nameOf(vir, i)), name)) return decl.canonical(vir, i);

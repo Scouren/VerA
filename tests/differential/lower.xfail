@@ -23,12 +23,12 @@ verilog-a/annex_a_syntax/replication.va codes: old {}, new E0512 (E0512: `concat
 verilog-a/annex_a_syntax/sum_chain_past_the_old_parser_limit.va codes: old {}, new E0241 (E0241: 4096 levels deep)
 verilog-a/annex_a_syntax/system_task_null_argument_space.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/annex_b_keywords/escaped_keyword_name_positions.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
-verilog-a/annex_d_standard_definitions/discrete_disciplines.va the old side refused, the new side lowered
-verilog-a/annex_d_standard_definitions/literal_logic_discipline.va the old side refused, the new side lowered
+verilog-a/annex_d_standard_definitions/discrete_disciplines.va codes: old E0501, new {}
+verilog-a/annex_d_standard_definitions/literal_logic_discipline.va codes: old E0501, new {}
 verilog-a/annex_d_standard_definitions/nature_as_ddt_abstol_argument.va codes: old {}, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
-verilog-a/annex_d_standard_definitions/signal_flow_flow_access_rejected.va codes: old E0360, new {}
-verilog-a/annex_d_standard_definitions/signal_flow_potential_access_rejected.va codes: old E0360, new {}
-verilog-a/annex_d_standard_definitions/unbound_nature_charge_rejected.va codes: old {}, new E0512 (E0512: `Q` is not lowered by Sema yet)
+verilog-a/annex_d_standard_definitions/signal_flow_flow_access_rejected.va codes: old E0360,E0501, new E0501 (E0501: `I` is not an access function of `p`)
+verilog-a/annex_d_standard_definitions/signal_flow_potential_access_rejected.va codes: old E0360,E0501, new E0501 (E0501: `V` is not an access function of `p`)
+verilog-a/annex_d_standard_definitions/unbound_nature_charge_rejected.va codes: old E0501, new E0512 (E0512: `Q` is not lowered by Sema yet)
 verilog-a/annex_g_change_history/generate_replaced_by_analog_for.va codes: old {}, new E0322,E0426,E0512 (E0512: an assignment to a name with no slot)
 verilog-a/annex_g_change_history/limexp_v1_spelling_rejected.va codes: old E0808, new {}
 verilog-a/ch01_intro/incompatible_flow_natures_rejected.va the old side refused, the new side lowered
@@ -70,7 +70,7 @@ verilog-a/ch03_data_types/desc_units_parameter_rows.va codes: old {}, new E0512 
 verilog-a/ch03_data_types/discipline_binds_undeclared_nature_rejected.va codes: old E0378, new {}
 verilog-a/ch03_data_types/discipline_duplicate_user_attribute_rejected.va codes: old E0343, new {}
 verilog-a/ch03_data_types/discipline_nonconstant_user_attribute_rejected.va codes: old E0340, new {}
-verilog-a/ch03_data_types/domainless_net_behavioral.va codes: old {}, new E0512 (E0512: an access of a name with no node)
+verilog-a/ch03_data_types/domainless_net_behavioral.va codes: old E0501, new E0512 (E0512: an access of a name with no node)
 verilog-a/ch03_data_types/duplicate_access_name.va codes: old E0335, new {}
 verilog-a/ch03_data_types/duplicate_discipline_name.va codes: old E0342, new {}
 verilog-a/ch03_data_types/duplicate_nature_name.va codes: old E0342, new {}
@@ -102,7 +102,7 @@ verilog-a/ch03_data_types/integer_parameter_precision.va codes: old {}, new E032
 verilog-a/ch03_data_types/multidimensional_strings.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch03_data_types/nature_access_as_string.va codes: old E0340, new {}
 verilog-a/ch03_data_types/nature_discipline_namespace_collision.va codes: old E0336, new {}
-verilog-a/ch03_data_types/natureless_net_behavioral.va the old side refused, the new side lowered
+verilog-a/ch03_data_types/natureless_net_behavioral.va codes: old E0501, new {}
 verilog-a/ch03_data_types/nature_units_as_identifier.va codes: old E0340, new {}
 verilog-a/ch03_data_types/nodeset_hierarchical_declaration.va tables row 3: old `contrib flow direct br0 g u.w`, new `node 3 m.p net`
 verilog-a/ch03_data_types/nodeset_hierarchical_not_constant_rejected.va codes: old E0365, new {}
@@ -111,7 +111,7 @@ verilog-a/ch03_data_types/nonconstant_array_dimension.va codes: old E0308,E0309,
 verilog-a/ch03_data_types/nonconstant_replication_to_integral.va codes: old E0354, new E0512 (E0512: `a replication by a count known only while the device runs` is not lowered by Sema yet)
 verilog-a/ch03_data_types/nonconstant_user_attribute.va codes: old E0340, new {}
 verilog-a/ch03_data_types/parameter_assigned_at_runtime.va codes: old E0312, new E0313 (E0313: an assignment to a name that is not a variable)
-verilog-a/ch03_data_types/parameter_default_not_constant_rejected.va the old side refused, the new side lowered
+verilog-a/ch03_data_types/parameter_default_not_constant_rejected.va codes: old E0363, new {}
 verilog-a/ch03_data_types/parameter_override_type.va tables row 0: old `param child.becomes_real real local = 4e0`, new `param child.becomes_real unspecified local = 4e0`
 verilog-a/ch03_data_types/parameter_types.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch03_data_types/parameter_units_are_documentation.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
@@ -145,13 +145,13 @@ verilog-a/ch03_data_types/string_to_integral_rejected.va codes: old E0354, new {
 verilog-a/ch03_data_types/string_variable_bitwise_rejected.va codes: old E0322, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch03_data_types/string_variables.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch03_data_types/untyped_parameter_type_derivation.va tables row 2: old `param counted integer = 4`, new `param counted unspecified = 4`
-verilog-a/ch03_data_types/variable_in_parameter_initializer.va codes: old E0314, new {}
+verilog-a/ch03_data_types/variable_in_parameter_initializer.va codes: old E0314,E0363, new {}
 verilog-a/ch03_data_types/vector_branches.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-a/ch03_data_types/vector_branch_on_part_select.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-a/ch03_data_types/vector_branch_part_select_reversed_rejected.va codes: old E0352, new {}
 verilog-a/ch03_data_types/vector_branch_size_mismatch.va codes: old E0353, new {}
 verilog-a/ch03_data_types/vector_range_past_65535_elements.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch03_data_types/wrong_access_function.va codes: old E0360, new {}
+verilog-a/ch03_data_types/wrong_access_function.va codes: old E0360,E0501, new E0501 (E0501: `V` is not an access function of `p`)
 verilog-a/ch04_expressions/13b_generic_access.va codes: old {}, new E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch04_expressions/absdelay_missing_td_rejected.va codes: old E0505, new E0506 (E0506: `absdelay` takes 2 to 3, given 1)
 verilog-a/ch04_expressions/access_bus_genvar_index.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
@@ -168,7 +168,7 @@ verilog-a/ch04_expressions/assignment_pattern_replication_count_variable_rejecte
 verilog-a/ch04_expressions/assignment_pattern_replication.va codes: old {}, new E0349 (E0349: initialising array parameter `data2`)
 verilog-a/ch04_expressions/concatenation_real_operand_rejected.va codes: old E0327, new E0512 (E0512: `concat` is not lowered by Sema yet)
 verilog-a/ch04_expressions/concatenation.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
-verilog-a/ch04_expressions/constant_expression_reads_a_probe_rejected.va the old side refused, the new side lowered
+verilog-a/ch04_expressions/constant_expression_reads_a_probe_rejected.va codes: old E0337,E0363, new {}
 verilog-a/ch04_expressions/ddt_abstol_dynamic_rejected.va codes: old E0515, new {}
 verilog-a/ch04_expressions/ddt_idt_nature_tolerance.va codes: old {}, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
 verilog-a/ch04_expressions/ddt_output_abstol.va codes: old {}, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
@@ -197,7 +197,7 @@ verilog-a/ch04_expressions/idtmod.va codes: old {}, new E0514 (E0514: `idtmod`)
 verilog-a/ch04_expressions/laplace_dynamic_coefficient_sampled.va codes: old {}, new E0512 (E0512: a user task enable is not lowered by Sema yet)
 verilog-a/ch04_expressions/laplace_zd_dc_gain.va codes: old {}, new E0505 (E0505: `laplace_zd()`)
 verilog-a/ch04_expressions/last_crossing_directions.va codes: old {}, new E0514 (E0514: `last_crossing`)
-verilog-a/ch04_expressions/limexp_not_a_constant_expression_rejected.va the old side refused, the new side lowered
+verilog-a/ch04_expressions/limexp_not_a_constant_expression_rejected.va codes: old E0363, new {}
 verilog-a/ch04_expressions/noise_generator_without_branch_rejected.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-a/ch04_expressions/noise_source_inside_array_pattern_argument.va codes: old {}, new E0512 (E0512: `pattern` is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_parameter_part_select.va codes: old {}, new E0512 (E0512: `slice` is not lowered by Sema yet)
@@ -210,7 +210,7 @@ verilog-a/ch04_expressions/parameter_reduction_and_arithmetic_shift.va tables ro
 verilog-a/ch04_expressions/partial_slice_assignment.va codes: old {}, new E0309,E0313,E0512 (E0309: 1 subscripts for 2 dimensions)
 verilog-a/ch04_expressions/port_access_bus_genvar_index.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch04_expressions/port_access_bus_variable_index_rejected.va codes: old E0352, new E0512 (E0512: a port access of an instance's port (`<u.p>`) is not lowered by Sema yet)
-verilog-a/ch04_expressions/port_access_wrong_discipline_rejected.va the old side refused, the new side lowered
+verilog-a/ch04_expressions/port_access_wrong_discipline_rejected.va codes: old E0501, new {}
 verilog-a/ch04_expressions/reduction_on_real_rejected.va codes: old E0319, new E0348 (E0348: )
 verilog-a/ch04_expressions/reject_4_5_11_concatenation_coefficients.va codes: old E0572, new {}
 verilog-a/ch04_expressions/reject_absdelay_vera_interp_parameter.va codes: old E0524, new {}
@@ -242,7 +242,7 @@ verilog-a/ch05_analog_behavior/assignment_hierarchical_invalid.va codes: old E03
 verilog-a/ch05_analog_behavior/branch_flow_probe_includes_the_reactive_part.va codes: old {}, new E0512 (E0512: a read of a reactive flow source is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/case_duplicate_default_invalid.va codes: old E0427, new {}
 verilog-a/ch05_analog_behavior/conditional_ddt_contribution_static.va codes: old {}, new E0512,E0514 (E0514: `ddt`)
-verilog-a/ch05_analog_behavior/contribution_to_discrete_net_rejected.va the old side refused, the new side lowered
+verilog-a/ch05_analog_behavior/contribution_to_discrete_net_rejected.va codes: old E0501, new {}
 verilog-a/ch05_analog_behavior/controlled_sources.va contribution 0 resist: old 0e0, new 2.6579876889098655e0
 verilog-a/ch05_analog_behavior/cross_under_genvar_condition.va codes: old {}, new E0512,E0707 (E0512: an assignment to a name with no slot)
 verilog-a/ch05_analog_behavior/cross_under_runtime_condition_rejected.va codes: old E0707, new E0512,E0707 (E0512: an assignment to a name with no slot)
@@ -257,7 +257,7 @@ verilog-a/ch05_analog_behavior/held_sformat_string_survives_rejected_step.va cod
 verilog-a/ch05_analog_behavior/held_through_output_actual_seed_and_scan.va tables row 4: old `held b`, new `held n`
 verilog-a/ch05_analog_behavior/hierarchical_contribution_closes_a_source_triangle_rejected.va codes: old E0477, new {}
 verilog-a/ch05_analog_behavior/hierarchical_contribution_voltage_loop_rejected.va codes: old E0477, new {}
-verilog-a/ch05_analog_behavior/hierarchical_reference_to_a_variable_rejected.va codes: old {}, new E0512 (E0512: an access of a name with no node)
+verilog-a/ch05_analog_behavior/hierarchical_reference_to_a_variable_rejected.va codes: old E0901, new E0512 (E0512: an access of a name with no node)
 verilog-a/ch05_analog_behavior/hierarchical_switch_branch_rejected.va codes: old E0439, new {}
 verilog-a/ch05_analog_behavior/hierarchical_unnamed_branch_reference.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/indirect_under_parameter_condition.va codes: old {}, new E0412 (E0412: the condition is not a constant expression)
@@ -268,7 +268,7 @@ verilog-a/ch05_analog_behavior/jump_in_runtime_for_in_analog_for.va codes: old {
 verilog-a/ch05_analog_behavior/jump_outside_loop_invalid.va codes: old E0404, new E0512 (E0512: `break` outside a loop)
 verilog-a/ch05_analog_behavior/monitored_event_timer_used_as_a_value_rejected.va codes: old E0701, new E0512 (E0512: `timer` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/named_block_local_assigned_from_outside_rejected.va codes: old E0316, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/named_block_local_by_hierarchical_name.va the old side lowered, the new side refused
+verilog-a/ch05_analog_behavior/named_block_local_by_hierarchical_name.va codes: old {}, new E0901 (E0901: `myscope.p2` names nothing in the elaborated design)
 verilog-a/ch05_analog_behavior/named_block_locals.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/named_block_scope_rejected.va codes: old E0314, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/nature_as_ddt_abstol_argument.va codes: old {}, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
@@ -283,8 +283,8 @@ verilog-a/ch05_analog_behavior/port_access_own_port_inside_instance_rejected.va 
 verilog-a/ch05_analog_behavior/port_branch_own_port_inside_instance_rejected.va codes: old {}, new E0512 (E0512: a port access in an instance below the root is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/probe_both_quantities_invalid.va codes: old E0423, new {}
 verilog-a/ch05_analog_behavior/reactive_sum_under_a_factor.va codes: old {}, new E0512 (E0512: a reactive term of this shape is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/reject_5_5_1_parameter_V_hides_access_function.va codes: old {}, new E0512 (E0512: `a call of a name that is no function` is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/reject_5_5_1_probe_of_discrete_net.va codes: old {}, new E0512 (E0512: an access of a name with no node)
+verilog-a/ch05_analog_behavior/reject_5_5_1_parameter_V_hides_access_function.va codes: old E0501, new E0512 (E0512: `a call of a name that is no function` is not lowered by Sema yet)
+verilog-a/ch05_analog_behavior/reject_5_5_1_probe_of_discrete_net.va codes: old E0501, new E0512 (E0512: an access of a name with no node)
 verilog-a/ch05_analog_behavior/reject_5_5_1_unnamed_branch_mixed_disciplines.va codes: old {}, new E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/reject_charge_site_lte_parameter.va codes: old E0523, new {}
 verilog-a/ch05_analog_behavior/reject_vera_timepoint_contribution.va codes: old E0530, new {}
@@ -316,13 +316,13 @@ verilog-a/ch05_analog_behavior/timer_effectful_file_leaf.va tables row 6: old `h
 verilog-a/ch05_analog_behavior/value_retention.va contribution 0 resist: old 7e0, new 8e0
 verilog-a/ch05_analog_behavior/vector_net_index_not_constant_rejected.va codes: old E0352, new E0512 (E0512: an access of a vector element at a run-time index)
 verilog-a/ch06_hierarchy/conditional_direct_nesting_is_not_a_scope.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch06_hierarchy/defparam_rhs_not_constant_rejected.va the old side refused, the new side lowered
+verilog-a/ch06_hierarchy/defparam_rhs_not_constant_rejected.va codes: old E0363, new {}
 verilog-a/ch06_hierarchy/defparam_upward_collect_first.va tables row 2: old `param gt real local = 2e0`, new `param gt real = 2e0`
 verilog-a/ch06_hierarchy/duplicate_parameter_rejected.va codes: old E0362, new {}
 verilog-a/ch06_hierarchy/escaped_name_vs_vector_element.va tables row 3: old `node 3 \bus[0] net`, new `contrib potential direct br0 a gnd`
 verilog-a/ch06_hierarchy/escaped_period_is_not_a_path.va tables row 1: old `node 1 u.x y net`, new `node 1 u.x.y net`
-verilog-a/ch06_hierarchy/external_genblk_reference_unsupported.va codes: old E0998, new {}
-verilog-a/ch06_hierarchy/generate_block_name_found_in_a_parent_module.va the old side lowered, the new side refused
+verilog-a/ch06_hierarchy/external_genblk_reference_unsupported.va codes: old E0998, new E0901 (E0901: `genblk1.tag` names nothing in the elaborated design)
+verilog-a/ch06_hierarchy/generate_block_name_found_in_a_parent_module.va codes: old {}, new E0901 (E0901: `gb.k` names nothing in the elaborated design)
 verilog-a/ch06_hierarchy/generate_blocks_same_localparam_name.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/generate_if_instantiates_one_arm.va tables row 2: old `param on.u_on.id integer local = 1`, new `param off.u_off.id integer local = 2`
 verilog-a/ch06_hierarchy/generate_mismatched_genvar_rejected.va codes: old E0419, new {}
@@ -341,7 +341,7 @@ verilog-a/ch06_hierarchy/hierarchical_vector_element_access.va codes: old {}, ne
 verilog-a/ch06_hierarchy/hierarchy_empty_paramset_tie.va tables row 1: old `param u.audit_empty_bin.b real local = 4e0`, new `param u.audit_empty_bin.a real local = 1e0`
 verilog-a/ch06_hierarchy/hierarchy_overview_instances_and_overrides.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/if_generate_values_drive_paramset_selection.va tables row 5: old `param g1.u2.b4_pgi_sel.w real local = 1e0 from(-inf:5e0)`, new `param g2.u4.b4_pgi_sel.w real local = 1e0 from(-inf:5e0)`
-verilog-a/ch06_hierarchy/implicit_net_hierarchical_reference_coerced.va the old side lowered, the new side refused
+verilog-a/ch06_hierarchy/implicit_net_hierarchical_reference_coerced.va codes: old {}, new E0901 (E0901: `ch6_implicit_probe_top.implicit_link` names nothing in the elaborated design)
 verilog-a/ch06_hierarchy/matching_size_concatenation_of_a_vector.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/matching_size_concatenation.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/matching_size_vector_net.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
@@ -354,7 +354,7 @@ verilog-a/ch06_hierarchy/named_port_expressions.va codes: old {}, new E0351 (E03
 verilog-a/ch06_hierarchy/nested_loop_generates_share_genvar_rejected.va codes: old E0419, new {}
 verilog-a/ch06_hierarchy/nonfinite_real_to_integer_rejected.va codes: old E0368, new {}
 verilog-a/ch06_hierarchy/oomr_function_unsupported.va codes: old {}, new E0512 (E0512: `a call` is not lowered by Sema yet)
-verilog-a/ch06_hierarchy/oomr_in_parameter_declaration_rejected.va codes: old E0924, new {}
+verilog-a/ch06_hierarchy/oomr_in_parameter_declaration_rejected.va codes: old E0901,E0924, new {}
 verilog-a/ch06_hierarchy/oomr_variable_assign_rejected.va codes: old E0316, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/param_given_of_a_variable_rejected.va codes: old E0822, new {}
 verilog-a/ch06_hierarchy/paramset_aliasparam_names_a_system_parameter.va tables row 2: old `param u.ch6_ps_alias.m real local = 1e0`, new `param u.tag integer local = 1`
@@ -366,7 +366,7 @@ verilog-a/ch06_hierarchy/paramset_defparam_generated_instance_rejected.va codes:
 verilog-a/ch06_hierarchy/paramset_defparam_hierarchy_legal.va tables row 10: old `param valid.absent_child.bad.marker real local = 0e0`, new `param valid.present_child.good.gain real local = 3e0`
 verilog-a/ch06_hierarchy/paramset_generate_localparam_out_of_scope_rejected.va codes: old E0314, new {}
 verilog-a/ch06_hierarchy/paramset_oomr_localparam.va tables row 3: old `param u.k real local = 6e0`, new `param u.k real local = ?`
-verilog-a/ch06_hierarchy/paramset_oomr_nonlocal_parameter_rejected.va the old side refused, the new side lowered
+verilog-a/ch06_hierarchy/paramset_oomr_nonlocal_parameter_rejected.va codes: old E0907, new {}
 verilog-a/ch06_hierarchy/paramset_outer_defparam_chain.va tables row 2: old `param u.ps_chain_far_high.unused_item real local = 0e0`, new `param u.gain real local = 5e0`
 verilog-a/ch06_hierarchy/paramset_outer_defparam_forbidden_body_rejected.va codes: old E0926, new {}
 verilog-a/ch06_hierarchy/paramset_outer_defparam_wide_card.va tables row 1: old `param wide integer = 1`, new `param wide unspecified = 1`
@@ -383,12 +383,12 @@ verilog-a/ch06_hierarchy/port_select_index_out_of_range_rejected.va codes: old E
 verilog-a/ch06_hierarchy/port_select_of_a_scalar_net_rejected.va codes: old E0351, new {}
 verilog-a/ch06_hierarchy/port_select_ordered_of_a_parent_port.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/rc_h01_paramset_chain_far_link_parameter.va tables row 2: old `param u.rc_h01p_slow.jval real local = 2e0`, new `param u.j real local = 2e0`
-verilog-a/ch06_hierarchy/reject_6_4_1_paramset_variable_assigns_parameter.va the old side refused, the new side lowered
+verilog-a/ch06_hierarchy/reject_6_4_1_paramset_variable_assigns_parameter.va codes: old E0237, new {}
 verilog-a/ch06_hierarchy/undeclared_interconnect_port_binding.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/unnamed_generate_block_external_names.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch06_hierarchy/unnamed_generate_instance_reference_rejected.va codes: old E0998, new {}
-verilog-a/ch06_hierarchy/unnamed_generate_reference_from_within.va the old side lowered, the new side refused
-verilog-a/ch06_hierarchy/untyped_child_port_behavioral_use_rejected.va the old side refused, the new side lowered
+verilog-a/ch06_hierarchy/unnamed_generate_reference_from_within.va codes: old {}, new E0901 (E0901: `u1.gain` names nothing in the elaborated design)
+verilog-a/ch06_hierarchy/untyped_child_port_behavioral_use_rejected.va codes: old E0337, new {}
 verilog-a/ch06_hierarchy/variable_name_stops_at_a_module_boundary_rejected.va codes: old E0314, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/vector_port_matching_net_width.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/vector_port_past_256_unknowns.va codes: old {}, new E0426,E0512 (E0512: an assignment to a name with no slot)
@@ -459,7 +459,7 @@ verilog-a/ch09_system_tasks/geometry_card_mfactor_outside_domain_is_fatal.va con
 verilog-a/ch09_system_tasks/geometry_defparam_alias.va tables row 0: old `param outer.leaf.placement_x real local = -1e0`, new `charge_sites 0`
 verilog-a/ch09_system_tasks/geometry_parameter_sweep.va contribution 0 resist: old -1.1992240966177543e0, new had no value (Unsupported)
 verilog-a/ch09_system_tasks/geometry_paramset.va tables row 1: old `param leaf.geometry_ps.placement_x real local = 2e0`, new `param leaf.seen_x real local = 2e0`
-verilog-a/ch09_system_tasks/geometry_state_read_rejected.va the old side refused, the new side lowered
+verilog-a/ch09_system_tasks/geometry_state_read_rejected.va codes: old E0363, new {}
 verilog-a/ch09_system_tasks/geometry_top_alias_host.va tables row 0: old `param placement_x real = 0e0`, new `charge_sites 0`
 verilog-a/ch09_system_tasks/hash_flag_without_alternative_form_rejected.va codes: old E0825, new {}
 verilog-a/ch09_system_tasks/input_position_restore_failure.va tables row 5: old `held sample`, new `limit_slots 0`
@@ -610,7 +610,7 @@ verilog-ams/ch03_data_types/discrete_domain_with_natures.va codes: old E0339, ne
 verilog-ams/ch03_data_types/ground_non_continuous.va codes: old E0344, new {}
 verilog-ams/ch03_data_types/mixed_port_with_connect_statement.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch03_data_types/nodeset_non_continuous.va codes: old E0366, new {}
-verilog-ams/ch03_data_types/wire_without_discipline_in_analog_rejected.va codes: old {}, new E0512 (E0512: an access of a name with no node)
+verilog-ams/ch03_data_types/wire_without_discipline_in_analog_rejected.va codes: old E0337, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch03_data_types/wreal_wire_port_merge.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch04_expressions/function_called_outside_analog_rejected.va codes: old E0430, new {}
 verilog-ams/ch04_expressions/operator_in_always_rejected.va codes: old E0422, new {}
@@ -656,8 +656,8 @@ verilog-ams/ch07_mixed_signal/both_contexts_assignment_rejected.va codes: old E0
 verilog-ams/ch07_mixed_signal/both_contexts_output_actual_rejected.va codes: old E0432, new {}
 verilog-ams/ch07_mixed_signal/both_halves_of_the_bridge_execute.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/changed_analog_assignment_fires.va tables row 5: old `held $assigned.smpl`, new `limit_slots 0`
-verilog-ams/ch07_mixed_signal/child_wrong_flow_rejected.va codes: old {}, new E0408 (E0408: )
-verilog-ams/ch07_mixed_signal/child_wrong_potential_rejected.va codes: old {}, new E0408 (E0408: )
+verilog-ams/ch07_mixed_signal/child_wrong_flow_rejected.va codes: old E0501, new E0408 (E0408: )
+verilog-ams/ch07_mixed_signal/child_wrong_potential_rejected.va codes: old E0501, new E0408 (E0408: )
 verilog-ams/ch07_mixed_signal/comparator_dac_feedback.va codes: old {}, new E0706 (E0706: )
 verilog-ams/ch07_mixed_signal/conflicting_discipline_declaration_rejected.va the old side refused, the new side lowered
 verilog-ams/ch07_mixed_signal/connect_insertion_generate_block_port.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
@@ -669,7 +669,7 @@ verilog-ams/ch07_mixed_signal/connect_insertion_upper_from_ooc_below.va codes: o
 verilog-ams/ch07_mixed_signal/connect_module_manually_inserted.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch07_mixed_signal/connect_plain_discipline_override.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/connect_rule_parameter_is_applied.va codes: old {}, new E0512 (E0512: an access of a name with no node)
-verilog-ams/ch07_mixed_signal/continuous_net_resolution_modes_agree.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
+verilog-ams/ch07_mixed_signal/continuous_net_resolution_modes_agree.va codes: old {}, new E0512,E0901 (E0901: `undec.potential.abstol` names nothing in the elaborated design)
 verilog-ams/ch07_mixed_signal/continuous_variable_read_from_digital.va tables row 6: old `held x`, new `held h`
 verilog-ams/ch07_mixed_signal/contribution_under_a_digital_event_rejected.va codes: old E0406, new E0704 (E0704: )
 verilog-ams/ch07_mixed_signal/cross_direction_in_digital_event_control_rejected.va codes: old E0517, new {}
@@ -697,7 +697,7 @@ verilog-ams/ch07_mixed_signal/event_bounds_absdelta_noninteger_enable_rejected.v
 verilog-ams/ch07_mixed_signal/event_bounds_cross_expr_tol_without_time_tol_rejected.va codes: old E0517, new {}
 verilog-ams/ch07_mixed_signal/explicit_d2a_per_delta_cycle.va codes: old {}, new E0706 (E0706: )
 verilog-ams/ch07_mixed_signal/explicit_d2a_reads_post_active.va codes: old {}, new E0704 (E0704: )
-verilog-ams/ch07_mixed_signal/figure_7_2_resolveto_two_levels.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
+verilog-ams/ch07_mixed_signal/figure_7_2_resolveto_two_levels.va codes: old {}, new E0512,E0901 (E0901: `NetA.potential.abstol` names nothing in the elaborated design)
 verilog-ams/ch07_mixed_signal/free_variable_in_digital_event_control_rejected.va codes: old E0484, new {}
 verilog-ams/ch07_mixed_signal/gate_connect_bridge_drives_gate_input.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/gate_generated_connect_name_defparam.va codes: old {}, new E0512 (E0512: an access of a name with no node)
@@ -706,7 +706,7 @@ verilog-ams/ch07_mixed_signal/guarded_d2a_holds.va codes: old {}, new E0704 (E07
 verilog-ams/ch07_mixed_signal/incompatible_disciplines_rejected.va the old side refused, the new side lowered
 verilog-ams/ch07_mixed_signal/inf_contribution.va codes: old E0424, new {}
 verilog-ams/ch07_mixed_signal/inserted_at_upper_connection_level.va codes: old {}, new E0512 (E0512: an access of a name with no node)
-verilog-ams/ch07_mixed_signal/local_discipline_accessors_across_hierarchy.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
+verilog-ams/ch07_mixed_signal/local_discipline_accessors_across_hierarchy.va codes: old {}, new E0501,E0512 (E0501: `V` is not an access function of `shared`)
 verilog-ams/ch07_mixed_signal/merged_generated_name_defparam.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/merged_groups_per_connect_module.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/merged_is_the_default_one_instance.va codes: old {}, new E0512 (E0512: an access of a name with no node)
@@ -726,7 +726,7 @@ verilog-ams/ch07_mixed_signal/prim_connect_noutput_gate.va codes: old {}, new E0
 verilog-ams/ch07_mixed_signal/prim_connect_pass_switch.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/prim_connect_pull.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/prim_connect_unnamed.va codes: old {}, new E0512 (E0512: an access of a name with no node)
-verilog-ams/ch07_mixed_signal/probe_of_a_discrete_net_in_digital_rejected.va the old side refused, the new side lowered
+verilog-ams/ch07_mixed_signal/probe_of_a_discrete_net_in_digital_rejected.va codes: old E0501, new {}
 verilog-ams/ch07_mixed_signal/receiver_count_reports_ordinary_receivers.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/receiver_default_bypass.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/receiver_reads_loaded_analog_state.va codes: old {}, new E0512 (E0512: an access of a name with no node)

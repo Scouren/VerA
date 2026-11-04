@@ -34,6 +34,7 @@ const sysfn = @import("sysfn.zig");
 const sub = @import("sub.zig");
 const hier = @import("hier.zig");
 const domain = @import("domain.zig");
+const ports = @import("ports.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -411,6 +412,14 @@ pub fn declName(l: *Lower, d: Inst.Index) Error!Name {
 /// net of its instance, or a §12.5 hierarchical `field`) is bound to from
 /// `Lower.frame`.
 pub fn leafName(l: *Lower, i: Inst.Index) Error!Name {
+    // VAMS §7.8.5.1 a bridged primitive terminal is its bridge's segment
+    // (its lane's, for an array whose lanes take one each).
+    if (l.segment_refs.count() != 0) {
+        const key: digital.SegmentRef = .{ .instance = @backingInt(l.frames.items[l.frame].instance), .inst = i };
+        // Outside a lane (a type query) any lane's: every segment is 1 bit.
+        const lane = if (l.lane_split.contains(key) and l.gate_lane != none) l.gate_lane else 0;
+        if (l.segment_refs.get(.{ .instance = key.instance, .inst = i, .lane = lane })) |b| return ports.segment(l, b, 1);
+    }
     const vir = l.virOf(l.frame);
     const data = vir.instructions.items(.data)[@backingInt(i)];
     if (Lower.tag(vir, i) == .decl_ref) return declName(l, data.decl_tok.decl);

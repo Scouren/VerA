@@ -205,7 +205,7 @@ fn astgenUnit(comp: *Compilation, unit: u32) Allocator.Error!?void {
     u.tree = try vams.Ast.parse(gpa, u.text, .{ .keywords = comp.config.language });
     u.vir = .{ .instructions = .empty, .extra = &.{}, .string_bytes = &.{}, .diag = .empty };
     if (u.tree.errors.len != 0) return null;
-    u.vir = try vams.AstGen.generate(gpa, &u.tree, .{ .directives = comp.pp.output().directives });
+    u.vir = try vams.AstGen.generate(gpa, &u.tree, .{ .directives = comp.pp.output().directives, .language = comp.config.language });
     u.builtins = builtinModules(comp, u);
 }
 

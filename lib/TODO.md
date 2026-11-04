@@ -1463,3 +1463,18 @@ src/
   the suite unedited. Switching the 1364 route to the specific codes means
   editing the suite (the user's repository) and deleting that table. That is
   the user's call.
+- **Morning item: versioned units bought nothing until now.** rw-codegen found that
+  `@setFloatMode(.optimized)` in a device's fast body reaches only the operators
+  written directly in it. Every float op goes through a kernel-family method, whose
+  body stays strict, so the fast body was bit-identical to the strict one.
+  Fix underway: the float mode becomes a comptime parameter of the family.
+  - The strict instantiation keeps the "no optional contraction" rule.
+  - A probe proves the optimized instantiation carries the fast flags.
+  - In-box ulp bounds are measured per root.
+  - A ReleaseFast benchmark decides whether versioning stays. If the gain is not
+    measurable, deleting versioned units (simpler code) is the user's call,
+    with the numbers.
+- **abs.va "zero Jacobian" was a false alarm:** a one-off filter script dropped the
+  "    d res" lines. The runner matches the old transcript. The scare led to a
+  bench-run test that checks a lane-derived Jacobian against sign(v); it goes red
+  on zeroed lanes. It also surfaced the fast-body finding above.

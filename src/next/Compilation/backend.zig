@@ -230,6 +230,7 @@ pub fn semaDigital(comp: *Compilation) !?Job {
     comp.lowered = sema.digital.lower(comp.arena(), &comp.zcu, .{ .sources = sources }, &why) catch |e| switch (e) {
         error.Unsupported => return notBuiltFmt(comp, "the digital lowering", why.text),
         error.Rejected => {
+            // A refusal before the run: a compile error, under the summary.
             try comp.wip.add(.lower, why.code, errors.relocate(out.*, why.at, why.at), "{s}", .{why.text});
             return null;
         },

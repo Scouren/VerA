@@ -28,6 +28,8 @@
 //! - `pub fn currentLine(pp: *const Pass, at: usize) u64`
 //! - `pub fn fail(pp: *Pass, span: Span, comptime code: []const u8, comptime fmt: []const u8, args: anytype) Error`
 //! - `pub fn failCode(pp: *Pass, span: Span, code: []const u8, why: []const u8) Error`
+//! - `pub fn failNoted(pp: *Pass, span: Span, comptime code: []const u8, comptime fmt: []const u8, args: anytype, notes: []const []const u8) Error`
+//! - `pub fn joinChain(pp: *Pass, stack: []const []const u8, last: []const u8) Allocator.Error![]const u8`
 //! - `pub fn warn(pp: *Pass, span: Span, comptime code: []const u8, comptime fmt: []const u8, args: anytype) Allocator.Error!void`
 //! - `pub fn addFile(pp: *Pass, name: []const u8, text: []const u8) Error!File.Index`
 //! - `pub fn resync(pp: *Pass, at: usize) Error!void`
@@ -302,6 +304,28 @@ pub fn failCode(pp: *Pass, span: Span, code: []const u8, why: []const u8) Error 
     assert(code[0] == 'E');
     try pp.report(span, code, "{s}", .{why});
     return error.PreprocessFailed;
+}
+
+/// `fail` with `notes` under the message; `notes` must outlive the pass
+/// (literals, or text on `pp.arena`).
+pub fn failNoted(pp: *Pass, span: Span, comptime code: []const u8, comptime fmt: []const u8, args: anytype, notes: []const []const u8) Error {
+    comptime assert(code[0] == 'E');
+    assert(notes.len > 0);
+    try pp.report(span, code, fmt, args);
+    pp.diags.items[pp.diags.items.len - 1].notes = notes;
+    return error.PreprocessFailed;
+}
+
+/// `stack` and `last` joined as `A -> B -> C` on `pp.arena`, for a note.
+pub fn joinChain(pp: *Pass, stack: []const []const u8, last: []const u8) Allocator.Error![]const u8 {
+    var out: std.ArrayList(u8) = .empty;
+    for (stack) |s| {
+        try out.appendSlice(pp.arena, s);
+        try out.appendSlice(pp.arena, " -> ");
+    }
+    try out.appendSlice(pp.arena, last);
+    assert(out.items.len >= last.len);
+    return out.items;
 }
 
 /// Appends warning `code` at `span` of the current file; the pass goes on.

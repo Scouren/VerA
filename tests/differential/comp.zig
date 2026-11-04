@@ -162,6 +162,11 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
     var t: struct { ruled: u32 = 0, agree: u32 = 0, not_built: u32 = 0, differ: u32 = 0, listed: u32 = 0, failed: u32 = 0 } = .{};
     var by_owner: std.StringArrayHashMapUnmanaged(u32) = .empty;
     for (fixtures, outcomes) |f, o| {
+        if (o == .ruled) {
+            t.ruled += 1;
+            try out.writer.print("RULED {s}: an old-side bug the tiebreaker settles ({s})\n", .{ f.rel, o.ruled });
+            continue;
+        }
         const line: ?[]const u8 = switch (o) {
             .pending => unreachable, // Every worker finished its fixtures.
             .agree => null,
@@ -170,11 +175,6 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
             .nondeterministic => |w| try std.fmt.allocPrint(arena, "rw-comp (determinism): -j1 and -jN differ: {s}", .{w}),
             .ruled => unreachable, // Counted above.
         };
-        if (o == .ruled) {
-            t.ruled += 1;
-            try out.writer.print("RULED {s}: an old-side bug the tiebreaker settles ({s})\n", .{ f.rel, o.ruled });
-            continue;
-        }
         switch (o) {
             .agree => t.agree += 1,
             .not_built => t.not_built += 1,

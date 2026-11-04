@@ -18,6 +18,7 @@
 //! - `pub fn probe(l: *Lower, i: Inst.Index) Error!u32`
 //! - `pub fn monitor(l: *Lower, i: Inst.Index) Error!?u32`
 //! - `pub const Bridge = struct`, `pub fn bridgeOf(l: *Lower, k: u32) Error!?Bridge`
+//! - `pub fn primitiveTerminals(l: *Lower, k: u32, f: u32) Error!void`
 //! - `pub fn segmented(l: *Lower, w_placed_frame: u32, k: u32) Error!std.AutoHashMapUnmanaged(Inst.Index, u32)`
 //! - `pub fn skipped(l: *Lower, f: u32, actual: Inst.Ref) Error!bool`
 
@@ -50,7 +51,9 @@ pub const Domain = struct {
 /// A VAMS §7.8 connect module instance's place: the instance whose mixed
 /// port it bridges, under the same parent, and that port's connection
 /// there (`Zcu.ports`, in the parent's Vir).
-pub const Bridge = struct { child: u32, actual: Inst.Ref };
+/// `prim`: on a primitive's terminal, the primitive's instance
+/// instruction in the parent (`child` then is the parent itself).
+pub const Bridge = struct { child: u32, actual: Inst.Ref, prim: ?Inst.Index = null };
 
 /// The domains of the variables of module `body` (`root`: the design's
 /// root instance's, the only one an analog value is written into).
@@ -166,11 +169,11 @@ pub fn monitor(l: *Lower, i: Inst.Index) Error!?u32 {
 pub fn bridgeOf(l: *Lower, k: u32) Error!?Bridge {
     const zcu = l.zcu;
     const parents = zcu.instances.items(.parent);
-    for (zcu.inserts.items(.bridge), zcu.inserts.items(.instance), zcu.inserts.items(.port)) |b, at, port| {
+    for (zcu.inserts.items(.bridge), zcu.inserts.items(.instance), zcu.inserts.items(.port), zcu.inserts.items(.terminal)) |b, at, port, term| {
         if (@backingInt(b) != k) continue;
         const child: u32 = @backingInt(at);
         // §7.8.5.1 a primitive's terminal: the row names the parent itself.
-        if (parents[child] != parents[k]) return l.refuse("a connect module on a primitive's terminal");
+        if (parents[child] != parents[k]) return .{ .child = child, .actual = terminalOf(l, child, port, term), .prim = port };
         return .{ .child = child, .actual = try actualOf(l, child, port) };
     }
     return null;
@@ -201,7 +204,72 @@ pub fn skipped(l: *Lower, f: u32, actual: Inst.Ref) Error!bool {
     return l.lookup(f, d) == null;
 }
 
+/// VAMS §7.8.5.1 the primitive terminals of instance `k`'s module (frame
+/// `f`) that a bridge re-points at its segment (`Lower.segment_refs`). An
+/// instance array's rows come one per lane, lowest index first (connect.zig
+/// `gateTerminals`' lane loop); when the lanes' bridges differ, each lane is
+/// keyed by its bit (§12.1.2: the leftmost index the most significant).
+pub fn primitiveTerminals(l: *Lower, k: u32, f: u32) Error!void {
+    const zcu = l.zcu;
+    const parents = zcu.instances.items(.parent);
+    const vir = zcu.fileVir(zcu.instances.items(.module)[k].file);
+    var rows: std.AutoArrayHashMapUnmanaged(digital.SegmentRef, std.ArrayList(u32)) = .empty;
+    for (zcu.inserts.items(.bridge), zcu.inserts.items(.instance), zcu.inserts.items(.port), zcu.inserts.items(.terminal)) |b, at, port, term| {
+        if (@backingInt(at) != k or parents[@backingInt(b)] != at) continue;
+        const gop = try rows.getOrPut(l.a, .{ .instance = k, .inst = terminalOf(l, k, port, term).toIndex().? });
+        if (!gop.found_existing) gop.value_ptr.* = .empty;
+        try gop.value_ptr.append(l.a, @backingInt(b));
+    }
+    for (rows.keys(), rows.values()) |key, bridges| {
+        const one = for (bridges.items[1..]) |b| {
+            if (b != bridges.items[0]) break false;
+        } else true;
+        if (one) {
+            try l.segment_refs.put(l.a, key, bridges.items[0]);
+            continue;
+        }
+        const g = gateOf(vir, key.inst) orelse return l.refuse("a bridged terminal of no primitive instance");
+        const range = Lower.payload(vir, Inst.Instance, g).range;
+        if (range.len == 0) return l.refuse("one primitive terminal taking several connect modules");
+        const r = try vars.rangeOf(l, f, range);
+        if (bridges.items.len != r.width) return l.refuse("a primitive array with connect modules on only some lanes");
+        const lo = @min(r.msb, r.lsb);
+        for (bridges.items, 0..) |b, n| {
+            const index = lo + @as(i64, @intCast(n));
+            const bit: u32 = r.width - 1 - @as(u32, @intCast(@abs(index - r.msb)));
+            try l.segment_refs.put(l.a, .{ .instance = k, .inst = key.inst, .lane = bit }, b);
+        }
+        try l.lane_split.put(l.a, key, {});
+    }
+}
+
 // ---- private ----
+
+/// Terminal `term` of primitive instance `g` in instance `k`'s module:
+/// its connection's value (connect.zig's `gateTerminals` numbering).
+fn terminalOf(l: *Lower, k: u32, g: Inst.Index, term: u32) Inst.Ref {
+    const zcu = l.zcu;
+    const vir = zcu.fileVir(zcu.instances.items(.module)[k].file);
+    const conns = vir.list(Inst.Arg, Lower.payload(vir, Inst.Instance, g).conns);
+    const value = vir.body(conns[term].value);
+    assert(value.len != 0); // connect.zig bridges only a connected terminal
+    return value[value.len - 1].toRef();
+}
+
+/// The primitive instance instruction among module body `vir`'s that holds
+/// terminal instruction `t` as a connection's value.
+fn gateOf(vir: *const Vir, t: Inst.Index) ?Inst.Index {
+    for (vir.decls()) |d| if (d.kind == .module) {
+        for (vir.body(Lower.payload(vir, Inst.Module, d.inst).body)) |g| {
+            if (Lower.tag(vir, g) != .instance) continue;
+            for (vir.list(Inst.Arg, Lower.payload(vir, Inst.Instance, g).conns)) |c| {
+                const v = vir.body(c.value);
+                if (v.len != 0 and v[v.len - 1] == t) return g;
+            }
+        }
+    };
+    return null;
+}
 
 /// Formal `port` of instance `child`'s module: its connection in the
 /// parent (`Zcu.ports`).

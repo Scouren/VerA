@@ -247,6 +247,10 @@ fn gate(l: *Lower, f: u32, kind: net.GateKind, t: []const Inst.Ref, lanes: u32, 
         if (w != 1 and w != lanes) return l.reject(f, x, "a gate's input terminal is one bit, or one per instance of an array");
     };
     for (outs) |o| {
+        // VAMS §7.8.5.1 an output lane by lane onto bridges of their own is
+        // not lowered: one net is driven for the whole array.
+        if (o.toIndex()) |oi| if (l.lane_split.contains(.{ .instance = @backingInt(l.frames.items[f].instance), .inst = oi }))
+            return l.refuse("a primitive array output whose lanes take connect modules of their own");
         const n = try nets.drivenNet(l, f, o, s);
         const width = l.nets.items[n].width;
         if (width != 1 and width != lanes) return l.refuse("a gate output terminal neither one bit nor one per instance of an array");

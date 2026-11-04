@@ -18,6 +18,7 @@
 //! - `pub fn declareNet(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Index, conn: ?Conn, deferred: *std.ArrayList(nets.Wire)) Error!void`
 //! - `pub fn outputVariable(l: *Lower, f: u32, n: Name, conn: Conn, deferred: *std.ArrayList(nets.Wire)) Error!void`
 //! - `pub fn implicitNets(l: *Lower, f: u32, insts: []const Inst.Index) Error!void`
+//! - `pub fn segment(l: *Lower, bridge: u32, width: u32) Error!Name`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -286,6 +287,22 @@ pub fn implicitNets(l: *Lower, f: u32, insts: []const Inst.Index) Error!void {
     };
 }
 
+/// VAMS §7.8 bridge `bridge`'s segment: the digital net between it and
+/// the port it bridges (lib/sim/digital's `<bridge>.<lower port>`), one per
+/// bridge, so `split` bridges on one signal each see only their own port.
+/// Made `width` bits wide by whichever side is declared first.
+pub fn segment(l: *Lower, bridge: u32, width: u32) Error!Name {
+    const gop = try l.segment_of.getOrPut(l.a, bridge);
+    if (gop.found_existing) {
+        if (gop.value_ptr.ty.width != width) return l.refuse("a connect module port and the port it bridges of different widths");
+        return gop.value_ptr.*;
+    }
+    const at = try nets.mintNet(l, .wire, width, false);
+    gop.value_ptr.* = .{ .kind = .net, .net = at, .slot = l.nets.items[at].slot, .ty = .{ .width = width, .signed = false }, .msb = width - 1, .scalar = width == 1 };
+    assert(l.nets.items[at].width == width);
+    return gop.value_ptr.*;
+}
+
 // ---- private ----
 
 /// The `default_nettype in force at frame `f`'s module.
@@ -360,22 +377,6 @@ fn netArray(l: *Lower, f: u32, first: Inst.Index, proto: Name, kind: net.NetKind
         try netOf(l, f, at, kind, dn);
     }
     _ = try l.bind(f, first, n);
-}
-
-/// VAMS §7.8 bridge `bridge`'s segment: the digital net between it and
-/// the port it bridges (lib/sim/digital's `<bridge>.<lower port>`), one per
-/// bridge, so `split` bridges on one signal each see only their own port.
-/// Made `width` bits wide by whichever side is declared first.
-fn segment(l: *Lower, bridge: u32, width: u32) Error!Name {
-    const gop = try l.segment_of.getOrPut(l.a, bridge);
-    if (gop.found_existing) {
-        if (gop.value_ptr.ty.width != width) return l.refuse("a connect module port and the port it bridges of different widths");
-        return gop.value_ptr.*;
-    }
-    const at = try nets.mintNet(l, .wire, width, false);
-    gop.value_ptr.* = .{ .kind = .net, .net = at, .slot = l.nets.items[at].slot, .ty = .{ .width = width, .signed = false }, .msb = width - 1, .scalar = width == 1 };
-    assert(l.nets.items[at].width == width);
-    return gop.value_ptr.*;
 }
 
 /// The whole net (not an array, not a select) `c.actual` names in its

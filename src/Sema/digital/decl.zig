@@ -188,9 +188,16 @@ fn instance(w: *Walk, k: u32) Error!void {
     // it; it sits beside the instance whose mixed port it bridges.
     const bridge = if (l.options.mixed and parent != .none and w.placed[k].scope == none) try domain_mod.bridgeOf(l, k) else null;
     if (bridge) |b| {
-        const by = w.placed[b.child];
-        if (by.scope == none) return l.refuse("a connect module beside an instance its parent's walk did not reach");
-        w.placed[k] = .{ .scope = by.scope, .frame = by.frame, .inst = by.inst, .name = zcu.intern_pool.stringToSlice(zcu.instances.items(.name)[k]), .at = by.at };
+        const name = zcu.intern_pool.stringToSlice(zcu.instances.items(.name)[k]);
+        if (b.prim) |g| {
+            // §7.8.5.1 on a primitive's terminal: in the scope that holds it.
+            const pf = l.instance_frame[b.child];
+            w.placed[k] = .{ .scope = l.frames.items[pf].scope, .frame = pf, .inst = g, .name = name, .at = l.srcOffset(pf, g) };
+        } else {
+            const by = w.placed[b.child];
+            if (by.scope == none) return l.refuse("a connect module beside an instance its parent's walk did not reach");
+            w.placed[k] = .{ .scope = by.scope, .frame = by.frame, .inst = by.inst, .name = name, .at = by.at };
+        }
     }
     const scope = if (parent == .none) root: {
         const s = try newScope(l, none, vir.string(row.name), null, time, 0, true);
@@ -203,6 +210,7 @@ fn instance(w: *Walk, k: u32) Error!void {
     };
     const f = try newFrame(l, none, @fromBackingInt(k), scope, &.{});
     l.instance_frame[k] = f;
+    if (l.options.mixed) try domain_mod.primitiveTerminals(l, k, f);
     l.sites[k] = if (parent == .none) .{ .frame = none, .inst = row.inst } else .{ .frame = w.placed[k].frame, .inst = w.placed[k].inst };
     w.index = k;
     w.conns.clearRetainingCapacity();
@@ -215,7 +223,8 @@ fn instance(w: *Walk, k: u32) Error!void {
     const formals = vir.body(m.ports);
     // VAMS §7.8 a connection through a bridge to a continuous net is that
     // bridge's segment: a bridged port's, and the bridge's own ports'.
-    const own_segment = if (bridge) |b| try domain_mod.skipped(l, w.placed[k].frame, b.actual) else false;
+    // A primitive terminal's upper net is always continuous (connect.zig).
+    const own_segment = if (bridge) |b| b.prim != null or try domain_mod.skipped(l, w.placed[k].frame, b.actual) else false;
     const segmented = if (l.options.mixed and parent != .none and bridge == null) try domain_mod.segmented(l, w.placed[k].frame, k) else std.AutoHashMapUnmanaged(Inst.Index, u32).empty;
     const grouped = ports.expressionPorts(vir, formals);
     for (formals, 0..) |formal, at| {

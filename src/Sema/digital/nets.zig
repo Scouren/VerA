@@ -265,6 +265,9 @@ pub fn compileDrivers(l: *Lower) Error!void {
             .pull => |bit| .{ .pull = bit },
             .gate => |g| blk: {
                 const rows = try l.a.alloc(u32, g.ins.len);
+                // VAMS §7.8.5.1 an array lane reads its own bridge's segment.
+                l.gate_lane = g.lane orelse 0;
+                defer l.gate_lane = none;
                 for (g.ins, rows) |x, *row| {
                     row.* = try expr.self_(l, x, 1);
                     try expr.reads(l, x, &sensitivity);

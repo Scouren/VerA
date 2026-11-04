@@ -12,7 +12,7 @@
 //! Cites: IEEE 1364-2005 §9.9, §11.4, §12.4, §12.5, §19.8.
 //!
 //! Contents:
-//! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Named = struct`, `pub const Why = struct`
+//! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Named = struct`, `pub const SegmentRef = struct`, `pub const Why = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
 //! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `reject`, `rejectFmt`, `rejectArg`, `rejectArgFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
@@ -70,6 +70,11 @@ pub const Lowered = struct {
 /// its path below the root as Sema's discrete card rows spell it (`n`,
 /// `u.clk`), its `Program.slots` row and type.
 pub const Named = struct { path: []const u8, slot: u32, ty: Program.Ty };
+
+/// VAMS §7.8.5.1 a bridged primitive terminal: its instance, its
+/// instruction and (in an instance array) its lane's bit; `lane` is 0 for a
+/// terminal one bridge serves.
+pub const SegmentRef = struct { instance: u32, inst: Inst.Index, lane: u32 = 0 };
 
 /// `Unsupported`: a construct the lowering does not express yet, named in
 /// `Lower.why`. `Rejected`: a design IEEE 1364-2005 makes an error, which
@@ -181,8 +186,16 @@ pub const Lower = struct {
     why_code: vams.Diag.Code = .E1100,
     /// VAMS §7.3.5 a mixed design's analog events (`Program.monitors`).
     monitors: std.ArrayList(Program.A2d) = .empty,
-    /// VAMS §7.8 each bridge's segment net, by its `Zcu.instances` row.
+    /// VAMS §7.8 each bridge's segment net, by its `Zcu.instances` row,
+    /// and the bridge each bridged primitive terminal (its instruction in
+    /// its instance's module) reads and drives instead of its net.
     segment_of: std.AutoHashMapUnmanaged(u32, Name) = .empty,
+    segment_refs: std.AutoHashMapUnmanaged(SegmentRef, u32) = .empty,
+    /// The bridged terminals whose array lanes take bridges of their own,
+    /// read only lane by lane (`gate_lane`), and the lane being compiled
+    /// (`none` outside a gate's inputs).
+    lane_split: std.AutoHashMapUnmanaged(SegmentRef, void) = .empty,
+    gate_lane: u32 = none,
     names: std.ArrayList(Name) = .empty,
     frames: std.ArrayList(Frame) = .empty,
     scopes: std.ArrayList(ScopeInfo) = .empty,

@@ -1,0 +1,4 @@
+# diff-comp's rulings: a fixture on which the old vera is wrong, settled by
+# the fixture's own verdict (its //! reject, its accept, or its .expected.txt
+# gold; tests/differential/comp.zig `tiebreak`). One line each: the fixture
+# path, then the //! lrm clause and why the old side is wrong. None yet.

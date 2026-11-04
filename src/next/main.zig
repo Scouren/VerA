@@ -6,8 +6,9 @@
 //! replaces `src/main.zig`.
 //!
 //! Exit status: 0 on success (warnings do not fail), 1 on a diagnosed
-//! error, 2 on a usage error, 3 when the input needs a backend `vera-next`
-//! does not have yet (named on stderr).
+//! error, 2 on a usage error, 126 (`Compilation.not_built_status`) when
+//! the input needs a backend `vera-next` does not have yet (named on
+//! stderr).
 //!
 //! Like Zig's `main.zig`, `main` owns the `Io`: an `Io.Threaded` whose
 //! workers get `Config.stack_size` stacks and whose limits are `-j`.
@@ -24,6 +25,7 @@ const Io = std.Io;
 const vams = @import("vams");
 const Compilation = @import("comp");
 const args = @import("cli/args.zig");
+const lsp = @import("lsp.zig");
 const Diag = vams.Diag;
 const Config = Compilation.Config;
 
@@ -57,8 +59,9 @@ fn drive(gpa: Allocator, io: Io, threaded: *Io.Threaded, init: std.process.Init.
     if (try args.parse(&cli, gpa, &argv, out, err)) |code| return code;
     if (try args.resolve(&cli, err)) |code| return code;
     if (cli.lsp) {
-        try err.writeAll("error: --lsp is not built in vera-next yet (the server over Compilation.update)\n");
-        return 3;
+        var stdin_buf: [1 << 16]u8 = undefined;
+        var stdin = Io.File.stdin().readerStreaming(io, &stdin_buf);
+        return lsp.serve(gpa, io, &cli, &stdin.interface, out, err);
     }
     assert(cli.paths.items.len != 0);
     const in_path = cli.paths.items[0];
@@ -77,7 +80,7 @@ fn drive(gpa: Allocator, io: Io, threaded: *Io.Threaded, init: std.process.Init.
     const arena = arena_state.allocator();
     if (try contractTree(io, arena, &cli, digital, err)) |code| return code;
     const threads: u32 = @intCast(@max(1, std.Thread.getCpuCount() catch 1));
-    const config = args.config(&cli, threads);
+    const config = args.config(&cli, cli.paths.items, threads);
     // Zig's `setThreadLimit`: `thread_limit` threads, the main one included.
     threaded.setAsyncLimit(.limited(config.thread_limit - 1));
     threaded.concurrent_limit = .limited(config.thread_limit - 1);
@@ -198,4 +201,6 @@ fn simTree(io: Io, arena: Allocator, dir: []const u8) ![]const u8 {
 
 test {
     _ = args;
+    _ = lsp;
+    _ = @import("lsp_diagnostics.zig");
 }

@@ -23,6 +23,10 @@ pub fn add(g: Graph, all: *Build.Step) void {
     const install = b.addInstallArtifact(next, .{});
     b.step("vera-next", "Build and install vera-next, the rewrite's driver (src/next/main.zig)").dependOn(&install.step);
     all.dependOn(&next.step);
+    // The driver's own tests: the flag tables, the LSP session.
+    const cli_tests = testRun(b, "vera-next", next.root_module, g.runner, g.results_dir);
+    b.step("test-vera-next", "Run vera-next's driver tests (src/next/main.zig, cli/, lsp)").dependOn(&cli_tests.step);
+    all.dependOn(&cli_tests.step);
 
     // diff-comp: both drivers over the corpus, as child processes.
     const o = b.addOptions();
@@ -41,6 +45,14 @@ pub fn add(g: Graph, all: *Build.Step) void {
     const step = b.step("diff-comp", "vera-next against vera on every fixture's harness command line: exit code, diagnostics, stdout, emitted files");
     step.dependOn(&r.step);
     all.dependOn(&r.step);
+
+    // §12: concurrent --check runs of one model in one directory.
+    const race_mod = g.m.make("tests/differential/comp_check.zig", &.{});
+    race_mod.addOptions("comp_options", o);
+    const race = testRun(b, "comp-check-race", race_mod, g.runner, g.results_dir);
+    race.has_side_effects = true; // Spawns vera-next, which spawns zig.
+    b.step("comp-check-race", "Eight concurrent `vera-next --emit-zig --check` runs of one model in one directory all succeed (lib/TODO.md §12)").dependOn(&race.step);
+    all.dependOn(&race.step);
 
     // conformance-next: the suite's harness with vera-next as the tool.
     const conform = b.addExecutable(.{ .name = "conform", .root_module = b.createModule(.{ .target = g.m.target, .optimize = .ReleaseSafe, .link_libc = true }) });

@@ -17,7 +17,7 @@
 //! - `pub fn parse(cli: *Options, gpa: Allocator, args: anytype, out: *Io.Writer, err: *Io.Writer) ParseError!?u8`
 //! - `pub fn resolve(cli: *Options, err: *Io.Writer) Io.Writer.Error!?u8`
 //! - `pub fn missing(w: *Io.Writer, flag: []const u8, what: []const u8) Io.Writer.Error!u8`
-//! - `pub fn config(cli: *const Options, thread_limit: u32) Config`
+//! - `pub fn config(cli: *const Options, paths: []const []const u8, thread_limit: u32) Config`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -308,17 +308,18 @@ pub fn missing(w: *Io.Writer, flag: []const u8, what: []const u8) Io.Writer.Erro
     return 2;
 }
 
-/// The resolved command line as one `Compilation.Config`; its slices
-/// borrow `cli`'s. `thread_limit` is used unless `--jobs=` was typed.
-/// Asserts that `resolve` returned null.
-pub fn config(cli: *const Options, thread_limit: u32) Config {
-    assert(cli.paths.items.len != 0);
+/// The resolved command line as one `Compilation.Config` over `paths`
+/// (`cli.paths` for the command line, the open document for the LSP); its
+/// slices borrow `cli`'s and `paths`. `thread_limit` is used unless
+/// `--jobs=` was typed. Asserts that `resolve` returned null.
+pub fn config(cli: *const Options, paths: []const []const u8, thread_limit: u32) Config {
+    assert(paths.len != 0);
     assert(thread_limit >= 1);
     const target: Config.Target = if (cli.elab) .elab else if (cli.emit_rtlil) .rtlil else if (cli.emit_verilog) .verilog else if (cli.exe_flag != null)
         (if (cli.run_exe) .run else .exe)
     else if (cli.emit_osdi) .osdi else if (cli.emit_so) .so else if (cli.emit_zig) .zig else if (cli.check) .check else .lint;
     return .{
-        .paths = cli.paths.items,
+        .paths = paths,
         .include_dirs = cli.include_dirs.items,
         .defines = cli.defines.items,
         .std_defs = cli.std_defs,
@@ -612,7 +613,7 @@ test "the old driver's command lines settle to their targets" {
         var discard: Io.Writer.Discarding = .init(&.{});
         try std.testing.expectEqual(@as(?u8, null), try parse(&cli, gpa, &it, &discard.writer, &discard.writer));
         try std.testing.expectEqual(@as(?u8, null), try resolve(&cli, &discard.writer));
-        const cfg = config(&cli, 4);
+        const cfg = config(&cli, cli.paths.items, 4);
         try std.testing.expectEqual(c.target, cfg.target);
         try std.testing.expectEqual(c.check, cfg.check);
         try std.testing.expectEqual(@as(u32, 4), cfg.thread_limit);

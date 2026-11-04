@@ -2,7 +2,7 @@
 //! `$table_model` data requests), the float verdict, the backend dispatch
 //! with one prong per backend of lib/TODO.md §5, the link through one
 //! `link.Queue` sized by `thread_limit`, and the digital lowering and run.
-//! A backend that is not merged yet reports "not built" (exit status 3,
+//! A backend that is not merged yet reports "not built" (exit status 126,
 //! `frontend.notBuilt`), so the fixtures that need it are named, never
 //! silently skipped. `--check` type-checks under a scratch directory of
 //! its own, removed afterwards (lib/TODO.md §12: concurrent checks of one
@@ -34,6 +34,7 @@ const link_mod = @import("link");
 const std_sim = @import("std_sim");
 const Compilation = @import("../Compilation.zig");
 const frontend = @import("frontend.zig");
+const errors = @import("errors.zig");
 const Job = Compilation.Job;
 
 /// Lowers the root and everything below it (docs/rewrite/lower.md),
@@ -223,8 +224,7 @@ pub fn runDigital(comp: *Compilation) !?Job {
     try comp.outputs.out.appendSlice(comp.arena(), out.written());
     const pp = comp.pp.output();
     for (s.checks, l.check_sites) |ch, site| if (ch.count != 0) {
-        const at = pp.resolve(site);
-        try comp.wip.add(.run, .W1199, .{ .file = @fromBackingInt(@backingInt(at.file)), .start = at.offset, .end = at.offset }, "a timing check reported a violation", .{});
+        try comp.wip.add(.run, .W1199, errors.relocate(pp, site, site), "a timing check reported a violation", .{});
     };
     result catch |e| switch (e) {
         error.SimFailed => try comp.wip.add(.run, .E1100, .none, "{s}", .{s.failure.?}),

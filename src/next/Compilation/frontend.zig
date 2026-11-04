@@ -69,22 +69,31 @@ pub fn readInputs(comp: *Compilation) !bool {
             return false;
         };
     }
+    // E.1.1: without `--spice`, a testbench's own `//! spice` cards are the
+    // netlist, read beside the source (the old spine's `harness.spice`).
+    if (c.spice_path == null and (c.target == .exe or c.target == .run) and !c.digital()) {
+        const cards = try spiceCards(comp.arena(), (try comp.read(c.paths[0])).bytes);
+        if (cards.len != 0) comp.netlist = .init(comp.gpa, c.paths[0], cards);
+    }
     return true;
 }
 
-/// Annex E.2: reads `--spice`'s netlist, answering its `.INCLUDE`/`.LIB`
-/// requests. A refusal stops the compilation (reported by `errors`).
+/// Annex E.2: reads the netlist (`--spice`'s file, or the `//! spice`
+/// cards), answering its `.INCLUDE`/`.LIB` requests. A refusal stops the
+/// compilation (reported by `errors`).
 pub fn spice(comp: *Compilation) !bool {
-    const path = comp.config.spice_path.?;
-    const text = switch (try comp.read(path)) {
-        .bytes => |b| b,
-        .failed => |e| {
-            try readFailed(comp, path, e);
-            comp.outputs.status = 2;
-            return false;
-        },
-    };
-    comp.netlist = .init(comp.gpa, path, text);
+    if (comp.netlist == null) {
+        const path = comp.config.spice_path.?;
+        const text = switch (try comp.read(path)) {
+            .bytes => |b| b,
+            .failed => |e| {
+                try readFailed(comp, path, e);
+                comp.outputs.status = 2;
+                return false;
+            },
+        };
+        comp.netlist = .init(comp.gpa, path, text);
+    }
     const n = &comp.netlist.?;
     var asked: u32 = 0;
     while (try n.run()) |req| : (asked += 1) {
@@ -168,13 +177,13 @@ pub fn semaTop(comp: *Compilation) !bool {
     return comp.zcu.instances.len != 0;
 }
 
-/// Writes the "not built" refusal for `b` and sets status 3: the fixture
+/// Writes the "not built" refusal for `b` and sets `not_built_status`: the fixture
 /// needs a backend `vera-next` does not have yet.
 pub fn notBuilt(comp: *Compilation, b: Compilation.Backend, what: []const u8) !void {
     assert(comp.outputs.not_built == null);
     try comp.outputs.err.print(comp.arena(), "error: {s}: {s} is not built in vera-next yet (backend `{t}`)\n", .{ comp.config.paths[0], what, b });
     comp.outputs.not_built = b;
-    comp.outputs.status = 3;
+    comp.outputs.status = Compilation.not_built_status;
 }
 
 // ---- private ----
@@ -203,6 +212,22 @@ fn builtinModules(comp: *const Compilation, u: *const Compilation.Unit) u32 {
         n += 1;
     }
     return n;
+}
+
+/// The `//! spice CARD` lines of `source`, each card verbatim (a leading
+/// `+` continuation kept), joined with `\n` in source order.
+fn spiceCards(arena: Allocator, source: []const u8) Allocator.Error![]const u8 {
+    var out: std.ArrayList(u8) = .empty;
+    var lines = std.mem.splitScalar(u8, source, '\n');
+    while (lines.next()) |raw| {
+        const line = std.mem.trim(u8, raw, " \t\r");
+        const rest = std.mem.trimStart(u8, std.mem.cutPrefix(u8, line, "//!") orelse continue, " \t");
+        const card = std.mem.cutPrefix(u8, rest, "spice") orelse continue;
+        if (card.len == 0 or (card[0] != ' ' and card[0] != '\t')) continue;
+        if (out.items.len != 0) try out.append(arena, '\n');
+        try out.appendSlice(arena, std.mem.trim(u8, card, " \t"));
+    }
+    return out.items;
 }
 
 fn severity(comp: *const Compilation, code: vams.Diag.Code) vams.Diag.Severity {

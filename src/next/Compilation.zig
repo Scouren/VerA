@@ -21,7 +21,7 @@
 //!
 //! Contents:
 //! - fields `gpa`, `io`, `arena_state`, `config`, `queue`, `next_job`, `reads`, `pp`, `netlist`, `units`, `zcu`, `analysis`, `float`, `device`, `lowered`, `wip`, `outputs`, `stopped`
-//! - `pub const Config`, `pub const Job`, `pub const Unit`, `pub const Read`, `pub const Outputs`, `pub const Backend`, `pub const jobs_max`
+//! - `pub const Config`, `pub const Job`, `pub const Unit`, `pub const Read`, `pub const Outputs`, `pub const Backend`, `pub const not_built_status`, `pub const jobs_max`
 //! - `pub fn create(gpa: Allocator, io: Io, config: Config) Allocator.Error!*Compilation`
 //! - `pub fn destroy(comp: *Compilation) void`
 //! - `pub fn update(comp: *Compilation) UpdateError!void`, `pub const UpdateError`
@@ -94,8 +94,14 @@ pub const Job = union(enum) {
 };
 
 /// Every backend `codegen`'s dispatch names. Only `zig` is merged; the
-/// others' prongs report "not built" (exit status 3).
+/// others' prongs report "not built" (`not_built_status`).
 pub const Backend = enum { zig, exe, verilog, osdi, rtlil, digital_device, digital_exe, libmap };
+
+/// The exit status of an input that needs a backend not built yet: above
+/// 125, which the conformance harness reads as "the tool could not run
+/// the command", so a `//! reject` fixture never passes on a missing
+/// backend (a status in 1..125 is a diagnosed refusal there).
+pub const not_built_status: u8 = 126;
 
 /// Most jobs one update queues: one per stage and one per unit, so a
 /// longer queue is a loop.
@@ -120,7 +126,8 @@ pub const Outputs = struct {
     /// Plain lines printed on stderr ahead of the diagnostics.
     err: std.ArrayList(u8) = .empty,
     /// The exit status when the diagnostics hold no error: 0, or 1/2 for a
-    /// refusal written on `err`, or 3 when `not_built` names a backend.
+    /// refusal written on `err`, or `not_built_status` when `not_built`
+    /// names a backend.
     status: u8 = 0,
     not_built: ?Backend = null,
 };
@@ -221,6 +228,7 @@ pub fn sources(comp: *Compilation) Allocator.Error![]const Diag.Source {
 /// every request of every stage goes through.
 pub fn read(comp: *Compilation, path: []const u8) Allocator.Error!Read {
     if (comp.reads.get(path)) |r| return r;
+    for (comp.config.overlays) |o| if (std.mem.eql(u8, o.path, path)) return .{ .bytes = o.bytes };
     const a = comp.arena();
     const r: Read = if (path.len == 0) .{ .failed = error.FileNotFound } else if (Io.Dir.cwd().readFileAlloc(comp.io, path, a, .limited(std.math.maxInt(u32)))) |b|
         .{ .bytes = b }
@@ -242,7 +250,7 @@ fn queueJob(comp: *Compilation, job: Job) Allocator.Error!void {
 fn runJob(comp: *Compilation, job: Job) UpdateError!void {
     assert(!comp.stopped);
     const next: ?Job = switch (job) {
-        .read_inputs => if (try frontend.readInputs(comp)) (if (comp.config.spice_path != null) .spice else .preprocess) else null,
+        .read_inputs => if (try frontend.readInputs(comp)) (if (comp.config.spice_path != null or comp.netlist != null) .spice else .preprocess) else null,
         .spice => if (try frontend.spice(comp)) .preprocess else null,
         .preprocess => if (try frontend.preprocess(comp)) .{ .astgen = 0 } else null,
         .astgen => unreachable, // `update` runs these in batches.

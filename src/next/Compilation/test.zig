@@ -120,14 +120,14 @@ test "an error stops the queue and is located in the file the user wrote" {
     try std.testing.expectEqualStrings("nope", src[m.loc.start..m.loc.end]);
 }
 
-test "a backend that is not built is named, with status 3" {
+test "a backend that is not built is named, with not_built_status" {
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
     var paths: std.heap.ArenaAllocator = .init(std.testing.allocator);
     defer paths.deinit();
     const comp = try compileText(paths.allocator(), &tmp, "res.va", resistor, .{ .target = .run });
     defer comp.destroy();
-    try std.testing.expectEqual(@as(u8, 3), comp.outputs.status);
+    try std.testing.expectEqual(Compilation.not_built_status, comp.outputs.status);
     try std.testing.expectEqual(Compilation.Backend.exe, comp.outputs.not_built.?);
     try std.testing.expect(std.mem.find(u8, comp.outputs.err.items, "not built") != null);
 }

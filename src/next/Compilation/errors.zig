@@ -11,6 +11,7 @@
 //! - `pub fn bundle(comp: *Compilation) Allocator.Error!Diag`
 //! - `pub fn sources(comp: *Compilation) Allocator.Error![]const Diag.Source`
 //! - `pub fn parseCode(tag: vams.Ast.Error.Tag) Diag.Code`
+//! - `pub fn relocate(out: vams.Preprocessor.Output, start: u32, end: u32) Diag.Loc`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -76,6 +77,17 @@ pub fn parseCode(tag: vams.Ast.Error.Tag) Diag.Code {
     };
 }
 
+/// A preprocessed-text range as a range of the original file its start
+/// came from; an end in another file collapses to the start.
+pub fn relocate(out: vams.Preprocessor.Output, start: u32, end: u32) Diag.Loc {
+    if (out.source_map.len == 0) return .none;
+    const s = out.resolve(@min(start, @as(u32, @intCast(out.text.len))));
+    const e = out.resolve(@min(@max(start, end), @as(u32, @intCast(out.text.len))));
+    const from = source(out, s.file, s.offset);
+    const to = if (e.file == s.file) source(out, e.file, e.offset) else from;
+    return .{ .file = @fromBackingInt(@backingInt(s.file)), .start = from, .end = @max(from, to) };
+}
+
 // ---- private ----
 
 /// The headline of a parse refusal: what was expected, and the token met.
@@ -113,34 +125,40 @@ fn move(out: ?vams.Preprocessor.Output, loc: Diag.Loc) Diag.Loc {
     return relocate(o, loc.start, loc.end);
 }
 
-/// A preprocessed-text range as a range of the original file its start
-/// came from; an end in another file collapses to the start.
-fn relocate(out: vams.Preprocessor.Output, start: u32, end: u32) Diag.Loc {
-    if (out.source_map.len == 0) return .none;
-    const s = out.resolve(@min(start, @as(u32, @intCast(out.text.len))));
-    const e = out.resolve(@min(@max(start, end), @as(u32, @intCast(out.text.len))));
-    const from = source(out, s.file, s.offset);
-    const to = if (e.file == s.file) source(out, e.file, e.offset) else from;
-    return .{ .file = @fromBackingInt(@backingInt(s.file)), .start = from, .end = @max(from, to) };
-}
-
 /// A stripped-text offset of `file` as an offset of its original bytes.
 fn source(out: vams.Preprocessor.Output, file: vams.Preprocessor.File.Index, offset: u32) u32 {
     return vams.Preprocessor.toSourceOffset(out.files[@backingInt(file)].marks, offset);
 }
 
-/// Where Vir instruction `src` of unit `u` was written: its main token.
+/// Where Vir instruction `src` of unit `u` was written, as the old
+/// compiler located it: a statement `<+` at its target's first byte (no
+/// width), a call at its callee's name, anything else at its main token.
 fn instLoc(out: vams.Preprocessor.Output, u: *const Compilation.Unit, src: Inst.Ref) Diag.Loc {
     const i = src.toIndex() orelse return .none;
-    const vir = &u.vir;
-    const data = vir.instructions.items(.data)[@backingInt(i)];
-    const tok: vams.Ast.TokenIndex = switch (Inst.dataKind(vir.instructions.items(.tag)[@backingInt(i)])) {
+    const tag = u.vir.instructions.items(.tag)[@backingInt(i)];
+    if (tag == .contrib or tag == .contrib_indirect) {
+        const at_payload = u.vir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index;
+        const lhs = if (tag == .contrib) u.vir.extraData(Inst.Bin, at_payload).lhs else u.vir.extraData(Inst.Triple, at_payload).a;
+        const t = instToken(u, lhs) orelse return .none;
+        const at = u.tree.tokenStart(t);
+        return relocate(out, at, at);
+    }
+    const t = instToken(u, src) orelse return .none;
+    const at = u.tree.tokenStart(t);
+    return relocate(out, at, at + @as(u32, @intCast(u.tree.tokenSlice(t).len)));
+}
+
+/// The token instruction `ref` names: its main token, or for a call (whose
+/// main token is its `(`) the callee's name; null for a literal.
+fn instToken(u: *const Compilation.Unit, ref: Inst.Ref) ?vams.Ast.TokenIndex {
+    const i = ref.toIndex() orelse return null;
+    const data = u.vir.instructions.items(.data)[@backingInt(i)];
+    const tok: vams.Ast.TokenIndex = switch (Inst.dataKind(u.vir.instructions.items(.tag)[@backingInt(i)])) {
         .pl_node => u.tree.nodeMainToken(data.pl_node.src_node),
         .un_node => u.tree.nodeMainToken(data.un_node.src_node),
         .decl_tok => data.decl_tok.src_tok,
         .str_tok => data.str_tok.src_tok,
-        .int, .float, .str => return .none,
+        .int, .float, .str => return null,
     };
-    const at = u.tree.tokenStart(tok);
-    return relocate(out, at, at + @as(u32, @intCast(u.tree.tokenSlice(tok).len)));
+    return if (tok > 0 and u.tree.tokenTag(tok) == .l_paren) tok - 1 else tok;
 }

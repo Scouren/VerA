@@ -11,7 +11,7 @@
 //!
 //! Contents:
 //! - fields, each with a default
-//! - `pub const Sim`, `pub const Display`, `pub const Override`, `pub const Target`
+//! - `pub const Sim`, `pub const Display`, `pub const Override`, `pub const Overlay`, `pub const Target`
 //! - `pub const stack_size: usize`
 //! - `pub fn digital(c: Config) bool`
 
@@ -71,6 +71,9 @@ jac_f32: bool = false,
 jac_f32_host: bool = false,
 /// `-j`/`--jobs=`: sizes every `Io.Group` and the `link.Queue`.
 thread_limit: u32 = 1,
+/// Files whose bytes are given instead of read (the LSP's open documents);
+/// borrowed.
+overlays: []const Overlay = &.{},
 
 /// `--sim=`: the language family.
 pub const Sim = enum { verilog_ams, verilog_a, verilog };
@@ -79,6 +82,9 @@ pub const Display = enum { record, drop, emit };
 /// One `--param NAME=VALUE`: its text (a string parameter's value) and the
 /// number, NaN when the text is not one.
 pub const Override = struct { name: []const u8, text: []const u8, value: f64 };
+
+/// One file's bytes as an editor holds them.
+pub const Overlay = struct { path: []const u8, bytes: []const u8 };
 
 /// The one artifact a compilation ends in. `lint` stops after the
 /// analysis; the rest name a backend (`Compilation/backend.zig`).

@@ -120,7 +120,7 @@ pub fn run(s: *Sema, roots: []const Zcu.Decl) Allocator.Error!defparams.Waiting 
         // Each pass adds a late value or changes one; the values a cycle of
         // defparams feeds itself stop changing or the passes run out.
         if (w.rerun and pass > late.count() + 1) for (w.origins.items) |o| if (o.used)
-            try s.fail(.E0907, o.file, o.src, "`{s}` keeps changing the value it reads (IEEE 1364-2005 §12.8.1)", .{o.text});
+            try s.failRule(.{ .part = .target }, .E0907, o.file, o.src, "`{s}` keeps changing the value it reads (IEEE 1364-2005 §12.8.1)", .{o.text});
         if (!w.rerun or pass > late.count() + 1) {
             // Every root is a module, so each made an instance.
             assert(zcu.instances.len >= roots.len);
@@ -216,13 +216,13 @@ pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const G
         const name = zcu.intern_pool.stringToSlice(g.name);
         const k = env.systemNamed(name) orelse continue;
         if (specified.get(k)) |before| if (!std.mem.eql(u8, before.spelling, name))
-            try s.fail(.E0908, file, src, "`{s}` and its alias are both given a value", .{@tagName(k)});
+            try s.fail(.E0908, file, src, "`${s}` is given more than one value", .{@tagName(k)});
         specified.set(k, .{ .value = g.value, .spelling = try s.arena.dupe(u8, name) });
     }
     for (dps) |dp| {
         const k = env.systemNamed(dp.name) orelse continue;
         if (specified.get(k)) |before| if (!std.mem.eql(u8, before.spelling, dp.name))
-            try s.fail(.E0908, dp.file, dp.src, "`{s}` and its alias are both given a value", .{@tagName(k)});
+            try s.failRule(.{ .part = .target }, .E0908, dp.file, dp.src, "`${s}` and its alias are both given a value", .{@tagName(k)});
         specified.set(k, .{ .value = dp.value, .spelling = dp.name });
     }
     var out: Zcu.Hier = undefined;

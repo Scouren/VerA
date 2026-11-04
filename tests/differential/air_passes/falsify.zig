@@ -1,8 +1,11 @@
 //! The Float falsification oracle of `diff-air-passes`: generated programs
-//! (`gen.zig`) analysed by `Float`, then run by `Air.interp` at points
-//! inside and outside their input box, every claim held against every value
-//! a run defines (the root file's header states the claims). Each planted
-//! bug rewrites `Float`'s answer before the runs.
+//! (`gen.zig`) analysed by `Float`, then run by `Air.interp` with the
+//! device's math (`interp.Math.device`: `std_kernels`, not the
+//! interpreter's own correctly rounded functions, which would share the
+//! assumption under test) at points inside and outside their input box,
+//! every claim held against every value a run defines (the root file's
+//! header states the claims). Each planted bug rewrites `Float`'s answer
+//! before the runs.
 //! Cites: VAMS-2023 §3.4.2, §4.3.1, §4.3.2, §4.4.
 //!
 //! Contents:
@@ -238,7 +241,7 @@ fn falsify(gpa: Allocator, ip: *const InternPool, p: *const gen.Program, claims:
             if (!g.admits(x)) break false;
         } else true;
         var w: Watch = .{ .air = p.air, .ip = ip, .claims = claims, .slice = slice, .last = last, .inside = inside, .inside_root = inside_root };
-        _ = interp.run(run_arena.allocator(), p.air, ip, .{ .args = &args, .probes = &probes, .loop_cap = loop_cap, .observe = .{ .ctx = &w, .seen = Watch.seen } }) catch |e| switch (e) {
+        _ = interp.run(run_arena.allocator(), p.air, ip, .{ .args = &args, .probes = &probes, .loop_cap = loop_cap, .observe = .{ .ctx = &w, .seen = Watch.seen }, .math = .device }) catch |e| switch (e) {
             error.NoValue, error.LoopCap => {},
             error.Unsupported, error.OutOfMemory => return e,
         };
@@ -305,14 +308,14 @@ fn plantWideBox(arena: Allocator, box: []const Float.Guard) ![]const Float.Guard
 }
 
 /// Every finite end of a real transfer's interval (a `+ - * /` or math
-/// result, not a leaf, a slot or a point) moved `lib_ulps + 1` doubles
-/// inward: an interval rounded inward where it must round outward.
+/// result, not a leaf, a slot or a point) moved `Interval.libUlps(tag) + 1`
+/// doubles inward: an interval rounded inward where it must round outward.
 fn plantInward(arena: Allocator, air: Air, iv: []const Interval) ![]const Interval {
     const out = try arena.dupe(Interval, iv);
     for (out, air.instructions.items(.tag)) |*x, tag| {
         const info = Air.tag_info.get(tag);
         if (info.int or info.operand != .real or !(x.lo < x.hi)) continue;
-        for (0..Interval.lib_ulps + 1) |_| {
+        for (0..Interval.libUlps(tag) + 1) |_| {
             if (math.isFinite(x.lo)) x.lo = math.nextAfter(f64, x.lo, math.inf(f64));
             if (math.isFinite(x.hi)) x.hi = math.nextAfter(f64, x.hi, -math.inf(f64));
         }

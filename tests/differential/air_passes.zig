@@ -22,6 +22,10 @@
 //!   contract (`+ - * /`, `%`, `hypot` on finite operands stay finite), an
 //!   interval one ulp short of its computed ends (rounded inward, not
 //!   outward), and a guard box wider than the one the proof assumed.
+//! - Interval's library transfers, by falsification against the device's
+//!   math (`air_passes/transfer.zig`) at the operand's ends, beside them
+//!   and inside. Planted: the interval the interpreter's own math gives at
+//!   the ends with no margin.
 //! - Legalize, by a metamorphic pair: each program and its `.pure` and
 //!   `.speculate` conversions give the same bits (any NaN equals any NaN)
 //!   or the same error at every sample. Planted: a conversion whose
@@ -49,6 +53,7 @@ const gen = @import("air_passes/gen.zig");
 const examples = @import("air_passes/examples.zig");
 const falsify = @import("air_passes/falsify.zig");
 const bound = @import("air_passes/bound.zig");
+const transfer = @import("air_passes/transfer.zig");
 const seed = falsify.seed;
 const loop_cap = falsify.loop_cap;
 const examples_max = falsify.examples_max;
@@ -306,6 +311,16 @@ test {
     _ = examples;
     _ = falsify;
     _ = bound;
+    _ = transfer;
+}
+
+test "Interval: every library transfer holds the device's values" {
+    const planted = transfer.sweep(.interp_ends);
+    std.debug.print("air_passes planted interp_ends: {d} device values outside\n", .{planted});
+    try std.testing.expect(planted != 0);
+    const outside = transfer.sweep(.none);
+    std.debug.print("air_passes transfer: {d} device values outside\n", .{outside});
+    try std.testing.expectEqual(@as(u64, 0), outside);
 }
 
 test "Float: each planted bug goes red" {

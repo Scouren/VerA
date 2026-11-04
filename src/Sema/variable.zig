@@ -80,7 +80,7 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
                 .str => if (ty == .string)
                     .{ .ref = .fromIntern(try decl.intern(s, k)), .ty = .string }
                 else
-                    .{ .ref = .fromIntern(try decl.intern(s, .{ .int = @import("kernels").fold.strToInt(k.str, 64) })), .ty = .integer },
+                    .{ .ref = .fromIntern(try decl.intern(s, .{ .int = @import("std_kernels").fold.strToInt(k.str, 64) })), .ty = .integer },
             } else try expr.lower(s, &eb, init[init.len - 1].toRef());
             const r = try expr.coerce(s, &eb, val, bind.slot.ty);
             _ = try s.addInst(&eb, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(bind.slot.alloc), .rhs = r } } });

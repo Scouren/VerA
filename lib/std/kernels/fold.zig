@@ -4,7 +4,9 @@
 //! (`frontend/constfold.zig`) and the MIR folder (`ir/opcode.zig`) call
 //! these, so a parameter default and a folded opcode answer alike, and each
 //! §4.3 function is the one a device computes (`math.zig`: Gompute's math,
-//! or the `std.math` call for asin, acos and hypot).
+//! which the rewrite's family takes its primitives from too,
+//! `RefOptions.math`; or the `std.math` call for asin, acos and hypot), and
+//! abs as `F.zAbs` (diff-kernels' fold-equals-device test).
 //! Cites: VAMS §2.7 (string operands), §3.2 (the 32-bit integer wrap),
 //! §3.3 (Table 3-3), §4.2.1.1, §4.2.1.3, §4.2.4-§4.2.12, §4.3 (Tables 4-14
 //! and 4-15), A.8.6; IEEE 1364-2005 §5.1.5 (Table 5-6), §5.1.12, §17.11.1
@@ -355,7 +357,9 @@ pub fn math(f: MathFn, args: []const Const) ?Const {
     } else true;
     return switch (f) {
         // Wrapping, like unary minus: |minInt(i64)| is not an i64.
-        .abs => if (int) Const{ .int = wrapFrom(args[0].int, if (args[0].int < 0) 0 -% args[0].int else args[0].int) } else Const{ .real = @abs(x) },
+        // §4.3.1 "abs(x) is equivalent to (x > 0) x : -x", as `F.zAbs`:
+        // abs(+0) is -0.
+        .abs => if (int) Const{ .int = wrapFrom(args[0].int, if (args[0].int < 0) 0 -% args[0].int else args[0].int) } else Const{ .real = if (x > 0) x else -x },
         // §4.3.1 "min(x,y) is equivalent to (x < y) ? x : y", bit for bit:
         // @min/@max drop a NaN and leave a zero's sign open, and run time
         // (`math.zMin`/`zMax`) uses the conditional form.

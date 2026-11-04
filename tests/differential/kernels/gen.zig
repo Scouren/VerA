@@ -18,6 +18,7 @@
 //! - `pub fn Of(comptime T: type) type`: a spec's default for a plain type
 //! - `pub fn cmp(rep: *Report, comptime name: []const u8, comptime old_f: anytype, comptime new_f: anytype, comptime pre: anytype, comptime Specs: anytype) void`
 //! - `pub fn cmpJudged(...)`: `cmp`, each difference judged by a reference
+//! - `pub fn bySign(want: f64, o: f64, n: f64) Judgement`, `pub fn lanesKept(o: anytype, n: @TypeOf(o)) bool`
 //! - `pub fn dist(a: anytype, b: anytype) u64`
 //! - `pub fn ulps(a: f64, b: f64) u64`
 
@@ -136,6 +137,26 @@ pub fn both(a: ?Judgement, b: ?Judgement) ?Judgement {
     if (!x.settles()) return x;
     if (!y.settles()) return y;
     return .{ .old_err = @max(x.old_err, y.old_err), .new_err = @max(x.new_err, y.new_err), .bound = @max(x.bound, y.bound) };
+}
+
+/// A value judged against the one it must be, bit for bit (a zero's sign
+/// counts, any NaN equals any NaN): 0 or 1 "ulp", bound 0.
+pub fn bySign(want: f64, o: f64, n: f64) Judgement {
+    const err = struct {
+        fn of(v: f64, w: f64) f64 {
+            return if (@as(u64, @bitCast(v)) == @as(u64, @bitCast(w)) or (std.math.isNan(v) and std.math.isNan(w))) 0 else 1;
+        }
+    }.of;
+    return .{ .old_err = err(o, want), .new_err = err(n, want), .bound = 0 };
+}
+
+/// Every lane of kernel scalar `n` (`.v.d`) equals `o`'s, where `o`'s is finite.
+pub fn lanesKept(o: anytype, n: @TypeOf(o)) bool {
+    const N = @typeInfo(@TypeOf(o.v.d)).vector.len;
+    const od: [N]f64 = o.v.d;
+    const nd: [N]f64 = n.v.d;
+    for (od, nd) |x, y| if (std.math.isFinite(x) and x != y) return false;
+    return true;
 }
 
 /// The default spec for a plain argument type.

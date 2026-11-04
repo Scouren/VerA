@@ -19,12 +19,13 @@ const sk = @import("std_kernels");
 const old = @import("old_text");
 const ok = @import("kernels");
 const math = @import("math.zig");
+const reference = @import("reference.zig");
 
 const cmp = g.cmp;
 const R = g.AnyReal;
 
 /// Two unknowns, both carried: every value has both lanes.
-pub const Ref = contract.RefFamily(f64, &[2]u8{ 0, 1 }, .{});
+pub const Ref = contract.RefFamily(f64, &[2]u8{ 0, 1 }, .{ .math = sk.math });
 /// The kernel scalar every generic kernel runs at.
 pub const K = Fam.zL(Ref, 3);
 
@@ -101,7 +102,7 @@ fn mathText(rep: *g.Report) void {
             }
         }.judge);
     cmp(rep, "math.zDevPow", old.zDevPow, sk.math.zDevPow, .{}, .{ R, g.Real(-30, 30) });
-    inline for (.{ "zMin", "zMax", "zHypot", "zAtan2" }) |f|
+    inline for (.{ "zMin", "zMax", "zHypot" }) |f|
         cmp(rep, "math." ++ f, @field(old, f), @field(sk.math, f), .{K}, .{ KSpec, KSpec });
     inline for (.{ "zTan", "zSqrtD", "zLnD", "zLn1pD", "zAsin", "zAcos", "zAsinh", "zAcosh", "zAtanh", "zFloor", "zCeil" }) |f|
         cmp(rep, "math." ++ f, @field(old, f), @field(sk.math, f), .{K}, .{KSpec});
@@ -114,7 +115,23 @@ fn mathText(rep: *g.Report) void {
                 return math.judgeAt("log10", args[0].v.v, 0, a.v.v, b.v.v);
             }
         }.judge);
-    cmp(rep, "math.zFmod", old.zFmod, sk.math.zFmod, .{K}, .{ KSpec, KNonZero });
+    // zAtan2 and zFmod lost their value to a NaN carrier (a subnormal
+    // hypot's overflowed slope; an infinite divisor): the value is judged by
+    // the f128 reference (fmod's is exact), every lane must equal the old
+    // one where the old was finite.
+    g.cmpJudged(rep, "math.zAtan2", old.zAtan2, sk.math.zAtan2, .{K}, .{ KSpec, KSpec }, struct {
+        fn judge(args: struct { K, K }, a: K, b: K) ?g.Judgement {
+            if (!g.lanesKept(a, b)) return null;
+            return math.judgeAt("atan2", args[0].v.v, args[1].v.v, a.v.v, b.v.v);
+        }
+    }.judge);
+    g.cmpJudged(rep, "math.zFmod", old.zFmod, sk.math.zFmod, .{K}, .{ KSpec, KNonZero }, struct {
+        fn judge(args: struct { K, K }, a: K, b: K) ?g.Judgement {
+            if (!g.lanesKept(a, b)) return null;
+            const q: f128 = @rem(args[0].v.v, args[1].v.v);
+            return .{ .old_err = reference.ulpErr(a.v.v, q), .new_err = reference.ulpErr(b.v.v, q), .bound = 0 };
+        }
+    }.judge);
     inline for (.{ true, false }) |ve| {
         const pw = struct {
             fn o(a: K, b: K) K {
@@ -124,11 +141,23 @@ fn mathText(rep: *g.Report) void {
                 return sk.math.zPow(K, a, b, ve);
             }
         };
-        cmp(rep, if (ve) "math.zPow.varying" else "math.zPow.fixed", pw.o, pw.n, .{}, .{ KSpec, KSpec });
+        // A grafted carrier no longer rounds a -0 value to +0 (`zCarry`):
+        // judged by the family's own pow value, bit for bit.
+        g.cmpJudged(rep, if (ve) "math.zPow.varying" else "math.zPow.fixed", pw.o, pw.n, .{}, .{ KSpec, KSpec }, struct {
+            fn judge(args: struct { K, K }, a: K, b: K) ?g.Judgement {
+                if (!g.lanesKept(a, b)) return null;
+                return g.bySign(args[0].v.pow(args[1].v.v).v, a.v.v, b.v.v);
+            }
+        }.judge);
     }
     cmp(rep, "math.zPowK", old.zPowK, sk.math.zPowK, .{K}, .{ KSpec, g.Real(-30, 30) });
     cmp(rep, "math.zLimitUf", old.zLimitUf, sk.math.zLimitUf, .{K}, .{ KSpec, KSpec });
-    cmp(rep, "math.zGraft", old.zGraft, sk.math.zGraft, .{K}, .{ KSpec, R, R, R });
+    g.cmpJudged(rep, "math.zGraft", old.zGraft, sk.math.zGraft, .{K}, .{ KSpec, R, R, R }, struct {
+        fn judge(args: struct { K, f64, f64, f64 }, a: K, b: K) ?g.Judgement {
+            if (!g.lanesKept(a, b)) return null;
+            return g.bySign(args[2], a.v.v, b.v.v);
+        }
+    }.judge);
     inline for (comptime std.enums.values(std.math.CompareOperator)) |op|
         cmp(rep, "math.zCmp." ++ @tagName(op), old.zCmp, sk.math.zCmp, .{ Ref, op }, .{ RefSpec, RefSpec });
     cmp(rep, "math.zRoundI", old.zRoundI, sk.math.zRoundI, .{Ref}, .{RefSpec});
@@ -180,7 +209,12 @@ fn familyText(rep: *g.Report) void {
                 return Fam.zPowL(Ref, 3, a, b, ve);
             }
         };
-        cmp(rep, if (ve) "family.zPowL.varying" else "family.zPowL.fixed", pw.o, pw.n, .{}, .{ RefSpec, RefSpec });
+        g.cmpJudged(rep, if (ve) "family.zPowL.varying" else "family.zPowL.fixed", pw.o, pw.n, .{}, .{ RefSpec, RefSpec }, struct {
+            fn judge(args: struct { RefV, RefV }, a: RefV, b: RefV) ?g.Judgement {
+                if (!g.lanesKept(.{ .v = a }, .{ .v = b })) return null;
+                return g.bySign(args[0].pow(args[1].v).v, a.v, b.v);
+            }
+        }.judge);
     }
     // `zL`'s methods: the same family value as each `zL`.
     inline for (.{ "neg", "exp", "log", "expm1", "log1p", "sqrt", "sin", "cos", "tanh", "sinh", "cosh", "atan", "abs" }) |m|

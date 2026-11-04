@@ -2586,26 +2586,17 @@ verilog-ams/ch12_vpi_routines/vpi_routines_not_va_functions.va rw-lower (analog 
 verilog-ams/digital/bare_event_trigger_in_analog_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = help: only `@(<event>) -> ev;` is legal`, new `   = help: run `vera --explain E0434` for a detailed explanation`
 verilog-ams/digital/digital_delay_primitive_notation.v rw-lower (analog lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `digital_delay_buffer` primitive`
 verilog-ams/digital/driver_count_in_an_ordinary_module_rejected.v not built: backend digital_device
-verilog-ams/digital/realtobits_bitstoreal_bridge.v not built: backend digital_device
 verilog-ams/digital/reject_wreal_connected_to_wand.v rw-comp (elab): exit status old 1, new 0
 verilog-ams/digital/scaled_delay_udp_rejected.v rw-lower (analog lowering): stderr: line 2: old `  --> verilog-ams/digital/scaled_delay_udp_rejected.v:18:25`, new `  --> verilog-ams/digital/scaled_delay_udp_rejected.v:18:29`
 verilog-ams/digital/std_1364_ams_keywords_reserved_by_default.v rw-comp (parse): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `error[E0219]: a null statement is not an analog statement: null_statement`
 verilog-ams/digital/std_1364_analog_block_rejected.v rw-comp (parse): stderr: line 1: old `error[E0242]: a Verilog-AMS construct under an IEEE 1364 language: `analog` under "1364-2005"`, new `error[E0207]: unexpected token: vams_construct_under_1364`
-verilog-ams/digital/vams_digital_abstime_math.v not built: backend digital_device
 verilog-ams/digital/vams_digital_temperature_refused.v not built: backend digital_device
-verilog-ams/digital/wreal_event_on_change.v not built: backend digital_device
-verilog-ams/digital/wreal_port_round_trip.v not built: backend digital_device
-verilog-ams/digital/wreal_single_driver_tracks.v not built: backend digital_device
-verilog-ams/digital/wreal_undriven_zero.v not built: backend digital_device
-verilog-ams/digital/wreal_wire_port_resolves_wreal.v not built: backend digital_device
-verilog/03_lexical_conventions/ams_lexical_escaped_hierarchy.v not built: backend digital_device
 verilog/03_lexical_conventions/attribute_positions.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_3_8_2_inv` primitive`
 verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/03_lexical_conventions/escaped_same_as_plain_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/03_lexical_conventions/escaped_system_task_rejected.v not built: backend digital_device
 verilog/03_lexical_conventions/forward_reference_reg_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/03_lexical_conventions/nested_attribute_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E0357]: illegal attribute value: the value contains an attribute instance`, new `error[E0207]: unexpected token: nested_attribute`
-verilog/04_data_types/array_17_dimensions.v not built: backend digital_device
 verilog/04_data_types/array_row_write_rejected.v not built: backend digital_device
 verilog/04_data_types/array_slice_write_rejected.v not built: backend digital_device
 verilog/04_data_types/continuous_assign_to_reg_rejected.v not built: backend digital_device
@@ -2628,7 +2619,6 @@ verilog/04_data_types/reject_charge_strength_on_wire.v rw-comp (parse): stderr: 
 verilog/04_data_types/scalared_without_range_rejected.v rw-comp (parse) message: stderr: line 1: old `error[E0207]: unexpected token: §4.3.2: scalared and vectored are only legal on a vector net, which declares a range`, new `error[E0207]: unexpected token: invalid_net_declaration`
 verilog/04_data_types/specparam_before_declaration_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/04_data_types/task_named_like_variable_rejected.v rw-comp (astgen): exit status old 1, new 0
-verilog/04_data_types/type_net_array.v not built: backend digital_device
 verilog/04_data_types/type_net_array_whole_assign_rejected.v not built: backend digital_device
 verilog/04_data_types/type_uwire_multiple_drivers_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/04_data_types/undeclared_procedural_target_rejected.v not built: backend digital_device
@@ -2636,14 +2626,12 @@ verilog/04_data_types/variable_range_bound_rejected.v not built: backend digital
 verilog/04_data_types/variable_redeclared_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/04_data_types/variable_redefined_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/04_data_types/whole_memory_write_rejected.v not built: backend digital_device
-verilog/05_expressions/concatenation.v not built: backend digital_device
 verilog/05_expressions/constant_time_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/05_expressions/expr_concat_unsized_rejected.v not built: backend digital_device
 verilog/05_expressions/expr_zero_replication_alone_rejected.v not built: backend digital_device
 verilog/05_expressions/native_select_variable_width_rejected.v not built: backend digital_device
 verilog/05_expressions/native_select_zero_width_rejected.v not built: backend digital_device
 verilog/05_expressions/native_wide_index_bound_limit.v not built: backend digital_device
-verilog/05_expressions/native_wide_index_edges.v not built: backend digital_device
 verilog/05_expressions/partial_address_rejected.v not built: backend digital_device
 verilog/05_expressions/real_bit_select_rejected.v not built: backend digital_device
 verilog/05_expressions/real_case_equality_rejected.v not built: backend digital_device
@@ -2656,12 +2644,10 @@ verilog/05_expressions/variable_part_select_rejected.v not built: backend digita
 verilog/06_assignments/array_declaration_assignment_rejected.v not built: backend digital_device
 verilog/06_assignments/assignment_highz_pair_rejected.v rw-comp (parse) message: stderr: line 1: old `error[E0207]: unexpected token: §6.1.4: both drive strengths cannot be high impedance`, new `error[E0207]: unexpected token: expected_strength`
 verilog/06_assignments/continuous_assign_to_integer_rejected.v not built: backend digital_device
-verilog/06_assignments/net_array_element_selects.v not built: backend digital_device
 verilog/06_assignments/net_declared_twice_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/06_assignments/procedural_assign_to_net_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/06_assignments/real_array_initializer_rejected.v not built: backend digital_device
 verilog/06_assignments/reject_delay4.v rw-comp (parse): stderr: line 1: old `error[E0210]: expected ')': found `,``, new `error[E0207]: unexpected token: found `,``
-verilog/06_assignments/select_bus.v not built: backend digital_device
 verilog/06_assignments/task_variable_initializer_rejected.v not built: backend digital_device
 verilog/07_gate_switch_level/and_gate_three_delays_rejected.v rw-comp (parse): stderr: line 1: old `error[E0210]: expected ')': found `,``, new `error[E0207]: unexpected token: found `,``
 verilog/07_gate_switch_level/buf_gate_three_delays_rejected.v rw-comp (parse): stderr: line 1: old `error[E0210]: expected ')': found `,``, new `error[E0207]: unexpected token: found `,``
@@ -2674,7 +2660,6 @@ verilog/07_gate_switch_level/mos_drive_strength_rejected.v rw-comp (parse): stde
 verilog/07_gate_switch_level/mos_switch_missing_control_rejected.v rw-comp (parse): stderr: line 1: old `error[E0209]: expected an expression: a mos switch (A.3.4 mos_switchtype) takes an output, an input and an enable terminal`, new `error[E0207]: unexpected token: invalid_gate_terminals`
 verilog/07_gate_switch_level/no_output_rejected.v rw-comp (parse): stderr: line 1: old `error[E0209]: expected an expression: a buf/not gate needs at least one output and one input`, new `error[E0207]: unexpected token: invalid_gate_terminals`
 verilog/07_gate_switch_level/non_charge_strength_rejected.v rw-comp (parse) message: stderr: line 1: old `error[E0207]: unexpected token: found strong, which is not a charge strength`, new `error[E0207]: unexpected token: expected_strength`
-verilog/07_gate_switch_level/pull_gate_bit_select.v not built: backend digital_device
 verilog/07_gate_switch_level/pull_gate_two_terminals_rejected.v rw-comp (parse) message: stderr: line 1: old `error[E0207]: unexpected token: found `,``, new `error[E0207]: unexpected token: invalid_gate_terminals`
 verilog/07_gate_switch_level/reject_same_polarity_drive_strength.v rw-comp (parse) message: stderr: line 1: old `error[E0207]: unexpected token: a drive strength pairs one 0-side with one 1-side strength`, new `error[E0207]: unexpected token: expected_strength`
 verilog/07_gate_switch_level/split_array_rejected.v rw-comp (astgen): exit status old 1, new 0
@@ -2729,8 +2714,6 @@ verilog/09_behavioral_modeling/assign_to_net_rejected.v not built: backend digit
 verilog/09_behavioral_modeling/assign_to_reg_select_rejected.v not built: backend digital_device
 verilog/09_behavioral_modeling/delay_sized_constant_rejected.v rw-comp (parse) message: stderr: line 1: old `error[E0207]: unexpected token: found 64'd2147483648`, new `error[E0207]: unexpected token: invalid_delay_value`
 verilog/09_behavioral_modeling/event_array_assign_rejected.v not built: backend digital_device
-verilog/09_behavioral_modeling/event_array_automatic.v not built: backend digital_device
-verilog/09_behavioral_modeling/event_array_native_automatic.v not built: backend digital_device
 verilog/09_behavioral_modeling/event_array_part_select_rejected.v not built: backend digital_device
 verilog/09_behavioral_modeling/event_array_posedge_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/09_behavioral_modeling/event_array_rank_rejected.v not built: backend digital_device
@@ -2739,7 +2722,6 @@ verilog/09_behavioral_modeling/event_array_value_rejected.v not built: backend d
 verilog/09_behavioral_modeling/event_holds_no_data_rejected.v not built: backend digital_device
 verilog/09_behavioral_modeling/event_used_before_declaration_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/09_behavioral_modeling/force_variable_bit_select_rejected.v not built: backend digital_device
-verilog/09_behavioral_modeling/force_wire_array_element.v not built: backend digital_device
 verilog/09_behavioral_modeling/forever_without_timing_rejected.v rw-comp (astgen) location: stderr: line 2: old `  --> verilog/09_behavioral_modeling/forever_without_timing_rejected.v:20:1`, new `  = note: LRM 8.5`
 verilog/09_behavioral_modeling/initial_without_statement_rejected.v rw-comp (parse): stderr: line 1: old `error[E0209]: expected an expression: found `;`: an initial construct takes a statement, not a null one`, new `error[E0219]: a null statement is not an analog statement: null_statement`
 verilog/09_behavioral_modeling/multiple_default_rejected.v rw-comp (astgen): exit status old 1, new 0
@@ -2747,7 +2729,6 @@ verilog/09_behavioral_modeling/native_wide_event_real_index_rejected.v not built
 verilog/09_behavioral_modeling/nonblocking_to_net_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/09_behavioral_modeling/procedural_assign_wire_array_element_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/09_behavioral_modeling/procedural_to_net_rejected.v rw-comp (astgen): exit status old 1, new 0
-verilog/09_behavioral_modeling/sched_implicit_event_exclusion.v not built: backend digital_device
 verilog/09_behavioral_modeling/undeclared_event_rejected.v not built: backend digital_device
 verilog/09_behavioral_modeling/unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 1: old `error[E0290]: a declaration in an unnamed block: found `reg``, new `error[E0207]: unexpected token: decl_in_unnamed_block`
 verilog/09_behavioral_modeling/unnamed_fork_declaration_rejected.v rw-comp (parse): stderr: line 1: old `error[E0290]: a declaration in an unnamed block: found `reg``, new `error[E0207]: unexpected token: decl_in_unnamed_block`
@@ -2759,8 +2740,6 @@ verilog/10_tasks_functions/automatic_nba_event_control_rejected.v rw-comp (astge
 verilog/10_tasks_functions/automatic_nonblocking_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/10_tasks_functions/automatic_procedural_assign_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/10_tasks_functions/automatic_task_item_hierarchical_rejected.v rw-comp (astgen): exit status old 1, new 0
-verilog/10_tasks_functions/constant_function_clogb2.v not built: backend digital_device
-verilog/10_tasks_functions/constant_function_generate_condition.v not built: backend digital_device
 verilog/10_tasks_functions/constant_function_hierarchical_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/10_tasks_functions/disable_function_rejected.v not built: backend digital_device
 verilog/10_tasks_functions/function_call_statement_rejected.v not built: backend digital_device
@@ -2802,11 +2781,7 @@ verilog/12_hierarchy/extra_ordered_value_ignored.v rw-comp (elab): exit status o
 verilog/12_hierarchy/function_port_range_scope_rejected.v not built: backend digital_device
 verilog/12_hierarchy/generate_loop_repeated_genvar_rejected.v not built: backend digital_device
 verilog/12_hierarchy/generate_nonterminating_rejected.v not built: backend digital_device
-verilog/12_hierarchy/generate_past_65536_iterations.v not built: backend digital_device
-verilog/12_hierarchy/generate_region_optional.v not built: backend digital_device
-verilog/12_hierarchy/hierarchy_explicit_port_concat.v not built: backend digital_device
 verilog/12_hierarchy/hierarchy_simple_name_stops_at_module_rejected.v not built: backend digital_device
-verilog/12_hierarchy/inout_net_expressions.v not built: backend digital_device
 verilog/12_hierarchy/input_declared_reg_rejected.v not built: backend digital_device
 verilog/12_hierarchy/instance_array_width_product_rejected.v rw-comp (astgen): exit status old 1, new 255
 verilog/12_hierarchy/instance_select_out_of_range_rejected.v not built: backend digital_device
@@ -2826,7 +2801,6 @@ verilog/12_hierarchy/nonansi_port_scalar_vs_vector_rejected.v rw-comp (astgen): 
 verilog/12_hierarchy/nonansi_port_time_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/12_hierarchy/nonansi_port_vector_vs_scalar_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/12_hierarchy/nonconstant_generate_scheme_rejected.v not built: backend digital_device
-verilog/12_hierarchy/null_port_combinations.v not built: backend digital_device
 verilog/12_hierarchy/null_port_extra_connection_rejected.v rw-comp (astgen): stderr: line 1: old `error[E1100]: digital source execution failed: more port connections than the module has ports`, new `error[E0906]: port connections do not match the module's ports: `null_leaf` declares 4 ports, and this instance connects 5`
 verilog/12_hierarchy/output_to_expression_rejected.v not built: backend digital_device
 verilog/12_hierarchy/output_to_variable_rejected.v not built: backend digital_device
@@ -2838,8 +2812,6 @@ verilog/12_hierarchy/port_connected_twice_rejected.v rw-comp (astgen): stderr: l
 verilog/12_hierarchy/port_range_mismatch_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/12_hierarchy/port_width_mismatch_vams_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/12_hierarchy/real_connected_to_port_rejected.v rw-comp (astgen): exit status old 1, new 0
-verilog/12_hierarchy/real_through_bits.v not built: backend digital_device
-verilog/12_hierarchy/select_and_concatenation_ports.v not built: backend digital_device
 verilog/12_hierarchy/select_warning.v rw-comp (elab): stderr: line 1: old `warning[W1160]: dissimilar net types joined through a port: §12.3.10: a `wand` port joined to a `wor` net is a Table 12-1 warn cell of the net type table`, new ``
 verilog/12_hierarchy/self_instantiation_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/12_hierarchy/standalone_generate_block_rejected.v rw-comp (parse) message: stderr: line 1: old `error[E0221]: a generate block is not a module item: found `begin``, new `error[E0221]: a generate block is not a module item: begin_at_module_scope`
@@ -2932,7 +2904,6 @@ verilog/17_system_tasks/clog2_arguments_rejected.v rw-comp (astgen): exit status
 verilog/17_system_tasks/clog2_real_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/17_system_tasks/closed_channel_not_written.v rw-dlower (run): stderr: line 1: old `warning[W1154]: file output not written: no file this descriptor names is open for writing: the output is not written`, new ``
 verilog/17_system_tasks/conversion_arguments_rejected.v rw-comp (astgen): exit status old 1, new 0
-verilog/17_system_tasks/conversions.v not built: backend digital_device
 verilog/17_system_tasks/descending_personality_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/17_system_tasks/display_missing_argument_rejected.v not built: backend digital_device
 verilog/17_system_tasks/dist_nonpositive_warning.v rw-dlower (run): stderr: line 1: old `warning[W1151]: probabilistic distribution argument not positive: a $dist_ mean, degree of freedom or k_stage is not positive: the result is 0 and the seed is u`, new ``
@@ -3022,7 +2993,6 @@ verilog/18_vcd/dumpvars_later_time_rejected.v rw-comp (astgen) location: stderr:
 verilog/18_vcd/dumpvars_memory_word_rejected.v not built: backend digital_device
 verilog/18_vcd/dumpvars_unknown_scope_rejected.v not built: backend digital_device
 verilog/18_vcd/part_select_rejected.v not built: backend digital_device
-verilog/19_compiler_directives/ams_keywords_are_identifiers.v not built: backend digital_device
 verilog/19_compiler_directives/begin_keywords_2005_under_2001_rejected.v rw-comp (parse) message: stderr: line 1: old `error[E0135]: unsupported keyword set: `1364-2005``, new `error[E0135]: unsupported keyword set: unknown_keyword_set`
 verilog/19_compiler_directives/default_nettype_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^`
 verilog/19_compiler_directives/macro_text_1800_forms_warn.v rw-comp (preprocess) location: stderr: line 2: old `  --> verilog/19_compiler_directives/macro_text_1800_forms_warn.v:11:34`, new `  --> verilog/19_compiler_directives/macro_text_1800_forms_warn.v:11:1`
@@ -3041,10 +3011,8 @@ verilog/A_formal_syntax/b_A_1_1_incdir.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_library_text.v not built: backend libmap
-verilog/A_formal_syntax/b_A_1_3_concat_port.v not built: backend digital_device
 verilog/A_formal_syntax/b_A_1_3_empty_parameter_header_rejected.v rw-comp (parse) message: stderr: line 1: old `error[E0246]: invalid module parameter list: an empty module parameter header has no parameter declaration`, new `error[E0246]: invalid module parameter list: invalid_parameter_list`
 verilog/A_formal_syntax/b_A_1_3_localparam_header_rejected.v rw-comp (parse) message: stderr: line 1: old `error[E0246]: invalid module parameter list: a module parameter header requires `parameter`, not `localparam``, new `error[E0246]: invalid module parameter list: invalid_parameter_list`
-verilog/A_formal_syntax/b_A_1_3_part_select_port.v not built: backend digital_device
 verilog/A_formal_syntax/b_A_1_3_port_mixed_forms_rejected.v rw-comp (parse) message: stderr: line 1: old `error[E0207]: unexpected token: found `input`: a port_declaration cannot follow a list_of_ports port (A.1.3)`, new `error[E0207]: unexpected token: invalid_port_declaration`
 verilog/A_formal_syntax/b_A_1_5_missing_design_rejected.v rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found `default`: a config_declaration begins with its `design` statement`, new `error[E0243]: a configuration rule IEEE 1364-2005 §13.3 forbids: invalid_config_rule`
 verilog/A_formal_syntax/b_A_2_1_2_input_reg_rejected.v rw-comp (parse) message: stderr: line 1: old `error[E0207]: unexpected token: found `reg`: A.2.1.2 gives a variable type to `output` only`, new `error[E0207]: unexpected token: invalid_port_declaration`

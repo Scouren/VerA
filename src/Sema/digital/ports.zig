@@ -5,10 +5,16 @@
 //! 1364-2005 clause 12: a port is a connection), else a net of its own fed
 //! from the parent's expression (an input) or bridged onto the parent's
 //! nets (an output). Also §4.5's implicit nets.
-//! Cites: IEEE 1364-2005 §4.5, §6.1.3, §12.3.3, §12.3.9.2, §19.2, §19.9.
+//! An expression-ported module's ports (§12.3.6) connect one external port
+//! at a time; an inout joined to anything but one whole net is a `tran`
+//! per bit (§7.6).
+//! Cites: IEEE 1364-2005 §4.5, §6.1.3, §7.6, §12.3.2, §12.3.3, §12.3.6,
+//! §12.3.9.2, §12.3.10, §19.2, §19.9.
 //!
 //! Contents:
-//! - `pub const Conn = struct`
+//! - `pub const Conn = struct`, `pub const Group = struct`
+//! - `pub fn expressionPorts(vir: *const Vir, formals: []const Inst.Index) bool`
+//! - `pub fn group(l: *Lower, f: u32, g: Group, deferred: *std.ArrayList(nets.Wire)) Error!void`
 //! - `pub fn declareNet(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Index, conn: ?Conn, deferred: *std.ArrayList(nets.Wire)) Error!void`
 //! - `pub fn outputVariable(l: *Lower, f: u32, n: Name, conn: Conn, deferred: *std.ArrayList(nets.Wire)) Error!void`
 //! - `pub fn implicitNets(l: *Lower, f: u32, insts: []const Inst.Index) Error!void`
@@ -35,6 +41,104 @@ const Inst = Vir.Inst;
 /// port is left open), and for an element of an instance array its lane
 /// (`lane[0]`, the lowest bits 0) of `lane[1]` (§12.1.2).
 pub const Conn = struct { actual: Inst.Ref, frame: u32, lane: ?[2]u32 = null };
+
+/// §12.3.6 one external port of an expression-ported module: its port
+/// expression (in the module's own frame) and its connection.
+pub const Group = struct { expr: Inst.Ref, conn: Conn };
+
+/// IEEE 1364-2005 §12.3.2: do `formals` use A.1.3's port expressions
+/// beyond one whole net per port (a select, a concatenation, a name more
+/// than one port references)? The module then connects one external port
+/// at a time (`group`).
+pub fn expressionPorts(vir: *const Vir, formals: []const Inst.Index) bool {
+    var seen: [64]Inst.Index = undefined;
+    var n: usize = 0;
+    for (formals) |formal| {
+        if (Lower.tag(vir, formal) != .port) continue;
+        const value = vir.body(Lower.payload(vir, Inst.Port, formal).value);
+        if (value.len == 0) continue; // A.1.3 a null port names no net
+        if (value.len > 1 or Lower.tag(vir, value[0]) != .decl_ref) return true;
+        const d = vir.instructions.items(.data)[@backingInt(value[0])].decl_tok.decl;
+        if (std.mem.indexOfScalar(Inst.Index, seen[0..n], d) != null) return true;
+        // ponytail: duplicates are sought among the first 64 ports only.
+        if (n < seen.len) {
+            seen[n] = d;
+            n += 1;
+        }
+    }
+    return false;
+}
+
+/// §12.3.2/§12.3.3 one external port `g` of frame `f`'s module, its
+/// connection split among its port references (leftmost the most
+/// significant): an input reference takes its bits of the connection
+/// through a net the connection drives, an output one drives its bits of
+/// the connected nets, and an inout one is joined to them bit by bit, as a
+/// `tran` joins two nets (§7.6).
+pub fn group(l: *Lower, f: u32, g: Group, deferred: *std.ArrayList(nets.Wire)) Error!void {
+    const c = g.conn;
+    if (c.actual == .none) return;
+    if (c.lane != null) return l.refuse("an instance array of a module with port expressions");
+    const saved = l.frame;
+    defer l.frame = saved;
+    l.frame = f;
+    const Ref = struct { slot: u32, net: u32, lo: u32, width: u32, at: u32, dir: Inst.Direction };
+    var leaves: std.ArrayList(Inst.Ref) = .empty;
+    try leavesOf(l, g.expr, &leaves);
+    const refs = try l.a.alloc(Ref, leaves.items.len);
+    var total: u32 = 0;
+    var k = leaves.items.len;
+    while (k != 0) {
+        k -= 1;
+        const x = leaves.items[k];
+        const dir = direction(l, f, x);
+        if (dir == .none) return l.refuse("§12.3.3 a port reference with no direction declaration");
+        const v = try expr.nameOf(l, x);
+        if (v != null and v.?.kind == .variable) {
+            refs[k] = .{ .slot = v.?.slot, .net = none, .lo = 0, .width = v.?.ty.width, .at = total, .dir = dir };
+        } else {
+            const s = try nets.sink(l, x);
+            refs[k] = .{ .slot = l.nets.items[s.net].slot, .net = s.net, .lo = s.lo, .width = s.width, .at = total, .dir = dir };
+        }
+        if (refs[k].net == none and dir != .output) return l.refuse("§12.3.3 an input or inout port declared as a variable");
+        total += refs[k].width;
+    }
+    // Inputs: the connection, as wide as the port, on a net of its own
+    // whose bits each input reference takes.
+    var fed: u32 = none;
+    for (refs) |ref| if (ref.dir == .input) {
+        if (fed == none) {
+            fed = try nets.mintNet(l, .wire, total, false);
+            try deferred.append(l.a, .{ .net = fed, .frame = c.frame, .source = .{ .expr = .{ .value = c.actual } } });
+        }
+        try deferred.append(l.a, .{ .net = ref.net, .frame = f, .source = .{ .bridge = .{ .src = l.nets.items[fed].slot, .src_lo = ref.at, .dst_lo = ref.lo, .width = ref.width } } });
+    };
+    for (refs) |ref| {
+        if (ref.dir != .input) break;
+    } else return;
+    // Outputs and inouts: the connected nets, bit ranges from the least
+    // significant (§12.3.9.2).
+    l.frame = c.frame;
+    leaves.clearRetainingCapacity();
+    try leavesOf(l, c.actual, &leaves);
+    var at: u32 = 0;
+    k = leaves.items.len;
+    while (k != 0) {
+        k -= 1;
+        const s = try nets.sink(l, leaves.items[k]);
+        for (refs) |ref| {
+            const from = @max(ref.at, at);
+            const to = @min(ref.at + ref.width, at + s.width);
+            if (from >= to) continue;
+            switch (ref.dir) {
+                .output => try deferred.append(l.a, .{ .net = s.net, .frame = f, .source = .{ .bridge = .{ .src = ref.slot, .src_lo = ref.lo + from - ref.at, .dst_lo = s.lo + from - at, .width = to - from } } }),
+                .inout => for (from..to) |b| try join(l, f, ref.net, ref.lo + @as(u32, @intCast(b)) - ref.at, s.net, s.lo + @as(u32, @intCast(b)) - at),
+                .input, .none => {},
+            }
+        }
+        at += s.width;
+    }
+}
 
 /// A net from its first declaration `first` and the later ones `decls`
 /// (`first` included) of frame `f`, joined to `conn` when it is a port.
@@ -84,7 +188,8 @@ pub fn declareNet(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Inde
     // expression as wide as the port times the elements.
     const slice: ?u32 = if (conn) |c| if (c.lane) |ln| if (c.actual != .none and try actualWidth(l, c) == width * ln[1]) ln[0] * width else null else null else null;
     if (slice == null) if (conn) |c| if (c.actual != .none) if (try wholeNet(l, c)) |outer| if (outer.ty.width == width) {
-        if (decl_net) |dn| if (dn.init.len != 0) return l.refuse("a port with a net declaration assignment");
+        // A port's net declaration assignment drives the merged net.
+        if (decl_net) |dn| if (dn.init.len != 0) try netOf(l, f, outer.net, nk, dn);
         // §12.3.10.1 the merged net takes the dominating type (a `tri0`
         // inside a `wire` stays a tri0 and reads 0 undriven).
         if (nets.internalDominates(nk, l.nets.items[outer.net].kind)) try nets.retype(l, outer.net, nk);
@@ -109,7 +214,7 @@ pub fn declareNet(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Inde
         .output => if (slice) |lo| {
             try sendLane(l, f, c, n.slot, width, lo, deferred);
         } else try send(l, f, c, n.slot, width, signed, deferred),
-        .inout => return l.refuse("an inout port joined to a select, a concatenation or a net of another width"),
+        .inout => if (slice != null) return l.refuse("an inout port of an instance array element") else try joinPort(l, n.net, width, c),
         .none => return l.refuse("a port with no direction"),
     }
 }
@@ -299,6 +404,65 @@ fn sendLane(l: *Lower, f: u32, c: Conn, src: u32, width: u32, lo: u32, deferred:
         if (start < end) try deferred.append(l.a, .{ .net = op.net, .frame = f, .source = .{ .bridge = .{ .src = src, .src_lo = start - lo, .dst_lo = op.lo + (start - pos), .width = end - start } } });
         pos += op.width;
     }
+}
+
+/// §12.3.10 an inout port (net `at`, `width` bits) joined to the nets its
+/// connection names, rightmost operand first: the bits both sides have,
+/// one `tran` each; the rest of either side connects nothing.
+fn joinPort(l: *Lower, at: u32, width: u32, c: Conn) Error!void {
+    const saved = l.frame;
+    defer l.frame = saved;
+    l.frame = c.frame;
+    var leaves: std.ArrayList(Inst.Ref) = .empty;
+    try leavesOf(l, c.actual, &leaves);
+    var lo: u32 = 0;
+    var k = leaves.items.len;
+    while (k != 0 and lo < width) {
+        k -= 1;
+        const op = try nets.sink(l, leaves.items[k]);
+        const n = @min(op.width, width - lo);
+        for (0..n) |j| try join(l, c.frame, at, lo + @as(u32, @intCast(j)), op.net, op.lo + @as(u32, @intCast(j)));
+        lo += n;
+    }
+    assert(lo <= width);
+}
+
+/// §7.6 bit `a_bit` of net `a` joined to bit `b_bit` of net `b`: an
+/// always-on `tran`.
+fn join(l: *Lower, f: u32, a: u32, a_bit: u32, b: u32, b_bit: u32) Error!void {
+    assert(a != none and b != none);
+    assert(a_bit < l.nets.items[a].width and b_bit < l.nets.items[b].width);
+    try l.trans.append(l.a, .{
+        .tran = .{ .a = a, .b = b, .a_bit = a_bit, .b_bit = b_bit, .ctrl = none, .on = .one, .resistive = false, .delay = .{}, .delay_rows = .{ none, none, none }, .state = .on },
+        .ctrl = .none,
+        .frame = f,
+        .delay = .{},
+    });
+}
+
+/// The direction declared for the declaration port reference `r` (a name
+/// or a select of one) names in frame `f`'s module, or `.none`.
+fn direction(l: *Lower, f: u32, r: Inst.Ref) Inst.Direction {
+    const vir = l.virOf(f);
+    var x = r.toIndex() orelse return .none;
+    var depth: u32 = 0;
+    while (Lower.tag(vir, x) != .decl_ref) : (depth += 1) {
+        assert(depth < vir.instructions.len);
+        const base = switch (Lower.tag(vir, x)) {
+            .elem => Lower.payload(vir, Inst.Bin, x).lhs,
+            .slice, .slice_up, .slice_down => Lower.payload(vir, Inst.Triple, x).a,
+            else => return .none, // else: no port reference
+        };
+        x = base.toIndex() orelse return .none;
+    }
+    const first = vir.instructions.items(.data)[@backingInt(x)].decl_tok.decl;
+    const d = l.zcu.instances.items(.module)[@backingInt(l.frames.items[f].instance)];
+    const m = Lower.payload(vir, Inst.Module, l.zcu.declRow(d).inst);
+    for (vir.body(m.body)) |i| if (Lower.tag(vir, i) == .io) {
+        const io = Lower.payload(vir, Inst.Io, i);
+        if (i == first or io.prev.toIndex() == first) return io.flags.dir;
+    };
+    return .none;
 }
 
 fn leavesOf(l: *Lower, r: Inst.Ref, out: *std.ArrayList(Inst.Ref)) Error!void {

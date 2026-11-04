@@ -408,7 +408,9 @@ pub fn sink(l: *Lower, r: Inst.Ref) Error!Sink {
         .elem, .slice, .slice_up, .slice_down => {
             const s = try place.selectOf(l, i);
             if (s.name.kind != .net) return l.refuse("a continuous assignment to a variable");
-            if (s.name.dims.len != 0) return l.refuse("a continuous assignment to a net array element");
+            // §4.9.1 a net array element is a net of its own.
+            const at = if (s.name.dims.len == 0) s.name.net else try elementNet(l, s);
+            if (s.whole_elem) return .{ .net = at, .lo = 0, .width = l.nets.items[at].width };
             const first: i64 = switch (s.mode) {
                 .const_part => s.first,
                 .bit, .up, .down => blk: {
@@ -419,9 +421,9 @@ pub fn sink(l: *Lower, r: Inst.Ref) Error!Sink {
                     break :blk if (s.mode == .bit) p else if (ascending == (s.mode == .up)) p else p -| (s.count - 1);
                 },
             };
-            const w = l.nets.items[s.name.net].width;
+            const w = l.nets.items[at].width;
             if (first < 0 or first + s.count > w) return l.refuse("§12.3.9.2 a select outside its net");
-            return .{ .net = s.name.net, .lo = @intCast(first), .width = s.count };
+            return .{ .net = at, .lo = @intCast(first), .width = s.count };
         },
         else => return l.refuse("a continuous assignment to an expression"),
     }
@@ -594,4 +596,23 @@ fn sendPort(l: *Lower, f: u32, operands: []const Sink, src: u32, width: u32, sig
         } } });
         lo += copy;
     }
+}
+
+/// The net row of net array element `s` (constant indices, row-major as
+/// `std_sim.eval.address` reads them: the last dimension innermost).
+fn elementNet(l: *Lower, s: place.Sel) Error!u32 {
+    const dims = s.name.dims;
+    assert(dims.len != 0 and s.indices.len >= dims.len);
+    var at: u64 = 0;
+    var stride: u64 = 1;
+    var k = dims.len;
+    while (k != 0) {
+        k -= 1;
+        const idx = try l.intOf(l.frame, s.indices[k]);
+        if (idx < dims[k].low or idx > dims[k].high) return l.refuse("§12.3.9.2 a net array index outside its array");
+        at += stride * @as(u64, @intCast(idx - dims[k].low));
+        stride *= @as(u64, @intCast(dims[k].high - dims[k].low + 1));
+    }
+    assert(at < s.name.count);
+    return s.name.net + @as(u32, @intCast(at));
 }

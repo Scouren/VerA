@@ -22,6 +22,7 @@ const InternPool = @import("intern_pool");
 const kernels = @import("kernels");
 const Zcu = @import("../../Zcu.zig");
 const eval = @import("../eval.zig");
+const walk = @import("../walk.zig");
 const digital = @import("../digital.zig");
 const nets = @import("nets.zig");
 const ports = @import("ports.zig");
@@ -54,6 +55,8 @@ const Walk = struct {
     conns: std.AutoHashMapUnmanaged(Inst.Index, ports.Conn) = .empty,
     /// Its ports' drivers, appended after its net declarations' own.
     deferred: std.ArrayList(nets.Wire) = .empty,
+    /// §12.3.6 an expression-ported module's ports, one external port each.
+    groups: std.ArrayList(ports.Group) = .empty,
 };
 
 /// Walks every instance in `Zcu.instances` order: its scope, its frame, its
@@ -186,24 +189,30 @@ fn instance(w: *Walk, k: u32) Error!void {
     l.sites[k] = if (parent == .none) .{ .frame = none, .inst = row.inst } else .{ .frame = w.placed[k].frame, .inst = w.placed[k].inst };
     w.index = k;
     w.conns.clearRetainingCapacity();
+    w.groups.clearRetainingCapacity();
     // §12.3 each port's connection, by the declaration it names inside; a
-    // root's ports are open.
+    // root's ports are open. A module with port expressions (§12.3.6)
+    // connects one external port at a time instead.
     const rows = zcu.instances.items(.ports)[k];
     const formals = vir.body(m.ports);
+    const grouped = ports.expressionPorts(vir, formals);
     for (formals, 0..) |formal, at| {
         const actual: Inst.Ref = if (rows.len == 0) .none else zcu.ports.items(.actual)[rows.start + at];
+        const conn: ports.Conn = .{ .actual = actual, .frame = if (actual == .none) none else w.placed[k].frame, .lane = w.placed[k].lane };
         const inner: Inst.Index = switch (Lower.tag(vir, formal)) {
             .io => formal,
             .port => blk: {
-                const port = Lower.payload(vir, Inst.Port, formal);
-                const value = vir.body(port.value);
+                const value = vir.body(Lower.payload(vir, Inst.Port, formal).value);
                 if (value.len == 0) continue;
-                if (value.len > 1 or Lower.tag(vir, value[0]) != .decl_ref) return l.refuse("a port expression (§12.3.6)");
+                if (grouped) {
+                    try w.groups.append(l.a, .{ .expr = value[value.len - 1].toRef(), .conn = conn });
+                    continue;
+                }
                 break :blk vir.instructions.items(.data)[@backingInt(value[0])].decl_tok.decl;
             },
             else => continue, // else: a header holds only ports and port declarations
         };
-        try w.conns.put(l.a, inner, .{ .actual = actual, .frame = if (actual == .none) none else w.placed[k].frame, .lane = w.placed[k].lane });
+        try w.conns.put(l.a, inner, conn);
     }
     // A.1.3 the header's `#( parameter ... )` list, before the body's items.
     for (vir.body(m.params)) |p| if (Lower.tag(vir, p) == .param) {
@@ -237,6 +246,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
     const top = l.frames.items[f].parent == none;
     w.deferred.clearRetainingCapacity();
     for (later.keys(), later.values()) |first, decls| try signal(w, f, first, decls.items, if (top) w.conns.get(first) else null);
+    if (top) for (w.groups.items) |g| try ports.group(l, f, g, &w.deferred);
     try l.wires.appendSlice(l.a, w.deferred.items);
     try ports.implicitNets(l, f, all);
     // A parameter's value may call a constant function (§10.4.5).
@@ -420,7 +430,9 @@ fn childInstance(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8
 
 fn place(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8, name: []const u8, index: ?i64, lane: ?[2]u32, at: u32) Error!void {
     const l = w.l;
-    const full = if (index) |k| try std.fmt.allocPrint(l.a, "{s}{s}[{d}]", .{ prefix, name, k }) else try std.fmt.allocPrint(l.a, "{s}{s}", .{ prefix, name });
+    // §2.7.1 an escaped name is one segment of `Zcu`'s paths.
+    const seg = try walk.segment(l.a, name);
+    const full = if (index) |k| try std.fmt.allocPrint(l.a, "{s}{s}[{d}]", .{ prefix, seg, k }) else try std.fmt.allocPrint(l.a, "{s}{s}", .{ prefix, seg });
     const key: Child = .{ .parent = w.index, .name = try l.zcu.intern_pool.getString(l.a, full) };
     const child = w.children.get(key) orelse return l.refuse("an instance the elaboration did not make");
     w.placed[child] = .{ .scope = scope, .frame = f, .inst = i, .index = index, .lane = lane, .at = at, .name = name };

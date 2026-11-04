@@ -74,13 +74,6 @@ verilog/09_behavioral_modeling/force_variable_bit_select_rejected.v lowering: §
 verilog/09_behavioral_modeling/multiple_default_rejected.v old run failed (E1100: a case statement cannot have multiple default items), new run completed
 verilog/09_behavioral_modeling/native_wide_event_real_index_rejected.v lowering: a real index
 verilog/09_behavioral_modeling/undeclared_event_rejected.v lowering: a hierarchical name
-verilog/10_tasks_functions/automatic_assign_rhs_rejected.v old run failed (E1100: §10.2.3: a procedural continuous assignment cannot name a variable of an automatic task or function), new run completed
-verilog/10_tasks_functions/automatic_force_rhs_rejected.v old run failed (E1100: §10.2.3: a procedural continuous assignment cannot name a variable of an automatic task or function), new run completed
-verilog/10_tasks_functions/automatic_monitor_rejected.v old run failed (E1100: §10.2.3: $monitor cannot name a variable of an automatic task or function), new run completed
-verilog/10_tasks_functions/automatic_nba_event_control_rejected.v old run failed (E1100: §10.2.3: a nonblocking assignment's event control cannot name a variable of an automatic task or function), new run completed
-verilog/10_tasks_functions/automatic_nonblocking_rejected.v old run failed (E1100: §10.2.3: a nonblocking assignment cannot name a variable of an automatic task or function), new run completed
-verilog/10_tasks_functions/automatic_procedural_assign_rejected.v old run failed (E1100: §10.2.3: a procedural continuous assignment cannot name a variable of an automatic task or function), new run completed
-verilog/10_tasks_functions/automatic_task_item_hierarchical_rejected.v old run failed (E1100: §10.2.1: `t` is automatic: its items cannot be accessed by hierarchical references), new run completed
 verilog/10_tasks_functions/constant_function_hierarchical_rejected.v old run failed (E1100: §10.4.5: a function called during elaboration is a constant function, and it contains a hierarchical reference), new run completed
 verilog/10_tasks_functions/disable_function_rejected.v lowering: §10.3 a disable of a function
 verilog/10_tasks_functions/function_call_statement_rejected.v lowering: §10.4 a function enabled as a task

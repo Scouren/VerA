@@ -8,6 +8,10 @@
 //! - `pub const Sel = struct`
 //! - `pub fn targetType(l: *Lower, r: Inst.Ref) Error!Type`
 //! - `pub fn place(l: *Lower, r: Inst.Ref) Error!u32`
+//! - `pub fn notAutomatic(l: *Lower, r: Inst.Ref, comptime what: []const u8) Error!void`
+//! - `pub fn readsNoAutomatic(l: *Lower, r: Inst.Ref, comptime what: []const u8) Error!void`
+//! - `pub fn indexReads(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void`
+//! - `pub fn bodyReads(l: *Lower, b: Vir.Body, out: *std.ArrayList(u32)) Error!void`
 //! - `pub fn terms(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void`
 //! - `pub fn selectOf(l: *Lower, i: Inst.Index) Error!Sel`
 //! - `pub fn elemRow(l: *Lower, s: Sel) Error!u32`
@@ -19,6 +23,7 @@ const vams = @import("vams");
 const std_sim = @import("std_sim");
 const digital = @import("../digital.zig");
 const expr = @import("expr.zig");
+const stmt = @import("stmt.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -97,6 +102,121 @@ pub fn place(l: *Lower, r: Inst.Ref) Error!u32 {
         },
         else => return l.refuse("an lvalue form"),
     }
+}
+
+/// §10.2.3 an automatic subroutine's variables "shall not be assigned
+/// values using nonblocking assignments or procedural continuous
+/// assignments" and "shall not be traced with system tasks such as
+/// $monitor": `r` (a target, or a traced argument) names none.
+pub fn notAutomatic(l: *Lower, r: Inst.Ref, comptime what: []const u8) Error!void {
+    const i = r.toIndex() orelse return;
+    const vir = l.virOf(l.frame);
+    const slot = switch (Lower.tag(vir, i)) {
+        .concat => {
+            for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |x| try notAutomatic(l, x, what);
+            return;
+        },
+        .decl_ref, .str_ref, .field => (try expr.leafName(l, i)).slot,
+        .elem, .slice, .slice_up, .slice_down => (try selectOf(l, i)).name.slot,
+        else => return, // else: an expression names no storage to outlive the activation
+    };
+    if (l.auto_slots.contains(slot)) return l.reject(l.frame, r, "§10.2.3: " ++ what ++ " cannot name a variable of an automatic task or function");
+}
+
+/// §10.2.3 `notAutomatic` for an expression read after the activation may
+/// have ended: no plain name in `r` is an automatic variable (§10.2.1 keeps
+/// a hierarchical name from reaching one).
+pub fn readsNoAutomatic(l: *Lower, r: Inst.Ref, comptime what: []const u8) Error!void {
+    const i = r.toIndex() orelse return;
+    const vir = l.virOf(l.frame);
+    const data = vir.instructions.items(.data)[@backingInt(i)];
+    switch (Lower.tag(vir, i)) {
+        .decl_ref => {
+            const n = try expr.leafName(l, i);
+            if (n.kind == .variable and l.auto_slots.contains(n.slot)) return l.reject(l.frame, r, "§10.2.3: " ++ what ++ " cannot name a variable of an automatic task or function");
+        },
+        .pos, .neg, .not, .bit_not, .red_and, .red_nand, .red_or, .red_nor, .red_xor, .red_xnor, .posedge, .negedge, .event_ctl => try readsNoAutomatic(l, data.un_node.operand, what),
+        .add, .sub, .mul, .div, .mod, .pow, .shl, .shr, .ashl, .ashr, .lt, .gt, .lte, .gte, .eq, .neq, .case_eq, .case_neq, .bit_and, .bit_or, .bit_xor, .bit_xnor, .bool_and, .bool_or, .elem, .replicate, .event_or, .repeat_ctl => {
+            const b = Lower.payload(vir, Inst.Bin, i);
+            try readsNoAutomatic(l, b.lhs, what);
+            try readsNoAutomatic(l, b.rhs, what);
+        },
+        .ternary, .mintypmax, .slice, .slice_up, .slice_down => {
+            const t = Lower.payload(vir, Inst.Triple, i);
+            try readsNoAutomatic(l, t.a, what);
+            try readsNoAutomatic(l, t.b, what);
+            try readsNoAutomatic(l, t.c, what);
+        },
+        .concat => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |x| try readsNoAutomatic(l, x, what),
+        .call_sys => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.SysCall, i).args)) |x| try readsNoAutomatic(l, x, what),
+        .call => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Call, i).args)) |x| try readsNoAutomatic(l, x, what),
+        else => {}, // else: a literal, a hierarchical name
+    }
+}
+
+/// The slots the index expressions of lvalue `r` read (not its targets).
+pub fn indexReads(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
+    const vir = l.virOf(l.frame);
+    const i = r.toIndex() orelse return;
+    switch (Lower.tag(vir, i)) {
+        .elem => {
+            const b = Lower.payload(vir, Inst.Bin, i);
+            try indexReads(l, b.lhs, out);
+            try expr.reads(l, b.rhs, out);
+        },
+        .slice, .slice_up, .slice_down => {
+            const t = Lower.payload(vir, Inst.Triple, i);
+            try indexReads(l, t.a, out);
+            try expr.reads(l, t.b, out);
+            try expr.reads(l, t.c, out);
+        },
+        .concat => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |x| try indexReads(l, x, out),
+        else => {}, // else: a name, whose slot is written, not read
+    }
+}
+
+/// Every slot the statements of body `b` read (§9.7.5's `@*`).
+pub fn bodyReads(l: *Lower, b: Vir.Body, out: *std.ArrayList(u32)) Error!void {
+    const vir = l.virOf(l.frame);
+    for (vir.body(b)) |i| switch (Lower.tag(vir, i)) {
+        .store, .store_nb => {
+            const s = Lower.payload(vir, Inst.Bin, i);
+            try expr.reads(l, s.rhs, out);
+            // §9.7.5 the target's index expressions are read too.
+            try indexReads(l, s.lhs, out);
+        },
+        .condbr => {
+            const c = Lower.payload(vir, Inst.CondBr, i);
+            try expr.reads(l, c.cond, out);
+            try bodyReads(l, c.then, out);
+            try bodyReads(l, c.@"else", out);
+        },
+        .block => try bodyReads(l, Lower.payload(vir, Inst.Block, i).body, out),
+        .case => {
+            const c = Lower.payload(vir, Inst.Case, i);
+            try expr.reads(l, c.operand, out);
+            for (vir.list(Inst.Arm, c.arms)) |arm| {
+                for (vir.list(Inst.Ref, arm.values)) |v| try expr.reads(l, v, out);
+                try bodyReads(l, arm.body, out);
+            }
+        },
+        .call_sys => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.SysCall, i).args)) |a| try expr.reads(l, a, out),
+        // A nested `@` suspends on its own terms; its statement's reads join.
+        .event_wait => try bodyReads(l, Lower.payload(vir, Inst.EventWait, i).body, out),
+        .loop => {
+            const lp = Lower.payload(vir, Inst.Loop, i);
+            const cond = vir.body(lp.cond);
+            if (cond.len != 0) try expr.reads(l, cond[cond.len - 1].toRef(), out);
+            try bodyReads(l, lp.body, out);
+            try bodyReads(l, lp.step, out);
+        },
+        .repeat => {
+            const r = Lower.payload(vir, Inst.Repeat, i);
+            try expr.reads(l, r.count, out);
+            try bodyReads(l, r.body, out);
+        },
+        else => if (stmt.isStatement(Lower.tag(vir, i))) return l.refuseFmt("the slots `@*` reads in `{t}`", .{Lower.tag(vir, i)}),
+    };
 }
 
 /// Appends the `Program.Term` rows (5 words each) of event expression `r`

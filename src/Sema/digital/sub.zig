@@ -179,8 +179,14 @@ pub fn compileBodies(l: *Lower) Error!void {
     }
 }
 
-/// Writes `Program.subs`, one row per subroutine in declaration order.
+/// Writes `Program.subs`, one row per subroutine in declaration order. A
+/// timed task never enabled is compiled out of line first, never run, so
+/// its body is checked as lib/sim/digital checks every body.
 pub fn finish(l: *Lower) Error!void {
+    for (l.subs.items, 0..) |r, k| if (!r.function and r.entry == none and r.body == none and r.ranges.items.len == 0) {
+        l.frame = r.outer;
+        try outOfLine(l, @intCast(k), 0);
+    };
     const out = try l.a.alloc(Program.Sub, l.subs.items.len);
     for (l.subs.items, out) |r, *s| {
         assert(r.ranges.items.len % 2 == 0);
@@ -291,6 +297,7 @@ fn storage(l: *Lower, outer: u32, scope: u32, i: Inst.Index) Error!Storage {
         try decl.preBlocks(l, f, s.body, 0);
     }
     const count: u32 = @as(u32, @intCast(l.b.p.slots.len)) - first;
+    if (s.flags.automatic) for (first..first + count) |k| try l.auto_slots.put(l.a, @intCast(k), {});
     for (all) |d| if (Lower.tag(vir, d) == .param) {
         _ = try vars.param(l, f, d);
     };

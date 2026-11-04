@@ -136,7 +136,10 @@ pub fn task(l: *Lower, i: Inst.Index) Error!void {
     const t: Program.Task = switch (kind) {
         .show => |sh| .{ .kind = .show, .a = try show(l, args, sh, at, false) },
         .strobe => |sh| .{ .kind = .strobe, .a = try show(l, args, sh, at, false) },
-        .monitor => |sh| .{ .kind = .monitor, .a = try monitor(l, args, sh, at, none) },
+        .monitor => |sh| blk: {
+            for (args) |a| try place.notAutomatic(l, a, "$monitor");
+            break :blk .{ .kind = .monitor, .a = try monitor(l, args, sh, at, none) };
+        },
         .fshow => |sh| .{ .kind = .fshow, .a = try fileShow(l, args, sh, at) },
         .fstrobe => |sh| .{ .kind = .fstrobe, .a = try fileShow(l, args, sh, at) },
         .fmonitor => |sh| blk: {

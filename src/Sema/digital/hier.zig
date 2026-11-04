@@ -29,7 +29,11 @@ const Inst = Vir.Inst;
 pub fn field(l: *Lower, i: Inst.Index) Error!Name {
     const vir = l.virOf(l.frame);
     const fd = Lower.payload(vir, Inst.Field, i);
-    const f = try frameOf(l, try scopeOf(l, fd.operand));
+    const s = try scopeOf(l, fd.operand);
+    const f = try frameOf(l, s);
+    // §10.2.1 "items declared within an automatic task or function ...
+    // cannot be accessed by hierarchical references".
+    if (l.frames.items[f].automatic) return l.rejectFmt(l.frame, fd.operand, "§10.2.1: `{s}` is automatic: its items cannot be accessed by hierarchical references", .{text(l, l.b.scopes.items[s].name)});
     const want = vir.string(fd.name);
     const cvir = l.virOf(f);
     var it = l.frames.items[f].names.iterator();

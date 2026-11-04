@@ -136,7 +136,7 @@ pub fn run(comptime A: type, a: *A, dig: *State, opts: Options) RunError(A)!void
     // solution at every digital event time, so the analog steps to each one
     // before the digital engine runs it (Figure 8-7's conservative half).
     const mons = analog.monitors(dig);
-    const sync = mons.len != 0 or dig.analog.has_probes;
+    const sync = mons.len != 0 or dig.analog.has_probes or dig.p.has_probes;
     if (sync) {
         dig.analog.probe = Coordinator(A).probeHook;
         dig.analog.probe_ctx = &s;

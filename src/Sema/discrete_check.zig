@@ -18,6 +18,7 @@
 //!
 //! Contents:
 //! - `pub fn check(s: *Sema, unit: *Unit) Allocator.Error!void`
+//! - private `Pass` (`item`, `decl.eachItem`'s visitor)
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -110,6 +111,41 @@ const Free = struct {
 
 const Set = std.AutoHashMapUnmanaged(Inst.Index, void);
 
+/// One of `check`'s three passes over the module's items (generate
+/// schemes unrolled by `decl.eachItem`): the analog blocks' free
+/// variables, then the digital processes, then the analog blocks against
+/// what those assign.
+const Pass = struct {
+    free: *Set,
+    vars: *const Set,
+    owned: *std.ArrayList(Inst.Index),
+    phase: enum { free, digital, analog },
+
+    pub fn item(p: Pass, s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
+        const vir = unit.vir;
+        const tag = vir.instructions.items(.tag)[@backingInt(i)];
+        const b = switch (tag) {
+            .analog, .analog_initial, .initial, .always => decl.payloadOf(vir, Inst.Process, i).body,
+            else => return, // else: no process
+        };
+        const analog = tag == .analog or tag == .analog_initial;
+        switch (p.phase) {
+            .free => if (analog) try walk(s, unit, b, Free{ .out = p.free }, 0),
+            .digital => if (!analog) {
+                try walk(s, unit, b, Digital{ .where = if (tag == .always) "an always block" else "an initial block", .free = p.free }, 0);
+                try discrete.writes(vir, b, p.owned, s.arena, 0);
+            },
+            .analog => if (analog) {
+                try walk(s, unit, b, Analog{ .vars = p.vars }, 0);
+                if (tag != .analog_initial) return;
+                var targets: Set = .empty;
+                try walk(s, unit, b, Targets{ .out = &targets }, 0);
+                try walk(s, unit, b, Initial{ .vars = p.vars, .targets = &targets }, 0);
+            },
+        }
+    }
+};
+
 /// The assignment targets of an analog block, by instruction.
 const Targets = struct {
     out: *Set,
@@ -172,37 +208,17 @@ const Analog = struct {
 /// Judges each `initial` and `always` body of `unit`'s module, then each
 /// analog block's writes against the variables those bodies assign.
 pub fn check(s: *Sema, unit: *Unit) Allocator.Error!void {
-    const vir = unit.vir;
+    var env = try decl.envOf(s, unit);
+    defer env.deinit();
+    const top = unit.module.body;
     var free: Set = .empty;
-    for (vir.body(unit.module.body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .analog, .analog_initial => try walk(s, unit, decl.payloadOf(vir, Inst.Process, i).body, Free{ .out = &free }, 0),
-        else => {}, // else: no analog block
-    };
+    try decl.eachItem(s, unit, &env, top, Pass{ .free = &free, .vars = undefined, .owned = undefined, .phase = .free }, 0);
     var owned: std.ArrayList(Inst.Index) = .empty;
-    // ponytail: a process inside a generate scope is not walked; walk the
-    // generate bodies when a fixture puts an analog construct there.
-    for (vir.body(unit.module.body)) |i| {
-        const tag = vir.instructions.items(.tag)[@backingInt(i)];
-        if (tag != .initial and tag != .always) continue;
-        const b = decl.payloadOf(vir, Inst.Process, i).body;
-        const d: Digital = .{ .where = if (tag == .always) "an always block" else "an initial block", .free = &free };
-        try walk(s, unit, b, d, 0);
-        try discrete.writes(vir, b, &owned, s.arena, 0);
-    }
+    try decl.eachItem(s, unit, &env, top, Pass{ .free = &free, .vars = undefined, .owned = &owned, .phase = .digital }, 0);
     var vars: Set = .empty;
-    for (owned.items) |d| if (vir.instructions.items(.tag)[@backingInt(d)] == .variable) try vars.put(s.arena, d, {});
+    for (owned.items) |d| if (unit.vir.instructions.items(.tag)[@backingInt(d)] == .variable) try vars.put(s.arena, d, {});
     if (vars.count() == 0) return;
-    for (vir.body(unit.module.body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .analog => try walk(s, unit, decl.payloadOf(vir, Inst.Process, i).body, Analog{ .vars = &vars }, 0),
-        .analog_initial => {
-            const b = decl.payloadOf(vir, Inst.Process, i).body;
-            try walk(s, unit, b, Analog{ .vars = &vars }, 0);
-            var targets: Set = .empty;
-            try walk(s, unit, b, Targets{ .out = &targets }, 0);
-            try walk(s, unit, b, Initial{ .vars = &vars, .targets = &targets }, 0);
-        },
-        else => {}, // else: no analog block
-    };
+    try decl.eachItem(s, unit, &env, top, Pass{ .free = &free, .vars = &vars, .owned = &owned, .phase = .analog }, 0);
 }
 
 // ---- private ----

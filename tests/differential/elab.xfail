@@ -1,10 +1,4 @@
 # diff-elab known differences: `<path under the fixture root> <reason>`, one per line.
-# A listed fixture that agrees, or is not compared, fails the run.
-verilog-a/ch06_hierarchy/generate_if_instantiates_one_arm.va §6.6.2 the old flatten inlines both arms of an if-generate under gates; the new walk evaluates the scheme and elaborates the selected arm only
-verilog-a/ch06_hierarchy/if_generate_values_drive_paramset_selection.va §6.6.2 the old flatten inlines both arms of an if-generate under gates; the new walk evaluates the scheme and elaborates the selected arm only
-verilog-a/ch06_hierarchy/paramset_defparam_hierarchy_legal.va §6.6.2 the old flatten inlines both arms of an if-generate under gates; the new walk evaluates the scheme and elaborates the selected arm only
-verilog-a/ch06_hierarchy/paramset_selected_after_generate.va §6.6.2 the old flatten inlines both arms of an if-generate under gates; the new walk evaluates the scheme and elaborates the selected arm only
-verilog-a/ch06_hierarchy/paramset_selected_by_generate_localparam.va §6.6.2 the old flatten inlines both arms of an if-generate under gates; the new walk evaluates the scheme and elaborates the selected arm only
-verilog-a/ch09_system_tasks/dist_type_string_misspelled_rejected.va E0816 a §9.13 distribution in a paramset statement is folded by the device rng (old paramset_dist), not by the comptime evaluator yet
-verilog-a/ch09_system_tasks/rng_paramset_fractional_rejected.va E0816 a §9.13 distribution in a paramset statement is folded by the device rng (old paramset_dist), not by the comptime evaluator yet
-verilog-a/ch09_system_tasks/rng_paramset_nonfinite_integer_rejected.va E0816 a §9.13 distribution in a paramset statement is folded by the device rng (old paramset_dist), not by the comptime evaluator yet
+# A listed fixture that agrees, or is not compared, fails the run. A later stage's codes
+# are compared one way (stages.zig), and a difference the LRM settles for the
+# new side is a line of elab.rulings, not of this file.

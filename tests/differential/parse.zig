@@ -6,8 +6,10 @@
 //! fixture it refuses is skipped and counted. Checks, in order: tokens (same
 //! starts, tags related by `expectedTag`), acceptance (the old parser reports
 //! an error iff `tree.errors` is not empty, or AstGen's per-file checks
-//! fail the tree's Vir), structure (per module: name and
-//! the counts `Shape` lists).
+//! fail the tree's Vir; an old error whose code a stage after AstGen owns,
+//! by `stages.ownerUnder` and the fixture's `//! lrm` clauses, is that
+//! stage's to raise and is set aside, named in the summary), structure (per
+//! module: name and the counts `Shape` lists).
 //! No LRM clause: this checks VerA's rewrite against VerA.
 //!
 //! Contents: tests only.
@@ -17,6 +19,7 @@ const vams = @import("vams");
 const frontend = @import("frontend");
 const diag = @import("diag");
 const options = @import("rewrite_options");
+const settle = @import("settle.zig");
 const OldTag = frontend.token.Tag;
 const NewTag = vams.Token.Tag;
 
@@ -143,6 +146,7 @@ fn runAll() !void {
         try xfail.put(arena, line[0..sp], line[sp + 1 ..]);
     }
 
+    var later: settle.Later = .{ .arena = arena };
     const fixtures = try collect(arena, io);
     var tally: Tally = .{};
     var seen: std.StringHashMapUnmanaged(void) = .empty;
@@ -152,7 +156,7 @@ fn runAll() !void {
     defer per.deinit();
     for (fixtures) |rel| {
         _ = per.reset(.retain_capacity);
-        const verdict = try checkFixture(per.allocator(), io, rel) orelse {
+        const verdict = try checkFixture(per.allocator(), io, rel, &later) orelse {
             tally.skipped += 1;
             continue;
         };
@@ -176,6 +180,7 @@ fn runAll() !void {
         tally.failed += 1;
         try out.writer.print("STALE {s}: parse.xfail names a fixture that was not compared\n", .{k.*});
     };
+    try later.print(&out.writer, "diff-parse");
     std.debug.print("{s}diff-parse: {d} fixtures compared, {d} agree, {d} listed in parse.xfail, {d} skipped (old preprocessor refused), {d} failures\n", .{ out.written(), tally.compared, tally.agreed, tally.xfailed, tally.skipped, tally.failed });
     if (tally.failed != 0) return error.DiffParseFailed;
 }
@@ -201,8 +206,9 @@ fn collect(arena: std.mem.Allocator, io: Io) ![]const []const u8 {
     return list.items;
 }
 
-/// Null when the old preprocessor refuses the fixture; else the verdict.
-fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8) !?Verdict {
+/// Null when the old preprocessor refuses the fixture; else the verdict. An
+/// old refusal by a later stage's codes alone counts them in `later`.
+fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, later: *settle.Later) !?Verdict {
     const path = try std.fs.path.join(arena, &.{ options.fixture_root, rel });
     const digital = std.mem.eql(u8, std.fs.path.extension(rel), ".v");
     const source = try Io.Dir.cwd().readFileAlloc(io, path, arena, .limited(1 << 26));
@@ -239,7 +245,14 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8) !?Verdict {
         // A per-file rule the old parser judged by names is AstGen's now
         // (docs/rewrite/astgen.md): the new frontend rejects when Vir's does.
         const vir = try vams.AstGen.generate(arena, &tree, .{});
-        return if (vir.diag.failed()) null else try firstOldError(arena, bag);
+        if (vir.diag.failed()) return @as(Verdict, null);
+        var errors: std.ArrayList([]const u8) = .empty;
+        for (0..bag.count()) |i| if (bag.at(i).severity == .err) try errors.append(arena, @tagName(bag.at(i).code));
+        const cited = try settle.clauses(arena, source);
+        const c = try settle.codesDiffer(arena, errors.items, &.{}, .{ .first = .parse, .last = .astgen }, cited);
+        if (c.why != null) return try firstOldError(arena, bag);
+        try later.add(c.later, cited);
+        return @as(Verdict, null);
     }
     if (old_file != null and tree.errors.len != 0) return try newErrorText(arena, &tree);
     const file = old_file orelse return @as(Verdict, null);
@@ -538,4 +551,9 @@ test "diff-parse: vams tokenizer and Ast.parse agree with lib/frontend on every 
     const t = try std.Thread.spawn(.{ .stack_size = 256 << 20 }, run, .{&result});
     t.join();
     try result;
+}
+
+test {
+    // The stage-ownership table's own tests.
+    _ = settle.stages;
 }

@@ -8,6 +8,7 @@
 //!
 //! Contents:
 //! - `pub fn run(rep: *g.Report) void`
+//! - `pub fn judgeAt(comptime name: []const u8, x: f64, y: f64, old_v: f64, new_v: f64) ?g.Judgement`
 //! - argument specs: each a struct with `pub const T` (the argument's type) and `pub fn gen`
 
 const std = @import("std");
@@ -23,11 +24,29 @@ const old = @import("old_text");
 const R = g.AnyReal;
 
 const Draw = union(enum) { int: i64, real: f64 };
+
+/// Gompute's documented accuracy (its `math.zig` header) for each function
+/// where it differs from gm; a function absent here is not settled.
+const bounds = std.StaticStringMap(f64).initComptime(.{
+    .{ "cosh", 0.998 },
+    .{ "sinh", 1.75 },
+    // "<= 2 ulp vs glibc (log10's slack is glibc's own)"
+    .{ "log10", 2.0 },
+});
+
 pub fn run(rep: *g.Report) void {
     scalar(rep);
     vector(rep);
     folds(rep);
     ac(rep);
+}
+
+/// The f128 reference's verdict on `name` at `x` (and `y`) between the old
+/// value and the new: null when the reference has no value there or the
+/// function has no documented bound.
+pub fn judgeAt(comptime name: []const u8, x: f64, y: f64, old_v: f64, new_v: f64) ?g.Judgement {
+    const q = reference.of(name, x, y) orelse return null;
+    return .{ .old_err = reference.ulpErr(old_v, q), .new_err = reference.ulpErr(new_v, q), .bound = bounds.get(name) orelse return null };
 }
 
 // ---- private ----
@@ -91,8 +110,7 @@ fn cmpRef(rep: *g.Report, comptime name: []const u8, comptime old_f: anytype, co
         rep.record(name, d, .{ x, y });
         if (d == 0) continue;
         // atan2's reference takes (y, x) in the call's order.
-        const q = reference.of(name, x, y) orelse continue;
-        rep.judge(name, reference.ulpErr(a, q), reference.ulpErr(b, q));
+        rep.judge(name, judgeAt(name, x, y, a, b));
     }
 }
 
@@ -119,7 +137,9 @@ fn folds(rep: *g.Report) void {
             }
             const a = OF.math(f, oa[0..f.arity()]);
             const b = NF.math(nf, na[0..f.arity()]);
-            rep.record("fold.math." ++ @tagName(f), g.dist(a, b), .{ oa[0], oa[1 % f.arity()] });
+            const d = g.dist(a, b);
+            rep.record("fold.math." ++ @tagName(f), d, .{ oa[0], oa[1 % f.arity()] });
+            if (d != 0) rep.judge("fold.math." ++ @tagName(f), foldJudge(f, oa[0], a, b));
         }
     }
     inline for (comptime std.enums.values(OF.UnaryOp)) |op| {
@@ -147,6 +167,32 @@ fn folds(rep: *g.Report) void {
     g.cmp(rep, "fold.wrap32", OF.wrap32, NF.wrap32, .{}, .{g.Of(i64)});
     g.cmp(rep, "fold.ipow32", OF.ipow32, NF.ipow32, .{}, .{ g.Int(i64, -1000, 1000), g.Int(i64, -40, 40) });
     g.cmp(rep, "fold.clog2", OF.clog2, NF.clog2, .{}, .{ g.Of(i64), g.Int(u32, 1, 200) });
+}
+
+/// A fold's difference judged as its function: VAMS `log` is base 10, and
+/// an integer operand is its real value; null for any other function or a
+/// non-real answer.
+fn foldJudge(comptime f: ok.fold.MathFn, arg: ok.fold.Const, a: ?ok.fold.Const, b: ?sk.fold.Const) ?g.Judgement {
+    const name = switch (f) {
+        .cosh => "cosh",
+        .sinh => "sinh",
+        .log => "log10",
+        else => return null,
+    };
+    const x: f64 = switch (arg) {
+        .int => |v| @floatFromInt(v),
+        .real => |v| v,
+        .str => return null,
+    };
+    const av = a orelse return null;
+    const bv = b orelse return null;
+    if (av != .real or bv != .real) return null;
+    return judgeAt(name, x, 0, av.real, bv.real);
+}
+
+/// Equal, or both NaN.
+fn same(x: f64, y: f64) bool {
+    return x == y or (std.math.isNan(x) and std.math.isNan(y));
 }
 
 /// A fold operand: one in four an integer (its specials first), else a real.
@@ -221,8 +267,23 @@ fn ac(rep: *g.Report) void {
             };
         }
     };
-    inline for (.{ "exp", "log", "expm1", "log1p", "sqrt", "sin", "cos", "tanh", "sinh", "cosh", "atan", "neg" }) |f|
+    inline for (.{ "exp", "log", "expm1", "log1p", "sqrt", "sin", "cos", "tanh", "atan", "neg" }) |f|
         g.cmp(rep, "ac.Ac." ++ f, S.U(f).old_, S.U(f).new_, .{}, .{S.Spec});
+    // sinh and cosh: the value is the function's, each lane the input lane
+    // times the other one (`map`); both judged by the reference, and each
+    // side's lanes held to its own factor bit for bit.
+    inline for (.{ .{ "sinh", "cosh" }, .{ "cosh", "sinh" } }) |fc| {
+        const J = struct {
+            fn judge(args: struct { NT }, o: OT, n: NT) ?g.Judgement {
+                const a = args[0];
+                const oc = @field(gm, fc[1])(a.v);
+                const nc = @field(sk.math, fc[1])(a.v);
+                for (a.d, o.d, n.d) |d, od, nd| if (!same(od, d * oc) or !same(nd, d * nc)) return null;
+                return g.both(judgeAt(fc[0], a.v, 0, o.v, n.v), if (oc == nc) g.Judgement{ .old_err = 0, .new_err = 0, .bound = 0 } else judgeAt(fc[1], a.v, 0, oc, nc));
+            }
+        };
+        g.cmpJudged(rep, "ac.Ac." ++ fc[0], S.U(fc[0]).old_, S.U(fc[0]).new_, .{}, .{S.Spec}, J.judge);
+    }
     inline for (.{ "add", "sub", "mul", "div", "lt", "le", "eq" }) |f|
         g.cmp(rep, "ac.Ac." ++ f, S.B(f).old_, S.B(f).new_, .{}, .{ S.Spec, S.Spec });
     inline for (.{ "pow", "scale", "addC" }) |f|

@@ -1435,3 +1435,19 @@ src/
   Order: rw-zero, rw-dlower, rw-codegen, rw-lower and rw-comp (`docs/rewrite/comp.md`)
   run now, at most 5 agents at once. The backends follow as slots free: exe,
   verilog, osdi, digital native, rtlil, VPI. Then the switch-over, then the audit.
+
+- **Morning items for the user (overnight 2026-11-03):**
+  - **diff-kernels criterion:** on every input, Gompute must be within its documented
+    bound, and its worst case must be no larger than gm's. gm is closer on 79 cosh
+    inputs, so a per-input rule would require a correctly rounded Gompute.
+  - **Conformance fixture `verilog/12_hierarchy/listed_port_undeclared_rejected.v`:**
+    it expects E1100, but the new pipeline raises E0376 (ruled by IEEE 1364 §12.3.3).
+    The fixture lives in the suite repository, so changing it is the user's call.
+  - **Air.interp:** exp, log10 and tan are now correctly rounded. diff-air found the
+    old fold farther from f128 on 24,804 tan inputs (max 1.98 ulp).
+  - **Follow-up (rw-zero):**
+    - Sema's fold moves to std_kernels, so a folded constant equals the device's
+      runtime value.
+    - Interval's library margin is derived from the device kernel's measured error,
+      not a flat 2 ulps.
+    - The float falsifier evaluates with std_kernels rather than interp.

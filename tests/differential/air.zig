@@ -5,9 +5,15 @@
 //! the integer limits, 0, ±1, and every pair of them for a binary tag) and
 //! over `random_per_opcode` seeded random operand sets, and each answer is
 //! compared with the fold's, bit for bit (any NaN equals any NaN; a fold
-//! that declines must meet `error.NoValue`). A difference passes only when
-//! a line of `air.xfail` names its opcode and kind, and a line whose kind
-//! never occurs fails the run (an unexpected pass). Then structured control
+//! that declines must meet `error.NoValue`). Two reals that differ on an
+//! opcode with a high-precision reference (`judged`: exp, pow, tan, log10)
+//! are settled by it, a three-way oracle: the f128 value of
+//! `kernels/reference.zig` (error ~2^-100) decides, and the difference
+//! passes only when the interpreter is within its documented bound of it
+//! and at least as close as the fold; each such case is the fold's error,
+//! counted and printed per opcode as an old-side bug. Any other difference
+//! passes only when a line of `air.xfail` names its opcode and kind, and a
+//! line whose kind never occurs fails the run (an unexpected pass). Then structured control
 //! against independent models: a loop summing 1..n against n(n+1)/2,
 //! nested `cond_br`s against a Zig `if` chain, and the metamorphic pair
 //! `select` / `block` + `cond_br`, which must agree bit for bit.
@@ -22,6 +28,7 @@ const Air = @import("air");
 const InternPool = @import("intern_pool");
 const opcode = @import("ir").Mir.opcode;
 const Const = @import("kernels").fold.Const;
+const reference = @import("kernels/reference.zig");
 const interp = Air.interp;
 const Inst = Air.Inst;
 const Value = interp.Value;
@@ -54,6 +61,35 @@ const Allowed = struct {
 
 const Outcome = union(enum) { agree, differ: struct { kind: Kind, ulps: u64 = 0 }, mismatch };
 
+/// An opcode whose real answers the f128 reference judges, and the
+/// interpreter's documented accuracy there, in ulps: each of the four is
+/// computed in f128 and rounded once (`src/Air/interp.zig`, `Air/tan.zig`),
+/// so half an ulp plus f128's error and the reference's (~2^-100
+/// relative), far inside the 0.001 added.
+const Judged = struct {
+    tag: Inst.Tag,
+    bound: f64,
+    /// Differences the reference settled: the interpreter strictly closer
+    /// (the fold's error), and equally close.
+    closer: u64 = 0,
+    ties: u64 = 0,
+    old_max: f64 = 0,
+    new_max: f64 = 0,
+    /// Differences it did not settle: the interpreter farther than the
+    /// fold or past its bound, or no reference value.
+    unsettled: u64 = 0,
+    unsettled_new_max: f64 = 0,
+    unsettled_old_max: f64 = 0,
+};
+
+/// The opcodes `judge` settles; `reference.of` knows each by its name.
+const judged_init = [_]Judged{
+    .{ .tag = .exp, .bound = 0.501 },
+    .{ .tag = .pow, .bound = 0.501 },
+    .{ .tag = .tan, .bound = 0.501 },
+    .{ .tag = .log10, .bound = 0.501 },
+};
+
 /// One opcode's Air body and what it was compared over.
 const Probe = struct {
     tag: Inst.Tag,
@@ -65,6 +101,7 @@ const Probe = struct {
 
 const Report = struct {
     allowed: []Allowed,
+    judged: [judged_init.len]Judged = judged_init,
     compared: u64 = 0,
     failures: u64 = 0,
 
@@ -77,6 +114,7 @@ const Report = struct {
             .mismatch => null,
             .differ => |d| d.kind,
         };
+        if (kind == .ulp) if (rep.judge(p.tag, args, want.?.real, (got catch unreachable).real)) return;
         if (kind) |k| for (rep.allowed) |*a| {
             if (a.tag != p.tag or a.kind != k) continue;
             if (k == .ulp and out.differ.ulps > a.ulps) break;
@@ -96,6 +134,38 @@ const Report = struct {
         if (want) |w| if (w == .real) std.debug.print(" (fold {e})", .{w.real});
         if (got) |g| if (g == .real) std.debug.print(" (interp {e})", .{g.real}) else {} else |_| {}
         std.debug.print("\n", .{});
+    }
+
+    /// Settles a real difference on a judged opcode by the f128 reference:
+    /// true when the interpreter's `new` is within its bound of it and at
+    /// least as close as the fold's `old`.
+    fn judge(rep: *Report, tag: Inst.Tag, args: []const Value, old: f64, new: f64) bool {
+        assert(@as(u64, @bitCast(old)) != @as(u64, @bitCast(new)));
+        const j = for (&rep.judged) |*j| {
+            if (j.tag == tag) break j;
+        } else return false;
+        const x = args[0].real;
+        const y = if (args.len > 1) args[1].real else 0;
+        const q = switch (tag) {
+            inline .exp, .pow, .tan, .log10 => |t| reference.of(@tagName(t), x, y),
+            else => unreachable, // else: `judged_init` names these four
+        } orelse {
+            j.unsettled += 1;
+            return false;
+        };
+        const oe = reference.ulpErr(old, q);
+        const ne = reference.ulpErr(new, q);
+        if (!(ne <= j.bound and ne <= oe)) {
+            j.unsettled += 1;
+            j.unsettled_new_max = @max(j.unsettled_new_max, ne);
+            j.unsettled_old_max = @max(j.unsettled_old_max, oe);
+            if (j.unsettled <= examples_max) std.debug.print("diff-air: {s} at {e} {e}: fold {e} ({d:.3} ulp from f128), interp {e} ({d:.3} ulp, bound {d})\n", .{ @tagName(tag), x, y, old, oe, new, ne, j.bound });
+            return false;
+        }
+        if (ne < oe) j.closer += 1 else j.ties += 1;
+        j.old_max = @max(j.old_max, oe);
+        j.new_max = @max(j.new_max, ne);
+        return true;
     }
 };
 
@@ -276,6 +346,8 @@ test "diff-air: every folding opcode, the interpreter against opcode.fold" {
             opcodes += 1;
         }
     }
+    for (rep.judged) |j| if (j.unsettled != 0) std.debug.print("diff-air: {s}: {d} differences the f128 reference does not settle for the interpreter (interpreter max {d:.3} ulp, fold max {d:.3} ulp there)\n", .{ @tagName(j.tag), j.unsettled, j.unsettled_new_max, j.unsettled_old_max });
+    for (rep.judged) |j| if (j.closer + j.ties != 0) std.debug.print("diff-air: old-side bug: {s}: {d} operand sets where the fold is farther from f128 than the interpreter ({d} equally far); fold max {d:.3} ulp, interpreter max {d:.3} ulp (bound {d})\n", .{ @tagName(j.tag), j.closer, j.ties, j.old_max, j.new_max, j.bound });
     std.debug.print("diff-air: {d} opcode sweeps, {d} operand sets compared, {d} failures\n", .{ opcodes, rep.compared, rep.failures });
     for (rep.allowed) |a| {
         std.debug.print("diff-air: xfail line {d} ({s} {s}): {d} operand sets, max {d} ulps\n", .{ a.line, @tagName(a.tag), @tagName(a.kind), a.seen, a.max_ulps });
@@ -396,4 +468,9 @@ test "control: select and block + cond_br agree bit for bit (metamorphic)" {
         const want = if (args[0].int != 0) args[1].real else args[2].real;
         try std.testing.expectEqual(@as(u64, @bitCast(want)), @as(u64, @bitCast(p.real)));
     }
+}
+
+test {
+    // The f128 reference's own cross-check.
+    _ = reference;
 }

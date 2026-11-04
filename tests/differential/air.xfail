@@ -5,12 +5,7 @@
 # apart), wide (both integer, an operand past 32 bits). A line whose kind
 # never occurs over the sweep fails the run.
 #
-# The ulp bounds are the sum of the two implementations' documented
-# accuracies, rounded up: the fold calls lib/contract/gm.zig (VerA's own
-# exp/log/pow, the sin/cos quotient for tan; VD-123), the interpreter
-# std.math and the Zig builtins. Measured at seed 0xA12F01D: exp 1, pow 1,
-# tan 2, log10 1.
-exp ulp 2 gm.exp (<= 0.52 ulp, fma-free) against @exp (< 1 ulp)
-pow ulp 2 gm.pow (<= 0.54 ulp) against interp's f128 exp(y ln|x|) rounded once (<= 0.5 ulp)
-tan ulp 3 gm.tan is sin(x)/cos(x) (<= 2 ulp, VD-123) against @tan (< 1 ulp)
-log10 ulp 3 a subnormal: interp scales it by 2^54 and subtracts 54 log10(2) (two roundings, <= 1.5 ulp) because @log10 is off there; gm.log10 <= 0.67 ulp
+# Not here: exp, pow, tan and log10 differ from the fold (VerA's gm) but the
+# f128 reference settles every such operand set for the interpreter, which
+# computes them in f128 and rounds once; diff-air prints each as an
+# old-side bug.

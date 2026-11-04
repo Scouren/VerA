@@ -32,6 +32,8 @@ const redecl = @import("redecl.zig");
 const gates = @import("gates.zig");
 const specify = @import("specify.zig");
 const vars = @import("vars.zig");
+const domain_mod = @import("domain.zig");
+const canonical = @import("../decl.zig").canonical;
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Name = digital.Name;
@@ -62,6 +64,8 @@ const Walk = struct {
     groups: std.ArrayList(ports.Group) = .empty,
     /// Its module's list of ports.
     list: Vir.Body = .empty,
+    /// A mixed design's module variables by domain (`domain.of`).
+    domain: domain_mod.Domain = .{},
 };
 
 /// Walks every instance in `Zcu.instances` order: its scope, its frame, its
@@ -251,6 +255,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
     }
     for (later.values()) |decls| try redecl.check(l, f, decls.items, .module, w.list);
     const top = l.frames.items[f].parent == none;
+    if (top and l.options.mixed) w.domain = try domain_mod.of(l.a, vir, body, w.index == 0);
     w.deferred.clearRetainingCapacity();
     for (later.keys(), later.values()) |first, decls| try signal(w, f, first, decls.items, if (top) w.conns.get(first) else null);
     if (top) for (w.groups.items) |g| try ports.group(l, f, g, &w.deferred);
@@ -268,7 +273,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
             try l.scopes.items[scope].procs.append(l.a, .{ .kind = if (Lower.tag(vir, i) == .initial) .initial else .always, .inst = i, .frame = f });
             try preBlocks(l, f, Lower.payload(vir, Inst.Process, i).body, 0);
         },
-        .variable => if (Lower.payload(vir, Inst.Variable, i).init.len != 0) {
+        .variable => if (Lower.payload(vir, Inst.Variable, i).init.len != 0 and !w.domain.analog.contains(canonical(vir, i)) and !w.domain.a2d.contains(canonical(vir, i))) {
             try l.scopes.items[scope].procs.append(l.a, .{ .kind = .init_var, .inst = i, .frame = f });
         },
         .io => if (Lower.payload(vir, Inst.Io, i).init.len != 0) {
@@ -283,7 +288,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
         .specify => try specify.block(l, f, i),
         .defparam => try l.defparam_frames.put(l.a, .{ .instance = @backingInt(l.frames.items[f].instance), .inst = i }, f),
         .genvar, .param, .event, .port, .net => {},
-        .analog, .analog_initial => return l.refuse("an analog block"),
+        .analog, .analog_initial => if (!l.options.mixed) return l.refuse("an analog block"),
         else => {}, // else: an expression of a range or a delay, read where it is used
     };
 }
@@ -447,12 +452,30 @@ fn place(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8, name: 
     w.placed[child] = .{ .scope = scope, .frame = f, .inst = i, .index = index, .lane = lane, .at = at, .name = name };
 }
 
+/// VAMS §7.2.1 whether a net or port's declarations `decls` make it the
+/// analog solver's: a ground net, or one of a continuous discipline.
+fn analogNet(l: *Lower, vir: *const Vir, decls: []const Inst.Index) Error!bool {
+    assert(l.options.mixed);
+    for (decls) |d| {
+        const kind: Inst.NetKind, const discipline: Vir.String = switch (Lower.tag(vir, d)) {
+            .io => .{ Lower.payload(vir, Inst.Io, d).flags.net, Lower.payload(vir, Inst.Io, d).discipline },
+            .net => .{ Lower.payload(vir, Inst.Net, d).flags.net, Lower.payload(vir, Inst.Net, d).discipline },
+            else => continue, // else: a variable has no net kind
+        };
+        if (kind == .ground) return true;
+        if (discipline != .empty and try l.zcu.continuousDiscipline(vir.string(discipline))) return true;
+    }
+    return false;
+}
+
 /// A variable, net or port, from its first declaration `first` and the
 /// later ones `decls` that complete it (`first` included); `conn` is a
 /// port's connection.
 fn signal(w: *Walk, f: u32, first: Inst.Index, decls: []const Inst.Index, conn: ?ports.Conn) Error!void {
     const l = w.l;
     const vir = l.virOf(f);
+    if (l.options.mixed and try analogNet(l, vir, decls)) return;
+    if (w.domain.analog.contains(first)) return; // VAMS §7.2.2 the analog block's
     var storage: Inst.Storage = .none;
     var dir: Inst.Direction = .none;
     for (decls) |d| switch (Lower.tag(vir, d)) {

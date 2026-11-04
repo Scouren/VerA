@@ -10,6 +10,7 @@
 //! Contents:
 //! - `pub fn mark(s: *Sema, unit: *Unit) Allocator.Error!void`
 //! - `pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void`
+//! - `pub fn writes(vir: *const Vir, b: Vir.Body, out: *std.ArrayList(Inst.Index), arena: Allocator, depth: u32) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -108,6 +109,32 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
     assert(s.param_args.items.len == s.device.params.len);
 }
 
+/// Appends every declaration a digital body writes, in order.
+pub fn writes(vir: *const Vir, b: Vir.Body, out: *std.ArrayList(Inst.Index), arena: Allocator, depth: u32) Allocator.Error!void {
+    if (depth > depth_max) return;
+    for (vir.body(b)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .store, .store_nb, .proc_assign, .force => if (base(vir, decl.payloadOf(vir, Inst.Bin, i).lhs)) |d| try out.append(arena, d),
+        .store_timed, .store_nb_timed => if (base(vir, decl.payloadOf(vir, Inst.Timed, i).lhs)) |d| try out.append(arena, d),
+        .block => try writes(vir, decl.payloadOf(vir, Inst.Block, i).body, out, arena, depth + 1),
+        .condbr => {
+            const x = decl.payloadOf(vir, Inst.CondBr, i);
+            try writes(vir, x.then, out, arena, depth + 1);
+            try writes(vir, x.@"else", out, arena, depth + 1);
+        },
+        .case => for (vir.list(Inst.Arm, decl.payloadOf(vir, Inst.Case, i).arms)) |arm| try writes(vir, arm.body, out, arena, depth + 1),
+        .loop => {
+            const x = decl.payloadOf(vir, Inst.Loop, i);
+            try writes(vir, x.body, out, arena, depth + 1);
+            try writes(vir, x.step, out, arena, depth + 1);
+        },
+        .repeat => try writes(vir, decl.payloadOf(vir, Inst.Repeat, i).body, out, arena, depth + 1),
+        .wait => try writes(vir, decl.payloadOf(vir, Inst.Wait, i).body, out, arena, depth + 1),
+        .delay => try writes(vir, decl.payloadOf(vir, Inst.Delay, i).body, out, arena, depth + 1),
+        .event_wait => try writes(vir, decl.payloadOf(vir, Inst.EventWait, i).body, out, arena, depth + 1),
+        else => {}, // else: writes nothing
+    };
+}
+
 // ---- private ----
 
 /// §7.2.2 whether the digital half runs on the mixed kernel: a continuous
@@ -157,19 +184,8 @@ fn plain(vir: *const Vir, b: Vir.Body, depth: u32) bool {
 /// Whether net `d`'s discipline is of the continuous domain (§3.6.2.2: a
 /// `domain`, else a nature bound); no discipline is discrete.
 fn continuous(s: *Sema, unit: *const Unit, d: Inst.Index) Allocator.Error!bool {
-    const vir = unit.vir;
-    const name = decl.payloadOf(vir, Inst.Net, d).discipline;
-    if (name == .empty) return false;
-    const zcu = s.zcu;
-    const dd = zcu.disciplines.get(try zcu.intern_pool.getString(s.gpa, vir.string(name))) orelse return false;
-    const dvir = zcu.fileVir(dd.file);
-    var bound = false;
-    for (dvir.list(Inst.DisciplineItem, decl.payloadOf(dvir, Inst.Discipline, zcu.declRow(dd).inst).items)) |item| switch (item.kind) {
-        .domain => return std.mem.eql(u8, dvir.string(item.name), "continuous"),
-        .potential, .flow => bound = true,
-        else => {}, // else: an attribute
-    };
-    return bound;
+    const name = decl.payloadOf(unit.vir, Inst.Net, d).discipline;
+    return s.zcu.continuousDiscipline(if (name == .empty) "" else unit.vir.string(name));
 }
 
 /// The declaration an assignment target names (through its selects).
@@ -185,32 +201,6 @@ fn base(vir: *const Vir, r: Inst.Ref) ?Inst.Index {
         }
     }
     return null;
-}
-
-/// Appends every declaration a digital body writes, in order.
-fn writes(vir: *const Vir, b: Vir.Body, out: *std.ArrayList(Inst.Index), arena: Allocator, depth: u32) Allocator.Error!void {
-    if (depth > depth_max) return;
-    for (vir.body(b)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .store, .store_nb, .proc_assign, .force => if (base(vir, decl.payloadOf(vir, Inst.Bin, i).lhs)) |d| try out.append(arena, d),
-        .store_timed, .store_nb_timed => if (base(vir, decl.payloadOf(vir, Inst.Timed, i).lhs)) |d| try out.append(arena, d),
-        .block => try writes(vir, decl.payloadOf(vir, Inst.Block, i).body, out, arena, depth + 1),
-        .condbr => {
-            const x = decl.payloadOf(vir, Inst.CondBr, i);
-            try writes(vir, x.then, out, arena, depth + 1);
-            try writes(vir, x.@"else", out, arena, depth + 1);
-        },
-        .case => for (vir.list(Inst.Arm, decl.payloadOf(vir, Inst.Case, i).arms)) |arm| try writes(vir, arm.body, out, arena, depth + 1),
-        .loop => {
-            const x = decl.payloadOf(vir, Inst.Loop, i);
-            try writes(vir, x.body, out, arena, depth + 1);
-            try writes(vir, x.step, out, arena, depth + 1);
-        },
-        .repeat => try writes(vir, decl.payloadOf(vir, Inst.Repeat, i).body, out, arena, depth + 1),
-        .wait => try writes(vir, decl.payloadOf(vir, Inst.Wait, i).body, out, arena, depth + 1),
-        .delay => try writes(vir, decl.payloadOf(vir, Inst.Delay, i).body, out, arena, depth + 1),
-        .event_wait => try writes(vir, decl.payloadOf(vir, Inst.EventWait, i).body, out, arena, depth + 1),
-        else => {}, // else: writes nothing
-    };
 }
 
 /// Every variable or net the analog body `b` reads by name: an access
@@ -242,7 +232,7 @@ fn analogReads(s: *Sema, unit: *Unit, b: Vir.Body, out: *std.AutoArrayHashMapUnm
             else => {}, // else: its operands and bodies, below
         }
         ops.clearRetainingCapacity();
-        try @import("control.zig").operands(s, vir, i, &ops);
+        try @import("control.zig").operands(s.arena, vir, i, &ops);
         var it = ops.keyIterator();
         while (it.next()) |o| try stack.append(s.arena, o.*);
         const bodies: []const Vir.Body = switch (tag) {

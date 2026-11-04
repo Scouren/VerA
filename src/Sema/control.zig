@@ -14,7 +14,7 @@
 //! - `pub fn br(s: *Sema, b: *Block, target: Air.Inst.Index, operand: Air.Inst.Ref) Allocator.Error!void`
 //! - `pub fn ifElse(s: *Sema, b: *Block, cond: Air.Inst.Ref, then_b: *Block, else_b: *Block) Allocator.Error!void`
 //! - `pub fn assignTo(s: *Sema, b: *Block, lhs_ref: Inst.Ref, v: Sema.Value, src: Inst.Ref) Allocator.Error!void`
-//! - `pub fn operands(s: *Sema, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void`
+//! - `pub fn operands(a: Allocator, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -38,7 +38,7 @@ pub fn body(s: *Sema, b: *Block, vb: Vir.Body) Allocator.Error!void {
     const vir = b.unit.vir;
     const insts = vir.body(vb);
     var used: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
-    for (insts) |i| try operands(s, vir, i, &used);
+    for (insts) |i| try operands(s.arena, vir, i, &used);
     for (insts) |i| {
         if (b.dead) return;
         const tag = vir.instructions.items(.tag)[@backingInt(i)];
@@ -73,11 +73,11 @@ pub fn ifElse(s: *Sema, b: *Block, cond: Air.Inst.Ref, then_b: *Block, else_b: *
 
 /// Adds every instruction `i` reads as an operand to `out` (its payload's
 /// `Ref` and `List(Ref)` fields; a body is not an operand).
-pub fn operands(s: *Sema, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void {
+pub fn operands(a: Allocator, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void {
     const data = vir.instructions.items(.data)[@backingInt(i)];
     switch (vir.instructions.items(.tag)[@backingInt(i)]) {
         inline else => |t| switch (comptime Inst.dataKind(t)) {
-            .un_node => if (data.un_node.operand.toIndex()) |o| try out.put(s.arena, o, {}),
+            .un_node => if (data.un_node.operand.toIndex()) |o| try out.put(a, o, {}),
             .pl_node => {
                 const P = Inst.Payload(t);
                 if (P == void) return;
@@ -85,9 +85,9 @@ pub fn operands(s: *Sema, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapU
                 inline for (@typeInfo(P).@"struct".field_names) |name| {
                     const F = @FieldType(P, name);
                     if (F == Inst.Ref) {
-                        if (@field(p, name).toIndex()) |o| try out.put(s.arena, o, {});
+                        if (@field(p, name).toIndex()) |o| try out.put(a, o, {});
                     } else if (F == Vir.List(Inst.Ref)) {
-                        for (vir.list(Inst.Ref, @field(p, name))) |r| if (r.toIndex()) |o| try out.put(s.arena, o, {});
+                        for (vir.list(Inst.Ref, @field(p, name))) |r| if (r.toIndex()) |o| try out.put(a, o, {});
                     }
                 }
             },

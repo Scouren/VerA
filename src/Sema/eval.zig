@@ -13,6 +13,7 @@
 //! - `pub const Const`
 //! - `pub const Env = struct` (`init`, `deinit`, `body`, `bodyValue`, `ref`, `param`, `named`, `systemNamed`, `toConst`, `intern`, `arraySize`, `dependsOn`)
 //! - `pub const eval_depth_max: u32`
+//! - `pub const v1364` (the IEEE 1364 mode: four-state values of any width, constant functions)
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -21,6 +22,10 @@ const vams = @import("vams");
 const InternPool = @import("intern_pool");
 const fold = @import("std_kernels").fold;
 const Zcu = @import("../Zcu.zig");
+/// The IEEE 1364 mode of this evaluator (`eval_1364.zig`): four-state
+/// values of any width, sized as §5.4/§5.5 size them, and §10.4.5 constant
+/// functions. The VAMS mode (`Env.ref`) is unchanged by it.
+pub const v1364 = @import("eval_1364.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 

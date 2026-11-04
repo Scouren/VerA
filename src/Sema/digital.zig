@@ -12,12 +12,12 @@
 //! Cites: IEEE 1364-2005 §9.9, §11.4, §12.4, §12.5, §19.8.
 //!
 //! Contents:
-//! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`
+//! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Why = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
-//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
+//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `reject`, `rejectArg`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
 //! - `pub const none: u32`
-//! - `pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *[]const u8) Error!Lowered`
+//! - `pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Lowered`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -30,6 +30,7 @@ const eval = @import("eval.zig");
 const decl = @import("digital/decl.zig");
 const stmt = @import("digital/stmt.zig");
 const nets = @import("digital/nets.zig");
+const time0 = @import("digital/time0.zig");
 const sub = @import("digital/sub.zig");
 const vars = @import("digital/vars.zig");
 const gates = @import("digital/gates.zig");
@@ -59,8 +60,13 @@ pub const Lowered = struct {
 };
 
 /// `Unsupported`: a construct the lowering does not express yet, named in
-/// `Lower.why`.
-pub const Error = error{Unsupported} || Allocator.Error;
+/// `Lower.why`. `Rejected`: a design IEEE 1364-2005 makes an error, which
+/// the caller reports as E1100 (lib/sim/digital's code for it) at `Why.at`.
+pub const Error = error{ Unsupported, Rejected } || Allocator.Error;
+
+/// Why `lower` failed: the construct or the error, and for `Rejected` the
+/// source offset (as a token start of `Options.sources`' trees) it is at.
+pub const Why = struct { text: []const u8 = "", at: u32 = none };
 
 /// The `none` of every u32 handle a `Program` row holds.
 pub const none: u32 = std.math.maxInt(u32);
@@ -155,6 +161,8 @@ pub const Lower = struct {
     b: *Builder,
     options: Options,
     why: []const u8 = "",
+    /// `reject`'s source offset.
+    why_at: u32 = none,
     names: std.ArrayList(Name) = .empty,
     frames: std.ArrayList(Frame) = .empty,
     scopes: std.ArrayList(ScopeInfo) = .empty,
@@ -203,6 +211,9 @@ pub const Lower = struct {
     sdf: bool = false,
     /// A function body is being compiled (§10.4.4: its fork runs in order).
     in_function: bool = false,
+    /// An automatic subroutine's activation storage is being laid out: its
+    /// named blocks' items join it (`sub.zig`'s `storage`).
+    laying_out: bool = false,
     /// The nets, their drivers (compiled after the walk), per slot its
     /// net, and each driver's `.continuous` pc.
     nets: std.ArrayList(nets.NetRow) = .empty,
@@ -238,6 +249,40 @@ pub const Lower = struct {
     pub fn refuse(l: *Lower, comptime why: []const u8) error{Unsupported} {
         l.why = why;
         return error.Unsupported;
+    }
+
+    /// Records error `msg` at expression `r` of frame `f` and fails
+    /// (`Rejected`): the message lib/sim/digital gives the same design.
+    /// A call is at its name (its node's main token is its `(`), as
+    /// lib/sim/digital reports it.
+    pub fn reject(l: *Lower, f: u32, r: Inst.Ref, comptime msg: []const u8) error{Rejected} {
+        l.why = msg;
+        l.why_at = 0;
+        const i = r.toIndex() orelse return error.Rejected;
+        l.why_at = l.srcOffset(f, i);
+        const vir = l.virOf(f);
+        if (Inst.dataKind(tag(vir, i)) != .pl_node) return error.Rejected;
+        const tree = l.options.sources[@backingInt(l.fileOf(f))].tree;
+        const n = vir.instructions.items(.data)[@backingInt(i)].pl_node.src_node;
+        if (tree.nodeTag(n) == .call) l.why_at = tree.tokenStart(tree.nodeMainToken(tree.nodeData(n).node_and_extra[0]));
+        return error.Rejected;
+    }
+
+    /// `reject` at argument `k` of call `call` (frame `f`), found in the
+    /// tree: a literal argument has no position of its own in Vir.
+    pub fn rejectArg(l: *Lower, f: u32, call: Inst.Index, k: usize, comptime msg: []const u8) error{Rejected} {
+        l.why = msg;
+        l.why_at = l.srcOffset(f, call);
+        const vir = l.virOf(f);
+        if (Inst.dataKind(tag(vir, call)) != .pl_node) return error.Rejected;
+        const tree = l.options.sources[@backingInt(l.fileOf(f))].tree;
+        const n = vir.instructions.items(.data)[@backingInt(call)].pl_node.src_node;
+        if (tree.nodeTag(n) != .call) return error.Rejected;
+        const slots = tree.extraDataSlice(tree.extraData(tree.nodeData(n).node_and_extra[1], vams.Ast.Node.SubRange), vams.Ast.Node.OptionalIndex);
+        if (k < slots.len) if (slots[k].unwrap()) |arg| {
+            l.why_at = tree.tokenStart(tree.nodeMainToken(arg));
+        };
+        return error.Rejected;
     }
 
     /// `refuse` with a formatted reason.
@@ -309,6 +354,9 @@ pub const Lower = struct {
 
     /// The folded integer `r` is in frame `f`, refused when it has none.
     pub fn intOf(l: *Lower, f: u32, r: Inst.Ref) Error!i64 {
+        // The IEEE 1364 mode first: §5.5's widths (a 64-bit parameter's
+        // arithmetic), x/z bits, selects, constant functions.
+        if (try eval.v1364.int(try l.envAt(f), r)) |v| return v;
         const c = (try l.constOf(f, r)) orelse return l.refuse("a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)");
         return switch (c) {
             .int => |v| v,
@@ -353,23 +401,23 @@ pub const Lower = struct {
 };
 
 /// Lowers every instance of `zcu` into one `Program` in `arena`. On
-/// `Unsupported`, `why` names the construct. Asserts `zcu` is elaborated
-/// (`Config.roots = .all`) and has one `Source` per file.
-pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *[]const u8) Error!Lowered {
+/// `Unsupported` or `Rejected`, `why` says what. Asserts `zcu` is
+/// elaborated (`Config.roots = .all`) and has one `Source` per file.
+pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Lowered {
     assert(options.sources.len == zcu.files.len);
     var b: Builder = .init(arena);
     var l: Lower = .{ .zcu = zcu, .a = arena, .b = &b, .options = options };
     spine(&l) catch |e| {
-        why.* = l.why;
+        why.* = .{ .text = l.why, .at = l.why_at };
         return e;
     };
     var program = b.finish();
     vars.finishParams(&l, &program) catch |e| {
-        why.* = l.why;
+        why.* = .{ .text = l.why, .at = l.why_at };
         return e;
     };
-    nets.finish(&l, &program) catch |e| {
-        why.* = l.why;
+    time0.finish(&l, &program) catch |e| {
+        why.* = .{ .text = l.why, .at = l.why_at };
         return e;
     };
     assert(program.inst_scope.len == program.insts.len);

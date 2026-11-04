@@ -247,12 +247,16 @@ pub const Failure = struct {
     nums: [2]u32 = .{ 0, 0 },
     /// The part of the instance `src` names that the failure is about.
     part: Part = .whole,
+    /// A `note:` and a `help:` row under the message; `.empty` for none.
+    note: InternPool.String = .empty,
+    help: InternPool.String = .empty,
 };
 
 /// A connection or parameter value of an instance, by position in its
-/// list, or a defparam's target name; a failure about one is located at
-/// its first token.
-pub const Part = union(enum) { whole, conn: u32, param: u32, target };
+/// list, a defparam's target name, or an attribute spec of a declaration
+/// or instance, by position among its prefix specs; a failure about one
+/// is located at its first token.
+pub const Part = union(enum) { whole, conn: u32, param: u32, target, attr: u32 };
 
 /// The rules a catalogue code covers whose IEEE 1364 report lib/sim/digital
 /// wrote in its own words: the instance's ports (§12.3.6) and parameter

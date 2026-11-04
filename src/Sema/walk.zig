@@ -162,12 +162,13 @@ pub fn applyGivens(s: *Sema, env: *Env, file: Zcu.File.Index, src: Inst.Ref, giv
             if (env.systemNamed(name) != null) continue;
             if (env.named(name)) |q| if (isOverridable(vir, q)) break :named q;
             const rule: Zcu.Rule = if (env.named(name) != null) .param_local else .param_unknown;
-            if (!quiet) try s.failRule(.{ .rule = rule, .name = name, .part = at }, .E0907, file, src, "`{s}` is not a parameter of `{s}`", .{ name, vir.string(module) });
+            // §3.4.5 a localparam is not overridable: said so by name.
+            if (!quiet) try s.failRule(.{ .rule = rule, .name = name, .part = at }, .E0907, file, src, "`{s}` is {s} of `{s}`", .{ name, if (rule == .param_local) "a localparam" else "not a parameter", vir.string(module) });
             continue;
         };
         if (g.value == .none) continue;
         const gop = try env.given.getOrPut(s.gpa, p);
-        if (gop.found_existing) try s.failRule(.{ .rule = .param_twice, .name = vir.string(payloadOf(vir, Inst.Param, p).name), .part = at }, .E0908, file, src, "`{s}` is given more than one value", .{vir.string(payloadOf(vir, Inst.Param, p).name)});
+        if (gop.found_existing) try s.failRule(.{ .rule = .param_twice, .name = vir.string(payloadOf(vir, Inst.Param, p).name), .part = at }, .E0908, file, src, "`{s}` and its alias are both given a value", .{vir.string(payloadOf(vir, Inst.Param, p).name)});
         gop.value_ptr.* = g.value;
         try env.spelling.put(s.gpa, p, if (g.name == .empty) vir.string(payloadOf(vir, Inst.Param, p).name) else ip.stringToSlice(g.name));
     }
@@ -329,19 +330,20 @@ fn portDisciplineAttrs(s: *Sema, p: Pending) Allocator.Error!void {
     assert(vir.instructions.items(.tag)[@backingInt(i)] == .instance);
     var env: Env = try .init(s.gpa, s.arena, &s.zcu.intern_pool, vir, &.{});
     defer env.deinit();
-    for (vir.list(Inst.Attr, payloadOf(vir, Inst.Instance, i).attrs)) |a| {
+    for (vir.list(Inst.Attr, payloadOf(vir, Inst.Instance, i).attrs), 0..) |a, k| {
         if (!std.mem.eql(u8, vir.string(a.name), "port_discipline")) continue;
+        const at: Sema.Why = .{ .part = .{ .attr = @intCast(k) } };
         const c: eval.Const = if (a.value.len == 0) .{ .int = 1 } else (try env.body(a.value)) orelse continue;
         if (c != .str) {
-            try s.fail(.E0358, p.file, p.src, "E.3.2.1: port_discipline requires a string naming a continuous discipline", .{});
+            try s.failRule(at, .E0358, p.file, p.src, "E.3.2.1: port_discipline requires a string naming a continuous discipline", .{});
             continue;
         }
         if (!s.zcu.disciplines.contains(try s.zcu.intern_pool.getString(s.gpa, c.str))) {
-            try s.fail(.E0358, p.file, p.src, "E.3.2.1: port_discipline names an undeclared discipline `{s}`", .{c.str});
+            try s.failRule(at, .E0358, p.file, p.src, "E.3.2.1: port_discipline names an undeclared discipline `{s}`", .{c.str});
             continue;
         }
         if (try discipline.domainOf(s, c.str) != .continuous)
-            try s.fail(.E0358, p.file, p.src, "E.3.2.1: port_discipline requires a continuous discipline; `{s}` is not one", .{c.str});
+            try s.failRule(at, .E0358, p.file, p.src, "E.3.2.1: port_discipline requires a continuous discipline; `{s}` is not one", .{c.str});
     }
 }
 

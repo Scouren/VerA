@@ -75,7 +75,7 @@ fn netDisciplines(s: *Sema, file: Zcu.File.Index, m: Inst.Module) Allocator.Erro
         if (zcu.modules.contains(key))
             try s.fail(.E0371, file, i.toRef(), "`{s}` in the declaration of `{s}` is a module; an A.4.1 module_instance takes a parenthesised port list even when it is empty: `{s} {s}();`", .{ text, vir.string(name), text, vir.string(name) })
         else
-            try s.fail(.E0371, file, i.toRef(), "`{s}` in the declaration of `{s}`", .{ text, vir.string(name) });
+            try s.fail(.E0371, file, i.toRef(), "`{s}` in the declaration of {s}`{s}`", .{ text, if (tag == .variable) "the reg " else "", vir.string(name) });
     }
 }
 
@@ -175,7 +175,7 @@ fn connectParams(s: *Sema, file: Zcu.File.Index, at: Inst.Index, ins: Inst.Conne
         const n = vir.string(a.name);
         if (env.systemNamed(n) != null) continue;
         if (env.named(n)) |p| if (walk.isOverridable(mvir, p)) continue;
-        try s.fail(.E0907, file, at.toRef(), "`{s}` is not an overridable parameter of connect module `{s}`", .{ n, mvir.string(mod.name) });
+        try s.fail(.E0907, file, at.toRef(), "`{s}` is not {s} of connect module `{s}`", .{ n, if (env.named(n) == null) "a parameter" else "an overridable parameter", mvir.string(mod.name) });
     }
 }
 

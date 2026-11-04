@@ -58,7 +58,7 @@ pub fn bundle(comp: *Compilation) Allocator.Error!Diag {
     // lib/sim/digital stopped at its first refusal: the 1364 route reports
     // elaboration's first error and every warning.
     var refused = false;
-    for (zf.items(.code), zf.items(.file), zf.items(.src), zf.items(.message), zf.items(.rule), zf.items(.name), zf.items(.nums), zf.items(.part)) |code, file, src, message, rule, name, nums, part| {
+    for (zf.items(.code), zf.items(.file), zf.items(.src), zf.items(.message), zf.items(.rule), zf.items(.name), zf.items(.nums), zf.items(.part), zf.items(.note), zf.items(.help)) |code, file, src, message, rule, name, nums, part, note, help| {
         const u = &comp.units.items[@backingInt(file)];
         const is_error = @tagName(code)[0] == 'E';
         if (comp.config.digital() and is_error) {
@@ -68,7 +68,13 @@ pub fn bundle(comp: *Compilation) Allocator.Error!Diag {
         const loc = partLoc(out, u, src, part);
         if (rule != .none and comp.config.digital()) {
             try legacy.rule(&w, rule, loc, ip.stringToSlice(name), nums, try legacy.searchOrder(comp.arena(), &comp.zcu));
-        } else try w.add(.lower, code, loc, "{s}", .{ip.stringToSlice(message)});
+        } else {
+            var b = w.build(.lower, code, loc);
+            b.msg("{s}", .{ip.stringToSlice(message)});
+            if (note != .empty) b.note("{s}", .{ip.stringToSlice(note)});
+            if (help != .empty) b.help("{s}", .{ip.stringToSlice(help)});
+            try b.emit();
+        }
     }
     var own = try comp.wip.toOwnedBundle();
     defer own.deinit(comp.gpa);
@@ -127,6 +133,7 @@ fn partLoc(out: vams.Preprocessor.Output, u: *const Compilation.Unit, src: Inst.
     const k: u32, const list_open: ?vams.Ast.TokenIndex = switch (part) {
         .whole => return instLoc(out, u, src),
         .target => return targetLoc(out, u, src),
+        .attr => |k| return attrLoc(out, u, src, k),
         .conn => |k| .{ k, connOpen(u, src) },
         .param => |k| .{ k, paramOpen(u, src) },
     };
@@ -151,6 +158,46 @@ fn targetLoc(out: vams.Preprocessor.Output, u: *const Compilation.Unit, src: Ins
     };
     const at = u.tree.tokenStart(t);
     return relocate(out, at, at + @as(u32, @intCast(u.tree.tokenSlice(t).len)));
+}
+
+/// The name of the k-th attribute spec in the `(* ... *)` instances just
+/// before the declaration or instance `src` (no `;` between); `src` itself
+/// when there is none.
+fn attrLoc(out: vams.Preprocessor.Output, u: *const Compilation.Unit, src: Inst.Ref, k: u32) Diag.Loc {
+    const tree = &u.tree;
+    var t = instToken(u, src) orelse return instLoc(out, u, src);
+    // Bounded by `t`: back to the last `*)` before the item.
+    while (t > 0 and tree.tokenTag(t) != .asterisk_r_paren) : (t -= 1) {
+        if (tree.tokenTag(t) == .semicolon) return instLoc(out, u, src);
+    }
+    if (t == 0) return instLoc(out, u, src);
+    // Back over the run of instances, to the first `(*`.
+    var first = t;
+    // Bounded by `t`: each turn moves one token back.
+    while (first > 0) : (first -= 1) {
+        if (tree.tokenTag(first) == .l_paren_asterisk and (first == 0 or tree.tokenTag(first - 1) != .asterisk_r_paren)) break;
+    }
+    var n: u32 = 0;
+    var depth: u32 = 0;
+    var i = first;
+    // Bounded by `t`: each turn moves one token on.
+    while (i < t) : (i += 1) switch (tree.tokenTag(i)) {
+        .l_paren_asterisk => if (n == k) return tokenLoc(out, tree, i + 1),
+        .asterisk_r_paren => n += 1,
+        .l_paren, .l_bracket, .l_brace => depth += 1,
+        .r_paren, .r_bracket, .r_brace => depth -|= 1,
+        .comma => if (depth == 0) {
+            n += 1;
+            if (n == k) return tokenLoc(out, tree, i + 1);
+        },
+        else => {},
+    };
+    return instLoc(out, u, src);
+}
+
+fn tokenLoc(out: vams.Preprocessor.Output, tree: *const vams.Ast, t: vams.Ast.TokenIndex) Diag.Loc {
+    const at = tree.tokenStart(t);
+    return relocate(out, at, at + @as(u32, @intCast(tree.tokenSlice(t).len)));
 }
 
 /// The `instance` node of Vir instance `src`, or null.

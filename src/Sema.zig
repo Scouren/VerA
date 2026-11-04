@@ -290,6 +290,8 @@ pub const Why = struct {
     name: []const u8 = "",
     nums: [2]u32 = .{ 0, 0 },
     part: Zcu.Part = .whole,
+    note: []const u8 = "",
+    help: []const u8 = "",
 };
 
 const Sema = @This();
@@ -372,13 +374,15 @@ pub fn fail(s: *Sema, code: Diag.Code, file: Zcu.File.Index, src: Inst.Ref, comp
 /// `fail` naming the rule that refused, what its old words quote, and the
 /// part of the instance it is about.
 pub fn failRule(s: *Sema, why: Why, code: Diag.Code, file: Zcu.File.Index, src: Inst.Ref, comptime fmt: []const u8, args: anytype) Allocator.Error!void {
-    assert(why.rule != .none or why.part != .whole);
+    assert(why.rule != .none or why.part != .whole or why.note.len + why.help.len != 0);
     try s.fail(code, file, src, fmt, args);
     const row = s.zcu.failed.len - 1;
     s.zcu.failed.items(.rule)[row] = why.rule;
     s.zcu.failed.items(.name)[row] = try s.zcu.intern_pool.getString(s.gpa, why.name);
     s.zcu.failed.items(.nums)[row] = why.nums;
     s.zcu.failed.items(.part)[row] = why.part;
+    s.zcu.failed.items(.note)[row] = try s.zcu.intern_pool.getString(s.gpa, why.note);
+    s.zcu.failed.items(.help)[row] = try s.zcu.intern_pool.getString(s.gpa, why.help);
 }
 
 /// The cell an instance of `cell` at absolute path `path` binds under the

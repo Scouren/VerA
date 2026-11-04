@@ -370,14 +370,11 @@ verilog-a/ch09_system_tasks/clog2_nested_contexts.va codes: old {}, new E0130 (E
 verilog-a/ch09_system_tasks/clog2_unsigned_width.va codes: old {}, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
 verilog-a/ch09_system_tasks/conversion_constant_expressions.va tables row 0: old `param cp integer = 1`, new `param cp integer = ?`
 verilog-a/ch09_system_tasks/fatal_finish_number_3_rejected.va codes: old E0824, new {}
-verilog-a/ch09_system_tasks/fclose_two_descriptors_rejected.va codes: old E0887, new {}
 verilog-a/ch09_system_tasks/fd_channels_past_30.va tables row 18: old `display $fopen`, new `display $fwrite`
 verilog-a/ch09_system_tasks/fdebug.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/fdisplay.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/feof.va tables row 4: old `held text`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/feof_without_descriptor_rejected.va codes: old E0887, new E0506 (E0506: `$feof` takes 1 to 1, given 0)
 verilog-a/ch09_system_tasks/ferror.va tables row 4: old `held text`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/fflush_two_descriptors_rejected.va codes: old E0887, new {}
 verilog-a/ch09_system_tasks/fflush.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/fgets_line_over_4096.va tables row 7: old `display $fopen`, new `display $fwrite`
 verilog-a/ch09_system_tasks/fgets_on_write_only_fd_fails.va tables row 4: old `held s`, new `limit_slots 0`
@@ -388,7 +385,6 @@ verilog-a/ch09_system_tasks/file_output_real_descriptor_rejected.va codes: old E
 verilog-a/ch09_system_tasks/file_output.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/file_position_status.va tables row 10: old `held message`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/file_read_scan.va tables row 5: old `held line`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/finish_two_arguments_rejected.va codes: old E0887, new {}
 verilog-a/ch09_system_tasks/fmonitor.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/fopen_multichannel_descriptor.va tables row 6: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/fopen_type_not_in_table_9_24_rejected.va codes: old E0889, new {}
@@ -401,7 +397,6 @@ verilog-a/ch09_system_tasks/fscanf_successive_scans_on_one_line.va tables row 7:
 verilog-a/ch09_system_tasks/fscanf.va tables row 9: old `display $fopen`, new `display $fwrite`
 verilog-a/ch09_system_tasks/fscanf_window_over_4096.va tables row 7: old `display $fopen`, new `display $fwrite`
 verilog-a/ch09_system_tasks/fseek.va tables row 5: old `display $fopen`, new `display $fwrite`
-verilog-a/ch09_system_tasks/fseek_without_operation_rejected.va codes: old E0887, new E0506 (E0506: `$fseek` takes 3 to 3, given 2)
 verilog-a/ch09_system_tasks/fstrobe.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/ftell.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/fwrite.va tables row 5: old `display $fopen`, new `display $strobe`
@@ -450,7 +445,6 @@ verilog-a/ch09_system_tasks/strobe_flow_read_inside_array_pattern_argument.va co
 verilog-a/ch09_system_tasks/swrite.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/table_snapshot_function.va codes: old {}, new E0512,E0815 (E0512: `a whole array read as a value` is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/two_instances_hold_distinct_channels.va tables row 13: old `display $fopen`, new `display $fwrite`
-verilog-a/ch09_system_tasks/value_plusargs_without_variable_rejected.va codes: old E0887, new {}
 verilog-a/ch09_system_tasks/write_mode_path_65_opens.va tables row 11: old `held why`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/write_mode_reopen_appends_across_analyses.va tables row 5: old `held s`, new `limit_slots 0`
 verilog-a/ch10_directives/compact_modeling_macro_implies_its_extensions.va tables row 7: old `held fold`, new `limit_slots 0`

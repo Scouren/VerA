@@ -136,7 +136,7 @@ fn earliestUnmatched(arena: Allocator, a: []const []const u8, b: []const []const
 
 fn earlier(code: []const u8, than: ?[]const u8) bool {
     const t = than orelse return true;
-    return @intFromEnum(stageOf(code)) < @intFromEnum(stageOf(t));
+    return @backingInt(stageOf(code)) < @backingInt(stageOf(t));
 }
 
 fn stageOf(code: []const u8) stages.Owner {

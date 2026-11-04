@@ -7,6 +7,7 @@
 //! Contents:
 //! - `pub const Fn = enum`
 //! - `pub fn check(l: *Lower, i: Inst.Index, f: Fn, args: []const Inst.Ref) Error!digital.Name`
+//! - `pub fn access(l: *Lower, i: Inst.Index, f: Fn, args: []const Inst.Ref) Error!u32`
 //! - `pub fn segregate(l: *Lower) Error!void`
 //! - `pub fn isConnect(l: *const Lower, f: u32) bool`
 //! - `pub fn count(l: *const Lower, net: u32) u32`
@@ -22,6 +23,7 @@ const Lower = digital.Lower;
 const Error = digital.Error;
 const none = digital.none;
 const Inst = vams.Vir.Inst;
+const Program = @import("std_sim").Program;
 
 /// The VAMS §9.22.1-§9.22.4 / §9.23.1-§9.23.4 access functions.
 pub const Fn = enum { count, receiver_count, state, strength, delay, next_state, next_strength, type };
@@ -44,6 +46,29 @@ pub fn check(l: *Lower, i: Inst.Index, f: Fn, args: []const Inst.Ref) Error!digi
     if (want == 2 and (try expr.typeValue(l, args[1])).real) return l.reject(l.frame, args[1], "§9.22.3: driver_index is an integer");
     assert(n.net != none);
     return n;
+}
+
+/// The `Program.DriverAccess` row (its `extra` index) of call `i` of `f`,
+/// one of the functions State reads a driver for at run time: the net's
+/// ordinary drivers in §9.22.1's numbering ("arbitrarily numbered from 0
+/// to N-1"; here in driver order, lib/sim/digital's), its driver_index row
+/// and the calling scope's time row.
+pub fn access(l: *Lower, i: Inst.Index, f: Fn, args: []const Inst.Ref) Error!u32 {
+    assert(f != .count and f != .receiver_count);
+    const n = try check(l, i, f, args);
+    var rows: std.ArrayList(u32) = .empty;
+    for (l.wires.items, 0..) |w, k| if (w.net == n.net and !isConnect(l, w.frame)) try rows.append(l.a, @intCast(k));
+    assert(rows.items.len == count(l, n.net));
+    const op: Program.DriverAccess.Op = switch (f) {
+        .state => .state,
+        .strength => .strength,
+        .delay => .delay,
+        .next_state => .next_state,
+        .next_strength => .next_strength,
+        .type => .type,
+        .count, .receiver_count => unreachable, // asserted above: folded
+    };
+    return l.b.extraOf(Program.DriverAccess{ .op = op, .index = try expr.self_(l, args[1], 0), .drivers = try l.b.listOf(rows.items), .time = l.frames.items[l.frame].scope });
 }
 
 /// §7.9 "the drivers and receivers of connect modules shall be oppositely

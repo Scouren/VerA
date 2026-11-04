@@ -106,7 +106,11 @@ pub fn sysCall(l: *Lower, i: Inst.Index, t: Ty, nat: Type) Error!u32 {
         // §9.22.1/§9.22.2 fixed at elaboration: the drivers and receivers.
         .driver_count => try l.b.int(natural, drivers.count(l, (try drivers.check(l, i, .count, s.args)).net)),
         .receiver_count => try l.b.int(natural, drivers.receiverCount(l, (try drivers.check(l, i, .receiver_count, s.args)).net)),
-        .driver_state, .driver_strength, .driver_next_state, .driver_next_strength, .driver_type => return l.refuse("a §9.22 driver state function"),
+        .driver_state => try l.b.expr(.driver_access, natural, try drivers.access(l, i, .state, s.args), 0),
+        .driver_strength => try l.b.expr(.driver_access, natural, try drivers.access(l, i, .strength, s.args), 0),
+        .driver_next_state => try l.b.expr(.driver_access, natural, try drivers.access(l, i, .next_state, s.args), 0),
+        .driver_next_strength => try l.b.expr(.driver_access, natural, try drivers.access(l, i, .next_strength, s.args), 0),
+        .driver_type => try l.b.expr(.driver_access, natural, try drivers.access(l, i, .type, s.args), 0),
         .random, .dist_uniform, .dist_normal, .dist_exponential, .dist_poisson, .dist_chi_square, .dist_t, .dist_erlang => try l.b.expr(.random, natural, try random(l, s.f, s.args), 0),
         .fopen, .fgets, .ferror, .fgetc, .ungetc, .ftell, .rewind, .fseek, .feof => try l.b.expr(.file, natural, try fileCall(l, s.f, s.args), 0),
         .sscanf, .fscanf => blk: {
@@ -136,6 +140,7 @@ pub fn sysReal(l: *Lower, i: Inst.Index) Error!u32 {
     return switch (s.f) {
         .realtime => l.b.expr(.realtime, rt, scope, 0),
         .abstime => l.b.expr(.abstime, rt, 0, 0),
+        .driver_delay => l.b.expr(.driver_access, rt, try drivers.access(l, i, .delay, s.args), 0),
         .itor => if ((try expr.typeOf(l, s.args[0])).real) l.b.expr(.math1, rt, try expr.real(l, s.args[0]), @backingInt(Program.Math.itor)) else l.b.expr(.real_of_int, rt, try expr.self_(l, s.args[0], 0), 0),
         .bitstoreal => l.b.expr(.bitstoreal, rt, try expr.self_(l, s.args[0], 64), 0),
         inline .ln, .log10, .exp, .ln1p, .expm1, .sqrt, .floor, .ceil, .sin, .cos, .tan, .asin, .acos, .atan, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh => |m| blk: {

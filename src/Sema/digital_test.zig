@@ -628,3 +628,37 @@ test "§7.9/§9.22.6 segregation: the connect module reads the ordinary drivers,
     // One shared net would resolve 0 against 1 to x for both.
     try std.testing.expectEqualStrings("d=0\ni=1\n", try transcript(a, &lowered.program));
 }
+
+test "§9.22.3/§9.22.4/§9.23 a driver's state, strength, type, pending state and delay (driver_delay_and_next_state.va)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const lowered = try lowerSource(a, prelude ++
+        \\connectmodule c2e(d, a);
+        \\  input d; output a; ddiscrete d; electrical a;
+        \\  reg out; assign d = out;
+        \\  initial begin
+        \\    out = 1'b0;
+        \\    #25 $display("%b %0.1f %b %0d %0d", $driver_state(d, 0), $driver_delay(d, 0), $driver_next_state(d, 0), $driver_strength(d, 0), $driver_type(d, 0));
+        \\    #10 $display("%b %0.1f %b", $driver_state(d, 0), $driver_delay(d, 0), $driver_next_state(d, 0));
+        \\    #10 $display("%b %0.1f %b", $driver_state(d, 0), $driver_delay(d, 0), $driver_next_state(d, 0));
+        \\    #11 $display("%b %0.1f %b %b", $driver_state(d, 0), $driver_delay(d, 0), $driver_next_state(d, 0), $driver_state(d, 1));
+        \\  end
+        \\  analog V(a) <+ 0.0;
+        \\endmodule
+        \\module drv(o); output o; ddiscrete o; reg o; initial begin o = 1'b0; #30 o <= #20 1'b1; end endmodule
+        \\module top; electrical n; drv dr(.o(n)); endmodule
+        \\connectrules r; connect c2e merged input ddiscrete, output electrical; endconnectrules
+        \\
+    , true);
+    // `dr.o <= #20 1'b1` at 30 lands at 50: pending from 30, 15 then 5 ns
+    // away at 35 and 45, active at 56. §9.22.4 a strong 0: 6 << 3 | 6; Annex
+    // D.3 a port window: DRIVER_ASSIGN's 16. Index 1 names no driver: x.
+    try std.testing.expectEqualStrings(
+        \\0 -1.0 0 54 16
+        \\0 15.0 1
+        \\0 5.0 1
+        \\1 -1.0 1 x
+        \\
+    , try transcript(a, &lowered.program));
+}

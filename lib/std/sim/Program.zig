@@ -27,7 +27,7 @@
 //! - `pub const Vcd = struct` (`Vcd.VcdScope`, `Vcd.Var`), `pub const DumpCall = struct`, `pub const DumpOp = enum(u32)`
 //! - `pub const EvcdPort = struct`, `pub const PortDir = enum(u8)`, `pub const DumpPorts = struct`, `pub const PortsCall = struct`, `pub const PortsOp = enum(u32)`
 //! - `pub const SdfScope = struct`, `pub const SdfCall = struct`
-//! - `pub const Probe = struct`, `pub const A2d = struct` (`A2d.Kind`)
+//! - `pub const Probe = struct`, `pub const A2d = struct` (`A2d.Kind`), `pub const DriverAccess = struct` (`DriverAccess.Op`)
 //! - `pub const Override = struct`, `pub const OverrideEval = struct`, `pub const Tran = struct`, `pub const Path = struct`, `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
 //! - `pub fn words(width: u32) u32`
 //! - `pub fn list(p: *const Program, l: List) []const u32`
@@ -296,6 +296,9 @@ pub const Expr = struct {
         /// at the current time, from the mixed host: `a` the `extra` index
         /// of a `Probe`.
         probe,
+        /// VAMS §9.22.3/§9.22.4/§9.23 a driver access call: `a` the `extra`
+        /// index of a `DriverAccess`.
+        driver_access,
         /// §17.8 `$rtoi(a)`, `$realtobits(a)`, `$bitstoreal(a)`, `$itor(a)`.
         rtoi,
         realtobits,
@@ -748,6 +751,19 @@ pub const CopyOut = struct { place: u32, slot: u32, ty: Ty };
 /// (a hierarchical name's parts joined by `.`), in `string_bytes`; `b` is
 /// empty for `V(a)`.
 pub const Probe = struct { a: List, b: List };
+
+/// VAMS §9.22.3/§9.22.4/§9.23 one driver access call: what it reads, its
+/// driver_index row, the net's ordinary drivers (`drivers` rows in
+/// §9.22.1's numbering, a `List` in `extra`) and the calling scope's
+/// `times` row (`$driver_delay`'s units).
+pub const DriverAccess = struct {
+    op: Op,
+    index: u32,
+    drivers: List,
+    time: u32,
+
+    pub const Op = enum(u32) { state, strength, delay, next_state, next_strength, type };
+};
 
 /// VAMS §7.3.5 one analog event a digital event control waits on: its
 /// arguments as real rows in the LRM's order (a `List` in `extra`, `none`

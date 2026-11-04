@@ -7,7 +7,7 @@
 //! Contents:
 //! - `pub const Program`, `pub const Builder`, `pub const State`, `pub const Interp`
 //! - `pub const eval`, `pub const display`, `pub const logic`, `pub const net`, `pub const resolve`, `pub const calls`, `pub const readmem`, `pub const holds`, `pub const files`, `pub const tchk`, `pub const vcd`, `pub const evcd`, `pub const sdf`, `pub const sdf_text`, `pub const scan`, `pub const queues`, `pub const pla`, `pub const activations`, `pub const wide`
-//! - `pub const scheduler`, `pub const time`, `pub const analog`, `pub const serial`
+//! - `pub const scheduler`, `pub const time`, `pub const analog`, `pub const serial`, `pub const mixed`
 
 pub const Program = @import("sim/Program.zig");
 pub const Builder = @import("sim/Builder.zig");
@@ -36,10 +36,12 @@ pub const scheduler = @import("sim/scheduler.zig");
 pub const time = @import("sim/time.zig");
 pub const analog = @import("sim/analog.zig");
 pub const serial = @import("sim/serial.zig");
+pub const mixed = @import("sim/mixed.zig");
 
 test {
     _ = analog;
     _ = serial;
+    _ = mixed;
     _ = Program;
     _ = Builder;
     _ = State;

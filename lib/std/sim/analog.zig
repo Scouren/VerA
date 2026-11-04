@@ -15,6 +15,7 @@
 //! - `pub fn requestAnalog(s: *State) Error!void`
 //! - `pub fn a2dWrite(s: *State, slot: u32, v: f64, assigned: bool) Error!void`
 //! - `pub fn deliverA2d(s: *State, event: u32, tick: u64) Error!void`
+//! - `pub const A2d`, `pub fn monitors(s: *const State) []const A2d`, `pub fn monitorArg(s: *State, j: usize, k: usize) Error!?f64`, `pub fn deliverMonitor(s: *State, j: usize, tick: u64) Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -42,10 +43,22 @@ pub const Link = struct {
     /// fails the run.
     probe: ?*const fn (ctx: *anyopaque, a: []const u8, b: ?[]const u8) Error!f64 = null,
     probe_ctx: *anyopaque = undefined,
+    /// A discrete expression reads the analog solution (a probe, or a free
+    /// §7.3.6.4 variable): the mixed kernel steps the analog to every
+    /// discrete event time before the discrete engine runs it.
+    has_probes: bool = false,
 };
 
 /// One explicit D2A term: `edge` of `slot`, reported as bit `site`.
 pub const D2aSite = struct { slot: u32, edge: Program.Edge, site: u6 };
+
+/// One §7.3.5 monitored analog event of a digital event control:
+/// `Program.A2d` once the digital lowering writes it.
+pub const A2d = if (@hasDecl(Program, "A2d")) Program.A2d else struct {
+    kind: enum(u8) { cross, above, timer, absdelta },
+    args: Program.List,
+    event: u32,
+};
 
 /// §8.5 / §8.4.3.2: the analog block reads `slot` outside any event guard,
 /// so every change of it is an implicit D2A: from now on `runUntil` stops
@@ -122,6 +135,30 @@ pub fn deliverA2d(s: *State, event: u32, tick: u64) Error!void {
     assert(event < s.p.slots.len);
     const now = s.scheduler.now;
     _ = try s.enqueue(.{ .a2d = event }, if (tick > now) tick - now else null, false);
+}
+
+/// The program's monitored analog events, in their order.
+pub fn monitors(s: *const State) []const A2d {
+    return if (comptime @hasField(Program, "monitors")) s.p.monitors else &.{};
+}
+
+/// Argument `k` of monitor `j` as a real, read now; null for an omitted
+/// or absent one. Probes in it call `Link.probe`.
+pub fn monitorArg(s: *State, j: usize, k: usize) Error!?f64 {
+    const m = monitors(s);
+    assert(j < m.len);
+    const args = s.p.list(m[j].args);
+    if (k >= args.len or args[k] == @backingInt(Program.Ref.none)) return null;
+    var tmp: std.heap.ArenaAllocator = .init(s.arena);
+    defer tmp.deinit();
+    return try @import("eval.zig").real(s, tmp.allocator(), args[k]);
+}
+
+/// Monitor `j` occurred: `deliverA2d` of the event slot it wakes.
+pub fn deliverMonitor(s: *State, j: usize, tick: u64) Error!void {
+    const m = monitors(s);
+    assert(j < m.len);
+    return deliverA2d(s, m[j].event, tick);
 }
 
 test "an implicit D2A queues one region-3b mark per tick" {

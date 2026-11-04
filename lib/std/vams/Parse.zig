@@ -343,7 +343,7 @@ fn parseRoot(p: *Parse) Allocator.Error!void {
             break;
         }
         const before = p.tok_i;
-        if (p.vamsWordUnder1364(before)) try p.warn(.vams_construct_under_1364);
+        if (p.vamsWordUnder1364(before)) try p.warnSite(.vams_construct_under_1364, .vams_under_language, before, @backingInt(p.language));
         const node = parseDescription(p) catch |e| switch (e) {
             error.OutOfMemory => return error.OutOfMemory,
             error.ParseError => {
@@ -440,7 +440,7 @@ fn parseAttribute(p: *Parse) Error!void {
     defer p.scratch.shrinkRetainingCapacity(top);
     while (true) {
         const name = p.tok_i;
-        if (!p.identLike(name) and p.tokenTag(name) != .keyword_units) return p.fail(.expected_identifier);
+        if (!p.identLike(name) and p.tokenTag(name) != .keyword_units) return if (p.tokenTag(name).isKeyword()) p.failSite(.expected_identifier, .attr_keyword_name, name, 0) else p.fail(.expected_identifier);
         p.tok_i += 1;
         const value: Node.OptionalIndex = if (p.eat(.equal) != null) (try expr.parseExpr(p)).toOptional() else .none;
         try p.push(try p.addNode(.attr_spec, name, .{ .opt_node = value }));

@@ -103,7 +103,7 @@ pub fn parseStmtIn(p: *Parse, mode: Mode) Error!Node.Index {
             return p.addNode(if (t == .keyword_break) .break_stmt else .continue_stmt, tok, .{ .none = {} });
         },
         // IEEE 1364-2005 §15.1: "no timing check can appear in procedural code".
-        .system_identifier => if (prim.timing_checks.has(p.tokenText(tok))) return p.fail(.expected_statement) else return exprStmt(p),
+        .system_identifier => if (prim.timing_checks.has(p.tokenText(tok))) return p.failSite(.expected_statement, .timing_check_in_procedure, tok, 0) else return exprStmt(p),
         else => return exprStmt(p),
     }
 }

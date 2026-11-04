@@ -6,9 +6,6 @@
 # line goes.
 verilog/09_behavioral_modeling/event_array_automatic.v lowering: a named block declaring storage in an automatic subroutine
 verilog/09_behavioral_modeling/event_array_native_automatic.v lowering: a named block declaring storage in an automatic subroutine
-verilog/12_hierarchy/extra_ordered_parameter_value_ignored.v elaboration refuses it (E0907)
-verilog/12_hierarchy/extra_ordered_value_ignored.v elaboration refuses it (E0907)
-verilog/12_hierarchy/generate_past_65536_iterations.v lowering: a loop generate scheme past 65536 iterations
 verilog/13_configuration/cfg1_default_liblist.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
 verilog/13_configuration/cfg2_gate_first.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
 verilog/13_configuration/cfg3_cell_use.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
@@ -20,7 +17,6 @@ verilog/13_configuration/default_search_order.v Compilation's libmap: a library 
 verilog/13_configuration/include_map.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
 verilog/13_configuration/parent_library_by_map.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
 verilog/13_configuration/resolution_order.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
-verilog/19_compiler_directives/ams_keywords_are_identifiers.v lowering: a string variable
 verilog/A_formal_syntax/b_A_1_1_incdir.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
 verilog/A_formal_syntax/b_A_1_1_library_text.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
 verilog-ams/digital/realtobits_bitstoreal_bridge.v lowering: a wreal net

@@ -39,8 +39,9 @@ const Program = std_sim.Program;
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 
-/// The most iterations one loop generate scheme unrolls (`walk.zig`'s).
-const loop_max: u32 = 1 << 16;
+/// The most iterations one loop generate scheme unrolls. §12.4.1 bounds
+/// none; a scheme that does not end repeats a genvar value first.
+const loop_max: u32 = 1 << 20;
 
 const Placement = struct { scope: u32 = none, frame: u32 = none, inst: Inst.Index = undefined, index: ?i64 = null, lane: ?[2]u32 = null, at: u32 = 0, name: []const u8 = "" };
 const Child = struct { parent: u32, name: InternPool.String };
@@ -365,7 +366,9 @@ fn genFor(w: *Walk, f: u32, scope: u32, g: Inst.GenFor, prefix: []const u8) Erro
     var v = try l.intOf(f, init.rhs);
     const step = storeOf(vir, g.step) orelse return l.refuse("a loop generate scheme without a step assignment");
     var n: u32 = 0;
+    var seen: std.AutoHashMapUnmanaged(i64, void) = .empty;
     while (n < loop_max) : (n += 1) {
+        if ((try seen.fetchPut(l.a, v, {})) != null) return l.refuse("§12.4.1 a loop generate scheme repeating a genvar value");
         const outer = l.frames.items[f].genvars;
         const genvars = try l.a.alloc(Frame.Genvar, outer.len + 1);
         @memcpy(genvars[0..outer.len], outer);
@@ -382,7 +385,7 @@ fn genFor(w: *Walk, f: u32, scope: u32, g: Inst.GenFor, prefix: []const u8) Erro
         try next_env.genvars.put(next_env.gpa, gv, v);
         v = ((try next_env.ref(step.rhs)) orelse return l.refuse("a loop generate step Sema/eval.zig does not fold")).asIntExact() orelse return l.refuse("a non-integral genvar");
     }
-    return l.refuse("a loop generate scheme past 65536 iterations");
+    return l.refuse("a loop generate scheme past 2^20 iterations");
 }
 
 /// A body's last instruction as a `store`, or null.

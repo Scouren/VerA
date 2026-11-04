@@ -148,7 +148,11 @@ pub fn applyGivens(s: *Sema, env: *Env, file: Zcu.File.Index, src: Inst.Ref, giv
                 if (n == ordered) break :ordered q;
                 n += 1;
             };
-            if (ordered == overridable) try s.fail(.E0907, file, src, "`{s}` declares {d} overridable parameters, and this instance overrides more", .{ vir.string(module), overridable });
+            if (ordered == overridable) {
+                if (s.config.ieee1364) {
+                    try s.fail(.W1161, file, src, "§12.2.2.1: `{s}` declares {d} overridable parameters, and this instance gives more values; the extra ones are ignored", .{ vir.string(module), overridable });
+                } else try s.fail(.E0907, file, src, "`{s}` declares {d} overridable parameters, and this instance overrides more", .{ vir.string(module), overridable });
+            }
             continue;
         } else named: {
             const name = ip.stringToSlice(g.name);

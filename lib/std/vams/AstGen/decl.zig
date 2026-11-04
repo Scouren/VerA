@@ -84,7 +84,11 @@ pub fn typeWords(tree: *const Ast, first: Ast.TokenIndex) TypeWords {
         .keyword_real => t.storage = .real,
         .keyword_realtime => t.storage = .realtime,
         .keyword_time => t.storage = .time,
-        .keyword_string => t.storage = .string,
+        // Under `begin_keywords "1364-2005"` `string` is a name (Annex B):
+        // the type word only when a name follows it.
+        .keyword_string => if (AstGen.isName(tree.tokenTag(i + 1))) {
+            t.storage = .string;
+        } else return t,
         .keyword_input, .keyword_output, .keyword_inout, .keyword_parameter, .keyword_localparam, .keyword_specparam, .keyword_automatic => {},
         .l_paren => {
             // A.2.2.2 strengths: skip to the `)`.

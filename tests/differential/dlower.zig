@@ -209,7 +209,7 @@ fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, op
     }
     var zcu: Zcu = try .init(a);
     _ = try zcu.addFile(path, vir, 0);
-    try sema.Sema.elaborate(&zcu, .{ .roots = .all });
+    try sema.Sema.elaborate(&zcu, .{ .roots = .all, .ieee1364 = true });
     for (zcu.failed.items(.code)) |code| if (@tagName(code)[0] == 'E') return .{ .refused = try a.print("elaboration refuses it ({t})", .{code}) };
     var why: []const u8 = "";
     const lowered = sema.digital.lower(a, &zcu, .{ .sources = &.{.{ .tree = tree, .pp = out }} }, &why) catch |e| switch (e) {

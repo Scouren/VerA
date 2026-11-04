@@ -107,6 +107,10 @@ pub const Config = struct {
     roots: Roots = .all,
     /// §6.3 `--param name=value`: values for the roots' parameters.
     overrides: []const Override = &.{},
+    /// An IEEE 1364 simulation (the digital lowering's): §12.2.2.1 values
+    /// past an ordered list's parameters are ignored with W1161, as
+    /// iverilog and lib/sim/digital do, instead of refused (E0907).
+    ieee1364: bool = false,
 
     /// Which uninstantiated modules elaborate. A device has one root
     /// (VAMS §6.2.2: the first such module); a simulation has every one

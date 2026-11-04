@@ -125,7 +125,7 @@ fn select(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, name: InternPool.String
     }
     const shown = s.zcu.intern_pool.stringToSlice(name);
     if (candidates == 0) {
-        try s.fail(.E0904, file, src, "`{s}`", .{shown});
+        try s.failRule(.{ .rule = .cell_unbound, .name = shown }, .E0904, file, src, "`{s}`", .{shown});
         return null;
     }
     // "applied in order until a unique paramset has been selected".

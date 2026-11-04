@@ -141,7 +141,8 @@ pub fn applyGivens(s: *Sema, env: *Env, file: Zcu.File.Index, src: Inst.Ref, giv
     var ordered: u32 = 0;
     var overridable: u32 = 0;
     for (env.positions.keys()) |p| overridable += @intFromBool(isOverridable(vir, p));
-    for (givens) |g| {
+    for (givens, 0..) |g, k| {
+        const at: Zcu.Part = .{ .param = @intCast(k) };
         const p = if (g.name == .empty) ordered: {
             defer ordered += 1;
             var n: u32 = 0;
@@ -151,8 +152,8 @@ pub fn applyGivens(s: *Sema, env: *Env, file: Zcu.File.Index, src: Inst.Ref, giv
             };
             if (ordered == overridable) {
                 if (s.config.ieee1364) {
-                    try s.fail(.W1161, file, src, "§12.2.2.1: `{s}` declares {d} overridable parameters, and this instance gives more values; the extra ones are ignored", .{ vir.string(module), overridable });
-                } else try s.fail(.E0907, file, src, "`{s}` declares {d} overridable parameters, and this instance overrides more", .{ vir.string(module), overridable });
+                    try s.failRule(.{ .rule = .param_extra, .nums = .{ @intCast(givens.len - k), overridable }, .part = at }, .W1161, file, src, "§12.2.2.1: `{s}` declares {d} overridable parameters, and this instance gives more values; the extra ones are ignored", .{ vir.string(module), overridable });
+                } else try s.failRule(.{ .part = at }, .E0907, file, src, "`{s}` declares {d} overridable parameters, and this instance overrides more", .{ vir.string(module), overridable });
             }
             continue;
         } else named: {
@@ -160,12 +161,13 @@ pub fn applyGivens(s: *Sema, env: *Env, file: Zcu.File.Index, src: Inst.Ref, giv
             // §9.18's hierarchical system parameters bind on any instance.
             if (env.systemNamed(name) != null) continue;
             if (env.named(name)) |q| if (isOverridable(vir, q)) break :named q;
-            if (!quiet) try s.fail(.E0907, file, src, "`{s}` is not a parameter of `{s}`", .{ name, vir.string(module) });
+            const rule: Zcu.Rule = if (env.named(name) != null) .param_local else .param_unknown;
+            if (!quiet) try s.failRule(.{ .rule = rule, .name = name, .part = at }, .E0907, file, src, "`{s}` is not a parameter of `{s}`", .{ name, vir.string(module) });
             continue;
         };
         if (g.value == .none) continue;
         const gop = try env.given.getOrPut(s.gpa, p);
-        if (gop.found_existing) try s.fail(.E0908, file, src, "`{s}` is given more than one value", .{vir.string(payloadOf(vir, Inst.Param, p).name)});
+        if (gop.found_existing) try s.failRule(.{ .rule = .param_twice, .name = vir.string(payloadOf(vir, Inst.Param, p).name), .part = at }, .E0908, file, src, "`{s}` is given more than one value", .{vir.string(payloadOf(vir, Inst.Param, p).name)});
         gop.value_ptr.* = g.value;
         try env.spelling.put(s.gpa, p, if (g.name == .empty) vir.string(payloadOf(vir, Inst.Param, p).name) else ip.stringToSlice(g.name));
     }
@@ -359,20 +361,20 @@ fn bindPorts(s: *Sema, p: Pending, vir: *const Vir, m: Inst.Module, module: Vir.
     const formals = vir.body(m.ports);
     const named = conns.len != 0 and conns[0].name != .empty;
     if (!named and conns.len > formals.len)
-        try s.fail(.E0906, p.file, p.src, "`{s}` declares {d} ports, and this instance connects {d}", .{ vir.string(module), formals.len, conns.len });
+        try s.failRule(.{ .rule = .port_count, .part = .{ .conn = @intCast(formals.len) } }, .E0906, p.file, p.src, "`{s}` declares {d} ports, and this instance connects {d}", .{ vir.string(module), formals.len, conns.len });
     for (conns, 0..) |c, k| {
         if (named != (c.name != .empty)) {
-            try s.fail(.E0906, p.file, p.src, "a{s} connection in a list of {s} connections", .{ if (named) "n ordered" else " named", if (named) "named" else "ordered" });
+            try s.failRule(.{ .rule = .port_mixed, .part = .{ .conn = @intCast(k) } }, .E0906, p.file, p.src, "a{s} connection in a list of {s} connections", .{ if (named) "n ordered" else " named", if (named) "named" else "ordered" });
             continue;
         }
         if (!named) continue;
         const n = pvir.string(c.name);
         if (portNamed(vir, formals, n) == null) {
-            try s.fail(.E0906, p.file, p.src, "`{s}` is not a port of `{s}`", .{ n, vir.string(module) });
+            try s.failRule(.{ .rule = .port_unknown, .name = n, .part = .{ .conn = @intCast(k) } }, .E0906, p.file, p.src, "`{s}` is not a port of `{s}`", .{ n, vir.string(module) });
             continue;
         }
         for (conns[0..k]) |prev| if (prev.name != .empty and std.mem.eql(u8, pvir.string(prev.name), n)) {
-            try s.fail(.E0906, p.file, p.src, "`{s}` is connected twice", .{n});
+            try s.failRule(.{ .rule = .port_twice, .name = n, .part = .{ .conn = @intCast(k) } }, .E0906, p.file, p.src, "`{s}` is connected twice", .{n});
             break;
         };
     }
@@ -472,7 +474,7 @@ fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i:
         // is no real.
         if (in.flags.scaled) try s.fail(.E0247, file, i.toRef(), "a scaled literal in `{s}`'s UDP delay", .{vir.string(in.target)});
         if (params.len > 2 or (params.len != 0 and params[0].name != .empty))
-            try s.fail(.E0239, file, i.toRef(), "`{s} #(…) {s}`: {d} value(s)", .{ vir.string(in.target), vir.string(in.name), params.len })
+            try s.failRule(.{ .rule = .udp_delay }, .E0239, file, i.toRef(), "`{s} #(…) {s}`: {d} value(s)", .{ vir.string(in.target), vir.string(in.name), params.len })
         else
             // The instance computes nothing in an analog device (a notice
             // stage 5 owns, tests/differential/stages.zig).

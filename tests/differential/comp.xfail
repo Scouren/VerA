@@ -46,7 +46,6 @@ spice/primitive_mesfet.va not built: backend exe
 spice/primitive_mixed_discipline_override.va not built: backend exe
 spice/primitive_named_ports.va not built: backend exe
 spice/primitive_port_discipline.va not built: backend exe
-spice/primitive_port_name_not_in_table_e1_rejected.va rw-comp (elab): stderr: line 2: old `  --> spice/primitive_port_name_not_in_table_e1_rejected.va:36:27`, new `  --> spice/primitive_port_name_not_in_table_e1_rejected.va:36:23`
 spice/primitive_segment_discipline.va rw-lower (analog lowering): exit status old 0, new 1
 spice/primitive_segment_scan.va not built: backend exe
 spice/primitive_source_scale_factor.va not built: backend exe
@@ -60,7 +59,6 @@ spice/primitive_vsine.va not built: backend exe
 spice/reject_limit_seed_reads_solution.va not built: backend exe
 spice/reject_limit_seed_reads_solution_through_conditional.va not built: backend exe
 spice/reject_limit_vera_seed_attr_not_constant.va not built: backend exe
-spice/reject_parameter_name_not_in_table_e1.va rw-comp (elab) location: stderr: line 2: old `   --> spice/reject_parameter_name_not_in_table_e1.va:107:14`, new `   --> spice/reject_parameter_name_not_in_table_e1.va:107:24`
 spice/spice_binned_model_selects_by_l_and_w.va not built: backend exe
 spice/spice_binning.va not built: backend exe
 spice/spice_case_lookup.va rw-comp (elab): exit status old 0, new 1
@@ -83,12 +81,10 @@ spice/spice_subckt_params_expressions.va not built: backend exe
 spice/spice_supported_model_type_neighbour.va not built: backend exe
 spice/spice_unsupported_model_type_rejected.va rw-comp (elab): stderr: line 1: old `error[E0952]: a SPICE model names a primitive VerA does not support: `sw1` is a SPICE `.MODEL` of type `sw`, a primitive Table E.1 and VerA do not provide`, new `error[E0904]: instance names no module: `sw1``
 spice/spice_x_card_subcircuit_instance.va not built: backend exe
-spice/subcircuit_spice_m_is_not_an_implicit_parameter_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> spice/subcircuit_spice_m_is_not_an_implicit_parameter_rejected.va:32:11`, new `  --> spice/subcircuit_spice_m_is_not_an_implicit_parameter_rejected.va:32:18`
 spice/subckt_body_contributes_equations.va rw-comp (elab): exit status old 0, new 1
 spice/subckt_port_name_not_in_subckt_rejected.va rw-comp (elab): stderr: line 1: old `error[E0906]: port connections do not match the module's ports: `vcc` is not a port of `ecposc``, new `error[E0904]: instance names no module: `ecpOsc``
 spice/subckt_source_card_drives_the_node.va rw-comp (elab): exit status old 0, new 1
 spice/vcvs_inside_a_spice_subcircuit.va not built: backend exe
-spice/verilog_module_shadowing_primitive_keeps_its_own_parameters_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> spice/verilog_module_shadowing_primitive_keeps_its_own_parameters_rejected.va:37:14`, new `  --> spice/verilog_module_shadowing_primitive_keeps_its_own_parameters_rejected.va:37:22`
 spice/verilog_module_wins_over_netlist_subckt.va rw-comp (elab): exit status old 0, new 1
 spice/vsine_dc_is_the_operating_point_value.va not built: backend exe
 verilog-a/annex_a_syntax/abstol_nature_identifier.va rw-lower (analog lowering): exit status old 0, new 1
@@ -145,7 +141,6 @@ verilog-a/annex_a_syntax/ranged_parameter_unsupported.va not built: backend exe
 verilog-a/annex_a_syntax/reject_A_1_5_config_without_design_statement.va rw-comp (parse): stderr: line 1: old `error[E0250]: a construct outside the Verilog-A subset: `config` under --sim=verilogA`, new `error[E0207]: unexpected token: found `default`: a config_declaration begins with its `design` statement`
 verilog-a/annex_a_syntax/reject_A_2_6_function_output_formal.va rw-comp (parse): stderr: line 1: old `error[E0250]: a construct outside the Verilog-A subset: `function` under --sim=verilogA`, new `error[E0207]: unexpected token: found `output`: A.2.6 gives a function `input` formals only; an `analog function` or a task takes `output``
 verilog-a/annex_a_syntax/reject_A_4_1_module_instance_without_name.va rw-lower (analog lowering): stderr: line 10: old `warning[W0252]: gate primitive accepted, and it computes nothing: named_instance_child primitive`, new `error: could not compile due to 1 previous error(s)`
-verilog-a/annex_a_syntax/reject_A_4_1_ordered_and_named_connections.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/annex_a_syntax/reject_A_4_1_ordered_and_named_connections.va:26:27`, new `  --> verilog-a/annex_a_syntax/reject_A_4_1_ordered_and_named_connections.va:26:21`
 verilog-a/annex_a_syntax/replication.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/annex_a_syntax/source_text.va not built: backend exe
 verilog-a/annex_a_syntax/string_literal.va not built: backend exe
@@ -171,7 +166,6 @@ verilog-a/annex_c_analog_subset/parameter_range.va not built: backend exe
 verilog-a/annex_c_analog_subset/port_access_contribution_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0407]: port access function cannot be a contribution target`, new `error[E0407]: port access function cannot be a contribution target: a contribution to a port access`
 verilog-a/annex_c_analog_subset/rc_34_port_access_read_accepted.va not built: backend exe
 verilog-a/annex_c_analog_subset/signal_flow_flow_access_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: `q` is of discipline `voltage`, which binds no flow nature, so `q` has no flow to access`, new `   = help: run `vera --explain E0501` for a detailed explanation`
-verilog-a/annex_c_analog_subset/spice_parameter_name_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/annex_c_analog_subset/spice_parameter_name_rejected.va:37:16`, new `  --> verilog-a/annex_c_analog_subset/spice_parameter_name_rejected.va:37:26`
 verilog-a/annex_c_analog_subset/spice_primitive.va not built: backend exe
 verilog-a/annex_c_analog_subset/standard_definitions.va not built: backend exe
 verilog-a/annex_d_standard_definitions/abstol_override_branches.va not built: backend exe
@@ -937,7 +931,6 @@ verilog-a/ch05_analog_behavior/assignment_concatenation_invalid.va rw-lower (ana
 verilog-a/ch05_analog_behavior/assignment_hierarchical_invalid.va rw-lower (analog lowering): stderr: line 1: old `error[E0316]: unsupported assignment target: a hierarchical name is not an assignment target`, new `error[E0512]: unknown function: an assignment to a select is not lowered by Sema yet`
 verilog-a/ch05_analog_behavior/batch_per_instance_state.va not built: backend exe
 verilog-a/ch05_analog_behavior/block_local_is_static_between_events.va not built: backend exe
-verilog-a/ch05_analog_behavior/block_local_parameter_override_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch05_analog_behavior/block_local_parameter_override_rejected.va:14:36`, new `  --> verilog-a/ch05_analog_behavior/block_local_parameter_override_rejected.va:14:54`
 verilog-a/ch05_analog_behavior/branch_flow_probe_includes_the_reactive_part.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch05_analog_behavior/case_default_only.va not built: backend exe
 verilog-a/ch05_analog_behavior/case_duplicate_default_invalid.va not built: backend exe
@@ -1194,7 +1187,6 @@ verilog-a/ch06_hierarchy/dependent_parameters.va not built: backend exe
 verilog-a/ch06_hierarchy/dependent_range_and_array_override.va not built: backend exe
 verilog-a/ch06_hierarchy/disable_in_a_child_instance.va not built: backend exe
 verilog-a/ch06_hierarchy/duplicate_declaration_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: §6.8: one identifier declares one item in a scope — the earlier declaration is unreachable`, new `   = help: run `vera --explain E0362` for a detailed explanation`
-verilog-a/ch06_hierarchy/duplicate_named_connection_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch06_hierarchy/duplicate_named_connection_rejected.va:21:29`, new `  --> verilog-a/ch06_hierarchy/duplicate_named_connection_rejected.va:21:20`
 verilog-a/ch06_hierarchy/duplicate_parameter_rejected.va not built: backend exe
 verilog-a/ch06_hierarchy/dynamic_parameter_dc_sweep.va not built: backend exe
 verilog-a/ch06_hierarchy/elaboration_order_defparam_before_generate.va not built: backend exe
@@ -1247,7 +1239,6 @@ verilog-a/ch06_hierarchy/hierarchy_duplicate_parameter_rejected.va rw-comp (elab
 verilog-a/ch06_hierarchy/hierarchy_empty_named_parameter.va not built: backend exe
 verilog-a/ch06_hierarchy/hierarchy_empty_named_semantics.va not built: backend exe
 verilog-a/ch06_hierarchy/hierarchy_empty_paramset_tie.va not built: backend exe
-verilog-a/ch06_hierarchy/hierarchy_empty_unknown_rejected.va rw-comp (elab) location: stderr: line 2: old ` --> verilog-a/ch06_hierarchy/hierarchy_empty_unknown_rejected.va:9:30`, new ` --> verilog-a/ch06_hierarchy/hierarchy_empty_unknown_rejected.va:9:41`
 verilog-a/ch06_hierarchy/hierarchy_override_breaks_dependency.va not built: backend exe
 verilog-a/ch06_hierarchy/hierarchy_overview_instances_and_overrides.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch06_hierarchy/hierarchy_zero_generate_control.va not built: backend exe
@@ -1285,7 +1276,6 @@ verilog-a/ch06_hierarchy/mfactor_multiplies_named_branch_flow_noise_power.va not
 verilog-a/ch06_hierarchy/mfactor_potential_noise.va not built: backend exe
 verilog-a/ch06_hierarchy/mfactor_propagation_unsupported.va not built: backend exe
 verilog-a/ch06_hierarchy/mfactor_scales_named_branch_flow.va not built: backend exe
-verilog-a/ch06_hierarchy/mixed_connection_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch06_hierarchy/mixed_connection_rejected.va:22:27`, new `  --> verilog-a/ch06_hierarchy/mixed_connection_rejected.va:22:22`
 verilog-a/ch06_hierarchy/mixed_sign_comparison_context.va not built: backend exe
 verilog-a/ch06_hierarchy/module_definition.va not built: backend exe
 verilog-a/ch06_hierarchy/module_instantiation_unsupported.va not built: backend exe
@@ -1313,7 +1303,6 @@ verilog-a/ch06_hierarchy/ordered_override_partial_subset.va not built: backend e
 verilog-a/ch06_hierarchy/ordered_override_skips_localparam.va not built: backend exe
 verilog-a/ch06_hierarchy/ordered_port_binding.va not built: backend exe
 verilog-a/ch06_hierarchy/output_port.va not built: backend exe
-verilog-a/ch06_hierarchy/override_of_a_child_variable_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch06_hierarchy/override_of_a_child_variable_rejected.va:32:33`, new `  --> verilog-a/ch06_hierarchy/override_of_a_child_variable_rejected.va:32:42`
 verilog-a/ch06_hierarchy/param_given.va not built: backend exe
 verilog-a/ch06_hierarchy/param_given_absent.va not built: backend exe
 verilog-a/ch06_hierarchy/param_given_of_a_variable_rejected.va not built: backend exe
@@ -1397,13 +1386,11 @@ verilog-a/ch06_hierarchy/port_select_indexed_part_select.va rw-lower (analog low
 verilog-a/ch06_hierarchy/port_select_of_a_scalar_net_rejected.va not built: backend exe
 verilog-a/ch06_hierarchy/port_select_ordered_of_a_parent_port.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch06_hierarchy/portless_instance_without_connections.va not built: backend exe
-verilog-a/ch06_hierarchy/portless_module_with_connections_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch06_hierarchy/portless_module_with_connections_rejected.va:17:20`, new `  --> verilog-a/ch06_hierarchy/portless_module_with_connections_rejected.va:17:18`
 verilog-a/ch06_hierarchy/rc_generate_block_instance_name.va not built: backend exe
 verilog-a/ch06_hierarchy/rc_h01_paramset_chain_far_link_parameter.va not built: backend exe
 verilog-a/ch06_hierarchy/recursive_instantiation_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0905]: recursive module instantiation: `ch6_self` → `ch6_self` closes at `again``, new `error[E0905]: recursive module instantiation: `ch6_self` instantiates itself with the same parameters (2 levels deep)`
 verilog-a/ch06_hierarchy/reject_6_4_1_paramset_access_function.va not built: backend exe
 verilog-a/ch06_hierarchy/reject_6_4_1_paramset_variable_assigns_parameter.va not built: backend exe
-verilog-a/ch06_hierarchy/reject_6_5_4_more_ordered_connections_than_ports.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch06_hierarchy/reject_6_5_4_more_ordered_connections_than_ports.va:26:26`, new `  --> verilog-a/ch06_hierarchy/reject_6_5_4_more_ordered_connections_than_ports.va:26:17`
 verilog-a/ch06_hierarchy/reject_6_5_7_incompatible_analog_port_discipline.va rw-comp (elab) message: stderr: line 1: old `error[E0355]: incompatible disciplines: port `c1.p` is of discipline `thermal` and is connected to `a`, of discipline `electrical` (3.11.1 Potential Incompatibi`, new `error[E0355]: incompatible disciplines: port `p` is `thermal` and its net `a` is `elect
 verilog-a/ch06_hierarchy/root_path_names_no_top_level_instance_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0901]: hierarchical name names nothing in the elaborated design: `u.gain` names nothing in the elaborated design`, new `error[E0901]: hierarchical name names nothing in the elaborated design: `$root.u.gain` names nothing in the elaborat
 verilog-a/ch06_hierarchy/root_reference_unsupported.va not built: backend exe
@@ -1415,7 +1402,6 @@ verilog-a/ch06_hierarchy/typed_ports.va not built: backend exe
 verilog-a/ch06_hierarchy/uncoerced_implicit_net_hierarchical_reference_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0901]: hierarchical name names nothing in the elaborated design: `implicit_link` names no net in the elaborated design`, new `error[E0901]: hierarchical name names nothing in the elaborated design: the path names a net with no disciplin
 verilog-a/ch06_hierarchy/undeclared_interconnect_port_binding.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch06_hierarchy/unknown_geometry_system_parameter_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0907]: override names no parameter of the module: `child.$temperature` names no parameter of the elaborated design`, new `error[E0907]: override names no parameter of the module: `$temperature` is not a parameter of `ch6_geom_unknown_child``
-verilog-a/ch06_hierarchy/unknown_named_port_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch06_hierarchy/unknown_named_port_rejected.va:17:17`, new `  --> verilog-a/ch06_hierarchy/unknown_named_port_rejected.va:17:15`
 verilog-a/ch06_hierarchy/unnamed_generate_block_external_names.va not built: backend exe
 verilog-a/ch06_hierarchy/unnamed_generate_instance_reference_rejected.va not built: backend exe
 verilog-a/ch06_hierarchy/unnamed_generate_reference_from_within.va rw-lower (analog lowering): exit status old 0, new 1
@@ -2523,7 +2509,6 @@ verilog/04_data_types/array_row_write_rejected.v not built: backend digital_devi
 verilog/04_data_types/array_slice_write_rejected.v not built: backend digital_device
 verilog/04_data_types/continuous_assign_to_reg_rejected.v not built: backend digital_device
 verilog/04_data_types/memory_as_vector_rejected.v not built: backend digital_device
-verilog/04_data_types/named_localparam_override_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.2: `L` is a local parameter, which a parameter value assignment cannot override`, new `error[E0907]: override names no parameter of the module: `L` is not a parameter of `b_4_10_2_leaf``
 verilog/04_data_types/native_real_edge_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/04_data_types/native_real_select_rejected.v not built: backend digital_device
 verilog/04_data_types/nonconstant_declaration_assignment_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
@@ -2563,7 +2548,6 @@ verilog/06_assignments/real_array_initializer_rejected.v not built: backend digi
 verilog/06_assignments/task_variable_initializer_rejected.v not built: backend digital_device
 verilog/07_gate_switch_level/split_array_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/07_gate_switch_level/switch_three_delays_rejected.v not built: backend digital_device
-verilog/07_gate_switch_level/unknown_gate_keyword_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: undeclared module in instantiation: no library of the search order (work) holds cell `AND``, new `error[E0904]: instance names no module: `AND``
 verilog/08_udp/combinational_reg_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/08_udp/definition_inside_module_rejected.v rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `q``, new `error[E0205]: unsupported module item: found table`
 verilog/08_udp/definition_placement.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv_before` primitive`
@@ -2577,16 +2561,13 @@ verilog/08_udp/jk_edge_ff.v rw-dlower (digital lowering): stderr: line 1: old ``
 verilog/08_udp/multibit_initial_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/08_udp/multiplexer.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `multiplexer` primitive`
 verilog/08_udp/output_bit_select.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv` primitive`
-verilog/08_udp/output_not_first_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §8.1.1: the output port shall be the first port of a UDP`, new `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port, and it is the first port`
 verilog/08_udp/output_reg_initializer.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `hdr` primitive`
 verilog/08_udp/overlapping_entries_agree.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `nand_overlap` primitive`
 verilog/08_udp/sequential_64_inputs.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `seq64` primitive`
 verilog/08_udp/sequential_hold_agrees.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `latch_agree` primitive`
 verilog/08_udp/sequential_without_reg_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/08_udp/table_symbols.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `pn` primitive`
-verilog/08_udp/three_delays_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §8.6: a UDP instance takes at most two delays`, new `error[E0239]: a UDP instance's delay is more than a delay2: `inv #(…) g`: 3 value(s)`
 verilog/08_udp/two_delays.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv` primitive`
-verilog/08_udp/two_outputs_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port`, new `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port, and it is the first port`
 verilog/08_udp/udp_65_inputs.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `and65` primitive`
 verilog/08_udp/udp_comb.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `udp_mux` primitive`
 verilog/08_udp/udp_dff.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `udp_dff` primitive`
@@ -2618,13 +2599,13 @@ verilog/09_behavioral_modeling/zero_delay_always_rejected.v rw-dlower (digital l
 verilog/10_tasks_functions/constant_function_hierarchical_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/10_tasks_functions/disable_function_rejected.v not built: backend digital_device
 verilog/10_tasks_functions/function_call_statement_rejected.v not built: backend digital_device
-verilog/10_tasks_functions/function_enables_task_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function cannot enable a task`, new `error[E0214]: expected '<+' or '=': found `;``
+verilog/10_tasks_functions/function_enables_task_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/10_tasks_functions/function_event_trigger_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/10_tasks_functions/function_nonblocking_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function body cannot contain a nonblocking assignment`, new `error[E0214]: expected '<+' or '=': found `;``
-verilog/10_tasks_functions/function_output_argument_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function argument is an input, not an output or inout`, new `error[E0207]: unexpected token: found `output`: A.2.6 gives a function `input` formals only; an `analog function` or a task takes `output``
+verilog/10_tasks_functions/function_nonblocking_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/10_tasks_functions/function_output_argument_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/10_tasks_functions/function_scope_object_named_as_function_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/10_tasks_functions/function_time_control_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function body cannot contain a time control`, new `error[E0254]: a delay control in an analog block`
-verilog/10_tasks_functions/function_without_input_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.1: a function shall have at least one input declared`, new `error[E0224]: an analog function declares no formal argument: `f` has an empty formal list`
+verilog/10_tasks_functions/function_time_control_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/10_tasks_functions/function_without_input_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/10_tasks_functions/module_object_named_as_function_rejected.v not built: backend digital_device
 verilog/10_tasks_functions/recursion_without_end_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: nesting here exhausts the 1987 MiB stack VerA reserved for it`, new `error[E1100]: digital source execution failed: §10.4.2: subroutine calls nested past 20000 activations`
 verilog/10_tasks_functions/subroutine_parameter_assignment_rejected.v not built: backend digital_device
@@ -2634,45 +2615,31 @@ verilog/10_tasks_functions/task_output_expression_rejected.v not built: backend 
 verilog/11_scheduling/primitive_output_to_reg_rejected.v not built: backend digital_device
 verilog/11_scheduling/zero_delay_loop_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/11_scheduling/zero_delay_loop_rejected.v:16:1`, new `  = note: LRM 8.5`
 verilog/12_hierarchy/assign_before_net_declaration_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/connections_to_portless_module_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: more port connections than the module has ports`, new `error[E0906]: port connections do not match the module's ports: `noports` declares 0 ports, and this instance connects 1`
 verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/defparam_across_generate_instances_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/defparam_early_resolution_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.8.2: this defparam's hierarchical name was resolved before the hierarchy was complete and would resolve diff`, new `error[E0907]: override names no parameter of the module: `m.n.p` names no parameter of the elab
-verilog/12_hierarchy/defparam_names_no_parameter_rejected.v rw-comp (elab) message: stderr: line 1: old `error[E0907]: override names no parameter of the module: §12.2.1: this defparam names `Z`, which is no parameter of its module`, new `error[E0907]: override names no parameter of the module: `Z` is not a parameter of `inner``
-verilog/12_hierarchy/defparam_names_nothing_rejected.v rw-comp (elab): stderr: line 1: old `error[E0901]: hierarchical name names nothing in the elaborated design: §12.2.1: this defparam's hierarchical name `foo` names nothing in the design`, new `error[E0907]: override names no parameter of the module: `foo` is not a parameter of `triage_defparam_name
+verilog/12_hierarchy/defparam_names_nothing_rejected.v rw-comp (elab): stderr: line 1: old `error[E0901]: hierarchical name names nothing in the elaborated design: §12.2.1: this defparam's hierarchical name `foo` names nothing in the design`, new `error[E0907]: override names no parameter of the module: §12.2.1: this defparam names `foo`, which is no 
 verilog/12_hierarchy/defparam_nonconstant_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element`, new `error[E0907]: override names no parameter of the module: `u[1].x.p` names no parameter of the e
-verilog/12_hierarchy/duplicate_module_later_wins.v rw-comp (elab) message: stderr: line 1: old `warning[W1152]: two cells with one name in one library: `work.a` is defined again; this later definition is the cell`, new `warning[W1152]: two cells with one name in one library: `a` is defined again; this later definition is the module`
 verilog/12_hierarchy/duplicate_port_name_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/extra_ordered_connection_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: more port connections than the module has ports`, new `error[E0906]: port connections do not match the module's ports: `m` declares 2 ports, and this instance connects 3`
-verilog/12_hierarchy/extra_ordered_parameter_value_ignored.v rw-comp (elab): exit status old 0, new 1
-verilog/12_hierarchy/extra_ordered_value_ignored.v rw-comp (elab): exit status old 0, new 1
 verilog/12_hierarchy/function_port_range_scope_rejected.v not built: backend digital_device
 verilog/12_hierarchy/generate_loop_repeated_genvar_rejected.v not built: backend digital_device
 verilog/12_hierarchy/generate_nonterminating_rejected.v not built: backend digital_device
 verilog/12_hierarchy/hierarchy_simple_name_stops_at_module_rejected.v not built: backend digital_device
 verilog/12_hierarchy/input_declared_reg_rejected.v not built: backend digital_device
 verilog/12_hierarchy/instance_select_out_of_range_rejected.v not built: backend digital_device
-verilog/12_hierarchy/listed_port_undeclared_rejected.v rw-comp (astgen): stderr: line 1: old `error[E1100]: digital source execution failed: §12.3.3: port `b` has no direction declaration`, new `error[E0376]: port has no direction declaration: port `b` of module `m` is not declared `input`, `output` or `inout``
 verilog/12_hierarchy/localparam_override_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/mixed_ordered_named_ports_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.3.6: an instance mixes ordered and named port connections`, new `error[E0906]: port connections do not match the module's ports: an ordered connection in a list of named connections`
 verilog/12_hierarchy/module_instance_delay_rejected.v not built: backend digital_device
-verilog/12_hierarchy/named_connection_to_concatenation_port_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: the instantiated module has no such port`, new `error[E0906]: port connections do not match the module's ports: `c` is not a port of `complex_ports``
 verilog/12_hierarchy/net_type_warning.v rw-comp (elab): stderr: line 1: old `warning[W1160]: dissimilar net types joined through a port: §12.3.10: a `wand` port joined to a `wor` net is a Table 12-1 warn cell of the net type table`, new ``
 verilog/12_hierarchy/no_top_level_module_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/non_ancestor_module_name_rejected.v not built: backend digital_device
 verilog/12_hierarchy/nonconstant_generate_scheme_rejected.v not built: backend digital_device
-verilog/12_hierarchy/null_port_extra_connection_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: more port connections than the module has ports`, new `error[E0906]: port connections do not match the module's ports: `null_leaf` declares 4 ports, and this instance connects 5`
 verilog/12_hierarchy/output_to_expression_rejected.v not built: backend digital_device
 verilog/12_hierarchy/output_to_variable_rejected.v not built: backend digital_device
-verilog/12_hierarchy/parameter_assigned_twice_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.2.2: parameter `size` is assigned twice`, new `error[E0908]: a parameter is overridden more than once: `size` is given more than one value`
-verilog/12_hierarchy/port_connected_twice_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.3.6: port `a` is connected twice`, new `error[E0906]: port connections do not match the module's ports: `a` is connected twice`
 verilog/12_hierarchy/port_width_mismatch_vams_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/real_connected_to_port_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/select_warning.v rw-comp (elab): stderr: line 1: old `warning[W1160]: dissimilar net types joined through a port: §12.3.10: a `wand` port joined to a `wor` net is a Table 12-1 warn cell of the net type table`, new ``
 verilog/12_hierarchy/self_instantiation_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/unknown_parameter_name_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.2.2: the module has no such parameter: `width``, new `error[E0907]: override names no parameter of the module: `width` is not a parameter of `vdff``
-verilog/12_hierarchy/unknown_port_name_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: the instantiated module has no such port`, new `error[E0906]: port connections do not match the module's ports: `zz` is not a port of `m``
 verilog/12_hierarchy/unnamed_block_referenced_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/cell_not_in_its_library_rejected.v not built: backend libmap
 verilog/13_configuration/cfg1_default_liblist.v not built: backend libmap
@@ -2692,11 +2659,9 @@ verilog/13_configuration/library_without_path_rejected.v not built: backend libm
 verilog/13_configuration/parent_library_by_map.v not built: backend libmap
 verilog/13_configuration/resolution_order.v not built: backend libmap
 verilog/13_configuration/rule_inside_other_config_rejected.v rw-comp (elab): exit status old 1, new 0
-verilog/13_configuration/same_name_cell_last_wins.v rw-comp (elab) message: stderr: line 1: old `warning[W1152]: two cells with one name in one library: `work.leaf` is defined again; this later definition is the cell`, new `warning[W1152]: two cells with one name in one library: `leaf` is defined again; this later definition is the module`
 verilog/13_configuration/source_text_in_map_rejected.v not built: backend libmap
 verilog/13_configuration/two_libraries_match_rejected.v not built: backend libmap
 verilog/13_configuration/two_unreferenced_configs_rejected.v rw-comp (elab): exit status old 1, new 0
-verilog/13_configuration/unbound_instance_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: undeclared module in instantiation: no library of the search order (work) holds cell `absent``, new `error[E0904]: instance names no module: `absent``
 verilog/13_configuration/undeclared_library_rejected.v not built: backend libmap
 verilog/15_timing_checks/conditions.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in b_15_6_conditions.u: timestamp event at 20, timecheck event at 22`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/fullskew_checks_both_orders.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$fullskew` in fullskew_checks_both_orders.forward: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
@@ -2786,13 +2751,10 @@ verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v not built: backe
 verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_library_text.v not built: backend libmap
 verilog/A_formal_syntax/b_A_2_2_1_dimension_and_initializer_rejected.v not built: backend digital_device
-verilog/A_formal_syntax/b_A_2_6_function_output_port_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function argument is an input, not an output or inout`, new `error[E0207]: unexpected token: found `output`: A.2.6 gives a function `input` formals only; an `analog function` or a task takes `output``
+verilog/A_formal_syntax/b_A_2_6_function_output_port_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/A_formal_syntax/b_A_2_8_net_block_item_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found `;``, new `error: could not compile due to 1 previous error(s)`
-verilog/A_formal_syntax/b_A_4_1_mixed_port_connections_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.3.6: an instance mixes ordered and named port connections`, new `error[E0906]: port connections do not match the module's ports: a named connection in a list of ordered connections`
 verilog/A_formal_syntax/b_A_5_1_udp_declarations.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_A_5_1_mux` primitive`
-verilog/A_formal_syntax/b_A_5_2_two_outputs_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port`, new `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port, and it is the first port`
 verilog/A_formal_syntax/b_A_5_3_udp_body.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_A_5_3_xor` primitive`
-verilog/A_formal_syntax/b_A_5_4_udp_delay3_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §8.6: a UDP instance takes at most two delays`, new `error[E0239]: a UDP instance's delay is more than a delay2: `b_A_5_4_buf #(…) u`: 3 value(s)`
 verilog/A_formal_syntax/b_A_6_3_unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found k`, new `error: could not compile due to 1 previous error(s)`
 verilog/A_formal_syntax/b_A_6_9_empty_task_argument_rejected.v not built: backend digital_device
 verilog/A_formal_syntax/b_A_8_2_empty_function_call_rejected.v not built: backend digital_device

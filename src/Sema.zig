@@ -14,11 +14,13 @@
 //! Contents:
 //! - `pub const Config = struct` (`Roots`, `Override`)
 //! - `pub fn elaborate(zcu: *Zcu, config: Config) Allocator.Error!void`
-//! - `pub const Analysis = struct` (`deinit`)
+//! - `pub const Analysis = struct` (`deinit`, `Src`)
 //! - lowering's types: `pub const Ty`, `pub const Value`, `pub const Slot`, `pub const Bind`, `pub const Unit`, `pub const Bridged`, `pub const ContribKey`, `pub const Block` (`Loop`, `Label`, `restricted`, `child`)
 //! - `pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis`
 //! - `pub fn addInst(s: *Sema, b: *Block, inst: Air.Inst) Allocator.Error!Air.Inst.Ref`
 //! - `pub fn fail(s: *Sema, code: Diag.Code, file: Zcu.File.Index, src: Vir.Inst.Ref, comptime fmt: []const u8, args: anytype) Allocator.Error!void`
+//! - `pub const Why = struct`
+//! - `pub fn failRule(s: *Sema, why: Why, code: Diag.Code, file: Zcu.File.Index, src: Vir.Inst.Ref, comptime fmt: []const u8, args: anytype) Allocator.Error!void`
 //! - `pub fn bound(s: *Sema, cell: InternPool.String, path: []const u8) InternPool.String`
 
 const std = @import("std");
@@ -282,6 +284,14 @@ pub const Block = struct {
     }
 };
 
+/// What `failRule` records beside the message (`Zcu.Failure`'s fields).
+pub const Why = struct {
+    rule: Zcu.Rule = .none,
+    name: []const u8 = "",
+    nums: [2]u32 = .{ 0, 0 },
+    part: Zcu.Part = .whole,
+};
+
 const Sema = @This();
 
 /// Elaborates every file of `zcu` into its namespace and instance tree.
@@ -357,6 +367,18 @@ pub fn fail(s: *Sema, code: Diag.Code, file: Zcu.File.Index, src: Inst.Ref, comp
     const before = s.zcu.failed.len;
     try s.zcu.failed.append(s.gpa, .{ .code = code, .file = file, .src = src, .message = message });
     assert(s.zcu.failed.len == before + 1);
+}
+
+/// `fail` naming the rule that refused, what its old words quote, and the
+/// part of the instance it is about.
+pub fn failRule(s: *Sema, why: Why, code: Diag.Code, file: Zcu.File.Index, src: Inst.Ref, comptime fmt: []const u8, args: anytype) Allocator.Error!void {
+    assert(why.rule != .none or why.part != .whole);
+    try s.fail(code, file, src, fmt, args);
+    const row = s.zcu.failed.len - 1;
+    s.zcu.failed.items(.rule)[row] = why.rule;
+    s.zcu.failed.items(.name)[row] = try s.zcu.intern_pool.getString(s.gpa, why.name);
+    s.zcu.failed.items(.nums)[row] = why.nums;
+    s.zcu.failed.items(.part)[row] = why.part;
 }
 
 /// The cell an instance of `cell` at absolute path `path` binds under the
@@ -444,7 +466,7 @@ fn namespace(s: *Sema) Allocator.Error!void {
                     const gop = try zcu.modules.getOrPut(s.gpa, name);
                     // §13.2.1.1 a cell defined again in its own library.
                     if (gop.found_existing and !zcu.isBuiltin(gop.value_ptr.*) and !zcu.isBuiltin(decl) and std.mem.eql(u8, zcu.libraryOf(gop.value_ptr.*), zcu.libraryOf(decl)))
-                        try s.fail(.W1152, file, d.inst.toRef(), "`{s}` is defined again; this later definition is the module", .{vir.string(d.name)});
+                        try s.failRule(.{ .rule = .cell_again, .name = try std.fmt.allocPrint(s.arena, "{s}.{s}", .{ zcu.libraryOf(decl), vir.string(d.name) }) }, .W1152, file, d.inst.toRef(), "`{s}` is defined again; this later definition is the module", .{vir.string(d.name)});
                     gop.value_ptr.* = decl;
                 },
                 .paramset => try zcu.paramsets.append(s.gpa, decl),

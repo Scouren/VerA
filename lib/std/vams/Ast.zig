@@ -77,6 +77,9 @@ pub const ParseOptions = struct {
     /// error (IEEE 1364-2005 annex A has no production for it). Under a
     /// Verilog-AMS set a null statement is no `analog_statement` (A.6.4).
     keywords: KeywordSet = .vams_2023,
+    /// An IEEE 1364 design (a `.v`, the old digital route) under any
+    /// language: statements are A.6's, as under a 1364 set.
+    discrete: bool = false,
 };
 
 /// One row of the node table, 13 bytes SoA: what it is, the token it is

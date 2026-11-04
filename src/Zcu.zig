@@ -23,7 +23,7 @@
 //!
 //! Contents:
 //! - fields `gpa`, `intern_pool`, `files`, `modules`, `paramsets`, `disciplines`, `natures`, `instances`, `instance_map`, `ports`, `defparams`, `defparam_sources`, `net_discipline`, `inserts`, `failed`
-//! - `pub const File` (`File.Index`), `pub const Decl` (`none`), `pub const Instance` (`Index`, `Key`), `pub const Port`, `pub const Defparam`, `pub const DefparamSource`, `pub const NetKey`, `pub const Insert`, `pub const Failure`
+//! - `pub const File` (`File.Index`), `pub const Decl` (`none`), `pub const Instance` (`Index`, `Key`), `pub const Port`, `pub const Defparam`, `pub const DefparamSource`, `pub const NetKey`, `pub const Insert`, `pub const Failure`, `pub const Rule`, `pub const Part`
 //! - `pub const SystemParam` (`fromName`, `initial`, `allows`, `domain`), `pub const Hier`, `pub const PathFormatter`
 //! - `pub const instances_max: u32`
 //! - `pub fn init(gpa: Allocator) Allocator.Error!Zcu`
@@ -238,6 +238,41 @@ pub const Failure = struct {
     file: File.Index,
     src: Vir.Inst.Ref,
     message: InternPool.String,
+    /// The rule that refused, where the IEEE 1364 route reports it in the
+    /// old digital engine's words (the driver's table); `.none` otherwise.
+    rule: Rule = .none,
+    /// The one name those words quote; `.empty` for none.
+    name: InternPool.String = .empty,
+    /// The counts those words quote (`Rule`'s doc says which).
+    nums: [2]u32 = .{ 0, 0 },
+    /// The part of the instance `src` names that the failure is about.
+    part: Part = .whole,
+};
+
+/// A connection or parameter value of an instance, by position in its
+/// list, or a defparam's target name; a failure about one is located at
+/// its first token.
+pub const Part = union(enum) { whole, conn: u32, param: u32, target };
+
+/// The rules a catalogue code covers whose IEEE 1364 report lib/sim/digital
+/// wrote in its own words: the instance's ports (§12.3.6) and parameter
+/// values (§12.2.2), a UDP instance's delay (§8.6), an unbound cell, a
+/// defparam's name (§12.2.1), a cell defined again (§13.2.1.1).
+pub const Rule = enum(u8) {
+    none,
+    port_count,
+    port_mixed,
+    port_unknown,
+    port_twice,
+    param_twice,
+    param_unknown,
+    param_local,
+    udp_delay,
+    cell_unbound,
+    defparam_unknown,
+    cell_again,
+    /// `nums`: the extra values, the overridable parameters.
+    param_extra,
 };
 
 /// `fmtPath`'s value; print it with `{f}`.

@@ -83,7 +83,7 @@ pub fn applyDefparams(s: *Sema, env: *Env, dps: []const Dp, module: Vir.String) 
     for (dps) |dp| {
         if (env.systemNamed(dp.name) != null) continue;
         const q = env.named(dp.name) orelse {
-            try s.fail(.E0907, dp.file, dp.src, "`{s}` is not a parameter of `{s}`", .{ dp.name, env.vir.string(module) });
+            try s.failRule(.{ .rule = .defparam_unknown, .name = dp.name, .part = .target }, .E0907, dp.file, dp.src, "`{s}` is not a parameter of `{s}`", .{ dp.name, env.vir.string(module) });
             continue;
         };
         // §3.4.7: a parameter and its alias are not both given a value.

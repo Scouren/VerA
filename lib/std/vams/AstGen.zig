@@ -87,9 +87,9 @@ pub const Options = struct {
     /// The preprocessor's positional directive events for this tree's text
     /// (`Preprocessor.Output.directives`), stamped on declarations.
     directives: events.Directives = .{},
-    /// The language the tree was parsed under (`Ast.ParseOptions.keywords`):
-    /// a 1364 one is the old discrete route, whose reports some rules keep.
-    language: Ast.KeywordSet = .vams_2023,
+    /// An IEEE 1364 design (a `.v`): the old digital route, whose reports
+    /// some rules keep.
+    ieee1364: bool = false,
 };
 
 /// One name space (Zig's `Scope`): a module, generate block, function,

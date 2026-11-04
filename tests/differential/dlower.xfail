@@ -4,16 +4,3 @@
 # (`lowering: ...`), a stage before it that refuses the fixture, or the first
 # transcript difference. A listed fixture that agrees fails the run until its
 # line goes.
-verilog/13_configuration/cfg1_default_liblist.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
-verilog/13_configuration/cfg2_gate_first.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
-verilog/13_configuration/cfg3_cell_use.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
-verilog/13_configuration/cfg4_instance_liblist.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
-verilog/13_configuration/cfg6_hierarchical.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
-verilog/13_configuration/command_line_search_order.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
-verilog/13_configuration/config_overrides_command_line.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
-verilog/13_configuration/default_search_order.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
-verilog/13_configuration/include_map.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
-verilog/13_configuration/parent_library_by_map.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
-verilog/13_configuration/resolution_order.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
-verilog/A_formal_syntax/b_A_1_1_incdir.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
-verilog/A_formal_syntax/b_A_1_1_library_text.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads

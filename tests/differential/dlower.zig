@@ -24,6 +24,7 @@ const diag = @import("diag");
 const frontend = @import("frontend");
 const vams = @import("vams");
 const sema = @import("sema");
+const InternPool = @import("intern_pool");
 const rewrite_options = @import("rewrite_options");
 const bridge = @import("sim/bridge.zig");
 const digital = sim.digital;
@@ -162,7 +163,6 @@ fn options(a: Allocator, io: std.Io, source: []const u8, path: []const u8) !?dig
 /// Preprocesses, parses, AstGens, elaborates and lowers fixture `path`
 /// (with its `//@ files` units) as the new pipeline does.
 fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, opts: digital.Options) !Compiled {
-    if (std.mem.find(u8, source, "//@ libmap") != null or std.mem.find(u8, source, "//@ liblist") != null) return .{ .refused = "Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads" };
     // IEEE 1364-2005 §28.2 the keys, read with the vams reader.
     var keys: vams.Preprocessor.protect.Keys = .{};
     var lines = std.mem.splitScalar(u8, source, '\n');
@@ -208,7 +208,9 @@ fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, op
         if (@tagName(code)[0] == 'E') return .{ .refused = try a.print("AstGen refuses it ({t})", .{code}) };
     }
     var zcu: Zcu = try .init(a);
-    _ = try zcu.addFile(path, vir, 0);
+    const file = try zcu.addFile(path, vir, 0);
+    if (std.mem.find(u8, source, "//@ libmap") != null or std.mem.find(u8, source, "//@ liblist") != null)
+        try libraries(a, &zcu, file, tree, out.unit_starts, opts);
     try sema.Sema.elaborate(&zcu, .{ .roots = .all, .ieee1364 = true });
     for (zcu.failed.items(.code)) |code| if (@tagName(code)[0] == 'E') return .{ .refused = try a.print("elaboration refuses it ({t})", .{code}) };
     var why: []const u8 = "";
@@ -217,6 +219,24 @@ fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, op
         error.OutOfMemory => return e,
     };
     return .{ .lowered = lowered };
+}
+
+/// §13.2.3 the library map `options` read, as Compilation hands it to the
+/// Zcu: each design unit's library (the unit its source offset falls in,
+/// `unit_starts`), and the search order.
+fn libraries(a: Allocator, zcu: *Zcu, file: Zcu.File.Index, tree: *const vams.Ast, unit_starts: []const u32, opts: digital.Options) !void {
+    const vir = zcu.fileVir(file);
+    for (vir.decls(), 0..) |d, k| {
+        const data = vir.instructions.items(.data)[@backingInt(d.inst)];
+        const at = tree.tokenStart(tree.nodeMainToken(data.pl_node.src_node));
+        var unit: usize = 0;
+        while (unit < unit_starts.len and unit_starts[unit] <= at) unit += 1;
+        const lib = if (unit == 0) opts.lib else opts.more[unit - 1].lib;
+        try zcu.decl_lib.put(a, .{ .file = file, .index = @fromBackingInt(@intCast(k)) }, try zcu.intern_pool.getString(a, lib));
+    }
+    const order = try a.alloc(InternPool.String, opts.search.len);
+    for (opts.search, order) |l, *o| o.* = try zcu.intern_pool.getString(a, l);
+    zcu.lib_order = order;
 }
 
 /// Runs `p` in `std_sim`, in the working directory, with `sites` naming

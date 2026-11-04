@@ -449,12 +449,12 @@ fn netOf(l: *Lower, e: Inst.Ref) Error!u32 {
     return n.net;
 }
 
-/// §17.1.1.6 `%l`: `library.cell` of the module of `Lower.frame`, every
-/// design in the default library (a library map is refused before here).
+/// §17.1.1.6 `%l`: `library.cell` of the module of `Lower.frame`, its
+/// library the map's (§13.2.3, `work` without one).
 fn cellName(l: *Lower) Error![]const u8 {
     const d = l.zcu.instances.items(.module)[@backingInt(l.frames.items[l.frame].instance)];
     const vir = l.zcu.fileVir(d.file);
-    return std.fmt.allocPrint(l.a, "work.{s}", .{vir.string(l.zcu.declRow(d).name)});
+    return std.fmt.allocPrint(l.a, "{s}.{s}", .{ l.zcu.libraryOf(d), vir.string(l.zcu.declRow(d).name) });
 }
 
 /// A `$sformat` format that is no literal: read at each call, its

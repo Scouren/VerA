@@ -87,6 +87,35 @@ fn expectCodes(src: [:0]const u8, config: Sema.Config, want: []const Diag.Code) 
     try std.testing.expectEqualSlices(Diag.Code, want, o.codes);
 }
 
+/// The tree of `src` elaborated under a library map: `libs[k]` the library
+/// of declaration row `k` (null: `work`), `order` the search order.
+fn treeUnderMap(src: [:0]const u8, libs: []const ?[]const u8, order: []const []const u8) ![]u8 {
+    const gpa = std.testing.allocator;
+    var ast = try vams.Ast.parse(gpa, src, .{});
+    defer ast.deinit(gpa);
+    try std.testing.expectEqual(@as(usize, 0), ast.errors.len);
+    var vir = try vams.AstGen.generate(gpa, &ast, .{});
+    defer vir.deinit(gpa);
+    var zcu: Zcu = try .init(gpa);
+    defer zcu.deinit();
+    const file = try zcu.addFile("test.v", vir, 0);
+    for (libs, 0..) |lib, k| if (lib) |l| {
+        try zcu.decl_lib.put(gpa, .{ .file = file, .index = @fromBackingInt(@intCast(k)) }, try zcu.intern_pool.getString(gpa, l));
+    };
+    var interned: [4]@import("intern_pool").String = undefined;
+    for (order, 0..) |l, k| interned[k] = try zcu.intern_pool.getString(gpa, l);
+    zcu.lib_order = interned[0..order.len];
+    try Sema.elaborate(&zcu, .{});
+    try std.testing.expectEqualSlices(Diag.Code, &.{}, zcu.failed.items(.code));
+    var text: std.Io.Writer.Allocating = .init(gpa);
+    errdefer text.deinit();
+    for (0..zcu.instances.len) |k| {
+        const d = zcu.instances.items(.module)[k];
+        try text.writer.print("{f} {s}.{s}\n", .{ zcu.fmtPath(@fromBackingInt(@intCast(k))), zcu.libraryOf(d), zcu.fileVir(d.file).string(zcu.declRow(d).name) });
+    }
+    return text.toOwnedSlice();
+}
+
 test "§6.2.2 the root is the module nothing instantiates, whatever the source order; children depth first" {
     try expectTree(
         \\module kid(a); inout a; endmodule
@@ -410,4 +439,24 @@ test "§2.7.1 an escaped instance name is one path segment" {
         \\module kid; endmodule
         \\module top; kid \a.b (); kid plain(); endmodule
     , .{}, "top top\ntop.\\a.b  kid\ntop.plain kid\n");
+}
+
+test "IEEE 1364-2005 §13.5.1 under a library map a cell binds from the search order's first library; §13.3.1.5 a config's default liblist first, inherited" {
+    const gpa = std.testing.allocator;
+    const cells =
+        \\module a_kid; endmodule
+        \\module b_kid; endmodule
+        \\module leaf; a_kid k(); endmodule
+        \\module leaf; b_kid k(); endmodule
+        \\module top; leaf u(); endmodule
+        \\
+    ;
+    const libs: []const ?[]const u8 = &.{ null, null, "libA", "libB", null, null };
+    // The search order's libA, not the last `leaf` written (libB's).
+    const by_order = try treeUnderMap(cells, libs, &.{ "libA", "libB", "work" });
+    defer gpa.free(by_order);
+    try std.testing.expectEqualStrings("top work.top\ntop.u libA.leaf\ntop.u.k work.a_kid\n", by_order);
+    const by_config = try treeUnderMap(cells ++ "config cfg; design work.top; default liblist libB work; endconfig\n", libs, &.{ "libA", "libB", "work" });
+    defer gpa.free(by_config);
+    try std.testing.expectEqualStrings("top work.top\ntop.u libB.leaf\ntop.u.k work.b_kid\n", by_config);
 }

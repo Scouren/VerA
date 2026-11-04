@@ -35,6 +35,7 @@ const Zcu = @import("../Zcu.zig");
 const eval = @import("eval.zig");
 const paramset = @import("paramset.zig");
 const discipline = @import("discipline.zig");
+const library = @import("library.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Env = eval.Env;
@@ -113,7 +114,7 @@ pub fn run(s: *Sema, roots: []const Zcu.Decl) Allocator.Error!defparams.Waiting 
             const name = try zcu.intern_pool.getString(s.gpa, zcu.fileVir(roots[k].file).string(zcu.declRow(roots[k]).name));
             const start: u32 = @intCast(w.givens.items.len);
             for (s.config.overrides) |o| try w.givens.append(s.arena, .{ .name = try zcu.intern_pool.getString(s.gpa, o.name), .value = o.value });
-            try w.pending.append(s.arena, .{ .parent = .none, .file = roots[k].file, .src = .none, .name = name, .target = name, .givens = .{ .start = start, .len = @intCast(s.config.overrides.len) }, .quiet = true });
+            try w.pending.append(s.arena, .{ .parent = .none, .file = roots[k].file, .src = .none, .name = name, .target = try library.rootTarget(s, roots[k], name), .givens = .{ .start = start, .len = @intCast(s.config.overrides.len) }, .quiet = true });
         }
         while (w.pending.pop()) |p| try instantiate(&w, p);
         // Each pass adds a late value or changes one; the values a cycle of
@@ -504,6 +505,7 @@ fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i:
 fn boundTarget(w: *Walk, parent: Instance.Index, name: InternPool.String, target: InternPool.String) Allocator.Error!InternPool.String {
     assert(@backingInt(parent) < w.zcu.instances.len);
     assert(name != .empty);
+    if (w.zcu.decl_lib.count() != 0) return library.bind(w.s, parent, name, target);
     if (w.s.uses.count() == 0) return target;
     const path = try std.fmt.allocPrint(w.s.arena, "{f}.{s}", .{ w.zcu.fmtPath(parent), w.zcu.intern_pool.stringToSlice(name) });
     return w.s.bound(target, path);

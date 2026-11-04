@@ -3,12 +3,10 @@
 //! value. Pure: no allocation, no AST. The constant_expression walker
 //! (`frontend/constfold.zig`) and the MIR folder (`ir/opcode.zig`) call
 //! these, so a parameter default and a folded opcode answer alike, and each
-//! §4.3 function is the one a device computes: a family primitive (exp, log,
-//! expm1, log1p, sin, cos, tanh, sinh, cosh, atan, pow) the reference
-//! family's value (`contract.gm`, `contract/family.zig`'s numerics table),
-//! every other the kernel's (`math.zig`: Gompute's math, or the `std.math`
-//! call for asin, acos and hypot), and abs as `F.zAbs` (diff-kernels'
-//! fold-equals-device test).
+//! §4.3 function is the one a device computes (`math.zig`: Gompute's math,
+//! which the rewrite's family takes its primitives from too,
+//! `RefOptions.math`; or the `std.math` call for asin, acos and hypot), and
+//! abs as `F.zAbs` (diff-kernels' fold-equals-device test).
 //! Cites: VAMS §2.7 (string operands), §3.2 (the 32-bit integer wrap),
 //! §3.3 (Table 3-3), §4.2.1.1, §4.2.1.3, §4.2.4-§4.2.12, §4.3 (Tables 4-14
 //! and 4-15), A.8.6; IEEE 1364-2005 §5.1.5 (Table 5-6), §5.1.12, §17.11.1
@@ -31,8 +29,6 @@ const assert = std.debug.assert;
 const testing = std.testing;
 /// The devices' math (`math.zig`, Gompute): a fold gives the bits the device computes.
 const math_k = @import("math.zig");
-/// The reference family's primitives (`contract.RefFamily`'s values).
-const gm = @import("contract").gm;
 
 /// A.8.6 unary_operator. Stored in the `extra` column of an Ast `.unary` node.
 pub const UnaryOp = enum(u8) {
@@ -369,26 +365,26 @@ pub fn math(f: MathFn, args: []const Const) ?Const {
         // (`math.zMin`/`zMax`) uses the conditional form.
         .min => if (int) Const{ .int = @min(args[0].int, args[1].int) } else Const{ .real = if (x < y) x else y },
         .max => if (int) Const{ .int = @max(args[0].int, args[1].int) } else Const{ .real = if (x > y) x else y },
-        .pow => .{ .real = gm.pow(x, y) },
+        .pow => .{ .real = math_k.pow(x, y) },
         .hypot => .{ .real = std.math.hypot(x, y) },
         .atan2 => .{ .real = math_k.atan2(x, y) },
         .sqrt => .{ .real = @sqrt(x) },
-        .exp => .{ .real = gm.exp(x) },
-        .expm1 => .{ .real = gm.expm1(x) },
-        .ln => .{ .real = gm.log(x) },
-        .ln1p => .{ .real = gm.log1p(x) },
+        .exp => .{ .real = math_k.exp(x) },
+        .expm1 => .{ .real = math_k.expm1(x) },
+        .ln => .{ .real = math_k.log(x) },
+        .ln1p => .{ .real = math_k.log1p(x) },
         .log => .{ .real = math_k.log10(x) },
         .floor => .{ .real = @floor(x) },
         .ceil => .{ .real = @ceil(x) },
-        .sin => .{ .real = gm.sin(x) },
-        .cos => .{ .real = gm.cos(x) },
+        .sin => .{ .real = math_k.sin(x) },
+        .cos => .{ .real = math_k.cos(x) },
         .tan => .{ .real = math_k.tan(x) },
         .asin => .{ .real = std.math.asin(x) },
         .acos => .{ .real = std.math.acos(x) },
-        .atan => .{ .real = gm.atan(x) },
-        .sinh => .{ .real = gm.sinh(x) },
-        .cosh => .{ .real = gm.cosh(x) },
-        .tanh => .{ .real = gm.tanh(x) },
+        .atan => .{ .real = math_k.atan(x) },
+        .sinh => .{ .real = math_k.sinh(x) },
+        .cosh => .{ .real = math_k.cosh(x) },
+        .tanh => .{ .real = math_k.tanh(x) },
         .asinh => .{ .real = math_k.asinh(x) },
         .acosh => .{ .real = math_k.acosh(x) },
         .atanh => .{ .real = math_k.atanh(x) },

@@ -327,12 +327,12 @@ pub fn zTan(comptime S: type, a: S) S {
 /// `val`, the value of f(a) at `v = a.val()`, with f's slope `g` grafted
 /// onto a's derivative through a zero-valued carrier (`zHypot`'s idiom). A
 /// non-finite slope (a pole, a branch point) has none worth propagating. At
-/// v = ±0 with f(±0) = ±0 (asin, asinh, atanh) the value is `a.scale(g)`,
-/// since -0 plus a +0 carrier would round to +0.
+/// v = ±0 with f(±0) = ±0 (asin, asinh, atanh) the value is `a.scale(g)`;
+/// elsewhere the carrier goes in through `zCarry`, which keeps a -0.
 pub fn zGraft(comptime S: type, a: S, v: f64, val: f64, g: f64) S {
     if (v == 0.0 and val == 0.0) return a.scale(g);
     var r = S.con(val);
-    if (std.math.isFinite(g) and g != 0.0) r = r.add(a.addC(-v).scale(g));
+    if (std.math.isFinite(g) and g != 0.0) r = zCarry(S, r, a.addC(-v).scale(g));
     return r;
 }
 
@@ -408,7 +408,7 @@ pub fn zHypot(comptime S: type, a: S, b: S) S {
     const h = std.math.hypot(av, bv);
     var r = S.con(h);
     if (h != 0.0 and std.math.isFinite(h))
-        r = r.add(a.addC(-av).scale(av / h)).add(b.addC(-bv).scale(bv / h));
+        r = zCarry(S, zCarry(S, r, a.addC(-av).scale(av / h)), b.addC(-bv).scale(bv / h));
     return r;
 }
 
@@ -462,8 +462,8 @@ pub fn zAtan2(comptime S: type, y: S, x: S) S {
     // in `zGraft`: its zero-valued carrier times inf would make the value NaN.
     const gy = (xv / h) / h;
     const gx = (yv / h) / h;
-    if (std.math.isFinite(gy)) r = r.add(y.addC(-yv).scale(gy));
-    if (std.math.isFinite(gx)) r = r.sub(x.addC(-xv).scale(gx));
+    if (std.math.isFinite(gy)) r = zCarry(S, r, y.addC(-yv).scale(gy));
+    if (std.math.isFinite(gx)) r = zCarry(S, r, x.addC(-xv).scale(-gx));
     return r;
 }
 /// §4.3.1 floor, derivative 0 almost everywhere.
@@ -478,7 +478,7 @@ pub fn zCeil(comptime S: type, a: S) S {
 /// §4.2.4 `%` keeps the sign of the first operand: C's fmod, which `@rem`
 /// on f64 is, exactly. k = trunc(a/b) is constant almost everywhere, so
 /// d = da − k·db, carried by zero-valued grafts so the exact value
-/// survives (but for a zero's sign: an exact multiple's -0 is +0); a
+/// survives (`zCarry`, a -0 included); a
 /// non-finite k (b = 0, or a/b overflowed) or b degrades to da alone (an
 /// infinite b's carrier is NaN: fmod(a, inf) = a). A zero `b` is §4.2.4's
 /// error (`zModZero`), real operands included, rather than @rem's NaN.
@@ -487,8 +487,8 @@ pub fn zFmod(comptime S: type, a: S, b: S) S {
     const bv = b.val();
     if (bv == 0.0) zModZero();
     const k = @trunc(av / bv);
-    var r = S.con(@rem(av, bv)).add(a.addC(-av));
-    if (std.math.isFinite(k) and std.math.isFinite(bv)) r = r.sub(b.addC(-bv).scale(k));
+    var r = zCarry(S, S.con(@rem(av, bv)), a.addC(-av));
+    if (std.math.isFinite(k) and std.math.isFinite(bv)) r = zCarry(S, r, b.addC(-bv).scale(-k));
     return r;
 }
 
@@ -513,8 +513,8 @@ pub fn zPow(comptime S: type, a: S, b: S, comptime varying_exponent: bool) S {
     const gx = if (x != 0.0) y * v / x else y * S.con(x).pow(y - 1.0).val();
     const gy: f64 = if (varying_exponent and x > 0.0) v * S.con(x).log().val() else 0.0;
     var r = S.con(v);
-    if (std.math.isFinite(gx) and gx != 0.0) r = r.add(a.addC(-x).scale(gx));
-    if (std.math.isFinite(gy) and gy != 0.0) r = r.add(b.addC(-y).scale(gy));
+    if (std.math.isFinite(gx) and gx != 0.0) r = zCarry(S, r, a.addC(-x).scale(gx));
+    if (std.math.isFinite(gy) and gy != 0.0) r = zCarry(S, r, b.addC(-y).scale(gy));
     return r;
 }
 
@@ -560,6 +560,17 @@ pub fn zStrCmp(a: []const u8, b: []const u8) i64 {
 }
 
 // ---- private ----
+
+/// `r` with the lanes of `c`, a zero-valued derivative carrier
+/// (`a.addC(-v)` scaled), added, and `r`'s value kept bit for bit, -0
+/// included: `r.add(c)` rounds a -0 value to +0 (+0 + -0 is +0 in
+/// round-to-nearest), while `r.sub(z)` with z = +0 is `r`. So the carrier
+/// goes in negated as `0 - c`, whose value is +0 whatever `c`'s zero's sign.
+/// The lanes are `r`'s plus `c`'s, as `r.add(c)` gives them (but for a
+/// zero lane's sign).
+inline fn zCarry(comptime S: type, r: S, c: S) S {
+    return r.sub(S.con(0.0).sub(c));
+}
 
 fn acoshBody(x: f64) f64 {
     const e = (@as(u64, @bitCast(x)) >> 52) & 0x7FF;

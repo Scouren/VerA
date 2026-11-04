@@ -25,7 +25,7 @@ const cmp = g.cmp;
 const R = g.AnyReal;
 
 /// Two unknowns, both carried: every value has both lanes.
-pub const Ref = contract.RefFamily(f64, &[2]u8{ 0, 1 }, .{});
+pub const Ref = contract.RefFamily(f64, &[2]u8{ 0, 1 }, .{ .math = sk.math });
 /// The kernel scalar every generic kernel runs at.
 pub const K = Fam.zL(Ref, 3);
 
@@ -84,14 +84,6 @@ pub fn run(rep: *g.Report) void {
 
 // ---- private ----
 
-/// Every lane of `n` equals `o`'s, where `o`'s is finite.
-fn lanesKept(o: K, n: K) bool {
-    const od: [2]f64 = o.v.d;
-    const nd: [2]f64 = n.v.d;
-    for (od, nd) |x, y| if (std.math.isFinite(x) and x != y) return false;
-    return true;
-}
-
 fn mathText(rep: *g.Report) void {
     cmp(rep, "math.zMinF", old.zMinF, sk.math.zMinF, .{}, .{ R, R });
     cmp(rep, "math.zMaxF", old.zMaxF, sk.math.zMaxF, .{}, .{ R, R });
@@ -129,13 +121,13 @@ fn mathText(rep: *g.Report) void {
     // one where the old was finite.
     g.cmpJudged(rep, "math.zAtan2", old.zAtan2, sk.math.zAtan2, .{K}, .{ KSpec, KSpec }, struct {
         fn judge(args: struct { K, K }, a: K, b: K) ?g.Judgement {
-            if (!lanesKept(a, b)) return null;
+            if (!g.lanesKept(a, b)) return null;
             return math.judgeAt("atan2", args[0].v.v, args[1].v.v, a.v.v, b.v.v);
         }
     }.judge);
     g.cmpJudged(rep, "math.zFmod", old.zFmod, sk.math.zFmod, .{K}, .{ KSpec, KNonZero }, struct {
         fn judge(args: struct { K, K }, a: K, b: K) ?g.Judgement {
-            if (!lanesKept(a, b)) return null;
+            if (!g.lanesKept(a, b)) return null;
             const q: f128 = @rem(args[0].v.v, args[1].v.v);
             return .{ .old_err = reference.ulpErr(a.v.v, q), .new_err = reference.ulpErr(b.v.v, q), .bound = 0 };
         }
@@ -149,11 +141,23 @@ fn mathText(rep: *g.Report) void {
                 return sk.math.zPow(K, a, b, ve);
             }
         };
-        cmp(rep, if (ve) "math.zPow.varying" else "math.zPow.fixed", pw.o, pw.n, .{}, .{ KSpec, KSpec });
+        // A grafted carrier no longer rounds a -0 value to +0 (`zCarry`):
+        // judged by the family's own pow value, bit for bit.
+        g.cmpJudged(rep, if (ve) "math.zPow.varying" else "math.zPow.fixed", pw.o, pw.n, .{}, .{ KSpec, KSpec }, struct {
+            fn judge(args: struct { K, K }, a: K, b: K) ?g.Judgement {
+                if (!g.lanesKept(a, b)) return null;
+                return g.bySign(args[0].v.pow(args[1].v.v).v, a.v.v, b.v.v);
+            }
+        }.judge);
     }
     cmp(rep, "math.zPowK", old.zPowK, sk.math.zPowK, .{K}, .{ KSpec, g.Real(-30, 30) });
     cmp(rep, "math.zLimitUf", old.zLimitUf, sk.math.zLimitUf, .{K}, .{ KSpec, KSpec });
-    cmp(rep, "math.zGraft", old.zGraft, sk.math.zGraft, .{K}, .{ KSpec, R, R, R });
+    g.cmpJudged(rep, "math.zGraft", old.zGraft, sk.math.zGraft, .{K}, .{ KSpec, R, R, R }, struct {
+        fn judge(args: struct { K, f64, f64, f64 }, a: K, b: K) ?g.Judgement {
+            if (!g.lanesKept(a, b)) return null;
+            return g.bySign(args[2], a.v.v, b.v.v);
+        }
+    }.judge);
     inline for (comptime std.enums.values(std.math.CompareOperator)) |op|
         cmp(rep, "math.zCmp." ++ @tagName(op), old.zCmp, sk.math.zCmp, .{ Ref, op }, .{ RefSpec, RefSpec });
     cmp(rep, "math.zRoundI", old.zRoundI, sk.math.zRoundI, .{Ref}, .{RefSpec});
@@ -205,7 +209,12 @@ fn familyText(rep: *g.Report) void {
                 return Fam.zPowL(Ref, 3, a, b, ve);
             }
         };
-        cmp(rep, if (ve) "family.zPowL.varying" else "family.zPowL.fixed", pw.o, pw.n, .{}, .{ RefSpec, RefSpec });
+        g.cmpJudged(rep, if (ve) "family.zPowL.varying" else "family.zPowL.fixed", pw.o, pw.n, .{}, .{ RefSpec, RefSpec }, struct {
+            fn judge(args: struct { RefV, RefV }, a: RefV, b: RefV) ?g.Judgement {
+                if (!g.lanesKept(.{ .v = a }, .{ .v = b })) return null;
+                return g.bySign(args[0].pow(args[1].v).v, a.v, b.v);
+            }
+        }.judge);
     }
     // `zL`'s methods: the same family value as each `zL`.
     inline for (.{ "neg", "exp", "log", "expm1", "log1p", "sqrt", "sin", "cos", "tanh", "sinh", "cosh", "atan", "abs" }) |m|

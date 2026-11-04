@@ -5,12 +5,8 @@
 //! a family method, a checked `M.z*D`, or `F.zLu(S, m, M.z*(F.zL(S, m),
 //! F.zLw(S, m, a)))`), over the specials (every pair, for a binary tag) and
 //! `g.random_per_fn` seeded draws. Equal bit for bit (any NaN equals any
-//! NaN): a folded constant is the device's value (lib/TODO.md §7). One
-//! exception, a zero's sign under `zFmod` and `zAtan2`: their value is
-//! `S.con(v)` plus zero-valued derivative carriers, and +0 + -0 is +0, so a
-//! -0 result (C99 F.10.7.1 fmod(-0, y); atan2(-tiny, x)) is +0 on the
-//! device. No family operation maps +0 to -0 and keeps a lane's sign, so
-//! the fold keeps the LRM's -0 (a parameter's value is the fold's).
+//! NaN, and a zero's sign counts): a folded constant is the device's value
+//! (lib/TODO.md §7).
 //! Cites: VAMS-2023 §4.2, §4.3 (Tables 4-14, 4-15).
 //!
 //! Contents:
@@ -32,7 +28,6 @@ const m = 3;
 const V = S.Of(m);
 const unary = [_]Tag{ .fneg, .exp, .sin, .cos, .tanh, .sinh, .cosh, .atan, .expm1, .sqrt, .ln, .ln1p, .fabs, .log10, .tan, .asin, .acos, .asinh, .acosh, .atanh, .floor, .ceil };
 const binary = [_]Tag{ .fadd, .fsub, .fmul, .fdiv, .fmod, .hypot, .atan2, .fmin, .fmax, .pow };
-
 
 /// Runs every tag; returns how many differ.
 pub fn run() u32 {
@@ -104,7 +99,6 @@ fn sweep(comptime t: Tag, comptime arity: u8, r: std.Random) u32 {
         const f = folded.asReal();
         const d = value(t, x[0], x[1]);
         if (same(f, d)) continue;
-        if ((t == .fmod or t == .atan2) and f == 0 and d == 0) continue;
         if (differ == 0) {
             example = x;
             ex_fold = f;

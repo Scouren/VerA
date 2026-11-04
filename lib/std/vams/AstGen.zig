@@ -77,6 +77,9 @@ header_params: bool = false,
 /// The last `defaultsAt` answer, keyed by how many events preceded it.
 defaults_seen: u32 = std.math.maxInt(u32),
 defaults_list: Vir.List(Inst.Default) = .empty,
+/// Every §2.9 `attribute` node, in source order, built on first use
+/// (decl.zig's `prefixAttrs`).
+attr_nodes: ?[]const Node.Index = null,
 
 /// What `generate` reads besides the tree.
 pub const Options = struct {

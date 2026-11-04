@@ -50,13 +50,12 @@ const Lowered = ir.Lowered;
 const Device = Air.Device;
 const values = @import("lower/values.zig");
 const tables = @import("lower/tables.zig");
+/// The codes elaboration owns (`stages.zig`): diff-elab compares them, so
+/// this oracle leaves them out and demands every other.
+const elab_codes = @import("stages.zig").elab_codes;
 
 /// One fixture's verdict: null `why` when every check agrees.
 pub const Verdict = struct { why: ?[]const u8, tables: bool = false, roots: u32 = 0, values: u64 = 0, values_libm: u64 = 0, skipped: u32 = 0 };
-
-/// Every code the old `src/elab` reports (diff-elab's list): elaboration's
-/// oracle compares them, so this one leaves them out.
-const elab_codes = [_][]const u8{ "E0235", "E0237", "E0239", "E0247", "E0337", "E0347", "E0355", "E0358", "E0363", "E0371", "E0373", "E0375", "E0376", "E0501", "E0816", "E0890", "E0901", "E0902", "E0903", "E0904", "E0905", "E0906", "E0907", "E0908", "E0909", "E0911", "E0914", "E0915", "E0916", "E0917", "E0921", "E0922", "E0923", "E0927", "E0929", "E0952", "E0982", "E0997", "W0252", "W0950", "W0951", "W1152" };
 
 const Tally = struct {
     compared: u32 = 0,
@@ -200,7 +199,14 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, show: bool) !
     var tree = try vams.Ast.parse(gpa, text, .{ .keywords = .vams_2023 });
     defer tree.deinit(gpa);
     if (tree.errors.len != 0) return .new_refused;
-    var vir = try vams.AstGen.generate(gpa, &tree, .{});
+    // The old preprocessor's §10.2 events, as the new AstGen reads them.
+    const defaults = try arena.alloc(vams.Preprocessor.events.DefaultDiscipline, pp.directives.disciplines.len);
+    for (pp.directives.disciplines, defaults) |e, *d| d.* = .{
+        .at = e.at,
+        .qualifier = if (e.qualifier) |q| std.meta.stringToEnum(vams.Preprocessor.events.Qualifier, @tagName(q)).? else null,
+        .discipline = e.discipline,
+    };
+    var vir = try vams.AstGen.generate(gpa, &tree, .{ .directives = .{ .disciplines = defaults } });
     defer vir.deinit(gpa);
     var zcu: Zcu = try .init(gpa);
     defer zcu.deinit();
@@ -227,6 +233,7 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, show: bool) !
     for (vir.diag.messages()) |m| try codes.append(arena, @tagName(vir.diag.message(m).tag.code));
     const new_codes = try lowerCodes(arena, codes.items);
     if (show) std.debug.print("== {s}\nold codes: {s}\nnew codes: {s}\n", .{ rel, try join(arena, old.codes), try join(arena, new_codes) });
+    if (show) for (zcu.failed.items(.code), zcu.failed.items(.message)) |c, m| std.debug.print("  new {t}: {s}\n", .{ c, zcu.intern_pool.stringToSlice(m) });
     if (!sameLines(old.codes, new_codes))
         return .{ .verdict = .{ .why = try arena.print("codes: old {s}, new {s}{s}", .{ try join(arena, old.codes), try join(arena, new_codes), try firstMessage(arena, &zcu) }) } };
     const lw = old.lw orelse return .{ .verdict = .{ .why = if (analysis != null) "the old side refused, the new side lowered" else null } };

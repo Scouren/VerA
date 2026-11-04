@@ -8,7 +8,8 @@
 //!   before any check): the set of codes the old `elab.elaborate` adds
 //!   to its bag equals the set in `Zcu.failed` plus the per-file codes of
 //!   `Vir.diag` the old elaboration owns (`elab_codes`: AstGen judges a few
-//!   of its rules alone, E0373 and E0376);
+//!   of its rules alone, E0376), less the codes stage 5 owns
+//!   (`stages.zig`), which diff-lower demands;
 //! - tree: when the old side elaborates, every instance's hierarchical path
 //!   and module name, in order (`.va`/`.vams`: `Design.units`, one root; `.v`:
 //!   the instance scopes of `sim.digital.elaborate`'s `Run.hier`, every root,
@@ -43,8 +44,10 @@ const options = @import("rewrite_options");
 const Zcu = sema.Zcu;
 const Sema = sema.Sema;
 
-/// Every code the old `src/elab` reports: the codes this oracle compares.
-const elab_codes = [_][]const u8{ "E0235", "E0237", "E0239", "E0247", "E0337", "E0347", "E0355", "E0358", "E0363", "E0371", "E0373", "E0375", "E0376", "E0501", "E0816", "E0890", "E0901", "E0902", "E0903", "E0904", "E0905", "E0906", "E0907", "E0908", "E0909", "E0911", "E0914", "E0915", "E0916", "E0917", "E0921", "E0922", "E0923", "E0927", "E0929", "E0952", "E0982", "E0997", "W0252", "W0950", "W0951", "W1152" };
+/// The codes elaboration owns (`stages.zig`): the codes this oracle
+/// compares. A code the old `src/elab` raised that stage 5 owns is diff-lower's.
+const stages = @import("stages.zig");
+const elab_codes = stages.elab_codes;
 
 const Tally = struct {
     compared: u32 = 0,
@@ -254,7 +257,7 @@ fn oldAnalog(arena: std.mem.Allocator, pp: frontend.preprocessor.Output, bag: *d
         error.DiagnosticsReported => null,
     };
     var codes: std.ArrayList([]const u8) = .empty;
-    for (before..bag.count()) |k| try codes.append(arena, @tagName(bag.at(k).code));
+    for (before..bag.count()) |k| if (!stages.isAnalysis(@tagName(bag.at(k).code))) try codes.append(arena, @tagName(bag.at(k).code));
     const d = design orelse return .{ .tree = null, .codes = try setOf(arena, codes.items) };
     var tree: std.ArrayList([]const u8) = .empty;
     const top = file.str(d.top.name);
@@ -394,7 +397,7 @@ fn newSide(arena: std.mem.Allocator, path: []const u8, text: [:0]const u8, digit
         };
     }
     var codes: std.ArrayList([]const u8) = .empty;
-    for (zcu.failed.items(.code)) |c| try codes.append(arena, @tagName(c));
+    for (zcu.failed.items(.code)) |c| if (!stages.isAnalysis(@tagName(c))) try codes.append(arena, @tagName(c));
     for (vir.diag.messages()) |m| {
         const name = @tagName(vir.diag.message(m).tag.code);
         for (elab_codes) |c| if (std.mem.eql(u8, c, name)) try codes.append(arena, name);

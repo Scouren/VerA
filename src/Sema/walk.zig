@@ -272,7 +272,7 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     }
     if (zcu.isBuiltin(picked.module)) try portDisciplineAttrs(s, p);
     const ports = try bindPorts(s, p, vir, m, row.name);
-    try zcu.instances.append(s.gpa, .{ .module = picked.module, .parent = p.parent, .name = p.name, .params = params, .paramset = picked.paramset, .src = p.src, .hier = env.hier, .ports = ports });
+    try zcu.instances.append(s.gpa, .{ .module = picked.module, .parent = p.parent, .name = p.name, .params = params, .paramset = picked.paramset, .paramset_params = picked.own, .src = p.src, .hier = env.hier, .ports = ports });
     assert(zcu.instances.len == @backingInt(index) + 1);
     const gop = try zcu.instance_map.getOrPut(s.gpa, key);
     if (!gop.found_existing) gop.value_ptr.* = index;
@@ -467,7 +467,11 @@ fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i:
         // is no real.
         if (in.flags.scaled) try s.fail(.E0247, file, i.toRef(), "a scaled literal in `{s}`'s UDP delay", .{vir.string(in.target)});
         if (params.len > 2 or (params.len != 0 and params[0].name != .empty))
-            try s.fail(.E0239, file, i.toRef(), "`{s} #(…) {s}`: {d} value(s)", .{ vir.string(in.target), vir.string(in.name), params.len });
+            try s.fail(.E0239, file, i.toRef(), "`{s} #(…) {s}`: {d} value(s)", .{ vir.string(in.target), vir.string(in.name), params.len })
+        else
+            // The instance computes nothing in an analog device (a notice
+            // stage 5 owns, tests/differential/stages.zig).
+            try s.fail(.W0252, file, i.toRef(), "`{s}` primitive", .{vir.string(in.target)});
         return;
     };
     try w.prefixes.put(s.arena, i, prefix);

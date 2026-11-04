@@ -10,7 +10,6 @@
 //! Contents:
 //! - `pub fn bundle(comp: *Compilation) Allocator.Error!Diag`
 //! - `pub fn sources(comp: *Compilation) Allocator.Error![]const Diag.Source`
-//! - `pub fn parseCode(tag: vams.Ast.Error.Tag) Diag.Code`
 //! - `pub fn relocate(out: vams.Preprocessor.Output, start: u32, end: u32) Diag.Loc`
 
 const std = @import("std");
@@ -36,11 +35,13 @@ pub fn bundle(comp: *Compilation) Allocator.Error!Diag {
     }
     if (comp.netlist) |*n| try n.output().report(&w, @fromBackingInt(pp_files));
     for (comp.units.items) |*u| {
-        for (u.tree.errors) |e| {
-            const at = u.tree.tokenStart(e.token);
-            var b = w.build(.parse, parseCode(e.tag), relocate(out, at, at + @as(u32, @intCast(u.tree.tokenSlice(e.token).len))));
-            b.msg("{s}", .{parseMessage(&u.tree, e)});
-            try b.emit();
+        if (u.tree.errors.len != 0) {
+            var pw: Diag.Wip = .init(comp.gpa);
+            defer pw.deinit();
+            try vams.Ast.parse_errors.report(&u.tree, &pw);
+            var parsed = try pw.toOwnedBundle();
+            defer parsed.deinit(comp.gpa);
+            try copy(&w, parsed, out);
         }
         try copy(&w, u.vir.diag, out);
     }
@@ -67,16 +68,6 @@ pub fn sources(comp: *Compilation) Allocator.Error![]const Diag.Source {
     return list;
 }
 
-/// The catalogue code a parse refusal is reported under: E0207, the old
-/// parser's "unexpected token", for every shape the tree names; the
-/// depth cap is E0241.
-pub fn parseCode(tag: vams.Ast.Error.Tag) Diag.Code {
-    return switch (tag) {
-        .nesting_too_deep => .E0241,
-        else => .E0207, // else: one code for every syntax refusal (the parse stage owns finer ones)
-    };
-}
-
 /// A preprocessed-text range as a range of the original file its start
 /// came from; an end in another file collapses to the start.
 pub fn relocate(out: vams.Preprocessor.Output, start: u32, end: u32) Diag.Loc {
@@ -89,12 +80,6 @@ pub fn relocate(out: vams.Preprocessor.Output, start: u32, end: u32) Diag.Loc {
 }
 
 // ---- private ----
-
-/// The headline of a parse refusal: what was expected, and the token met.
-fn parseMessage(tree: *const vams.Ast, e: vams.Ast.Error) []const u8 {
-    _ = tree;
-    return @tagName(e.tag);
-}
 
 /// Every message of `d`, located in a unit's preprocessed text, into `w`.
 fn copy(w: *Diag.Wip, d: Diag, out: vams.Preprocessor.Output) Allocator.Error!void {

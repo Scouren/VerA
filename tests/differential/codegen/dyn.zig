@@ -58,13 +58,17 @@ fn Run(comptime D: type) type {
         /// The instance and state a transient carries from one step to the next.
         var inst: D.Instance = .{};
         var state: if (@hasDecl(D, "State")) D.State else void = undefined;
+        /// Whether this process ran a step: the oracle's child that
+        /// resumes past a point where every side stopped starts there.
+        var started = false;
 
         /// Step `step` of a transient: sets the card (`names[k]` =
         /// `vals[k]`), evaluates at `x` and time `t`, writes `2n + 2n²`
         /// reals to `out` (the rows, their Jacobian row-major, the reactive
         /// rows, theirs), then accepts the point (`updateState`, `stateCtl
         /// .commit`), as a host does. Step 0 starts a fresh instance
-        /// (`initState`) in `analog initial` (§5.2.1). Returns 0; -1 when
+        /// (`initState`) in `analog initial` (§5.2.1), and so does a
+        /// process's first step. Returns 0; -1 when
         /// `n_x` is not |U|, -2 when `out` is short, -3 when a name is no
         /// field of `Model`.
         fn run(names: [*]const [*:0]const u8, vals: [*]const f64, n_params: u32, x: [*]const f64, n_x: u32, t: f64, step: u32, out: [*]f64, out_len: u32) callconv(.c) i32 {
@@ -78,7 +82,8 @@ fn Run(comptime D: type) type {
             }
             if (@hasDecl(D, "derive")) D.derive(V, &m);
             if (@hasDecl(D, "setup")) D.setup(V, &m);
-            if (step == 0) {
+            if (step == 0 or !started) {
+                started = true;
                 inst = .{};
                 if (@hasDecl(D, "initState")) state = D.initState(&m, &inst);
             }

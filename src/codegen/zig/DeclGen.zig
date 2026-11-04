@@ -339,10 +339,11 @@ fn genTables(dg: *DeclGen, w: *std.Io.Writer, p: stamps.Plan) Error!void {
 /// fast-math body, else the strict body).
 fn genCore(dg: *DeclGen, w: *std.Io.Writer, uses: Function.Uses, body: []const u8) Error!void {
     const d = dg.device;
-    var fields = d.charge_sites.len;
-    for (dg.held_field) |h| fields += @intFromBool(h != null);
-    for (d.contributions.items(.resist)) |slot| fields += @intFromBool(dg.live.assigned[@backingInt(slot)]);
-    try dg.print(w, "\nfn Core(comptime S: type) type {{\n    {s}return struct {{", .{if (fields == 0) "_ = S;\n    " else ""});
+    // The fields typed over `S`: an integer held value is an `i64`.
+    var reals = d.charge_sites.len;
+    for (dg.held_field, 0..) |h, i| reals += @intFromBool(h != null and dg.air.instructions.items(.data)[i].ty == InternPool.Index.real_type);
+    for (d.contributions.items(.resist)) |slot| reals += @intFromBool(dg.live.assigned[@backingInt(slot)]);
+    try dg.print(w, "\nfn Core(comptime S: type) type {{\n    {s}return struct {{", .{if (reals == 0) "_ = S;\n    " else ""});
     for (d.contributions.items(.resist), 0..) |slot, k| if (dg.live.assigned[@backingInt(slot)]) try dg.print(w, " r{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
     for (d.charge_sites.items(.slot), 0..) |slot, k| try dg.print(w, " c{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
     for (dg.held_field, 0..) |h, i| if (h != null) {

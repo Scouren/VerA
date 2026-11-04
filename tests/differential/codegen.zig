@@ -319,15 +319,18 @@ fn blame(arena: Allocator, b: std.zig.ErrorBundle, group: []const Ready, left: [
 
 /// `compare` in a child process, so a device that stops (§4.2.4's zero
 /// integer divisor reaches a safety check) is compared like a value: where
-/// one side stops, every side must stop, by the same signal; the point is
-/// then skipped and the run goes on past it. A side that stops alone is the
-/// fixture's disagreement. Bounded: each rerun adds a point to `stops`.
+/// one side stops, every side must stop, by the same signal; the run then
+/// resumes past the point in a new child, every side from a fresh instance
+/// (`dyn.zig`), so each point is evaluated a bounded number of times. A
+/// side that stops alone is the fixture's disagreement. Bounded: each
+/// resume starts past a new point of `stops`.
 fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, tally: *Tally) !?[]const u8 {
     const sides_n: u2 = if (ver_fn != null) 3 else 2;
     const side_names = [3][]const u8{ "old", "new", "versioned" };
     var stops: std.ArrayList(u32) = .empty;
     for (0..points + 1) |_| {
-        const first = try child(arena, r, old_fn, new_fn, ver_fn, stops.items, null);
+        const start: u32 = if (stops.items.len == 0) 0 else stops.items[stops.items.len - 1] + 1;
+        const first = try child(arena, r, old_fn, new_fn, ver_fn, stops.items, start, null);
         const stop = switch (first) {
             .done => |d| {
                 tally.points += d.counts[0];
@@ -344,7 +347,7 @@ fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver
         const side: u2 = @intCast(stop.rec & 3);
         for (0..sides_n) |o| {
             if (o == side) continue;
-            const other = try child(arena, r, old_fn, new_fn, ver_fn, stops.items, .{ .point = p, .side = @intCast(o) });
+            const other = try child(arena, r, old_fn, new_fn, ver_fn, stops.items, start, .{ .point = p, .side = @intCast(o) });
             switch (other) {
                 .done => return try arena.print("the {s} device stopped the process at point {d} (wait status 0x{x}), the {s} device did not", .{ side_names[side], p, stop.status, side_names[o] }),
                 .stopped => |os| if (os.rec != (stop.rec & ~@as(u32, 3)) | @as(u32, @intCast(o)) or os.status != stop.status)
@@ -356,7 +359,7 @@ fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver
     unreachable; // every rerun adds a distinct point below `points`
 }
 
-/// A probe: replay the points before `point`, then evaluate only `side`.
+/// A probe: evaluate the points from `start` to `point`, then only `side`.
 const Probe = struct { point: u32, side: u2 };
 
 const ChildRun = union(enum) {
@@ -367,7 +370,7 @@ const ChildRun = union(enum) {
 /// Runs `compare` in a forked child. The child writes a `u32` record
 /// before each call (point << 2 | side), then `done`, its counts and the
 /// why; a child that dies leaves its last record.
-fn child(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, stops: []const u32, probe: ?Probe) !ChildRun {
+fn child(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, stops: []const u32, start: u32, probe: ?Probe) !ChildRun {
     const linux = std.os.linux;
     var fds: [2]i32 = undefined;
     if (linux.errno(linux.pipe2(&fds, .{})) != .SUCCESS) return error.PipeFailed;
@@ -379,7 +382,7 @@ fn child(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunF
         // seconds and a share of the machine's coredump store).
         _ = linux.prctl(@backingInt(linux.PR.SET_DUMPABLE), 0, 0, 0, 0);
         var counts: Counts = .{ 0, 0, 0, 0, 0 };
-        const why = compare(arena, r, old_fn, new_fn, ver_fn, fds[1], &counts, stops, probe) catch "the oracle ran out of memory";
+        const why = compare(arena, r, old_fn, new_fn, ver_fn, fds[1], &counts, stops, start, probe) catch "the oracle ran out of memory";
         const tail = [_]u32{done} ++ counts;
         _ = linux.write(fds[1], @ptrCast(&tail), @sizeOf(@TypeOf(tail)));
         if (why) |w| _ = linux.write(fds[1], w.ptr, w.len);
@@ -414,7 +417,7 @@ fn child(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunF
 
 /// Evaluates both devices at `points` seeded points, writing a progress
 /// record to `fd` before each call; returns the first difference, or null.
-fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, fd: i32, counts: *Counts, stops: []const u32, probe: ?Probe) !?[]const u8 {
+fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, fd: i32, counts: *Counts, stops: []const u32, start: u32, probe: ?Probe) !?[]const u8 {
     const libm = for (libm_kernels) |k| {
         if (std.mem.find(u8, r.new, k) != null) break true;
     } else false;
@@ -446,6 +449,11 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?Ru
         if (ver_fn != null) counts[if (inside) 2 else 3] += 1;
         // A point where every side stops is drawn but not evaluated.
         if (std.mem.findScalar(u32, stops, @intCast(p)) != null) continue;
+        // An earlier child compared it (only the libm and ulp tallies are lost).
+        if (p < start) {
+            counts[0] += 1;
+            continue;
+        }
         const fns = [3]?RunFn{ old_fn, new_fn, ver_fn };
         if (probe) |pr| if (pr.point == p) {
             const rec: u32 = @intCast(p << 2 | pr.side);

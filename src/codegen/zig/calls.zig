@@ -143,7 +143,13 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Ref
         },
         // §9.21 a table lookup (`K.table.zTable`), the old `emitTable`.
         .@"$table_model" => try table(f, inst, args),
-        else => return f.dg.fail("a call of `{s}`", .{@tagName(tag)}), // else: not yet spelled by this backend
+        else => {
+            // rw-lower's `display$phase` guards a print's operands: a solver
+            // device drops prints, so it answers 0. By name, so this spells
+            // it before and after the tag lands.
+            if (std.mem.eql(u8, @tagName(tag), "display$phase")) return f.print("@as(i64, 0)", .{});
+            return f.dg.fail("a call of `{s}`", .{@tagName(tag)}); // not yet spelled by this backend
+        },
     }
 }
 

@@ -10,7 +10,7 @@
 //! IEEE 1364-2005 §5.1.5 (Table 5-6).
 //!
 //! Contents:
-//! - `pub const Value = union(enum) { int: i64, real: f64, array: []Value }`
+//! - `pub const Value = union(enum) { int: i64, real: f64, array: []Value, str: []const u8 }`
 //! - `pub const Observer = struct`, `pub const Slot = struct { alloc: Inst.Index, value: Value }`
 //! - `pub const Calls = struct`, `pub const Inputs = struct`
 //! - `pub const Error = error{ NoValue, LoopCap, Unsupported, OutOfMemory }`
@@ -28,8 +28,9 @@ const tan_q = @import("tan.zig");
 const fold = @import("std_kernels").fold;
 const Inst = Air.Inst;
 
-/// A value of a §3.2 `integer` or `real`, or a §3.2.2 array version.
-pub const Value = union(enum) { int: i64, real: f64, array: []Value };
+/// A value of a §3.2 `integer` or `real`, a §3.2.2 array version, or a
+/// §3.3 `string` (its bytes, the pool's or a call's).
+pub const Value = union(enum) { int: i64, real: f64, array: []Value, str: []const u8 };
 
 /// Sees every value a run defines, in execution order: each value
 /// instruction's result, a `block`'s result as a `br` leaves it, and each
@@ -195,7 +196,7 @@ const Run = struct {
                 const x = r.air.extraData(Air.Call, data.ty_pl.payload);
                 const refs: []const Inst.Ref = @ptrCast(r.air.extra[x.end..][0..x.data.args_len]);
                 const args = try r.scratch.alloc(Value, refs.len);
-                // A string operand (a format) reaches the hook as 0.
+                // An aggregate operand reaches the hook as 0.
                 for (refs, args) |a, *v| v.* = r.get(a) catch |e| switch (e) {
                     error.Unsupported => .{ .int = 0 },
                     else => return e,
@@ -236,7 +237,8 @@ const Run = struct {
                 .big => error.Unsupported,
             },
             .undef => error.NoValue,
-            .str, .aggregate => error.Unsupported,
+            .str => |t| .{ .str = r.ip.stringToSlice(t) },
+            .aggregate => error.Unsupported,
             .simple_type, .int_type, .array_type, .nature, .discipline => unreachable, // Verify: an operand is a value
         };
     }
@@ -411,7 +413,7 @@ fn zeroOf(r: *Run, ty: InternPool.Index) Error!Value {
         .simple_type => |s| switch (s) {
             .real => .{ .real = 0 },
             .integer => .{ .int = 0 },
-            .string => error.Unsupported,
+            .string => .{ .str = "" },
         },
         .int_type => .{ .int = 0 },
         .nature, .discipline, .undef, .float, .int, .str, .aggregate => unreachable, // Verify: a slot's type is a type

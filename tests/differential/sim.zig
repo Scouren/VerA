@@ -12,8 +12,8 @@
 //! own (Linux), so one that crashes either side is a difference of its
 //! own and its memory is not this test's. A `//! reject` fixture agrees when both sides refuse
 //! it: the new side at a stage before the lowering (that stage's oracle
-//! owns its codes), or the lowering raising E1100 with lib/sim/digital's
-//! message at its byte, or the run failing as the old run does; a crash,
+//! owns its codes), or the lowering raising lib/sim/digital's code with
+//! its message at its byte, or the run failing as the old run does; a crash,
 //! or a lowering that refuses it as unsupported, is a difference. A known difference is a line of `sim.xfail` (`<path
 //! under the fixture root> <reason>`); a listed fixture that agrees, or
 //! that is not in the corpus, fails the run until its line goes.
@@ -46,7 +46,7 @@ const Side = struct { out: []const u8, failed: bool, why: []const u8 = "", sites
 /// or why it stopped.
 /// `earlier`: a stage before the lowering raised an error; `refused`: the
 /// lowering does not express the design yet (or the harness cannot run
-/// it); `rejected`: the lowering raised E1100.
+/// it); `rejected`: the lowering raised an error (`Why.code`).
 const Compiled = union(enum) { lowered: sema.digital.Lowered, refused: []const u8, earlier: []const u8, rejected: sema.digital.Why };
 
 // ---- private ----
@@ -319,9 +319,10 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
         .lowered => |l| l,
         .earlier => |why| return if (old.failed) "" else std.fmt.allocPrint(a, "old run completed, new {s}", .{why}),
         .rejected => |why| {
-            const f = first orelse return std.fmt.allocPrint(a, "old run completed, the new lowering raised E1100 at byte {d}: {s}", .{ why.at, why.text });
-            if (f.code != .E1100 or !std.mem.endsWith(u8, f.message, why.text) or f.at != why.at)
-                return std.fmt.allocPrint(a, "old {t} at byte {d}: {s}; new E1100 at byte {d}: {s}", .{ f.code, f.at, f.message, why.at, why.text });
+            const f = first orelse return std.fmt.allocPrint(a, "old run completed, the new lowering raised {t} at byte {d}: {s}", .{ why.code, why.at, why.text });
+            // Two code enums (lib/diag's and vams'), one catalogue: compared by name.
+            if (!std.mem.eql(u8, @tagName(f.code), @tagName(why.code)) or !std.mem.endsWith(u8, f.message, why.text) or f.at != why.at)
+                return std.fmt.allocPrint(a, "old {t} at byte {d}: {s}; new {t} at byte {d}: {s}", .{ f.code, f.at, f.message, why.code, why.at, why.text });
             return "";
         },
         .refused => unreachable, // returned above

@@ -4,7 +4,7 @@
 //! `Function` the one body. Cites the clauses its files cite.
 //!
 //! Contents:
-//! - `pub const DeclGen`, `pub const Function`, `pub const Liveness`
+//! - `pub const DeclGen`, `pub const Function`, `pub const Liveness`, `pub const Ident`
 //! - `pub fn generate(gpa: Allocator, in: codegen.Input, options: codegen.Options) Allocator.Error!codegen.Result`
 
 const std = @import("std");
@@ -17,6 +17,8 @@ pub const DeclGen = @import("zig/DeclGen.zig");
 pub const Function = @import("zig/Function.zig");
 /// The lanes and uses of every value.
 pub const Liveness = @import("zig/Liveness.zig");
+/// A Verilog-A name as the ABI's Zig identifier.
+pub const Ident = @import("zig/Ident.zig");
 
 /// Writes `in`'s device. The text in `.ok` is `gpa`'s; a `.fail` names
 /// what this backend does not spell yet, also in `gpa`.
@@ -53,5 +55,8 @@ test {
     _ = DeclGen;
     _ = Function;
     _ = Liveness;
+    _ = Ident;
     _ = @import("zig/stamps.zig");
+    _ = @import("zig/state.zig");
+    _ = @import("zig/calls.zig");
 }

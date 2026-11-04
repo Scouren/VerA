@@ -1,14 +1,14 @@
 //! diff-codegen's two sides of one fixture: the old pipeline's device text
 //! (`vera.analyze` + `Result.generate`, every unit forced strict) and the new
 //! one's (the old preprocessor's text through vams, Sema, `Air.Float` over
-//! `codegen.floatRoots`, `codegen.generate`), with the card the oracle
+//! `codegen.floatRoots`, `codegen.generate` strict and versioned), with the card the oracle
 //! draws parameters from.
 //! No LRM clause: this checks VerA's rewrite against VerA.
 //!
 //! Contents:
 //! - `pub const Card = struct`, `pub const New = union(enum)`
 //! - `pub fn old(gpa: Allocator, arena: Allocator, path: []const u8, source: []const u8, include: []const []const u8) !?[]const u8`
-//! - `pub fn new(gpa: Allocator, arena: Allocator, io: Io, path: []const u8, source: []const u8, include: []const []const u8, strict: bool) !New`
+//! - `pub fn new(gpa: Allocator, arena: Allocator, io: Io, path: []const u8, source: []const u8, include: []const []const u8) !New`
 
 const std = @import("std");
 const Io = std.Io;
@@ -45,7 +45,9 @@ pub const New = union(enum) {
     refused,
     /// Codegen does not spell something yet: why.
     fail: []const u8,
-    ok: struct { text: []const u8, card: Card, optimized: u32, roots: u32 },
+    /// `text` every unit strict; `versioned` the verdict's versioned units,
+    /// null when no root is `.optimized` (the same device).
+    ok: struct { text: []const u8, versioned: ?[]const u8, card: Card, optimized: u32, roots: u32 },
 };
 
 /// The old device's text with every unit strict, in `arena`; null when the
@@ -70,7 +72,7 @@ pub fn old(gpa: Allocator, arena: Allocator, path: []const u8, source: []const u
 }
 
 /// The new device's text and card, in `arena`.
-pub fn new(gpa: Allocator, arena: Allocator, io: Io, path: []const u8, source: []const u8, include: []const []const u8, strict: bool) !New {
+pub fn new(gpa: Allocator, arena: Allocator, io: Io, path: []const u8, source: []const u8, include: []const []const u8) !New {
     const bag = try arena.create(diag.Bag);
     bag.* = .init(arena);
     const files = try arena.create(frontend.Files);
@@ -117,8 +119,12 @@ pub fn new(gpa: Allocator, arena: Allocator, io: Io, path: []const u8, source: [
     var optimized: u32 = 0;
     for (f.verdict.modes) |m| optimized += @intFromBool(m == .optimized);
 
-    var r = try codegen.generate(gpa, .zig, .{ .air = &a.air, .ip = ip, .device = &a.device, .verdict = &f.verdict }, .{ .strict = strict });
+    var r = try codegen.generate(gpa, .zig, .{ .air = &a.air, .ip = ip, .device = &a.device, .verdict = &f.verdict }, .{ .strict = true });
     defer r.deinit(gpa);
+    const box = try boxOf(arena, &f.verdict);
+    var vr: ?codegen.Result = if (box != null) try codegen.generate(gpa, .zig, .{ .air = &a.air, .ip = ip, .device = &a.device, .verdict = &f.verdict }, .{}) else null;
+    defer if (vr) |*v| v.deinit(gpa);
+    if (vr) |v| if (v == .fail) return .{ .fail = try arena.dupe(u8, v.fail) };
     switch (r) {
         .fail => |why| return .{ .fail = try arena.dupe(u8, why) },
         .ok => |out| {
@@ -140,14 +146,15 @@ pub fn new(gpa: Allocator, arena: Allocator, io: Io, path: []const u8, source: [
                     .float => |x| x,
                     else => continue, // else: an integer, a string: kept at its default
                 };
-                try names.append(arena, try arena.dupeSentinel(u8, ip.stringToSlice(n), 0));
+                try names.append(arena, try arena.printSentinel("{f}", .{codegen.zig.Ident{ .name = ip.stringToSlice(n) }}, 0));
                 try defaults.append(arena, x);
                 try ranges.append(arena, try arena.dupe(Air.Device.Range, a.device.paramRanges(@fromBackingInt(@intCast(k)))));
                 try arg_of.append(arena, @intCast(k));
             }
             return .{ .ok = .{
                 .text = try arena.dupe(u8, out.text),
-                .card = .{ .names = names.items, .defaults = defaults.items, .ranges = ranges.items, .n_u = @intCast(a.device.nodes.len), .box = try boxOf(arena, &f.verdict, strict), .arg_of = arg_of.items, .args = args },
+                .versioned = if (vr) |v| try arena.dupe(u8, v.ok.text) else null,
+                .card = .{ .names = names.items, .defaults = defaults.items, .ranges = ranges.items, .n_u = @intCast(a.device.nodes.len), .box = box, .arg_of = arg_of.items, .args = args },
                 .optimized = optimized,
                 .roots = @intCast(f.verdict.modes.len),
             } };
@@ -160,8 +167,8 @@ pub fn new(gpa: Allocator, arena: Allocator, io: Io, path: []const u8, source: [
 /// The box the device's versioned unit checks, read off the verdict as the
 /// spec states it (§11.9: every root `.optimized`, the union of their
 /// boxes), so a codegen that checks a different box disagrees here.
-fn boxOf(arena: Allocator, v: *const Air.Float.Verdict, strict: bool) !?[]const Air.Float.Guard {
-    if (strict or v.modes.len == 0) return null;
+fn boxOf(arena: Allocator, v: *const Air.Float.Verdict) !?[]const Air.Float.Guard {
+    if (v.modes.len == 0) return null;
     var out: std.ArrayList(Air.Float.Guard) = .empty;
     for (v.modes, 0..) |m, r| {
         if (m == .strict) return null;

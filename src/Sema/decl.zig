@@ -71,8 +71,10 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     s.device.num_ports = @intCast(s.device.nodes.len);
     for (s.units.items) |*u| try net.nets(s, u);
     for (s.units.items[1..]) |*u| try net.bindChildPorts(s, u);
+    try net.bindBridges(s);
     for (s.units.items) |*u| try param.declare(s, u);
     for (s.units.items) |*u| try discrete.declare(s, u);
+    for (s.units.items[1..]) |*u| try @import("derive.zig").child(s, u);
     for (s.units.items) |*u| try branches(s, u);
     for (s.units.items) |*u| try held.mark(s, u);
     for (s.units.items) |*u| try @import("attr.zig").check(s, u);
@@ -301,10 +303,22 @@ fn items(s: *Sema, main: *Block, env: *eval.Env, body: Vir.Body, depth: u32) All
     const vir = unit.vir;
     if (depth > gen_depth_max) return;
     for (vir.body(body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .analog, .analog_initial => |tag| {
+        .analog => {
             var b = main.child();
-            b.analog_initial = tag == .analog_initial;
             try control.body(s, &b, payloadOf(vir, Inst.Process, i).body);
+            try main.insts.appendSlice(s.arena, b.insts.items);
+        },
+        // §5.2.1 an `analog initial` body runs on the analysis's first
+        // evaluation only: guarded by `analog$initial`, which the host answers.
+        .analog_initial => {
+            var b = main.child();
+            const flag = try @import("expr.zig").call(s, &b, @backingInt(@import("vams").SysFn.Tag.@"analog$initial"), .integer, &.{});
+            var then_b = b.child();
+            then_b.analog_initial = true;
+            then_b.conditional += 1;
+            try control.body(s, &then_b, payloadOf(vir, Inst.Process, i).body);
+            var else_b = b.child();
+            try control.ifElse(s, &b, flag, &then_b, &else_b);
             try main.insts.appendSlice(s.arena, b.insts.items);
         },
         .gen_block => try items(s, main, env, payloadOf(vir, Inst.GenBlock, i).body, depth + 1),

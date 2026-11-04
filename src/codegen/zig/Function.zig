@@ -17,6 +17,8 @@
 //! - `pub const Uses = struct { x, model, inst, sim }`
 //! - `pub const Real = struct { x }` (`format`): a real constant as Zig source
 //! - `pub fn genBody(f: *Function, body: []const Air.Inst.Index) DeclGen.Error!void`
+//! - `pub fn genTree`, `pub fn valueOf`: a derived parameter's default
+//! - `pub fn real`, `pub fn int`, `pub fn isIntRef`, `pub fn isInt`, `pub fn line`, `pub fn print`: what `calls.zig` writes with
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -25,6 +27,8 @@ const InternPool = @import("intern_pool");
 const vams = @import("vams");
 const DeclGen = @import("DeclGen.zig");
 const Liveness = @import("Liveness.zig");
+const Ident = @import("Ident.zig");
+const calls = @import("calls.zig");
 const Inst = Air.Inst;
 const Ref = Inst.Ref;
 const Error = DeclGen.Error;
@@ -91,6 +95,99 @@ pub fn genBody(f: *Function, body: []const Inst.Index) Error!void {
     for (body) |inst| try f.genInst(inst);
 }
 
+/// Writes `const v<i> = ...;` for every instruction `ref` reads, itself
+/// included, in index order (an operand precedes its reader): a derived
+/// parameter's default, which reads only `arg`s, constants and pure
+/// operations. Returns how many it wrote.
+pub fn genTree(f: *Function, ref: Ref) Error!u32 {
+    const root = ref.toIndex() orelse return 0;
+    const air = f.dg.air;
+    const seen = try f.dg.arena.alloc(bool, air.instructions.len);
+    @memset(seen, false);
+    var stack: std.ArrayList(Inst.Index) = .empty;
+    try stack.append(f.dg.arena, root);
+    // Each instruction is pushed once, so the walk is bounded by the body.
+    while (stack.pop()) |i| {
+        if (seen[@backingInt(i)]) continue;
+        seen[@backingInt(i)] = true;
+        const tag = air.instructions.items(.tag)[@backingInt(i)];
+        switch (tag) {
+            .alloc, .load, .assign, .call, .probe, .block, .loop, .cond_br, .br, .repeat, .ret, .anew, .store, .fload, .iload, .path_prev, .path_acc => return f.dg.fail("a derived parameter default that reads `{t}`", .{tag}),
+            else => {}, // else: a value of args, constants and its operands
+        }
+        var ops: Liveness.Operands = .{};
+        ops.collect(air.*, tag, air.instructions.items(.data)[@backingInt(i)]);
+        for (ops.slice()) |o| if (o.toIndex()) |oi| try stack.append(f.dg.arena, oi);
+    }
+    var n: u32 = 0;
+    for (seen, 0..) |s, i| if (s) {
+        const inst: Inst.Index = @fromBackingInt(@intCast(i));
+        try f.line();
+        try f.print("const v{d} = ", .{i});
+        try f.genValue(inst, air.instructions.items(.tag)[i], air.instructions.items(.data)[i]);
+        try f.print(";", .{});
+        n += 1;
+    };
+    return n;
+}
+
+/// Writes operand `ref` as a plain number: a real's `.val()`, an integer.
+pub fn valueOf(f: *Function, ref: Ref) Error!void {
+    if (isIntRef(f, ref)) return f.int(ref);
+    if (ref.toIndex()) |i| return f.print("v{d}.val()", .{@backingInt(i)});
+    switch (f.dg.ip.indexToKey(ref.toInterned().?)) {
+        .float => |x| return f.print("{f}", .{Real{ .x = x }}),
+        else => return f.dg.fail("a derived parameter default that is not a number", .{}), // else: Verify types every real operand
+    }
+}
+
+/// Writes a real operand: a value, or a constant as an `Of(0)` value.
+pub fn real(f: *Function, ref: Ref) Error!void {
+    if (ref.toIndex()) |i| return f.print("v{d}", .{@backingInt(i)});
+    switch (f.dg.ip.indexToKey(ref.toInterned().?)) {
+        .float => |x| return f.print("S.con({f})", .{Real{ .x = x }}),
+        .int => |n| return f.print("S.con({d}.0)", .{n.storage.small}),
+        else => return f.dg.fail("a real operand that is not a number", .{}), // else: Verify types every real operand
+    }
+}
+
+/// Writes an integer operand.
+pub fn int(f: *Function, ref: Ref) Error!void {
+    if (ref.toIndex()) |i| return f.print("v{d}", .{@backingInt(i)});
+    switch (f.dg.ip.indexToKey(ref.toInterned().?)) {
+        .int => |n| switch (n.storage) {
+            .small => |s| return f.print("@as(i64, {d})", .{s}),
+            .big => return f.dg.fail("an integer constant wider than 64 bits", .{}),
+        },
+        else => return f.dg.fail("an integer operand that is not an integer", .{}), // else: Verify types every integer operand
+    }
+}
+
+/// Whether operand `ref` is an integer.
+pub fn isIntRef(f: *Function, ref: Ref) bool {
+    return isInt(f.dg.ip, f.dg.air.typeOf(f.dg.ip, ref));
+}
+
+/// Whether type `ty` is an integer.
+pub fn isInt(ip: *const InternPool, ty: InternPool.Index) bool {
+    if (ty == InternPool.Index.integer_type) return true;
+    return switch (ip.indexToKey(ty)) {
+        .int_type => true,
+        else => false, // else: a real, a string or an array
+    };
+}
+
+/// Starts a statement line at the current nesting.
+pub fn line(f: *Function) Error!void {
+    try f.print("\n", .{});
+    for (0..f.indent) |_| try f.print("    ", .{});
+}
+
+/// Writes to the body.
+pub fn print(f: *Function, comptime fmt: []const u8, args: anytype) Error!void {
+    f.w.print(fmt, args) catch return error.OutOfMemory;
+}
+
 // ---- private ----
 
 fn genInst(f: *Function, inst: Inst.Index) Error!void {
@@ -103,7 +200,14 @@ fn genInst(f: *Function, inst: Inst.Index) Error!void {
         .alloc => {
             try f.line();
             const kw = if (live.assigned[i]) "var" else "const";
-            if (isInt(f.dg.ip, data.ty)) {
+            if (f.dg.held_field[i]) |field| {
+                // §5.10 the value the last accepted point left.
+                f.uses.inst = true;
+                if (isInt(f.dg.ip, data.ty))
+                    try f.print("{s} s{d}: i64 = M.zInstI(S, inst, \"{s}\");", .{ kw, i, field })
+                else
+                    try f.print("{s} s{d}: F.zOf(S, 0x{x}) = F.zTo(S, 0x{x}, M.zInst(S, inst, \"{s}\"));", .{ kw, i, live.masks[i], live.masks[i], field });
+            } else if (isInt(f.dg.ip, data.ty)) {
                 try f.print("{s} s{d}: i64 = 0;", .{ kw, i });
             } else if (data.ty == InternPool.Index.real_type) {
                 try f.print("{s} s{d}: F.zOf(S, 0x{x}) = F.zTo(S, 0x{x}, S.con(0.0));", .{ kw, i, live.masks[i], live.masks[i] });
@@ -274,8 +378,8 @@ fn genValue(f: *Function, inst: Inst.Index, tag: Inst.Tag, data: Inst.Data) Erro
             f.uses.model = true;
             const k = data.ty_index.index;
             const name = f.dg.paramName(k);
-            if (isInt(f.dg.ip, data.ty_index.ty)) return f.print("model.{f}", .{std.zig.fmtId(name)});
-            return f.print("S.con(model.{f})", .{std.zig.fmtId(name)});
+            if (isInt(f.dg.ip, data.ty_index.ty)) return f.print("model.{f}", .{Ident{ .name = name }});
+            return f.print("S.con(model.{f})", .{Ident{ .name = name }});
         },
         .probe => {
             f.uses.x = true;
@@ -470,36 +574,7 @@ fn genCall(f: *Function, inst: Inst.Index, data: Inst.Data) Error!void {
     if (!used and !Liveness.effect(air.*, .call, data)) return;
     try f.line();
     try f.print("const v{d} = ", .{@backingInt(inst)});
-    switch (tag) {
-        // §9.10 environment.
-        .@"$temperature" => {
-            f.uses.model = true;
-            try f.print("S.con(model.temperature__)", .{});
-        },
-        .@"$vt" => if (args.len == 0) {
-            f.uses.model = true;
-            try f.print("S.con(model.temperature__ * 8.617333262145179e-5)", .{});
-        } else {
-            try f.print("(", .{});
-            try f.real(args[0]);
-            try f.print(").scale(8.617333262145179e-5)", .{});
-        },
-        .@"$abstime", .@"$realtime" => {
-            f.uses.sim = true;
-            try f.print("S.con(sim.t)", .{});
-        },
-        .@"$mfactor" => {
-            f.uses.inst = true;
-            try f.print("M.zInst(S, inst, \"mfactor\")", .{});
-        },
-        // §4.5.13: limexp is `exp`'s own text (VD-121, as the old device).
-        .limexp => {
-            try f.print("(", .{});
-            try f.real(args[0]);
-            try f.print(").exp()", .{});
-        },
-        else => return f.dg.fail("a call of `{s}`", .{@tagName(tag)}), // else: not yet spelled by this backend
-    }
+    try calls.gen(f, inst, tag, args);
     try f.print(";", .{});
 }
 
@@ -535,59 +610,16 @@ fn widened(f: *Function, to: Inst.Index, ref: Ref) Error!void {
     try f.print(")", .{});
 }
 
-/// Writes a real operand: a value, or a constant as an `Of(0)` value.
-fn real(f: *Function, ref: Ref) Error!void {
-    if (ref.toIndex()) |i| return f.print("v{d}", .{@backingInt(i)});
-    switch (f.dg.ip.indexToKey(ref.toInterned().?)) {
-        .float => |x| return f.print("S.con({f})", .{Real{ .x = x }}),
-        .int => |n| return f.print("S.con({d}.0)", .{n.storage.small}),
-        else => return f.dg.fail("a real operand that is not a number", .{}), // else: Verify types every real operand
-    }
-}
-
-/// Writes an integer operand.
-fn int(f: *Function, ref: Ref) Error!void {
-    if (ref.toIndex()) |i| return f.print("v{d}", .{@backingInt(i)});
-    switch (f.dg.ip.indexToKey(ref.toInterned().?)) {
-        .int => |n| switch (n.storage) {
-            .small => |s| return f.print("@as(i64, {d})", .{s}),
-            .big => return f.dg.fail("an integer constant wider than 64 bits", .{}),
-        },
-        else => return f.dg.fail("an integer operand that is not an integer", .{}), // else: Verify types every integer operand
-    }
-}
-
 /// The Zig type of instruction `inst`'s value.
 fn typeText(f: *Function, inst: Inst.Index) TypeText {
     const ty = f.dg.air.typeOfIndex(f.dg.ip, inst);
     return .{ .int = isInt(f.dg.ip, ty), .mask = f.dg.live.masks[@backingInt(inst)] };
 }
 
-fn isIntRef(f: *Function, ref: Ref) bool {
-    return isInt(f.dg.ip, f.dg.air.typeOf(f.dg.ip, ref));
-}
-
-fn isInt(ip: *const InternPool, ty: InternPool.Index) bool {
-    if (ty == InternPool.Index.integer_type) return true;
-    return switch (ip.indexToKey(ty)) {
-        .int_type => true,
-        else => false, // else: a real, a string or an array
-    };
-}
-
 fn nested(f: *Function, body: []const Inst.Index) Error!void {
     f.indent += 1;
     defer f.indent -= 1;
     try f.genBody(body);
-}
-
-fn line(f: *Function) Error!void {
-    try f.print("\n", .{});
-    for (0..f.indent) |_| try f.print("    ", .{});
-}
-
-fn print(f: *Function, comptime fmt: []const u8, args: anytype) Error!void {
-    f.w.print(fmt, args) catch return error.OutOfMemory;
 }
 
 test "Real: every constant prints as a literal that parses back to its bits" {

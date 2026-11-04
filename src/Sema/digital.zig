@@ -15,7 +15,7 @@
 //! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Why = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
-//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `reject`, `rejectArg`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
+//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `reject`, `rejectFmt`, `rejectArg`, `rejectArgFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
 //! - `pub const none: u32`
 //! - `pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Lowered`
 
@@ -61,12 +61,14 @@ pub const Lowered = struct {
 
 /// `Unsupported`: a construct the lowering does not express yet, named in
 /// `Lower.why`. `Rejected`: a design IEEE 1364-2005 makes an error, which
-/// the caller reports as E1100 (lib/sim/digital's code for it) at `Why.at`.
+/// the caller reports under `Why.code` (lib/sim/digital's code for it) at
+/// `Why.at`.
 pub const Error = error{ Unsupported, Rejected } || Allocator.Error;
 
 /// Why `lower` failed: the construct or the error, and for `Rejected` the
-/// source offset (as a token start of `Options.sources`' trees) it is at.
-pub const Why = struct { text: []const u8 = "", at: u32 = none };
+/// source offset (as a token start of `Options.sources`' trees) it is at
+/// and its code (E1100, lib/sim/digital's catch-all, unless a rule has one).
+pub const Why = struct { text: []const u8 = "", at: u32 = none, code: vams.Diag.Code = .E1100 };
 
 /// The `none` of every u32 handle a `Program` row holds.
 pub const none: u32 = std.math.maxInt(u32);
@@ -163,6 +165,8 @@ pub const Lower = struct {
     why: []const u8 = "",
     /// `reject`'s source offset.
     why_at: u32 = none,
+    /// `reject`'s code: set before a `reject` whose rule has its own.
+    why_code: vams.Diag.Code = .E1100,
     names: std.ArrayList(Name) = .empty,
     frames: std.ArrayList(Frame) = .empty,
     scopes: std.ArrayList(ScopeInfo) = .empty,
@@ -211,6 +215,9 @@ pub const Lower = struct {
     sdf: bool = false,
     /// A function body is being compiled (§10.4.4: its fork runs in order).
     in_function: bool = false,
+    /// §10.2.1 every slot of an automatic subroutine's storage (each
+    /// activation copy's too).
+    auto_slots: std.AutoHashMapUnmanaged(u32, void) = .empty,
     /// An automatic subroutine's activation storage is being laid out: its
     /// named blocks' items join it (`sub.zig`'s `storage`).
     laying_out: bool = false,
@@ -251,6 +258,13 @@ pub const Lower = struct {
         return error.Unsupported;
     }
 
+    /// `rejectArg` with a formatted message.
+    pub fn rejectArgFmt(l: *Lower, f: u32, call: Inst.Index, k: usize, comptime fmt: []const u8, args: anytype) Error {
+        l.rejectArg(f, call, k, "") catch {};
+        l.why = try std.fmt.allocPrint(l.a, fmt, args);
+        return error.Rejected;
+    }
+
     /// Records error `msg` at expression `r` of frame `f` and fails
     /// (`Rejected`): the message lib/sim/digital gives the same design.
     /// A call is at its name (its node's main token is its `(`), as
@@ -265,6 +279,14 @@ pub const Lower = struct {
         const tree = l.options.sources[@backingInt(l.fileOf(f))].tree;
         const n = vir.instructions.items(.data)[@backingInt(i)].pl_node.src_node;
         if (tree.nodeTag(n) == .call) l.why_at = tree.tokenStart(tree.nodeMainToken(tree.nodeData(n).node_and_extra[0]));
+        return error.Rejected;
+    }
+
+    /// `reject` with a formatted message.
+    pub fn rejectFmt(l: *Lower, f: u32, r: Inst.Ref, comptime fmt: []const u8, args: anytype) Error {
+        const msg = try std.fmt.allocPrint(l.a, fmt, args);
+        l.reject(f, r, "") catch {};
+        l.why = msg;
         return error.Rejected;
     }
 
@@ -408,16 +430,16 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Low
     var b: Builder = .init(arena);
     var l: Lower = .{ .zcu = zcu, .a = arena, .b = &b, .options = options };
     spine(&l) catch |e| {
-        why.* = .{ .text = l.why, .at = l.why_at };
+        why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
         return e;
     };
     var program = b.finish();
     vars.finishParams(&l, &program) catch |e| {
-        why.* = .{ .text = l.why, .at = l.why_at };
+        why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
         return e;
     };
     time0.finish(&l, &program) catch |e| {
-        why.* = .{ .text = l.why, .at = l.why_at };
+        why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
         return e;
     };
     assert(program.inst_scope.len == program.insts.len);

@@ -23,6 +23,7 @@
 //! - `pub fn portDecl(vir: *const Vir, p: Inst.Index) ?Inst.Index`
 //! - `pub fn rowInstance(i: Zcu.Instance.Index) Device.Instance`
 //! - `pub fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String`
+//! - `pub fn envOf(s: *Sema, unit: *Unit) Allocator.Error!eval.Env`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -40,6 +41,7 @@ const held = @import("held.zig");
 const param = @import("param.zig");
 const discrete = @import("discrete.zig");
 const variable = @import("variable.zig");
+const net = @import("net.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Device = Air.Device;
@@ -65,14 +67,15 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     if (s.units.items.len == 0) return finish(s, &.{});
     try contrib.loadDisciplines(s);
     for (s.units.items) |*u| try discrete.mark(s, u);
-    try ports(s, &s.units.items[0]);
+    try net.ports(s, &s.units.items[0]);
     s.device.num_ports = @intCast(s.device.nodes.len);
-    for (s.units.items) |*u| try nets(s, u);
-    for (s.units.items[1..]) |*u| try bindChildPorts(s, u);
+    for (s.units.items) |*u| try net.nets(s, u);
+    for (s.units.items[1..]) |*u| try net.bindChildPorts(s, u);
     for (s.units.items) |*u| try param.declare(s, u);
     for (s.units.items) |*u| try discrete.declare(s, u);
     for (s.units.items) |*u| try branches(s, u);
     for (s.units.items) |*u| try held.mark(s, u);
+    for (s.units.items) |*u| try @import("attr.zig").check(s, u);
     for (s.units.items) |*u| try variable.declare(s, u);
     var main: Block = .{ .parent = null, .unit = &s.units.items[0] };
     // The old flattener's order: an instance's blocks where its instance
@@ -221,6 +224,18 @@ pub fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String {
     return @fromBackingInt(vir.extra[at]);
 }
 
+/// An evaluator over `unit`'s module with the instance's folded parameters.
+pub fn envOf(s: *Sema, unit: *Unit) Allocator.Error!eval.Env {
+    const zcu = s.zcu;
+    var env: eval.Env = try .init(s.gpa, s.arena, &zcu.intern_pool, unit.vir, &.{ unit.module.params, unit.module.body });
+    errdefer env.deinit();
+    const elems = zcu.intern_pool.indexToKey(zcu.instances.items(.params)[@backingInt(unit.instance)]).aggregate.elems;
+    assert(elems.len == env.values.items.len);
+    @memcpy(env.values.items, elems);
+    env.hier = zcu.instances.items(.hier)[@backingInt(unit.instance)];
+    return env;
+}
+
 // ---- private ----
 
 /// The main body: the prologue's slots, the entry assignments, `body`, and the `ret`.
@@ -354,203 +369,6 @@ fn lastStore(vir: *const Vir, b: Vir.Body) ?Inst.Bin {
     const last = insts[insts.len - 1];
     if (vir.instructions.items(.tag)[@backingInt(last)] != .store) return null;
     return payloadOf(vir, Inst.Bin, last);
-}
-
-/// An evaluator over `unit`'s module with the instance's folded parameters.
-fn envOf(s: *Sema, unit: *Unit) Allocator.Error!eval.Env {
-    const zcu = s.zcu;
-    var env: eval.Env = try .init(s.gpa, s.arena, &zcu.intern_pool, unit.vir, &.{ unit.module.params, unit.module.body });
-    errdefer env.deinit();
-    const elems = zcu.intern_pool.indexToKey(zcu.instances.items(.params)[@backingInt(unit.instance)]).aggregate.elems;
-    assert(elems.len == env.values.items.len);
-    @memcpy(env.values.items, elems);
-    env.hier = zcu.instances.items(.hier)[@backingInt(unit.instance)];
-    return env;
-}
-
-/// Appends a node row named `name` (or returns the row already named so).
-fn internNode(s: *Sema, unit: *const Unit, name: []const u8, discipline: InternPool.String) Allocator.Error!Node.Index {
-    const ip = &s.zcu.intern_pool;
-    const key = try ip.getString(s.gpa, name);
-    const gop = try s.node_rows.getOrPut(s.arena, key);
-    if (gop.found_existing) return gop.value_ptr.*;
-    const row: Node.Index = @fromBackingInt(@intCast(s.device.nodes.len));
-    try s.device.nodes.append(s.gpa, .{ .name = key, .kind = .net, .of = .none, .discipline = discipline, .instance = rowInstance(unit.instance) });
-    gop.value_ptr.* = row;
-    assert(@backingInt(row) + 1 == s.device.nodes.len);
-    return row;
-}
-
-/// §3.6.2 the discipline of net `first`: its declaration's, else the one
-/// Annex F resolution gave it (`zcu.net_discipline`), else none.
-fn netDiscipline(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.Error!InternPool.String {
-    const vir = unit.vir;
-    const ip = &s.zcu.intern_pool;
-    const declared = disciplineOf(unit, first);
-    if (declared != .empty) return ip.getString(s.gpa, vir.string(declared));
-    const net = try ip.getString(s.gpa, vir.string(nameOf(vir, first)));
-    return s.zcu.net_discipline.get(.{ .instance = unit.instance, .net = net }) orelse .empty;
-}
-
-/// The discipline any declaration of `first`'s name in the module gives it.
-fn disciplineOf(unit: *const Unit, first: Inst.Index) Vir.String {
-    const vir = unit.vir;
-    const tags = vir.instructions.items(.tag);
-    if (tags[@backingInt(first)] == .net) {
-        const n = payloadOf(vir, Inst.Net, first);
-        if (n.discipline != .empty) return n.discipline;
-    }
-    for (vir.body(unit.module.body)) |i| {
-        if (canonical(vir, i) != first) continue;
-        switch (tags[@backingInt(i)]) {
-            .net => {
-                const n = payloadOf(vir, Inst.Net, i);
-                if (n.discipline != .empty) return n.discipline;
-            },
-            .io => {
-                const io = payloadOf(vir, Inst.Io, i);
-                if (io.discipline != .empty) return io.discipline;
-            },
-            else => {}, // else: only a net or a direction carries a discipline
-        }
-    }
-    return .empty;
-}
-
-/// §6.5 the root's ports, in header order: the first rows.
-fn ports(s: *Sema, unit: *Unit) Allocator.Error!void {
-    const vir = unit.vir;
-    const tags = vir.instructions.items(.tag);
-    _ = tags;
-    for (vir.body(unit.module.ports)) |p| {
-        const first = portDecl(vir, p) orelse continue;
-        try declareNet(s, unit, first);
-    }
-}
-
-/// §3.6.3 the instance's nets: every `net` and `io` not bound yet. §3.6.4
-/// a `ground` net is the reference node. A child's port waits for
-/// `bindChildPorts`.
-fn nets(s: *Sema, unit: *Unit) Allocator.Error!void {
-    const vir = unit.vir;
-    const tags = vir.instructions.items(.tag);
-    var child_ports: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
-    if (unit.prefix.len != 0) for (vir.body(unit.module.ports)) |p| if (portDecl(vir, p)) |d| try child_ports.put(s.arena, d, {});
-    for (vir.body(unit.module.body)) |i| {
-        const tag = tags[@backingInt(i)];
-        if (tag != .net and tag != .io) continue;
-        const first = canonical(vir, i);
-        if (unit.binds.contains(first) or child_ports.contains(first)) continue;
-        if (std.mem.findScalar(Inst.Index, unit.discrete.items, first) != null) continue;
-        if (tag == .io and tags[@backingInt(first)] == .io and !hasNet(unit, first)) continue;
-        try declareNet(s, unit, first);
-    }
-    // §6.5.4 (IEEE 1364-2005 §4.5) a name an instance connects that no
-    // declaration names is an implicit net of this instance.
-    const zcu = s.zcu;
-    for (0..zcu.instances.len) |k| {
-        if (zcu.instances.items(.parent)[k] != unit.instance) continue;
-        const list = zcu.instances.items(.ports)[k];
-        for (zcu.ports.items(.actual)[list.start..][0..list.len]) |actual| {
-            const a = actual.toIndex() orelse continue;
-            if (tags[@backingInt(a)] != .str_ref) continue;
-            const name = vir.string(vir.instructions.items(.data)[@backingInt(a)].str_tok.start);
-            const net = try zcu.intern_pool.getString(s.gpa, name);
-            const disc = zcu.net_discipline.get(.{ .instance = unit.instance, .net = net }) orelse .empty;
-            _ = try internNode(s, unit, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disc);
-        }
-    }
-}
-
-/// §3.6.4 whether any declaration of `first`'s name is `ground`.
-fn isGround(unit: *const Unit, first: Inst.Index) bool {
-    const vir = unit.vir;
-    for (vir.body(unit.module.body)) |i| {
-        if (vir.instructions.items(.tag)[@backingInt(i)] != .net or canonical(vir, i) != first) continue;
-        if (payloadOf(vir, Inst.Net, i).flags.net == .ground) return true;
-    }
-    return false;
-}
-
-/// One net or port: a row, or a §3.6.3 vector's rows msb first (`name[k]`).
-/// §3.6.4 a `ground` net keeps its row, and its name reads the reference node.
-fn declareNet(s: *Sema, unit: *Unit, first: Inst.Index) Allocator.Error!void {
-    const vir = unit.vir;
-    const name = vir.string(nameOf(vir, first));
-    const disc = try netDiscipline(s, unit, first);
-    if (try vectorRange(s, unit, first)) |r| {
-        const at: u32 = @intCast(unit.vec_rows.items.len);
-        const n: u32 = @intCast(@abs(r[0] - r[1]) + 1);
-        for (0..n) |k| {
-            const i: i64 = if (r[0] >= r[1]) r[0] - @as(i64, @intCast(k)) else r[0] + @as(i64, @intCast(k));
-            try unit.vec_rows.append(s.arena, try internNode(s, unit, try std.fmt.allocPrint(s.arena, "{s}{s}[{d}]", .{ unit.prefix, name, i }), disc));
-        }
-        try unit.binds.put(s.arena, first, .{ .vector = .{ .first = at, .len = n, .msb = r[0], .lsb = r[1] } });
-        return;
-    }
-    const row = try internNode(s, unit, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), disc);
-    try unit.binds.put(s.arena, first, .{ .node = if (isGround(unit, first)) .ground else row });
-}
-
-/// The folded `[msb:lsb]` any declaration of `first`'s name carries, or null.
-fn vectorRange(s: *Sema, unit: *Unit, first: Inst.Index) Allocator.Error!?[2]i64 {
-    const vir = unit.vir;
-    for ([_]Vir.Body{ unit.module.ports, unit.module.body }) |body| for (vir.body(body)) |i| {
-        const tag = vir.instructions.items(.tag)[@backingInt(i)];
-        if (tag != .net and tag != .io) continue;
-        if (canonical(vir, i) != first) continue;
-        const range = if (tag == .net) payloadOf(vir, Inst.Net, i).range else payloadOf(vir, Inst.Io, i).range;
-        const insts = vir.body(range);
-        if (insts.len == 0) continue;
-        const bin = payloadOf(vir, Inst.Bin, insts[insts.len - 1]);
-        var env = try envOf(s, unit);
-        defer env.deinit();
-        const msb = ((try env.ref(bin.lhs)) orelse return null).asIntExact() orelse return null;
-        const lsb = ((try env.ref(bin.rhs)) orelse return null).asIntExact() orelse return null;
-        return .{ msb, lsb };
-    };
-    return null;
-}
-
-/// Whether a `net` declares the name `first` (an `io`) names too.
-fn hasNet(unit: *const Unit, first: Inst.Index) bool {
-    const vir = unit.vir;
-    for (vir.body(unit.module.body)) |i| {
-        if (vir.instructions.items(.tag)[@backingInt(i)] == .net and canonical(vir, i) == first) return true;
-    }
-    return false;
-}
-
-/// §6.5 a child's ports: each the node its connection names in the
-/// parent; an unconnected port is a net of the child's own.
-fn bindChildPorts(s: *Sema, unit: *Unit) Allocator.Error!void {
-    const zcu = s.zcu;
-    const k = @backingInt(unit.instance);
-    const parent = zcu.instances.items(.parent)[k];
-    const pu = for (s.units.items) |*u| {
-        if (u.instance == parent) break u;
-    } else unreachable; // a child's parent is a unit before it
-    const list = zcu.instances.items(.ports)[k];
-    for (zcu.ports.items(.formal)[list.start..][0..list.len], zcu.ports.items(.actual)[list.start..][0..list.len]) |formal, actual| {
-        const first = portDecl(unit.vir, formal) orelse continue;
-        const node: Node.Index = blk: {
-            if (actual.toIndex()) |a| switch (pu.vir.instructions.items(.tag)[@backingInt(a)]) {
-                .decl_ref => {
-                    const d = canonical(pu.vir, pu.vir.instructions.items(.data)[@backingInt(a)].decl_tok.decl);
-                    if (pu.binds.get(d)) |b| if (b == .node) break :blk b.node;
-                },
-                // The parent's implicit net (`nets`).
-                .str_ref => {
-                    const flat = try std.fmt.allocPrint(s.arena, "{s}{s}", .{ pu.prefix, pu.vir.string(pu.vir.instructions.items(.data)[@backingInt(a)].str_tok.start) });
-                    if (s.node_rows.get(try zcu.intern_pool.getString(s.gpa, flat))) |n| break :blk n;
-                },
-                else => {}, // else: a select or concatenation, not bound here
-            };
-            const name = unit.vir.string(nameOf(unit.vir, first));
-            break :blk try internNode(s, unit, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name }), try netDiscipline(s, unit, first));
-        };
-        try unit.binds.put(s.arena, first, .{ .node = node });
-    }
 }
 
 /// §3.12 the instance's named branches, in declaration order.

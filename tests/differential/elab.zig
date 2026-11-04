@@ -5,10 +5,12 @@
 //! disagrees). The old preprocessor makes both sides' text, as in
 //! diff-astgen. Checks, in order:
 //! - codes (`.va`/`.vams`, unless the old elaboration stopped at NoModule,
-//!   before any check): the set of codes the old `elab.elaborate` adds
-//!   to its bag equals the set in `Zcu.failed` plus the per-file codes of
-//!   `Vir.diag` the old elaboration owns (`elab_codes`: AstGen judges a few
-//!   of its rules alone, E0373 and E0376);
+//!   before any check): the codes the old `elab.elaborate` adds to its bag
+//!   against those in `Zcu.failed` and `Vir.diag`, by stage
+//!   (`settle.codesDiffer`, `stages.zig`): elaboration's both ways, a later
+//!   stage's one way (the new side raised it only where the old did; the
+//!   old side's others are named in the summary, diff-lower demands them),
+//!   an earlier stage's not at all (diff-astgen's);
 //! - tree: when the old side elaborates, every instance's hierarchical path
 //!   and module name, in order (`.va`/`.vams`: `Design.units`, one root; `.v`:
 //!   the instance scopes of `sim.digital.elaborate`'s `Run.hier`, every root,
@@ -18,6 +20,8 @@
 //!   `Run.values`, by `Run.hier.names`) equals the new instance's folded
 //!   integer in that many low bits; a real or unfoldable one is not compared;
 //! - determinism: elaborating a fixture twice gives the same tree and codes.
+//! A tree the LRM settles for the new side is a line of `elab.rulings`,
+//! whose expected result is the old rows the new tree drops.
 //! A fixture the old front end refuses (preprocess, parse, the §3.7 and
 //! §8.1.1 rules) or the new parser refuses is skipped and counted; a `.v`
 //! the old digital route refuses is compared on nothing and counted.

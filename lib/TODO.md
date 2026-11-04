@@ -1404,3 +1404,34 @@ src/
   that owns the check (a stage-ownership table for diagnostic codes), or as an
   old-side bug that an independent tiebreaker settles (an f128 reference, or an
   `//! lrm` fixture). Never as a line. `docs/rewrite/README.md` rule 3.
+
+- **`--check` scratch per invocation (ESPice espice-8a, 2026-11-03; v0.30.0 only, no v0.23.1):**
+  the old `src/zigbuild/check.zig` writes `.zig-cache/vera-check/<model>.check.zig`
+  at a fixed path, so two builds that share a `.zig-cache` symlink read each
+  other's half-written file ("contract requires `pub U`"). `link.check` takes
+  `f.work_dir` from its caller. The rewrite's driver (rw-comp) gives each
+  invocation its own directory: under the `-o` output's directory, or a
+  mkdtemp-style name with a random suffix, removed afterwards. It never uses a
+  fixed path under the cwd, and a cache-relative path is not enough, because
+  the caches are shared on purpose. Oracle: one model, one cwd, N concurrent
+  `vera --emit-zig --check` runs in a test, all of which succeed. Tell
+  espice-8a the tag when v0.30.0 ships.
+
+- **The goal (user, 2026-11-03, overnight):** "the complete rewrite, passing at 0 xfails, all green."
+  This means:
+  - every `tests/differential/*.xfail` is empty;
+  - `vera-next` passes conformance 6818/6818;
+  - `zig build test` is green with the new pipeline as the product;
+  - the old pipeline is deleted.
+
+  "Then a final audit using AGENTS.md over the codegen code part to make sure it
+  codegens performance critical code." The audit covers:
+  - the assembly probes (FOLDED/IDENTICAL/EQUIVALENT/NEGATIVE; RESIDUE fails);
+  - dispatch per batch;
+  - SoA with size assertions;
+  - versioned units that actually take the fast body;
+  - a benchmark behind every speed claim.
+
+  Order: rw-zero, rw-dlower, rw-codegen, rw-lower and rw-comp (`docs/rewrite/comp.md`)
+  run now, at most 5 agents at once. The backends follow as slots free: exe,
+  verilog, osdi, digital native, rtlil, VPI. Then the switch-over, then the audit.

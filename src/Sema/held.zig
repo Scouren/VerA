@@ -362,6 +362,9 @@ pub fn mark(s: *Sema, unit: *Unit) Allocator.Error!void {
         if (gop.found_existing) continue;
         gop.value_ptr.* = if (e.value_ptr.reach or e.value_ptr.initial) .retained else .unless_invariant;
     };
+    it = w.marks.iterator();
+    while (it.next()) |e| if (e.key_ptr.elem == Key.whole and e.value_ptr.read and (e.value_ptr.initial or unit.held.get(e.key_ptr.var_) == .event))
+        try unit.carried.put(s.arena, e.key_ptr.var_, {});
 }
 
 // ---- private ----

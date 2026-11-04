@@ -234,6 +234,10 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, show: bool) !
     const new_codes = try lowerCodes(arena, codes.items);
     if (show) std.debug.print("== {s}\nold codes: {s}\nnew codes: {s}\n", .{ rel, try join(arena, old.codes), try join(arena, new_codes) });
     if (show) for (zcu.failed.items(.code), zcu.failed.items(.message)) |c, m| std.debug.print("  new {t}: {s}\n", .{ c, zcu.intern_pool.stringToSlice(m) });
+    if (show and analysis == null) if (old.lw) |w| {
+        std.debug.print("-- old tables (the new side refused)\n", .{});
+        for (try tables.oldTables(arena, w)) |l| std.debug.print("  {s}\n", .{l});
+    };
     if (!sameLines(old.codes, new_codes))
         return .{ .verdict = .{ .why = try arena.print("codes: old {s}, new {s}{s}", .{ try join(arena, old.codes), try join(arena, new_codes), try firstMessage(arena, &zcu) }) } };
     const lw = old.lw orelse return .{ .verdict = .{ .why = if (analysis != null) "the old side refused, the new side lowered" else null } };

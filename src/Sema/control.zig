@@ -103,7 +103,8 @@ pub fn assignTo(s: *Sema, b: *Block, lhs_ref: Inst.Ref, v: Sema.Value, src: Inst
     if (vir.instructions.items(.tag)[@backingInt(lhs)] == .elem) {
         const array = @import("array.zig");
         const e = (try array.element(s, b, lhs_ref, src)) orelse return;
-        const r = try expr.coerce(s, b, v, e.ty);
+        var r = try expr.coerce(s, b, v, e.ty);
+        if (b.nodiff and e.ty == .real) r = try expr.unOp(s, b, .dstop, r);
         return array.store(s, b, e, r);
     }
     if (vir.instructions.items(.tag)[@backingInt(lhs)] != .decl_ref)
@@ -111,7 +112,8 @@ pub fn assignTo(s: *Sema, b: *Block, lhs_ref: Inst.Ref, v: Sema.Value, src: Inst
     const first = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(lhs)].decl_tok.decl);
     const bind = b.unit.binds.get(first) orelse return s.fail(.E0512, b.unit.file, src, "an assignment to a name with no slot", .{});
     if (bind != .slot) return s.fail(.E0313, b.unit.file, src, "an assignment to a name that is not a variable", .{});
-    const r = try expr.coerce(s, b, v, bind.slot.ty);
+    var r = try expr.coerce(s, b, v, bind.slot.ty);
+    if (b.nodiff and bind.slot.ty == .real) r = try expr.unOp(s, b, .dstop, r);
     if (op.isStatic(s, r, 0)) try s.static_slots.put(s.arena, bind.slot.alloc, {}) else _ = s.static_slots.remove(bind.slot.alloc);
     _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(bind.slot.alloc), .rhs = r } } });
 }
@@ -170,6 +172,17 @@ fn task(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!void {
 /// statements, in place (a value lowered there stays readable after it).
 fn block(s: *Sema, b: *Block, x: Inst.Block) Allocator.Error!void {
     if (x.flags.fork) return s.fail(.E0512, b.unit.file, .none, "a `fork` block in an analog body", .{});
+    // VerA's `vera_nodiff` (§2.9): every assignment inside, unless a nearer
+    // spec says otherwise; a value that does not fold is E0525.
+    const outer_nodiff = b.nodiff;
+    defer b.nodiff = outer_nodiff;
+    for (b.unit.vir.list(Inst.Attr, x.attrs)) |a| if (std.mem.eql(u8, b.unit.vir.string(a.name), "vera_nodiff")) {
+        if (a.value.len == 0) {
+            b.nodiff = true;
+        } else if (try decl.foldBody(s, b.unit, a.value)) |c| {
+            b.nodiff = c.isTrue();
+        } else try s.fail(.E0525, b.unit.file, .none, "", .{});
+    };
     if (x.name == .empty) return body(s, b, x.body);
     const name = b.unit.vir.string(x.name);
     const exit = try s.air.addInst(s.gpa, .{ .tag = .block, .data = undefined });

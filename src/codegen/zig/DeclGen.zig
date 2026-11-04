@@ -25,7 +25,11 @@ const InternPool = @import("intern_pool");
 const contract = @import("contract");
 const Function = @import("Function.zig");
 const Liveness = @import("Liveness.zig");
+const Ident = @import("Ident.zig");
+const SysFn = @import("vams").SysFn;
 const stamps = @import("stamps.zig");
+const state = @import("state.zig");
+const calls = @import("calls.zig");
 const Device = Air.Device;
 const Real = Function.Real;
 
@@ -41,6 +45,24 @@ live: Liveness,
 options: Options,
 /// Why `generate` failed, once it has (`fail`).
 failure: ?[]const u8 = null,
+/// Per parameter, its §9.19 `$param_given` bit in `Model.given__`, or
+/// `no_bit`: every parameter the body asks about or `derive` fills.
+given_bit: []u32 = &.{},
+/// Every unknown's source spelling, `U`'s order: `nodes`, then the branch
+/// currents codegen mints (`stamps.unknowns`).
+u_names: []const []const u8 = &.{},
+/// Per contribution: its branch-current unknown, or `none` for a flow row.
+branch_u: []u32 = &.{},
+/// Bit k: the body reads `calls.host_params[k]` (a `Model` field).
+host_params: u8 = 0,
+/// Per instruction: an `alloc`'s `Instance` field when §5.10 holds it.
+held_field: []?[]const u8 = &.{},
+/// Per §9.21.1 snapshot site (a `$table_model` call's `site - 1`): its
+/// sample count, the length of `Instance.table_<k>` (`state.plan`).
+table_len: []u32 = &.{},
+
+/// A parameter with no `given__` bit.
+pub const no_bit: u32 = std.math.maxInt(u32);
 
 /// The choices the caller makes beyond the inputs.
 pub const Options = struct {
@@ -96,10 +118,11 @@ const DeclGen = @This();
 /// Writes the whole device to `w`.
 pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     const d = dg.device;
-    if (d.nodes.len == 0) return dg.fail("a device with no unknowns", .{});
-    if (d.held.len != 0) return dg.fail("a §5.10 held variable", .{});
     if (d.limit_slots.len != 0) return dg.fail("a §9.17.3 `$limit`", .{});
+    try stamps.unknowns(dg);
     const p = try stamps.plan(dg);
+    try dg.givenBits();
+    try state.plan(dg);
 
     // The body first: its uses decide `core`'s signature.
     var body: std.Io.Writer.Allocating = .init(dg.arena);
@@ -112,6 +135,7 @@ pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     try dg.genTables(w, p);
     try dg.genCore(w, f.uses, body.written());
     try dg.genEntries(w, p);
+    try state.genEntries(dg, w);
     try dg.print(w, "\ncomptime {{\n    contract.validate(Self);\n}}\n", .{});
 }
 
@@ -122,6 +146,7 @@ pub fn genReturn(dg: *DeclGen, f: *Function) Error!void {
     try dg.print(f.w, "return .{{", .{});
     for (d.contributions.items(.resist), 0..) |slot, k| if (dg.live.assigned[@backingInt(slot)]) try dg.print(f.w, " .r{d} = s{d},", .{ k, @backingInt(slot) });
     for (d.charge_sites.items(.slot), 0..) |slot, k| try dg.print(f.w, " .c{d} = s{d},", .{ k, @backingInt(slot) });
+    for (dg.held_field, 0..) |h, i| if (h != null) try dg.print(f.w, " .h{d} = s{d},", .{ i, i });
     try dg.print(f.w, " }};", .{});
 }
 
@@ -153,17 +178,24 @@ pub fn fail(dg: *DeclGen, comptime fmt: []const u8, args: anytype) Error {
 
 fn genUnknowns(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     const d = dg.device;
-    try dg.print(w, "\n/// §1.3.1 the unknowns, ports first.\npub const U = enum(u{d}) {{\n", .{if (d.nodes.len <= 256) @as(u32, 8) else 32});
-    for (d.nodes.items(.name)) |n| try dg.print(w, "    {f},\n", .{std.zig.fmtId(dg.ip.stringToSlice(n))});
+    try dg.print(w, "\n/// §1.3.1 the unknowns, ports first, then the branch currents codegen mints.\npub const U = enum(u{d}) {{\n", .{if (dg.u_names.len <= 256) @as(u32, 8) else 32});
+    for (dg.u_names) |n| try dg.print(w, "    {f},\n", .{Ident{ .name = n }});
+    // §6.2 a module with no ports or nets: Zig spells the empty `U` `_`.
+    if (dg.u_names.len == 0) try dg.print(w, "    _,\n", .{});
     try dg.print(w, "}};\npub const num_ports: usize = {d};\n", .{d.num_ports});
 }
 
 fn genModel(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     const d = dg.device;
     try dg.print(w, "\n/// §3.4 the card.\npub const Model = struct {{\n", .{});
-    for (d.params.items(.name), d.params.items(.default)) |n, def| {
+    for (d.params.items(.name), d.params.items(.default), d.params.items(.derive), d.params.items(.ty)) |n, def, der, ty| {
+        if ((def == InternPool.Index.undef or def == .none) and der != .none) {
+            // `derive` computes it from the card before any reader.
+            try dg.print(w, "    {f}: {s} = 0,\n", .{ Ident{ .name = dg.ip.stringToSlice(n) }, if (ty == .integer) "i64" else "f64" });
+            continue;
+        }
         if (def == InternPool.Index.undef or def == .none) return dg.fail("parameter `{s}`'s default does not fold", .{dg.ip.stringToSlice(n)});
-        try dg.print(w, "    {f}: ", .{std.zig.fmtId(dg.ip.stringToSlice(n))});
+        try dg.print(w, "    {f}: ", .{Ident{ .name = dg.ip.stringToSlice(n) }});
         switch (dg.ip.indexToKey(def)) {
             .float => |x| try dg.print(w, "f64 = {f},\n", .{Real{ .x = x }}),
             .int => |i| switch (i.storage) {
@@ -173,22 +205,112 @@ fn genModel(dg: *DeclGen, w: *std.Io.Writer) Error!void {
             else => return dg.fail("parameter `{s}` is not a number", .{dg.ip.stringToSlice(n)}), // else: a string, an array or an aggregate
         }
     }
-    try dg.print(w, "    temperature__: f64 = 300.15,\n}};\n", .{});
-    try dg.print(w, "\n/// §6.3.6 the instance.\npub const Instance = struct {{\n    mfactor: f64 = 1.0,\n}};\n", .{});
-    // §3.4.1 an `integer` parameter is 32 bits; the host writes an `i64`
-    // carrier, so `derive` keeps its low 32 bits, sign-extended.
-    var ints: u32 = 0;
-    for (d.params.items(.default)) |def| {
-        if (dg.ip.indexToKey(def) == .int) ints += 1;
+    for (calls.host_params, 0..) |h, k| if (dg.host_params & (@as(u8, 1) << @intCast(k)) != 0)
+        try dg.print(w, "    /// §9.15 `$simparam(\"{s}\")`, host-written.\n    {s}: f64 = {f},\n", .{ h.name, h.field, Real{ .x = h.default } });
+    try dg.print(w, "    temperature__: f64 = 300.15,\n", .{});
+    // `given__` is the last field: `genGiven` writes declarations after it.
+    try dg.genGiven(w);
+    try dg.print(w, "}};\n", .{});
+    try dg.print(w, "\n/// §6.3.6 the instance.\npub const Instance = struct {{\n    mfactor: f64 = 1.0,\n", .{});
+    try state.genInstanceFields(dg, w);
+    try dg.print(w, "}};\n", .{});
+    try dg.genDerive(w);
+}
+
+/// Numbers `given_bit`: each parameter the body reads through
+/// `$param_given`, or whose default `derive` computes, in card order.
+fn givenBits(dg: *DeclGen) Error!void {
+    const d = dg.device;
+    const asked = try dg.arena.alloc(bool, d.params.len);
+    @memset(asked, false);
+    const tags = dg.air.instructions.items(.tag);
+    const datas = dg.air.instructions.items(.data);
+    for (tags, datas) |tag, data| {
+        if (tag != .call) continue;
+        const x = dg.air.extraData(Air.Call, data.ty_pl.payload);
+        if (x.data.callee != @backingInt(SysFn.Tag.@"$param_given") or x.data.args_len != 1) continue;
+        const arg: Air.Inst.Ref = @fromBackingInt(dg.air.extra[x.end]);
+        const i = arg.toIndex() orelse continue;
+        if (tags[@backingInt(i)] == .arg) asked[datas[@backingInt(i)].ty_index.index] = true;
     }
-    if (ints == 0) return;
-    try dg.print(w, "\n/// §3.4.1 each `integer` parameter's low 32 bits: the host writes an `i64`.\npub fn derive(comptime S: type, model: *Model) void {{\n    _ = S;\n", .{});
+    dg.given_bit = try dg.arena.alloc(u32, d.params.len);
+    var next: u32 = 0;
+    for (dg.given_bit, asked, d.params.items(.derive)) |*b, a, der| {
+        b.* = no_bit;
+        if (!a and der == .none) continue;
+        b.* = next;
+        next += 1;
+    }
+}
+
+/// `Model.given__`, `given_params` and `setGiven`: §9.19 which card entries
+/// the host named (the old device's names and layout).
+fn genGiven(dg: *DeclGen, w: *std.Io.Writer) Error!void {
+    var n: u32 = 0;
+    for (dg.given_bit) |b| n += @intFromBool(b != no_bit);
+    if (n == 0) return;
+    try dg.print(w, "    /// §9.19 bit k: the host's card named `given_params[k]` (`setGiven`).\n    given__: std.StaticBitSet({d}) = .empty,\n    pub const given_params = [_][]const u8{{", .{n});
+    for (dg.given_bit, dg.device.params.items(.name)) |b, name| if (b != no_bit) try dg.print(w, " \"{f}\",", .{Ident{ .name = dg.ip.stringToSlice(name) }});
+    try dg.print(w,
+        \\ }};
+        \\    /// Marks field `name` given; a name without a bit is a no-op.
+        \\    pub fn setGiven(model: *Model, name: []const u8) void {{
+        \\        for (given_params, 0..) |g, k| if (std.mem.eql(u8, g, name)) return model.given__.set(k);
+        \\    }}
+        \\
+    , .{});
+}
+
+/// `derive`: each `integer` parameter's low 32 bits (§3.4.1: the host
+/// writes an `i64`), then each default that reads another parameter
+/// (§6.3.4), in card order, unless the card named it.
+fn genDerive(dg: *DeclGen, w: *std.Io.Writer) Error!void {
+    const d = dg.device;
+    var any = false;
+    for (d.params.items(.default), d.params.items(.derive)) |def, der| any = any or der != .none or dg.ip.indexToKey(def) == .int;
+    if (!any) return;
+    var body: std.Io.Writer.Allocating = .init(dg.arena);
+    var f: Function = .{ .dg = dg, .w = &body.writer };
     for (d.params.items(.name), d.params.items(.default)) |n, def| {
         if (dg.ip.indexToKey(def) != .int) continue;
-        const name = std.zig.fmtId(dg.ip.stringToSlice(n));
-        try dg.print(w, "    model.{f} = @as(i32, @truncate(model.{f}));\n", .{ name, name });
+        const name = Ident{ .name = dg.ip.stringToSlice(n) };
+        try dg.print(&body.writer, "\n    model.{f} = @as(i32, @truncate(model.{f}));", .{ name, name });
     }
-    try dg.print(w, "}}\n", .{});
+    for (d.params.items(.name), d.params.items(.derive), dg.given_bit) |n, der, bit| {
+        if (der == .none) continue;
+        const name = Ident{ .name = dg.ip.stringToSlice(n) };
+        try dg.print(&body.writer, "\n    if (!model.given__.isSet({d})) {{", .{bit});
+        f.indent = 2;
+        _ = try f.genTree(der);
+        try dg.print(&body.writer, "\n        model.{f} = ", .{name});
+        try f.valueOf(der);
+        try dg.print(&body.writer, ";\n    }}", .{});
+    }
+
+    try dg.print(w, "\n/// §3.4.1 each `integer` parameter's low 32 bits; §6.3.4 each default\n/// over other parameters, unless the card named it.\npub fn derive(comptime S: type, model: *Model) void {{{s}{s}\n}}\n", .{ if (namesIdent(body.written(), "S")) "" else "\n    _ = S;", body.written() });
+}
+
+/// Whether Zig text `text` spells identifier `id` as a whole token.
+fn namesIdent(text: []const u8, id: []const u8) bool {
+    var at: usize = 0;
+    // Each pass moves `at` past one occurrence.
+    while (std.mem.findPos(u8, text, at, id)) |k| : (at = k + id.len) {
+        const before = k == 0 or !isIdentByte(text[k - 1]);
+        const after = k + id.len == text.len or !isIdentByte(text[k + id.len]);
+        if (before and after) return true;
+    }
+    return false;
+}
+
+fn isIdentByte(c: u8) bool {
+    return std.ascii.isAlphanumeric(c) or c == '_' or c == '@';
+}
+
+test namesIdent {
+    try std.testing.expect(namesIdent("S.con(1)", "S"));
+    try std.testing.expect(namesIdent("F.zTo(S, 0x3, v)", "S"));
+    try std.testing.expect(!namesIdent("model.Sx = @as(i64, 1)", "S"));
+    try std.testing.expect(!namesIdent("", "S"));
 }
 
 /// The lane tables (`deriv_reads`, `jac_pattern`) and the §5.6.1.2 charge
@@ -208,7 +330,7 @@ fn genTables(dg: *DeclGen, w: *std.Io.Writer, p: stamps.Plan) Error!void {
     for (d.charge_sites.items(.slot)) |slot| try dg.print(w, " 0x{x},", .{dg.live.masks[@backingInt(slot)]});
     try dg.print(w, " }};\n", .{});
     try dg.print(w, "pub const q_stamps = [_]contract.QStamp(U){{\n", .{});
-    for (p.q) |s| try dg.print(w, "    .{{ .site = {d}, .row = .{f}, .sign = {f} }},\n", .{ s.site, std.zig.fmtId(dg.nodeName(s.row)), Real{ .x = s.sign } });
+    for (p.q) |s| try dg.print(w, "    .{{ .site = {d}, .row = .{f}, .sign = {f} }},\n", .{ s.site, Ident{ .name = dg.nodeName(s.row) }, Real{ .x = s.sign } });
     try dg.print(w, "}};\n", .{});
 }
 
@@ -217,17 +339,25 @@ fn genTables(dg: *DeclGen, w: *std.Io.Writer, p: stamps.Plan) Error!void {
 /// fast-math body, else the strict body).
 fn genCore(dg: *DeclGen, w: *std.Io.Writer, uses: Function.Uses, body: []const u8) Error!void {
     const d = dg.device;
-    var fields = d.charge_sites.len;
-    for (d.contributions.items(.resist)) |slot| fields += @intFromBool(dg.live.assigned[@backingInt(slot)]);
-    try dg.print(w, "\nfn Core(comptime S: type) type {{\n    {s}return struct {{", .{if (fields == 0) "_ = S;\n    " else ""});
+    // The fields typed over `S`: an integer held value is an `i64`.
+    var reals = d.charge_sites.len;
+    for (dg.held_field, 0..) |h, i| reals += @intFromBool(h != null and dg.air.instructions.items(.data)[i].ty == InternPool.Index.real_type);
+    for (d.contributions.items(.resist)) |slot| reals += @intFromBool(dg.live.assigned[@backingInt(slot)]);
+    try dg.print(w, "\nfn Core(comptime S: type) type {{\n    {s}return struct {{", .{if (reals == 0) "_ = S;\n    " else ""});
     for (d.contributions.items(.resist), 0..) |slot, k| if (dg.live.assigned[@backingInt(slot)]) try dg.print(w, " r{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
     for (d.charge_sites.items(.slot), 0..) |slot, k| try dg.print(w, " c{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
+    for (dg.held_field, 0..) |h, i| if (h != null) {
+        if (dg.air.instructions.items(.data)[i].ty == InternPool.Index.real_type) try dg.print(w, " h{d}: F.zOf(S, 0x{x}),", .{ i, dg.live.masks[i] }) else try dg.print(w, " h{d}: i64,", .{i});
+    };
     try dg.print(w, " }};\n}}\n", .{});
-    try dg.print(w, "\n/// The whole analog body, once per evaluation.\nfn core(comptime S: type, comptime mode: std.builtin.FloatMode, {s}: D.zX(S), {s}: *const Model, {s}: InstancePtr, {s}: contract.SimState) Core(S) {{\n    @setFloatMode(mode);{s}\n}}\n", .{
+    // §9.21.1 every evaluation starts from the snapshots an accepted point kept.
+    const tables = dg.table_len.len != 0;
+    try dg.print(w, "\n/// The whole analog body, once per evaluation.\nfn core(comptime S: type, comptime mode: std.builtin.FloatMode, {s}: D.zX(S), {s}: *const Model, {s}: InstancePtr, {s}: contract.SimState) Core(S) {{\n    @setFloatMode(mode);{s}{s}\n}}\n", .{
         if (uses.x) "x" else "_",
         if (uses.model) "model" else "_",
-        if (uses.inst) "inst" else "_",
+        if (uses.inst or tables) "inst" else "_",
         if (uses.sim) "sim" else "_",
+        if (tables) "\n    inst.table_ready = inst.table_kept;" else "",
         body,
     });
     const guards_opt = try dg.box();
@@ -243,7 +373,7 @@ fn genCore(dg: *DeclGen, w: *std.Io.Writer, uses: Function.Uses, body: []const u
             switch (g.leaf) {
                 .probe => try dg.print(w, "x[{d}]", .{g.index}),
                 .arg => {
-                    const name = std.zig.fmtId(dg.paramName(g.index));
+                    const name = Ident{ .name = dg.paramName(g.index) };
                     if (d.params.items(.ty)[g.index] == .integer) try dg.print(w, "@as(f64, @floatFromInt(model.{f}))", .{name}) else try dg.print(w, "model.{f}", .{name});
                 },
             }
@@ -279,7 +409,7 @@ fn genEntries(dg: *DeclGen, w: *std.Io.Writer, p: stamps.Plan) Error!void {
     try dg.print(w, "\n/// §5.6 the resistive residual: KCL at every unknown.\npub fn eval(comptime S: type, x: *const [n_u]S.V, model: *const Model, inst: InstancePtr, sim: contract.SimState) contract.Rows(Self, S) {{\n", .{});
     try dg.print(w, "    const xs = D.zProbe(S, x);\n    const m = run(S, x, xs, model, inst, sim);\n    var res = D.zRowsZero(S);\n    _ = .{{ &m, &res }};\n", .{});
     for (p.stamps) |s| {
-        try dg.print(w, "    res[{d}] = D.zRow(S, .{f}, ", .{ s.row, std.zig.fmtId(dg.nodeName(s.row)) });
+        try dg.print(w, "    res[{d}] = D.zRow(S, .{f}, ", .{ s.row, Ident{ .name = dg.nodeName(s.row) } });
         if (s.op != .set) try dg.print(w, "res[{d}].{t}(", .{ s.row, s.op });
         switch (s.term) {
             .resist => |k| try dg.print(w, "m.r{d}", .{k}),
@@ -315,7 +445,7 @@ fn voltage(dg: *DeclGen, w: *std.Io.Writer, u: u32) Error!void {
 }
 
 fn nodeName(dg: *const DeclGen, r: u32) []const u8 {
-    return dg.ip.stringToSlice(dg.device.nodes.items(.name)[r]);
+    return dg.u_names[r];
 }
 
 fn print(dg: *DeclGen, w: *std.Io.Writer, comptime fmt: []const u8, args: anytype) Error!void {

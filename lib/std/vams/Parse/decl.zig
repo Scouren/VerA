@@ -184,7 +184,7 @@ pub fn parsePortDecl(p: *Parse, where: PortWhere) Error!Node.Index {
             portType(p);
             switch (p.tokenTag(p.tok_i)) {
                 .keyword_integer, .keyword_time, .keyword_reg => {
-                    if (dir != .keyword_output) try p.warn(.invalid_port_declaration);
+                    if (dir != .keyword_output) try p.warnSite(.invalid_port_declaration, .port_variable_type, p.tok_i, 0);
                     p.tok_i += 1;
                     _ = p.eat(.keyword_signed);
                     variable = true;
@@ -204,7 +204,7 @@ pub fn parsePortDecl(p: *Parse, where: PortWhere) Error!Node.Index {
         .analog_header, .analog_body => {
             switch (p.tokenTag(p.tok_i)) {
                 .keyword_integer, .keyword_time, .keyword_real, .keyword_string, .keyword_realtime => |t| {
-                    if (!(dir == .keyword_output and (t == .keyword_integer or t == .keyword_time))) try p.warn(.invalid_port_declaration);
+                    if (!(dir == .keyword_output and (t == .keyword_integer or t == .keyword_time))) try p.warnSite(.invalid_port_declaration, .port_analog_typed, p.tok_i, kw);
                     p.tok_i += 1;
                 },
                 else => {
@@ -252,16 +252,17 @@ pub fn parseNetDecl(p: *Parse) Error!Node.Index {
                     drive = true;
                 } else try prim.parseChargeStrength(p, tag == .keyword_trireg);
             }
+            const advice = p.tok_i;
             const advised = p.eat(.keyword_scalared) != null or p.eat(.keyword_vectored) != null;
             const after_disc = p.tok_i + @intFromBool(p.tokenTag(p.tok_i) == .identifier and p.identLike(p.tok_i + 1));
-            if (netType(p.tokenTag(after_disc)) or p.tokenTag(after_disc) == .keyword_wreal) return p.failAt(.invalid_net_declaration, after_disc);
+            if (netType(p.tokenTag(after_disc)) or p.tokenTag(after_disc) == .keyword_wreal) return p.failSite(.invalid_net_declaration, .net_two_types, after_disc, 0);
             portType(p);
-            if (advised and p.tokenTag(p.tok_i) != .l_bracket) return p.fail(.invalid_net_declaration);
+            if (advised and p.tokenTag(p.tok_i) != .l_bracket) return p.failSite(.invalid_net_declaration, .net_advised_no_range, advice, 0);
         },
     }
     const range: Node.OptionalIndex = if (p.tokenTag(p.tok_i) == .l_bracket) (try parseRange(p)).toOptional() else .none;
     const delay: Node.OptionalIndex = if (p.tokenTag(p.tok_i) == .hash) (try prim.parseDelay(p, 3)).toOptional() else .none;
-    if (delay != .none and p.tokenTag(p.tok_i) == .l_bracket) return p.fail(.invalid_net_declaration);
+    if (delay != .none and p.tokenTag(p.tok_i) == .l_bracket) return p.failSite(.invalid_net_declaration, .net_range_after_delay, p.tok_i, 0);
     const top = p.scratch.items.len;
     defer p.scratch.shrinkRetainingCapacity(top);
     var assigns: ?bool = null;
@@ -272,9 +273,9 @@ pub fn parseNetDecl(p: *Parse) Error!Node.Index {
         while (p.eat(.period) != null) _ = try p.expectIdent();
         const dims = try parseDims(p);
         const init: Node.OptionalIndex = if (tag != .keyword_ground and p.eat(.equal) != null) (try expr.parseExpr(p)).toOptional() else .none;
-        if (assigns) |a| if (a != (init != .none)) try p.warnAt(.invalid_net_declaration, name);
+        if (assigns) |a| if (a != (init != .none)) try p.warnSite(.invalid_net_declaration, .net_mixed_init, name, @intFromBool(init != .none));
         assigns = init != .none;
-        if (drive and init == .none) return p.failAt(.invalid_net_declaration, name);
+        if (drive and init == .none) return p.failSite(.invalid_net_declaration, .net_drive_no_init, name, 0);
         try p.push(try p.addNode(.declarator, name, .{ .extra_and_opt_node = .{ try p.addExtra(dims), init } }));
         if (p.eat(.comma) == null) break;
     }
@@ -391,7 +392,7 @@ fn parseValueRange(p: *Parse) Error!Node.Index {
         return p.addNode(.value_range, kw, .{ .extra = try p.addExtra(Node.ValueRange{ .lo = lo, .hi = .none, .close = .none }) });
     }
     if (open != .l_paren and open != .l_bracket) {
-        if (p.tokenTag(kw) == .keyword_from) return p.fail(.expected_expr);
+        if (p.tokenTag(kw) == .keyword_from) return p.failSite(.expected_expr, .value_range_bare_from, p.tok_i, 0);
         const lo = try expr.parseExpr(p);
         return p.addNode(.value_range, kw, .{ .extra = try p.addExtra(Node.ValueRange{ .lo = lo, .hi = .none, .close = .none }) });
     }

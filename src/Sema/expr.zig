@@ -50,9 +50,6 @@ pub const user_callee: u32 = std.math.maxInt(u32);
 /// The value a refused operand stands for after its diagnostic.
 pub const poison: Value = .{ .ref = .fromIntern(.zero_real), .ty = .real };
 
-/// The longest string a constant replication folds to.
-const concat_bytes_max: u64 = 1 << 20;
-
 /// Lowers `r` and returns its value. A construct lowering refuses is
 /// reported to `zcu.failed` and stands for `poison`.
 pub fn lower(s: *Sema, b: *Block, r: Inst.Ref) Allocator.Error!Value {
@@ -74,6 +71,7 @@ pub fn lower(s: *Sema, b: *Block, r: Inst.Ref) Allocator.Error!Value {
 /// `v` as a value of type `ty` (§4.2.1.1, §4.2.1.2; §2.7 a string literal
 /// is its characters' integer).
 pub fn coerce(s: *Sema, b: *Block, v: Value, ty: Sema.Ty) Allocator.Error!Ref {
+    if (ty == .string) return v.ref;
     const w = try strNum(s, v);
     return switch (ty) {
         .real => if (w.ty == .integer) try unOp(s, b, .if_cast, w.ref) else w.ref,
@@ -169,7 +167,7 @@ fn inst(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!Value {
             break :blk array.load(s, b, e);
         },
         .field => hierRead(s, b, src),
-        .concat, .replicate => concat(s, b, i, src),
+        .concat, .replicate => @import("string.zig").concat(s, b, i, src),
         .str_ref, .slice, .slice_up, .slice_down, .pattern, .pattern_repl, .port_branch, .event_or, .posedge, .negedge, .driver_update, .step_event, .paramset_output, .range, .pulse_limits => refuse(s, b, src, @tagName(tag)),
         .module, .nature, .discipline, .paramset, .primitive, .connectrules, .config, .port, .io, .net, .variable, .param, .aliasparam, .genvar, .event, .branch, .instance, .assign, .defparam, .analog, .analog_initial, .initial, .always, .function, .gen_for, .gen_if, .gen_case, .gen_block, .specify, .path, .timing_check, .pulse_style, .timing_event, .ps_override, .connect_resolve, .connect_insert, .block, .condbr, .case, .loop, .repeat, .wait, .delay, .event_wait, .store, .store_nb, .contrib, .proc_assign, .force, .store_timed, .store_nb_timed, .contrib_indirect, .deassign, .release, .trigger, .disable, .ret, .brk, .cont, .delay_ctl, .event_ctl, .repeat_ctl => unreachable, // AstGen: an operand is an expression
     };
@@ -254,52 +252,6 @@ fn bindValue(s: *Sema, b: *Block, bind: Sema.Bind, src: Inst.Ref) Allocator.Erro
     };
 }
 
-/// §3.3 Table 3-3 `{s1, s2}` and `{n{s}}` over string constants: the
-/// joined string, folded as the old lowering folds it (E0326 for an empty
-/// list, E0327 for a count that is negative or no integer). Any other
-/// operand (a sized integer, a string known only while the device runs) is
-/// not lowered yet.
-fn concat(s: *Sema, b: *Block, i: Inst.Index, src: Inst.Ref) Allocator.Error!Value {
-    const vir = b.unit.vir;
-    const repl = vir.instructions.items(.tag)[@backingInt(i)] == .replicate;
-    var copies: i64 = 1;
-    var list = i;
-    if (repl) {
-        const x = decl.payloadOf(vir, Inst.Bin, i);
-        const n = (try decl.foldRef(s, b.unit, x.lhs)) orelse return refuse(s, b, src, "a replication by a count known only while the device runs");
-        copies = n.asIntExact() orelse {
-            try s.fail(.E0327, b.unit.file, src, "a replication constant shall be a finite integer after conversion, got {d}", .{n.asReal()});
-            return poison;
-        };
-        if (copies < 0) {
-            try s.fail(.E0327, b.unit.file, src, "a replication constant shall be non-negative, got {d}", .{copies});
-            return poison;
-        }
-        list = x.rhs.toIndex() orelse return poison;
-        if (vir.instructions.items(.tag)[@backingInt(list)] != .concat) return refuse(s, b, src, "replicate");
-    }
-    const elems = vir.list(Inst.Ref, decl.payloadOf(vir, Inst.Refs, list));
-    if (elems.len == 0) {
-        try s.fail(.E0326, b.unit.file, src, "", .{});
-        return poison;
-    }
-    var out: std.ArrayList(u8) = .empty;
-    for (elems) |el| {
-        const v = try lower(s, b, el);
-        const c = constOf(s, v.ref) orelse return refuse(s, b, src, "concat");
-        if (c != .str) return refuse(s, b, src, "concat");
-        try out.appendSlice(s.arena, c.str);
-    }
-    const one = out.items;
-    // N copies of "" are "", never counted out.
-    if (one.len == 0 or copies == 1) return constant(s, .{ .str = one });
-    if (std.math.mul(u64, one.len, @intCast(copies)) catch std.math.maxInt(u64) > concat_bytes_max)
-        return refuse(s, b, src, "a replication past the bytes folded here");
-    var all: std.ArrayList(u8) = .empty;
-    for (0..@intCast(copies)) |_| try all.appendSlice(s.arena, one);
-    return constant(s, .{ .str = all.items });
-}
-
 /// §2.7: a string constant as its characters' integer; anything else as is.
 fn strNum(s: *Sema, v: Value) Allocator.Error!Value {
     if (v.ty != .string) return v;
@@ -337,8 +289,15 @@ fn unify(a: Sema.Ty, b: Sema.Ty) Sema.Ty {
 
 fn binary(s: *Sema, b: *Block, tag: Inst.Tag, bin: Inst.Bin, src: Inst.Ref) Allocator.Error!Value {
     const file = b.unit.file;
-    const x = try strNum(s, try lower(s, b, bin.lhs));
-    const y = try strNum(s, try lower(s, b, bin.rhs));
+    const lx = try lower(s, b, bin.lhs);
+    const ly = try lower(s, b, bin.rhs);
+    // §3.3 Table 3-3: two strings compare as strings.
+    if (lx.ty == .string and ly.ty == .string) switch (tag) {
+        .lt, .gt, .lte, .gte, .eq, .neq, .case_eq, .case_neq => return @import("string.zig").compare(s, b, tag, lx, ly),
+        else => {}, // else: no other operator takes two strings (E0321 below)
+    };
+    const x = try strNum(s, lx);
+    const y = try strNum(s, ly);
     if (x.ty == .string or y.ty == .string) {
         try s.fail(.E0321, file, src, "a string is not a number; §3.3 Table 3-3 gives it no arithmetic", .{});
         return poison;

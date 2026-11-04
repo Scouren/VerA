@@ -42,6 +42,8 @@ pub fn statement(l: *Lower, i: Inst.Index) Error!void {
         else => .{ vir.instructions.items(.data)[@backingInt(i)].un_node.operand, Inst.Ref.none }, // else: deassign, release
     };
     const li = lhs.toIndex() orelse return l.refuse("a procedural continuous assignment of nothing");
+    try place.notAutomatic(l, lhs, "a procedural continuous assignment");
+    try place.readsNoAutomatic(l, value, "a procedural continuous assignment");
     if (Lower.tag(vir, li) == .concat) {
         const ops = vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, li));
         var of: u32 = 0;

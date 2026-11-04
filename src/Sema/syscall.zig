@@ -47,15 +47,19 @@ pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Erro
     const args = vir.list(Inst.Ref, c.args);
     const tag = SysFn.Tag.fromName(name) orelse {
         if (try refuseForeign(s, b, name, src)) return expr.poison;
-        return userCall(s, b, args, .real);
+        return userCall(s, b, name, args, .real);
     };
     const info = SysFn.get(tag);
     if (try refuseContext(s, b, tag, src)) return expr.poison;
+    // §9.5.4/§9.12 a reader assigns its destinations.
+    if (readFrom(tag)) |first| return @import("string.zig").read(s, b, tag, first, args, src);
     // Each of these judges its own argument list, with its clause's codes.
     switch (tag) {
         .white_noise, .flicker_noise, .noise_table, .noise_table_log, .ac_stim => return @import("op.zig").noise(s, b, tag, args, src),
         else => if (info.family == .kernel) return @import("kernel.zig").lower(s, b, tag, args, src), // else: the kernel family by its table row; the rest below
     }
+    // §9.13 a distribution judges its own arity, as E0816.
+    if (info.family == .random) return @import("dist.zig").lower(s, b, tag, args, src);
     if (!info.args.admits(args.len)) {
         try s.fail(.E0506, b.unit.file, src, "`{s}` takes {d} to {d}, given {d}", .{ name, info.args.min, info.args.max, args.len });
         return expr.poison;
@@ -98,11 +102,16 @@ pub fn task(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error
     const args = vir.list(Inst.Ref, c.args);
     const tag = SysFn.Tag.fromName(name) orelse {
         if (try refuseForeign(s, b, name, src)) return;
-        _ = try userCall(s, b, args, null);
+        _ = try userCall(s, b, name, args, null);
         return;
     };
     const info = SysFn.get(tag);
     if (try refuseContext(s, b, tag, src)) return;
+    if (tag == .@"$sformat" or tag == .@"$swrite") return @import("string.zig").write(s, b, tag, args, src);
+    if (readFrom(tag)) |first| {
+        _ = try @import("string.zig").read(s, b, tag, first, args, src);
+        return;
+    }
     switch (info.family) {
         .display, .file_out, .simctl, .string => {},
         else => {
@@ -193,6 +202,16 @@ fn readsFlow(s: *Sema, unit: *const Sema.Unit, r: Inst.Ref, depth: u32) bool {
     }
 }
 
+/// The first destination argument of a §9.5.4/§9.12 reader, or null.
+fn readFrom(tag: SysFn.Tag) ?usize {
+    return switch (tag) {
+        .@"$sscanf", .@"$fscanf" => 2,
+        .@"$fgets" => 0,
+        .@"$value$plusargs" => 1,
+        else => null, // else: no destination argument
+    };
+}
+
 /// §9.19 `$port_connected(p)`: the root's port is the host's bit (a call
 /// on its ordinal); a child's is known here, from its connection.
 fn portConnected(s: *Sema, b: *Block, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
@@ -252,9 +271,12 @@ fn lowerArgs(s: *Sema, b: *Block, args: []const Inst.Ref) Allocator.Error![]cons
     return out;
 }
 
-fn userCall(s: *Sema, b: *Block, args: []const Inst.Ref, ty: ?Sema.Ty) Allocator.Error!Value {
+/// §12 a user system function or task: a `call` of `user_callee`, its name
+/// in `device.systf` for the host's table.
+fn userCall(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, ty: ?Sema.Ty) Allocator.Error!Value {
     const refs = try lowerArgs(s, b, args);
     const r = try expr.call(s, b, expr.user_callee, ty, refs);
+    try s.device.systf.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .call = r.toIndex().? });
     return .{ .ref = r, .ty = ty orelse .real };
 }
 

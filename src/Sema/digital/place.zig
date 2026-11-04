@@ -59,12 +59,12 @@ pub fn targetType(l: *Lower, r: Inst.Ref) Error!Type {
         },
         .decl_ref, .str_ref, .field => {
             const n = try expr.leafName(l, i);
-            try writable(l, n);
+            try writable(l, n, r);
             return n.ty;
         },
         .elem, .slice, .slice_up, .slice_down => {
             const s = try selectOf(l, i);
-            try writable(l, s.name);
+            try writable(l, s.name, r);
             if (s.whole_elem) return s.name.ty;
             return .{ .width = s.ty.width, .signed = false };
         },
@@ -85,13 +85,13 @@ pub fn place(l: *Lower, r: Inst.Ref) Error!u32 {
         },
         .decl_ref, .str_ref, .field => {
             const n = try expr.leafName(l, i);
-            try writable(l, n);
+            try writable(l, n, r);
             if (n.dims.len != 0) return l.refuse("an assignment to a whole unpacked array");
             return l.b.extraOf(Program.Place{ .kind = .slot, .a = n.slot });
         },
         .elem, .slice, .slice_up, .slice_down => {
             const s = try selectOf(l, i);
-            try writable(l, s.name);
+            try writable(l, s.name, r);
             if (s.whole_elem) return l.b.extraOf(Program.Place{ .kind = .elem, .a = try elemRow(l, s) });
             return l.b.extraOf(Program.Place{ .kind = .select, .a = try selectRow(l, s) });
         },
@@ -227,9 +227,13 @@ pub fn selectRow(l: *Lower, s: Sel) Error!u32 {
 
 // ---- private ----
 
-fn writable(l: *Lower, n: Name) Error!void {
+/// §6.2/§9.2 a procedural target is a variable (lib/sim/digital's
+/// `checkTarget`): a net, or an element of a net array (§4.9.1), is driven
+/// by a continuous assignment only.
+fn writable(l: *Lower, n: Name, r: Inst.Ref) Error!void {
     switch (n.kind) {
-        .variable, .net => {},
+        .variable => {},
+        .net => return l.reject(l.frame, r, "a net is driven by a continuous assignment; there is no procedural assignment to a net"),
         .param, .genvar => return l.refuse("an assignment to a parameter"),
         .event, .sub, .scope => return l.refuse("an assignment to a named event, task, function or scope"),
     }

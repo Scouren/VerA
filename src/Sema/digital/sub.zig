@@ -23,6 +23,7 @@ const vams = @import("vams");
 const std_sim = @import("std_sim");
 const digital = @import("../digital.zig");
 const decl = @import("decl.zig");
+const redecl = @import("redecl.zig");
 const vars = @import("vars.zig");
 const expr = @import("expr.zig");
 const place = @import("place.zig");
@@ -276,6 +277,7 @@ fn storage(l: *Lower, outer: u32, scope: u32, i: Inst.Index) Error!Storage {
         if (!gop.found_existing) gop.value_ptr.* = .empty;
         try gop.value_ptr.append(l.a, d);
     }
+    for (later.values()) |decls| try redecl.check(l, outer, decls.items, .subroutine, .empty);
     for (later.keys(), later.values()) |d, decls| _ = try vars.variable(l, f, d, decls.items);
     for (all) |d| if (Lower.tag(vir, d) == .event) {
         _ = try vars.event(l, f, d);

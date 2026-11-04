@@ -28,6 +28,7 @@ const digital = @import("../digital.zig");
 const nets = @import("nets.zig");
 const ports = @import("ports.zig");
 const sub = @import("sub.zig");
+const redecl = @import("redecl.zig");
 const gates = @import("gates.zig");
 const specify = @import("specify.zig");
 const vars = @import("vars.zig");
@@ -59,6 +60,8 @@ const Walk = struct {
     deferred: std.ArrayList(nets.Wire) = .empty,
     /// §12.3.6 an expression-ported module's ports, one external port each.
     groups: std.ArrayList(ports.Group) = .empty,
+    /// Its module's list of ports.
+    list: Vir.Body = .empty,
 };
 
 /// Walks every instance in `Zcu.instances` order: its scope, its frame, its
@@ -192,6 +195,7 @@ fn instance(w: *Walk, k: u32) Error!void {
     w.index = k;
     w.conns.clearRetainingCapacity();
     w.groups.clearRetainingCapacity();
+    w.list = m.ports;
     // §12.3 each port's connection, by the declaration it names inside; a
     // root's ports are open. A module with port expressions (§12.3.6)
     // connects one external port at a time instead.
@@ -245,6 +249,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
         if (!gop.found_existing) gop.value_ptr.* = .empty;
         try gop.value_ptr.append(l.a, i);
     }
+    for (later.values()) |decls| try redecl.check(l, f, decls.items, .module, w.list);
     const top = l.frames.items[f].parent == none;
     w.deferred.clearRetainingCapacity();
     for (later.keys(), later.values()) |first, decls| try signal(w, f, first, decls.items, if (top) w.conns.get(first) else null);

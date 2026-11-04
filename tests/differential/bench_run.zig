@@ -29,13 +29,19 @@ const resistor =
 /// Runs `vera-next --run res.va` over `resistor` plus `directives` in a
 /// fresh directory and returns its stderr (the transcript), in `arena`.
 fn run(arena: std.mem.Allocator, directives: []const u8) ![]const u8 {
+    return runText(arena, "res.va", try std.mem.concat(arena, u8, &.{ resistor, directives }));
+}
+
+/// Runs `vera-next --run` over `text` written to `name` in a fresh
+/// directory and returns its stderr, in `arena`.
+fn runText(arena: std.mem.Allocator, name: []const u8, text: []const u8) ![]const u8 {
     const io = std.testing.io;
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
-    try tmp.dir.writeFile(io, .{ .sub_path = "res.va", .data = try std.mem.concat(arena, u8, &.{ resistor, directives }) });
+    try tmp.dir.writeFile(io, .{ .sub_path = name, .data = text });
     const cwd = try tmp.dir.realPathFileAlloc(io, ".", arena);
     const exe = try Io.Dir.cwd().realPathFileAlloc(io, options.vera_next, arena);
-    const r = try std.process.run(arena, io, .{ .argv = &.{ exe, "--run", "--allow=W0650", "res.va" }, .cwd = .{ .path = cwd } });
+    const r = try std.process.run(arena, io, .{ .argv = &.{ exe, "--run", "--allow=W0650", name }, .cwd = .{ .path = cwd } });
     if (!r.term.success()) {
         std.debug.print("vera-next --run failed ({any}):\n{s}\n", .{ r.term, r.stderr });
         return error.RunFailed;
@@ -71,6 +77,28 @@ test "a sweep runs every point in order, each residual Ohm's law" {
     const got = try run(arena, "//! param r = 2\n//! sweep V(p) = 1, 2, 4\n");
     const want = try std.mem.concat(arena, u8, &.{ "=== res ===\n", try point(arena, 0, 1, 2), try point(arena, 1, 2, 2), try point(arena, 2, 4, 2) });
     try std.testing.expectEqualStrings(want, got);
+}
+
+test "a flow unknown is named as the device spells it, in a directive and in the transcript" {
+    // Oracle: §5.4.2's `I(p,n)` is the flow unknown `flow(p,n)`, which the
+    // device ABI spells `flowZ28pZ2cnZ29` (codegen's `Ident`, by hand); the
+    // bias pins it, so the transcript prints that name with that value.
+    var a: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer a.deinit();
+    const arena = a.allocator();
+    const src =
+        \\`include "disciplines.vams"
+        \\module vs(p, n);
+        \\  inout p, n;
+        \\  electrical p, n;
+        \\  analog V(p, n) <+ 2.0;
+        \\endmodule
+        \\//! bias I(p,n) = 0.5
+        \\
+    ;
+    const got = try runText(arena, "vs.va", src);
+    try std.testing.expect(std.mem.find(u8, got, "  x[flowZ28pZ2cnZ29] = 5.000000e-1\n") != null);
+    try std.testing.expect(std.mem.find(u8, got, "flow(") == null);
 }
 
 test "a psweep gives each point its own card (§8.2)" {

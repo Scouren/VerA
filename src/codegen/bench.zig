@@ -18,9 +18,10 @@
 //! Cites: §2.4, §4.5.2, §9.4; each file cites its own clauses.
 //!
 //! Contents:
-//! - from `bench/spec.zig`: `Spec`, `Bench`, `Harness`, `Facts`, `Binding`, `ParseError`, `RenderError`, `points_max`
+//! - from `bench/spec.zig`: `Spec`, `Bench`, `Harness`, `Facts`, `Digital`, `Binding`, `ParseError`, `RenderError`, `points_max`
 //! - from `bench/runner.zig`: `writeRunner`
 //! - `pub fn facts(arena: Allocator, device: *const Air.Device) Allocator.Error!Facts`
+//! - `pub fn digital(arena: Allocator, program: *const std_sim.Program, names: []const Digital.Name) Allocator.Error!Digital`
 //! - `pub fn gridEvent(air: *const Air) ?Air.Inst.Index`
 
 const std = @import("std");
@@ -28,6 +29,7 @@ const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const Air = @import("air");
 const SysFn = @import("vams").SysFn;
+const std_sim = @import("std_sim");
 const spec = @import("bench/spec.zig");
 const runner = @import("bench/runner.zig");
 
@@ -35,6 +37,7 @@ pub const Spec = spec.Spec;
 pub const Bench = spec.Bench;
 pub const Harness = spec.Harness;
 pub const Facts = spec.Facts;
+pub const Digital = spec.Digital;
 pub const Binding = spec.Binding;
 pub const ParseError = spec.ParseError;
 pub const RenderError = spec.RenderError;
@@ -52,6 +55,15 @@ pub fn facts(arena: Allocator, device: *const Air.Device) Allocator.Error!Facts 
     // ponytail: `mem_bytes` 0 sizes `bigStack` by unknowns alone; count the
     // §3.2.2 arrays when a large array overflows the 8 MiB main stack.
     return .{ .op_states = ops.items };
+}
+
+/// A mixed design's digital half as the runner embeds it (`Facts.mixed`):
+/// `program` saved by `std_sim.serial`, beside its `names`; in `arena`.
+pub fn digital(arena: Allocator, program: *const std_sim.Program, names: []const Digital.Name) Allocator.Error!Digital {
+    var aw: std.Io.Writer.Allocating = .init(arena);
+    std_sim.serial.save(program, &aw.writer) catch return error.OutOfMemory;
+    assert(aw.written().len != 0);
+    return .{ .program = aw.written(), .names = names };
 }
 
 /// The first §5.10.3 `cross`, `above` or `timer` call in `air`, or null:

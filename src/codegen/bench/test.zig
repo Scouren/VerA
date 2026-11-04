@@ -21,10 +21,12 @@ test "a runner imports only contract, std_kernels, std_sim and the device" {
         "//! param r = 2\n//! sweep V(p) = 1, 2\n//! time 0, 1n, 2n\n//! noise none\n//! acstim none\n//! limit V(p) = 0 -> V(p) = 0.1\n",
         "//! psweep r = 1, 2\n//! seed none\n//! meta none\n//! qsite none\n//! abstol V(p) = 1e-6\n",
     };
-    for (sources) |src| {
+    // The fixed-grid runner for each source, and the §8 mixed one for the first.
+    const mixed: bench.Digital = .{ .program = "\x00", .names = &.{.{ .path = "clk", .slot = 0, .real = false }} };
+    for (sources, 0..) |src, k| for ([_]?bench.Digital{ null, if (k == 0) mixed else null }) |m| {
         const s = try bench.Spec.parse(arena, src, null);
         var aw: std.Io.Writer.Allocating = .init(arena);
-        try bench.writeRunner(&aw.writer, arena, "t", &s.bench, .{});
+        try bench.writeRunner(&aw.writer, arena, "t", &s.bench, .{ .mixed = m });
         var it = std.mem.splitSequence(u8, aw.written(), "@import(\"");
         _ = it.next();
         var n: u32 = 0;
@@ -36,7 +38,7 @@ test "a runner imports only contract, std_kernels, std_sim and the device" {
             if (!ok) std.debug.print("a runner imports `{s}`\n", .{name});
             try std.testing.expect(ok);
         }
-        // `std`, `device` and `contract` at least.
-        try std.testing.expect(n >= 3);
-    }
+        // `std`, `device` and `contract` at least, and `std_sim` when mixed.
+        try std.testing.expect(n >= 3 + @as(u32, @intFromBool(m != null)));
+    };
 }

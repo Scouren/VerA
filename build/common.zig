@@ -50,7 +50,7 @@ pub const module_specs = [_]struct {
     .{ .name = "dynlib", .path = "src/dynlib.zig" },
     .{ .name = "link", .path = "src/link.zig", .imports = &.{ "contract", "dynlib" } },
     // The Zig device backend (docs/rewrite/codegen.md): Air + Air.Device in, device text out.
-    .{ .name = "codegen", .path = "src/codegen.zig", .imports = &.{ "air", "intern_pool", "vams", "sema", "std_kernels", "contract", "link" } },
+    .{ .name = "codegen", .path = "src/codegen.zig", .imports = &.{ "air", "intern_pool", "vams", "sema", "std_kernels", "std_sim", "contract", "link" } },
     // The rewrite's spine (docs/rewrite/comp.md): `vera-next`'s Compilation.
     .{ .name = "comp", .path = "src/next/Compilation.zig", .imports = &.{ "vams", "intern_pool", "air", "sema", "std_sim", "codegen", "link" } },
     .{ .name = "frontend", .path = "lib/frontend/root.zig", .imports = &.{ "base", "diag", "kernels" } },

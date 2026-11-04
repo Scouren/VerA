@@ -43,6 +43,7 @@ pub fn writeRunner(w: *Writer, scratch: Allocator, title: []const u8, bench: *co
     assert(count != 0);
     assert(bench.times_s.len != 0);
     _ = scratch;
+    if (facts.mixed) |d| return @import("mixed.zig").writeMixed(w, title, bench, facts, d, count);
 
     try parts.head(w, title, bench, facts);
     try prologue(w, bench);

@@ -148,6 +148,10 @@ pub const Analysis = struct {
     /// §7.2.2 a module of the design has a digital half the analog blocks
     /// read (discrete.zig): its testbench is the mixed-signal one (§8).
     mixed: bool = false,
+    /// The digital half of a `mixed` design, lowered by `digital.lower`
+    /// in mixed mode (the driver fills it: the lowering reads the trees);
+    /// arena-owned, so `deinit` leaves it.
+    digital: ?@import("Sema/digital.zig").Lowered = null,
 
     /// A source: a file and a Vir instruction in it.
     pub const Src = struct { file: Zcu.File.Index, src: Inst.Ref };

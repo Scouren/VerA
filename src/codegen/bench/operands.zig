@@ -332,12 +332,12 @@ pub fn limitCase(arena: Allocator, rest: []const u8) ParseError!LimitCase {
 
 // ---- private ----
 
-/// The transcript's spelling of a name that is not a Zig identifier, into
-/// `buf` (3 bytes per byte in, plus one): a byte outside `[a-zA-Y]`, a
-/// leading digit and a leading, trailing or doubled `_` become `Z<hex><hex>`,
-/// and a Zig keyword or primitive takes a trailing `Z`. Injective, since `Z`
-/// is always escaped. The runner prints unknowns this way (`body.zig.txt`'s
-/// `oldName`); keep the two in step.
+/// The device's spelling of a name that is not a Zig identifier (codegen's
+/// `Ident`), into `buf` (3 bytes per byte in, plus one): a byte outside
+/// `[a-zA-Y]`, a leading digit and a leading, trailing or doubled `_`
+/// become `Z<hex><hex>`, and a Zig keyword or primitive takes a trailing
+/// `Z`. Injective, since `Z` is always escaped. The runner's `fieldName`
+/// (`body.zig.txt`) spells the same; keep the three in step.
 fn sanitize(buf: []u8, name: []const u8) []const u8 {
     assert(buf.len >= 3 * name.len + 1);
     var n: usize = 0;

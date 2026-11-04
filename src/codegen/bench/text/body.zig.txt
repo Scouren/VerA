@@ -799,20 +799,20 @@ fn sayPass(x: *const [n_u]f64, model: *const D.Model, inst: contract.InstancePtr
 }
 
 /// Each unknown as the transcript and the directives spell it: the
-/// device's `U` member through `oldName`.
+/// device's `U` member, already `fieldName`'s spelling.
 const u_names = blk: {
     const f = @typeInfo(D.U).@"enum".field_names;
-    @setEvalBranchQuota(1000 + 200 * f.len);
     var names: [f.len][]const u8 = undefined;
-    for (f, 0..) |e, i| names[i] = oldName(e);
+    for (f, 0..) |e, i| names[i] = e;
     break :blk names;
 };
 
-/// `name` with every byte outside `[a-zA-Y]`, a leading digit and a
-/// leading, trailing or doubled `_` as `Z<hex><hex>`, and a Zig keyword or
-/// primitive with a trailing `Z`: one identifier per name, `Z` always
-/// escaped. The bench's `operands.sanitize` spells directive names so.
-fn oldName(comptime name: []const u8) []const u8 {
+/// The device's spelling of a Verilog-A name as a `Model` field or `U`
+/// member (codegen's `Ident`): every byte outside `[a-zA-Y]`, a leading
+/// digit and a leading, trailing or doubled `_` as `Z<hex><hex>`, and a
+/// Zig keyword or primitive with a trailing `Z`. The bench's
+/// `operands.sanitize` spells directive names so.
+fn fieldName(comptime name: []const u8) []const u8 {
     comptime {
         var out: []const u8 = "";
         for (name, 0..) |c, i| {

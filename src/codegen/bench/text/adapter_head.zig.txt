@@ -1,0 +1,46 @@
+
+/// `std_sim.mixed.run`'s analog side over the device.
+const Analog = struct {
+    model: *D.Model,
+    inst: *D.Instance,
+    x: *[n_u]f64,
+    forced: *[n_u]?f64,
+    state: *State,
+    dout: *std.Io.Writer.Allocating,
+    n: *usize,
+    dig: *std_sim.State,
+    t: f64 = 0.0,
+    solved: bool = false,
+    /// The last finished solution, for §7.3.6.3's interpolation.
+    x_prev: [n_u]f64 = @splat(0.0),
+    t_prev: ?f64 = null,
+
+    /// §7.3.6.5 / Table 7-1: every input as the digital engine holds it for
+    /// the latest tick. The fields are parameters to the device, so its
+    /// parameter-only prep is redone.
+    pub fn setInputs(a: *Analog, dig: *std_sim.State, fired: u64) !void {
+        _ = fired;
+        a.flush();
+        @setEvalBranchQuota(1000 + 100 * input_ports.len);
+        inline for (input_ports) |p| setField(a.model, comptime fieldName(p.path), mixedInput(dig, p));
+        if (comptime @hasDecl(D, "setup")) D.setup(Dual, a.model);
+        if (comptime @hasDecl(D, "setupInstance")) D.setupInstance(a.model, a.inst);
+    }
+
+    /// §5.10.3.3 the device's next timer instant after `t`, if it has one.
+    pub fn breakpoint(a: *Analog, t: f64) ?f64 {
+        const m: ?f64 = if (comptime @hasDecl(D, "nextBreakpoint")) D.nextBreakpoint(a.model, t) else null;
+        const i: ?f64 = if (comptime @hasDecl(D, "pendingBreakpoint")) D.pendingBreakpoint(a.inst, t) else null;
+        return if (m != null and i != null) @min(m.?, i.?) else m orelse i;
+    }
+
+    // ponytail: no §8.5.3.6 explicit D2A terms yet (the device has no
+    // snapshot or event-flag rows), so region 1b keeps nothing.
+    pub fn snapshot(_: *Analog, _: *std_sim.State) !void {}
+    pub fn latch(_: *Analog) !void {}
+
+    pub fn solveAt(a: *Analog, t: f64, dt: f64, first: bool, last: bool) !void {
+        atPoint(t, dt);
+        sim_state.initial_step = first;
+        sim_state.final_step = last;
+        sim_state.analog_initial = first;

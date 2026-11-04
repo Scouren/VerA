@@ -16,6 +16,7 @@
 //! - `pub const Bench = struct`
 //! - `pub const Harness = struct`
 //! - `pub const Facts = struct`
+//! - `pub const Digital = struct` (`Digital.Name`)
 //! - `pub const Binding = struct { name, value }`
 //! - `pub const Sweep = struct { name, values }`
 //! - `pub const LimitCase = struct { old, want }`
@@ -181,6 +182,9 @@ pub const Harness = struct {
 /// What the caller learns from the compile and hands a renderer beside the
 /// `Bench` (`compileFacts` fills the first three).
 pub const Facts = struct {
+    /// The design's digital half, for the §8 mixed-signal runner; null for
+    /// the fixed-grid one.
+    mixed: ?Digital = null,
     /// §4.5.2 operator unknowns' `U` indices, ascending; never forced.
     op_states: []const u32 = &.{},
     /// Bytes of §3.2.2 memory-backed arrays an `eval` frame holds.
@@ -191,6 +195,17 @@ pub const Facts = struct {
     certify: bool = false,
     /// Every contribution unit was proved finite, the claim `certify` tests.
     finite_proved: bool = false,
+};
+
+/// A mixed design's digital half as the runner embeds it: the
+/// `std_sim.Program` as `std_sim.serial` bytes, and each named digital value
+/// (`path`, spelled as the device's card row of it, `n` or `u.clk`).
+pub const Digital = struct {
+    program: []const u8,
+    names: []const Name,
+
+    /// One named digital value: its path, its slot, whether it is a `real`.
+    pub const Name = struct { path: []const u8, slot: u32, real: bool };
 };
 
 /// One `name = value` binding: a parameter card value or a pinned unknown.

@@ -49,7 +49,28 @@ pub fn semaAnalog(comp: *Compilation) !bool {
         try zcu.answerData(try findData(comp, want));
     } else return error.OutOfMemory;
     comp.analysis = a;
-    return checkTop(comp);
+    if (!try checkTop(comp)) return false;
+    // VAMS §7, §8: a mixed design's digital half, for the §8 runner.
+    if (a.mixed and (comp.config.target == .exe or comp.config.target == .run)) {
+        const sources = try comp.arena().alloc(sema.digital.Source, comp.units.items.len);
+        const out = try comp.arena().create(vams.Preprocessor.Output);
+        out.* = comp.pp.output();
+        for (sources, comp.units.items) |*s, *u| s.* = .{ .tree = &u.tree, .pp = out };
+        var why: sema.digital.Why = .{};
+        comp.analysis.?.digital = sema.digital.lower(comp.arena(), zcu, .{ .sources = sources, .mixed = true }, &why) catch |e| switch (e) {
+            // The §8 runner has no digital half to run: not built, named.
+            error.Unsupported => {
+                try frontend.notBuilt(comp, .exe, try comp.arena().print("the mixed-signal testbench's digital half ({s})", .{why.text}));
+                return false;
+            },
+            error.Rejected => {
+                try comp.wip.add(.lower, why.code, errors.relocate(out.*, why.at, why.at), "{s}", .{why.text});
+                return false;
+            },
+            error.OutOfMemory => return error.OutOfMemory,
+        };
+    }
+    return true;
 }
 
 /// The float verdict over codegen's roots (§11.9), each parameter's
@@ -98,9 +119,8 @@ pub fn codegen(comp: *Compilation, b: Compilation.Backend) !?Job {
         .libmap => unreachable, // Refused before preprocessing.
     }
     const an = &comp.analysis.?;
-    // ponytail: the §8 runner (a digital `std_sim.Program` beside the
-    // device, lib/sim/mixed ported to std_sim) is not written yet.
-    if (b == .exe and an.mixed) return notBuilt(comp, b, "the mixed-signal testbench (VAMS §8, a design with a digital half)");
+    // §8: the mixed runner needs the digital half Sema lowers beside it.
+    if (b == .exe and an.mixed and digitalOf(an) == null) return notBuilt(comp, b, "the mixed-signal testbench (VAMS §8, a design with a digital half)");
     var r = try codegen_mod.generate(comp.gpa, .zig, .{
         .air = &an.air,
         .ip = &comp.zcu.intern_pool,
@@ -284,15 +304,22 @@ fn testbench(comp: *Compilation) !?Job {
     const bench = codegen_mod.bench;
     const spec = &comp.bench.?;
     const an = &comp.analysis.?;
-    if (bench.gridEvent(&an.air)) |i| {
+    // The mixed runner places a point at each event; the fixed grid does not.
+    if (!an.mixed) if (bench.gridEvent(&an.air)) |i| {
         const s = an.srcs[@backingInt(i)];
         const loc: vams.Diag.Loc = if (s.src == .none) .none else errors.instLoc(comp.pp.output(), &comp.units.items[@backingInt(s.file)], s.src);
         try comp.wip.add(.codegen, .W0750, loc, "the testbench inserts no timepoint at it", .{});
         // `--deny=W0750` refuses before anything is built.
         if (comp.wip.failed()) return null;
-    }
+    };
     var facts = try bench.facts(a, &an.device);
     facts.validate_contract = c.validate_contract;
+    if (an.mixed) {
+        const low = digitalOf(an).?;
+        const names = try a.alloc(bench.Digital.Name, low.names.len);
+        for (names, low.names) |*n, x| n.* = .{ .path = x.path, .slot = x.slot, .real = x.ty.real };
+        facts.mixed = try bench.digital(a, &low.program, names);
+    }
     var runner: Io.Writer.Allocating = .init(a);
     bench.writeRunner(&runner.writer, a, std.fs.path.stem(c.paths[0]), &spec.bench, facts) catch |e| switch (e) {
         error.TooManyPoints => return refuse(comp, 2, try a.print("error: {s}: `//!` directive: the sweeps expand to more than {d} points\n", .{ c.paths[0], bench.points_max })),
@@ -301,8 +328,15 @@ fn testbench(comp: *Compilation) !?Job {
     const slots = try a.alloc(link_mod.Server, c.thread_limit);
     var q: link_mod.Queue = .init(slots);
     const engine = try engineModules(a, c.contract.?);
+    // The mixed runner runs its digital half on `std_sim` (and the old
+    // `kernels` it imports), from the same tree.
+    const tree = std.fs.path.dirname(std.fs.path.dirname(c.contract.?) orelse ".") orelse ".";
+    const sim_mods = engine ++ [_]link_mod.Module{
+        .{ .name = "std_sim", .root = try std.fs.path.join(a, &.{ tree, "lib", "std", "sim.zig" }), .deps = &.{ "kernels", "contract" } },
+        .{ .name = "kernels", .root = try std.fs.path.join(a, &.{ tree, "lib", "kernels", "root.zig" }), .deps = &.{"contract"} },
+    };
     const top = comp.zcu.intern_pool.stringToSlice(comp.zcu.instances.items(.name)[0]);
-    const f: link_mod.File = .{ .kind = .exe, .work_dir = c.work_dir orelse ".zig-cache/vera-tb", .name = top, .optimize = c.optimize, .modules = &engine, .zig_exe = c.zig_exe, .debug_info = c.debug_info, .out_path = c.out_path };
+    const f: link_mod.File = .{ .kind = .exe, .work_dir = c.work_dir orelse ".zig-cache/vera-tb", .name = top, .optimize = c.optimize, .modules = if (an.mixed) &sim_mods else &engine, .zig_exe = c.zig_exe, .debug_info = c.debug_info, .out_path = c.out_path };
     var built = link_mod.buildExe(f, comp.gpa, comp.io, &q, comp.device.?.text, runner.written()) catch |e| {
         try comp.outputs.err.print(a, "error: {s}: building the testbench failed: {t}\n", .{ c.paths[0], e });
         comp.outputs.status = 1;
@@ -323,6 +357,12 @@ fn testbench(comp: *Compilation) !?Job {
         },
     }
     return null;
+}
+
+/// The analysis' lowered digital half (`Analysis.digital`), or null when
+/// the digital lowering does not express it yet.
+fn digitalOf(an: *const sema.Sema.Analysis) ?*const sema.digital.Lowered {
+    return if (an.digital) |*d| d else null;
 }
 
 fn refuse(comp: *Compilation, status: u8, line: []const u8) !?Job {

@@ -234,7 +234,8 @@ pub fn terms(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
         },
         .posedge => .posedge,
         .negedge => .negedge,
-        .driver_update => return l.refuse("a driver_update event term"),
+        // VAMS §9.22.5 an anonymous event the run triggers per update.
+        .driver_update => return out.appendSlice(l.a, &.{ try @import("drivers.zig").update(l, vir.instructions.items(.data)[@backingInt(i)].un_node.operand), @backingInt(Program.Edge.any), 0, 0, none }),
         else => .any, // else: a name or an expression
     };
     const watched = if (edge == .any) r else vir.instructions.items(.data)[@backingInt(i)].un_node.operand;

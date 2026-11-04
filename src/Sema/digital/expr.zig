@@ -418,7 +418,12 @@ pub fn leafName(l: *Lower, i: Inst.Index) Error!Name {
         const key: digital.SegmentRef = .{ .instance = @backingInt(l.frames.items[l.frame].instance), .inst = i };
         // Outside a lane (a type query) any lane's: every segment is 1 bit.
         const lane = if (l.lane_split.contains(key) and l.gate_lane != none) l.gate_lane else 0;
-        if (l.segment_refs.get(.{ .instance = key.instance, .inst = i, .lane = lane })) |b| return ports.segment(l, b, 1);
+        if (l.segment_refs.get(.{ .instance = key.instance, .inst = i, .lane = lane })) |b| {
+            const seg = try ports.segment(l, b, 1);
+            // §7.9 a gate's input is a receiver: it reads the receivers' net.
+            if (l.gate_lane != none) if (l.receivers.get(seg.net)) |rx| return rx;
+            return seg;
+        }
     }
     const vir = l.virOf(l.frame);
     const data = vir.instructions.items(.data)[@backingInt(i)];

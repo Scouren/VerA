@@ -72,5 +72,6 @@ test {
     _ = wide;
     _ = scheduler;
     _ = time;
+    _ = @import("sim/driver_access.zig");
     _ = @import("sim/test.zig");
 }

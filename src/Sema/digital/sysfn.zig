@@ -20,6 +20,7 @@ const digital = @import("../digital.zig");
 const expr = @import("expr.zig");
 const place = @import("place.zig");
 const task = @import("task.zig");
+const drivers = @import("drivers.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -31,29 +32,33 @@ const Vir = vams.Vir;
 const Inst = Vir.Inst;
 
 /// §17 the system functions `ctx` lowers, by name.
-const SysFn = enum { time, stime, realtime, abstime, ln1p, expm1, signed, unsigned, clog2, rtoi, itor, realtobits, bitstoreal, random, test_plusargs, value_plusargs, ln, log10, exp, sqrt, floor, ceil, sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh, pow, atan2, hypot, fopen, fgets, ferror, fgetc, ungetc, ftell, rewind, fseek, feof, sscanf, fscanf, fread, dist_uniform, dist_normal, dist_exponential, dist_poisson, dist_chi_square, dist_t, dist_erlang, q_full };
+const SysFn = enum { time, stime, realtime, abstime, ln1p, expm1, signed, unsigned, clog2, rtoi, itor, realtobits, bitstoreal, random, test_plusargs, value_plusargs, ln, log10, exp, sqrt, floor, ceil, sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh, pow, atan2, hypot, fopen, fgets, ferror, fgetc, ungetc, ftell, rewind, fseek, feof, sscanf, fscanf, fread, dist_uniform, dist_normal, dist_exponential, dist_poisson, dist_chi_square, dist_t, dist_erlang, q_full, driver_count, receiver_count, driver_state, driver_strength, driver_delay, driver_next_state, driver_next_strength, driver_type };
 
 const sys_fns = std.StaticStringMap(SysFn).initComptime(.{
-    .{ "$time", .time },                         .{ "$stime", .stime },               .{ "$realtime", .realtime },
-    .{ "$signed", .signed },                     .{ "$unsigned", .unsigned },         .{ "$clog2", .clog2 },
-    .{ "$rtoi", .rtoi },                         .{ "$itor", .itor },                 .{ "$realtobits", .realtobits },
-    .{ "$bitstoreal", .bitstoreal },             .{ "$random", .random },             .{ "$test$plusargs", .test_plusargs },
-    .{ "$value$plusargs", .value_plusargs },     .{ "$ln", .ln },                     .{ "$log10", .log10 },
-    .{ "$exp", .exp },                           .{ "$sqrt", .sqrt },                 .{ "$floor", .floor },
-    .{ "$ceil", .ceil },                         .{ "$sin", .sin },                   .{ "$cos", .cos },
-    .{ "$tan", .tan },                           .{ "$asin", .asin },                 .{ "$acos", .acos },
-    .{ "$atan", .atan },                         .{ "$sinh", .sinh },                 .{ "$cosh", .cosh },
-    .{ "$tanh", .tanh },                         .{ "$asinh", .asinh },               .{ "$acosh", .acosh },
-    .{ "$atanh", .atanh },                       .{ "$pow", .pow },                   .{ "$atan2", .atan2 },
-    .{ "$hypot", .hypot },                       .{ "$fopen", .fopen },               .{ "$fgets", .fgets },
-    .{ "$ferror", .ferror },                     .{ "$fgetc", .fgetc },               .{ "$ungetc", .ungetc },
-    .{ "$ftell", .ftell },                       .{ "$rewind", .rewind },             .{ "$fseek", .fseek },
-    .{ "$feof", .feof },                         .{ "$sscanf", .sscanf },             .{ "$fscanf", .fscanf },
-    .{ "$fread", .fread },                       .{ "$dist_uniform", .dist_uniform }, .{ "$dist_normal", .dist_normal },
-    .{ "$dist_exponential", .dist_exponential }, .{ "$dist_poisson", .dist_poisson }, .{ "$dist_chi_square", .dist_chi_square },
-    .{ "$dist_t", .dist_t },                     .{ "$dist_erlang", .dist_erlang },   .{ "$q_full", .q_full },
+    .{ "$time", .time },                                 .{ "$stime", .stime },                   .{ "$realtime", .realtime },
+    .{ "$signed", .signed },                             .{ "$unsigned", .unsigned },             .{ "$clog2", .clog2 },
+    .{ "$rtoi", .rtoi },                                 .{ "$itor", .itor },                     .{ "$realtobits", .realtobits },
+    .{ "$bitstoreal", .bitstoreal },                     .{ "$random", .random },                 .{ "$test$plusargs", .test_plusargs },
+    .{ "$value$plusargs", .value_plusargs },             .{ "$ln", .ln },                         .{ "$log10", .log10 },
+    .{ "$exp", .exp },                                   .{ "$sqrt", .sqrt },                     .{ "$floor", .floor },
+    .{ "$ceil", .ceil },                                 .{ "$sin", .sin },                       .{ "$cos", .cos },
+    .{ "$tan", .tan },                                   .{ "$asin", .asin },                     .{ "$acos", .acos },
+    .{ "$atan", .atan },                                 .{ "$sinh", .sinh },                     .{ "$cosh", .cosh },
+    .{ "$tanh", .tanh },                                 .{ "$asinh", .asinh },                   .{ "$acosh", .acosh },
+    .{ "$atanh", .atanh },                               .{ "$pow", .pow },                       .{ "$atan2", .atan2 },
+    .{ "$hypot", .hypot },                               .{ "$fopen", .fopen },                   .{ "$fgets", .fgets },
+    .{ "$ferror", .ferror },                             .{ "$fgetc", .fgetc },                   .{ "$ungetc", .ungetc },
+    .{ "$ftell", .ftell },                               .{ "$rewind", .rewind },                 .{ "$fseek", .fseek },
+    .{ "$feof", .feof },                                 .{ "$sscanf", .sscanf },                 .{ "$fscanf", .fscanf },
+    .{ "$fread", .fread },                               .{ "$dist_uniform", .dist_uniform },     .{ "$dist_normal", .dist_normal },
+    .{ "$dist_exponential", .dist_exponential },         .{ "$dist_poisson", .dist_poisson },     .{ "$dist_chi_square", .dist_chi_square },
+    .{ "$dist_t", .dist_t },                             .{ "$dist_erlang", .dist_erlang },       .{ "$q_full", .q_full },
     // VAMS §9.10 Table 9-7 and §4.3.2 Table 4-15, in a digital process too.
-    .{ "$abstime", .abstime },                   .{ "$ln1p", .ln1p },                 .{ "$expm1", .expm1 },
+    .{ "$abstime", .abstime },                           .{ "$ln1p", .ln1p },                     .{ "$expm1", .expm1 },
+    // VAMS §9.22/§9.23 driver access, in a connect module (`drivers.zig`).
+    .{ "$driver_count", .driver_count },                 .{ "$receiver_count", .receiver_count }, .{ "$driver_state", .driver_state },
+    .{ "$driver_strength", .driver_strength },           .{ "$driver_delay", .driver_delay },     .{ "$driver_next_state", .driver_next_state },
+    .{ "$driver_next_strength", .driver_next_strength }, .{ "$driver_type", .driver_type },
 });
 
 pub fn sysType(l: *Lower, i: Inst.Index) Error!Type {
@@ -78,7 +83,9 @@ pub fn sysType(l: *Lower, i: Inst.Index) Error!Type {
         },
         .clog2, .rtoi, .random, .test_plusargs, .value_plusargs => .{ .width = 32, .signed = true },
         .realtobits => .{ .width = 64, .signed = false },
-        else => Type.real_type, // else: §17.11.2 Table 17-17's math functions
+        .driver_count, .receiver_count, .driver_strength, .driver_next_strength, .driver_type => .{ .width = 32, .signed = true },
+        .driver_state, .driver_next_state => .{ .width = 1, .signed = false },
+        else => Type.real_type, // else: §17.11.2 Table 17-17's math functions, `$driver_delay`
     };
 }
 
@@ -96,6 +103,14 @@ pub fn sysCall(l: *Lower, i: Inst.Index, t: Ty, nat: Type) Error!u32 {
         .clog2 => try l.b.expr(.clog2, Ty.int(32, true), try expr.self_(l, s.args[0], 0), 0),
         // §17.10: a run is given no plusargs, so no query matches.
         .test_plusargs, .value_plusargs => try l.b.int(natural, 0),
+        // §9.22.1/§9.22.2 fixed at elaboration: the drivers and receivers.
+        .driver_count => try l.b.int(natural, drivers.count(l, (try drivers.check(l, i, .count, s.args)).net)),
+        .receiver_count => try l.b.int(natural, drivers.receiverCount(l, (try drivers.check(l, i, .receiver_count, s.args)).net)),
+        .driver_state => try l.b.expr(.driver_access, natural, try drivers.access(l, i, .state, s.args), 0),
+        .driver_strength => try l.b.expr(.driver_access, natural, try drivers.access(l, i, .strength, s.args), 0),
+        .driver_next_state => try l.b.expr(.driver_access, natural, try drivers.access(l, i, .next_state, s.args), 0),
+        .driver_next_strength => try l.b.expr(.driver_access, natural, try drivers.access(l, i, .next_strength, s.args), 0),
+        .driver_type => try l.b.expr(.driver_access, natural, try drivers.access(l, i, .type, s.args), 0),
         .random, .dist_uniform, .dist_normal, .dist_exponential, .dist_poisson, .dist_chi_square, .dist_t, .dist_erlang => try l.b.expr(.random, natural, try random(l, s.f, s.args), 0),
         .fopen, .fgets, .ferror, .fgetc, .ungetc, .ftell, .rewind, .fseek, .feof => try l.b.expr(.file, natural, try fileCall(l, s.f, s.args), 0),
         .sscanf, .fscanf => blk: {
@@ -125,14 +140,15 @@ pub fn sysReal(l: *Lower, i: Inst.Index) Error!u32 {
     return switch (s.f) {
         .realtime => l.b.expr(.realtime, rt, scope, 0),
         .abstime => l.b.expr(.abstime, rt, 0, 0),
+        .driver_delay => l.b.expr(.driver_access, rt, try drivers.access(l, i, .delay, s.args), 0),
         .itor => if ((try expr.typeOf(l, s.args[0])).real) l.b.expr(.math1, rt, try expr.real(l, s.args[0]), @backingInt(Program.Math.itor)) else l.b.expr(.real_of_int, rt, try expr.self_(l, s.args[0], 0), 0),
         .bitstoreal => l.b.expr(.bitstoreal, rt, try expr.self_(l, s.args[0], 64), 0),
         inline .ln, .log10, .exp, .ln1p, .expm1, .sqrt, .floor, .ceil, .sin, .cos, .tan, .asin, .acos, .atan, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh => |m| blk: {
-            if (s.args.len != 1) return l.refuse("a math function with the wrong argument count");
+            if (s.args.len != 1) return l.reject(l.frame, i.toRef(), "wrong number of arguments to a §17.11.2 math function");
             break :blk l.b.expr(.math1, rt, try expr.real(l, s.args[0]), @backingInt(@field(Program.Math, @tagName(m))));
         },
         inline .pow, .atan2, .hypot => |m| blk: {
-            if (s.args.len != 2) return l.refuse("a math function with the wrong argument count");
+            if (s.args.len != 2) return l.reject(l.frame, i.toRef(), "wrong number of arguments to a §17.11.2 math function");
             const pair = try l.b.listOf(&.{ try expr.real(l, s.args[0]), try expr.real(l, s.args[1]) });
             break :blk l.b.expr(.math2, rt, pair.start, @backingInt(@field(Program.Math, @tagName(m))));
         },
@@ -175,6 +191,16 @@ fn argumentForms(l: *Lower, i: Inst.Index, f: SysFn, args: []const Inst.Ref) Err
         // §17.2.1 "The type is a character string ... of one of the forms in Table 17-7".
         .fopen => if (args.len == 2) if (literal(l, args[1])) |ty| if (!kernels.fopen_types.has(ty))
             return l.rejectArg(l.frame, i, 1, "§17.2.1: an $fopen type is one of Table 17-7's r, w, a, r+, w+, a+ (with b)"),
+        .driver_count, .receiver_count, .driver_state, .driver_strength, .driver_delay, .driver_next_state, .driver_next_strength, .driver_type => _ = try drivers.check(l, i, switch (f) {
+            .driver_count => .count,
+            .receiver_count => .receiver_count,
+            .driver_state => .state,
+            .driver_strength => .strength,
+            .driver_delay => .delay,
+            .driver_next_state => .next_state,
+            .driver_next_strength => .next_strength,
+            else => .type, // else: `$driver_type`, the last
+        }, args),
         else => {}, // else: checked where lowered
     }
 }
@@ -251,7 +277,7 @@ fn fread(l: *Lower, args: []const Inst.Ref) Error!u32 {
     const n = try expr.nameOf(l, args[0]);
     if (n != null and n.?.dims.len != 0) {
         const m = n.?;
-        if (m.dims.len != 1) return l.refuse("§17.2.4.4 $fread into a memory of more than one dimension");
+        if (m.dims.len != 1) return l.reject(l.frame, args[0], "§17.2.4.4: $fread loads a one-dimensional memory");
         fr.base = m.slot;
         fr.low = m.dims[0].low;
         fr.high = m.dims[0].high;

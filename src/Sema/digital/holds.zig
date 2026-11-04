@@ -79,7 +79,7 @@ fn target(l: *Lower, r: Inst.Ref) Error!Target {
         },
         .elem, .slice, .slice_up, .slice_down => {
             const s = try place.selectOf(l, i);
-            if (s.name.kind != .net) return l.refuse("§9.3.2 a procedural continuous assignment of a select that is no select of a net");
+            if (s.name.kind != .net) return l.reject(l.frame, r, "§9.3: a procedural continuous assignment names one whole variable or net, a constant bit-select or part-select of a vector net, or a concatenation of them");
             // The bits `nets.sink` names, as a continuous assignment's.
             const k = try nets.sink(l, r);
             const row = l.nets.items[k.net];

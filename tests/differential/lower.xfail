@@ -520,16 +520,11 @@ verilog-ams/ch03_data_types/nodeset_non_continuous.va codes: old E0366, new {}
 verilog-ams/ch03_data_types/wire_without_discipline_in_analog_rejected.va codes: old E0337, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch03_data_types/wreal_wire_port_merge.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch04_expressions/function_called_outside_analog_rejected.va codes: old E0430, new {}
-verilog-ams/ch04_expressions/operator_in_always_rejected.va codes: old E0422, new {}
-verilog-ams/ch04_expressions/operator_in_initial.va codes: old E0422, new {}
 verilog-ams/ch04_expressions/revert_ops.va tables row 34: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-ams/ch04_expressions/table_4_1_every_operator.va codes: old {}, new E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
-verilog-ams/ch05_analog_behavior/absdelta_without_delta_rejected.va codes: old E0517, new {}
 verilog-ams/ch05_analog_behavior/analog_initial_digital_access_rejected.va codes: old E0431, new {}
 verilog-ams/ch05_analog_behavior/analog_initial_event_rejected.va codes: old E0702, new E0707 (E0707: )
 verilog-ams/ch05_analog_behavior/array_assignment_from_packed_vector_rejected.va codes: old E0429, new E0313 (E0313: an assignment to a name that is not a variable)
-verilog-ams/ch05_analog_behavior/final_step_in_digital_context_rejected.va codes: old E0708, new {}
-verilog-ams/ch05_analog_behavior/initial_step_in_digital_context_rejected.va codes: old E0708, new {}
 verilog-ams/ch05_analog_behavior/node_alias_reevaluated_when_a_parameter_changes.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch05_analog_behavior/timer_body_array_controls.va tables row 6: old `held rate[0]`, new `held rate`
 verilog-ams/ch05_analog_behavior/timer_body_array_function_controls.va codes: old {}, new E0512 (E0512: `a whole array read as a value` is not lowered by Sema yet)
@@ -576,8 +571,6 @@ verilog-ams/ch07_mixed_signal/connect_rule_parameter_is_applied.va contribution 
 verilog-ams/ch07_mixed_signal/continuous_net_resolution_modes_agree.va codes: old {}, new E0512,E0901 (E0901: `undec.potential.abstol` names nothing in the elaborated design)
 verilog-ams/ch07_mixed_signal/continuous_variable_read_from_digital.va tables row 6: old `held x`, new `held h`
 verilog-ams/ch07_mixed_signal/contribution_under_a_digital_event_rejected.va codes: old E0406, new E0704 (E0704: )
-verilog-ams/ch07_mixed_signal/cross_direction_in_digital_event_control_rejected.va codes: old E0517, new {}
-verilog-ams/ch07_mixed_signal/digital_function_in_cross_arguments_rejected.va codes: old E0436, new {}
 verilog-ams/ch07_mixed_signal/direction_override_redirects_a_bridge.va contribution 0 resist: old -3.9934744856664015e-3, new -3.993474485666402e-3
 verilog-ams/ch07_mixed_signal/discipline_and_direction_overrides.va contribution 0 resist: old -1.463813329581295e-4, new -1.4638133295812947e-4
 verilog-ams/ch07_mixed_signal/discipline_resolution_basic_figure_7_3.va tables row 1: old `node 1 m.out__f73_d2a__cmos2.d net`, new `node 1 netd net`
@@ -591,11 +584,6 @@ verilog-ams/ch07_mixed_signal/discrete_bus_part_select_above_31.va codes: old {}
 verilog-ams/ch07_mixed_signal/discrete_real_from_analog.va contribution 0 resist: old 1.25e0, new 0e0
 verilog-ams/ch07_mixed_signal/driver_state_histogram.va tables row 10: old `held net__m04_ds_c2e__ddiscrete.n`, new `limit_slots 0`
 verilog-ams/ch07_mixed_signal/driver_update_without_resolved_change.va tables row 6: old `held net__m04_du_c2e__ddiscrete.ones`, new `limit_slots 0`
-verilog-ams/ch07_mixed_signal/event_bounds_absdelta_negative_delta_rejected.va codes: old E0517, new {}
-verilog-ams/ch07_mixed_signal/event_bounds_absdelta_negative_expr_tol_rejected.va codes: old E0517, new {}
-verilog-ams/ch07_mixed_signal/event_bounds_absdelta_negative_time_tol_rejected.va codes: old E0517, new {}
-verilog-ams/ch07_mixed_signal/event_bounds_absdelta_noninteger_enable_rejected.va codes: old E0517, new {}
-verilog-ams/ch07_mixed_signal/event_bounds_cross_expr_tol_without_time_tol_rejected.va codes: old E0517, new {}
 verilog-ams/ch07_mixed_signal/explicit_d2a_per_delta_cycle.va codes: old {}, new E0706 (E0706: )
 verilog-ams/ch07_mixed_signal/explicit_d2a_reads_post_active.va codes: old {}, new E0704 (E0704: )
 verilog-ams/ch07_mixed_signal/figure_7_2_resolveto_two_levels.va codes: old {}, new E0512,E0901 (E0901: `NetA.potential.abstol` names nothing in the elaborated design)
@@ -693,7 +681,6 @@ verilog-ams/ch09_system_tasks/reject_clog2_reg_width.va codes: old E0222, new {}
 verilog-ams/ch09_system_tasks/r_format_in_the_digital_context.va tables row 7: old `display $fopen`, new `display $strobe`
 verilog-ams/ch09_system_tasks/r_format_in_the_digital_context_without_argument_rejected.va codes: old E0810, new {}
 verilog-ams/ch09_system_tasks/rng_constant_distribution_stream.va tables row 3: old `held $rng.0.seed`, new `limit_slots 0`
-verilog-ams/ch09_system_tasks/severity_task_digital_context_rejected.va codes: old E0821, new {}
 verilog-ams/ch09_system_tasks/stochastic_queue_in_digital_context.va tables row 8: old `held st`, new `limit_slots 0`
 verilog-ams/ch09_system_tasks/stop_in_analog_initial_rejected.va codes: old E0807, new {}
 verilog-ams/ch09_system_tasks/strobe_writes_once_per_accepted_solution.va tables row 6: old `display $fopen`, new `display $fstrobe`

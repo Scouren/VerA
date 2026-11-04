@@ -15,6 +15,7 @@
 //! - `pub fn ifElse(s: *Sema, b: *Block, cond: Air.Inst.Ref, then_b: *Block, else_b: *Block) Allocator.Error!void`
 //! - `pub fn assignTo(s: *Sema, b: *Block, lhs_ref: Inst.Ref, v: Sema.Value, src: Inst.Ref) Allocator.Error!void`
 //! - `pub fn operands(s: *Sema, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void`
+//! - `pub fn eventArgs(s: *Sema, unit: *Sema.Unit, tag: vams.SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!bool`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -117,6 +118,67 @@ pub fn assignTo(s: *Sema, b: *Block, lhs_ref: Inst.Ref, v: Sema.Value, src: Inst
     if (op.isStatic(s, r, 0)) try s.static_slots.put(s.arena, bind.slot.alloc, {}) else _ = s.static_slots.remove(bind.slot.alloc);
     _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(bind.slot.alloc), .rhs = r } } });
 }
+/// §5.10.3.1-§5.10.3.3 the shape of a monitored event's arguments (the old
+/// `event_args.zig`): the required slots, the enable last and integral, the
+/// tolerances and a timer's time_tol non-negative, cross's direction
+/// integral (E0517). False when a required slot is missing.
+pub fn eventArgs(s: *Sema, unit: *Sema.Unit, tag: vams.SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!bool {
+    const file = unit.file;
+    const required: usize = switch (tag) {
+        .cross, .above, .timer => 1,
+        else => 0, // else: initial_step/final_step take names, not slots
+    };
+    const enable: ?usize = switch (tag) {
+        .cross => 4,
+        .above, .timer => 3,
+        else => null, // else: no enable slot
+    };
+    var complete = true;
+    for (0..required) |k| if (k >= args.len or args[k] == .none) {
+        try s.fail(.E0517, file, src, "`{t}()` requires its {s} argument", .{ tag, if (tag == .timer) "start_time" else "expr" });
+        complete = false;
+    };
+    if (enable) |k| {
+        if (k < args.len and args[k] == .none) {
+            try s.fail(.E0517, file, src, "`{t}()` has a comma before its enable and no enable", .{tag});
+            complete = false;
+        }
+        if (args.len > k + 1) {
+            try s.fail(.E0517, file, src, "`{t}()` takes at most {d} arguments, got {d} (A.6.5)", .{ tag, k + 1, args.len });
+            complete = false;
+        }
+    }
+    if (!complete) return false;
+    if (enable) |k| if (k < args.len) if (try decl.foldRef(s, unit, args[k])) |c| {
+        if (c != .str and c.asReal() != @round(c.asReal())) try s.fail(.E0517, file, src, "`{t}()` enable shall evaluate to an integer, got {d}", .{ tag, c.asReal() });
+    };
+    switch (tag) {
+        .timer => if (args.len >= 3 and args[2] != .none) if (try decl.foldRef(s, unit, args[2])) |c| {
+            if (c != .str and c.asReal() < 0) try s.fail(.E0517, file, src, "`timer()` time_tol shall be non-negative, got {d}", .{c.asReal()});
+        },
+        .cross, .above => {
+            if (tag == .cross and args.len > 1 and args[1] != .none) if (try decl.foldRef(s, unit, args[1])) |c| {
+                if (c != .str and c.asReal() != @round(c.asReal())) try s.fail(.E0517, file, src, "`cross()` direction shall evaluate to an integer, got {d}", .{c.asReal()});
+            };
+            const first: usize = if (tag == .cross) 2 else 1;
+            var tol_given = false;
+            for (first..@max(first, @min(first + 2, args.len))) |k| {
+                if (args[k] == .none) continue;
+                tol_given = true;
+                const c = (try decl.foldRef(s, unit, args[k])) orelse continue;
+                if (c != .str and c.asReal() < 0) try s.fail(.E0517, file, src, "`{t}()` tolerance shall be non-negative, got {d}", .{ tag, c.asReal() });
+            }
+            // "If either or both tolerances are defined, then the direction
+            // shall also be defined"; "If expr_tol is specified, time_tol shall
+            // also be specified" (§5.10.3.1).
+            if (tag == .cross and tol_given and (args.len < 2 or args[1] == .none)) try s.fail(.E0517, file, src, "a tolerance is given but the direction slot is empty", .{});
+            if (tag == .cross and args.len > 3 and args[3] != .none and args[2] == .none) try s.fail(.E0517, file, src, "`cross()` expr_tol is given but the time_tol slot is empty", .{});
+        },
+        else => {}, // else: no bound to check
+    }
+    return true;
+}
+
 // ---- private ----
 
 fn stmt(s: *Sema, b: *Block, i: Inst.Index, tag: Inst.Tag) Allocator.Error!void {
@@ -237,67 +299,6 @@ fn disable(s: *Sema, b: *Block, target: Inst.Ref, src: Inst.Ref) Allocator.Error
     return s.fail(.E0402, b.unit.file, src, "`{s}` names no named block in scope", .{name});
 }
 
-/// §5.10.3.1-§5.10.3.3 the shape of a monitored event's arguments (the old
-/// `event_args.zig`): the required slots, the enable last and integral, the
-/// tolerances and a timer's time_tol non-negative, cross's direction
-/// integral (E0517). False when a required slot is missing.
-fn eventArgs(s: *Sema, b: *Block, tag: vams.SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!bool {
-    const file = b.unit.file;
-    const required: usize = switch (tag) {
-        .cross, .above, .timer => 1,
-        else => 0, // else: initial_step/final_step take names, not slots
-    };
-    const enable: ?usize = switch (tag) {
-        .cross => 4,
-        .above, .timer => 3,
-        else => null, // else: no enable slot
-    };
-    var complete = true;
-    for (0..required) |k| if (k >= args.len or args[k] == .none) {
-        try s.fail(.E0517, file, src, "`{t}()` requires its {s} argument", .{ tag, if (tag == .timer) "start_time" else "expr" });
-        complete = false;
-    };
-    if (enable) |k| {
-        if (k < args.len and args[k] == .none) {
-            try s.fail(.E0517, file, src, "`{t}()` has a comma before its enable and no enable", .{tag});
-            complete = false;
-        }
-        if (args.len > k + 1) {
-            try s.fail(.E0517, file, src, "`{t}()` takes at most {d} arguments, got {d} (A.6.5)", .{ tag, k + 1, args.len });
-            complete = false;
-        }
-    }
-    if (!complete) return false;
-    if (enable) |k| if (k < args.len) if (try decl.foldRef(s, b.unit, args[k])) |c| {
-        if (c != .str and c.asReal() != @round(c.asReal())) try s.fail(.E0517, file, src, "`{t}()` enable shall evaluate to an integer, got {d}", .{ tag, c.asReal() });
-    };
-    switch (tag) {
-        .timer => if (args.len >= 3 and args[2] != .none) if (try decl.foldRef(s, b.unit, args[2])) |c| {
-            if (c != .str and c.asReal() < 0) try s.fail(.E0517, file, src, "`timer()` time_tol shall be non-negative, got {d}", .{c.asReal()});
-        },
-        .cross, .above => {
-            if (tag == .cross and args.len > 1 and args[1] != .none) if (try decl.foldRef(s, b.unit, args[1])) |c| {
-                if (c != .str and c.asReal() != @round(c.asReal())) try s.fail(.E0517, file, src, "`cross()` direction shall evaluate to an integer, got {d}", .{c.asReal()});
-            };
-            const first: usize = if (tag == .cross) 2 else 1;
-            var tol_given = false;
-            for (first..@max(first, @min(first + 2, args.len))) |k| {
-                if (args[k] == .none) continue;
-                tol_given = true;
-                const c = (try decl.foldRef(s, b.unit, args[k])) orelse continue;
-                if (c != .str and c.asReal() < 0) try s.fail(.E0517, file, src, "`{t}()` tolerance shall be non-negative, got {d}", .{ tag, c.asReal() });
-            }
-            // "If either or both tolerances are defined, then the direction
-            // shall also be defined"; "If expr_tol is specified, time_tol shall
-            // also be specified" (§5.10.3.1).
-            if (tag == .cross and tol_given and (args.len < 2 or args[1] == .none)) try s.fail(.E0517, file, src, "a tolerance is given but the direction slot is empty", .{});
-            if (tag == .cross and args.len > 3 and args[3] != .none and args[2] == .none) try s.fail(.E0517, file, src, "`cross()` expr_tol is given but the time_tol slot is empty", .{});
-        },
-        else => {}, // else: no bound to check
-    }
-    return true;
-}
-
 /// §5.10 `@(event) s`: the event's flag guards `s`.
 fn eventWait(s: *Sema, b: *Block, x: Inst.EventWait, src: Inst.Ref) Allocator.Error!void {
     const file = b.unit.file;
@@ -348,7 +349,7 @@ fn eventExpr(s: *Sema, b: *Block, r: vams.Vir.Inst.Ref, src: Inst.Ref) Allocator
                 return null;
             }
             const vargs = vir.list(Inst.Ref, c.args);
-            if (!try eventArgs(s, b, tag, vargs, src)) return null;
+            if (!try eventArgs(s, b.unit, tag, vargs, src)) return null;
             const args = try s.arena.alloc(Air.Inst.Ref, vargs.len);
             for (vargs, args, 1..) |a, *o, k| {
                 if (a == .none) {

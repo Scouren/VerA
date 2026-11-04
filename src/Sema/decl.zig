@@ -67,6 +67,7 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     if (s.units.items.len == 0) return finish(s, &.{});
     try contrib.loadDisciplines(s);
     for (s.units.items) |*u| try discrete.mark(s, u);
+    for (s.units.items) |*u| try @import("discrete_check.zig").check(s, u);
     try net.ports(s, &s.units.items[0]);
     s.device.num_ports = @intCast(s.device.nodes.len);
     for (s.units.items) |*u| try net.nets(s, u);

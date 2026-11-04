@@ -2130,8 +2130,6 @@ verilog-ams/ch04_expressions/case_equality.va rw-lower (analog lowering) notes: 
 verilog-ams/ch04_expressions/case_equality_real_operand_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = help: use `==`; for reals prefer `abs(a - b) < tol``, new `   = help: run `vera --explain E0369` for a detailed explanation`
 verilog-ams/ch04_expressions/function_called_outside_analog_rejected.va not built: backend exe
 verilog-ams/ch04_expressions/integer_to_real_xz_bit_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0130]: literal requires digital value support in the execution backend: `4'b10x1`: the analog backend cannot execute this 4-bit four-state literal`, new `error[E0130]: literal requires digital value support in the execution backend: the
-verilog-ams/ch04_expressions/operator_in_always_rejected.va not built: backend exe
-verilog-ams/ch04_expressions/operator_in_initial.va not built: backend exe
 verilog-ams/ch04_expressions/table_4_1_every_operator.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch05_analog_behavior/absdelta_direction_change.va not built: backend exe
 verilog-ams/ch05_analog_behavior/absdelta_dynamic_controls.va not built: backend exe
@@ -2141,7 +2139,6 @@ verilog-ams/ch05_analog_behavior/absdelta_samples_analog_changes.va not built: b
 verilog-ams/ch05_analog_behavior/absdelta_self_disable.va not built: backend exe
 verilog-ams/ch05_analog_behavior/absdelta_time_tol_below_precision.va not built: backend exe
 verilog-ams/ch05_analog_behavior/absdelta_time_tol_filters.va not built: backend exe
-verilog-ams/ch05_analog_behavior/absdelta_without_delta_rejected.va not built: backend exe
 verilog-ams/ch05_analog_behavior/analog_initial.va not built: backend exe
 verilog-ams/ch05_analog_behavior/analog_initial_digital_access_rejected.va not built: backend exe
 verilog-ams/ch05_analog_behavior/analog_initial_event_rejected.va not built: backend exe
@@ -2151,8 +2148,6 @@ verilog-ams/ch05_analog_behavior/array_assignment_from_packed_vector_rejected.va
 verilog-ams/ch05_analog_behavior/bare_event_trigger_in_analog_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = help: only `@(<event>) -> ev;` is legal`, new `   = help: run `vera --explain E0434` for a detailed explanation`
 verilog-ams/ch05_analog_behavior/cross_expr_tol_and_time_tol_both_hold.va not built: backend exe
 verilog-ams/ch05_analog_behavior/event_array_index_change_is_not_an_event.va not built: backend exe
-verilog-ams/ch05_analog_behavior/final_step_in_digital_context_rejected.va not built: backend exe
-verilog-ams/ch05_analog_behavior/initial_step_in_digital_context_rejected.va not built: backend exe
 verilog-ams/ch05_analog_behavior/multiple_analog_initial_blocks_concatenate.va not built: backend exe
 verilog-ams/ch05_analog_behavior/named_event_has_no_time_duration.va not built: backend exe
 verilog-ams/ch05_analog_behavior/named_event_unsupported.va not built: backend exe
@@ -2443,7 +2438,6 @@ verilog-ams/ch09_system_tasks/receiver_net_resolution_assign.va not built: backe
 verilog-ams/ch09_system_tasks/receiver_segregation_ignored_without_driver_value.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch09_system_tasks/reject_clog2_reg_width.va not built: backend exe
 verilog-ams/ch09_system_tasks/rng_constant_distribution_stream.va not built: backend exe
-verilog-ams/ch09_system_tasks/severity_task_digital_context_rejected.va not built: backend exe
 verilog-ams/ch09_system_tasks/stochastic_queue_in_digital_context.va not built: backend exe
 verilog-ams/ch09_system_tasks/stop_in_analog_initial_rejected.va not built: backend exe
 verilog-ams/ch09_system_tasks/strobe_writes_once_per_accepted_solution.va not built: backend exe

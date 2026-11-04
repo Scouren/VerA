@@ -12,6 +12,8 @@
 
 const std = @import("std");
 const contract = @import("contract");
+/// The family's transcendentals: Gompute's, the rewrite's (`RefOptions.math`).
+const math = @import("std_kernels").math;
 
 /// Every device of the bundle is held to `contract.validate` (link's shim
 /// reads this from the dyn).
@@ -47,8 +49,8 @@ fn pinMath(a: *const i128, b: *const i128) callconv(.c) i128 {
 fn Run(comptime D: type) type {
     return struct {
         const n = contract.nU(D);
-        const S = contract.RefFamily(f64, &std.simd.iota(u8, n), .{});
-        const V = contract.RefFamily(f64, &@as([n]u8, @splat(contract.no_lane)), .{});
+        const S = contract.RefFamily(f64, &std.simd.iota(u8, n), .{ .math = math });
+        const V = contract.RefFamily(f64, &@as([n]u8, @splat(contract.no_lane)), .{ .math = math });
 
         /// |U|.
         fn unknowns() callconv(.c) u32 {

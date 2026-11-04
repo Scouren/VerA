@@ -13,6 +13,7 @@
 //! - `pub fn newScope(l: *Lower, parent: u32, name: []const u8, index: ?i64, time: Program.Time, at: u32, queued: bool) Error!u32`
 //! - `pub fn newFrame(l: *Lower, parent: u32, instance: Zcu.Instance.Index, scope: u32, genvars: []const Frame.Genvar) Error!u32`
 //! - `pub fn blockFrame(l: *Lower, outer: u32, i: Inst.Index) Error!u32`
+//! - `pub fn preBlocks(l: *Lower, f: u32, b: Vir.Body, depth: u32) Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -22,6 +23,7 @@ const InternPool = @import("intern_pool");
 const kernels = @import("kernels");
 const Zcu = @import("../../Zcu.zig");
 const eval = @import("../eval.zig");
+const walk = @import("../walk.zig");
 const digital = @import("../digital.zig");
 const nets = @import("nets.zig");
 const ports = @import("ports.zig");
@@ -38,8 +40,9 @@ const Program = std_sim.Program;
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 
-/// The most iterations one loop generate scheme unrolls (`walk.zig`'s).
-const loop_max: u32 = 1 << 16;
+/// The most iterations one loop generate scheme unrolls. §12.4.1 bounds
+/// none; a scheme that does not end repeats a genvar value first.
+const loop_max: u32 = 1 << 20;
 
 const Placement = struct { scope: u32 = none, frame: u32 = none, inst: Inst.Index = undefined, index: ?i64 = null, lane: ?[2]u32 = null, at: u32 = 0, name: []const u8 = "" };
 const Child = struct { parent: u32, name: InternPool.String };
@@ -54,6 +57,8 @@ const Walk = struct {
     conns: std.AutoHashMapUnmanaged(Inst.Index, ports.Conn) = .empty,
     /// Its ports' drivers, appended after its net declarations' own.
     deferred: std.ArrayList(nets.Wire) = .empty,
+    /// §12.3.6 an expression-ported module's ports, one external port each.
+    groups: std.ArrayList(ports.Group) = .empty,
 };
 
 /// Walks every instance in `Zcu.instances` order: its scope, its frame, its
@@ -111,22 +116,20 @@ pub fn blockFrame(l: *Lower, outer: u32, i: Inst.Index) Error!u32 {
     const outer_scope = l.frames.items[outer].scope;
     const s = try newScope(l, outer_scope, vir.string(blk.name), null, l.b.times.items[outer_scope], l.srcOffset(outer, i), false);
     const f = try newFrame(l, outer, l.frames.items[outer].instance, s, l.frames.items[outer].genvars);
-    // §10.2.1 an automatic subroutine's block items are per activation,
-    // which its storage (laid out at its declaration) does not hold.
+    // §10.2.1 an automatic subroutine's block items are per activation:
+    // they are laid out with its storage, never after it.
     l.frames.items[f].automatic = l.frames.items[outer].automatic;
     gop.value_ptr.* = f;
     const slots_before = l.b.p.slots.len;
     try vars.locals(l, f, blk.body);
-    if (l.frames.items[outer].automatic and l.b.p.slots.len != slots_before) return l.refuse("a named block declaring storage in an automatic subroutine");
+    if (l.frames.items[outer].automatic and !l.laying_out and l.b.p.slots.len != slots_before) return l.refuse("a named block declaring storage outside its automatic subroutine's activation");
     return f;
 }
-
-// ---- private ----
 
 /// §12.5 the named blocks of a process body, made at the walk (as
 /// lib/sim/digital's elaboration binds them), so a hierarchical name in any
 /// process reaches them.
-fn preBlocks(l: *Lower, f: u32, b: Vir.Body, depth: u32) Error!void {
+pub fn preBlocks(l: *Lower, f: u32, b: Vir.Body, depth: u32) Error!void {
     if (depth >= 1 << 12) return l.refuse("statements nested past 4096 levels");
     const vir = l.virOf(f);
     for (vir.body(b)) |i| switch (Lower.tag(vir, i)) {
@@ -153,6 +156,8 @@ fn preBlocks(l: *Lower, f: u32, b: Vir.Body, depth: u32) Error!void {
         else => {}, // else: no other statement nests one
     };
 }
+
+// ---- private ----
 
 /// One instance: its env (its module's parameters as `Zcu` folded them),
 /// its scope and frame, then its module's items.
@@ -186,24 +191,30 @@ fn instance(w: *Walk, k: u32) Error!void {
     l.sites[k] = if (parent == .none) .{ .frame = none, .inst = row.inst } else .{ .frame = w.placed[k].frame, .inst = w.placed[k].inst };
     w.index = k;
     w.conns.clearRetainingCapacity();
+    w.groups.clearRetainingCapacity();
     // §12.3 each port's connection, by the declaration it names inside; a
-    // root's ports are open.
+    // root's ports are open. A module with port expressions (§12.3.6)
+    // connects one external port at a time instead.
     const rows = zcu.instances.items(.ports)[k];
     const formals = vir.body(m.ports);
+    const grouped = ports.expressionPorts(vir, formals);
     for (formals, 0..) |formal, at| {
         const actual: Inst.Ref = if (rows.len == 0) .none else zcu.ports.items(.actual)[rows.start + at];
+        const conn: ports.Conn = .{ .actual = actual, .frame = if (actual == .none) none else w.placed[k].frame, .lane = w.placed[k].lane };
         const inner: Inst.Index = switch (Lower.tag(vir, formal)) {
             .io => formal,
             .port => blk: {
-                const port = Lower.payload(vir, Inst.Port, formal);
-                const value = vir.body(port.value);
+                const value = vir.body(Lower.payload(vir, Inst.Port, formal).value);
                 if (value.len == 0) continue;
-                if (value.len > 1 or Lower.tag(vir, value[0]) != .decl_ref) return l.refuse("a port expression (§12.3.6)");
+                if (grouped) {
+                    try w.groups.append(l.a, .{ .expr = value[value.len - 1].toRef(), .conn = conn });
+                    continue;
+                }
                 break :blk vir.instructions.items(.data)[@backingInt(value[0])].decl_tok.decl;
             },
             else => continue, // else: a header holds only ports and port declarations
         };
-        try w.conns.put(l.a, inner, .{ .actual = actual, .frame = if (actual == .none) none else w.placed[k].frame, .lane = w.placed[k].lane });
+        try w.conns.put(l.a, inner, conn);
     }
     // A.1.3 the header's `#( parameter ... )` list, before the body's items.
     for (vir.body(m.params)) |p| if (Lower.tag(vir, p) == .param) {
@@ -237,6 +248,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
     const top = l.frames.items[f].parent == none;
     w.deferred.clearRetainingCapacity();
     for (later.keys(), later.values()) |first, decls| try signal(w, f, first, decls.items, if (top) w.conns.get(first) else null);
+    if (top) for (w.groups.items) |g| try ports.group(l, f, g, &w.deferred);
     try l.wires.appendSlice(l.a, w.deferred.items);
     try ports.implicitNets(l, f, all);
     // A parameter's value may call a constant function (§10.4.5).
@@ -278,8 +290,18 @@ fn scheme(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8) Error
     const vir = l.virOf(f);
     if (Lower.tag(vir, i) == .gen_case) return genCase(w, f, scope, Lower.payload(vir, Inst.GenCase, i), prefix);
     const g = Lower.payload(vir, Inst.GenIf, i);
-    const c = (try (try l.envAt(f)).body(g.cond)) orelse return l.refuse("a generate condition Sema/eval.zig does not fold");
-    try armBlock(w, f, scope, if (c.isTrue()) g.then else g.@"else", prefix);
+    const env = try l.envAt(f);
+    const taken = if (try env.body(g.cond)) |c| c.isTrue() else blk: {
+        // The IEEE 1364 mode: a constant function, an x/z bit.
+        const cb = vir.body(g.cond);
+        if (cb.len == 0) return l.refuse("a generate condition with no expression");
+        const v = (try eval.v1364.value(env, cb[cb.len - 1].toRef())) orelse return l.refuse("a generate condition Sema/eval.zig does not fold");
+        break :blk switch (v) {
+            .int => |x| x.truth() == .one,
+            .real => |x| x != 0,
+        };
+    };
+    try armBlock(w, f, scope, if (taken) g.then else g.@"else", prefix);
 }
 
 /// A generate arm: its `gen_block`, a conditional scheme nested directly
@@ -301,7 +323,8 @@ fn genBlock(w: *Walk, f: u32, scope: u32, b: Inst.Index, index: ?i64, genvars: [
     const blk = Lower.payload(vir, Inst.GenBlock, b);
     const name = vir.string(blk.name);
     const inner_scope = try newScope(l, scope, name, index, l.b.times.items[scope], l.srcOffset(f, b), true);
-    const inner = try newFrame(l, f, l.frames.items[f].instance, inner_scope, genvars);
+    // §12.4 a conditional arm's block sees the genvars of the iteration around it.
+    const inner = try newFrame(l, f, l.frames.items[f].instance, inner_scope, if (index == null) l.frames.items[f].genvars else genvars);
     _ = try l.bind(f, b, .{ .kind = .scope, .slot = inner_scope });
     // §12.4.1 the iteration's genvar reads as a localparam integer.
     if (index) |v| {
@@ -327,7 +350,7 @@ fn genCase(w: *Walk, f: u32, scope: u32, g: Inst.GenCase, prefix: []const u8) Er
         if (arm.flags.default) default = arm.body;
         for (vir.list(Inst.Ref, arm.values)) |r| {
             const label = (try env.ref(r)) orelse continue;
-            const eq = kernels.fold.binary(.eq, operand, label, null) orelse continue;
+            const eq = @import("std_kernels").fold.binary(.eq, operand, label, null) orelse continue;
             if (eq.isTrue()) return armBlock(w, f, scope, arm.body, prefix);
         }
     }
@@ -344,7 +367,9 @@ fn genFor(w: *Walk, f: u32, scope: u32, g: Inst.GenFor, prefix: []const u8) Erro
     var v = try l.intOf(f, init.rhs);
     const step = storeOf(vir, g.step) orelse return l.refuse("a loop generate scheme without a step assignment");
     var n: u32 = 0;
+    var seen: std.AutoHashMapUnmanaged(i64, void) = .empty;
     while (n < loop_max) : (n += 1) {
+        if ((try seen.fetchPut(l.a, v, {})) != null) return l.refuse("§12.4.1 a loop generate scheme repeating a genvar value");
         const outer = l.frames.items[f].genvars;
         const genvars = try l.a.alloc(Frame.Genvar, outer.len + 1);
         @memcpy(genvars[0..outer.len], outer);
@@ -361,7 +386,7 @@ fn genFor(w: *Walk, f: u32, scope: u32, g: Inst.GenFor, prefix: []const u8) Erro
         try next_env.genvars.put(next_env.gpa, gv, v);
         v = ((try next_env.ref(step.rhs)) orelse return l.refuse("a loop generate step Sema/eval.zig does not fold")).asIntExact() orelse return l.refuse("a non-integral genvar");
     }
-    return l.refuse("a loop generate scheme past 65536 iterations");
+    return l.refuse("a loop generate scheme past 2^20 iterations");
 }
 
 /// A body's last instruction as a `store`, or null.
@@ -409,7 +434,9 @@ fn childInstance(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8
 
 fn place(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8, name: []const u8, index: ?i64, lane: ?[2]u32, at: u32) Error!void {
     const l = w.l;
-    const full = if (index) |k| try std.fmt.allocPrint(l.a, "{s}{s}[{d}]", .{ prefix, name, k }) else try std.fmt.allocPrint(l.a, "{s}{s}", .{ prefix, name });
+    // §2.7.1 an escaped name is one segment of `Zcu`'s paths.
+    const seg = try walk.segment(l.a, name);
+    const full = if (index) |k| try std.fmt.allocPrint(l.a, "{s}{s}[{d}]", .{ prefix, seg, k }) else try std.fmt.allocPrint(l.a, "{s}{s}", .{ prefix, seg });
     const key: Child = .{ .parent = w.index, .name = try l.zcu.intern_pool.getString(l.a, full) };
     const child = w.children.get(key) orelse return l.refuse("an instance the elaboration did not make");
     w.placed[child] = .{ .scope = scope, .frame = f, .inst = i, .index = index, .lane = lane, .at = at, .name = name };

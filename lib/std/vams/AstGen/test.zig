@@ -86,8 +86,8 @@ test "a local name resolves to its declaration; another file's name stays a stri
         \\    %4 = decl_ref(%1)
         \\  })
         \\}, body={
-        \\  %1 = io(name="p", prev=none, flags=.{dir=.inout, net=.none, storage=.none, signed=false, header=false}, discipline="", range={}, dims={}, init={}, defaults=[])
-        \\  %2 = net(name="p", prev=%1, flags=.{net=.none, signed=false, vectored=false, scalared=false}, discipline="electrical", strength="", range={}, dims={}, delay=.{body={}, values=[]}, init={}, defaults=[])
+        \\  %1 = io(name="p", prev=none, flags=.{dir=.inout, net=.none, storage=.none, signed=false, header=false}, discipline="", range={}, dims={}, init={}, defaults=[], attrs=[])
+        \\  %2 = net(name="p", prev=%1, flags=.{net=.none, signed=false, vectored=false, scalared=false}, discipline="electrical", strength="", range={}, dims={}, delay=.{body={}, values=[]}, init={}, defaults=[], attrs=[])
         \\  %11 = analog(body={
         \\    %6 = str_ref("V")
         \\    %7 = decl_ref(%1)
@@ -95,10 +95,27 @@ test "a local name resolves to its declaration; another file's name stays a stri
         \\    %9 = decl_ref(%3)
         \\    %10 = contrib(lhs=%8, rhs=%9)
         \\  })
-        \\  %3 = variable(name="x", prev=none, flags=.{storage=.real, signed=false}, discipline="", range={}, dims={}, init={})
+        \\  %3 = variable(name="x", prev=none, flags=.{storage=.real, signed=false}, discipline="", range={}, dims={}, init={}, attrs=[])
         \\})
         \\
     , out);
+}
+
+test "IEEE 1364-2005 Annex B `string` is a variable's name under 1364-2005, not its type" {
+    const gpa = std.testing.allocator;
+    var tree = try Ast.parse(gpa, "module m; reg string; endmodule\n", .{ .keywords = .v1364_2005 });
+    defer tree.deinit(gpa);
+    try std.testing.expectEqual(@as(usize, 0), tree.errors.len);
+    var vir = try AstGen.generate(gpa, &tree, .{});
+    defer vir.deinit(gpa);
+    var seen: u32 = 0;
+    for (vir.instructions.items(.tag), vir.instructions.items(.data)) |t, d| if (t == .variable) {
+        const v = vir.extraData(Vir.Inst.Variable, d.pl_node.payload_index);
+        try std.testing.expectEqualStrings("string", vir.string(v.name));
+        try std.testing.expectEqual(Vir.Inst.Storage.reg, v.flags.storage);
+        seen += 1;
+    };
+    try std.testing.expectEqual(@as(u32, 1), seen);
 }
 
 test "IEEE 1364-2005 §12.4.3 an unnamed generate block is genblk<n>, zero-padded past a clash" {

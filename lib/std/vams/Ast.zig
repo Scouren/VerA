@@ -18,7 +18,7 @@
 //! - `pub const ParseOptions = struct`
 //! - `pub const Node = struct`: `Node.Tag`, `Node.Data`, `Node.Index` (`toOptional`), `Node.OptionalIndex`, `Node.SubRange`, and the extra payloads `Module`, `Decl`, `NetDecl`, `ParamAssign`, `ValueRange`, `Branch`, `Instantiation`, `Instance`, `GateInstance`, `Function`, `Udp`, `Insertion`, `For`, `If`, `Timed`, `Indirect`, `MinTypMax`, `Ternary`, `Pair`, `Path`
 //! - `pub const Error = struct` (`Error.Tag`)
-//! - `pub const full`
+//! - `pub const full`, `pub const parse_errors` (`report`, `code`)
 //! - `pub fn parse(gpa: Allocator, source: [:0]const u8, options: ParseOptions) Allocator.Error!Ast`
 //! - `pub fn deinit(tree: *Ast, gpa: Allocator) void`
 //! - `pub fn tokenTag(tree: *const Ast, i: TokenIndex) Token.Tag`, `pub fn tokenStart(tree: *const Ast, i: TokenIndex) ByteOffset`
@@ -36,6 +36,8 @@ const Token = tokenizer.Token;
 const Parse = @import("Parse.zig");
 /// Views of nodes whose payload spans several `extra_data` lists (Ast/full.zig).
 pub const full = @import("Ast/full.zig");
+/// The parse errors as diagnostics (Ast/errors.zig): `parse_errors.report(tree, wip)`.
+pub const parse_errors = @import("Ast/errors.zig");
 
 /// Reference to externally-owned text, which must outlive the tree.
 source: [:0]const u8,

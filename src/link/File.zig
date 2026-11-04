@@ -9,7 +9,7 @@
 //! fresh inode. Cites §8.3's device-side ABI and no other clause.
 //!
 //! Contents:
-//! - fields `kind`, `work_dir`, `name`, `optimize`, `modules`, `backend`, `zig_exe`, `debug_info`, `strip`, `target`, `split`, `engine`, `cache_dir`, `out_path`
+//! - fields `kind`, `work_dir`, `name`, `optimize`, `modules`, `backend`, `zig_exe`, `debug_info`, `strip`, `target`, `split`, `engine`, `cache_dir`, `out_path`, `check_pause`
 //! - `pub const Kind = enum { so, osdi, exe, check }`
 //! - `pub const Artifact = union(enum) { ok: []u8, failed: std.zig.ErrorBundle }`, `Artifact.deinit`
 //! - `pub const Error`
@@ -81,6 +81,9 @@ engine: ?[]const u8 = null,
 cache_dir: ?[]const u8 = null,
 /// A testbench's binary path instead of `<work_dir>/<name>`.
 out_path: ?[]const u8 = null,
+/// Test hook: `typeCheck` waits this long between writing its files and
+/// type-checking them, so a test can overlap two checks deterministically.
+check_pause: std.Io.Duration = .zero,
 
 /// What a `File` becomes. `.so`: a device library for a `dyn` host.
 /// `.osdi`: the same under the OSDI dyn, whose cold pieces may build

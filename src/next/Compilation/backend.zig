@@ -136,7 +136,7 @@ pub fn link(comp: *Compilation, task: @FieldType(Job, "link")) !?Job {
             };
             defer Io.Dir.cwd().deleteTree(comp.io, dir) catch {};
             var err: Io.Writer.Allocating = .init(a);
-            const f: link_mod.File = .{ .kind = .check, .work_dir = dir, .name = "check", .optimize = c.optimize, .modules = &engine, .zig_exe = c.zig_exe };
+            const f: link_mod.File = .{ .kind = .check, .work_dir = dir, .name = "check", .optimize = c.optimize, .modules = &engine, .zig_exe = c.zig_exe, .check_pause = c.check_pause };
             const v = link_mod.typeCheck(f, comp.gpa, comp.io, &q, comp.device.?.text, c.paths[0], &err.writer) catch |e| {
                 try comp.outputs.err.print(a, "error: {s}: type check failed: {t}\n", .{ c.paths[0], e });
                 comp.outputs.status = 1;
@@ -186,9 +186,13 @@ pub fn semaDigital(comp: *Compilation) !?Job {
     const out = try comp.arena().create(vams.Preprocessor.Output);
     out.* = comp.pp.output();
     for (sources, comp.units.items) |*s, *u| s.* = .{ .tree = &u.tree, .pp = out };
-    var why: []const u8 = "";
+    var why: sema.digital.Why = .{};
     comp.lowered = sema.digital.lower(comp.arena(), &comp.zcu, .{ .sources = sources }, &why) catch |e| switch (e) {
-        error.Unsupported => return notBuiltFmt(comp, "the digital lowering", why),
+        error.Unsupported => return notBuiltFmt(comp, "the digital lowering", why.text),
+        error.Rejected => {
+            try comp.wip.add(.run, .E1100, errors.relocate(out.*, why.at, why.at), "{s}", .{why.text});
+            return null;
+        },
         error.OutOfMemory => return error.OutOfMemory,
     };
     return switch (comp.config.target) {

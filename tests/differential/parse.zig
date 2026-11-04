@@ -8,8 +8,11 @@
 //! an error iff `tree.errors` is not empty, or AstGen's per-file checks
 //! fail the tree's Vir; an old error whose code a stage after AstGen owns,
 //! by `stages.ownerUnder` and the fixture's `//! lrm` clauses, is that
-//! stage's to raise and is set aside, named in the summary), structure (per
-//! module: name and the counts `Shape` lists).
+//! stage's to raise and is set aside, named in the summary), the report
+//! (both reject: the first parse error's code, caret offset, headline, caret
+//! text, notes and fix-its through `Ast.parse_errors`, row for row, as
+//! `vera-next` prints them), structure (per module: name and the counts
+//! `Shape` lists).
 //! No LRM clause: this checks VerA's rewrite against VerA.
 //!
 //! Contents: tests only.
@@ -255,9 +258,39 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, later: *settl
         return @as(Verdict, null);
     }
     if (old_file != null and tree.errors.len != 0) return try newErrorText(arena, &tree);
-    const file = old_file orelse return @as(Verdict, null);
+    const file = old_file orelse return try reportsDiffer(arena, bag, &tree);
     const builtins: u32 = if (digital) 0 else frontend.annex_e.spice_module_count + pp.netlist_modules;
     return try compareStructure(arena, &file, builtins, &tree, digital);
+}
+
+/// Both reject: the first parse error each reports, row for row: code,
+/// caret offset, headline, caret text, and each note, help and fix-it.
+/// Null when they agree.
+fn reportsDiffer(arena: std.mem.Allocator, bag: *const diag.Bag, tree: *const vams.Ast) !Verdict {
+    const old = for (0..bag.count()) |i| {
+        const e = bag.at(i);
+        if (e.severity == .err and e.stage == .parse) break e;
+    } else return null; // A later stage's refusal: `acceptance` settles it.
+    var wip: vams.Diag.Wip = .init(arena);
+    try vams.Ast.parse_errors.report(tree, &wip);
+    const d = try wip.toOwnedBundle();
+    const first = d.messages()[0];
+    const m = d.message(first);
+    var want: Io.Writer.Allocating = .init(arena);
+    try want.writer.print("{t}@{d} `{s}` `{s}`", .{ old.code, old.span.start, old.message, old.point });
+    var nbuf: [diag.max_children]diag.Note = undefined;
+    for (bag.notes(old, &nbuf)) |n| {
+        try want.writer.print(" {t}: {s}", .{ n.kind, n.text });
+        if (n.fix) |f| try want.writer.print(" [{d}..{d} `{s}`]", .{ f.span.start, f.span.end, f.replacement });
+    }
+    var got: Io.Writer.Allocating = .init(arena);
+    try got.writer.print("{t}@{d} `{s}` `{s}`", .{ m.tag.code, m.loc.start, d.string(m.msg), d.string(m.point) });
+    for (d.notes(first)) |n| {
+        try got.writer.print(" {t}: {s}", .{ n.kind, d.string(n.text) });
+        if (n.replacement != .none) try got.writer.print(" [{d}..{d} `{s}`]", .{ n.fix.start, n.fix.end, d.string(n.replacement) });
+    }
+    if (std.mem.eql(u8, want.written(), got.written())) return null;
+    return try arena.print("report: old {s}, new {s}", .{ want.written(), got.written() });
 }
 
 fn firstOldError(arena: std.mem.Allocator, bag: *const diag.Bag) ![]const u8 {

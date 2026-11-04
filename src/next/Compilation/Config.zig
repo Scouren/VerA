@@ -71,6 +71,9 @@ jac_f32: bool = false,
 jac_f32_host: bool = false,
 /// `-j`/`--jobs=`: sizes every `Io.Group` and the `link.Queue`.
 thread_limit: u32 = 1,
+/// Test hook (`--test-check-pause-ms=`): `link.File.check_pause` of a
+/// `--check`, so a test overlaps two checks deterministically.
+check_pause: std.Io.Duration = .zero,
 /// Files whose bytes are given instead of read (the LSP's open documents);
 /// borrowed.
 overlays: []const Overlay = &.{},

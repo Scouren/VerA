@@ -3,18 +3,21 @@
 //! transfer per value tag (an operand's `Abstract` in, the result's out).
 //! Pure arithmetic: no Air walk, no allocation, no diagnostics.
 //!
-//! Every transfer is sound for IEEE 754 round-to-nearest as
-//! `Air/interp.zig` computes it, with no overflow contract: an interval's
+//! Every transfer is sound for IEEE 754 round-to-nearest as the device
+//! computes it (`interp.deviceLib` for the §4.3 library functions, which
+//! diff-kernels holds to the device bit for bit), with no overflow
+//! contract: an interval's
 //! members are the extended reals, so a sum that can pass `floatMax` reaches
 //! `inf` and is not finite, and every way an operation can make NaN from
 //! numbers (`inf - inf`, `0 * inf`, `0 / 0`, `sin(inf)`, a negative base
 //! under a fraction, an operand outside the domain) sets `nan`. A bound is
-//! the value `interp` computes at the operand's extreme member: rounding is
-//! monotone, so for `+ - * /`, `sqrt`, `floor` and `ceil` (correctly
+//! the value the device computes at the operand's extreme member: rounding
+//! is monotone, so for `+ - * /`, `sqrt`, `floor` and `ceil` (correctly
 //! rounded) that bound is exact; the library functions are not correctly
 //! rounded and need not be monotone (`tanh` drops 1 ulp between neighbours
-//! near 0.337), so their bounds move `lib_ulps` outward and are clamped to
-//! the function's range. The falsification oracle
+//! near 0.337), so their bounds move `libUlps(tag)` outward, derived from
+//! the device function's error bound (`libErr`), and are clamped to the
+//! function's range. The falsification oracle
 //! (tests/differential/air_passes.zig) holds every interval and every NaN
 //! bit against every value a run defines. An integer's interval holds
 //! `@floatFromInt` of it, which is monotone, so an integer fact closes its
@@ -28,7 +31,7 @@
 //! - `pub const top: Interval`, `pub const i32_range: Interval`, `pub const i64_range: Interval`
 //! - `pub const Abstract = struct { iv: Interval, nan: bool }` (`finite`)
 //! - `pub const Range = struct`
-//! - `pub const lib_ulps: u32`
+//! - `pub fn libErr(tag: Tag) f64`, `pub fn libUlps(tag: Tag) u32`
 //! - `pub fn point(x: f64) Interval`
 //! - `pub fn bounded(i: Interval) bool`, `pub fn isEmpty(i: Interval) bool`, `pub fn excludesInf(i: Interval) bool`
 //! - `pub fn whole(i: Interval) bool`
@@ -101,16 +104,43 @@ pub const Range = struct {
     hi_inclusive: bool = true,
 };
 
-/// The ulps a library function's computed bound moves outward: twice the
-/// worst drop between neighbouring doubles measured over 10^6 random points
-/// per function (`tanh`, 1 ulp; the rest of `interp`'s math, none). The
-/// move never crosses zero: near its zero no function's computed sign was
-/// wrong (2·10^6 samples each), so `ln` over `[1, x]` stays `>= 0`.
-pub const lib_ulps: u32 = 2;
+/// The device's error bound for library tag `tag`, in ulps of the exact
+/// value: the documented accuracy of the function `interp.deviceLib` calls
+/// (contract/gm.zig, Gompute's math header, VD-123), which diff-kernels
+/// checks against the f128 reference over the specials and 10^5 draws.
+pub fn libErr(tag: Tag) f64 {
+    return switch (tag) {
+        // gm (ARM optimized-routines): <= 0.52, pow <= 0.55.
+        .exp, .ln => 0.52,
+        .pow => 0.55,
+        // musl's, std's bodies; acos and asin `std.math`'s.
+        .expm1, .ln1p, .atan, .asin, .acos => 1,
+        // gm's cosh and `std.math.hypot`: 1.145 and 1.163 measured against
+        // f128 (diff-kernels' lib-err), no documented bound.
+        .cosh, .hypot => 1.25,
+        // Gompute's log10 "<= 2 ulp"; VD-123's asinh, acosh, atanh, atan2
+        // "under 2 ulp"; musl's sinh 1.75.
+        .log10, .asinh, .acosh, .atanh, .atan2, .sinh => 2,
+        // musl's tanh: 2.05.
+        .tanh => 2.1,
+        else => 0, // else: not a library function; computed exactly
+    };
+}
+
+/// The doubles a library function's computed bound moves outward. For a
+/// monotone f with x <= e, device(x) <= f(x) + E·u(f(x)) <= f(e) + E·u(f(e))
+/// and device(e) >= f(e) - E·u(f(e)), where E = `libErr(tag)`; u(f(e)) is
+/// at most twice the ulp at device(e) (one binade down), so device(x) is
+/// within 4E ulps of device(e) above it: ceil(4E). Non-monotonicity of the
+/// device's rounding is inside that (it is f's monotonicity the bound uses).
+/// The move never crosses zero: near its zero no function's computed sign
+/// was wrong (2·10^6 samples each), so `ln` over `[1, x]` stays `>= 0`.
+pub fn libUlps(tag: Tag) u32 {
+    return @intFromFloat(@ceil(4 * libErr(tag)));
+}
 
 comptime {
     assert(@sizeOf(Interval) == 24);
-    assert(lib_ulps >= 1);
 }
 
 /// Returns `[x, x]`, or `top` for NaN.
@@ -289,7 +319,7 @@ pub fn fromRanges(ranges: []const Range, integer_param: bool) Interval {
 }
 
 /// Returns real unary `tag` over `a`: the bounds are `interp`'s values at
-/// `a`'s extreme members (moved `lib_ulps` outward for a library
+/// `a`'s extreme members (moved `libUlps` outward for a library
 /// function), closed; an operand straddling the function's domain edge
 /// gives `top` and may be NaN, as does `sin`, `cos` or `tan` of ±inf.
 pub fn unary(tag: Tag, a: Abstract) Abstract {
@@ -429,7 +459,7 @@ fn unaryRaw(tag: Tag, a: Interval) Abstract {
         .fneg => .{ .iv = .{ .lo = -a.hi, .hi = -a.lo, .lo_open = a.hi_open, .hi_open = a.lo_open }, .nan = false },
         .fabs => .{ .iv = absIv(a), .nan = false },
         // cosh is even and grows with |x|.
-        .cosh => .{ .iv = .{ .lo = 1, .hi = up(f1(.cosh, absIv(a).hi), lib_ulps) }, .nan = false },
+        .cosh => .{ .iv = .{ .lo = 1, .hi = up(f1(.cosh, absIv(a).hi), libUlps(.cosh)) }, .nan = false },
         // sin(±inf) and cos(±inf) are NaN.
         .sin, .cos => .{ .iv = .{ .lo = -1, .hi = 1 }, .nan = may_inf },
         // tan of a finite double is finite (no double is a pole), but no
@@ -473,8 +503,8 @@ fn binaryRaw(tag: Tag, x: Interval, y: Interval, x_nan: bool) Abstract {
             break :blk .{ .iv = .{ .lo = if (x.ge(0)) 0 else -b, .hi = if (x.le(0)) 0 else b }, .nan = x_inf };
         },
         .pow => .{ .iv = powIv(x, y), .nan = !x.ge(0) and !integerPoint(y) },
-        .hypot => .{ .iv = .{ .lo = 0, .hi = up(addHi(absIv(x).hi, absIv(y).hi), lib_ulps) }, .nan = false },
-        .atan2 => .{ .iv = .{ .lo = down(-math.pi, lib_ulps), .hi = up(math.pi, lib_ulps) }, .nan = false },
+        .hypot => .{ .iv = .{ .lo = 0, .hi = up(addHi(absIv(x).hi, absIv(y).hi), libUlps(.hypot)) }, .nan = false },
+        .atan2 => .{ .iv = .{ .lo = down(-math.pi, libUlps(.atan2)), .hi = up(math.pi, libUlps(.atan2)) }, .nan = false },
         // §4.3.1 `(x < y) ? x : y`: a NaN `x` picks `y`, so a maybe-NaN
         // `x` bounds the result only by the hull.
         .fmin => .{ .iv = if (!x_nan) .{ .lo = @min(x.lo, y.lo), .hi = @min(x.hi, y.hi) } else x.join(y), .nan = false },
@@ -498,11 +528,11 @@ fn monotone(tag: Tag) bool {
 }
 
 /// The ulps a monotone tag's computed bound moves outward: none for the
-/// correctly rounded ones, `lib_ulps` for a library function.
+/// correctly rounded ones, `libUlps` for a library function.
 fn ulps(tag: Tag) u32 {
     return switch (tag) {
         .sqrt, .floor, .ceil => 0,
-        else => lib_ulps, // else: every other tag is a library function
+        else => libUlps(tag), // else: every other tag is a library function
     };
 }
 
@@ -537,13 +567,14 @@ fn up(x: f64, n: u32) f64 {
     return r;
 }
 
-/// `interp`'s value of real unary `tag` at `x`.
+/// The device's value of real unary `tag` at `x`.
 fn f1(tag: Tag, x: f64) f64 {
+    if (interp.deviceLib(tag, x, 0)) |v| return v;
     return (interp.unary(tag, .{ .real = x }) catch unreachable).real; // a real unary tag has no error
 }
 
 fn powOp(a: f64, b: f64) f64 {
-    return (interp.binary(.pow, .{ .real = a }, .{ .real = b }) catch unreachable).real; // pow has no error
+    return interp.deviceLib(.pow, a, b).?;
 }
 fn mulOp(a: f64, b: f64) f64 {
     return a * b;
@@ -555,8 +586,8 @@ fn divOp(a: f64, b: f64) f64 {
 /// The hull of `f` at the corners of the box's extreme members, closed. A
 /// NaN corner (0*inf, inf/inf) gives `top`. Sound when `f` is monotone in
 /// each argument over the box, as computed: `*` always, `/` over a
-/// one-signed divisor, `pow` for x >= 0 (up to `lib_ulps`, which the caller
-/// adds).
+/// one-signed divisor, `pow` for x >= 0 (up to `libUlps(.pow)`, which the
+/// caller adds).
 fn combine(x: Interval, y: Interval, f: *const fn (f64, f64) f64) Interval {
     const xl = inLo(x);
     const xh = inHi(x);
@@ -569,7 +600,7 @@ fn combine(x: Interval, y: Interval, f: *const fn (f64, f64) f64) Interval {
     return r;
 }
 
-/// §4.3.1 pow over a box, its bounds `lib_ulps` outward. Corners hold only
+/// §4.3.1 pow over a box, its bounds `libUlps(.pow)` outward. Corners hold only
 /// where pow is monotone in each argument: x >= 0. A base that may be
 /// negative needs one known integer exponent (an even one has its interior
 /// minimum at 0; a negative one a pole at 0, sound only for a strictly
@@ -603,9 +634,9 @@ fn powIv(x: Interval, y: Interval) Interval {
     return r;
 }
 
-/// `i` with each end `lib_ulps` outward, closed.
+/// `i` with each end `libUlps(.pow)` outward, closed.
 fn outward(i: Interval) Interval {
-    const r: Interval = .{ .lo = down(i.lo, lib_ulps), .hi = up(i.hi, lib_ulps) };
+    const r: Interval = .{ .lo = down(i.lo, libUlps(.pow)), .hi = up(i.hi, libUlps(.pow)) };
     assert(!(r.lo > i.lo));
     assert(!(r.hi < i.hi));
     return r;
@@ -738,7 +769,7 @@ test "fromRanges: §3.4.2 brackets decide the hole and the clipped ends" {
 }
 
 test "unary: every value interp computes inside the operand is in the result, or the result may be NaN" {
-    // The old prover's transfer oracle, with `interp` as the device and no
+    // The old prover's transfer oracle, with the device's math and no
     // excuse for NaN or ±inf: ends where rounding collapses an open bound
     // (exp underflows below about -745, tanh saturates past about ±19.1,
     // floor and ceil are flat), the infinities themselves, and the doubles
@@ -761,7 +792,7 @@ test "unary: every value interp computes inside the operand is in the result, or
 }
 
 test "unary: tanh's computed drop between neighbours stays inside the bound" {
-    // Measured: tanh as `interp` computes it is not monotone; it drops 1
+    // Measured: tanh as the device computes it is not monotone; it drops 1
     // ulp between two neighbours near 0.33717500785869. A bound read off
     // the ends alone misses the low one (the merged transfer did).
     var x: f64 = 0.3371750078586919;
@@ -791,7 +822,7 @@ test "binary: every value interp computes inside the operands is in the result, 
     for (ops) |op| for (all) |a| for (all) |b| {
         const out = binary(op, .{ .iv = a, .nan = false }, .{ .iv = b, .nan = false });
         for (samplePoints(a, &extra, &xb)) |x| for (samplePoints(b, &extra, &yb)) |y| {
-            const z = (interp.binary(op, .{ .real = x }, .{ .real = y }) catch continue).real;
+            const z = interp.deviceLib(op, x, y) orelse (interp.binary(op, .{ .real = x }, .{ .real = y }) catch continue).real;
             if (math.isNan(z)) try std.testing.expect(out.nan) else try std.testing.expect(out.iv.contains(z));
             if (out.finite()) try std.testing.expect(math.isFinite(z));
         };

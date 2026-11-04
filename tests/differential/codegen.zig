@@ -239,7 +239,7 @@ fn runBatch(gpa: Allocator, arena: Allocator, io: Io, q: *link.Queue, work: []co
                 .{ .name = "contract", .root = contract },
                 .{ .name = "gompute_math", .root = options.gompute_math },
                 .{ .name = "std_kernels", .root = kernels, .deps = &.{ "contract", "gompute_math" } },
-                .{ .name = "dyn", .root = dyn, .deps = &.{"contract"} },
+                .{ .name = "dyn", .root = dyn, .deps = &.{ "contract", "std_kernels" } },
             });
             var devices: Io.Writer.Allocating = .init(arena);
             var names: Io.Writer.Allocating = .init(arena);

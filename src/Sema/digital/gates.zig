@@ -240,6 +240,12 @@ fn gate(l: *Lower, f: u32, kind: net.GateKind, t: []const Inst.Ref, lanes: u32, 
     const many = kind == .g_buf or kind == .g_not;
     const outs = if (many) t[0 .. t.len - 1] else t[0..1];
     const ins = if (many) t[t.len - 1 ..] else t[1..];
+    // §7.1.6 "Too many or too few bits to connect to all the instances
+    // shall be considered an error."
+    if (arrayed) for (ins) |x| {
+        const w = (try expr.typeOf(l, x)).width;
+        if (w != 1 and w != lanes) return l.reject(f, x, "a gate's input terminal is one bit, or one per instance of an array");
+    };
     for (outs) |o| {
         const n = try nets.drivenNet(l, f, o, s);
         const width = l.nets.items[n].width;

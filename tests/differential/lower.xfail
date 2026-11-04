@@ -16,7 +16,6 @@ verilog-a/annex_a_syntax/parameter_declarations.va tables row 7: old `param sign
 verilog-a/annex_a_syntax/pattern_empty_element_rejected.va codes: old E0894, new {}
 verilog-a/annex_a_syntax/replication.va codes: old {}, new E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
 verilog-a/annex_a_syntax/sum_chain_past_the_old_parser_limit.va codes: old {}, new E0241 (E0241: 4096 levels deep)
-verilog-a/annex_a_syntax/system_task_null_argument_space.va tables row 3: old `held s1`, new `limit_slots 0`
 verilog-a/annex_b_keywords/escaped_keyword_name_positions.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
 verilog-a/annex_d_standard_definitions/discrete_disciplines.va codes: old E0501, new {}
 verilog-a/annex_d_standard_definitions/literal_logic_discipline.va codes: old E0501, new {}
@@ -105,7 +104,6 @@ verilog-a/ch03_data_types/nonconstant_array_dimension.va codes: old E0308,E0309,
 verilog-a/ch03_data_types/nonconstant_replication_to_integral.va codes: old E0354, new {}
 verilog-a/ch03_data_types/nonconstant_user_attribute.va codes: old E0340, new {}
 verilog-a/ch03_data_types/parameter_assigned_at_runtime.va codes: old E0312, new E0313 (E0313: an assignment to a name that is not a variable)
-verilog-a/ch03_data_types/parameter_default_not_constant_rejected.va codes: old E0363, new {}
 verilog-a/ch03_data_types/parameter_override_type.va tables row 0: old `param child.becomes_real real local = 4e0`, new `param child.becomes_real unspecified local = 4e0`
 verilog-a/ch03_data_types/parameter_units_are_documentation.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
 verilog-a/ch03_data_types/port_branch_on_internal_net_rejected.va codes: old E0372, new {}
@@ -173,7 +171,6 @@ verilog-a/ch04_expressions/idtmod.va codes: old {}, new E0514 (E0514: `idtmod`)
 verilog-a/ch04_expressions/laplace_dynamic_coefficient_sampled.va codes: old {}, new E0512 (E0512: a user task enable is not lowered by Sema yet)
 verilog-a/ch04_expressions/laplace_zd_dc_gain.va codes: old {}, new E0505 (E0505: `laplace_zd()`)
 verilog-a/ch04_expressions/last_crossing_directions.va codes: old {}, new E0514 (E0514: `last_crossing`)
-verilog-a/ch04_expressions/limexp_not_a_constant_expression_rejected.va codes: old E0363, new {}
 verilog-a/ch04_expressions/noise_generator_without_branch_rejected.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-a/ch04_expressions/noise_source_inside_array_pattern_argument.va codes: old {}, new E0512 (E0512: `pattern` is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_parameter_part_select.va codes: old {}, new E0512 (E0512: `slice` is not lowered by Sema yet)
@@ -229,7 +226,6 @@ verilog-a/ch05_analog_behavior/double_throw_switch_topology.va contribution 2 re
 verilog-a/ch05_analog_behavior/event_control_undeclared_event_rejected.va codes: old E0705, new E0512 (E0512: this event expression is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/generic_access.va codes: old {}, new E0408,E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/genvar_loop_condition_reads_a_probe_rejected.va codes: old E0418, new E0426,E0512 (E0512: an assignment to a name with no slot)
-verilog-a/ch05_analog_behavior/held_sformat_string_survives_rejected_step.va tables row 5: old `held s`, new `limit_slots 0`
 verilog-a/ch05_analog_behavior/held_through_output_actual_seed_and_scan.va tables row 4: old `held b`, new `held n`
 verilog-a/ch05_analog_behavior/hierarchical_contribution_closes_a_source_triangle_rejected.va codes: old E0477, new {}
 verilog-a/ch05_analog_behavior/hierarchical_contribution_voltage_loop_rejected.va codes: old E0477, new {}
@@ -273,7 +269,6 @@ verilog-a/ch05_analog_behavior/return_expression_of_the_function_type.va codes: 
 verilog-a/ch05_analog_behavior/return_outside_analog_function_rejected.va codes: old E0403, new E0512 (E0512: `return` outside a function)
 verilog-a/ch05_analog_behavior/return_string_from_integer_function_rejected.va codes: old E0354, new E0512 (E0512: `return` with a value is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/sequential_ifs_10000.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
-verilog-a/ch05_analog_behavior/string_written_in_event_body_is_held.va tables row 4: old `held t`, new `limit_slots 0`
 verilog-a/ch05_analog_behavior/timer_body_array_controls.va tables row 6: old `held rate[0]`, new `held rate`
 verilog-a/ch05_analog_behavior/timer_body_array_function_controls.va codes: old {}, new E0512 (E0512: `a whole array read as a value` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/timer_body_constant_effect_controls.va tables row 11: old `held visits`, new `held stamp`
@@ -368,25 +363,16 @@ verilog-a/ch06_hierarchy/vector_port_scalar_net_width_mismatch_rejected.va codes
 verilog-a/ch06_hierarchy/vector_ports.va codes: old E0350, new {}
 verilog-a/ch08_scheduling/continuous_variable_interpolation_host.va tables row 3: old `held x`, new `held held`
 verilog-a/ch09_system_tasks/aliasparam_mfactor.va tables row 2: old `param m real = 1e0`, new `contrib flow direct br0 p n`
-verilog-a/ch09_system_tasks/analog_decimal_is_auto_sized.va tables row 5: old `held t`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/analog_radix_of_integer_expression_is_32_bits.va tables row 4: old `held t`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/append_writes_at_end_of_file.va tables row 6: old `held value`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/append_writes_at_end_of_file.va tables row 8: old `display $fopen`, new `display $fwrite`
 verilog-a/ch09_system_tasks/arandom_negative_seed.va tables row 4: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/arandom_parameter_seed.va tables row 5: old `held $rng.0.seed`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/arandom_type_string_outside_paramset_rejected.va codes: old E0816, new {}
 verilog-a/ch09_system_tasks/clog2_nested_contexts.va codes: old {}, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
 verilog-a/ch09_system_tasks/clog2_unsigned_width.va codes: old {}, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
 verilog-a/ch09_system_tasks/conversion_constant_expressions.va tables row 0: old `param cp integer = 1`, new `param cp integer = ?`
 verilog-a/ch09_system_tasks/display_argument_pairing_rejected.va codes: old E0810, new {}
-verilog-a/ch09_system_tasks/display_argument_runs.va tables row 4: old `held t`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/display_c_format_flags.va tables row 4: old `held t`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/display_formats.va tables row 4: old `held text`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/display_library_binding.va tables row 4: old `held text`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/display_radix_of_integer_is_32_bits.va tables row 4: old `held t`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/distribution_arity_rejected.va codes: old E0816, new E0506 (E0506: `$rdist_uniform` takes 3 to 4, given 2)
 verilog-a/ch09_system_tasks/fatal_finish_number_3_rejected.va codes: old E0824, new {}
 verilog-a/ch09_system_tasks/fclose_two_descriptors_rejected.va codes: old E0887, new {}
-verilog-a/ch09_system_tasks/fd_channels_past_30.va tables row 16: old `held name`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/fd_channels_past_30.va tables row 18: old `display $fopen`, new `display $fwrite`
 verilog-a/ch09_system_tasks/fdebug.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/fdisplay.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/feof.va tables row 4: old `held text`, new `limit_slots 0`
@@ -396,29 +382,29 @@ verilog-a/ch09_system_tasks/ferror.va tables row 4: old `held text`, new `limit_
 verilog-a/ch09_system_tasks/fflush_two_descriptors_rejected.va codes: old E0887, new {}
 verilog-a/ch09_system_tasks/fflush.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/fgets_into_real_rejected.va codes: old E0813, new {}
-verilog-a/ch09_system_tasks/fgets_line_over_4096.va tables row 5: old `held line`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/fgets_line_over_4096.va tables row 7: old `display $fopen`, new `display $fwrite`
 verilog-a/ch09_system_tasks/fgets_on_write_only_fd_fails.va tables row 4: old `held s`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/fgets.va tables row 4: old `held text`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/file_io_categories_in_analog_context.va tables row 4: old `held a`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/file_io_categories_in_analog_context.va tables row 8: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/file_open_close.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/file_output_real_descriptor_rejected.va codes: old E0888, new {}
 verilog-a/ch09_system_tasks/file_output.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/file_position_status.va tables row 10: old `held message`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/file_read_scan.va tables row 4: old `held value`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/file_read_scan.va tables row 5: old `held line`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/finish_two_arguments_rejected.va codes: old E0887, new {}
 verilog-a/ch09_system_tasks/fmonitor.va tables row 5: old `display $fopen`, new `display $strobe`
-verilog-a/ch09_system_tasks/fopen_multichannel_descriptor.va tables row 4: old `held line`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/fopen_multichannel_descriptor.va tables row 6: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/fopen_type_not_in_table_9_24_rejected.va codes: old E0889, new {}
 verilog-a/ch09_system_tasks/format_conversion_type_mismatch_rejected.va codes: old E0819, new {}
 verilog-a/ch09_system_tasks/format_field_past_its_limit_rejected.va codes: old E0828, new {}
 verilog-a/ch09_system_tasks/fscanf_destination_preservation.va tables row 5: old `display $fopen`, new `display $fwrite`
-verilog-a/ch09_system_tasks/fscanf_directive_spans_lines.va tables row 4: old `held a`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/fscanf_failed_match_leaves_input.va tables row 4: old `held got`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/fscanf_directive_spans_lines.va tables row 9: old `display $fopen`, new `display $fwrite`
+verilog-a/ch09_system_tasks/fscanf_failed_match_leaves_input.va tables row 4: old `held got`, new `held line`
 verilog-a/ch09_system_tasks/fscanf_real_descriptor_rejected.va codes: old E0888, new {}
-verilog-a/ch09_system_tasks/fscanf_real_destination.va tables row 4: old `held count`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/fscanf_successive_scans_on_one_line.va tables row 4: old `held a`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/fscanf.va tables row 4: old `held value`, new `held good_fd`
-verilog-a/ch09_system_tasks/fscanf_window_over_4096.va tables row 5: old `held v`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/fscanf_real_destination.va tables row 8: old `display $fopen`, new `display $fwrite`
+verilog-a/ch09_system_tasks/fscanf_successive_scans_on_one_line.va tables row 7: old `held d`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/fscanf.va tables row 9: old `display $fopen`, new `display $fwrite`
+verilog-a/ch09_system_tasks/fscanf_window_over_4096.va tables row 7: old `display $fopen`, new `display $fwrite`
 verilog-a/ch09_system_tasks/fseek.va tables row 5: old `display $fopen`, new `display $fwrite`
 verilog-a/ch09_system_tasks/fseek_without_operation_rejected.va codes: old E0887, new E0506 (E0506: `$fseek` takes 3 to 3, given 2)
 verilog-a/ch09_system_tasks/fstrobe.va tables row 5: old `display $fopen`, new `display $strobe`
@@ -431,20 +417,16 @@ verilog-a/ch09_system_tasks/geometry_paramset.va tables row 1: old `param leaf.g
 verilog-a/ch09_system_tasks/geometry_state_read_rejected.va codes: old E0363, new {}
 verilog-a/ch09_system_tasks/geometry_top_alias_host.va tables row 0: old `param placement_x real = 0e0`, new `charge_sites 0`
 verilog-a/ch09_system_tasks/hash_flag_without_alternative_form_rejected.va codes: old E0825, new {}
-verilog-a/ch09_system_tasks/input_position_restore_failure.va tables row 5: old `held sample`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/integer_default_fields.va tables row 4: old `held text`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/l_format_library_cell.va tables row 4: old `held lower`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/input_position_restore_failure.va tables row 7: old `display $fopen`, new `(none)`
 verilog-a/ch09_system_tasks/limit_omitted_algorithm_rejected.va codes: old E0894, new {}
 verilog-a/ch09_system_tasks/limit_user_function_output_arg_rejected.va codes: old E0814, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/long_record_is_not_truncated.va tables row 4: old `held line`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/mcd_channels_exhausted_at_bit_31.va tables row 10: old `held name`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/m_format_hierarchical_name.va tables row 4: old `held t`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/mcd_channels_exhausted_at_bit_31.va tables row 11: old `held why`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/monitor_ignores_abstime.va tables row 6: old `display $fopen`, new `display $fmonitor`
 verilog-a/ch09_system_tasks/monitor_reports_every_change.va tables row 6: old `display $fopen`, new `display $fmonitor`
 verilog-a/ch09_system_tasks/monitor_suppresses_an_unchanged_step.va tables row 6: old `display $fopen`, new `display $fmonitor`
 verilog-a/ch09_system_tasks/node_alias_outside_initial_rejected.va codes: old E0812, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-a/ch09_system_tasks/null_argument_consumed_by_d_rejected.va codes: old E0819, new {}
-verilog-a/ch09_system_tasks/null_argument_consumed_by_s.va tables row 4: old `held t`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/numeric_string_arithmetic_width_rejected.va codes: old E0819, new {}
 verilog-a/ch09_system_tasks/numeric_string_local_width.va tables row 2: old `param wide integer local = 4702394921427289928`, new `param wide unspecified local = 4702394921427289928`
 verilog-a/ch09_system_tasks/numeric_string_mixed_width_rejected.va codes: old E0819, new {}
@@ -454,20 +436,7 @@ verilog-a/ch09_system_tasks/numeric_string.va codes: old {}, new E0130,E0512 (E0
 verilog-a/ch09_system_tasks/numeric_string_width_rejected.va codes: old E0819, new {}
 verilog-a/ch09_system_tasks/numeric_string_width.va tables row 2: old `param select integer = 1`, new `param select unspecified = 1`
 verilog-a/ch09_system_tasks/param_given_variable_rejected.va codes: old E0822, new {}
-verilog-a/ch09_system_tasks/percent_escape_prints_one_percent.va tables row 4: old `held a`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/percent_escape_with_width_rejected.va codes: old E0826, new {}
-verilog-a/ch09_system_tasks/rdist_domain_rejected.va codes: old E0816, new {}
-verilog-a/ch09_system_tasks/rdist_real_seed_rejected.va codes: old E0816, new {}
-verilog-a/ch09_system_tasks/rdist_type_string_outside_paramset_rejected.va codes: old E0816, new {}
-verilog-a/ch09_system_tasks/rdist_uniform_start_end_rejected.va codes: old E0816, new {}
-verilog-a/ch09_system_tasks/real_conversion_rounds_half_to_even.va tables row 4: old `held two_five`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/real_engineering_notation.va tables row 4: old `held milli`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/real_flags_sign_before_zero_fill.va tables row 4: old `held plus_zero`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/real_format_fields.va tables row 4: old `held text`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/real_g_conversion_is_significant_digits.va tables row 4: old `held a`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/real_hash_flag_e_always_prints_the_point.va tables row 4: old `held plain`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/real_hash_flag_f_always_prints_the_point.va tables row 4: old `held plain`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/real_hash_flag_g_keeps_trailing_zeros.va tables row 4: old `held plain`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/real_hash_flag_string_operand_rejected.va codes: old E0819, new {}
 verilog-a/ch09_system_tasks/reject_9_16_simprobe_unresolved_without_fallback.va codes: old E0817, new {}
 verilog-a/ch09_system_tasks/reject_9_5_3_swrite_into_real.va codes: old E0813, new {}
@@ -479,39 +448,27 @@ verilog-a/ch09_system_tasks/reject_clog2_wide_widening.va codes: old E0893, new 
 verilog-a/ch09_system_tasks/rejected_iterations_leave_no_file_side_effects.va tables row 5: old `held s`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/reserved_system_function_name_rejected.va codes: old E1014, new {}
 verilog-a/ch09_system_tasks/rewind.va tables row 4: old `held text`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/rng_count_range_rejected.va codes: old E0816, new {}
-verilog-a/ch09_system_tasks/rng_fractional_count_rejected.va codes: old E0816, new {}
 verilog-a/ch09_system_tasks/rng_skipped_arity_rejected.va codes: old E0816, new {}
 verilog-a/ch09_system_tasks/rng_skipped_seed_rejected.va codes: old E0816, new {}
 verilog-a/ch09_system_tasks/rng_skipped_type_string_rejected.va codes: old E0816, new {}
-verilog-a/ch09_system_tasks/sformat_32_conversions.va tables row 4: old `held s`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/sformat_33_conversions.va tables row 6: old `held s`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/sformat_field_width_over_4096.va tables row 4: old `held a`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/sformat_runtime_width_past_its_row_rejected.va tables row 4: old `held s`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/sformat_runtime_width_within_its_row.va tables row 4: old `held s`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/sformat_variable_format_mismatch_continues.va tables row 4: old `held t`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/sformat_33_conversions.va tables row 12: old `display $fopen`, new `display $fwrite`
 verilog-a/ch09_system_tasks/sformat.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/simparam_spice_option_not_known_rejected.va codes: old E0811, new {}
 verilog-a/ch09_system_tasks/simparam_str_unknown_name_rejected.va codes: old E0811, new {}
 verilog-a/ch09_system_tasks/simparam_unknown_no_fallback_rejected.va codes: old E0811, new {}
 verilog-a/ch09_system_tasks/simprobe.va contribution 0 resist: old -6.498062873668107e-1, new -3.1498062873668107e0
-verilog-a/ch09_system_tasks/sscanf_conversion_rules.va tables row 4: old `held second`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/sscanf_engineering_and_path_codes.va tables row 4: old `held v`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/sscanf_conversion_rules.va tables row 6: old `held junk`, new `held fval`
+verilog-a/ch09_system_tasks/sscanf_engineering_and_path_codes.va tables row 9: old `held path`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/sscanf_from_real_rejected.va codes: old E0813, new {}
-verilog-a/ch09_system_tasks/sscanf_nul_is_whitespace.va tables row 7: old `held k`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/sscanf_reads_a_string_variable.va tables row 4: old `held k`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/sscanf_nul_is_whitespace.va tables row 13: old `display $fopen`, new `display $fwrite`
 verilog-a/ch09_system_tasks/sscanf_uppercase_conversion_rejected.va codes: old E0813, new {}
-verilog-a/ch09_system_tasks/sscanf.va tables row 4: old `held value`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/string_concat_past_4096_bytes.va tables row 4: old `held s`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/string_formatting.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/strobe_flow_read_inside_array_pattern_argument.va codes: old {}, new E0512 (E0512: a user task enable is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/swrite_s_with_argument.va tables row 4: old `held t`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/swrite_s_without_argument_rejected.va codes: old E0810, new {}
 verilog-a/ch09_system_tasks/swrite.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/table_snapshot_function.va codes: old {}, new E0512,E0815 (E0512: `a whole array read as a value` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/two_instances_hold_distinct_channels.va tables row 9: old `held a.got`, new `held b.fd`
-verilog-a/ch09_system_tasks/value_plusargs_without_variable_rejected.va codes: old E0887, new E0506 (E0506: `$value$plusargs` takes 2 to 2, given 1)
-verilog-a/ch09_system_tasks/write_mode_path_65_opens.va tables row 10: old `held name`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/two_instances_hold_distinct_channels.va tables row 13: old `display $fopen`, new `display $fwrite`
+verilog-a/ch09_system_tasks/value_plusargs_without_variable_rejected.va codes: old E0887, new {}
+verilog-a/ch09_system_tasks/write_mode_path_65_opens.va tables row 11: old `held why`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/write_mode_reopen_appends_across_analyses.va tables row 5: old `held s`, new `limit_slots 0`
 verilog-a/ch10_directives/compact_modeling_macro_implies_its_extensions.va tables row 7: old `held fold`, new `limit_slots 0`
 verilog-a/ch10_directives/default_nettype_crosses_a_file_boundary.va codes: old E0367, new {}
@@ -632,7 +589,6 @@ verilog-ams/ch07_mixed_signal/discrete_bus_part_select_32_rejected.va codes: old
 verilog-ams/ch07_mixed_signal/discrete_bus_part_select_above_31_analog_assigned.va codes: old E0316, new E0512 (E0512: `slice` is not lowered by Sema yet)
 verilog-ams/ch07_mixed_signal/discrete_bus_part_select_above_31.va codes: old {}, new E0512 (E0512: `slice` is not lowered by Sema yet)
 verilog-ams/ch07_mixed_signal/discrete_real_from_analog.va contribution 0 resist: old 1.25e0, new 0e0
-verilog-ams/ch07_mixed_signal/display_binary_operand_analog.va tables row 3: old `held a`, new `limit_slots 0`
 verilog-ams/ch07_mixed_signal/driver_state_histogram.va tables row 10: old `held net__m04_ds_c2e__ddiscrete.n`, new `limit_slots 0`
 verilog-ams/ch07_mixed_signal/driver_update_without_resolved_change.va tables row 6: old `held net__m04_du_c2e__ddiscrete.ones`, new `limit_slots 0`
 verilog-ams/ch07_mixed_signal/event_bounds_absdelta_negative_delta_rejected.va codes: old E0517, new {}
@@ -717,9 +673,9 @@ verilog-ams/ch09_system_tasks/clog2_inferred_parameter_width.va codes: old E0316
 verilog-ams/ch09_system_tasks/clog2_reg_analog_conversion.va codes: old E0316, new {}
 verilog-ams/ch09_system_tasks/error_in_analog_initial_stops_after_initialization.va tables row 8: old `display $fatal`, new `display $strobe`
 verilog-ams/ch09_system_tasks/fdebug_writes_in_rejected_iterations.va tables row 5: old `held s`, new `limit_slots 0`
-verilog-ams/ch09_system_tasks/file_descriptor_shared_across_contexts.va tables row 5: old `held text`, new `limit_slots 0`
+verilog-ams/ch09_system_tasks/file_descriptor_shared_across_contexts.va tables row 8: old `display $fclose`, new `display $strobe`
 verilog-ams/ch09_system_tasks/ieee_1364_system_functions_in_both_contexts.va tables row 2: old `contrib flow direct br0 p n`, new `param from_digital integer = 0`
-verilog-ams/ch09_system_tasks/input_position_restore_failure.va tables row 5: old `held sample`, new `limit_slots 0`
+verilog-ams/ch09_system_tasks/input_position_restore_failure.va tables row 7: old `display $fopen`, new `(none)`
 verilog-ams/ch09_system_tasks/kernel_control_in_digital_context_rejected.va codes: old E0484,E0821, new {}
 verilog-ams/ch09_system_tasks/node_alias_bit_select_rejected.va codes: old E0812, new E0512 (E0512: a bit or part select of a scalar is not lowered by Sema yet)
 verilog-ams/ch09_system_tasks/node_alias_calls.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
@@ -734,7 +690,7 @@ verilog-ams/ch09_system_tasks/node_alias_whole_vector_reference.va codes: old {}
 verilog-ams/ch09_system_tasks/port_alias_resolves.va codes: old {}, new E0315,E0508 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch09_system_tasks/port_alias_to_a_net_returns_zero.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch09_system_tasks/reject_clog2_reg_width.va codes: old E0222, new {}
-verilog-ams/ch09_system_tasks/r_format_in_the_digital_context.va tables row 4: old `held text`, new `limit_slots 0`
+verilog-ams/ch09_system_tasks/r_format_in_the_digital_context.va tables row 7: old `display $fopen`, new `display $strobe`
 verilog-ams/ch09_system_tasks/r_format_in_the_digital_context_without_argument_rejected.va codes: old E0810, new {}
 verilog-ams/ch09_system_tasks/rng_constant_distribution_stream.va tables row 3: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-ams/ch09_system_tasks/severity_task_digital_context_rejected.va codes: old E0821, new {}

@@ -197,6 +197,9 @@ fn hostCall(ctx: *anyopaque, callee: u32, args: []const Air.interp.Value) Air.in
         .@"$mfactor" => return .{ .real = 1 },
         .@"$temperature" => return .{ .real = 300.15 },
         .@"op$static" => return .{ .int = 0 },
+        // A reader's destinations: the old interpreter refuses the reader.
+        .@"scan$item" => return .{ .real = 0 },
+        .@"scan$str" => return .{ .str = "" },
         // §3.3 Table 3-3 over strings, as the old `$str$cat`/`$str$repeat`
         // and string comparison compute them.
         .@"str$cmp" => return if (args[0] != .str or args[1] != .str) error.Unsupported else .{ .int = switch (std.mem.order(u8, args[0].str, args[1].str)) {
@@ -220,7 +223,11 @@ fn hostCall(ctx: *anyopaque, callee: u32, args: []const Air.interp.Value) Air.in
     }
     const info = vams.SysFn.get(tag);
     return switch (info.family) {
-        .display, .simctl, .file_out, .string => if (info.ty == .str) .{ .str = "" } else .{ .real = 0 },
+        .display, .simctl, .file_out, .string => switch (info.ty) {
+            .str => .{ .str = "" },
+            .int => .{ .int = 0 },
+            .real, .none => .{ .real = 0 },
+        },
         .analog_op, .event, .kernel => if (info.ty == .int) .{ .int = 0 } else .{ .real = 0 },
         .math, .query, .convert, .file_func, .random => error.Unsupported,
     };

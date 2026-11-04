@@ -11,6 +11,7 @@
 //! - `pub fn compare(s: *Sema, b: *Block, tag: Inst.Tag, x: Value, y: Value) Allocator.Error!Value`
 //! - `pub fn concat(s: *Sema, b: *Block, i: Inst.Index, src: Inst.Ref) Allocator.Error!Value`
 //! - `pub fn write(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!void`
+//! - `pub fn read(s: *Sema, b: *Block, tag: SysFn.Tag, first: usize, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -123,7 +124,56 @@ pub fn write(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
     try @import("control.zig").assignTo(s, b, args[0], .{ .ref = v, .ty = .string }, src);
 }
 
+/// §9.5.4 `$sscanf`/`$fscanf`/`$fgets` and §9.12 `$value$plusargs`: an
+/// integer `call` of the operands it reads (its count or status), then
+/// each destination (argument `first`, and every one after it for a scan)
+/// assigned `scan$item(call, k)` (a number, coerced) or `scan$str(call, k)`.
+pub fn read(s: *Sema, b: *Block, tag: SysFn.Tag, first: usize, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
+    const many = first >= 2;
+    var ops: std.ArrayList(Ref) = .empty;
+    for (args, 0..) |a, k| {
+        if (k == first or (many and k > first)) continue;
+        try ops.append(s.arena, if (a == .none) .fromIntern(.zero_real) else (try expr.lower(s, b, a)).ref);
+    }
+    const r = try expr.call(s, b, @backingInt(tag), .integer, ops.items);
+    for (args, 0..) |a, k| {
+        if (!(k == first or (many and k > first)) or a == .none) continue;
+        const ty = try destType(s, b, a);
+        const at: Ref = .fromIntern(try decl.intern(s, .{ .int = @intCast(k - first) }));
+        const v: Value = if (ty == .string)
+            .{ .ref = try expr.call(s, b, @backingInt(SysFn.Tag.@"scan$str"), .string, &.{ r, at }), .ty = .string }
+        else
+            .{ .ref = try expr.call(s, b, @backingInt(SysFn.Tag.@"scan$item"), .real, &.{ r, at }), .ty = .real };
+        try @import("control.zig").assignTo(s, b, a, v, src);
+    }
+    return .{ .ref = r, .ty = .integer };
+}
+
 // ---- private ----
+
+/// The type of the variable (or array element) `r` names; real when it
+/// names none (the assignment reports it).
+fn destType(s: *Sema, b: *Block, r: Inst.Ref) Allocator.Error!Sema.Ty {
+    _ = s;
+    const vir = b.unit.vir;
+    var at = r;
+    for (0..64) |_| {
+        const i = at.toIndex() orelse return .real;
+        switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+            .elem => at = decl.payloadOf(vir, Inst.Bin, i).lhs,
+            .decl_ref => {
+                const bind = b.unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl)) orelse return .real;
+                return switch (bind) {
+                    .slot => |x| x.ty,
+                    .array => |x| x.ty,
+                    else => .real, // else: no variable
+                };
+            },
+            else => return .real, // else: no variable
+        }
+    }
+    return .real;
+}
 
 fn str(s: *Sema, bytes: []const u8) Allocator.Error!Value {
     return .{ .ref = .fromIntern(try decl.intern(s, .{ .str = bytes })), .ty = .string };

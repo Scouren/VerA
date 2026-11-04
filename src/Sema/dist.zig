@@ -10,11 +10,13 @@
 //! one trial VerA compiles, anything else is E0816, as are a parameter
 //! §9.13.2 requires positive that is not, a stage count the reference
 //! algorithm cannot take, a start not below its end, and an integer draw no
-//! signed 32-bit integer holds.
+//! signed 32-bit integer holds. In the analog context (`lower`) the same
+//! rules judge a call's operands where they fold.
 //! Cites: VAMS-2023 §4.2.1.1, §6.4.1, §9.13.1, §9.13.2, Table 9-10.
 //!
 //! Contents:
 //! - `pub fn fold(s: *Sema, env: *eval.Env, file: Zcu.File.Index, value: Vir.Body) Allocator.Error!?InternPool.Index`
+//! - `pub fn lower(s: *Sema, b: *Block, tag: vams.SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Sema.Value`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -22,11 +24,14 @@ const Allocator = std.mem.Allocator;
 const vams = @import("vams");
 const InternPool = @import("intern_pool");
 const rng = @import("kernels").rng_kernels;
+const Air = @import("air");
 const Sema = @import("../Sema.zig");
+const expr = @import("expr.zig");
 const Zcu = @import("../Zcu.zig");
 const eval = @import("eval.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
+const Block = Sema.Block;
 
 /// One row of Table 9-10 past `$random` (whose Syntax 9-8 production has
 /// no `type_string`): the kernel, the parameters after the seed, and the
@@ -133,7 +138,79 @@ pub fn fold(s: *Sema, env: *eval.Env, file: Zcu.File.Index, value: Vir.Body) All
     return try env.intern(.{ .int = @intFromFloat(@round(v)) });
 }
 
+/// A Table 9-10 call `tag` in the analog context (the old
+/// `analog/random.zig`'s rules): a `call` of the tag over `args`, after
+/// §9.13.1/§9.13.2's static rules, each E0816: no `type_string` outside a
+/// paramset, the arity the row allows, an integer seed; and, where the
+/// call runs unconditionally (§4.2.3 suppresses errors in a skipped
+/// operand), the parameter rules over operands that fold.
+pub fn lower(s: *Sema, b: *Block, tag: vams.SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Sema.Value {
+    const vir = b.unit.vir;
+    const file = b.unit.file;
+    const name = @tagName(tag);
+    // §9.13.1's `$random` takes `$arandom`'s row: no parameters, an optional seed.
+    const key = if (tag == .@"$random") "$arandom" else name;
+    const d = for (&dists) |*d| {
+        if (std.mem.eql(u8, d.name, key)) break d;
+    } else unreachable; // every `.random` tag has a row
+    var given: std.ArrayList(Inst.Ref) = .empty;
+    for (args) |a| if (a != .none) try given.append(s.arena, a);
+    if (given.getLastOrNull()) |last| if (last.toIndex()) |li| if (vir.instructions.items(.tag)[@backingInt(li)] == .str) {
+        try s.fail(.E0816, file, last, "`{s}`'s `type_string` argument is only meaningful within a paramset (§6.4)", .{name});
+        return expr.poison;
+    };
+    const want: usize = @as(usize, d.nparam) + 1;
+    const min: usize = if (d.nparam == 0) 0 else want;
+    if (given.items.len < min or given.items.len > want) {
+        try s.fail(.E0816, file, src, "`{s}` takes {s}{d} argument{s}, got {d}", .{ name, if (min < want) "at most " else "", want, if (want == 1) "" else "s", given.items.len });
+        return expr.poison;
+    }
+    return lowerCall(s, b, tag, d, args);
+}
+
 // ---- private ----
+
+/// The `call` of `tag` over `args` (an empty slot a real zero), each
+/// operand judged by `d`'s rules as it is lowered.
+fn lowerCall(s: *Sema, b: *Block, tag: vams.SysFn.Tag, d: *const Dist, args: []const Inst.Ref) Allocator.Error!Sema.Value {
+    const file = b.unit.file;
+    const name = @tagName(tag);
+    const eager = b.conditional == 0 and b.function == null;
+    const refs = try s.arena.alloc(Air.Inst.Ref, args.len);
+    var p: [2]?f64 = .{ null, null };
+    var at: [2]Inst.Ref = .{ .none, .none };
+    var k: usize = 0; // the written operands so far
+    for (args, refs) |a, *r| {
+        if (a == .none) {
+            r.* = .fromIntern(.zero_real);
+            continue;
+        }
+        defer k += 1;
+        const v = try expr.lower(s, b, a);
+        r.* = v.ref;
+        if (k == 0) {
+            // §9.13.2 "the seed argument shall be an integer".
+            if (v.ty != .integer) {
+                try s.fail(.E0816, file, a, "the seed argument shall be an integer, and this one is {s}", .{@tagName(v.ty)});
+                return expr.poison;
+            }
+            continue;
+        }
+        const i = k - 1;
+        const c = expr.constOf(s, v.ref) orelse continue;
+        if (!eager or c == .str or i >= 2) continue;
+        p[i] = c.asReal();
+        at[i] = a;
+        if (d.positive & (@as(u8, 1) << @intCast(i)) != 0 and !(p[i].? > 0))
+            try s.fail(.E0816, file, a, "`{s}`'s parameter {d} shall be greater than zero, got {d}", .{ name, i + 1, p[i].? });
+        if (d.count and i == 0 and p[i].? > 0 and (!(p[i].? <= 2147483647.0) or p[i].? != @trunc(p[i].?)))
+            try s.fail(.E0816, file, a, "`{s}`'s fractional or out-of-range count is unsupported; the reference count domain is 1..2147483647", .{name});
+    }
+    if (d.ordered and !d.integer) if (p[0]) |lo| if (p[1]) |hi| if (!(lo < hi))
+        try s.fail(.E0816, file, at[0], "the start value shall be smaller than the end value, got {d} and {d}", .{ lo, hi });
+    const ty: Sema.Ty = if (d.integer) .integer else .real;
+    return .{ .ref = try expr.call(s, b, @backingInt(tag), ty, refs), .ty = ty };
+}
 
 /// `[ sign ] decimal_number`: an integer literal under any `+`/`-` signs.
 fn literalSeed(vir: *const Vir, r: Inst.Ref) ?i64 {

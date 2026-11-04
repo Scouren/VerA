@@ -56,6 +56,7 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
         const row = try addRow(s, unit, vir.string(p.name), p, ty, elems[at]);
         try unit.binds.put(s.arena, decl.canonical(vir, i), .{ .param = row });
         try checkRange(s, unit, i, p, elems[at]);
+        if (try stateRead(s, unit, p.value)) |what| try s.fail(.E0363, unit.file, i.toRef(), "`{s}` reads `{s}`", .{ vir.string(p.name), what });
         if (unit.prefix.len == 0) try derived.append(s.arena, .{ row, p.value });
     };
     assert(s.param_args.items.len == s.device.params.len);
@@ -143,6 +144,33 @@ fn boundIn(env: *eval.Env, vir: *const Vir, b: Vir.Body) Allocator.Error!?f64 {
     if (c == .str) return null;
     const x = c.asReal();
     return if (std.math.isNan(x)) null else x;
+}
+
+/// §3.4 a default is a constant expression over "constant numbers and
+/// previously defined parameters": the first read in `b` of the operating
+/// point or the simulation state (an access, an analog operator, a noise
+/// source, an event, `$abstime` and the like, a module variable), or null.
+fn stateRead(s: *Sema, unit: *Unit, b: Vir.Body) Allocator.Error!?[]const u8 {
+    const vir = unit.vir;
+    for (vir.body(b)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .call => if (try @import("contrib.zig").accessCall(s, unit, i.toRef())) |a| return a.name,
+        .call_sys => {
+            const name = vir.string(decl.payloadOf(vir, Inst.SysCall, i).name);
+            const t = vams.SysFn.Tag.fromName(name) orelse continue;
+            switch (vams.SysFn.get(t).family) {
+                .analog_op, .event => return name,
+                else => {}, // else: by name below
+            }
+            for ([_][]const u8{ "$abstime", "$realtime", "$temperature", "$vt", "$random", "$arandom", "analysis" }) |n| if (std.mem.eql(u8, n, name)) return name;
+            if (std.mem.startsWith(u8, name, "$dist_") or std.mem.startsWith(u8, name, "$rdist_")) return name;
+        },
+        .decl_ref => {
+            const d = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl);
+            if (vir.instructions.items(.tag)[@backingInt(d)] == .variable) return vir.string(decl.nameOf(vir, d));
+        },
+        else => {}, // else: an operator over its operands, walked in the body
+    };
+    return null;
 }
 
 /// Appends one card row named `name` (under the unit's prefix) of value

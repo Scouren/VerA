@@ -223,6 +223,10 @@ pub const Tag = enum(u8) {
     @"str$cmp",
     @"str$cat",
     @"str$repeat",
+    // §9.5.4/§9.12 a reader's `k`th destination value, of the call (its
+    // first operand) that read it: a number, or a string.
+    @"scan$item",
+    @"scan$str",
 
     /// The tag `spelling` names, or null for a user system function.
     pub fn fromName(spelling: []const u8) ?Tag {
@@ -498,6 +502,8 @@ pub const table = std.EnumArray(Tag, Info).init(.{
     .@"str$cmp" = .{ .ty = .int, .args = .exactly(2), .family = .string },
     .@"str$cat" = .{ .ty = .str, .args = .{ .min = 2 }, .family = .string },
     .@"str$repeat" = .{ .ty = .str, .args = .exactly(2), .family = .string },
+    .@"scan$item" = .{ .ty = .real, .args = .exactly(2), .family = .string },
+    .@"scan$str" = .{ .ty = .str, .args = .exactly(2), .family = .string },
 });
 
 const display: Info = .{ .ty = .none, .family = .display };

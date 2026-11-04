@@ -18,6 +18,7 @@ const contract = @import("contract");
 const sk = @import("std_kernels");
 const old = @import("old_text");
 const ok = @import("kernels");
+const math = @import("math.zig");
 
 const cmp = g.cmp;
 const R = g.AnyReal;
@@ -90,13 +91,29 @@ fn mathText(rep: *g.Report) void {
     cmp(rep, "math.zShl", old.zShl, sk.math.zShl, .{}, .{ I64, g.Int(i64, -70, 70) });
     cmp(rep, "math.zShr", old.zShr, sk.math.zShr, .{}, .{ I64, g.Int(i64, -70, 70) });
     cmp(rep, "math.zClog2", old.zClog2, sk.math.zClog2, .{}, .{ I64, g.Int(i64, 0, 200) });
-    inline for (.{ "Exp", "Expm1", "Atan", "Log", "Sin", "Cos", "Tanh", "Sinh", "Cosh" }) |f|
+    inline for (.{ "Exp", "Expm1", "Atan", "Log", "Sin", "Cos", "Tanh" }) |f|
         cmp(rep, "math.zDev" ++ f, @field(old, "zDev" ++ f), @field(sk.math, "zDev" ++ f), .{}, .{R});
+    // The device's sinh and cosh are the functions'; the reference judges.
+    inline for (.{ .{ "Sinh", "sinh" }, .{ "Cosh", "cosh" } }) |fn_|
+        g.cmpJudged(rep, "math.zDev" ++ fn_[0], @field(old, "zDev" ++ fn_[0]), @field(sk.math, "zDev" ++ fn_[0]), .{}, .{R}, struct {
+            fn judge(args: struct { f64 }, a: f64, b: f64) ?g.Judgement {
+                return math.judgeAt(fn_[1], args[0], 0, a, b);
+            }
+        }.judge);
     cmp(rep, "math.zDevPow", old.zDevPow, sk.math.zDevPow, .{}, .{ R, g.Real(-30, 30) });
     inline for (.{ "zMin", "zMax", "zHypot", "zAtan2" }) |f|
         cmp(rep, "math." ++ f, @field(old, f), @field(sk.math, f), .{K}, .{ KSpec, KSpec });
-    inline for (.{ "zTan", "zLog10", "zSqrtD", "zLnD", "zLn1pD", "zLog10D", "zAsin", "zAcos", "zAsinh", "zAcosh", "zAtanh", "zFloor", "zCeil" }) |f|
+    inline for (.{ "zTan", "zSqrtD", "zLnD", "zLn1pD", "zAsin", "zAcos", "zAsinh", "zAcosh", "zAtanh", "zFloor", "zCeil" }) |f|
         cmp(rep, "math." ++ f, @field(old, f), @field(sk.math, f), .{K}, .{KSpec});
+    // log10's value is the function's and its lanes the analytic
+    // derivative's, the same on both sides: the reference judges the value.
+    inline for (.{ "zLog10", "zLog10D" }) |f|
+        g.cmpJudged(rep, "math." ++ f, @field(old, f), @field(sk.math, f), .{K}, .{KSpec}, struct {
+            fn judge(args: struct { K }, a: K, b: K) ?g.Judgement {
+                if (!std.mem.eql(u8, std.mem.asBytes(&a.v.d), std.mem.asBytes(&b.v.d))) return null;
+                return math.judgeAt("log10", args[0].v.v, 0, a.v.v, b.v.v);
+            }
+        }.judge);
     cmp(rep, "math.zFmod", old.zFmod, sk.math.zFmod, .{K}, .{ KSpec, KNonZero });
     inline for (.{ true, false }) |ve| {
         const pw = struct {

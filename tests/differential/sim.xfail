@@ -118,25 +118,16 @@ verilog/13_configuration/source_text_in_map_rejected.v a `//@` line the cli refu
 verilog/13_configuration/two_libraries_match_rejected.v a `//@` line the cli refuses
 verilog/13_configuration/two_unreferenced_configs_rejected.v old run failed (E0243: configurations `cfg_a` and `cfg_b` are both unreferenced, so neither is the design's (IEEE 1364-2005 §13.4.4)), new run completed
 verilog/13_configuration/undeclared_library_rejected.v old run failed (E1100: undeclared module in instantiation: no library of the search order (nosuch) holds cell `adder`), new run completed
-verilog/15_timing_checks/hold_negative_limit_rejected.v lowering: §15 a negative limit where a non-negative one is required
 verilog/15_timing_checks/notifier_net_rejected.v lowering: §15.5.2 a notifier that is no reg
-verilog/15_timing_checks/recovery_negative_limit_rejected.v lowering: §15 a negative limit where a non-negative one is required
 verilog/15_timing_checks/recrem_signal_limit_rejected.v lowering: a timing check limit Sema/eval.zig does not fold
-verilog/15_timing_checks/removal_negative_limit_rejected.v lowering: §15 a negative limit where a non-negative one is required
-verilog/15_timing_checks/setup_negative_limit_rejected.v lowering: §15 a negative limit where a non-negative one is required
 verilog/15_timing_checks/setuphold_signal_limit_rejected.v lowering: a timing check limit Sema/eval.zig does not fold
-verilog/17_system_tasks/c_flag_on_integer_rejected.v old run failed (E0827: `%-5d`: IEEE 1364-2005 §17.1.1.2 grants C's '-', '+' and ' ' flags to the real conversions only), new run completed
 verilog/17_system_tasks/dist_seed_constant_rejected.v lowering: an lvalue form
 verilog/17_system_tasks/fclose_two_descriptors_rejected.v lowering: $fclose without one argument
-verilog/17_system_tasks/fopen_type_rejected.v old run failed (E1100: §17.2.1: an $fopen type is one of Table 17-7's r, w, a, r+, w+, a+ (with b)), new run completed
 verilog/17_system_tasks/fread_multidim_rejected.v lowering: §17.2.4.4 $fread into a memory of more than one dimension
 verilog/17_system_tasks/fwrite_no_descriptor_rejected.v lowering: a file task with no descriptor
 verilog/17_system_tasks/math_arguments_rejected.v lowering: a math function with the wrong argument count
-verilog/17_system_tasks/percent_escape_with_width_rejected.v lowering: a flag, width or precision before the second `%` of `%%` (E0826)
 verilog/17_system_tasks/printtimescale_unknown_scope_rejected.v lowering: a hierarchical name whose first part names no scope
 verilog/17_system_tasks/random_seed_constant_rejected.v lowering: an lvalue form
-verilog/17_system_tasks/strength_vector_rejected.v old run failed (E1100: §17.1.1.5: %v takes a scalar net reference), new run completed
-verilog/17_system_tasks/value_plusargs_format_rejected.v old run failed (E1100: §17.10.2: a $value$plusargs format is one of %d %o %h %b %e %f %g %s, not `%t`), new run completed
 verilog/18_vcd/dumplimit_without_size_rejected.v lowering: $dumplimit without one argument
 verilog/18_vcd/dumpports_duplicate_scope_rejected.v old run failed (E1100: §18.3.1: each $dumpports scope shall be unique), new run completed
 verilog/18_vcd/dumpports_variable_scope_rejected.v old run failed (E1100: §18.3.1: a $dumpports scope is a module instance: only modules are allowed, not variables), new run completed

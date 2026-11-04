@@ -99,7 +99,7 @@ pub fn parseDelay(p: *Parse, max: u8) Error!Node.Index {
             try p.push(try expr.parseMinTypMax(p));
             if (n + 1 == max or p.eat(.comma) == null) break;
         }
-        _ = try p.expect(.r_paren);
+        if (p.eat(.r_paren) == null) return p.failSite(.invalid_delay_value, .delay_close, p.tok_i, 0);
     } else try p.push(try delayValue(p));
     try checkScaleFactors(p, hash, p.tok_i);
     return p.addNode(.delay, hash, .{ .extra_range = try p.spanFrom(top) });
@@ -146,7 +146,16 @@ pub fn parseGates(p: *Parse) Error!Node.Index {
         }
         _ = try p.expect(.l_paren);
         const terms_top = p.scratch.items.len;
-        while (true) {
+        // A switch or pull gate's terminals are fixed in number, its
+        // outputs read as net_lvalues (a name or `{`) one by one.
+        if (!shape.strength or pull) {
+            for (0..shape.max) |i| {
+                if (i != 0 and p.tokenTag(p.tok_i) == .r_paren) return p.failSite(.invalid_gate_terminals, .gate_count, inst, kw);
+                if (i != 0) _ = try p.expect(.comma);
+                if (i < shape.lvalues and !p.identLike(p.tok_i) and p.tokenTag(p.tok_i) != .l_brace) return p.fail(.expected_identifier);
+                try p.push(try expr.parseExpr(p));
+            }
+        } else while (true) {
             try p.push(try expr.parseExpr(p));
             if (p.eat(.comma) == null) break;
         }

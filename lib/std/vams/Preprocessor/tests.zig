@@ -420,6 +420,8 @@ test "E0101 points at the end of the file the open `ifdef is in" {
     const d = pp.output().diagnostics[0];
     try testing.expectEqualStrings("E0101", d.code);
     try testing.expectEqual(@as(u32, src.len), d.start);
+    // The open `ifdef is labelled where it stands.
+    try testing.expectEqual(@as(u32, 2), d.label.?.start);
 }
 
 test "§10.5 predefined macros survive undef; user macros survive resetall" {

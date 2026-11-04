@@ -34,6 +34,7 @@
 //! - `pub fn defaultsAt(ag: *AstGen, tok: Ast.TokenIndex) Allocator.Error!Vir.List(Inst.Default)`
 //! - `pub fn stampAt(ag: *const AstGen, tok: Ast.TokenIndex) Inst.Module.Stamp`
 //! - `pub fn report(ag: *AstGen, c: Diag.Code, tok: Ast.TokenIndex, comptime fmt: []const u8, args: anytype) Allocator.Error!void`
+//! - `pub fn build(ag: *AstGen, c: Diag.Code, tok: Ast.TokenIndex) Diag.Wip.Builder`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -86,6 +87,9 @@ pub const Options = struct {
     /// The preprocessor's positional directive events for this tree's text
     /// (`Preprocessor.Output.directives`), stamped on declarations.
     directives: events.Directives = .{},
+    /// The language the tree was parsed under (`Ast.ParseOptions.keywords`):
+    /// a 1364 one is the old discrete route, whose reports some rules keep.
+    language: Ast.KeywordSet = .vams_2023,
 };
 
 /// One name space (Zig's `Scope`): a module, generate block, function,
@@ -345,14 +349,20 @@ pub fn stampAt(ag: *const AstGen, tok: Ast.TokenIndex) Inst.Module.Stamp {
 /// Reports `c` at token `tok` (a byte range of the tree's source, which the
 /// caller maps to a file through `Preprocessor.Output.resolve`).
 pub fn report(ag: *AstGen, c: Diag.Code, tok: Ast.TokenIndex, comptime fmt: []const u8, args: anytype) Allocator.Error!void {
+    var b = ag.build(c, tok);
+    b.msg(fmt, args);
+    try b.emit();
+}
+
+/// `report`'s row at token `tok`, for a caller that adds notes or help
+/// before it emits.
+pub fn build(ag: *AstGen, c: Diag.Code, tok: Ast.TokenIndex) Diag.Wip.Builder {
     const start = ag.tree.tokenStart(tok);
     const loc: Diag.Loc = .{ .file = .root, .start = start, .end = start + @as(u32, @intCast(ag.tree.tokenSlice(tok).len)) };
     // The stage the old compiler reported the code from: E02xx and E1100 in
     // the parse, the elaborator's in lowering.
     const stage: Diag.Stage = if (@tagName(c)[2] == '2' or c == .E1100) .parse else .lower;
-    var b = ag.wip.build(stage, c, loc);
-    b.msg(fmt, args);
-    try b.emit();
+    return ag.wip.build(stage, c, loc);
 }
 
 // ---- private ----

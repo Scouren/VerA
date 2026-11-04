@@ -392,7 +392,7 @@ fn parseValueRange(p: *Parse) Error!Node.Index {
         return p.addNode(.value_range, kw, .{ .extra = try p.addExtra(Node.ValueRange{ .lo = lo, .hi = .none, .close = .none }) });
     }
     if (open != .l_paren and open != .l_bracket) {
-        if (p.tokenTag(kw) == .keyword_from) return p.fail(.expected_expr);
+        if (p.tokenTag(kw) == .keyword_from) return p.failSite(.expected_expr, .value_range_bare_from, p.tok_i, 0);
         const lo = try expr.parseExpr(p);
         return p.addNode(.value_range, kw, .{ .extra = try p.addExtra(Node.ValueRange{ .lo = lo, .hi = .none, .close = .none }) });
     }

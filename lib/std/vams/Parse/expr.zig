@@ -272,7 +272,12 @@ fn parseEventTerm(p: *Parse) Error!Node.Index {
         .keyword_initial_step, .keyword_final_step => return parseStepEvent(p),
         .keyword_posedge, .keyword_negedge, .keyword_driver_update => |t| {
             const kw = p.tok_i;
-            if (t == .keyword_driver_update and !p.connect_module) try p.warn(.driver_update_outside_connect_module);
+            // §9.22: outside a connect module, a discrete event reports the
+            // rule and an analog one finds no expression (§2.8.2).
+            if (t == .keyword_driver_update and !p.connect_module) {
+                if (!p.discrete) return p.fail(.expected_expr);
+                try p.warn(.driver_update_outside_connect_module);
+            }
             p.tok_i += 1;
             return p.addNode(.edge_event, kw, .{ .node = try parseExpr(p) });
         },

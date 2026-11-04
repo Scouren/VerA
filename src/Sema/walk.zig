@@ -24,6 +24,7 @@
 //! - `pub fn isOverridable(vir: *const Vir, p: Inst.Index) bool`
 //! - `pub fn payloadOf(vir: *const Vir, comptime T: type, i: Inst.Index) T`
 //! - `pub fn segment(arena: Allocator, name: []const u8) Allocator.Error![]const u8`
+//! - `pub fn rootShapes(s: *Sema, env: *const Env) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -238,6 +239,15 @@ pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const G
     return out;
 }
 
+/// Files the shape parameters `env` read into `Zcu.shape_params` (the
+/// root's: a testbench card names a root parameter).
+pub fn rootShapes(s: *Sema, env: *const Env) Allocator.Error!void {
+    for (env.shapes.keys()) |p| {
+        const name = env.vir.string(payloadOf(env.vir, Inst.Param, p).name);
+        try s.zcu.shape_params.put(s.gpa, try s.zcu.intern_pool.getString(s.gpa, name), {});
+    }
+}
+
 // ---- private ----
 
 /// Creates the instance `p` names, then walks its body for its children.
@@ -287,6 +297,7 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     w.kids.clearRetainingCapacity();
     w.prefixes.clearRetainingCapacity();
     try items(w, &env, index, picked.module.file, m.body, "");
+    if (p.parent == .none) try rootShapes(s, &env);
     var k = w.kids.items.len;
     while (k > 0) {
         k -= 1;
@@ -439,7 +450,7 @@ fn items(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, body:
             const g = payloadOf(vir, Inst.GenIf, i);
             // ponytail: a scheme that does not fold selects no arm; the
             // per-instance analysis reports the unfoldable condition.
-            const c = (try env.body(g.cond)) orelse continue;
+            const c = (try shapeBody(env, g.cond)) orelse continue;
             try items(w, env, index, file, if (c.isTrue()) g.then else g.@"else", prefix);
         },
         .gen_case => try genCase(w, env, index, file, payloadOf(vir, Inst.GenCase, i), prefix),
@@ -495,8 +506,10 @@ fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i:
     // §6.2.2 an array: one instance per element, lowest index first.
     const r = vir.body(in.range);
     const bin = payloadOf(vir, Inst.Bin, r[r.len - 1]);
+    env.shaping += 1;
     const msb = if (try env.ref(bin.lhs)) |c| c.asIntExact() else null;
     const lsb = if (try env.ref(bin.rhs)) |c| c.asIntExact() else null;
+    env.shaping -= 1;
     if (msb == null or lsb == null) return s.fail(.E0909, file, i.toRef(), "`{s}`", .{name});
     var k: i128 = @min(msb.?, lsb.?);
     while (k <= @max(msb.?, lsb.?)) : (k += 1) {
@@ -520,6 +533,8 @@ fn boundTarget(w: *Walk, parent: Instance.Index, name: InternPool.String, target
 fn genFor(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, g: Inst.GenFor, prefix: []const u8) Allocator.Error!void {
     assert(@backingInt(index) < w.zcu.instances.len);
     assert(env.depth == 0);
+    env.shaping += 1;
+    defer env.shaping -= 1;
     const vir = env.vir;
     const init = storeOf(vir, g.init) orelse return;
     const gv = declOf(vir, init.lhs) orelse return;
@@ -550,12 +565,17 @@ fn genCase(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, g: 
     assert(@backingInt(index) < w.zcu.instances.len);
     assert(env.depth == 0);
     const vir = env.vir;
-    const operand = (try env.body(g.operand)) orelse return;
+    const operand = (try shapeBody(env, g.operand)) orelse return;
     var default: ?Vir.Body = null;
     for (vir.list(Inst.Arm, g.arms)) |arm| {
         if (arm.flags.default) default = arm.body;
         for (vir.list(Inst.Ref, arm.values)) |l| {
-            const label = (try env.ref(l)) orelse continue;
+            env.shaping += 1;
+            const label = (try env.ref(l)) orelse {
+                env.shaping -= 1;
+                continue;
+            };
+            env.shaping -= 1;
             const eq = eval.Const.isTrue(@import("std_kernels").fold.binary(.eq, operand, label, null) orelse continue);
             if (eq) return items(w, env, index, file, arm.body, prefix);
         }
@@ -579,4 +599,11 @@ fn declOf(vir: *const Vir, r: Inst.Ref) ?Inst.Index {
     const i = r.toIndex() orelse return null;
     if (vir.instructions.items(.tag)[@backingInt(i)] != .decl_ref) return null;
     return vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl;
+}
+
+/// `env.body(b)` read as a §3.4 shape (`Env.shaping`).
+fn shapeBody(env: *Env, b: Vir.Body) Allocator.Error!?eval.Const {
+    env.shaping += 1;
+    defer env.shaping -= 1;
+    return env.body(b);
 }

@@ -303,7 +303,13 @@ fn eventWait(s: *Sema, b: *Block, x: Inst.EventWait, src: Inst.Ref) Allocator.Er
     const file = b.unit.file;
     if (b.in_event) return s.fail(.E0703, file, src, "", .{});
     if (b.conditional != 0) try s.fail(.E0707, file, src, "", .{});
-    const c = (try eventExpr(s, b, x.event, src)) orelse return;
+    // A later stage's diagnostic about the event (the testbench's W0750)
+    // points at the statement, as the old driver's did.
+    const outer = s.expr_src;
+    s.expr_src = src;
+    const event = eventExpr(s, b, x.event, src);
+    s.expr_src = outer;
+    const c = (try event) orelse return;
     var then_b = b.child();
     then_b.conditional += 1;
     then_b.runtime += 1;

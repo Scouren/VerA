@@ -26,7 +26,7 @@ test "a runner imports only contract, std_kernels, std_sim and the device" {
     for (sources, 0..) |src, k| for ([_]?bench.Digital{ null, if (k == 0) mixed else null }) |m| {
         const s = try bench.Spec.parse(arena, src, null);
         var aw: std.Io.Writer.Allocating = .init(arena);
-        try bench.writeRunner(&aw.writer, arena, "t", &s.bench, .{ .mixed = m });
+        try bench.writeRunner(&aw.writer, "t", &s.bench, .{ .title = "", .mixed = m });
         var it = std.mem.splitSequence(u8, aw.written(), "@import(\"");
         _ = it.next();
         var n: u32 = 0;
@@ -38,7 +38,7 @@ test "a runner imports only contract, std_kernels, std_sim and the device" {
             if (!ok) std.debug.print("a runner imports `{s}`\n", .{name});
             try std.testing.expect(ok);
         }
-        // `std`, `device` and `contract` at least, and `std_sim` when mixed.
-        try std.testing.expect(n >= 3 + @as(u32, @intFromBool(m != null)));
+        // `std`, `std_sim` and `device` at least.
+        try std.testing.expect(n >= 3);
     };
 }

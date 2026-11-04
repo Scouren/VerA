@@ -333,22 +333,22 @@ fn testbench(comp: *Compilation) !?Job {
         facts.mixed = try bench.digital(a, &low.program, names);
     }
     var runner: Io.Writer.Allocating = .init(a);
-    bench.writeRunner(&runner.writer, a, std.fs.path.stem(c.paths[0]), &spec.bench, facts) catch |e| switch (e) {
+    bench.writeRunner(&runner.writer, std.fs.path.stem(c.paths[0]), &spec.bench, facts) catch |e| switch (e) {
         error.TooManyPoints => return refuse(comp, 2, try a.print("error: {s}: `//!` directive: the sweeps expand to more than {d} points\n", .{ c.paths[0], bench.points_max })),
         error.OutOfMemory, error.WriteFailed => return error.OutOfMemory,
     };
     const slots = try a.alloc(link_mod.Server, c.thread_limit);
     var q: link_mod.Queue = .init(slots);
     const engine = try engineModules(a, c.contract.?);
-    // The mixed runner runs its digital half on `std_sim` (and the old
-    // `kernels` it imports), from the same tree.
+    // The runner is `std_sim.bench` (and the old `kernels` `std_sim`
+    // imports), from the same tree as the contract.
     const tree = std.fs.path.dirname(std.fs.path.dirname(c.contract.?) orelse ".") orelse ".";
     const sim_mods = engine ++ [_]link_mod.Module{
         .{ .name = "std_sim", .root = try std.fs.path.join(a, &.{ tree, "lib", "std", "sim.zig" }), .deps = &.{ "kernels", "contract" } },
         .{ .name = "kernels", .root = try std.fs.path.join(a, &.{ tree, "lib", "kernels", "root.zig" }), .deps = &.{"contract"} },
     };
     const top = comp.zcu.intern_pool.stringToSlice(comp.zcu.instances.items(.name)[0]);
-    const f: link_mod.File = .{ .kind = .exe, .work_dir = c.work_dir orelse ".zig-cache/vera-tb", .name = top, .optimize = c.optimize, .modules = if (an.mixed) &sim_mods else &engine, .zig_exe = c.zig_exe, .debug_info = c.debug_info, .out_path = c.out_path };
+    const f: link_mod.File = .{ .kind = .exe, .work_dir = c.work_dir orelse ".zig-cache/vera-tb", .name = top, .optimize = c.optimize, .modules = &sim_mods, .zig_exe = c.zig_exe, .debug_info = c.debug_info, .out_path = c.out_path };
     var built = link_mod.buildExe(f, comp.gpa, comp.io, &q, comp.device.?.text, runner.written()) catch |e| {
         try comp.outputs.err.print(a, "error: {s}: building the testbench failed: {t}\n", .{ c.paths[0], e });
         comp.outputs.status = 1;

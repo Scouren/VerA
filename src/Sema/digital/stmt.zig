@@ -470,7 +470,6 @@ fn statements(l: *Lower, b: Vir.Body) Error![]const Inst.Index {
     return out.items;
 }
 
-/// Every slot the statements of body `b` read (§9.7.5's `@*`).
 /// The slots the index expressions of lvalue `r` read (not its targets).
 fn indexReads(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
     const vir = l.virOf(l.frame);
@@ -492,6 +491,7 @@ fn indexReads(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
     }
 }
 
+/// Every slot the statements of body `b` read (§9.7.5's `@*`).
 fn bodyReads(l: *Lower, b: Vir.Body, out: *std.ArrayList(u32)) Error!void {
     const vir = l.virOf(l.frame);
     for (vir.body(b)) |i| switch (Lower.tag(vir, i)) {
@@ -517,6 +517,20 @@ fn bodyReads(l: *Lower, b: Vir.Body, out: *std.ArrayList(u32)) Error!void {
             }
         },
         .call_sys => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.SysCall, i).args)) |a| try expr.reads(l, a, out),
+        // A nested `@` suspends on its own terms; its statement's reads join.
+        .event_wait => try bodyReads(l, Lower.payload(vir, Inst.EventWait, i).body, out),
+        .loop => {
+            const lp = Lower.payload(vir, Inst.Loop, i);
+            const cond = vir.body(lp.cond);
+            if (cond.len != 0) try expr.reads(l, cond[cond.len - 1].toRef(), out);
+            try bodyReads(l, lp.body, out);
+            try bodyReads(l, lp.step, out);
+        },
+        .repeat => {
+            const r = Lower.payload(vir, Inst.Repeat, i);
+            try expr.reads(l, r.count, out);
+            try bodyReads(l, r.body, out);
+        },
         else => if (isStatement(Lower.tag(vir, i))) return l.refuseFmt("the slots `@*` reads in `{t}`", .{Lower.tag(vir, i)}),
     };
 }

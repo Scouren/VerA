@@ -17,6 +17,7 @@ const std_sim = @import("std_sim");
 const digital = @import("../digital.zig");
 const expr = @import("expr.zig");
 const place = @import("place.zig");
+const nets = @import("nets.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const none = digital.none;
@@ -62,8 +63,8 @@ fn widthOf(t: Target) u32 {
     return if (t.width != 0) t.width else t.slot_width;
 }
 
-/// §9.3 a target: one whole variable or net, or (§9.3.2) a constant
-/// bit- or part-select of a vector net.
+/// §9.3 a target: one whole variable or net, or (§9.3.2) a net array
+/// element or a constant bit- or part-select of a vector net.
 fn target(l: *Lower, r: Inst.Ref) Error!Target {
     const vir = l.virOf(l.frame);
     const i = r.toIndex() orelse return l.refuse("a procedural continuous assignment of nothing");
@@ -76,16 +77,11 @@ fn target(l: *Lower, r: Inst.Ref) Error!Target {
         },
         .elem, .slice, .slice_up, .slice_down => {
             const s = try place.selectOf(l, i);
-            if (s.name.kind != .net or s.name.dims.len != 0 or s.whole_elem) return l.refuse("§9.3.2 a procedural continuous assignment of a select that is no select of a vector net");
-            const first: i64 = switch (s.mode) {
-                .const_part => s.first,
-                .bit, .up, .down => blk: {
-                    const idx = try l.intOf(l.frame, s.index);
-                    break :blk if (s.name.msb >= s.name.lsb) idx -| s.name.lsb else s.name.lsb -| idx;
-                },
-            };
-            if (first < 0 or first + s.count > s.name.ty.width) return l.refuse("§9.3.2 a select outside its net");
-            return .{ .slot = s.name.slot, .lo = @intCast(first), .width = s.count, .net = true, .slot_width = s.name.ty.width };
+            if (s.name.kind != .net) return l.refuse("§9.3.2 a procedural continuous assignment of a select that is no select of a net");
+            // The bits `nets.sink` names, as a continuous assignment's.
+            const k = try nets.sink(l, r);
+            const row = l.nets.items[k.net];
+            return .{ .slot = row.slot, .lo = k.lo, .width = if (s.whole_elem) 0 else k.width, .net = true, .slot_width = row.width };
         },
         else => return l.refuse("§9.3 a procedural continuous assignment of an expression"),
     }

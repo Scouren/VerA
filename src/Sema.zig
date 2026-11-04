@@ -33,10 +33,13 @@ const paramset = @import("Sema/paramset.zig");
 const checks = @import("Sema/checks.zig");
 const connect = @import("Sema/connect.zig");
 const defparam = @import("Sema/defparam.zig");
+const library = @import("Sema/library.zig");
 const lower_decl = @import("Sema/decl.zig");
 const Vir = vams.Vir;
 const Diag = vams.Diag;
 const Inst = Vir.Inst;
+const ruleWords = library.ruleWords;
+const cellOf = library.cellOf;
 
 zcu: *Zcu,
 gpa: Allocator,
@@ -46,6 +49,10 @@ config: Config,
 /// IEEE 1364-2005 §13.3.1.6 the root configuration's `use` clauses:
 /// instance paths and cell names to the cell each binds instead.
 uses: std.StringHashMapUnmanaged(InternPool.String) = .empty,
+/// §13.3 under a library map (`library.zig`): the configurations, and each
+/// instance path's binding context.
+lib_configs: []const library.ConfigRef = &.{},
+lib_ctx: std.StringHashMapUnmanaged(library.Ctx) = .empty,
 
 // ---- analog lowering (`analyze`): each table's one writer is a file under `Sema/` ----
 /// The body being written.
@@ -110,6 +117,10 @@ pub const Config = struct {
     roots: Roots = .all,
     /// §6.3 `--param name=value`: values for the roots' parameters.
     overrides: []const Override = &.{},
+    /// An IEEE 1364 simulation (the digital lowering's): §12.2.2.1 values
+    /// past an ordered list's parameters are ignored with W1161, as
+    /// iverilog and lib/sim/digital do, instead of refused (E0907).
+    ieee1364: bool = false,
 
     /// Which uninstantiated modules elaborate. A device has one root
     /// (VAMS §6.2.2: the first such module); a simulation has every one
@@ -345,20 +356,22 @@ pub fn bound(s: *Sema, cell: InternPool.String, path: []const u8) InternPool.Str
 /// names in a `use ...:config` clause) names the top-level cells in its
 /// `design` statement (`lib.cell` or `cell`); appends them to `roots` and
 /// records its `instance`/`cell ... use` clauses in `s.uses`. Returns
-/// whether the design has a configuration naming any cell.
-/// ponytail: one level of configuration (a `:config` use binds that
-/// configuration's first design cell, not its rules); `liblist` clauses and
-/// the library map (§13.2) bind nothing.
+/// whether the design has a configuration naming any cell. Under a library
+/// map `library.zig` binds by the configurations' every rule instead.
+/// ponytail: without a map, one level of configuration (a `:config` use
+/// binds that configuration's first design cell, not its rules), and
+/// `liblist` clauses bind nothing.
 fn configRoots(s: *Sema, roots: *std.ArrayList(Zcu.Decl)) Allocator.Error!bool {
     assert(roots.items.len == 0);
     const zcu = s.zcu;
-    var configs: std.ArrayList(struct { vir: *const Vir, c: Inst.Config }) = .empty;
+    var configs: std.ArrayList(library.ConfigRef) = .empty;
     for (0..zcu.files.len) |f| {
-        const vir = zcu.fileVir(@fromBackingInt(@intCast(f)));
-        for (vir.decls()) |d| if (d.kind == .config)
-            try configs.append(s.arena, .{ .vir = vir, .c = vir.extraData(Inst.Config, vir.instructions.items(.data)[@backingInt(d.inst)].pl_node.payload_index) });
+        const file: Zcu.File.Index = @fromBackingInt(@intCast(f));
+        const vir = zcu.fileVir(file);
+        for (vir.decls(), 0..) |d, k| if (d.kind == .config)
+            try configs.append(s.arena, .{ .vir = vir, .c = vir.extraData(Inst.Config, vir.instructions.items(.data)[@backingInt(d.inst)].pl_node.payload_index), .decl = .{ .file = file, .index = @fromBackingInt(@intCast(k)) } });
     }
-    const root = for (configs.items) |cfg| {
+    const root_at = for (configs.items, 0..) |cfg, k| {
         const name = cfg.vir.string(cfg.c.name);
         const named = named: {
             for (configs.items) |other| for (other.vir.list(Vir.String, other.c.rules)) |r| {
@@ -367,8 +380,13 @@ fn configRoots(s: *Sema, roots: *std.ArrayList(Zcu.Decl)) Allocator.Error!bool {
             };
             break :named false;
         };
-        if (!named) break cfg;
+        if (!named) break k;
     } else return false;
+    const root = configs.items[root_at];
+    if (zcu.decl_lib.count() != 0) {
+        try library.roots(s, configs.items, @intCast(root_at), roots);
+        return roots.items.len != 0;
+    }
     for (root.vir.list(Vir.String, root.c.design)) |cell| {
         const m = zcu.modules.get(try zcu.intern_pool.getString(s.gpa, cellOf(root.vir.string(cell)))) orelse continue;
         try roots.append(s.arena, m);
@@ -389,33 +407,6 @@ fn configRoots(s: *Sema, roots: *std.ArrayList(Zcu.Decl)) Allocator.Error!bool {
     return roots.items.len != 0;
 }
 
-/// A rule's words: its tokens (AstGen joins them with spaces) with `.` and
-/// `:` glued to their neighbours, so `top . u use work . gate` is `top.u`,
-/// `use`, `work.gate`.
-fn ruleWords(s: *Sema, text: []const u8) Allocator.Error![]const []const u8 {
-    assert(text.len != 0);
-    var words: std.ArrayList([]const u8) = .empty;
-    var glue = false;
-    var it = std.mem.tokenizeScalar(u8, text, ' ');
-    while (it.next()) |t| {
-        const sticky = std.mem.eql(u8, t, ".") or std.mem.eql(u8, t, ":");
-        if ((sticky or glue) and words.items.len != 0) {
-            words.items[words.items.len - 1] = try std.mem.concat(s.arena, u8, &.{ words.items[words.items.len - 1], t });
-        } else try words.append(s.arena, t);
-        glue = sticky;
-    }
-    return words.items;
-}
-
-/// `lib.cell[:config]`'s cell.
-fn cellOf(text: []const u8) []const u8 {
-    assert(text.len != 0);
-    defer assert(text.len != 0);
-    const end = std.mem.findScalar(u8, text, ':') orelse text.len;
-    const dot = std.mem.findScalarLast(u8, text[0..end], '.');
-    return if (dot) |d| text[d + 1 .. end] else text[0..end];
-}
-
 /// Fills `modules` (the last unit of each name wins, IEEE 1364-2005
 /// §13.2.1.1; W1152 for a user module defined again), `paramsets` (all, in
 /// order), `disciplines` and `natures`, in file then source order.
@@ -431,7 +422,8 @@ fn namespace(s: *Sema) Allocator.Error!void {
                 .module, .macromodule, .connectmodule, .primitive => {
                     const name = try zcu.intern_pool.getString(s.gpa, vir.string(d.name));
                     const gop = try zcu.modules.getOrPut(s.gpa, name);
-                    if (gop.found_existing and !zcu.isBuiltin(gop.value_ptr.*) and !zcu.isBuiltin(decl))
+                    // §13.2.1.1 a cell defined again in its own library.
+                    if (gop.found_existing and !zcu.isBuiltin(gop.value_ptr.*) and !zcu.isBuiltin(decl) and std.mem.eql(u8, zcu.libraryOf(gop.value_ptr.*), zcu.libraryOf(decl)))
                         try s.fail(.W1152, file, d.inst.toRef(), "`{s}` is defined again; this later definition is the module", .{vir.string(d.name)});
                     gop.value_ptr.* = decl;
                 },
@@ -442,6 +434,8 @@ fn namespace(s: *Sema) Allocator.Error!void {
             }
         }
     }
+    // §13.2.3 under a library map, each library's cells.
+    if (zcu.decl_lib.count() != 0) try library.index(s);
 }
 
 /// §6.2.2/IEEE 1364-2005 §12.1.1 the roots: each user module that no

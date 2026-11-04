@@ -1,4 +1,6 @@
 # diff-sim's known differences (tests/differential/sim.zig): one fixture per
-# line, its path under tests/conformance/tests and why it is not compared yet.
-# Every line is a construct the bridge (tests/differential/sim/bridge.zig) does
-# not express yet; a listed fixture that agrees fails the run until its line goes.
+# line, its path under tests/conformance/tests and why it does not agree yet:
+# a construct Sema's digital lowering (src/Sema/digital*) does not lower yet
+# (`lowering: ...`), a stage before it that refuses the fixture, or the first
+# transcript difference. A listed fixture that agrees fails the run until its
+# line goes.

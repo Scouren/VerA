@@ -8,6 +8,7 @@
 //! - `pub const Fn = enum`
 //! - `pub fn check(l: *Lower, i: Inst.Index, f: Fn, args: []const Inst.Ref) Error!digital.Name`
 //! - `pub fn access(l: *Lower, i: Inst.Index, f: Fn, args: []const Inst.Ref) Error!u32`
+//! - `pub fn update(l: *Lower, r: Inst.Ref) Error!u32`
 //! - `pub fn segregate(l: *Lower) Error!void`
 //! - `pub fn isConnect(l: *const Lower, f: u32) bool`
 //! - `pub fn count(l: *const Lower, net: u32) u32`
@@ -18,6 +19,7 @@ const assert = std.debug.assert;
 const vams = @import("vams");
 const digital = @import("../digital.zig");
 const nets = @import("nets.zig");
+const vars = @import("vars.zig");
 const expr = @import("expr.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
@@ -69,6 +71,34 @@ pub fn access(l: *Lower, i: Inst.Index, f: Fn, args: []const Inst.Ref) Error!u32
         .count, .receiver_count => unreachable, // asserted above: folded
     };
     return l.b.extraOf(Program.DriverAccess{ .op = op, .index = try expr.self_(l, args[1], 0), .drivers = try l.b.listOf(rows.items), .time = l.frames.items[l.frame].scope });
+}
+
+/// VAMS §9.22.5 `driver_update r`: the event slot the run triggers when an
+/// ordinary driver of the net `r` names takes a new pending value, one per
+/// net, its sources those of lib/sim/digital's `arm` (both halves of a
+/// segregated net; a port window's variable, else each slot the driver
+/// reads). Runs after the drivers are compiled.
+pub fn update(l: *Lower, r: Inst.Ref) Error!u32 {
+    assert(l.b.p.drivers.len == l.wires.items.len);
+    const n = (try expr.nameOf(l, r)) orelse return l.reject(l.frame, r, "§9.22.5: driver_update watches the drivers of a net");
+    if (n.kind != .net) return l.reject(l.frame, r, "§9.22.5: driver_update watches the drivers of a net");
+    const gop = try l.update_of.getOrPut(l.a, n.net);
+    if (gop.found_existing) return l.driver_updates.items[gop.value_ptr.*].event;
+    const event = try vars.slots(l, .{ .width = 1, .signed = false }, 1, .x);
+    var pairs: std.ArrayList(u32) = .empty;
+    const rx = if (l.receivers.get(n.net)) |x| x.net else n.net;
+    for ([2]u32{ n.net, rx }, 0..) |half, h| {
+        if (h == 1 and half == n.net) break;
+        for (l.wires.items, l.b.p.drivers) |w, d| {
+            if (w.net != half or isConnect(l, w.frame)) continue;
+            if (d.source == .bridge) {
+                try pairs.appendSlice(l.a, &.{ d.source.bridge.src, 1 });
+            } else for (l.b.extra.items[d.sensitivity.start..][0..d.sensitivity.len]) |slot| try pairs.appendSlice(l.a, &.{ slot, 0 });
+        }
+    }
+    gop.value_ptr.* = @intCast(l.driver_updates.items.len);
+    try l.driver_updates.append(l.a, .{ .event = event, .sources = try l.b.listOf(pairs.items) });
+    return event;
 }
 
 /// §7.9 "the drivers and receivers of connect modules shall be oppositely

@@ -8,6 +8,8 @@
 //! Contents:
 //! - `pub fn value(s: *State, a: Allocator, e: u32) Error!Literal`
 //! - `pub fn delay(s: *State, a: Allocator, e: u32) Error!f64`
+//! - `pub fn stored(s: *State, slot: u32, changed: bool) Error!void`
+//! - `pub fn scheduled(s: *State, slot: u32) Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -22,6 +24,9 @@ const Literal = logic.Literal;
 const Bit = logic.Bit;
 const Signal = net.Signal;
 const Error = State.Error;
+
+/// A driver's next value and the tick it lands at.
+const Pend = struct { bit: Bit, time: u64 };
 
 /// Row `e`'s value (a `.driver_access` row other than `$driver_delay`):
 /// one bit for a state, an i32 otherwise; x for an index naming no
@@ -62,9 +67,45 @@ pub fn delay(s: *State, a: Allocator, e: u32) Error!f64 {
     return scale.realAt(next.time) - scale.realAt(s.scheduler.now);
 }
 
-// ---- private ----
+/// VAMS §9.22.5 `store` wrote `slot`: "an update is defined as the
+/// addition of a new pending value to the driver. This is true whether or
+/// not there is a change in the resolved value", so a port window's
+/// variable updates on every assignment, an operand on a change. A
+/// nonblocking write already updated when it was queued (`scheduled`): its
+/// landing in the NBA region is not a second update.
+// ponytail: a scan of every watched net's sources per write, only in a
+// design with a `driver_update` term; a per-slot index if one is hot.
+pub fn stored(s: *State, slot: u32, changed: bool) Error!void {
+    assert(s.p.driver_updates.len != 0);
+    const maturing = switch (s.scheduler.phase) {
+        .dispatch => |region| region == .nba,
+        else => false, // else: no event, or a stopped run
+    };
+    for (s.p.driver_updates) |u| {
+        const pairs = s.p.list(u.sources);
+        var k: usize = 0;
+        while (k < pairs.len) : (k += 2) if (pairs[k] == slot and (if (pairs[k + 1] == 1) !maturing else changed)) {
+            try s.trigger(u.event);
+            break;
+        };
+    }
+}
 
-const Pend = struct { bit: Bit, time: u64 };
+/// `scheduleWrite` queued a write of `slot`: a pending value added to the
+/// driver its port window is (§9.22.5, and what §9.23 then reads back).
+pub fn scheduled(s: *State, slot: u32) Error!void {
+    assert(s.p.driver_updates.len != 0);
+    for (s.p.driver_updates) |u| {
+        const pairs = s.p.list(u.sources);
+        var k: usize = 0;
+        while (k < pairs.len) : (k += 2) if (pairs[k] == slot and pairs[k + 1] == 1) {
+            try s.trigger(u.event);
+            break;
+        };
+    }
+}
+
+// ---- private ----
 
 /// The ordinary driver `da.index` names, or null.
 fn driverOf(s: *State, a: Allocator, da: Program.DriverAccess) Error!?u32 {

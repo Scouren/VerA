@@ -662,3 +662,37 @@ test "§9.22.3/§9.22.4/§9.23 a driver's state, strength, type, pending state a
         \\
     , try transcript(a, &lowered.program));
 }
+
+test "§9.22.5 driver_update fires on every assignment of a port's reg, a change or not, and not for the connect module's own driver (driver_update_without_resolved_change.va)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const lowered = try lowerSource(a, prelude ++
+        \\connectmodule c2e(d, a);
+        \\  input d; output a; ddiscrete d; electrical a;
+        \\  reg out; integer updates;
+        \\  assign d = out;
+        \\  always @(driver_update d) updates = updates + 1;
+        \\  initial begin
+        \\    updates = 0; out = 1'b0;
+        \\    #15 $display("%0d", updates);
+        \\    #20 $display("%0d", updates);
+        \\    #20 out = 1'b1;
+        \\    #1 $display("%0d", updates);
+        \\    #10 $display("%0d", updates);
+        \\  end
+        \\  analog V(a) <+ 0.0;
+        \\endmodule
+        \\module drv(o); output o; ddiscrete o; reg o;
+        \\  initial begin #10 o = 1'b1; #20 o = 1'b1; #30 o <= #5 1'b0; end
+        \\endmodule
+        \\module top; electrical n; drv dr(.o(n)); endmodule
+        \\connectrules r; connect c2e merged input ddiscrete, output electrical; endconnectrules
+        \\
+    , true);
+    // t=10 `o = 1`: 1. t=30 `o = 1` again, no change: 2 (§9.22.5 "whether
+    // or not there is a change"). t=55 the connect module's own `out = 1`:
+    // still 2 (§9.22 ¶3, its driver is no ordinary one). t=60 `o <= #5 0`
+    // is queued: 3, and landing at 65 is no second update: still 3.
+    try std.testing.expectEqualStrings("1\n2\n2\n3\n", try transcript(a, &lowered.program));
+}

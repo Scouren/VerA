@@ -198,6 +198,10 @@ pub const Lower = struct {
     /// VAMS §7.9 a segment a connect module drives: its receivers' net, by
     /// its drivers' net (`domain.segregate`).
     receivers: std.AutoHashMapUnmanaged(u32, Name) = .empty,
+    /// VAMS §9.22.5 the nets `driver_update` terms watch (`Program.
+    /// driver_updates`), and each one's row by its net.
+    driver_updates: std.ArrayList(Program.DriverUpdate) = .empty,
+    update_of: std.AutoHashMapUnmanaged(u32, u32) = .empty,
     gate_lane: u32 = none,
     names: std.ArrayList(Name) = .empty,
     frames: std.ArrayList(Frame) = .empty,
@@ -467,6 +471,7 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Low
     };
     var program = b.finish();
     program.monitors = l.monitors.items;
+    program.driver_updates = l.driver_updates.items;
     vars.finishParams(&l, &program) catch |e| {
         why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
         return e;

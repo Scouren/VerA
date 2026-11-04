@@ -27,7 +27,7 @@
 //! - `pub const Vcd = struct` (`Vcd.VcdScope`, `Vcd.Var`), `pub const DumpCall = struct`, `pub const DumpOp = enum(u32)`
 //! - `pub const EvcdPort = struct`, `pub const PortDir = enum(u8)`, `pub const DumpPorts = struct`, `pub const PortsCall = struct`, `pub const PortsOp = enum(u32)`
 //! - `pub const SdfScope = struct`, `pub const SdfCall = struct`
-//! - `pub const Probe = struct`, `pub const A2d = struct` (`A2d.Kind`), `pub const DriverAccess = struct` (`DriverAccess.Op`)
+//! - `pub const Probe = struct`, `pub const A2d = struct` (`A2d.Kind`), `pub const DriverAccess = struct` (`DriverAccess.Op`), `pub const DriverUpdate = struct`
 //! - `pub const Override = struct`, `pub const OverrideEval = struct`, `pub const Tran = struct`, `pub const Path = struct`, `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
 //! - `pub fn words(width: u32) u32`
 //! - `pub fn list(p: *const Program, l: List) []const u32`
@@ -43,6 +43,7 @@ const time = @import("time.zig");
 const net = @import("net.zig");
 const Bit = @import("logic.zig").Bit;
 const dump_rows = @import("dump_rows.zig");
+const mixed_rows = @import("mixed_rows.zig");
 
 /// An expression's or a slot's type (§5.5.1): a width and a signedness, or
 /// §4.8's `real`, a double held as its 64 bits. 30 bits of width: 2^30 - 1
@@ -747,35 +748,11 @@ pub const Arg = struct { in: u32, place: u32, ty: Ty, pad: u32 = 0 };
 /// written to `place`.
 pub const CopyOut = struct { place: u32, slot: u32, ty: Ty };
 
-/// VAMS §7.3.3 a potential probe's terminals as the source names them
-/// (a hierarchical name's parts joined by `.`), in `string_bytes`; `b` is
-/// empty for `V(a)`.
-pub const Probe = struct { a: List, b: List };
-
-/// VAMS §9.22.3/§9.22.4/§9.23 one driver access call: what it reads, its
-/// driver_index row, the net's ordinary drivers (`drivers` rows in
-/// §9.22.1's numbering, a `List` in `extra`) and the calling scope's
-/// `times` row (`$driver_delay`'s units).
-pub const DriverAccess = struct {
-    op: Op,
-    index: u32,
-    drivers: List,
-    time: u32,
-
-    pub const Op = enum(u32) { state, strength, delay, next_state, next_strength, type };
-};
-
-/// VAMS §7.3.5 one analog event a digital event control waits on: its
-/// arguments as real rows in the LRM's order (a `List` in `extra`, `none`
-/// for an omitted one), and the event slot the mixed host triggers at each
-/// occurrence.
-pub const A2d = struct {
-    kind: Kind,
-    args: List,
-    event: u32,
-
-    pub const Kind = enum(u8) { cross, above, timer, absdelta };
-};
+/// VAMS §7.3 and §9.22 mixed-signal rows (`mixed_rows.zig`).
+pub const Probe = mixed_rows.Probe;
+pub const DriverAccess = mixed_rows.DriverAccess;
+pub const DriverUpdate = mixed_rows.DriverUpdate;
+pub const A2d = mixed_rows.A2d;
 
 /// §7.9 one net: its type, its slot, its drivers (a `List` of `drivers`
 /// indices in `extra`), A.2.1.3's `delay3` on the resolved value, and a
@@ -923,6 +900,8 @@ random_seed: i32 = 0,
 monitors: []const A2d = &.{},
 /// VAMS §7.3.6.3 some expression is a `probe`: the run needs a mixed host.
 has_probes: bool = false,
+/// VAMS §9.22.5 the nets `driver_update` terms watch.
+driver_updates: []const DriverUpdate = &.{},
 
 const Program = @This();
 

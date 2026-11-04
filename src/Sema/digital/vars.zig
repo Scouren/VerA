@@ -110,6 +110,9 @@ pub fn variable(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Index)
 pub fn param(l: *Lower, f: u32, i: Inst.Index) Error!u32 {
     const vir = l.virOf(f);
     const p = Lower.payload(vir, Inst.Param, i);
+    // VAMS §7.2.2 a mixed design's string and array parameters are the
+    // analog block's (lib/sim/digital's mixed elaboration skips them).
+    if (l.options.mixed and (p.dims.len != 0 or p.flags.storage == .string)) return none;
     if (p.dims.len != 0) return l.refuse("a parameter array");
     const env = try l.envAt(f);
     const value = (try env.param(i)) orelse return lateParam(l, f, i);

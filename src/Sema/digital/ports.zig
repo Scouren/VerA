@@ -18,6 +18,7 @@
 //! - `pub fn declareNet(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Index, conn: ?Conn, deferred: *std.ArrayList(nets.Wire)) Error!void`
 //! - `pub fn outputVariable(l: *Lower, f: u32, n: Name, conn: Conn, deferred: *std.ArrayList(nets.Wire)) Error!void`
 //! - `pub fn implicitNets(l: *Lower, f: u32, insts: []const Inst.Index) Error!void`
+//! - `pub fn segment(l: *Lower, bridge: u32, width: u32) Error!Name`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -40,7 +41,14 @@ const Inst = Vir.Inst;
 /// parent's expression and the frame it is written in (`none` when the
 /// port is left open), and for an element of an instance array its lane
 /// (`lane[0]`, the lowest bits 0) of `lane[1]` (§12.1.2).
-pub const Conn = struct { actual: Inst.Ref, frame: u32, lane: ?[2]u32 = null };
+pub const Conn = struct {
+    actual: Inst.Ref,
+    frame: u32,
+    lane: ?[2]u32 = null,
+    /// VAMS §7.8 the bridge (an `Zcu.instances` row) whose segment this
+    /// connection is, where `actual` names a continuous net: `none` else.
+    bridge: u32 = none,
+};
 
 /// §12.3.6 one external port of an expression-ported module: its port
 /// expression (in the module's own frame) and its connection.
@@ -194,6 +202,9 @@ pub fn declareNet(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Inde
     // §12.1.2 an instance array's element takes its own slice of an
     // expression as wide as the port times the elements.
     const slice: ?u32 = if (conn) |c| try laneSlice(l, c, width) else null;
+    if (conn) |c| if (c.bridge != none) {
+        _ = try segment(l, c.bridge, width);
+    };
     if (slice == null) if (conn) |c| if (c.actual != .none) if (try wholeNet(l, c)) |outer| {
         // VAMS §3.7 a wreal joined to a wire or tri: one wreal net.
         const outer_wreal = l.nets.items[outer.net].kind == .wreal;
@@ -238,6 +249,7 @@ pub fn declareNet(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Inde
 pub fn outputVariable(l: *Lower, f: u32, n: Name, conn: Conn, deferred: *std.ArrayList(nets.Wire)) Error!void {
     if (conn.actual == .none) return;
     if (n.ty.real) return l.refuse("a real output port");
+    if (conn.bridge != none) _ = try segment(l, conn.bridge, n.ty.width);
     if (try wholeNet(l, conn)) |outer| {
         const w = l.nets.items[outer.net].width;
         try deferred.append(l.a, .{ .net = outer.net, .frame = f, .source = .{ .bridge = .{
@@ -273,6 +285,22 @@ pub fn implicitNets(l: *Lower, f: u32, insts: []const Inst.Index) Error!void {
         },
         else => {}, // else: no other item declares a net by naming it
     };
+}
+
+/// VAMS §7.8 bridge `bridge`'s segment: the digital net between it and
+/// the port it bridges (lib/sim/digital's `<bridge>.<lower port>`), one per
+/// bridge, so `split` bridges on one signal each see only their own port.
+/// Made `width` bits wide by whichever side is declared first.
+pub fn segment(l: *Lower, bridge: u32, width: u32) Error!Name {
+    const gop = try l.segment_of.getOrPut(l.a, bridge);
+    if (gop.found_existing) {
+        if (gop.value_ptr.ty.width != width) return l.refuse("a connect module port and the port it bridges of different widths");
+        return gop.value_ptr.*;
+    }
+    const at = try nets.mintNet(l, .wire, width, false);
+    gop.value_ptr.* = .{ .kind = .net, .net = at, .slot = l.nets.items[at].slot, .ty = .{ .width = width, .signed = false }, .msb = width - 1, .scalar = width == 1 };
+    assert(l.nets.items[at].width == width);
+    return gop.value_ptr.*;
 }
 
 // ---- private ----
@@ -378,6 +406,7 @@ fn actualWidth(l: *Lower, c: Conn) Error!u32 {
 }
 
 fn wholeNet(l: *Lower, c: Conn) Error!?Name {
+    if (c.bridge != none) return l.segment_of.get(c.bridge).?;
     const saved = l.frame;
     defer l.frame = saved;
     l.frame = c.frame;

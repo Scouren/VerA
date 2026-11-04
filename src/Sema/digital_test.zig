@@ -106,6 +106,16 @@ fn expectEqualPrograms(want: *const Program, got: *const Program) !void {
     }
 }
 
+/// Whether slot `src` drives the net whose slot is `net_slot` through a
+/// port (a `.bridge` driver, §12.3.9.2).
+fn drives(p: *const Program, src: u32, net_slot: u32) bool {
+    for (p.drivers) |d| {
+        if (p.nets[d.net].slot != net_slot) continue;
+        if (d.source == .bridge and d.source.bridge.src == src) return true;
+    }
+    return false;
+}
+
 fn isMultiArrayList(comptime T: type) bool {
     return @typeInfo(T) == .@"struct" and @hasDecl(T, "Field") and @hasDecl(T, "Slice");
 }
@@ -252,4 +262,278 @@ test "§19.8 a mixed design's modules ahead of its first `timescale take it (lib
     , true);
     // The design's tick is the finest precision: 1 ps, 10^-12 s.
     try std.testing.expectEqual(@as(i32, -12), lowered.program.finest);
+}
+
+test "§7.8 an inserted connect module's discrete port joins the digital net it bridges (net_read_by_digital_code_resolves_digital.va)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const lowered = try lowerSource(arena_state.allocator(), prelude ++
+        \\connectmodule a2d(el, cm);
+        \\  input el; output cm; electrical el; ddiscrete cm; reg cm;
+        \\  analog I(el) <+ V(el) / 1000.0;
+        \\  initial cm = 1'b0;
+        \\endmodule
+        \\module src(p); output p; electrical p; analog I(p) <+ -1.0e-3; endmodule
+        \\module top;
+        \\  ddiscrete n; wire n;
+        \\  reg seen;
+        \\  src u1(n);
+        \\  always @(n) seen = n;
+        \\endmodule
+        \\connectrules rules; connect a2d; endconnectrules
+        \\
+    , true);
+    // §7.8.3 one bridge under `top` on `n`. Its `cm` is an output `reg`
+    // port: its own slot, driving `n` through the port (§12.3.9.2). `el`
+    // and `u1.p` are continuous, not the digital half's.
+    var n_slot: ?u32 = null;
+    var cm_slot: ?u32 = null;
+    for (lowered.names) |x| {
+        if (std.mem.eql(u8, x.path, "n")) n_slot = x.slot;
+        if (std.mem.endsWith(u8, x.path, ".cm")) cm_slot = x.slot;
+        try std.testing.expect(!std.mem.endsWith(u8, x.path, ".el") and !std.mem.eql(u8, x.path, "u1.p"));
+    }
+    try std.testing.expect(drives(&lowered.program, cm_slot.?, n_slot.?));
+}
+
+test "§7.2.2 a process naming fewer instructions than the names read before it (regression: specify_paths_design_runs.va crashed)" {
+    try expectSameProgram(prelude ++
+        \\module mx(/*<*/vo/*>*/);
+        \\  /*<*/inout vo; electrical vo;/*>*/
+        \\  reg a, b, c, d, e, f, g, h, i, j;
+        \\  initial begin a = 0; b = 0; c = 0; d = 0; e = 0; f = 0; g = 0; h = 0; i = 0; j = 0; end
+        \\  always #1 ;
+        \\  /*<*/analog V(vo) <+ a;/*>*/
+        \\endmodule
+        \\
+    );
+}
+
+test "§7.8 a digital port meeting a continuous net: the bridge's segment joins them, the net stays analog (both_halves_of_the_bridge_execute.va)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const lowered = try lowerSource(arena_state.allocator(), prelude ++
+        \\connectmodule d2a(cm, el);
+        \\  input cm; output el; ddiscrete cm; electrical el;
+        \\  reg lvl; always @(cm) lvl = cm;
+        \\  analog I(el) <+ 0.0;
+        \\endmodule
+        \\module inv(d, q); input d; output q; ddiscrete d, q; reg q; initial q = 1'b0; always @(d) q = ~d; endmodule
+        \\module top;
+        \\  electrical y1; ddiscrete s; reg r;
+        \\  assign s = r;
+        \\  inv u1(s, y1);
+        \\  analog I(y1) <+ V(y1) / 1000.0;
+        \\endmodule
+        \\connectrules rules; connect d2a; endconnectrules
+        \\
+    , true);
+    // `y1` is continuous: not the digital half's. The bridge's input net
+    // `cm` is its segment, which `u1.q` (an output reg) drives (§12.3.9.2).
+    var q: ?u32 = null;
+    var cm: ?u32 = null;
+    for (lowered.names) |x| {
+        try std.testing.expect(!std.mem.eql(u8, x.path, "y1"));
+        if (std.mem.eql(u8, x.path, "u1.q")) q = x.slot;
+        if (std.mem.endsWith(u8, x.path, ".cm")) cm = x.slot;
+    }
+    try std.testing.expect(drives(&lowered.program, q.?, cm.?));
+}
+
+test "§7.8.3.2 split: each port's own bridge and segment, so one port's driver reaches only its bridge (split_one_instance_per_port.va)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const lowered = try lowerSource(arena_state.allocator(), prelude ++
+        \\connectmodule d2a(cm, el);
+        \\  input cm; output el; ddiscrete cm; electrical el;
+        \\  reg lvl; always @(cm) lvl = cm;
+        \\  analog I(el) <+ 0.0;
+        \\endmodule
+        \\module src(q); output q; ddiscrete q; reg q; initial q = 1'b0; endmodule
+        \\module top;
+        \\  electrical a;
+        \\  src u1(a);
+        \\  src u2(a);
+        \\  analog I(a) <+ V(a) / 1000.0;
+        \\endmodule
+        \\connectrules rules; connect d2a split; endconnectrules
+        \\
+    , true);
+    // §7.8.3.2 "one connect module per port": `a__u1__q` and `a__u2__q`
+    // (§7.8.5's split names), each `cm` the segment its own port drives.
+    var q1: ?u32 = null;
+    var q2: ?u32 = null;
+    var cm1: ?u32 = null;
+    var cm2: ?u32 = null;
+    for (lowered.names) |x| {
+        if (std.mem.eql(u8, x.path, "u1.q")) q1 = x.slot;
+        if (std.mem.eql(u8, x.path, "u2.q")) q2 = x.slot;
+        if (std.mem.eql(u8, x.path, "a__u1__q.cm")) cm1 = x.slot;
+        if (std.mem.eql(u8, x.path, "a__u2__q.cm")) cm2 = x.slot;
+    }
+    try std.testing.expect(cm1.? != cm2.?);
+    const p = &lowered.program;
+    try std.testing.expect(drives(p, q1.?, cm1.?) and drives(p, q2.?, cm2.?));
+    try std.testing.expect(!drives(p, q1.?, cm2.?) and !drives(p, q2.?, cm1.?));
+}
+
+test "§7.8.5.1 a primitive's terminal on a continuous net: the gate drives its bridge's segment (prim_connect_* fixtures)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const lowered = try lowerSource(arena_state.allocator(), prelude ++
+        \\connectmodule d2a(cm, el);
+        \\  input cm; output el; ddiscrete cm; electrical el;
+        \\  reg lvl; always @(cm) lvl = cm;
+        \\  analog I(el) <+ 0.0;
+        \\endmodule
+        \\`default_discipline ddiscrete
+        \\module top;
+        \\  electrical y; reg r;
+        \\  initial r = 1'b1;
+        \\  buf b1(y, r);
+        \\  analog I(y) <+ V(y) / 1000.0;
+        \\endmodule
+        \\`default_discipline
+        \\connectrules rules; connect d2a; endconnectrules
+        \\
+    , true);
+    // `y` stays analog; the buffer's output terminal is the bridge's `cm`.
+    var cm: ?u32 = null;
+    for (lowered.names) |x| {
+        try std.testing.expect(!std.mem.eql(u8, x.path, "y"));
+        if (std.mem.endsWith(u8, x.path, ".cm")) cm = x.slot;
+    }
+    const p = &lowered.program;
+    const gate_drives = for (p.drivers) |d| {
+        if (d.source == .gate and p.nets[d.net].slot == cm.?) break true;
+    } else false;
+    try std.testing.expect(gate_drives);
+}
+
+test "§7.8.5.1 split on a gate array: each lane reads its own bridge's segment (prim_connect_gate_array.va)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const lowered = try lowerSource(arena_state.allocator(), prelude ++
+        \\connectmodule a2d(el, cm);
+        \\  input el; output cm; electrical el; ddiscrete cm; reg cm;
+        \\  analog I(el) <+ V(el) / 1000.0;
+        \\  initial cm = 1'b1;
+        \\endmodule
+        \\`default_discipline ddiscrete
+        \\module top;
+        \\  electrical a;
+        \\  wire [1:0] y; reg [1:0] b;
+        \\  and g[1:0] (y, a, b);
+        \\  initial b = 2'b10;
+        \\  analog I(a) <+ V(a) / 1000.0;
+        \\endmodule
+        \\`default_discipline
+        \\connectrules rules; connect a2d split; endconnectrules
+        \\
+    , true);
+    // §7.8.5 split names `a__g[1]__in1` and `a__g[0]__in1`; §12.1.2 `g[1]`
+    // is the array's most significant lane, bit 1. Each bridge's `cm` is an
+    // output reg: it drives its segment, which its lane's gate reads.
+    var cm = [2]?u32{ null, null };
+    for (lowered.names) |x| {
+        if (std.mem.eql(u8, x.path, "a__g[0]__in1.cm")) cm[0] = x.slot;
+        if (std.mem.eql(u8, x.path, "a__g[1]__in1.cm")) cm[1] = x.slot;
+    }
+    try std.testing.expect(cm[0].? != cm[1].?);
+    const p = &lowered.program;
+    const tags = p.exprs.items(.tag);
+    const data = p.exprs.items(.data);
+    var seen = [2]bool{ false, false };
+    for (p.drivers) |d| {
+        if (d.source != .gate) continue;
+        const lane = d.source.gate.lane.?;
+        const first_in = p.list(d.source.gate.ins)[0]; // `and`'s first input, `a`
+        try std.testing.expectEqual(Program.Expr.Tag.slot, tags[first_in]);
+        try std.testing.expect(drives(p, cm[lane].?, data[first_in].a));
+        try std.testing.expect(!drives(p, cm[1 - lane].?, data[first_in].a));
+        seen[lane] = true;
+    }
+    try std.testing.expect(seen[0] and seen[1]);
+}
+
+test "§7.8.5.1 split on a gate array's output: each lane drives its own bridge's segment (lib/sim/digital's lane rows)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const lowered = try lowerSource(arena_state.allocator(), prelude ++
+        \\connectmodule d2a(cm, el);
+        \\  input cm; output el; ddiscrete cm; electrical el;
+        \\  reg lvl; always @(cm) lvl = cm;
+        \\  analog I(el) <+ 0.0;
+        \\endmodule
+        \\`default_discipline ddiscrete
+        \\module top;
+        \\  electrical a;
+        \\  reg [1:0] b, c;
+        \\  and g[1:0] (a, b, c);
+        \\  initial begin b = 2'b11; c = 2'b10; end
+        \\  analog I(a) <+ V(a) / 1000.0;
+        \\endmodule
+        \\`default_discipline
+        \\connectrules rules; connect d2a split; endconnectrules
+        \\
+    , true);
+    // §7.8.5 split names `a__g[L]__out`; §12.1.2 `g[1]` is bit 1. Each
+    // lane's gate drives the bridge input `cm` of its own name, one bit.
+    var cm = [2]?u32{ null, null };
+    for (lowered.names) |x| {
+        if (std.mem.eql(u8, x.path, "a__g[0]__out.cm")) cm[0] = x.slot;
+        if (std.mem.eql(u8, x.path, "a__g[1]__out.cm")) cm[1] = x.slot;
+    }
+    try std.testing.expect(cm[0].? != cm[1].?);
+    const p = &lowered.program;
+    var seen = [2]bool{ false, false };
+    for (p.drivers) |d| {
+        if (d.source != .gate) continue;
+        const lane = d.source.gate.lane.?;
+        try std.testing.expectEqual(cm[lane].?, p.nets[d.net].slot);
+        try std.testing.expectEqual(@as(?u32, null), d.source.gate.out_bit);
+        seen[lane] = true;
+    }
+    try std.testing.expect(seen[0] and seen[1]);
+}
+
+test "§7.2.2 a mixed design's string parameter is the analog block's (supply_sensitive_bridge_via_connect_rule.va)" {
+    try expectSameProgram(prelude ++
+        \\module mx(/*<*/vo/*>*/);
+        \\  /*<*/inout vo; electrical vo;/*>*/
+        \\  /*<*/parameter string name = "(not_given)";/*>*/
+        \\  reg r; initial r = 1'b1;
+        \\  /*<*/analog V(vo) <+ r;/*>*/
+        \\endmodule
+        \\
+    );
+}
+
+test "A.8.5 a one-operand concatenation as a switch, pull or MOS terminal is its operand (concatenation_as_switch_terminal.va)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    // The same text with each `{x}` written ` x `: every offset equal.
+    const braced = try lowerSource(a, prelude ++
+        \\module mx(p); inout p; electrical p;
+        \\  reg d, en; wire a, b, u, q;
+        \\  assign a = 1'b1;
+        \\  tran ({a}, b); pullup ({u}); nmos ({q}, d, en);
+        \\  initial begin d = 1'b0; en = 1'b1; end
+        \\  analog I(p) <+ V(p);
+        \\endmodule
+        \\
+    , true);
+    const plain = try lowerSource(a, prelude ++
+        \\module mx(p); inout p; electrical p;
+        \\  reg d, en; wire a, b, u, q;
+        \\  assign a = 1'b1;
+        \\  tran ( a , b); pullup ( u ); nmos ( q , d, en);
+        \\  initial begin d = 1'b0; en = 1'b1; end
+        \\  analog I(p) <+ V(p);
+        \\endmodule
+        \\
+    , true);
+    try expectEqualPrograms(&plain.program, &braced.program);
+    try std.testing.expectEqual(@as(usize, 1), braced.program.trans.len);
 }

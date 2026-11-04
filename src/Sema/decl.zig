@@ -71,6 +71,7 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     s.device.num_ports = @intCast(s.device.nodes.len);
     for (s.units.items) |*u| try net.nets(s, u);
     for (s.units.items[1..]) |*u| try net.bindChildPorts(s, u);
+    try net.bindBridges(s);
     for (s.units.items) |*u| try param.declare(s, u);
     for (s.units.items) |*u| try discrete.declare(s, u);
     for (s.units.items[1..]) |*u| try @import("derive.zig").child(s, u);

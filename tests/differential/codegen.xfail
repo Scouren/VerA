@@ -590,6 +590,8 @@ verilog-ams/ch07_mixed_signal/cross_enable_and_dir_disable_the_event.va a potent
 verilog-ams/ch07_mixed_signal/cross_time_tol_below_time_resolution.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/dc_time_zero_settle.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/digital_value_has_zero_derivative.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/driver_count_excludes_connectmodule.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/driver_delay_and_next_state.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/event_bounds_mixed_legal.va a call of `final_step`
 verilog-ams/ch07_mixed_signal/implicit_d2a_bus.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/macro_process_runs_after_nba.va a potential contribution whose flow unknown is not `flow(hi,lo)`
@@ -599,6 +601,9 @@ verilog-ams/ch07_mixed_signal/named_event_from_analog_reaches_digital.va a call 
 verilog-ams/ch07_mixed_signal/onebit_dac_reads_a_discrete_wire.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/probe_in_continuous_assign_refused.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/probe_in_procedural_read.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/receiver_count_reports_ordinary_receivers.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/receiver_default_bypass.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/receiver_value_set_by_connectmodule.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/rejected_trials_deliver_once.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/timer_runtime_body_period.va a call of `timer`
 verilog-ams/ch07_mixed_signal/timer_runtime_controls.va a call of `timer`
@@ -625,11 +630,13 @@ verilog-ams/ch09_system_tasks/diagnostic_finish_zero.va codegen does not spell a
 verilog-ams/ch09_system_tasks/diagnostic_info_dc_sweep.va codegen does not spell a device with no unknowns
 verilog-ams/ch09_system_tasks/diagnostic_info_initial.va codegen does not spell a device with no unknowns
 verilog-ams/ch09_system_tasks/diagnostic_info_transient.va codegen does not spell a device with no unknowns
+verilog-ams/ch09_system_tasks/driver_strength_next_strength_type.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch09_system_tasks/driver_type_unavailable.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch09_system_tasks/fatal_in_analog_initial_skips_simulation.va codegen does not spell a §5.10 held variable
 verilog-ams/ch09_system_tasks/finish_in_analog_initial_skips_simulation.va codegen does not spell a §5.10 held variable
 verilog-ams/ch09_system_tasks/pla_array_in_digital_context.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch09_system_tasks/port_mask.va codegen does not spell a call of `$port_connected`
+verilog-ams/ch09_system_tasks/receiver_segregation_ignored_without_driver_value.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch09_system_tasks/say_ops.va §9.7.3 status sites: the old device returns zero rows once a severity task fires (a check past |V| = 10); codegen has no status protocol yet
 verilog-ams/ch09_system_tasks/status_ops.va a call of `white_noise`
 verilog-ams/ch09_system_tasks/table_status.va a call of `$table_model`

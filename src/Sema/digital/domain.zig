@@ -5,13 +5,18 @@
 //! in, the variables the digital half leaves to the analog block (`analog`)
 //! and those it declares only to receive an analog value (`a2d`, §7.3.6.4)
 //! out. And the lowered design's variables and nets by path (`names`), the
-//! slots a host reads for D2A and writes for A2D.
-//! Cites: VAMS-2023 §7.2.2, §7.3.1, §7.3.6.4.
+//! slots a host reads for D2A and writes for A2D; the analog solution's
+//! potentials a digital expression probes (`probe`) and the analog events
+//! a digital event control waits on (`monitor`).
+//! Cites: VAMS-2023 §7.2.2, §7.3.1, §7.3.5, §7.3.6.3, §7.3.6.4.
 //!
 //! Contents:
 //! - `pub const Domain = struct`
 //! - `pub fn of(a: Allocator, vir: *const Vir, body: Vir.Body, root: bool) Allocator.Error!Domain`
 //! - `pub fn names(l: *Lower) Error![]const digital.Named`
+//! - `pub fn isProbe(l: *Lower, i: Inst.Index) bool`
+//! - `pub fn probe(l: *Lower, i: Inst.Index) Error!u32`
+//! - `pub fn monitor(l: *Lower, i: Inst.Index) Error!?u32`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -19,7 +24,11 @@ const Allocator = std.mem.Allocator;
 const vams = @import("vams");
 const decl = @import("../decl.zig");
 const discrete = @import("../discrete.zig");
+const std_sim = @import("std_sim");
 const digital = @import("../digital.zig");
+const expr = @import("expr.zig");
+const vars = @import("vars.zig");
+const Program = std_sim.Program;
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Vir = vams.Vir;
@@ -100,7 +109,63 @@ pub fn names(l: *Lower) Error![]const digital.Named {
     return out.items;
 }
 
+/// Whether call `i` of `Lower.frame` is a VAMS §7.3.6.3 potential probe
+/// `V(...)` of a mixed design's analog solution.
+pub fn isProbe(l: *Lower, i: Inst.Index) bool {
+    if (!l.options.mixed) return false;
+    const vir = l.virOf(l.frame);
+    if (Lower.tag(vir, i) != .call) return false;
+    const callee = Lower.payload(vir, Inst.Call, i).callee.toIndex() orelse return false;
+    if (Lower.tag(vir, callee) != .str_ref) return false;
+    return std.mem.eql(u8, vir.string(vir.instructions.items(.data)[@backingInt(callee)].str_tok.start), "V");
+}
+
+/// The `.probe` row of probe call `i` (`isProbe`): its terminals by name,
+/// as lib/sim/digital hands them to the mixed host.
+pub fn probe(l: *Lower, i: Inst.Index) Error!u32 {
+    assert(isProbe(l, i));
+    const vir = l.virOf(l.frame);
+    const args = vir.list(Inst.Ref, Lower.payload(vir, Inst.Call, i).args);
+    if (args.len == 0 or args.len > 2) return l.refuse("a V() probe of other than one or two terminals");
+    const a = try terminal(l, args[0]);
+    const b = if (args.len == 2) try terminal(l, args[1]) else Program.List.empty;
+    l.b.p.has_probes = true;
+    return l.b.expr(.probe, Program.Ty.real_ty, try l.b.extraOf(Program.Probe{ .a = a, .b = b }), 0);
+}
+
+/// The event slot of a VAMS §7.3.5 analog event term `i` (`cross`,
+/// `above`, `timer`, `absdelta`) of a mixed design's digital event
+/// control, its `Program.A2d` row appended; null for any other term.
+pub fn monitor(l: *Lower, i: Inst.Index) Error!?u32 {
+    if (!l.options.mixed) return null;
+    const vir = l.virOf(l.frame);
+    if (Lower.tag(vir, i) != .call_sys) return null;
+    const c = Lower.payload(vir, Inst.SysCall, i);
+    const kind = std.meta.stringToEnum(Program.A2d.Kind, vir.string(c.name)) orelse return null;
+    const args = vir.list(Inst.Ref, c.args);
+    const rows = try l.a.alloc(u32, args.len);
+    for (args, rows) |x, *row| row.* = if (x == .none) digital.none else try expr.real(l, x);
+    // An anonymous named event: the host triggers it, its waiters wake.
+    const event = try vars.slots(l, .{ .width = 1, .signed = false }, 1, .x);
+    try l.monitors.append(l.a, .{ .kind = kind, .args = try l.b.listOf(rows), .event = event });
+    assert(l.monitors.items.len != 0);
+    return event;
+}
+
 // ---- private ----
+
+/// A probe terminal's name as the source writes it.
+fn terminal(l: *Lower, r: Inst.Ref) Error!Program.List {
+    const vir = l.virOf(l.frame);
+    const i = r.toIndex() orelse return l.refuse("an omitted probe terminal");
+    const name = switch (Lower.tag(vir, i)) {
+        .decl_ref => vir.string(decl.nameOf(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl)),
+        .str_ref => vir.string(vir.instructions.items(.data)[@backingInt(i)].str_tok.start),
+        else => return l.refuse("a probe terminal that is no simple name"), // ponytail: lib/sim/digital also takes a hierarchical one
+    };
+    const s = try l.b.string(name);
+    return .{ .start = s.start, .len = s.len };
+}
 
 /// Appends scope `scope`'s path below the root, each scope then a `.`
 /// (nothing for the root's own scope).

@@ -179,6 +179,8 @@ pub const Lower = struct {
     why_at: u32 = none,
     /// `reject`'s code: set before a `reject` whose rule has its own.
     why_code: vams.Diag.Code = .E1100,
+    /// VAMS §7.3.5 a mixed design's analog events (`Program.monitors`).
+    monitors: std.ArrayList(Program.A2d) = .empty,
     names: std.ArrayList(Name) = .empty,
     frames: std.ArrayList(Frame) = .empty,
     scopes: std.ArrayList(ScopeInfo) = .empty,
@@ -446,6 +448,7 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Low
         return e;
     };
     var program = b.finish();
+    program.monitors = l.monitors.items;
     vars.finishParams(&l, &program) catch |e| {
         why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
         return e;

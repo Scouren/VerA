@@ -150,6 +150,45 @@ test "§7.3.6.4 a real the analog block writes and a discrete process reads is d
     );
 }
 
+test "§7.3.5 an analog event in a digital event control: one monitor row, its event slot the term the process waits on" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const lowered = try lowerSource(arena_state.allocator(), prelude ++
+        \\module mx(p); inout p; electrical p;
+        \\  integer n;
+        \\  initial n = 0;
+        \\  always @(cross(V(p) - 0.5, 1)) n = n + 1;
+        \\  analog I(p) <+ 0.0;
+        \\endmodule
+        \\
+    , true);
+    const p = &lowered.program;
+    // §7.3.5 `cross(expr, dir)`: one monitor, its two arguments as real
+    // rows: `V(p) - 0.5` (a probe of `p` alone) and the direction 1.
+    try std.testing.expectEqual(@as(usize, 1), p.monitors.len);
+    const m = p.monitors[0];
+    try std.testing.expectEqual(Program.A2d.Kind.cross, m.kind);
+    const args = p.list(m.args);
+    try std.testing.expectEqual(@as(usize, 2), args.len);
+    const tags = p.exprs.items(.tag);
+    const data = p.exprs.items(.data);
+    try std.testing.expectEqual(Program.Expr.Tag.real_sub, tags[args[0]]);
+    try std.testing.expectEqual(Program.Expr.Tag.probe, tags[data[args[0]].a]);
+    const probe = p.extraData(Program.Probe, data[data[args[0]].a].a);
+    try std.testing.expectEqualStrings("p", p.str(probe.a));
+    try std.testing.expectEqual(@as(u32, 0), probe.b.len);
+    try std.testing.expectEqual(Program.Expr.Tag.real_of_int, tags[args[1]]);
+    try std.testing.expect(p.has_probes);
+    // The `always` waits on exactly the monitor's event slot.
+    const insts = p.insts.items(.tag);
+    const waits = for (insts, 0..) |t, k| {
+        if (t == .wait_event) break p.insts.items(.data)[k].a;
+    } else return error.TestUnexpectedResult;
+    // `wait_event`'s `a` is the `List` of its terms; a term's first word is
+    // the slot it watches.
+    try std.testing.expectEqual(m.event, p.list(p.extraData(Program.List, waits))[0]);
+}
+
 test "§7.3 the mixed host's names: each variable and net by its path below the root, as Sema's card rows spell it" {
     var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
     defer arena_state.deinit();

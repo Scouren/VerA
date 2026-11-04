@@ -617,3 +617,11 @@ verilog-a/ch03_data_types/parameter_array.va the old device's entry returned -3
 verilog-a/ch04_expressions/assignment_pattern.va the old device's entry returned -3
 verilog-a/ch04_expressions/ddx_vera_nodiff_assignment.va differs: point 0: d row 0: old 3.069199822529498e-2, new -3.592690991994424e-1
 verilog-a/ch04_expressions/zi_np_parameter_roots_dc_gain.va the old device's entry returned -3
+verilog-a/ch03_data_types/aliasparam_source_bindings.va a device with no unknowns
+verilog-a/ch03_data_types/vera_scratch_starts_each_evaluation.va a §5.10 held variable
+verilog-a/ch06_hierarchy/paramset_outer_defparam_shape.va parameter `mode` is not a number
+verilog-a/ch06_hierarchy/paramset_output_reads_a_module_output.va a call of a user function (callee 4294967295)
+verilog-a/ch06_hierarchy/paramset_string_range_selection.va parameter `u.h01_type_ps.t` is not a number
+verilog-a/ch06_hierarchy/paramset_variable_is_an_output_variable.va a call of a user function (callee 4294967295)
+verilog-a/ch06_hierarchy/paramset_outer_defparam_selection_parameter.va differs: point 0: row 0: old -4.790351634458477e0, new -5.8077535073955335e0
+verilog-a/ch06_hierarchy/paramset_under_parameter_sweep.va differs: point 0: row 0: old 1.2510878312513327e0, new 1.3221247534776226e0

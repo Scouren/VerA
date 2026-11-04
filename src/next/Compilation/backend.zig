@@ -186,9 +186,13 @@ pub fn semaDigital(comp: *Compilation) !?Job {
     const out = try comp.arena().create(vams.Preprocessor.Output);
     out.* = comp.pp.output();
     for (sources, comp.units.items) |*s, *u| s.* = .{ .tree = &u.tree, .pp = out };
-    var why: []const u8 = "";
+    var why: sema.digital.Why = .{};
     comp.lowered = sema.digital.lower(comp.arena(), &comp.zcu, .{ .sources = sources }, &why) catch |e| switch (e) {
-        error.Unsupported => return notBuiltFmt(comp, "the digital lowering", why),
+        error.Unsupported => return notBuiltFmt(comp, "the digital lowering", why.text),
+        error.Rejected => {
+            try comp.wip.add(.run, .E1100, errors.relocate(out.*, why.at, why.at), "{s}", .{why.text});
+            return null;
+        },
         error.OutOfMemory => return error.OutOfMemory,
     };
     return switch (comp.config.target) {

@@ -38,8 +38,10 @@ over u64 planes).
 
 ## The oracle: `zig build diff-sim`
 
-A **bridge** stands in for Sema until it exists: test code (in
-`tests/differential/sim/bridge.zig`) that takes the OLD elaborated design, a
+(History: the new Sema's digital lowering now writes the `Program` from source
+and `diff-sim` runs it; the bridge described here was deleted when all 815
+fixtures agreed.) A **bridge** stood in for Sema until it existed: test code (in
+`tests/differential/sim/bridge.zig`) that took the OLD elaborated design, a
 `lib/sim/digital` `Run` after `elaborate`, and writes the new `Program` from it
 (slots, processes, instructions, expressions bound to slots, nets, drivers, ...).
 Then, for every `.v` fixture the old `vera --run` runs (`tests/conformance/tests/verilog/**`,

@@ -34,6 +34,7 @@
 //! - `pub fn isBuiltin(zcu: *const Zcu, d: Decl) bool`
 //! - `pub fn fmtPath(zcu: *const Zcu, i: Instance.Index) PathFormatter` (`PathFormatter.format`)
 //! - `pub fn hasCode(zcu: *const Zcu, code: Diag.Code) bool`
+//! - `pub fn libraryOf(zcu: *const Zcu, d: Decl) []const u8`
 //! - `pub fn answerData(zcu: *Zcu, bytes: ?[]const u8) Allocator.Error!void`
 
 const std = @import("std");
@@ -86,6 +87,12 @@ data_files: std.StringHashMapUnmanaged(?[]const u8) = .empty,
 /// The data file the last `Sema.analyze` stopped on, on `gpa`, until
 /// `answerData`.
 data_want: ?[]const u8 = null,
+/// IEEE 1364-2005 §13.2.3 the library each design unit maps into, from
+/// the caller's library map; a unit it lacks is in `work`. Empty: no map,
+/// and cells bind by name alone.
+decl_lib: std.AutoHashMapUnmanaged(Decl, InternPool.String) = .empty,
+/// §13.5.1/§13.7.1 the library search order under a map (borrowed).
+lib_order: []const InternPool.String = &.{},
 
 /// One source file's analysis: its path and its Vir, which the caller
 /// owns and keeps alive as long as the `Zcu`.
@@ -295,6 +302,7 @@ pub fn deinit(zcu: *Zcu) void {
     zcu.net_discipline.deinit(gpa);
     zcu.inserts.deinit(gpa);
     zcu.failed.deinit(gpa);
+    zcu.decl_lib.deinit(gpa);
     var it = zcu.data_files.keyIterator();
     while (it.next()) |k| gpa.free(k.*);
     zcu.data_files.deinit(gpa);
@@ -356,6 +364,13 @@ pub fn isBuiltin(zcu: *const Zcu, d: Decl) bool {
 pub fn fmtPath(zcu: *const Zcu, i: Instance.Index) PathFormatter {
     assert(@backingInt(i) < zcu.instances.len);
     return .{ .zcu = zcu, .instance = i };
+}
+
+/// §13.2.3 the library design unit `d` maps into (`work` without a map).
+pub fn libraryOf(zcu: *const Zcu, d: Decl) []const u8 {
+    assert(@backingInt(d.file) < zcu.files.len);
+    const lib = zcu.decl_lib.get(d) orelse return "work";
+    return zcu.intern_pool.stringToSlice(lib);
 }
 
 /// Whether elaboration raised `code`.

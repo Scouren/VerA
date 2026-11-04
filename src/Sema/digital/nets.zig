@@ -3,8 +3,7 @@
 //! whole net outside it is that net; any other connection is a driver into
 //! the port net or out of it) in; `Program.nets`, `Program.drivers` (each
 //! with its `.continuous` instruction, queued at time 0), the time-0 driver
-//! values (unknown, save the bits no operand can make other than z) and the
-//! nets' §7.9/§7.10 time-0 resolution out.
+//! values and the nets' §7.9/§7.10 time-0 resolution (`time0.zig`) out.
 //! Cites: IEEE 1364-2005 §4.2.1, §4.5, §6.1, §6.1.3, §7.9, §7.10, §12.3.3,
 //! §12.3.9.2, §12.3.10, §19.9.
 //!
@@ -14,13 +13,13 @@
 //! - `pub fn netKind(k: Inst.NetKind) ?std_sim.net.NetKind`
 //! - `pub fn mintNet(l: *Lower, kind: std_sim.net.NetKind, width: u32, signed: bool) Error!u32`
 //! - `pub fn retype(l: *Lower, n: u32, kind: net.NetKind) Error!void`
+//! - `pub fn promoteWreal(l: *Lower, n: u32) Error!void`
 //! - `pub fn internalDominates(internal: net.NetKind, external: net.NetKind) bool`
 //! - `pub fn strengths(text: []const u8) [2]std_sim.net.Strength`
 //! - `pub fn delay3(l: *Lower, f: u32, d: Inst.Exprs) Error!Delay3`
 //! - `pub fn assign(l: *Lower, f: u32, i: Inst.Index) Error!void`
 //! - `pub fn drivenNet(l: *Lower, f: u32, target: Inst.Ref, s: [2]std_sim.net.Strength) Error!u32`
 //! - `pub fn compileDrivers(l: *Lower) Error!void`
-//! - `pub fn finish(l: *Lower, p: *Program) Error!void`
 //! - `pub fn sink(l: *Lower, r: Inst.Ref) Error!Sink`
 //! - `pub fn delayOf(l: *Lower, d: Delay3, rows: *[3]u32) Error!net.Delay`
 
@@ -113,15 +112,17 @@ pub fn netKind(k: Inst.NetKind) ?net.NetKind {
 }
 
 /// A new net of `kind`, `width` bits, on a slot of its own holding §4.2.1's
-/// undriven value. Returns its `nets` row.
+/// undriven value (VAMS §3.7: a `wreal` holds a real, 0.0). Returns its
+/// `nets` row.
 pub fn mintNet(l: *Lower, kind: net.NetKind, width: u32, signed: bool) Error!u32 {
-    if (kind == .wreal) return l.refuse("a wreal net");
-    const t = try l.tyOf(.{ .width = width, .signed = signed });
-    const words = Program.words(width);
-    const value = try std_sim.logic.filled(l.a, width, signed, undriven(kind));
+    const wreal = kind == .wreal;
+    const bits: u32 = if (wreal) 64 else width;
+    const t = if (wreal) Program.Ty.real_ty else try l.tyOf(.{ .width = width, .signed = signed });
+    const words = Program.words(bits);
+    const value = try std_sim.logic.filled(l.a, bits, signed, if (wreal) .zero else undriven(kind));
     const slot = try l.b.slot(t, try l.a.dupe(u64, value.values()[0..words]), try l.a.dupe(u64, value.unknowns()[0..words]));
     const at: u32 = @intCast(l.nets.items.len);
-    try l.nets.append(l.a, .{ .kind = kind, .slot = slot, .width = width });
+    try l.nets.append(l.a, .{ .kind = kind, .slot = slot, .width = bits });
     try l.slot_net.put(l.a, slot, at);
     return at;
 }
@@ -136,6 +137,25 @@ pub fn retype(l: *Lower, n: u32, kind: net.NetKind) Error!void {
     const value = try std_sim.logic.filled(l.a, row.width, false, undriven(kind));
     @memcpy(l.b.init_v.items[word..][0..words], value.values()[0..words]);
     @memcpy(l.b.init_x.items[word..][0..words], value.unknowns()[0..words]);
+}
+
+/// VAMS §3.7's port merge: a wire or tri joined to a wreal port becomes one
+/// wreal net (a real, 0.0 undriven) for every connection to it, the names
+/// already bound to it included.
+pub fn promoteWreal(l: *Lower, n: u32) Error!void {
+    const row = &l.nets.items[n];
+    assert(row.kind != .wreal);
+    if (Program.words(row.width) != 1) return l.refuse("VAMS §3.7 a vector net joined to a wreal port");
+    row.kind = .wreal;
+    row.width = 64;
+    l.b.p.slots.items(.ty)[row.slot] = Program.Ty.real_ty;
+    const word = l.b.p.slots.items(.word)[row.slot];
+    l.b.init_v.items[word] = 0;
+    l.b.init_x.items[word] = 0;
+    for (l.names.items) |*name| if (name.kind == .net and name.net == n) {
+        name.ty = digital.Type.real_type;
+    };
+    assert(l.b.p.slots.items(.ty)[row.slot].real);
 }
 
 /// §12.3.10 Table 12-1's "int" cells: whether a port net of type
@@ -297,102 +317,6 @@ pub fn compileDrivers(l: *Lower) Error!void {
     for (l.nets.items, runs) |*n, run| n.drivers = try l.b.listOf(run.items);
 }
 
-/// Writes the nets' and drivers' tables into finished program `p`: each
-/// driver's time-0 value (x, save the bits a constant z holds, read with
-/// every net x), each net's §7.9 time-0 resolution (its signals, its
-/// resolved value, its slot's value), and per slot its net.
-pub fn finish(l: *Lower, p: *Program) Error!void {
-    const nets = l.nets.items;
-    const drivers = @constCast(p.drivers);
-    // Each driver's time-0 value, unknown.
-    var init: std.ArrayList(u64) = .empty;
-    for (drivers) |*d| {
-        d.init = @intCast(init.items.len);
-        const v = try std_sim.logic.filled(l.a, d.width, false, .x);
-        // §8.5 a UDP's output starts at its state (x for a combinational one).
-        if (d.source == .udp) std_sim.logic.setBit(v, d.source.udp.out_bit orelse 0, d.source.udp.state);
-        try init.appendSlice(l.a, v.values());
-        try init.appendSlice(l.a, v.unknowns());
-    }
-    p.driver_init = init.items;
-    try knownZ(l, p, init.items);
-    const rows = try l.a.alloc(Program.Net, nets.len);
-    // §14.2 the module paths, a run per net, and the slots they start at.
-    var paths: std.ArrayList(Program.Path) = .empty;
-    const path_source = try l.a.alloc(bool, p.slots.len);
-    @memset(path_source, false);
-    var resolved: std.ArrayList(u64) = .empty;
-    var signals: std.ArrayList(net.Signal) = .empty;
-    const init_v = try l.a.dupe(u64, p.init_v);
-    const init_x = try l.a.dupe(u64, p.init_x);
-    for (nets, rows) |n, *row| {
-        const ds = p.list(n.drivers);
-        const word = p.slots.items(.word)[n.slot];
-        const words = Program.words(n.width);
-        const sig_at: u32 = @intCast(signals.items.len);
-        try signals.appendNTimes(l.a, .{}, n.width);
-        const at: u32 = @intCast(resolved.items.len);
-        const value = try std_sim.logic.filled(l.a, n.width, false, .z);
-        // §7.9 the first resolution (lib/sim/digital's `resolution.initial`).
-        if (n.kind != .trireg) {
-            const sigs = signals.items[sig_at..][0..n.width];
-            if (ds.len == 0) {
-                @memset(sigs, net.netPull(n.kind));
-            } else {
-                const table = net.wiredLogic(n.kind);
-                for (0..n.width) |b| {
-                    var acc: net.Signal = .{};
-                    for (ds) |di| {
-                        const d = drivers[di];
-                        const dv = p.driver_init[d.init..][0..Program.words(d.width)];
-                        const dx = p.driver_init[d.init + Program.words(d.width) ..][0..Program.words(d.width)];
-                        const bit = std_sim.logic.planeBit(dv[b / 64] >> @intCast(b % 64), dx[b / 64] >> @intCast(b % 64));
-                        const c: net.Signal = if (d.init_or_z and bit != .z) .orZ(bit, d.s0, d.s1) else .of(bit, d.s0, d.s1);
-                        acc = if (table) |t| acc.combineWired(c, t) else acc.combine(c);
-                    }
-                    acc = acc.combine(net.netPull(n.kind));
-                    sigs[b] = acc;
-                    std_sim.logic.setBit(value, @intCast(b), acc.collapse());
-                }
-                @memcpy(init_v[word..][0..words], value.values());
-                @memcpy(init_x[word..][0..words], value.unknowns());
-            }
-        }
-        try resolved.appendSlice(l.a, value.values());
-        try resolved.appendSlice(l.a, value.unknowns());
-        row.* = .{
-            .kind = n.kind,
-            .charge = n.charge,
-            .slot = n.slot,
-            .drivers = n.drivers,
-            .delay = n.delay,
-            .decay = n.decay,
-            .signal = sig_at,
-            .strength_read = n.strength_read,
-            .trans = n.trans,
-            .paths = .{ .start = @intCast(paths.items.len), .len = @intCast(n.paths.items.len) },
-            .ondetect = n.ondetect,
-            .showcancelled = n.showcancelled,
-            .resolved = at,
-            .cold = n.delay.present or n.decay != Program.Net.no_decay or n.paths.items.len != 0,
-        };
-        for (n.paths.items) |pp| path_source[pp.src] = true;
-        try paths.appendSlice(l.a, n.paths.items);
-    }
-    p.nets = rows;
-    p.paths = paths.items;
-    if (paths.items.len != 0) p.path_source = path_source;
-    p.resolved_init = resolved.items;
-    p.signal_init = signals.items;
-    p.init_v = init_v;
-    p.init_x = init_x;
-    const slot_net = try l.a.alloc(u32, p.slots.len);
-    @memset(slot_net, none);
-    for (nets, 0..) |n, k| slot_net[n.slot] = @intCast(k);
-    p.slot_net = slot_net;
-    try switchJoined(l, p);
-}
-
 /// The net bits lvalue operand `r` names: a whole net (or net array
 /// element), or a constant bit- or part-select of a vector net.
 pub fn sink(l: *Lower, r: Inst.Ref) Error!Sink {
@@ -408,7 +332,9 @@ pub fn sink(l: *Lower, r: Inst.Ref) Error!Sink {
         .elem, .slice, .slice_up, .slice_down => {
             const s = try place.selectOf(l, i);
             if (s.name.kind != .net) return l.refuse("a continuous assignment to a variable");
-            if (s.name.dims.len != 0) return l.refuse("a continuous assignment to a net array element");
+            // §4.9.1 a net array element is a net of its own.
+            const at = if (s.name.dims.len == 0) s.name.net else try elementNet(l, s);
+            if (s.whole_elem) return .{ .net = at, .lo = 0, .width = l.nets.items[at].width };
             const first: i64 = switch (s.mode) {
                 .const_part => s.first,
                 .bit, .up, .down => blk: {
@@ -419,9 +345,9 @@ pub fn sink(l: *Lower, r: Inst.Ref) Error!Sink {
                     break :blk if (s.mode == .bit) p else if (ascending == (s.mode == .up)) p else p -| (s.count - 1);
                 },
             };
-            const w = l.nets.items[s.name.net].width;
+            const w = l.nets.items[at].width;
             if (first < 0 or first + s.count > w) return l.refuse("§12.3.9.2 a select outside its net");
-            return .{ .net = s.name.net, .lo = @intCast(first), .width = s.count };
+            return .{ .net = at, .lo = @intCast(first), .width = s.count };
         },
         else => return l.refuse("a continuous assignment to an expression"),
     }
@@ -474,99 +400,6 @@ fn undriven(kind: net.NetKind) Bit {
     };
 }
 
-/// §7.6 every switch-joined net resolved once at time 0, by the run's own
-/// group resolution over the drivers' time-0 values (lib/sim/digital's
-/// elaboration does the same): its slot, signals and resolution as the
-/// group leaves them.
-fn switchJoined(l: *Lower, p: *Program) Error!void {
-    for (p.nets) |n| {
-        if (n.trans.len != 0) break;
-    } else return;
-    var discard: std.Io.Writer.Discarding = .init(&.{});
-    var s = std_sim.State.init(l.a, p, &discard.writer) catch |e| switch (e) {
-        error.OutOfMemory => return error.OutOfMemory,
-        error.SimFailed, error.WriteFailed => return l.refuse("a design the runtime cannot start"),
-    };
-    for (p.nets, 0..) |n, k| if (n.trans.len != 0) std_sim.resolve.resolve(&s, l.a, @intCast(k)) catch |e| switch (e) {
-        error.OutOfMemory => return error.OutOfMemory,
-        error.SimFailed, error.WriteFailed => return l.refuse("a switch-joined net the runtime cannot resolve at time 0"),
-    };
-    p.init_v = s.v;
-    p.init_x = s.x;
-    p.signal_init = s.signals;
-    p.resolved_init = s.net_resolved;
-}
-
-/// The bits of each driver no operand value can make other than z are z
-/// from the start (iverilog's reading): each driver's value is computed
-/// once with every net x, by the run's own evaluator.
-fn knownZ(l: *Lower, p: *Program, init: []u64) Error!void {
-    if (p.drivers.len == 0) return;
-    var discard: std.Io.Writer.Discarding = .init(&.{});
-    var s = std_sim.State.init(l.a, p, &discard.writer) catch |e| switch (e) {
-        error.OutOfMemory => return error.OutOfMemory,
-        error.SimFailed, error.WriteFailed => return l.refuse("a design the runtime cannot start"),
-    };
-    for (l.nets.items) |n| {
-        const word = p.slots.items(.word)[n.slot];
-        const x = try std_sim.logic.filled(l.a, n.width, false, .x);
-        @memcpy(s.v[word..][0..x.values().len], x.values());
-        @memcpy(s.x[word..][0..x.unknowns().len], x.unknowns());
-    }
-    for (p.drivers, l.wires.items) |d, w| {
-        const words = Program.words(d.width);
-        const dv = init[d.init..][0..words];
-        const dx = init[d.init + words ..][0..words];
-        switch (d.source) {
-            .bridge => |b| {
-                const zv = try std_sim.logic.filled(l.a, d.width, false, .z);
-                for (b.dst_lo..b.dst_lo + b.width + b.ext) |k| std_sim.logic.setBit(zv, @intCast(k), .x);
-                @memcpy(dv, zv.values());
-                @memcpy(dx, zv.unknowns());
-            },
-            .expr => |x| {
-                l.frame = w.frame;
-                if (try calls(l, w.source.expr.value)) continue;
-                const v = std_sim.eval.eval(&s, l.a, x.value) catch |e| switch (e) {
-                    error.OutOfMemory => return error.OutOfMemory,
-                    error.SimFailed, error.WriteFailed => return l.refuse("a continuous assignment the runtime cannot evaluate at time 0"),
-                };
-                for (0..d.width) |k| {
-                    const from: u32 = if (x.slice) x.lo + @as(u32, @intCast(k)) else @intCast(k);
-                    if (v.bit(from) == .z) {
-                        dv[k / 64] &= ~(@as(u64, 1) << @intCast(k % 64));
-                        dx[k / 64] |= @as(u64, 1) << @intCast(k % 64);
-                    }
-                }
-            },
-            else => {}, // else: a gate, switch, UDP or pull starts at its own value
-        }
-    }
-}
-
-/// Whether expression `r` calls a function, user or system.
-fn calls(l: *Lower, r: Inst.Ref) Error!bool {
-    const i = r.toIndex() orelse return false;
-    const vir = l.virOf(l.frame);
-    const data = vir.instructions.items(.data)[@backingInt(i)];
-    return switch (Lower.tag(vir, i)) {
-        .call, .call_sys => true,
-        .pos, .neg, .not, .bit_not, .red_and, .red_nand, .red_or, .red_nor, .red_xor, .red_xnor => calls(l, data.un_node.operand),
-        .add, .sub, .mul, .div, .mod, .pow, .shl, .shr, .ashl, .ashr, .lt, .gt, .lte, .gte, .eq, .neq, .case_eq, .case_neq, .bit_and, .bit_or, .bit_xor, .bit_xnor, .bool_and, .bool_or, .elem, .replicate => blk: {
-            const b = Lower.payload(vir, Inst.Bin, i);
-            break :blk try calls(l, b.lhs) or try calls(l, b.rhs);
-        },
-        .ternary, .mintypmax, .slice, .slice_up, .slice_down => blk: {
-            const t = Lower.payload(vir, Inst.Triple, i);
-            break :blk try calls(l, t.a) or try calls(l, t.b) or try calls(l, t.c);
-        },
-        .concat => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |x| {
-            if (try calls(l, x)) break true;
-        } else false,
-        else => false, // else: a leaf
-    };
-}
-
 fn concatLeaves(l: *Lower, r: Inst.Ref, out: *std.ArrayList(Inst.Ref)) Error!void {
     const vir = l.virOf(l.frame);
     const i = r.toIndex() orelse return l.refuse("an omitted net lvalue");
@@ -594,4 +427,23 @@ fn sendPort(l: *Lower, f: u32, operands: []const Sink, src: u32, width: u32, sig
         } } });
         lo += copy;
     }
+}
+
+/// The net row of net array element `s` (constant indices, row-major as
+/// `std_sim.eval.address` reads them: the last dimension innermost).
+fn elementNet(l: *Lower, s: place.Sel) Error!u32 {
+    const dims = s.name.dims;
+    assert(dims.len != 0 and s.indices.len >= dims.len);
+    var at: u64 = 0;
+    var stride: u64 = 1;
+    var k = dims.len;
+    while (k != 0) {
+        k -= 1;
+        const idx = try l.intOf(l.frame, s.indices[k]);
+        if (idx < dims[k].low or idx > dims[k].high) return l.refuse("§12.3.9.2 a net array index outside its array");
+        at += stride * @as(u64, @intCast(idx - dims[k].low));
+        stride *= @as(u64, @intCast(dims[k].high - dims[k].low + 1));
+    }
+    assert(at < s.name.count);
+    return s.name.net + @as(u32, @intCast(at));
 }

@@ -2831,7 +2831,6 @@ verilog/07_gate_switch_level/pull_gate_two_terminals_rejected.v rw-zero (parse/a
 verilog/07_gate_switch_level/reject_same_polarity_drive_strength.v rw-zero (parse/astgen) message: stderr: line 1: old `error[E0207]: unexpected token: a drive strength pairs one 0-side with one 1-side strength`, new `error[E0207]: unexpected token: expected_strength`
 verilog/07_gate_switch_level/split_array_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/07_gate_switch_level/switch_three_delays_rejected.v not built: backend digital_device
-verilog/07_gate_switch_level/terminal_width_mismatch_rejected.v rw-dlower (digital lowering): exit status old 1, new 255
 verilog/07_gate_switch_level/unknown_gate_keyword_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1100]: digital source execution failed: undeclared module in instantiation: no library of the search order (work) holds cell `AND``, new `error[E0904]: instance names no module: `AND``
 verilog/07_gate_switch_level/unnamed_array_rejected.v rw-zero (parse/astgen) message: stderr: line 1: old `error[E0207]: unexpected token: found `[``, new `error[E0207]: unexpected token: expected_token`
 verilog/08_udp/combinational_reg_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
@@ -2968,7 +2967,6 @@ verilog/12_hierarchy/hierarchy_explicit_port_concat.v not built: backend digital
 verilog/12_hierarchy/hierarchy_simple_name_stops_at_module_rejected.v not built: backend digital_device
 verilog/12_hierarchy/inout_net_expressions.v not built: backend digital_device
 verilog/12_hierarchy/input_declared_reg_rejected.v not built: backend digital_device
-verilog/12_hierarchy/instance_array_width_product_rejected.v rw-dlower (digital lowering): exit status old 1, new 255
 verilog/12_hierarchy/instance_select_out_of_range_rejected.v not built: backend digital_device
 verilog/12_hierarchy/listed_port_undeclared_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1100]: digital source execution failed: §12.3.3: port `b` has no direction declaration`, new `error[E0376]: port has no direction declaration: port `b` of module `m` is not declared `input`, `output` or `inout``
 verilog/12_hierarchy/localparam_override_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
@@ -3115,12 +3113,7 @@ verilog/17_system_tasks/native_sformat_dynamic.v rw-dlower (digital lowering): s
 verilog/17_system_tasks/output_term_net_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/17_system_tasks/percent_escape_with_width_rejected.v not built: backend digital_device
 verilog/17_system_tasks/printtimescale_unknown_scope_rejected.v not built: backend digital_device
-verilog/17_system_tasks/q_add_arguments_rejected.v rw-dlower (digital lowering): exit status old 1, new 255
-verilog/17_system_tasks/q_exam_arguments_rejected.v rw-dlower (digital lowering): exit status old 1, new 255
 verilog/17_system_tasks/q_exam_code_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/17_system_tasks/q_full_arguments_rejected.v rw-dlower (digital lowering): exit status old 1, new 255
-verilog/17_system_tasks/q_initialize_arguments_rejected.v rw-dlower (digital lowering): exit status old 1, new 255
-verilog/17_system_tasks/q_remove_arguments_rejected.v rw-dlower (digital lowering): exit status old 1, new 255
 verilog/17_system_tasks/random_seed_constant_rejected.v not built: backend digital_device
 verilog/17_system_tasks/readmem_address_outside_memory.v rw-dlower (digital lowering): stderr: line 1: old `warning[W1156]: memory file address outside the memory: memory file address @8 is outside the memory's declared range [0:3]; its words are skipped`, new ``
 verilog/17_system_tasks/readmem_address_outside_task_range.v rw-dlower (digital lowering): stderr: line 1: old `warning[W1157]: a $readmem load terminated: §17.2.9: memory file address @3 is outside the load range [0:1] the task gives (the words before it stay loaded); t`, new ``
@@ -3182,7 +3175,6 @@ verilog/18_vcd/dumpports_same_file_rejected.v rw-dlower (digital lowering) locat
 verilog/18_vcd/dumpports_variable_scope_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/18_vcd/dumpportsall_two_files_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/18_vcd/dumpportsflush_two_files_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/18_vcd/dumpportslimit_without_size_rejected.v rw-dlower (digital lowering): exit status old 1, new 255
 verilog/18_vcd/dumpportsoff_two_files_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/18_vcd/dumpvars_later_time_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/18_vcd/dumpvars_later_ti`, new `  = note: LRM 8.5`
 verilog/18_vcd/dumpvars_memory_word_rejected.v not built: backend digital_device

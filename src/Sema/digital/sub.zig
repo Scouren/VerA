@@ -199,6 +199,18 @@ pub fn finish(l: *Lower) Error!void {
         };
     }
     l.b.p.subs = out;
+    // §10.2.1 each slot of a timed automatic task's out-of-line storage is
+    // each activation's own: a change in one wakes no waiter of another.
+    for (l.subs.items, 0..) |r, k| if (r.automatic and r.body != none) {
+        if (l.b.p.slot_act.len == 0) {
+            const acts = try l.a.alloc(u32, l.b.p.slots.len);
+            @memset(acts, none);
+            l.b.p.slot_act = acts;
+        }
+        const acts: []u32 = @constCast(l.b.p.slot_act);
+        @memset(acts[r.body_own.first..][0..r.body_own.count], @intCast(k));
+    };
+    assert(l.b.p.slot_act.len == 0 or l.b.p.slot_act.len == l.b.p.slots.len);
 }
 
 // ---- private ----
@@ -268,6 +280,14 @@ fn storage(l: *Lower, outer: u32, scope: u32, i: Inst.Index) Error!Storage {
     for (all) |d| if (Lower.tag(vir, d) == .event) {
         _ = try vars.event(l, f, d);
     };
+    // §10.2.1 an automatic one's named blocks' items are per activation:
+    // inside its storage.
+    if (s.flags.automatic) {
+        assert(!l.laying_out);
+        l.laying_out = true;
+        defer l.laying_out = false;
+        try decl.preBlocks(l, f, s.body, 0);
+    }
     const count: u32 = @as(u32, @intCast(l.b.p.slots.len)) - first;
     for (all) |d| if (Lower.tag(vir, d) == .param) {
         _ = try vars.param(l, f, d);

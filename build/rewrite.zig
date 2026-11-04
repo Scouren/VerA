@@ -5,9 +5,9 @@
 //! lib/diag), `diff-air` (Air's interpreter vs src/ir's opcode folds),
 //! `diff-air-passes` (the Air passes against Air's interpreter over
 //! generated programs; `-Dfull-oracles` runs the nightly's full sweep),
-//! `diff-sim` (the std_sim runtime vs lib/sim/digital over every `.v`),
-//! `diff-link` (link vs src/zigbuild over the same device builds),
-//! `diff-dlower` (sema's digital lowering vs lib/sim/digital and the bridge),
+//! `diff-sim` (sema's digital lowering run in std_sim vs lib/sim/digital
+//! over every `.v`), `diff-link` (link vs src/zigbuild over the same device
+//! builds),
 //! `diff-astgen` (vams AstGen/Vir vs the old compiler's per-file codes and
 //! design units), `diff-elab` (sema's elaboration vs src/elab and the
 //! digital route's), `diff-lower` (sema's analog lowering vs src/analog,
@@ -67,8 +67,7 @@ pub fn add(g: Graph) void {
         .{ .step = "diff-spice", .root = "tests/differential/spice.zig", .what = "vams spice against lib/frontend's spice_cards.synthesize on every netlist the fixtures use", .imports = &.{ "vams", "frontend" } },
         .{ .step = "diff-astgen", .root = "tests/differential/astgen.zig", .what = "vams AstGen/Vir against the old compiler's per-file codes and design units on every fixture", .imports = &.{ "vams", "frontend", "diag", "vera" } },
         .{ .step = "diff-air-passes", .root = "tests/differential/air_passes.zig", .what = "the Air passes (Interval, Float, Legalize, Setup) against Air's interpreter over generated programs", .imports = &.{ "air", "intern_pool", "vams" } },
-        .{ .step = "diff-sim", .root = "tests/differential/sim.zig", .what = "the std_sim runtime against lib/sim/digital: every .v fixture's transcript, through the bridge", .imports = &.{ "std_sim", "sim", "frontend", "diag", "kernels" } },
-        .{ .step = "diff-dlower", .root = "tests/differential/dlower.zig", .what = "sema's digital lowering against lib/sim/digital: every .v fixture's transcript from source, and against the bridge's Program", .imports = &.{ "sema", "vams", "std_sim", "sim", "frontend", "diag", "kernels", "intern_pool" } },
+        .{ .step = "diff-sim", .root = "tests/differential/sim.zig", .what = "sema's digital lowering run in std_sim against lib/sim/digital: every .v fixture's transcript from source", .imports = &.{ "sema", "vams", "std_sim", "sim", "frontend", "diag", "intern_pool" } },
         .{ .step = "diff-elab", .root = "tests/differential/elab.zig", .what = "sema's elaboration against src/elab and the digital route's elaboration on every fixture", .imports = &.{ "sema", "vams", "frontend", "diag", "elab", "sim" } },
         .{ .step = "diff-lower", .root = "tests/differential/lower.zig", .what = "sema's analog lowering against src/analog: tables, codes, and every contribution's value by both interpreters", .imports = &.{ "sema", "air", "intern_pool", "vams", "frontend", "diag", "elab", "analog", "ir", "old_interp" } },
         .{ .step = "diff-codegen", .root = "tests/differential/codegen.zig", .what = "codegen's Zig backend against src/codegen/device: both devices built and run, rows, Jacobians and charges bit for bit", .imports = &.{ "sema", "air", "intern_pool", "vams", "codegen", "link", "dynlib", "frontend", "diag", "vera", "contract" }, .libc = true },

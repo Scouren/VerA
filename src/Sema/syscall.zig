@@ -35,9 +35,11 @@ pub const Deferred = struct {
     tag: SysFn.Tag,
     args: []const Inst.Ref,
     /// Each operand's value at the statement; null for one lowered at the end.
-    pre: []const ?Ref,
+    pre: []const ?Value,
     /// Its `device.displays` row.
     row: u32,
+    /// The statement, for §9.4.3's findings.
+    src: Inst.Ref,
 };
 
 /// A system function call read as a value.
@@ -139,16 +141,18 @@ pub fn task(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error
     try s.device.displays.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .call = undefined });
     if (b.conditional != 0) {
         // A guarded print is minted where it stands.
-        const r = try expr.call(s, b, @backingInt(tag), null, try lowerArgs(s, b, args));
+        const vals = try s.arena.alloc(Value, args.len);
+        for (args, vals) |a, *v| v.* = try printArg(s, b, a);
+        const r = try expr.call(s, b, @backingInt(tag), null, try formatted(s, b, tag, args, vals, src));
         s.device.displays.items(.call)[row] = r.toIndex().?;
         return;
     }
     // §9.4.1 an unconditional print is minted at the end of the analog
     // blocks: an operand that reads a branch flow is lowered there, against
     // the converged sums; every other operand is its value here.
-    const pre = try s.arena.alloc(?Ref, args.len);
-    for (args, pre) |a, *p| p.* = if (a == .none or readsFlow(s, b.unit, a, 0)) null else (try expr.lower(s, b, a)).ref;
-    try s.deferred.append(s.arena, .{ .unit = b.unit, .tag = tag, .args = args, .pre = pre, .row = row });
+    const pre = try s.arena.alloc(?Value, args.len);
+    for (args, pre) |a, *p| p.* = if (a == .none or readsFlow(s, b.unit, a, 0)) null else try expr.lower(s, b, a);
+    try s.deferred.append(s.arena, .{ .unit = b.unit, .tag = tag, .args = args, .pre = pre, .row = row, .src = src });
 }
 
 /// Mints every print `task` deferred, in source order, at the end of `b`
@@ -157,15 +161,30 @@ pub fn finishDisplays(s: *Sema, b: *Block) Allocator.Error!void {
     assert(b.parent == null);
     for (s.deferred.items) |d| {
         b.unit = d.unit;
-        const refs = try s.arena.alloc(Ref, d.args.len);
-        for (d.args, d.pre, refs) |a, p, *r| r.* = p orelse if (a == .none) .fromIntern(.zero_real) else (try expr.lower(s, b, a)).ref;
-        const call = try expr.call(s, b, @backingInt(d.tag), null, refs);
+        const vals = try s.arena.alloc(Value, d.args.len);
+        for (d.args, d.pre, vals) |a, p, *v| v.* = p orelse try printArg(s, b, a);
+        const call = try expr.call(s, b, @backingInt(d.tag), null, try formatted(s, b, d.tag, d.args, vals, d.src));
         s.device.displays.items(.call)[d.row] = call.toIndex().?;
     }
     assert(s.deferred.items.len <= s.device.displays.len);
 }
 
 // ---- private ----
+
+/// A print operand's value; a null argument is §9.4.1's space.
+fn printArg(s: *Sema, b: *Block, a: Inst.Ref) Allocator.Error!Value {
+    if (a == .none) return .{ .ref = .fromIntern(try decl.intern(s, .{ .str = " " })), .ty = .string };
+    return expr.lower(s, b, a);
+}
+
+/// A print's operand refs, after §9.4.3 judged and marked `vals` (format.zig).
+fn formatted(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, vals: []Value, src: Inst.Ref) Allocator.Error![]const Ref {
+    const format = @import("format.zig");
+    try format.operands(s, b, format.skipOf(tag, vals), args, vals, src);
+    const refs = try s.arena.alloc(Ref, vals.len);
+    for (vals, refs) |v, *r| r.* = v.ref;
+    return refs;
+}
 
 /// Whether `r` reads a branch flow (an access whose name is a flow's
 /// anywhere): such an operand is lowered at the end of the blocks.

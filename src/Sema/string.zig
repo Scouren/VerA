@@ -117,9 +117,18 @@ pub fn concat(s: *Sema, b: *Block, i: Inst.Index, src: Inst.Ref) Allocator.Error
 /// §9.5.3 `$sformat(s, fmt, args...)` and `$swrite(s, args...)`: `s`
 /// assigned the call's string, which the host formats.
 pub fn write(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!void {
-    if (args.len == 0 or args[0] == .none) return s.fail(.E0506, b.unit.file, src, "`{t}` writes its first argument", .{tag});
-    const refs = try s.arena.alloc(Ref, args.len - 1);
-    for (args[1..], refs) |a, *r| r.* = if (a == .none) .fromIntern(.zero_real) else (try expr.lower(s, b, a)).ref;
+    const file = b.unit.file;
+    if (args.len == 0 or args[0] == .none) return s.fail(.E0813, file, src, "`{t}` needs a string variable to write into", .{tag});
+    if (slotType(b, args[0])) |t| if (t != .string) return s.fail(.E0813, file, src, "`{t}` writes into a `string` variable, and this one is {t}", .{ tag, t });
+    const ops = args[1..];
+    const vals = try s.arena.alloc(Value, ops.len);
+    for (ops, vals) |a, *v| v.* = if (a == .none) .{ .ref = .fromIntern(try decl.intern(s, .{ .str = " " })), .ty = .string } else try expr.lower(s, b, a);
+    // §9.5.3 `$sformat`'s format may be a string variable, read at run time.
+    const runtime = tag == .@"$sformat" and vals.len != 0 and ops[0] != .none and expr.constOf(s, vals[0].ref) == null;
+    if (runtime and vals[0].ty != .string) return s.fail(.E0813, file, src, "`$sformat`'s format_string is a string, and this one is {t}", .{vals[0].ty});
+    if (!runtime) try @import("format.zig").operands(s, b, 0, ops, vals, src);
+    const refs = try s.arena.alloc(Ref, vals.len);
+    for (vals, refs) |x, *r| r.* = x.ref;
     const v = try expr.call(s, b, @backingInt(tag), .string, refs);
     try @import("control.zig").assignTo(s, b, args[0], .{ .ref = v, .ty = .string }, src);
 }
@@ -138,7 +147,7 @@ pub fn read(s: *Sema, b: *Block, tag: SysFn.Tag, first: usize, args: []const Ins
     const r = try expr.call(s, b, @backingInt(tag), .integer, ops.items);
     for (args, 0..) |a, k| {
         if (!(k == first or (many and k > first)) or a == .none) continue;
-        const ty = try destType(s, b, a);
+        const ty = slotType(b, a) orelse .real;
         const at: Ref = .fromIntern(try decl.intern(s, .{ .int = @intCast(k - first) }));
         const v: Value = if (ty == .string)
             .{ .ref = try expr.call(s, b, @backingInt(SysFn.Tag.@"scan$str"), .string, &.{ r, at }), .ty = .string }
@@ -151,28 +160,26 @@ pub fn read(s: *Sema, b: *Block, tag: SysFn.Tag, first: usize, args: []const Ins
 
 // ---- private ----
 
-/// The type of the variable (or array element) `r` names; real when it
-/// names none (the assignment reports it).
-fn destType(s: *Sema, b: *Block, r: Inst.Ref) Allocator.Error!Sema.Ty {
-    _ = s;
+/// The type of the variable (or array element) `r` names, or null.
+fn slotType(b: *Block, r: Inst.Ref) ?Sema.Ty {
     const vir = b.unit.vir;
     var at = r;
     for (0..64) |_| {
-        const i = at.toIndex() orelse return .real;
+        const i = at.toIndex() orelse return null;
         switch (vir.instructions.items(.tag)[@backingInt(i)]) {
             .elem => at = decl.payloadOf(vir, Inst.Bin, i).lhs,
             .decl_ref => {
-                const bind = b.unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl)) orelse return .real;
+                const bind = b.unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl)) orelse return null;
                 return switch (bind) {
                     .slot => |x| x.ty,
                     .array => |x| x.ty,
-                    else => .real, // else: no variable
+                    else => null, // else: no variable
                 };
             },
-            else => return .real, // else: no variable
+            else => return null, // else: no variable
         }
     }
-    return .real;
+    return null;
 }
 
 fn str(s: *Sema, bytes: []const u8) Allocator.Error!Value {

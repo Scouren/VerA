@@ -31,6 +31,7 @@
 //! - `pub fn addFile(zcu: *Zcu, path: []const u8, vir: Vir, builtins: u32) Allocator.Error!File.Index`
 //! - `pub fn fileVir(zcu: *const Zcu, file: File.Index) *const Vir`
 //! - `pub fn declRow(zcu: *const Zcu, d: Decl) Vir.Decl`
+//! - `pub fn continuousDiscipline(zcu: *Zcu, name: []const u8) Allocator.Error!bool`
 //! - `pub fn isBuiltin(zcu: *const Zcu, d: Decl) bool`
 //! - `pub fn fmtPath(zcu: *const Zcu, i: Instance.Index) PathFormatter` (`PathFormatter.format`)
 //! - `pub fn hasCode(zcu: *const Zcu, code: Diag.Code) bool`
@@ -351,6 +352,25 @@ pub fn declRow(zcu: *const Zcu, d: Decl) Vir.Decl {
     const rows = zcu.fileVir(d.file).decls();
     assert(@backingInt(d.index) < rows.len);
     return rows[@backingInt(d.index)];
+}
+
+/// VAMS §3.6.2.2 whether discipline `name` is of the continuous domain:
+/// its `domain`, else whether it binds a nature. An empty or unknown name
+/// is discrete: §7.2.1 such a net is the digital kernel's.
+pub fn continuousDiscipline(zcu: *Zcu, name: []const u8) Allocator.Error!bool {
+    if (name.len == 0) return false;
+    const dd = zcu.disciplines.get(try zcu.intern_pool.getString(zcu.gpa, name)) orelse return false;
+    const dvir = zcu.fileVir(dd.file);
+    const row = zcu.declRow(dd);
+    const disc = dvir.extraData(Vir.Inst.Discipline, dvir.instructions.items(.data)[@backingInt(row.inst)].pl_node.payload_index);
+    var bound = false;
+    for (dvir.list(Vir.Inst.DisciplineItem, disc.items)) |item| switch (item.kind) {
+        .domain => return std.mem.eql(u8, dvir.string(item.name), "continuous"),
+        .potential, .flow => bound = true,
+        else => {}, // else: an attribute
+    };
+    assert(row.kind == .discipline);
+    return bound;
 }
 
 /// Whether `d` is a shipped module (`File.builtin_end`).

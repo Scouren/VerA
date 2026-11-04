@@ -12,7 +12,7 @@
 //! Cites: IEEE 1364-2005 §9.9, §11.4, §12.4, §12.5, §19.8.
 //!
 //! Contents:
-//! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Why = struct`
+//! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Named = struct`, `pub const Why = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
 //! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `reject`, `rejectFmt`, `rejectArg`, `rejectArgFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
@@ -50,14 +50,26 @@ pub const Source = struct {
 pub const Options = struct {
     /// One per `Zcu` file, in file order.
     sources: []const Source,
+    /// VAMS §7 the digital half of a mixed design (lib/sim/digital's
+    /// `Link.mixed`): its analog blocks, analog functions and continuous or
+    /// ground nets are the analog solver's, skipped, where a pure IEEE 1364
+    /// design refuses them.
+    mixed: bool = false,
 };
 
 /// The program, and per timing check (`Program.checks` order) the byte of
-/// the preprocessed text its W1199 report is filed at.
+/// the preprocessed text its W1199 report is filed at. A mixed design's
+/// also has `names`: its variables and nets by path (`Named`).
 pub const Lowered = struct {
     program: Program,
     check_sites: []const u32 = &.{},
+    names: []const Named = &.{},
 };
+
+/// VAMS §7.3 one variable or net a mixed host reads (D2A) or writes (A2D):
+/// its path below the root as Sema's discrete card rows spell it (`n`,
+/// `u.clk`), its `Program.slots` row and type.
+pub const Named = struct { path: []const u8, slot: u32, ty: Program.Ty };
 
 /// `Unsupported`: a construct the lowering does not express yet, named in
 /// `Lower.why`. `Rejected`: a design IEEE 1364-2005 makes an error, which
@@ -167,6 +179,8 @@ pub const Lower = struct {
     why_at: u32 = none,
     /// `reject`'s code: set before a `reject` whose rule has its own.
     why_code: vams.Diag.Code = .E1100,
+    /// VAMS §7.3.5 a mixed design's analog events (`Program.monitors`).
+    monitors: std.ArrayList(Program.A2d) = .empty,
     names: std.ArrayList(Name) = .empty,
     frames: std.ArrayList(Frame) = .empty,
     scopes: std.ArrayList(ScopeInfo) = .empty,
@@ -434,6 +448,7 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Low
         return e;
     };
     var program = b.finish();
+    program.monitors = l.monitors.items;
     vars.finishParams(&l, &program) catch |e| {
         why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
         return e;
@@ -443,7 +458,11 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Low
         return e;
     };
     assert(program.inst_scope.len == program.insts.len);
-    return .{ .program = program, .check_sites = l.check_sites.items };
+    const named = if (options.mixed) @import("digital/domain.zig").names(&l) catch |e| {
+        why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
+        return e;
+    } else &.{};
+    return .{ .program = program, .check_sites = l.check_sites.items, .names = named };
 }
 
 // ---- private ----

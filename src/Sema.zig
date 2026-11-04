@@ -14,7 +14,7 @@
 //! Contents:
 //! - `pub const Config = struct` (`Roots`, `Override`)
 //! - `pub fn elaborate(zcu: *Zcu, config: Config) Allocator.Error!void`
-//! - `pub const Analysis = struct` (`deinit`)
+//! - `pub const Analysis = struct` (`Src`, `deinit`)
 //! - lowering's types: `pub const Ty`, `pub const Value`, `pub const Slot`, `pub const Bind`, `pub const Unit`, `pub const Bridged`, `pub const ContribKey`, `pub const Block` (`Loop`, `Label`, `restricted`, `child`)
 //! - `pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis`
 //! - `pub fn addInst(s: *Sema, b: *Block, inst: Air.Inst) Allocator.Error!Air.Inst.Ref`
@@ -83,6 +83,8 @@ expr_depth: u32 = 0,
 /// instruction's, by index (`addInst`): `Analysis.srcs`.
 expr_src: Inst.Ref = .none,
 inst_srcs: std.ArrayList(Analysis.Src) = .empty,
+/// A unit has a digital half (`Analysis.mixed`).
+mixed: bool = false,
 /// Each node row's one `probe`, in the prologue (contrib.zig).
 probes: std.AutoHashMapUnmanaged(Air.Device.Node.Index, Air.Inst.Ref) = .empty,
 /// §3.6.2 every access function name and the quantity it reads under a
@@ -143,6 +145,9 @@ pub const Analysis = struct {
     /// where a later stage's diagnostic about it points (`Air.Float`'s
     /// `Input.locs`); `.none` for one no expression wrote.
     srcs: []const Src,
+    /// §7.2.2 a module of the design has a digital half the analog blocks
+    /// read (discrete.zig): its testbench is the mixed-signal one (§8).
+    mixed: bool = false,
 
     /// A source: a file and a Vir instruction in it.
     pub const Src = struct { file: Zcu.File.Index, src: Inst.Ref };
@@ -335,7 +340,7 @@ pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis {
     @memset(srcs, .{ .file = @fromBackingInt(0), .src = .none });
     const n = @min(srcs.len, s.inst_srcs.items.len);
     @memcpy(srcs[0..n], s.inst_srcs.items[0..n]);
-    return .{ .air = air, .device = s.device, .srcs = srcs };
+    return .{ .air = air, .device = s.device, .srcs = srcs, .mixed = s.mixed };
 }
 
 /// Appends `inst` to `b`'s body and returns it as an operand.

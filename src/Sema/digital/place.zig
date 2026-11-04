@@ -239,6 +239,10 @@ pub fn terms(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
     };
     const watched = if (edge == .any) r else vir.instructions.items(.data)[@backingInt(i)].un_node.operand;
     const w = watched.toIndex() orelse return l.refuse("an omitted event expression");
+    if (try @import("domain.zig").monitor(l, w)) |event| {
+        if (edge != .any) return l.refuse("an edge of an analog event");
+        return out.appendSlice(l.a, &.{ event, @backingInt(Program.Edge.any), 0, 0, none });
+    }
     switch (Lower.tag(vir, w)) {
         .decl_ref, .str_ref, .field => {
             const n = try expr.leafName(l, w);

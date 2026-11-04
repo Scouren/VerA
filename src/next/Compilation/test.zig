@@ -146,10 +146,10 @@ test "a backend that is not built is named, with not_built_status" {
     defer tmp.cleanup();
     var paths: std.heap.ArenaAllocator = .init(std.testing.allocator);
     defer paths.deinit();
-    const comp = try compileText(paths.allocator(), &tmp, "res.va", resistor, .{ .target = .run });
+    const comp = try compileText(paths.allocator(), &tmp, "res.va", resistor, .{ .target = .verilog });
     defer comp.destroy();
     try std.testing.expectEqual(Compilation.not_built_status, comp.outputs.status);
-    try std.testing.expectEqual(Compilation.Backend.exe, comp.outputs.not_built.?);
+    try std.testing.expectEqual(Compilation.Backend.verilog, comp.outputs.not_built.?);
     try std.testing.expect(std.mem.find(u8, comp.outputs.err.items, "not built") != null);
 }
 

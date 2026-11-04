@@ -667,6 +667,7 @@ test {
     _ = print;
     _ = Verify;
     _ = interp;
+    _ = @import("Air/tan.zig");
     _ = Interval;
     _ = Float;
     _ = Legalize;

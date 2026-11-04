@@ -5,11 +5,16 @@
 //! as a device's `h.zig` is), called with the same arguments as its port,
 //! over the specials and 10^5 seeded draws, compared bit for bit (string
 //! kernels byte for byte). (2) Gompute against gm: every function `gm`
-//! provides against `std_kernels.math`, each difference judged by an f128
-//! reference so the log says which side is wrong. A name that differs
-//! passes only when a line of `kernels.xfail` names it with a bound in ulps
-//! that covers the largest difference seen; a line whose name never differs
-//! fails the run (an unexpected pass).
+//! provides against `std_kernels.math`. A difference on a function the
+//! f128 reference knows (and on the kernels and folds over it) is judged by
+//! it, a three-way oracle: a name passes when the new side is within
+//! Gompute's documented bound of the reference on every differing input and
+//! its largest error there is no larger than the old side's; each input
+//! where the new side is strictly closer is the old side's error, counted
+//! and printed per name with each side's largest error. Any other difference passes only when a line of
+//! `kernels.xfail` names it with a bound in ulps that covers the largest
+//! difference seen; a line whose name never differs fails the run (an
+//! unexpected pass).
 //! Cites: none of its own (`kernels/*.zig` name theirs).
 //!
 //! Contents: none public; tests only.
@@ -59,14 +64,20 @@ test "diff-kernels: std_kernels against lib/kernels, the old kernel text and gm"
     var failures: u32 = 0;
     var compared: u64 = 0;
     var listed_differ: u32 = 0;
+    var old_bugs: u32 = 0;
     for (rep.rows.keys(), rep.rows.values()) |name, row| {
         compared += row.compared;
         const a = for (allowed) |a| {
             if (std.mem.eql(u8, a.name, name)) break a;
         } else null;
         if (row.differ == 0) continue;
+        if (a == null and row.judged == row.differ and row.unsettled == 0 and row.new_err <= row.old_err) {
+            old_bugs += 1;
+            std.debug.print("old-side bug: {s}: {d} of {d} differ; against f128 the old side is strictly farther on {d} (old max {d:.3} ulp), the new one on {d}, within its bound (new max {d:.3} ulp)\n", .{ name, row.differ, row.compared, row.new_closer, row.old_err, row.old_closer, row.new_err });
+            continue;
+        }
         std.debug.print("{s}: {d} of {d} differ, max {d} ulp; e.g. {s}", .{ name, row.differ, row.compared, row.max, row.example[0..row.example_len] });
-        if (row.judged != 0) std.debug.print("; against f128 ({d} judged): old max {d:.3} ulp, closer {d}; new max {d:.3} ulp, closer {d}", .{ row.judged, row.old_err, row.old_closer, row.new_err, row.new_closer });
+        if (row.judged != 0) std.debug.print("; against f128 ({d} judged, {d} not settled for the new side): old max {d:.3} ulp, closer {d}; new max {d:.3} ulp, closer {d}", .{ row.judged, row.unsettled, row.old_err, row.old_closer, row.new_err, row.new_closer });
         std.debug.print("\n", .{});
         if (a) |line| {
             listed_differ += 1;
@@ -81,7 +92,7 @@ test "diff-kernels: std_kernels against lib/kernels, the old kernel text and gm"
         std.debug.print("kernels.xfail:{d}: `{s}` no longer differs ({s}): remove the line\n", .{ a.line, a.name, if (row == null) "never compared" else "agrees" });
         failures += 1;
     }
-    std.debug.print("diff-kernels: {d} names, {d} comparisons, {d} listed differences, {d} failures\n", .{ rep.rows.count(), compared, listed_differ, failures });
+    std.debug.print("diff-kernels: {d} names, {d} comparisons, {d} settled by the f128 reference (old-side bugs), {d} listed differences, {d} failures\n", .{ rep.rows.count(), compared, old_bugs, listed_differ, failures });
     try std.testing.expect(rep.rows.count() > 300);
     try std.testing.expectEqual(@as(u32, 0), failures);
 }

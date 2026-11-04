@@ -17,7 +17,7 @@ pub fn main(init: std.process.Init) !void {
     if (args.len != 4) return error.Usage;
     const source = try std.Io.Dir.cwd().readFileAlloc(init.io, args[1], arena, .limited(1 << 26));
     const dirs = [_][]const u8{ std.fs.path.dirname(args[1]).?, args[2] };
-    switch (try sides.new(init.gpa, arena, init.io, args[1], source, &dirs, true)) {
+    switch (try sides.new(init.gpa, arena, init.io, args[1], source, &dirs)) {
         .refused => return error.NewSideRefused,
         .fail => |why| {
             std.debug.print("codegen: {s}\n", .{why});

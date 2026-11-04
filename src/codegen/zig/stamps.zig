@@ -11,6 +11,7 @@
 //!
 //! Contents:
 //! - `pub const Term = union(enum)`, `pub const Stamp = struct` (`Op`), `pub const QStamp = struct`, `pub const Plan = struct`
+//! - `pub fn unknowns(dg: *DeclGen) DeclGen.Error!void`
 //! - `pub fn plan(dg: *DeclGen) DeclGen.Error!Plan`
 
 const std = @import("std");
@@ -56,12 +57,57 @@ pub const Plan = struct {
 
 const none: u32 = std.math.maxInt(u32);
 
+/// Fills `dg.u_names` and `dg.branch_u`: lowering mints a branch's flow
+/// unknown only where the model probes its current (§5.4.2), so a
+/// potential or §5.6.7 indirect source without one gets an unknown here,
+/// appended after `nodes` in contribution order, spelled `flow(hi,lo)`
+/// (`#k` added while the spelling is taken). A source whose unknown an
+/// earlier source already drives gets its own: two sources in one branch
+/// carry two currents (§5.6.7.1). The old codegen's `plan/names.zig`, so
+/// `U` numbers the unknowns alike.
+pub fn unknowns(dg: *DeclGen) DeclGen.Error!void {
+    const d = dg.device;
+    const a = dg.arena;
+    var names: std.ArrayList([]const u8) = .empty;
+    for (d.nodes.items(.name)) |n| try names.append(a, dg.ip.stringToSlice(n));
+    dg.branch_u = try a.alloc(u32, d.contributions.len);
+    @memset(dg.branch_u, none);
+    for (d.contributions.items(.access), d.contributions.items(.kind), d.contributions.items(.flow), d.contributions.items(.hi), d.contributions.items(.lo), 0..) |access, kind, flow, hi, lo, k| {
+        if (access != .potential and kind != .indirect) continue;
+        var found: u32 = if (flow == .none) none else @backingInt(flow);
+        if (found != none and std.mem.findScalar(u32, dg.branch_u[0..k], found) != null) found = none;
+        if (found == none) {
+            const base = try std.fmt.allocPrint(a, "flow({s},{s})", .{ name(dg, hi), name(dg, lo) });
+            var spelled = base;
+            // Each try is a distinct taken spelling, of finitely many.
+            for (1..names.items.len + 2) |t| {
+                const taken = for (names.items) |nm| {
+                    if (std.mem.eql(u8, nm, spelled)) break true;
+                } else false;
+                if (!taken) break;
+                spelled = try std.fmt.allocPrint(a, "{s}#{d}", .{ base, t });
+            }
+            found = @intCast(names.items.len);
+            try names.append(a, spelled);
+        }
+        dg.branch_u[k] = found;
+    }
+    dg.u_names = names.items;
+    if (dg.u_names.len > Liveness.unknowns_max) return dg.fail("more than {d} unknowns", .{Liveness.unknowns_max});
+    assert(dg.u_names.len >= d.nodes.len);
+}
+
+fn name(dg: *DeclGen, n: Device.Node.Index) []const u8 {
+    if (n == .ground) return "gnd";
+    return dg.ip.stringToSlice(dg.device.nodes.items(.name)[@backingInt(n)]);
+}
+
 /// The stamp plan of `dg.device`. Fails (`dg.fail`) on a shape this
 /// backend does not stamp yet.
 pub fn plan(dg: *DeclGen) DeclGen.Error!Plan {
     const d = dg.device;
     const a = dg.arena;
-    const n_u: u32 = @intCast(d.nodes.len);
+    const n_u: u32 = @intCast(dg.u_names.len);
     var stamps: std.ArrayList(Stamp) = .empty;
     const pattern = try a.alloc(Mask, n_u);
     @memset(pattern, 0);
@@ -73,7 +119,7 @@ pub fn plan(dg: *DeclGen) DeclGen.Error!Plan {
         fl.* = none;
         if (c.access == .flow) continue;
         if (!dg.unconditional(c.wrote)) return dg.fail("a §5.6.1.3 potential contribution that runs under a condition (a switch branch)", .{});
-        fl.* = flowUnknown(dg, @backingInt(c.hi), @backingInt(c.lo)) orelse return dg.fail("a potential contribution whose flow unknown is not `flow(hi,lo)`", .{});
+        fl.* = dg.branch_u[k];
     }
     for (flows, 0..) |fl, k| {
         const c = d.contributions.get(k);
@@ -95,10 +141,10 @@ pub fn plan(dg: *DeclGen) DeclGen.Error!Plan {
     }
     // §5.4.2.1/§5.6.6 the flow unknowns no branch relation defines, in
     // unknown order: a sourced one closes `x[u] - Σ`, a probe is a short.
-    for (d.nodes.items(.kind), 0..) |kind, ui| {
-        const u: u32 = @intCast(ui);
-        if (kind != .branch_flow or std.mem.findScalar(u32, flows, u) != null) continue;
-        const ends = flowEnds(dg, u) orelse return dg.fail("a flow unknown whose name is not `flow(hi,lo)`", .{});
+    for (d.flows.items(.unknown), d.flows.items(.hi), d.flows.items(.lo), d.flows.items(.kind)) |un, hi, lo, kind| {
+        const u: u32 = @backingInt(un);
+        if (kind != .branch or std.mem.findScalar(u32, flows, u) != null) continue;
+        const ends = [2]u32{ @backingInt(hi), @backingInt(lo) };
         const bit = @as(Mask, 1) << @intCast(u);
         if (sourced(dg, ends[0], ends[1])) {
             try add(a, &stamps, pattern, u, .add, .{ .x = u }, bit);
@@ -109,10 +155,10 @@ pub fn plan(dg: *DeclGen) DeclGen.Error!Plan {
         }
     }
     // §5.4.3 a port probe reads the finished KCL row of its port.
-    for (d.nodes.items(.kind), 0..) |kind, ui| {
-        const u: u32 = @intCast(ui);
-        if (kind != .port_flow) continue;
-        const p = portOf(dg, u) orelse return dg.fail("a port flow unknown whose name is not `flow(<p>)`", .{});
+    for (d.flows.items(.unknown), d.flows.items(.hi), d.flows.items(.kind)) |un, port, kind| {
+        if (kind != .port) continue;
+        const u: u32 = @backingInt(un);
+        const p: u32 = @backingInt(port);
         try add(a, &stamps, pattern, u, .set, .{ .port = .{ .u = u, .p = p } }, (@as(Mask, 1) << @intCast(u)) | pattern[p]);
     }
     return .{ .stamps = stamps.items, .pattern = pattern, .q = try qPlan(dg, flows) };
@@ -148,11 +194,10 @@ fn qPlan(dg: *DeclGen, flows: []const u32) DeclGen.Error![]const QStamp {
         try qAdd(dg, &out, @backingInt(c.lo), site, -sign);
         if (freeOf(dg, flows, @backingInt(c.hi), @backingInt(c.lo))) |u| try qAdd(dg, &out, u, site, -sign);
     }
-    for (d.nodes.items(.kind), 0..) |kind, ui| {
-        if (kind != .port_flow) continue;
-        const p = portOf(dg, @intCast(ui)).?;
+    for (d.flows.items(.unknown), d.flows.items(.hi), d.flows.items(.kind)) |un, port, kind| {
+        if (kind != .port) continue;
         const port_rows = try dg.arena.dupe(QStamp, out.items);
-        for (port_rows) |s| if (s.row == p) try qAdd(dg, &out, @intCast(ui), s.site, -s.sign);
+        for (port_rows) |s| if (s.row == @backingInt(port)) try qAdd(dg, &out, @backingInt(un), s.site, -s.sign);
     }
     std.mem.sort(QStamp, out.items, {}, struct {
         fn lt(_: void, x: QStamp, y: QStamp) bool {
@@ -203,51 +248,11 @@ fn potentialOn(d: *const Device, hi: u32, lo: u32) bool {
     return false;
 }
 
-// ponytail: the flow unknown of a pair and the port of a port flow are
-// found by Sema's spelling (`flow(hi,lo)`, `flow(<p>)`), since `Air.Device`
-// has no column for them yet; asked of rw-lower as `Contribution.flow` and
-// a probes table. A misspelling fails codegen, never mis-stamps.
-
-/// The `branch_flow` unknown spelled `flow(<hi>,<lo>)`, ground `gnd`.
+/// The `branch` flow unknown of pair (hi, lo) (`Device.flows`), or null.
 fn flowUnknown(dg: *DeclGen, hi: u32, lo: u32) ?u32 {
     const d = dg.device;
-    const name = std.fmt.allocPrint(dg.arena, "flow({s},{s})", .{ nodeName(dg, hi), nodeName(dg, lo) }) catch return null;
-    for (d.nodes.items(.kind), d.nodes.items(.name), 0..) |kind, n, u| {
-        if (kind == .branch_flow and std.mem.eql(u8, dg.ip.stringToSlice(n), name)) return @intCast(u);
+    for (d.flows.items(.unknown), d.flows.items(.hi), d.flows.items(.lo), d.flows.items(.kind)) |u, h, l, kind| {
+        if (kind == .branch and @backingInt(h) == hi and @backingInt(l) == lo) return @backingInt(u);
     }
     return null;
-}
-
-/// The pair a `branch_flow` unknown's name spells.
-fn flowEnds(dg: *DeclGen, u: u32) ?[2]u32 {
-    const d = dg.device;
-    const name = dg.ip.stringToSlice(d.nodes.items(.name)[u]);
-    if (!std.mem.startsWith(u8, name, "flow(") or name[name.len - 1] != ')') return null;
-    const inner = name[5 .. name.len - 1];
-    // Every split at a comma; the one that names two nodes wins.
-    for (inner, 0..) |ch, at| {
-        if (ch != ',') continue;
-        const hi = nodeByName(dg, inner[0..at]) orelse continue;
-        const lo = nodeByName(dg, inner[at + 1 ..]) orelse continue;
-        if (flowUnknown(dg, hi, lo) == u) return .{ hi, lo };
-    }
-    return null;
-}
-
-/// The port a `port_flow` unknown `flow(<p>)` reads.
-fn portOf(dg: *DeclGen, u: u32) ?u32 {
-    const name = dg.ip.stringToSlice(dg.device.nodes.items(.name)[u]);
-    if (!std.mem.startsWith(u8, name, "flow(<") or !std.mem.endsWith(u8, name, ">)")) return null;
-    return nodeByName(dg, name[6 .. name.len - 2]);
-}
-
-fn nodeByName(dg: *DeclGen, s: []const u8) ?u32 {
-    if (std.mem.eql(u8, s, "gnd")) return @backingInt(Device.Node.Index.ground);
-    for (dg.device.nodes.items(.name), 0..) |n, u| if (std.mem.eql(u8, dg.ip.stringToSlice(n), s)) return @intCast(u);
-    return null;
-}
-
-fn nodeName(dg: *DeclGen, u: u32) []const u8 {
-    if (u == @backingInt(Device.Node.Index.ground)) return "gnd";
-    return dg.ip.stringToSlice(dg.device.nodes.items(.name)[u]);
 }

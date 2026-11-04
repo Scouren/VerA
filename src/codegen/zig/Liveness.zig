@@ -124,11 +124,17 @@ pub fn init(arena: Allocator, air: Air, n_u: u32) error{ OutOfMemory, TooManyUnk
         if (tag == .assign) l.assigned[@backingInt(data.bin_op.lhs.toIndex().?)] = true;
         if (tag == .br) l.targeted[@backingInt(data.br.block_inst)] = true;
     }
+    // Only the main body's instructions run in `core`: a derived
+    // parameter's tree (`Param.derive`) sits outside it and reads args the
+    // body may not.
+    const reach = try arena.alloc(bool, n);
+    @memset(reach, false);
+    markReach(air, air.mainBody(), reach);
     // Backward from the effects: a value only a print reads is dead in the
     // residual. Operands mostly precede their readers, so a reverse sweep
     // settles in a pass or two; each pass that changes marks a new value.
     var sweep: usize = 0;
-    while (l.markUsed(air)) : (sweep += 1) assert(sweep <= n);
+    while (l.markUsed(air, reach)) : (sweep += 1) assert(sweep <= n);
     // Each pass only ORs bits in, so it stops: at most one pass per bit of
     // every slot and block, plus the pass that sees nothing change.
     const passes_max = n * unknowns_max + 2;
@@ -171,13 +177,14 @@ pub fn effect(air: Air, tag: Inst.Tag, data: Inst.Data) bool {
 /// One reverse pass: every operand of a live instruction (an effect, or a
 /// value some live instruction reads) is used. Returns whether any mark
 /// was new.
-fn markUsed(l: Liveness, air: Air) bool {
+fn markUsed(l: Liveness, air: Air, reach: []const bool) bool {
     const tags = air.instructions.items(.tag);
     const datas = air.instructions.items(.data);
     var grew = false;
     var i = tags.len;
     while (i > 0) {
         i -= 1;
+        if (!reach[i]) continue;
         if (!l.used[i] and !effect(air, tags[i], datas[i])) continue;
         var ops: Operands = .{};
         ops.collect(air, tags[i], datas[i]);
@@ -187,6 +194,30 @@ fn markUsed(l: Liveness, air: Air) bool {
         };
     }
     return grew;
+}
+
+/// Marks every instruction of `body` and of the bodies nested in it. Each
+/// instruction sits in one body, so the walk is bounded by `air`.
+fn markReach(air: Air, body: []const Inst.Index, reach: []bool) void {
+    const tags = air.instructions.items(.tag);
+    const datas = air.instructions.items(.data);
+    for (body) |inst| {
+        const i = @backingInt(inst);
+        assert(!reach[i]);
+        reach[i] = true;
+        switch (tags[i]) {
+            .block, .loop => {
+                const x = air.extraData(Air.Block, datas[i].ty_pl.payload);
+                markReach(air, air.body(x.end, x.data.body_len), reach);
+            },
+            .cond_br => {
+                const x = air.extraData(Air.CondBr, datas[i].pl_op.payload);
+                markReach(air, air.body(x.end, x.data.then_body_len), reach);
+                markReach(air, air.body(x.end + x.data.then_body_len, x.data.else_body_len), reach);
+            },
+            else => {}, // else: no nested body
+        }
+    }
 }
 
 /// One pass over every instruction in index order; returns whether any

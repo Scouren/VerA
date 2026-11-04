@@ -111,19 +111,21 @@ pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool) ![]const u8 {
 
 // ---- private ----
 
-/// The stage that owns `code` (`E0405`), and its agent.
+/// The stage that owns `code` (`E0405`) by `stages.owner`, and its agent:
+/// the front end is rw-comp's, Sema's lowering rw-lower's or rw-dlower's.
 fn ownerOf(code: []const u8, digital: bool) []const u8 {
     assert(code.len == 5);
-    if (stages.isElab(code)) return "rw-zero (elab)";
-    if (stages.isAnalysis(code)) return if (digital) "rw-dlower (digital lowering)" else "rw-lower (analog lowering)";
-    const class = code[1..3];
-    if (std.mem.eql(u8, class, "01")) return "rw-zero (preprocess)";
-    if (std.mem.eql(u8, class, "02")) return "rw-zero (parse/astgen)";
-    if (std.mem.eql(u8, class, "06")) return "rw-zero (air passes)";
-    if (std.mem.eql(u8, class, "09")) return "rw-zero (elab)";
-    if (std.mem.eql(u8, class, "11")) return "rw-dlower (digital lowering)";
-    if (std.mem.eql(u8, class, "12")) return "rtlil backend";
-    return if (digital) "rw-dlower (digital lowering)" else "rw-lower (analog lowering)";
+    const c = std.meta.stringToEnum(@import("vams").Diag.Code, code) orelse return "rw-comp (driver)";
+    return switch (stages.owner(c)) {
+        .preprocess => "rw-comp (preprocess)",
+        .parse => "rw-comp (parse)",
+        .astgen => "rw-comp (astgen)",
+        .elab => "rw-comp (elab)",
+        .sema => if (digital) "rw-dlower (digital lowering)" else "rw-lower (analog lowering)",
+        .proof => "rw-zero (air passes)",
+        .codegen => "rw-codegen (codegen)",
+        .run => if (digital) "rw-dlower (run)" else "rw-codegen (run)",
+    };
 }
 
 /// Which part of a rendered diagnostic the first differing line is: its

@@ -79,6 +79,8 @@ event_budget: u64 = 10_000_000,
 logic: Logic = .auto,
 logic_flag: ?[]const u8 = null,
 negative_timing: bool = false,
+/// `--test-check-pause-ms=`, a test hook.
+check_pause_ms: u32 = 0,
 
 /// `--color=`.
 pub const Color = enum { auto, always, never };

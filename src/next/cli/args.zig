@@ -124,6 +124,8 @@ const Valued = enum {
     discipline_resolution,
     unknown_bound,
     jobs,
+    /// Test hook, not in `--help`: `Config.check_pause` in milliseconds.
+    test_check_pause_ms,
 };
 
 const valued = std.StaticStringMap(Valued).initComptime(.{
@@ -133,7 +135,7 @@ const valued = std.StaticStringMap(Valued).initComptime(.{
     .{ "--zig-backend=", .zig_backend },                     .{ "--expect-module=", .expect_module },
     .{ "--std=", .std },                                     .{ "--sim=", .sim },
     .{ "--discipline-resolution=", .discipline_resolution }, .{ "--unknown-bound=", .unknown_bound },
-    .{ "--jobs=", .jobs },
+    .{ "--jobs=", .jobs },                                   .{ "--test-check-pause-ms=", .test_check_pause_ms },
 });
 
 /// `--optimize=` names. Zig 0.17 renamed `std.lang.Optimize`'s tags
@@ -350,6 +352,7 @@ pub fn config(cli: *const Options, paths: []const []const u8, thread_limit: u32)
         .jac_f32 = cli.jac_f32,
         .jac_f32_host = cli.jac_f32_host,
         .thread_limit = cli.jobs orelse thread_limit,
+        .check_pause = .fromMilliseconds(cli.check_pause_ms),
     };
 }
 
@@ -500,6 +503,10 @@ fn takeValued(cli: *Cli, v: Valued, arg: []const u8, value: []const u8, err: *Io
         },
         .schedule => cli.schedule = std.meta.stringToEnum(Options.Schedule, value) orelse {
             try err.print("error: `{s}`: not static|fifo\n", .{arg});
+            return 2;
+        },
+        .test_check_pause_ms => cli.check_pause_ms = std.fmt.parseInt(u32, value, 10) catch {
+            try err.print("error: `{s}`: not a non-negative integer\n", .{arg});
             return 2;
         },
         .event_budget, .jobs => {

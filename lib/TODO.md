@@ -1474,6 +1474,7 @@ src/
   - A ReleaseFast benchmark decides whether versioning stays. If the gain is not
     measurable, deleting versioned units (simpler code) is the user's call,
     with the numbers.
-- **abs.va zero Jacobian (wrong number, no crash):** the device agrees with the
-  old device at 763 in-box points, so the fault is in the new bench host's lane
-  handling (`lib/std/sim/bench`). rw-zero is tracing it red-first.
+- **abs.va "zero Jacobian" was a false alarm:** a one-off filter script dropped the
+  "    d res" lines. The runner matches the old transcript. The scare led to a
+  bench-run test that checks a lane-derived Jacobian against sign(v); it goes red
+  on zeroed lanes. It also surfaced the fast-body finding above.

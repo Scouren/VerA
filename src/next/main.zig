@@ -96,6 +96,10 @@ fn drive(gpa: Allocator, io: Io, threaded: *Io.Threaded, init: std.process.Init.
         try err.writeAll(o.err.items);
         return 2;
     }
+    // `--run`: the testbench runs first, inheriting both streams; the old
+    // driver's buffered stderr put its own lines and the warnings after
+    // the transcript.
+    const ran: ?u8 = if (o.exe != null and config.target == .run and !bundle.failed()) try runTestbench(io, arena, o.exe.?, o.plusargs) else null;
     try out.writeAll(o.out.items);
     try err.writeAll(o.err.items);
     if (bundle.count() != 0 or bundle.header().suppressed != 0) {
@@ -104,7 +108,24 @@ fn drive(gpa: Allocator, io: Io, threaded: *Io.Threaded, init: std.process.Init.
         try err.flush();
     }
     if (bundle.failed()) return @max(o.status, 1);
-    return o.status;
+    if (ran) |code| return code;
+    const bin = o.exe orelse return o.status;
+    try out.print("{s}\n", .{bin});
+    return 0;
+}
+
+/// `--run`: the testbench inherits both streams, before anything else is
+/// printed, and its exit status is `vera`'s (IEEE 1364-2005 §17.10: the
+/// plusargs are its arguments).
+fn runTestbench(io: Io, arena: Allocator, bin: []const u8, plusargs: []const []const u8) !u8 {
+    const argv = try arena.alloc([]const u8, 1 + plusargs.len);
+    argv[0] = bin;
+    @memcpy(argv[1..], plusargs);
+    var child = try std.process.spawn(io, .{ .argv = argv });
+    return switch (try child.wait(io)) {
+        .exited => |c| c,
+        else => 1,
+    };
 }
 
 /// Refuses an input whose language has no compilation path: IEEE 1800 is

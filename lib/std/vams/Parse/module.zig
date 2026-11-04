@@ -123,7 +123,7 @@ pub fn parseParamValues(p: *Parse) Error!Node.SubRange {
     if (p.tokenTag(p.tok_i) != .r_paren) while (true) {
         const dot = p.tok_i;
         const is_named = p.eat(.period) != null;
-        if (named) |n| if (n != is_named) try p.warnAt(.invalid_parameter_list, dot);
+        if (named) |n| if (n != is_named) try p.warnSite(.invalid_parameter_list, .param_list_mixed, dot, 0);
         named = is_named;
         if (is_named) {
             // §9.18 Example 1: `.$mfactor(2)`.
@@ -157,7 +157,7 @@ fn parsePorts(p: *Parse) Error!Node.SubRange {
         const tok = p.tok_i;
         switch (p.tokenTag(tok)) {
             .keyword_input, .keyword_output, .keyword_inout => {
-                if (plain) try p.warn(.invalid_port_declaration);
+                if (plain) try p.warnSite(.invalid_port_declaration, .port_after_list, p.tok_i, 0);
                 ansi = true;
                 try p.push(try decl.parsePortDecl(p, .header));
             },
@@ -215,7 +215,7 @@ fn parseItem(p: *Parse) Error!?Node.Index {
     // reserves none of them); otherwise it is a Verilog-AMS item, refused.
     const vams = p.vamsWordUnder1364(tok);
     const freed = vams and (p.identLike(tok + 1) or p.peek(1) == .hash);
-    if (vams and !freed) try p.warn(.vams_construct_under_1364);
+    if (vams and !freed) try p.warnSite(.vams_construct_under_1364, .vams_under_language, tok, @backingInt(p.language));
     const tag: Token.Tag = if (freed) .identifier else p.tokenTag(tok);
     return switch (tag) {
         .directive_begin_keywords, .directive_end_keywords, .directive_resetall, .directive_default_nettype, .directive_unconnected_drive, .directive_nounconnected_drive, .directive_default_transition => p.fail(.directive_inside_design_element),

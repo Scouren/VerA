@@ -56,10 +56,10 @@ pub fn check(l: *Lower, f: u32, i: Inst.Index) Error!void {
             // §15.3.4 "data event = reference event signal with opposite
             // edge"; §15.3.5 "... with the same edge".
             if (kind == .width) c.ev[1].mask = opposite(c.ev[0].mask);
-            c.lim[0] = try nonNegative(l, f, arg(args, 1));
+            c.lim[0] = try nonNegative(l, f, arg(args, 1), name, "limit");
             if (kind == .width) {
                 // Syntax 15-12: "the default value for the threshold zero".
-                if (arg(args, 2) != .none) c.lim[1] = try nonNegative(l, f, arg(args, 2));
+                if (arg(args, 2) != .none) c.lim[1] = try nonNegative(l, f, arg(args, 2), name, "threshold");
                 c.notifier = try notifier(l, arg(args, 3));
             } else c.notifier = try notifier(l, arg(args, 2));
         },
@@ -67,19 +67,19 @@ pub fn check(l: *Lower, f: u32, i: Inst.Index) Error!void {
         .setup => {
             try event(l, &c, 0, arg(args, 1));
             try event(l, &c, 1, args[0]);
-            c.lim[0] = try nonNegative(l, f, arg(args, 2));
+            c.lim[0] = try nonNegative(l, f, arg(args, 2), name, "limit");
             c.notifier = try notifier(l, arg(args, 3));
         },
         .removal => {
             try event(l, &c, 0, args[0]);
             try event(l, &c, 1, arg(args, 1));
-            c.lim[0] = try nonNegative(l, f, arg(args, 2));
+            c.lim[0] = try nonNegative(l, f, arg(args, 2), name, "limit");
             c.notifier = try notifier(l, arg(args, 3));
         },
         .hold, .recovery => {
             try event(l, &c, 0, args[0]);
             try event(l, &c, 1, arg(args, 1));
-            c.lim[1] = try nonNegative(l, f, arg(args, 2));
+            c.lim[1] = try nonNegative(l, f, arg(args, 2), name, "limit");
             c.notifier = try notifier(l, arg(args, 3));
         },
         .setuphold, .recrem => {
@@ -99,10 +99,10 @@ pub fn check(l: *Lower, f: u32, i: Inst.Index) Error!void {
         .skew, .timeskew, .fullskew => {
             try event(l, &c, 0, args[0]);
             try event(l, &c, 1, arg(args, 1));
-            c.lim[0] = try nonNegative(l, f, arg(args, 2));
+            c.lim[0] = try nonNegative(l, f, arg(args, 2), name, "limit");
             var k: usize = 3;
             if (kind == .fullskew) {
-                c.lim[1] = try nonNegative(l, f, arg(args, 3));
+                c.lim[1] = try nonNegative(l, f, arg(args, 3), name, "limit");
                 k = 4;
             }
             c.notifier = try notifier(l, arg(args, k));
@@ -317,10 +317,17 @@ fn limitTicks(l: *Lower, f: u32, r: Inst.Ref) Error!i64 {
     return if (negative) -ticks else ticks;
 }
 
-/// A "non-negative constant expression" limit (Tables 15-1 to 15-12).
-fn nonNegative(l: *Lower, f: u32, r: Inst.Ref) Error!u64 {
+/// A "non-negative constant expression" limit (Tables 15-1 to 15-12),
+/// the `what` (limit or threshold) of timing check `name`; a negative one
+/// is lib/sim/digital's E1148.
+fn nonNegative(l: *Lower, f: u32, r: Inst.Ref, name: []const u8, what: []const u8) Error!u64 {
+    assert(name.len > 0 and what.len > 0);
     const v = try limitTicks(l, f, r);
-    if (v < 0) return l.refuse("§15 a negative limit where a non-negative one is required");
+    if (v < 0) {
+        l.why_code = .E1148;
+        return l.rejectFmt(f, r, "the {s} of `{s}` is a non-negative constant expression (IEEE 1364-2005 §15), and this one is negative", .{ what, name });
+    }
+    assert(v >= 0);
     return @intCast(v);
 }
 

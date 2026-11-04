@@ -28,9 +28,12 @@ const digital = @import("../digital.zig");
 const nets = @import("nets.zig");
 const ports = @import("ports.zig");
 const sub = @import("sub.zig");
+const redecl = @import("redecl.zig");
 const gates = @import("gates.zig");
 const specify = @import("specify.zig");
 const vars = @import("vars.zig");
+const domain_mod = @import("domain.zig");
+const canonical = @import("../decl.zig").canonical;
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Name = digital.Name;
@@ -59,6 +62,10 @@ const Walk = struct {
     deferred: std.ArrayList(nets.Wire) = .empty,
     /// §12.3.6 an expression-ported module's ports, one external port each.
     groups: std.ArrayList(ports.Group) = .empty,
+    /// Its module's list of ports.
+    list: Vir.Body = .empty,
+    /// A mixed design's module variables by domain (`domain.of`).
+    domain: domain_mod.Domain = .{},
 };
 
 /// Walks every instance in `Zcu.instances` order: its scope, its frame, its
@@ -177,6 +184,21 @@ fn instance(w: *Walk, k: u32) Error!void {
     env.hier = zcu.instances.items(.hier)[k];
     const time = l.module_times.get(d).?;
     const parent = zcu.instances.items(.parent)[k];
+    // VAMS §7.8 an inserted connect module: no instance instruction places
+    // it; it sits beside the instance whose mixed port it bridges.
+    const bridge = if (l.options.mixed and parent != .none and w.placed[k].scope == none) try domain_mod.bridgeOf(l, k) else null;
+    if (bridge) |b| {
+        const name = zcu.intern_pool.stringToSlice(zcu.instances.items(.name)[k]);
+        if (b.prim) |g| {
+            // §7.8.5.1 on a primitive's terminal: in the scope that holds it.
+            const pf = l.instance_frame[b.child];
+            w.placed[k] = .{ .scope = l.frames.items[pf].scope, .frame = pf, .inst = g, .name = name, .at = l.srcOffset(pf, g) };
+        } else {
+            const by = w.placed[b.child];
+            if (by.scope == none) return l.refuse("a connect module beside an instance its parent's walk did not reach");
+            w.placed[k] = .{ .scope = by.scope, .frame = by.frame, .inst = by.inst, .name = name, .at = by.at };
+        }
+    }
     const scope = if (parent == .none) root: {
         const s = try newScope(l, none, vir.string(row.name), null, time, 0, true);
         try l.roots.append(l.a, s);
@@ -188,19 +210,33 @@ fn instance(w: *Walk, k: u32) Error!void {
     };
     const f = try newFrame(l, none, @fromBackingInt(k), scope, &.{});
     l.instance_frame[k] = f;
+    if (l.options.mixed) try domain_mod.primitiveTerminals(l, k, f);
     l.sites[k] = if (parent == .none) .{ .frame = none, .inst = row.inst } else .{ .frame = w.placed[k].frame, .inst = w.placed[k].inst };
     w.index = k;
     w.conns.clearRetainingCapacity();
     w.groups.clearRetainingCapacity();
+    w.list = m.ports;
     // §12.3 each port's connection, by the declaration it names inside; a
     // root's ports are open. A module with port expressions (§12.3.6)
     // connects one external port at a time instead.
     const rows = zcu.instances.items(.ports)[k];
     const formals = vir.body(m.ports);
+    // VAMS §7.8 a connection through a bridge to a continuous net is that
+    // bridge's segment: a bridged port's, and the bridge's own ports'.
+    // A primitive terminal's upper net is always continuous (connect.zig).
+    const own_segment = if (bridge) |b| b.prim != null or try domain_mod.skipped(l, w.placed[k].frame, b.actual) else false;
+    const segmented = if (l.options.mixed and parent != .none and bridge == null) try domain_mod.segmented(l, w.placed[k].frame, k) else std.AutoHashMapUnmanaged(Inst.Index, u32).empty;
     const grouped = ports.expressionPorts(vir, formals);
     for (formals, 0..) |formal, at| {
-        const actual: Inst.Ref = if (rows.len == 0) .none else zcu.ports.items(.actual)[rows.start + at];
-        const conn: ports.Conn = .{ .actual = actual, .frame = if (actual == .none) none else w.placed[k].frame, .lane = w.placed[k].lane };
+        // A bridge's every port takes the bridged port's connection: its
+        // continuous one is skipped (`analogNet`), its discrete one joins it.
+        const actual: Inst.Ref = if (bridge) |b| b.actual else if (rows.len == 0) .none else zcu.ports.items(.actual)[rows.start + at];
+        const conn: ports.Conn = .{
+            .actual = actual,
+            .frame = if (actual == .none) none else w.placed[k].frame,
+            .lane = w.placed[k].lane,
+            .bridge = if (own_segment) k else segmented.get(formal) orelse none,
+        };
         const inner: Inst.Index = switch (Lower.tag(vir, formal)) {
             .io => formal,
             .port => blk: {
@@ -245,7 +281,9 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
         if (!gop.found_existing) gop.value_ptr.* = .empty;
         try gop.value_ptr.append(l.a, i);
     }
+    for (later.values()) |decls| try redecl.check(l, f, decls.items, .module, w.list);
     const top = l.frames.items[f].parent == none;
+    if (top and l.options.mixed) w.domain = try domain_mod.of(l.a, vir, body, w.index == 0);
     w.deferred.clearRetainingCapacity();
     for (later.keys(), later.values()) |first, decls| try signal(w, f, first, decls.items, if (top) w.conns.get(first) else null);
     if (top) for (w.groups.items) |g| try ports.group(l, f, g, &w.deferred);
@@ -263,7 +301,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
             try l.scopes.items[scope].procs.append(l.a, .{ .kind = if (Lower.tag(vir, i) == .initial) .initial else .always, .inst = i, .frame = f });
             try preBlocks(l, f, Lower.payload(vir, Inst.Process, i).body, 0);
         },
-        .variable => if (Lower.payload(vir, Inst.Variable, i).init.len != 0) {
+        .variable => if (Lower.payload(vir, Inst.Variable, i).init.len != 0 and !w.domain.analog.contains(canonical(vir, i)) and !w.domain.a2d.contains(canonical(vir, i))) {
             try l.scopes.items[scope].procs.append(l.a, .{ .kind = .init_var, .inst = i, .frame = f });
         },
         .io => if (Lower.payload(vir, Inst.Io, i).init.len != 0) {
@@ -278,7 +316,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
         .specify => try specify.block(l, f, i),
         .defparam => try l.defparam_frames.put(l.a, .{ .instance = @backingInt(l.frames.items[f].instance), .inst = i }, f),
         .genvar, .param, .event, .port, .net => {},
-        .analog, .analog_initial => return l.refuse("an analog block"),
+        .analog, .analog_initial => if (!l.options.mixed) return l.refuse("an analog block"),
         else => {}, // else: an expression of a range or a delay, read where it is used
     };
 }
@@ -442,12 +480,30 @@ fn place(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8, name: 
     w.placed[child] = .{ .scope = scope, .frame = f, .inst = i, .index = index, .lane = lane, .at = at, .name = name };
 }
 
+/// VAMS §7.2.1 whether a net or port's declarations `decls` make it the
+/// analog solver's: a ground net, or one of a continuous discipline.
+fn analogNet(l: *Lower, vir: *const Vir, decls: []const Inst.Index) Error!bool {
+    assert(l.options.mixed);
+    for (decls) |d| {
+        const kind: Inst.NetKind, const discipline: Vir.String = switch (Lower.tag(vir, d)) {
+            .io => .{ Lower.payload(vir, Inst.Io, d).flags.net, Lower.payload(vir, Inst.Io, d).discipline },
+            .net => .{ Lower.payload(vir, Inst.Net, d).flags.net, Lower.payload(vir, Inst.Net, d).discipline },
+            else => continue, // else: a variable has no net kind
+        };
+        if (kind == .ground) return true;
+        if (discipline != .empty and try l.zcu.continuousDiscipline(vir.string(discipline))) return true;
+    }
+    return false;
+}
+
 /// A variable, net or port, from its first declaration `first` and the
 /// later ones `decls` that complete it (`first` included); `conn` is a
 /// port's connection.
 fn signal(w: *Walk, f: u32, first: Inst.Index, decls: []const Inst.Index, conn: ?ports.Conn) Error!void {
     const l = w.l;
     const vir = l.virOf(f);
+    if (l.options.mixed and try analogNet(l, vir, decls)) return;
+    if (w.domain.analog.contains(first)) return; // VAMS §7.2.2 the analog block's
     var storage: Inst.Storage = .none;
     var dir: Inst.Direction = .none;
     for (decls) |d| switch (Lower.tag(vir, d)) {

@@ -65,8 +65,12 @@ pub fn handleInclude(pp: *Pass, rest: []const u8, at: usize, off: usize) Error!v
     if (r.i < r.s.len)
         return pp.fail(pp.spanAt(off + r.i, off + r.s.len), "E0144", "`{s}`", .{std.mem.trim(u8, r.s[r.i..], " \t\r\n")});
 
-    const inc = (try findInclude(pp, path, name_span)) orelse
-        return pp.fail(name_span, "E0126", "\"{s}\"", .{path});
+    const inc = (try findInclude(pp, path, name_span)) orelse {
+        const dirs = if (includerDir(pp)) |d| try std.mem.concat(pp.arena, []const u8, &.{ &.{d}, pp.opts.include_dirs }) else pp.opts.include_dirs;
+        const builtins = "then the built-in annex D headers (constants.vams, disciplines.vams)";
+        const notes: []const []const u8 = if (dirs.len == 0) &.{builtins} else try pp.arena.dupe([]const u8, &.{ try pp.arena.print("searched, in order: {s}", .{try std.mem.join(pp.arena, ", ", dirs)}), builtins });
+        return pp.failNoted(name_span, "E0126", "\"{s}\"", .{path}, notes);
+    };
 
     // §19.5: "The number of nesting levels for include files shall be
     // finite". What makes nesting infinite is a file opened again inside
@@ -79,9 +83,12 @@ pub fn handleInclude(pp: *Pass, rest: []const u8, at: usize, off: usize) Error!v
         .macro_hash = pp.macro_hash,
         .conds = pp.conds.items.len,
     };
-    for (pp.includes.items) |o| {
+    for (pp.includes.items, 0..) |o, k| {
         if (o.macro_hash != opened.macro_hash or o.conds != opened.conds or !std.mem.eql(u8, o.key, opened.key)) continue;
-        return pp.fail(name_span, "E0125", "\"{s}\" includes itself with every macro as it was", .{path});
+        const chain = try pp.arena.alloc([]const u8, pp.includes.items.len - k);
+        for (chain, pp.includes.items[k..]) |*c, i| c.* = i.path;
+        const note = try pp.arena.print("include cycle: {s}", .{try pp.joinChain(chain, path)});
+        return pp.failNoted(name_span, "E0125", "\"{s}\" includes itself with every macro as it was", .{path}, try pp.arena.dupe([]const u8, &.{note}));
     }
     try pp.includes.append(pp.arena, opened);
     defer _ = pp.includes.pop();

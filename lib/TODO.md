@@ -1451,3 +1451,15 @@ src/
     - Interval's library margin is derived from the device kernel's measured error,
       not a flat 2 ulps.
     - The float falsifier evaluates with std_kernels rather than interp.
+- **Backends (2026-11-04):** `comp.xfail` lists 1752 fixtures under "not built: backend exe",
+  114 under vpi and 100 under digital_device. rw-zero takes exe
+  (`docs/rewrite/exe.md`, new `src/codegen/bench/`, renamed to `exe` at the switch-over).
+  VPI and digital_device follow as slots free.
+- **Morning item: E1100 on the 1364 route.** The conformance suite's `.v` reject
+  fixtures expect `//! reject E1100`, the old digital engine's catch-all code,
+  where the new front end has specific codes: E0906 "connected twice", E0904,
+  E0907, E0908, E0239, E0376, and others. vera-next reports them as E1100 with
+  the old wording through one table in the driver, so conformance-next passes
+  the suite unedited. Switching the 1364 route to the specific codes means
+  editing the suite (the user's repository) and deleting that table. That is
+  the user's call.

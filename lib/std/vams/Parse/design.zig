@@ -34,7 +34,7 @@ pub fn parseNature(p: *Parse) Error!Node.Index {
     if (p.eat(.colon) != null) {
         _ = try p.expectIdent();
         if (p.eat(.period) != null) {
-            if (p.eat(.keyword_potential) == null and p.eat(.keyword_flow) == null) return p.fail(.expected_identifier);
+            if (p.eat(.keyword_potential) == null and p.eat(.keyword_flow) == null) return p.failSite(.expected_identifier, .nature_parent_access, p.tok_i, 0);
         }
     }
     _ = p.eat(.semicolon);
@@ -67,12 +67,12 @@ pub fn parseDiscipline(p: *Parse) Error!Node.Index {
             },
             .keyword_domain => item: {
                 p.tok_i += 1;
-                const domain = p.eat(.keyword_continuous) orelse p.eat(.keyword_discrete) orelse return p.fail(.expected_identifier);
+                const domain = p.eat(.keyword_continuous) orelse p.eat(.keyword_discrete) orelse return p.failSite(.expected_identifier, .discipline_domain, p.tok_i, 0);
                 _ = try p.expect(.semicolon);
                 break :item try p.addNode(.discipline_domain, tok, .{ .token = domain });
             },
-            .identifier, .escaped_identifier => if (p.peek(1) == .equal) try natureAttr(p) else return p.fail(.expected_module_item),
-            else => return p.fail(.expected_module_item),
+            .identifier, .escaped_identifier => if (p.peek(1) == .equal) try natureAttr(p) else return p.failSite(.expected_module_item, .discipline_item, tok, 0),
+            else => return p.failSite(.expected_module_item, .discipline_item, tok, 0),
         };
         try p.push(item);
     }
@@ -163,7 +163,7 @@ pub fn parseConnectRules(p: *Parse) Error!Node.Index {
             const directed = a_dir == .keyword_input or a_dir == .keyword_output or a_dir == .keyword_inout;
             if (directed) p.tok_i += 1;
             _ = try p.expectIdent();
-            if (!directed and p.tokenTag(p.tok_i) == .semicolon) return p.failAt(.expected_identifier, p.tok_i - 1);
+            if (!directed and p.tokenTag(p.tok_i) == .semicolon) return p.failSite(.expected_identifier, .connect_mode, p.tok_i - 1, 0);
             _ = try p.expect(.comma);
             if (directed) _ = try p.expect(switch (a_dir) {
                 .keyword_input => .keyword_output,
@@ -190,7 +190,7 @@ pub fn parseConfig(p: *Parse) Error!Node.Index {
     _ = try p.expect(.semicolon);
     const top = p.scratch.items.len;
     defer p.scratch.shrinkRetainingCapacity(top);
-    const design = p.eat(.keyword_design) orelse return p.fail(.invalid_config_rule);
+    const design = p.eat(.keyword_design) orelse return p.failSite(.invalid_config_rule, .config_design_first, p.tok_i, 0);
     while (p.tokenTag(p.tok_i) != .semicolon) _ = try libCell(p);
     try p.push(try p.addNode(.config_design, design, .{ .token = p.tok_i }));
     p.tok_i += 1;
@@ -202,7 +202,7 @@ pub fn parseConfig(p: *Parse) Error!Node.Index {
             .keyword_default => {
                 p.tok_i += 1;
                 defaults += 1;
-                if (defaults > 1) try p.warnAt(.invalid_config_rule, rule);
+                if (defaults > 1) try p.warnSite(.invalid_config_rule, .config_two_defaults, rule, 0);
             },
             .keyword_instance => {
                 p.tok_i += 1;
@@ -212,15 +212,16 @@ pub fn parseConfig(p: *Parse) Error!Node.Index {
                 p.tok_i += 1;
                 qualified = try libCell(p);
             },
-            else => return p.fail(.invalid_config_rule),
+            .eof => return p.failSite(.invalid_config_rule, .config_no_endconfig, rule, 0),
+            else => return p.failSite(.invalid_config_rule, .config_rule_start, rule, 0),
         }
         if (p.eat(.keyword_liblist) != null) {
-            if (qualified) try p.warnAt(.invalid_config_rule, rule);
+            if (qualified) try p.warnSite(.invalid_config_rule, .config_lib_liblist, rule, 0);
             while (p.tokenTag(p.tok_i) != .semicolon) _ = try p.expectIdent();
         } else if (p.tokenTag(rule) != .keyword_default and p.eat(.keyword_use) != null) {
             _ = try libCell(p);
-            if (p.eat(.colon) != null) _ = try p.expect(.keyword_config);
-        } else return p.fail(.invalid_config_rule);
+            if (p.eat(.colon) != null and p.eat(.keyword_config) == null) return p.failSite(.invalid_config_rule, .config_use_suffix, p.tok_i, 0);
+        } else return p.failSite(.invalid_config_rule, .config_expansion, p.tok_i, rule);
         _ = try p.expect(.semicolon);
         try p.push(try p.addNode(.config_rule, rule, .{ .token = p.tok_i - 1 }));
     }

@@ -6,7 +6,7 @@
 //! §11.4, §17.1.2, §17.1.3, §17.4.1.
 //!
 //! Contents:
-//! - `pub const Stop = enum { idle }`
+//! - `pub const Stop = enum { idle, analog, explicit_d2a }`
 //! - `pub fn run(s: *State) Error!void`
 //! - `pub fn runUntil(s: *State, limit: u64) Error!Stop`
 //! - `pub fn delayIn(s: *State, a: Allocator, e: u32, scope: u32) Error!u64`
@@ -33,11 +33,14 @@ const sdf = @import("sdf.zig");
 const queues = @import("queues.zig");
 const pla = @import("pla.zig");
 const activations = @import("activations.zig");
+const analog = @import("analog.zig");
 const Error = State.Error;
 const Literal = logic.Literal;
 
-/// Why `runUntil` returned: nothing is left at or before the limit.
-pub const Stop = enum { idle };
+/// Why `runUntil` returned: nothing is left at or before the limit; or,
+/// in a mixed run, a value the analog block reads changed (VAMS §8.5.1
+/// region 3b) or an explicit D2A term occurred (§8.5.3.6 region 1b).
+pub const Stop = enum { idle, analog, explicit_d2a };
 
 /// Whether a process goes on after an instruction.
 const Flow = enum { next, ended };
@@ -99,6 +102,20 @@ pub fn runUntil(s: *State, limit: u64) Error!Stop {
             .put => |w| {
                 const n = Program.words(w.width);
                 try s.store(w.slot, .{ .width = w.width, .signed = false, .sized = true, .planes = try a.dupe(u64, row.buf[0 .. 2 * n]) });
+            },
+            .a2d => |slot| try s.trigger(slot),
+            .analog_mark => {
+                try s.free_rows.append(s.arena, event.payload);
+                s.analog.pending = false;
+                return .analog;
+            },
+            // §8.4.7 "Digital to analog events shall cause an analog
+            // solution of the time where they occur": 1b is followed by 3b.
+            .d2a_mark => {
+                try s.free_rows.append(s.arena, event.payload);
+                s.analog.d2a_pending = false;
+                try analog.requestAnalog(s);
+                return .explicit_d2a;
             },
         }
         try s.free_rows.append(s.arena, event.payload);

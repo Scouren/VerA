@@ -112,10 +112,10 @@ pub fn parseUdpInst(p: *Parse) Error!Node.Index {
         _ = try p.expect(.l_paren);
         const terms_top = p.scratch.items.len;
         const out = try expr.parseExpr(p);
-        if (!prim.isNetLvalue(p, out)) return p.failAt(.invalid_gate_terminals, inst);
+        if (!prim.isNetLvalue(p, out)) return p.failSite(.invalid_gate_terminals, .gate_output, p.nodes.items(.main_token)[@backingInt(out)], 0);
         try p.push(out);
         while (p.eat(.comma) != null) try p.push(try expr.parseExpr(p));
-        if (!named and p.scratch.items.len - terms_top < 2) return p.failAt(.invalid_gate_terminals, name_tok);
+        if (!named and p.scratch.items.len - terms_top < 2) return p.failSite(.invalid_gate_terminals, .instance_unnamed, name_tok, @intCast(p.scratch.items.len - terms_top));
         _ = try p.expect(.r_paren);
         const terms = try p.spanFrom(terms_top);
         try p.push(try p.addNode(.gate_instance, inst, .{ .extra = try p.addExtra(Node.GateInstance{ .range = range, .terms_start = terms.start, .terms_end = terms.end }) }));
@@ -146,12 +146,12 @@ fn udpPort(p: *Parse) Error!Node.Index {
 /// A.5.3 `table entry { entry } endtable`; every entry has the first one's
 /// body (one colon: combinational, two: sequential).
 fn parseTable(p: *Parse) Error!Node.Index {
-    const kw = p.eat(.keyword_table) orelse return p.fail(.invalid_udp);
+    const kw = p.eat(.keyword_table) orelse return p.failSite(.invalid_udp, .udp_body, p.tok_i, 0);
     const top = p.scratch.items.len;
     defer p.scratch.shrinkRetainingCapacity(top);
     var sequential: ?bool = null;
     while (p.eat(.keyword_endtable) == null) {
-        if (p.tokenTag(p.tok_i) == .eof) return p.fail(.invalid_udp);
+        if (p.tokenTag(p.tok_i) == .eof) return p.failSite(.invalid_udp, .udp_no_endtable, p.tok_i, 0);
         try p.push(try parseEntry(p, &sequential));
     }
     return p.addNode(.udp_table, kw, .{ .extra_range = try p.spanFrom(top) });
@@ -160,55 +160,62 @@ fn parseTable(p: *Parse) Error!Node.Index {
 /// One `level_input_list : output ;` or `seq_input_list : state : next ;`
 /// against A.5.3's alphabets: inputs from `01xX?bB` (and in a sequential
 /// entry at most one edge, `rRfFpPnN*` or `( level level )`), the state one
-/// level symbol, the output one of `01xX` (or `-` for a next state).
+/// level symbol, the output one of `01xX` (or `-` for a next state). The
+/// checks run in the old parser's order, so the first refusal is its.
 fn parseEntry(p: *Parse, sequential: *?bool) Error!Node.Index {
     const first = p.tok_i;
-    var colons: [2]TokenIndex = undefined;
-    var n: usize = 0;
+    // The first token of each column; a colon opens columns 1 and 2.
+    var cols: [3]TokenIndex = .{ first, first, first };
+    var n: u32 = 0;
     while (p.tokenTag(p.tok_i) != .semicolon) : (p.tok_i += 1) {
-        if (p.tokenTag(p.tok_i) == .eof or p.tokenTag(p.tok_i) == .keyword_endtable) return p.fail(.invalid_udp);
+        if (p.tokenTag(p.tok_i) == .eof or p.tokenTag(p.tok_i) == .keyword_endtable) return p.failSite(.invalid_udp, .udp_entry_semicolon, p.tok_i, 0);
         if (p.tokenTag(p.tok_i) != .colon) continue;
-        if (n == 2) return p.failAt(.invalid_udp, first);
-        colons[n] = p.tok_i;
         n += 1;
+        if (n > 2) return p.failSite(.invalid_udp, .udp_colons, first, n);
+        cols[n] = p.tok_i + 1;
     }
     const semi = p.tok_i;
     p.tok_i += 1;
-    if (n == 0) return p.failAt(.invalid_udp, first);
+    if (n == 0) return p.failSite(.invalid_udp, .udp_colons, first, 0);
     const seq = n == 2;
     if (sequential.*) |was| {
-        if (was != seq) return p.failAt(.invalid_udp, first);
+        if (was != seq) return p.failSite(.invalid_udp, .udp_body_mixed, first, @intFromBool(seq));
     } else sequential.* = seq;
-    // The inputs: levels, and in a sequential entry one edge.
+    // The inputs' alphabet, then (A.5.3 edge_indicator) the shape of each
+    // `( level level )`.
     var edges: u32 = 0;
-    var pair: u8 = 0; // characters seen inside an open `(`
-    var it: Chars = .{ .p = p, .tok = first, .end = colons[0] };
+    var it: Chars = .{ .p = p, .tok = first, .end = cols[1] - 1 };
     while (it.next()) |c| {
-        if (pair != 0) {
-            if (pair < 3 and !isLevel(c)) return p.failAt(.invalid_udp, first);
-            if (pair == 3) {
-                if (c != ')') return p.failAt(.invalid_udp, first);
-                pair = 0;
-            } else pair += 1;
-            continue;
-        }
         if (isLevel(c)) continue;
-        if (std.mem.findScalar(u8, "rRfFpPnN*(", c) == null) return p.failAt(.invalid_udp, first);
-        if (!seq) return p.failAt(.invalid_udp, first);
-        edges += 1;
-        if (edges > 1) return p.failAt(.invalid_udp, first);
-        if (c == '(') pair = 1;
+        if (std.mem.findScalar(u8, "rRfFpPnN*()", c) == null) return p.failSite(.invalid_udp, .udp_input_symbol, first, c);
+        if (!seq) return p.failSite(.invalid_udp, .udp_comb_edge, first, c);
+        edges += @intFromBool(c != ')');
+        if (edges > 1) return p.failSite(.invalid_udp, .udp_two_edges, first, 0);
     }
-    if (pair != 0) return p.failAt(.invalid_udp, first);
+    var pair: u8 = 0; // characters seen inside an open `(`
+    it = .{ .p = p, .tok = first, .end = cols[1] - 1 };
+    while (it.next()) |c| {
+        const ok = switch (pair) {
+            0 => c != ')',
+            1, 2 => isLevel(c),
+            else => c == ')',
+        };
+        if (!ok) return p.failSite(.invalid_udp, .udp_edge_shape, first, 0);
+        pair = if (pair == 3 or (pair == 0 and c != '(')) 0 else pair + 1;
+    }
+    if (pair != 0) return p.failSite(.invalid_udp, .udp_edge_shape, first, 0);
     if (seq) {
-        var state: Chars = .{ .p = p, .tok = colons[0] + 1, .end = colons[1] };
-        const s = state.next() orelse return p.failAt(.invalid_udp, first);
-        if (!isLevel(s) or state.next() != null) return p.failAt(.invalid_udp, first);
+        var count: u32 = 0;
+        var state: Chars = .{ .p = p, .tok = cols[1], .end = cols[2] - 1 };
+        while (state.next()) |c| : (count += 1) if (!isLevel(c)) return p.failSite(.invalid_udp, .udp_state_symbol, cols[1], c);
+        if (count != 1) return p.failSite(.invalid_udp, .udp_state_count, cols[1], count);
     }
-    var out: Chars = .{ .p = p, .tok = colons[n - 1] + 1, .end = semi };
-    const o = out.next() orelse return p.failAt(.invalid_udp, first);
-    if (out.next() != null) return p.failAt(.invalid_udp, first);
-    if (std.mem.findScalar(u8, "01xX", o) == null and !(seq and o == '-')) return p.failAt(.invalid_udp, first);
+    var count: u32 = 0;
+    var last: u8 = 0;
+    var out: Chars = .{ .p = p, .tok = cols[n], .end = semi };
+    while (out.next()) |c| : (count += 1) last = c;
+    if (count != 1) return p.failSite(.invalid_udp, .udp_output_count, cols[n], count);
+    if (std.mem.findScalar(u8, "01xX", last) == null and !(seq and last == '-')) return p.failSite(.invalid_udp, .udp_output_symbol, cols[n], last);
     return p.addNode(.udp_entry, first, .{ .token = semi });
 }
 

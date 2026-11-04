@@ -187,7 +187,7 @@ pub fn eval(s: *State, a: Allocator, e: u32) Error!Literal {
             break :blk normalize(a, v, w, ty.signed);
         },
         .int_of_real => normalize(a, try logic.intOfReal(a, try real(s, a, d.a)), w, ty.signed),
-        .real_of_int, .real_neg, .real_add, .real_sub, .real_mul, .real_div, .real_pow, .real_cond, .realtime, .abstime, .bitstoreal, .math1, .math2 => logic.realLiteral(a, try real(s, a, e)),
+        .real_of_int, .real_neg, .real_add, .real_sub, .real_mul, .real_div, .real_pow, .real_cond, .realtime, .abstime, .probe, .bitstoreal, .math1, .math2 => logic.realLiteral(a, try real(s, a, e)),
         .real_eq, .real_neq, .real_lt, .real_le, .real_gt, .real_ge => blk: {
             const l = try real(s, a, d.a);
             const r = try real(s, a, d.b);
@@ -287,6 +287,13 @@ pub fn real(s: *State, a: Allocator, e: u32) Error!f64 {
         },
         .realtime => p.times[d.a].scale.realAt(s.scheduler.now),
         .abstime => time.secondsAt(s.scheduler.now, p.finest),
+        // VAMS §7.3.6.3: V(a) or V(a, b) of the analog solution, from the
+        // mixed host (`analog.Link.probe`); a run with no host fails.
+        .probe => blk: {
+            const probe = s.analog.probe orelse return s.fail("an analog probe needs the mixed-signal kernel", .{});
+            const pr = p.extraData(Program.Probe, d.a);
+            break :blk try probe(s.analog.probe_ctx, p.str(pr.a), if (pr.b.len == 0) null else p.str(pr.b));
+        },
         .bitstoreal => @bitCast((try eval(s, a, d.a)).values()[0]),
         .math1 => math1(@fromBackingInt(@intCast(d.b)), try real(s, a, d.a)),
         .math2 => blk: {

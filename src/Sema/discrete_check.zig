@@ -284,7 +284,7 @@ fn probeOutside(s: *Sema, unit: *Unit, r: Inst.Ref, free: *const Set, depth: u32
         else => {}, // else: searched through its operands
     }
     var ops: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
-    try control.operands(s, vir, i, &ops);
+    try control.operands(s.arena, vir, i, &ops);
     var it = ops.keyIterator();
     while (it.next()) |o| if (try probeOutside(s, unit, o.toRef(), free, depth + 1)) |p| return p;
     return null;
@@ -332,7 +332,7 @@ fn digitalCalls(s: *Sema, unit: *Unit, r: Inst.Ref, depth: u32) Allocator.Error!
             try s.fail(.E0436, unit.file, r, "`{s}`", .{vir.string(decl.payloadOf(vir, Inst.Function, f).name)});
     };
     var ops: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
-    try control.operands(s, vir, i, &ops);
+    try control.operands(s.arena, vir, i, &ops);
     var it = ops.keyIterator();
     while (it.next()) |o| try digitalCalls(s, unit, o.toRef(), depth + 1);
 }

@@ -12,10 +12,10 @@
 //! Cites: IEEE 1364-2005 §9.9, §11.4, §12.4, §12.5, §19.8.
 //!
 //! Contents:
-//! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Why = struct`
+//! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Named = struct`, `pub const SegmentRef = struct`, `pub const Why = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
-//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `reject`, `rejectArg`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
+//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `reject`, `rejectFmt`, `rejectArg`, `rejectArgFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
 //! - `pub const none: u32`
 //! - `pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Lowered`
 
@@ -50,23 +50,42 @@ pub const Source = struct {
 pub const Options = struct {
     /// One per `Zcu` file, in file order.
     sources: []const Source,
+    /// VAMS §7 the digital half of a mixed design (lib/sim/digital's
+    /// `Link.mixed`): its analog blocks, analog functions and continuous or
+    /// ground nets are the analog solver's, skipped, where a pure IEEE 1364
+    /// design refuses them.
+    mixed: bool = false,
 };
 
 /// The program, and per timing check (`Program.checks` order) the byte of
-/// the preprocessed text its W1199 report is filed at.
+/// the preprocessed text its W1199 report is filed at. A mixed design's
+/// also has `names`: its variables and nets by path (`Named`).
 pub const Lowered = struct {
     program: Program,
     check_sites: []const u32 = &.{},
+    names: []const Named = &.{},
 };
+
+/// VAMS §7.3 one variable or net a mixed host reads (D2A) or writes (A2D):
+/// its path below the root as Sema's discrete card rows spell it (`n`,
+/// `u.clk`), its `Program.slots` row and type.
+pub const Named = struct { path: []const u8, slot: u32, ty: Program.Ty };
+
+/// VAMS §7.8.5.1 a bridged primitive terminal: its instance, its
+/// instruction and (in an instance array) its lane's bit; `lane` is 0 for a
+/// terminal one bridge serves.
+pub const SegmentRef = struct { instance: u32, inst: Inst.Index, lane: u32 = 0 };
 
 /// `Unsupported`: a construct the lowering does not express yet, named in
 /// `Lower.why`. `Rejected`: a design IEEE 1364-2005 makes an error, which
-/// the caller reports as E1100 (lib/sim/digital's code for it) at `Why.at`.
+/// the caller reports under `Why.code` (lib/sim/digital's code for it) at
+/// `Why.at`.
 pub const Error = error{ Unsupported, Rejected } || Allocator.Error;
 
 /// Why `lower` failed: the construct or the error, and for `Rejected` the
-/// source offset (as a token start of `Options.sources`' trees) it is at.
-pub const Why = struct { text: []const u8 = "", at: u32 = none };
+/// source offset (as a token start of `Options.sources`' trees) it is at
+/// and its code (E1100, lib/sim/digital's catch-all, unless a rule has one).
+pub const Why = struct { text: []const u8 = "", at: u32 = none, code: vams.Diag.Code = .E1100 };
 
 /// The `none` of every u32 handle a `Program` row holds.
 pub const none: u32 = std.math.maxInt(u32);
@@ -163,6 +182,20 @@ pub const Lower = struct {
     why: []const u8 = "",
     /// `reject`'s source offset.
     why_at: u32 = none,
+    /// `reject`'s code: set before a `reject` whose rule has its own.
+    why_code: vams.Diag.Code = .E1100,
+    /// VAMS §7.3.5 a mixed design's analog events (`Program.monitors`).
+    monitors: std.ArrayList(Program.A2d) = .empty,
+    /// VAMS §7.8 each bridge's segment net, by its `Zcu.instances` row,
+    /// and the bridge each bridged primitive terminal (its instruction in
+    /// its instance's module) reads and drives instead of its net.
+    segment_of: std.AutoHashMapUnmanaged(u32, Name) = .empty,
+    segment_refs: std.AutoHashMapUnmanaged(SegmentRef, u32) = .empty,
+    /// The bridged terminals whose array lanes take bridges of their own,
+    /// read only lane by lane (`gate_lane`), and the lane being compiled
+    /// (`none` outside a gate's inputs).
+    lane_split: std.AutoHashMapUnmanaged(SegmentRef, void) = .empty,
+    gate_lane: u32 = none,
     names: std.ArrayList(Name) = .empty,
     frames: std.ArrayList(Frame) = .empty,
     scopes: std.ArrayList(ScopeInfo) = .empty,
@@ -211,6 +244,9 @@ pub const Lower = struct {
     sdf: bool = false,
     /// A function body is being compiled (§10.4.4: its fork runs in order).
     in_function: bool = false,
+    /// §10.2.1 every slot of an automatic subroutine's storage (each
+    /// activation copy's too).
+    auto_slots: std.AutoHashMapUnmanaged(u32, void) = .empty,
     /// An automatic subroutine's activation storage is being laid out: its
     /// named blocks' items join it (`sub.zig`'s `storage`).
     laying_out: bool = false,
@@ -251,6 +287,13 @@ pub const Lower = struct {
         return error.Unsupported;
     }
 
+    /// `rejectArg` with a formatted message.
+    pub fn rejectArgFmt(l: *Lower, f: u32, call: Inst.Index, k: usize, comptime fmt: []const u8, args: anytype) Error {
+        l.rejectArg(f, call, k, "") catch {};
+        l.why = try std.fmt.allocPrint(l.a, fmt, args);
+        return error.Rejected;
+    }
+
     /// Records error `msg` at expression `r` of frame `f` and fails
     /// (`Rejected`): the message lib/sim/digital gives the same design.
     /// A call is at its name (its node's main token is its `(`), as
@@ -265,6 +308,14 @@ pub const Lower = struct {
         const tree = l.options.sources[@backingInt(l.fileOf(f))].tree;
         const n = vir.instructions.items(.data)[@backingInt(i)].pl_node.src_node;
         if (tree.nodeTag(n) == .call) l.why_at = tree.tokenStart(tree.nodeMainToken(tree.nodeData(n).node_and_extra[0]));
+        return error.Rejected;
+    }
+
+    /// `reject` with a formatted message.
+    pub fn rejectFmt(l: *Lower, f: u32, r: Inst.Ref, comptime fmt: []const u8, args: anytype) Error {
+        const msg = try std.fmt.allocPrint(l.a, fmt, args);
+        l.reject(f, r, "") catch {};
+        l.why = msg;
         return error.Rejected;
     }
 
@@ -408,20 +459,25 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Low
     var b: Builder = .init(arena);
     var l: Lower = .{ .zcu = zcu, .a = arena, .b = &b, .options = options };
     spine(&l) catch |e| {
-        why.* = .{ .text = l.why, .at = l.why_at };
+        why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
         return e;
     };
     var program = b.finish();
+    program.monitors = l.monitors.items;
     vars.finishParams(&l, &program) catch |e| {
-        why.* = .{ .text = l.why, .at = l.why_at };
+        why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
         return e;
     };
     time0.finish(&l, &program) catch |e| {
-        why.* = .{ .text = l.why, .at = l.why_at };
+        why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
         return e;
     };
     assert(program.inst_scope.len == program.insts.len);
-    return .{ .program = program, .check_sites = l.check_sites.items };
+    const named = if (options.mixed) @import("digital/domain.zig").names(&l) catch |e| {
+        why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
+        return e;
+    } else &.{};
+    return .{ .program = program, .check_sites = l.check_sites.items, .names = named };
 }
 
 // ---- private ----
@@ -438,27 +494,33 @@ fn spine(l: *Lower) Error!void {
 
 /// IEEE 1364-2005 §19.8: each module's `timescale (the last before it, or
 /// none); some modules with one and some without is an error. The design's
-/// tick is the finest precision of all of them, `s` when none is given.
+/// tick is the finest precision of all of them, `s` when none is given. A
+/// mixed design's modules before its first `timescale take that one, as
+/// lib/sim/digital's `mixedTimescales` moves it to the text's start: the
+/// shipped prelude's modules come ahead of every directive the source wrote.
 fn timeScales(l: *Lower) Error!void {
     const zcu = l.zcu;
+    const first = if (l.options.mixed) firstTimescale(l) else null;
     var finest: i32 = 0;
     var set: u32 = 0;
     var total: u32 = 0;
+    var ahead = true;
     for (0..zcu.files.len) |f| {
         const vir = zcu.fileVir(@fromBackingInt(@intCast(f)));
         for (vir.decls()) |d| {
             if (d.kind != .module and d.kind != .macromodule and d.kind != .connectmodule) continue;
             const m = Lower.payload(vir, Inst.Module, d.inst);
             total += 1;
-            if (!m.stamp.flags.has_timescale) continue;
+            const stamp = stampOf(m, first, &ahead) orelse continue;
             set += 1;
-            const p = try quantum(l, m.stamp.precision.get());
+            const p = try quantum(l, stamp.precision.get());
             finest = @min(finest, @backingInt(p));
         }
     }
     if (set != 0 and set != total) return l.refuse("§19.8 some modules with a `timescale and some without");
     l.b.p.finest = finest;
     const global: std_sim.time.Quantum = @fromBackingInt(@intCast(finest));
+    ahead = true;
     for (0..zcu.files.len) |f| {
         const file: Zcu.File.Index = @fromBackingInt(@intCast(f));
         const vir = zcu.fileVir(file);
@@ -466,17 +528,39 @@ fn timeScales(l: *Lower) Error!void {
             if (d.kind != .module and d.kind != .macromodule and d.kind != .connectmodule and d.kind != .primitive) continue;
             var unit: std_sim.time.Quantum = .s;
             var precision: std_sim.time.Quantum = .s;
-            if (d.kind != .primitive) {
-                const m = Lower.payload(vir, Inst.Module, d.inst);
-                if (m.stamp.flags.has_timescale) {
-                    unit = try quantum(l, m.stamp.unit.get());
-                    precision = try quantum(l, m.stamp.precision.get());
-                }
-            }
+            if (d.kind != .primitive) if (stampOf(Lower.payload(vir, Inst.Module, d.inst), first, &ahead)) |stamp| {
+                unit = try quantum(l, stamp.unit.get());
+                precision = try quantum(l, stamp.precision.get());
+            };
             const scale = std_sim.time.Scale.init(unit, precision, global) catch return l.refuse("an invalid timescale");
             try l.module_times.put(l.a, .{ .file = file, .index = @fromBackingInt(@intCast(k)) }, .{ .scale = scale, .unit_exp = @backingInt(unit) });
         }
     }
+}
+
+/// The stamp of a mixed design's first module with a `timescale.
+fn firstTimescale(l: *Lower) ?Inst.Module.Stamp {
+    assert(l.options.mixed);
+    for (0..l.zcu.files.len) |f| {
+        const vir = l.zcu.fileVir(@fromBackingInt(@intCast(f)));
+        for (vir.decls()) |d| {
+            if (d.kind != .module and d.kind != .macromodule and d.kind != .connectmodule) continue;
+            const m = Lower.payload(vir, Inst.Module, d.inst);
+            if (m.stamp.flags.has_timescale) return m.stamp;
+        }
+    }
+    return null;
+}
+
+/// Module `m`'s `timescale: its own, else `first` (a mixed design's) while
+/// no module before it had one (`ahead`, cleared at the first that does),
+/// else none.
+fn stampOf(m: Inst.Module, first: ?Inst.Module.Stamp, ahead: *bool) ?Inst.Module.Stamp {
+    if (m.stamp.flags.has_timescale) {
+        ahead.* = false;
+        return m.stamp;
+    }
+    return if (ahead.*) first else null;
 }
 
 fn quantum(l: *Lower, seconds: f64) Error!std_sim.time.Quantum {

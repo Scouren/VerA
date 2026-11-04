@@ -23,6 +23,7 @@ const vams = @import("vams");
 const std_sim = @import("std_sim");
 const digital = @import("../digital.zig");
 const decl = @import("decl.zig");
+const redecl = @import("redecl.zig");
 const vars = @import("vars.zig");
 const expr = @import("expr.zig");
 const place = @import("place.zig");
@@ -79,7 +80,8 @@ const depth_max: u32 = 1 << 12;
 pub fn declare(l: *Lower, f: u32, scope: u32, i: Inst.Index) Error!void {
     const vir = l.virOf(f);
     const s = Lower.payload(vir, Inst.Function, i);
-    if (s.flags.analog) return l.refuse("an analog function");
+    // VAMS §4.7 an analog function is the analog block's to call.
+    if (s.flags.analog) return if (l.options.mixed) {} else l.refuse("an analog function");
     const sc = try decl.newScope(l, scope, vir.string(s.name), null, l.b.times.items[scope], l.srcOffset(f, i), false);
     const own = try storage(l, f, sc, i);
     const row: u32 = @intCast(l.subs.items.len);
@@ -178,8 +180,14 @@ pub fn compileBodies(l: *Lower) Error!void {
     }
 }
 
-/// Writes `Program.subs`, one row per subroutine in declaration order.
+/// Writes `Program.subs`, one row per subroutine in declaration order. A
+/// timed task never enabled is compiled out of line first, never run, so
+/// its body is checked as lib/sim/digital checks every body.
 pub fn finish(l: *Lower) Error!void {
+    for (l.subs.items, 0..) |r, k| if (!r.function and r.entry == none and r.body == none and r.ranges.items.len == 0) {
+        l.frame = r.outer;
+        try outOfLine(l, @intCast(k), 0);
+    };
     const out = try l.a.alloc(Program.Sub, l.subs.items.len);
     for (l.subs.items, out) |r, *s| {
         assert(r.ranges.items.len % 2 == 0);
@@ -276,6 +284,7 @@ fn storage(l: *Lower, outer: u32, scope: u32, i: Inst.Index) Error!Storage {
         if (!gop.found_existing) gop.value_ptr.* = .empty;
         try gop.value_ptr.append(l.a, d);
     }
+    for (later.values()) |decls| try redecl.check(l, outer, decls.items, .subroutine, .empty);
     for (later.keys(), later.values()) |d, decls| _ = try vars.variable(l, f, d, decls.items);
     for (all) |d| if (Lower.tag(vir, d) == .event) {
         _ = try vars.event(l, f, d);
@@ -289,6 +298,7 @@ fn storage(l: *Lower, outer: u32, scope: u32, i: Inst.Index) Error!Storage {
         try decl.preBlocks(l, f, s.body, 0);
     }
     const count: u32 = @as(u32, @intCast(l.b.p.slots.len)) - first;
+    if (s.flags.automatic) for (first..first + count) |k| try l.auto_slots.put(l.a, @intCast(k), {});
     for (all) |d| if (Lower.tag(vir, d) == .param) {
         _ = try vars.param(l, f, d);
     };

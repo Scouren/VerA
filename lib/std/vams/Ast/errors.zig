@@ -18,36 +18,9 @@ const Allocator = std.mem.Allocator;
 const Ast = @import("../Ast.zig");
 const Diag = @import("../Diag.zig");
 const Token = @import("../tokenizer.zig").Token;
-
-/// The old lexer's dedicated keyword tags: `found` quotes these and prints
-/// any other keyword's text bare (it lexed them all as one reserved tag).
-const quoted_keywords = std.StaticStringMap(void).initComptime(kv: {
-    const words = [_][]const u8{
-        "module",      "macromodule", "connectmodule", "endmodule",       "paramset",        "endparamset",   "function",      "endfunction",
-        "analog",      "initial",     "always",        "assign",          "begin",           "end",           "wait",          "generate",
-        "endgenerate", "defparam",    "connectrules",  "endconnectrules", "connect",         "resolveto",     "merged",        "split",
-        "parameter",   "localparam",  "aliasparam",    "integer",         "real",            "string",        "realtime",      "time",
-        "reg",         "event",       "genvar",        "branch",          "input",           "output",        "inout",         "wire",
-        "tri",         "tri0",        "tri1",          "triand",          "trior",           "trireg",        "wand",          "wor",
-        "uwire",       "supply0",     "supply1",       "signed",          "unsigned",        "scalared",      "vectored",      "tran",
-        "rtran",       "and",         "nand",          "nor",             "xor",             "xnor",          "buf",           "not",
-        "bufif0",      "bufif1",      "notif0",        "notif1",          "discipline",      "enddiscipline", "nature",        "endnature",
-        "domain",      "continuous",  "discrete",      "potential",       "flow",            "abstol",        "access",        "units",
-        "ddt_nature",  "idt_nature",  "ground",        "from",            "exclude",         "inf",           "if",            "else",
-        "case",        "casex",       "casez",         "endcase",         "default",         "for",           "while",         "repeat",
-        "forever",     "return",      "break",         "continue",        "disable",         "or",            "initial_step",  "final_step",
-        "cross",       "above",       "timer",         "absdelta",        "driver_update",   "posedge",       "negedge",       "ddt",
-        "ddx",         "idt",         "idtmod",        "absdelay",        "transition",      "slew",          "last_crossing", "laplace_zd",
-        "laplace_zp",  "laplace_nd",  "laplace_np",    "zi_zd",           "zi_zp",           "zi_nd",         "zi_np",         "analysis",
-        "ac_stim",     "white_noise", "flicker_noise", "noise_table",     "noise_table_log", "abs",           "max",           "min",
-        "pow",         "sqrt",        "exp",           "limexp",          "ln",              "log",           "expm1",         "ln1p",
-        "hypot",       "floor",       "ceil",          "sin",             "cos",             "tan",           "asin",          "acos",
-        "atan",        "atan2",       "sinh",          "cosh",            "tanh",            "asinh",         "acosh",         "atanh",
-    };
-    var kvs: [words.len]struct { []const u8 } = undefined;
-    for (&kvs, words) |*kv, word| kv.* = .{word};
-    break :kv kvs;
-});
+const sites = @import("sites.zig");
+const found = sites.found;
+const desc = sites.desc;
 
 const Runaway = enum { none, unterminated, line_continuation };
 
@@ -82,6 +55,7 @@ pub fn code(tag: Ast.Error.Tag) Diag.Code {
         .invalid_config_rule => .E0243,
         .invalid_parameter_list => .E0246,
         .digital_statement_in_analog => .E0249,
+        .driver_update_outside_connect_module => .E0818,
         .nesting_too_deep => .E0241,
         // else: the shapes the old parser reported as "unexpected token"
         // with a reason; finer codes are diff-parse's debt (parse.xfail).
@@ -116,6 +90,7 @@ fn one(tree: *const Ast, e: Ast.Error, w: *Diag.Wip) Allocator.Error!void {
         var b = w.build(.parse, .E0236, loc);
         return b.emit();
     }
+    if (try refined(tree, e, loc, w)) return;
     var b = w.build(.parse, code(e.tag), loc);
     switch (e.tag) {
         .expected_token => {
@@ -131,56 +106,223 @@ fn one(tree: *const Ast, e: Ast.Error, w: *Diag.Wip) Allocator.Error!void {
         .expected_description => b.msg("`{s}`", .{found(tree, tok)}),
         .invalid_number => b.msg("`{s}`", .{text}),
         .scale_factor_in_delay => b.msg("`{s}` in a digital delay; use decimal or scientific notation in the module's time units", .{text}),
-        .directive_inside_design_element => b.msg("`{s} inside a module", .{text[@min(1, text.len)..]}),
+        .directive_inside_design_element => b.msg("`{s} inside a {s}", .{ text[@min(1, text.len)..], enclosing(tree, tok) }),
+        .unknown_keyword_set => b.msg("`{s}`", .{std.mem.trim(u8, text, "\"")}),
+        .begin_at_module_scope => b.msg("found {s}", .{found(tree, tok)}),
+        .library_text_in_source => b.msg("`{s}` is a library_description, and this file is source_text", .{std.mem.trimStart(u8, text, "`")}),
+        .specify_outside_module => b.msg("a specify block outside a module (§14.1)", .{}),
+        .driver_update_outside_connect_module => {
+            b.msg("`driver_update` in a module that is not a connect module", .{});
+            b.note("§9.22: \"Driver access functions can only be called from connect modules\", and driver_update \"is used in combination with the driver access functions\"", .{});
+        },
+        .unmatched_end_keywords, .null_statement, .not_a_generate_item, .digital_statement_in_analog => {},
         // else: a refusal whose old text names the site; diff-parse's debt.
         else => b.msg("{s}", .{@tagName(e.tag)}),
     }
     try b.emit();
 }
 
-/// The old parser's name for token `i`: a name or literal as written, a
-/// symbol or dedicated keyword quoted, any other keyword bare.
-fn found(tree: *const Ast, i: Ast.TokenIndex) []const u8 {
-    const tag = tree.tokenTag(i);
-    const text = tree.tokenSlice(i);
-    return switch (tag) {
-        .eof => "end of file",
-        .invalid => "invalid token",
-        .identifier, .escaped_identifier, .system_identifier, .number_literal, .string_literal => text,
-        else => if (!Token.Tag.isKeyword(tag) and tag != .keyword_builtin)
-            desc(tag)
-        else if (quoted_keywords.has(text))
-            quote(text)
-        else
-            text,
-    };
-}
-
-/// What the grammar wanted, as the old parser's caret named it.
-fn desc(tag: Token.Tag) []const u8 {
-    return switch (tag) {
-        .eof => "end of file",
-        .invalid => "invalid token",
-        .identifier, .escaped_identifier => "an identifier",
-        .system_identifier => "a system task or function name",
-        .number_literal => "an integer literal",
-        .string_literal => "a string literal",
-        else => quotedLexeme(tag),
-    };
-}
-
-fn quotedLexeme(tag: Token.Tag) []const u8 {
-    return switch (tag) {
-        inline else => |t| comptime if (Token.Tag.lexeme(t)) |l| "`" ++ l ++ "`" else @tagName(t),
-    };
-}
-
-/// `text` in backticks, from a fixed table: `found`'s keywords are short.
-fn quote(text: []const u8) []const u8 {
-    inline for (comptime quoted_keywords.keys()) |k| {
-        if (std.mem.eql(u8, k, text)) return "`" ++ k ++ "`";
+/// The refusals whose old code or text the error's token and its
+/// neighbours decide; true when it emitted one.
+fn refined(tree: *const Ast, e: Ast.Error, loc: Diag.Loc, w: *Diag.Wip) Allocator.Error!bool {
+    if (e.site != .generic) {
+        try sites.report(tree, e, loc, w);
+        return true;
     }
-    unreachable; // `found` quotes only `quoted_keywords`.
+    const tok = e.token;
+    const tag = tree.tokenTag(tok);
+    const prev: Token.Tag = if (tok == 0) .eof else tree.tokenTag(tok - 1);
+    var b: Diag.Wip.Builder = switch (e.tag) {
+        // A.6.4: each digital statement form has its own code.
+        .digital_statement_in_analog => switch (tag) {
+            .hash => w.build(.parse, .E0254, loc),
+            .keyword_wait => w.build(.parse, .E0255, loc),
+            .keyword_forever => w.build(.parse, .E0256, loc),
+            .keyword_assign, .keyword_deassign, .keyword_force, .keyword_release => blk: {
+                var x = w.build(.parse, .E0258, loc);
+                x.msg("`{s}`", .{tree.tokenSlice(tok)});
+                break :blk x;
+            },
+            else => return false, // else: the fork-join and the rest keep E0249
+        },
+        // Syntax 6-8: a parameter declaration has its own code.
+        .not_a_generate_item => if (tag == .keyword_parameter or tag == .keyword_localparam) w.build(.parse, .E0229, loc) else return false,
+        // An initial or always construct takes a statement: E0209.
+        .null_statement => if (prev == .keyword_initial or prev == .keyword_always) blk: {
+            var x = w.build(.parse, .E0209, loc);
+            x.msg("found `;`: an {s} construct takes a statement, not a null one", .{if (prev == .keyword_always) "always" else "initial"});
+            break :blk x;
+        } else return false,
+        // A.1.4: a keyword with no dedicated tag in module item position.
+        .expected_module_item => if (Token.Tag.isKeyword(tag) and found(tree, tok)[0] != '`') blk: {
+            var x = w.build(.parse, .E0205, loc);
+            x.msg("found {s}", .{found(tree, tok)});
+            break :blk x;
+        } else return false,
+        // A.6.5: `initial_step()`/`final_step()` names the event.
+        .empty_step_event_list => blk: {
+            var k = tok;
+            // Bounded by three tokens: the keyword, `(`, `)`.
+            while (k > 0 and tok - k < 3 and tree.tokenTag(k) != .keyword_initial_step and tree.tokenTag(k) != .keyword_final_step) k -= 1;
+            var x = w.build(.parse, .E0220, loc);
+            x.msg("after `{s}`", .{tree.tokenSlice(k)});
+            break :blk x;
+        },
+        // §2.6: a number the new tokenizer ends early (`4af`, `4'b101f`,
+        // `8'`) is one bad literal to the old lexer, reported at its start.
+        .expected_token => if (tok > 0 and prev == .number_literal and tree.tokenStart(tok) == endOfPrev(tree, tok) and
+            ((tag == .identifier and hexLetter(tree.tokenSlice(tok)[0]) and std.mem.findScalar(u8, tree.tokenSlice(tok - 1), '.') == null) or (tag == .invalid and tree.source[tree.tokenStart(tok)] == '\'')))
+        blk: {
+            const at = tree.tokenStart(tok - 1);
+            const end = tree.tokenStart(tok) + @as(u32, @intCast(tree.tokenSlice(tok).len));
+            var x = w.build(.parse, if (tag == .invalid) .E0131 else .E0133, .{ .file = .root, .start = at, .end = end });
+            x.msg("`{s}`", .{tree.source[at..end]});
+            break :blk x;
+        } else return false,
+        // §2.7: at the escape above `\377`.
+        .invalid_string_escape => blk: {
+            const text = tree.tokenSlice(tok);
+            var k: usize = 0;
+            // Bounded by the token's length.
+            const esc = while (k + 3 < text.len) : (k += 1) {
+                if (text[k] == '\\' and std.ascii.isDigit(text[k + 1]) and text[k + 1] >= '4' and std.ascii.isDigit(text[k + 2]) and std.ascii.isDigit(text[k + 3])) break k;
+            } else 0;
+            const at = tree.tokenStart(tok) + @as(u32, @intCast(esc));
+            var x = w.build(.parse, .E0148, .{ .file = .root, .start = at, .end = at + 4 });
+            x.msg("`{s}`", .{text[esc..@min(text.len, esc + 4)]});
+            break :blk x;
+        },
+        // §6.4.1: an empty paramset, a forbidden statement form, or an item
+        // that begins no statement.
+        .invalid_paramset => blk: {
+            if (tag == .keyword_paramset) {
+                var x = w.build(.parse, .E0297, loc);
+                x.msg("paramset `{s}` declares no parameter, aliasparam or variable", .{tree.tokenSlice(tok + 1)});
+                break :blk x;
+            }
+            const what: ?[]const u8 = switch (tag) {
+                .angle_bracket_left_plus => "a contribution statement",
+                .at_sign => "an event control",
+                .keyword_begin => "a named block",
+                .keyword_potential, .keyword_flow => "an access function",
+                else => null, // else: no forbidden form, an item no statement begins
+            };
+            var x = w.build(.parse, if (what != null) .E0237 else .E0205, loc);
+            if (what) |wh| x.msg("{s}: found {s}", .{ wh, found(tree, tok) }) else x.msg("found {s} in a paramset body", .{found(tree, tok)});
+            break :blk x;
+        },
+        // A.1.3 / A.4.1.1: the parameter list's rule, by the token.
+        .invalid_parameter_list => blk: {
+            var x = w.build(.parse, .E0246, loc);
+            const header = tok >= 4 and tree.tokenTag(tok - 1) == .l_paren and tree.tokenTag(tok - 2) == .hash and switch (tree.tokenTag(tok - 4)) {
+                .keyword_module, .keyword_macromodule, .keyword_connectmodule => true,
+                else => false,
+            };
+            x.msg("{s}", .{switch (tag) {
+                .keyword_localparam => "a module parameter header requires `parameter`, not `localparam`",
+                else => if (header) "an empty module parameter header has no parameter declaration" else "an empty parameter value assignment has no expression or named assignment",
+            }});
+            break :blk x;
+        },
+        // A.6.3: the declaration in an unnamed block.
+        .decl_in_unnamed_block => blk: {
+            var x = w.build(.parse, .E0290, loc);
+            x.msg("found {s}", .{found(tree, tok)});
+            break :blk x;
+        },
+        .forever_needs_statement => w.build(.parse, .E0296, loc),
+        .invalid_delay_value => blk: {
+            var x = w.build(.parse, .E0207, loc);
+            x.msg("found {s}", .{found(tree, tok)});
+            break :blk x;
+        },
+        .nested_attribute => blk: {
+            var x = w.build(.parse, .E0357, loc);
+            x.msg("the value contains an attribute instance", .{});
+            x.note("§2.9: \"Nesting of attribute instances is disallowed\"", .{});
+            break :blk x;
+        },
+        // A.8.5: reported at the literal, the token before the operator.
+        .literal_assignment_target => blk: {
+            const lit = tok - 1;
+            const at = tree.tokenStart(lit);
+            var x = w.build(.parse, .E0207, .{ .file = .root, .start = at, .end = at + @as(u32, @intCast(tree.tokenSlice(lit).len)) });
+            x.msg("found {s}: an A.8.5 assignment target is a variable, never a literal", .{found(tree, lit)});
+            break :blk x;
+        },
+        // §4.7.1: the token says which rule.
+        .invalid_function => switch (tag) {
+            .keyword_return => blk: {
+                var x = w.build(.parse, .E0227, loc);
+                x.help("write `return <expr>;`", .{});
+                break :blk x;
+            },
+            .keyword_begin => blk: {
+                const label = tok + 2;
+                const at = tree.tokenStart(label);
+                var x = w.build(.parse, .E0226, .{ .file = .root, .start = at, .end = at + @as(u32, @intCast(tree.tokenSlice(label).len)) });
+                x.msg("`{s}`", .{tree.tokenSlice(label)});
+                x.help("remove the label", .{});
+                break :blk x;
+            },
+            else => blk: {
+                var x = w.build(.parse, .E0224, loc);
+                x.msg("`{s}` has an empty formal list", .{tree.tokenSlice(functionName(tree, tok))});
+                break :blk x;
+            },
+        },
+        // A.8.2: which argument of which function is empty.
+        .empty_argument => blk: {
+            var depth: u32 = 0;
+            var commas: u32 = 0;
+            var k = tok;
+            // Bounded by `tok`: back to the call's `(`.
+            while (k > 0) : (k -= 1) switch (tree.tokenTag(k - 1)) {
+                .r_paren, .r_bracket, .r_brace => depth += 1,
+                .l_paren, .l_bracket, .l_brace => if (depth == 0) break else {
+                    depth -= 1;
+                },
+                .comma => commas += @intFromBool(depth == 0),
+                else => {},
+            };
+            var x = w.build(.parse, .E0289, loc);
+            x.msg("argument {d} of `{s}` is empty", .{ commas + 1, if (k >= 2) tree.tokenSlice(k - 2) else "" });
+            break :blk x;
+        },
+        else => return false, // else: the generic rendering below
+    };
+    try b.emit();
+    return true;
+}
+
+fn hexLetter(c: u8) bool {
+    return (c >= 'a' and c <= 'f') or (c >= 'A' and c <= 'F');
+}
+
+/// The name a function declaration starting at `first` declares: the
+/// token before its `;` or `(` after `function`.
+fn functionName(tree: *const Ast, first: Ast.TokenIndex) Ast.TokenIndex {
+    var k = first;
+    // Bounded by the token count: each turn moves one token on.
+    while (tree.tokenTag(k) != .eof and tree.tokenTag(k) != .keyword_function) k += 1;
+    while (tree.tokenTag(k) != .eof and tree.tokenTag(k) != .semicolon and tree.tokenTag(k) != .l_paren) k += 1;
+    return if (k > first) k - 1 else first;
+}
+
+/// The design element a directive sits inside, by the nearest opening
+/// keyword before `i`.
+fn enclosing(tree: *const Ast, i: Ast.TokenIndex) []const u8 {
+    var k = i;
+    // Bounded by `i`: each turn moves one token back.
+    while (k > 0) {
+        k -= 1;
+        switch (tree.tokenTag(k)) {
+            .keyword_paramset => return "paramset",
+            .keyword_module, .keyword_macromodule, .keyword_connectmodule => return "module",
+            else => {},
+        }
+    }
+    return "module";
 }
 
 fn terminator(tag: Token.Tag) bool {

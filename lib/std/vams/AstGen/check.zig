@@ -342,7 +342,13 @@ fn drivers(ag: *AstGen, f: *const Facts, n: []const u8, declared: bool) Error!vo
     for (f.assigns.items) |target| {
         if (tree.nodeTag(target) != .identifier or !std.mem.eql(u8, name(tree, target), n)) continue;
         count += 1;
-        if (count == 2) try ag.report(.E0918, tree.nodeMainToken(target), "`{s}` is already driven", .{n});
+        if (count == 2) {
+            // The old check pointed at the target's first byte.
+            const at = tree.tokenStart(tree.nodeMainToken(target));
+            var b = ag.wip.build(.lower, .E0918, .{ .file = .root, .start = at, .end = at });
+            b.msg("`{s}` is already driven", .{n});
+            try b.emit();
+        }
     }
 }
 
@@ -369,8 +375,12 @@ fn formals(ag: *AstGen, node: Node.Index) Error!void {
         else => {}, // else: parameters and statements type no formal
     };
     const fname = AstGen.identText(tree, stmt.functionName(tree, node));
-    for (order.items) |t| if (!typed.contains(AstGen.identText(tree, t)))
-        try ag.report(.E0225, t, "formal `{s}` of `{s}` has no data type declaration", .{ AstGen.identText(tree, t), fname });
+    for (order.items) |t| if (!typed.contains(AstGen.identText(tree, t))) {
+        var b = ag.build(.E0225, t);
+        b.msg("formal `{s}` of `{s}` has no data type declaration", .{ AstGen.identText(tree, t), fname });
+        b.help("add `real {s};` to the function body", .{AstGen.identText(tree, t)});
+        try b.emit();
+    };
 }
 
 /// A.4.2 E0238 and §6.6.2 E0230 over the module's hoisted names: a block

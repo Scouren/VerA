@@ -23,6 +23,7 @@ const digital = @import("../digital.zig");
 const vars = @import("vars.zig");
 const expr = @import("expr.zig");
 const nets = @import("nets.zig");
+const ports = @import("ports.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const none = digital.none;
@@ -247,6 +248,18 @@ fn gate(l: *Lower, f: u32, kind: net.GateKind, t: []const Inst.Ref, lanes: u32, 
         if (w != 1 and w != lanes) return l.reject(f, x, "a gate's input terminal is one bit, or one per instance of an array");
     };
     for (outs) |o| {
+        // VAMS §7.8.5.1 an output whose lanes take bridges of their own: each
+        // lane drives its own one-bit segment (lib/sim/digital's lane rows).
+        const owner = @backingInt(l.frames.items[f].instance);
+        if (o.toIndex()) |oi| if (l.lane_split.contains(.{ .instance = owner, .inst = oi })) {
+            for (0..lanes) |j| {
+                const lane: u32 = @intCast(lanes - 1 - j);
+                const b = l.segment_refs.get(.{ .instance = owner, .inst = oi, .lane = lane }).?;
+                const seg = try ports.segment(l, b, 1);
+                try l.wires.append(l.a, .{ .net = seg.net, .frame = f, .source = .{ .gate = .{ .kind = kind, .ins = ins, .lane = lane, .out_bit = null } }, .s0 = s[0], .s1 = s[1], .delay = d });
+            }
+            continue;
+        };
         const n = try nets.drivenNet(l, f, o, s);
         const width = l.nets.items[n].width;
         if (width != 1 and width != lanes) return l.refuse("a gate output terminal neither one bit nor one per instance of an array");

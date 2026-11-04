@@ -57,6 +57,9 @@ branch_u: []u32 = &.{},
 host_params: u8 = 0,
 /// Per instruction: an `alloc`'s `Instance` field when §5.10 holds it.
 held_field: []?[]const u8 = &.{},
+/// Per §9.21.1 snapshot site (a `$table_model` call's `site - 1`): its
+/// sample count, the length of `Instance.table_<k>` (`state.plan`).
+table_len: []u32 = &.{},
 
 /// A parameter with no `given__` bit.
 pub const no_bit: u32 = std.math.maxInt(u32);
@@ -115,7 +118,6 @@ const DeclGen = @This();
 /// Writes the whole device to `w`.
 pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     const d = dg.device;
-    if (d.nodes.len == 0) return dg.fail("a device with no unknowns", .{});
     if (d.limit_slots.len != 0) return dg.fail("a §9.17.3 `$limit`", .{});
     try stamps.unknowns(dg);
     const p = try stamps.plan(dg);
@@ -178,6 +180,8 @@ fn genUnknowns(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     const d = dg.device;
     try dg.print(w, "\n/// §1.3.1 the unknowns, ports first, then the branch currents codegen mints.\npub const U = enum(u{d}) {{\n", .{if (dg.u_names.len <= 256) @as(u32, 8) else 32});
     for (dg.u_names) |n| try dg.print(w, "    {f},\n", .{Ident{ .name = n }});
+    // §6.2 a module with no ports or nets: Zig spells the empty `U` `_`.
+    if (dg.u_names.len == 0) try dg.print(w, "    _,\n", .{});
     try dg.print(w, "}};\npub const num_ports: usize = {d};\n", .{d.num_ports});
 }
 
@@ -267,7 +271,6 @@ fn genDerive(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     if (!any) return;
     var body: std.Io.Writer.Allocating = .init(dg.arena);
     var f: Function = .{ .dg = dg, .w = &body.writer };
-    var trees = false;
     for (d.params.items(.name), d.params.items(.default)) |n, def| {
         if (dg.ip.indexToKey(def) != .int) continue;
         const name = Ident{ .name = dg.ip.stringToSlice(n) };
@@ -278,13 +281,36 @@ fn genDerive(dg: *DeclGen, w: *std.Io.Writer) Error!void {
         const name = Ident{ .name = dg.ip.stringToSlice(n) };
         try dg.print(&body.writer, "\n    if (!model.given__.isSet({d})) {{", .{bit});
         f.indent = 2;
-        if (try f.genTree(der) != 0) trees = true;
+        _ = try f.genTree(der);
         try dg.print(&body.writer, "\n        model.{f} = ", .{name});
         try f.valueOf(der);
         try dg.print(&body.writer, ";\n    }}", .{});
     }
 
-    try dg.print(w, "\n/// §3.4.1 each `integer` parameter's low 32 bits; §6.3.4 each default\n/// over other parameters, unless the card named it.\npub fn derive(comptime S: type, model: *Model) void {{{s}{s}\n}}\n", .{ if (trees) "" else "\n    _ = S;", body.written() });
+    try dg.print(w, "\n/// §3.4.1 each `integer` parameter's low 32 bits; §6.3.4 each default\n/// over other parameters, unless the card named it.\npub fn derive(comptime S: type, model: *Model) void {{{s}{s}\n}}\n", .{ if (namesIdent(body.written(), "S")) "" else "\n    _ = S;", body.written() });
+}
+
+/// Whether Zig text `text` spells identifier `id` as a whole token.
+fn namesIdent(text: []const u8, id: []const u8) bool {
+    var at: usize = 0;
+    // Each pass moves `at` past one occurrence.
+    while (std.mem.findPos(u8, text, at, id)) |k| : (at = k + id.len) {
+        const before = k == 0 or !isIdentByte(text[k - 1]);
+        const after = k + id.len == text.len or !isIdentByte(text[k + id.len]);
+        if (before and after) return true;
+    }
+    return false;
+}
+
+fn isIdentByte(c: u8) bool {
+    return std.ascii.isAlphanumeric(c) or c == '_' or c == '@';
+}
+
+test namesIdent {
+    try std.testing.expect(namesIdent("S.con(1)", "S"));
+    try std.testing.expect(namesIdent("F.zTo(S, 0x3, v)", "S"));
+    try std.testing.expect(!namesIdent("model.Sx = @as(i64, 1)", "S"));
+    try std.testing.expect(!namesIdent("", "S"));
 }
 
 /// The lane tables (`deriv_reads`, `jac_pattern`) and the §5.6.1.2 charge
@@ -323,11 +349,14 @@ fn genCore(dg: *DeclGen, w: *std.Io.Writer, uses: Function.Uses, body: []const u
         if (dg.air.instructions.items(.data)[i].ty == InternPool.Index.real_type) try dg.print(w, " h{d}: F.zOf(S, 0x{x}),", .{ i, dg.live.masks[i] }) else try dg.print(w, " h{d}: i64,", .{i});
     };
     try dg.print(w, " }};\n}}\n", .{});
-    try dg.print(w, "\n/// The whole analog body, once per evaluation.\nfn core(comptime S: type, comptime mode: std.builtin.FloatMode, {s}: D.zX(S), {s}: *const Model, {s}: InstancePtr, {s}: contract.SimState) Core(S) {{\n    @setFloatMode(mode);{s}\n}}\n", .{
+    // §9.21.1 every evaluation starts from the snapshots an accepted point kept.
+    const tables = dg.table_len.len != 0;
+    try dg.print(w, "\n/// The whole analog body, once per evaluation.\nfn core(comptime S: type, comptime mode: std.builtin.FloatMode, {s}: D.zX(S), {s}: *const Model, {s}: InstancePtr, {s}: contract.SimState) Core(S) {{\n    @setFloatMode(mode);{s}{s}\n}}\n", .{
         if (uses.x) "x" else "_",
         if (uses.model) "model" else "_",
-        if (uses.inst) "inst" else "_",
+        if (uses.inst or tables) "inst" else "_",
         if (uses.sim) "sim" else "_",
+        if (tables) "\n    inst.table_ready = inst.table_kept;" else "",
         body,
     });
     const guards_opt = try dg.box();

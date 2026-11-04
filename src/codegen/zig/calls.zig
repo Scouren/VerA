@@ -1,10 +1,11 @@
 //! One system-function call's value (`Function`'s `call`): the §9.10
 //! environment, §9.15 simulation parameters, §9.19 queries, §4.6 analysis
-//! tests and §9.11 conversions, each spelled as the old device spelled it
-//! (`src/codegen/device/codegen/call.zig`, `call_analysis.zig`), so the two
+//! tests, §9.11 conversions and the §9.21 table lookup, each spelled as
+//! the old device spelled it (`src/codegen/device/codegen/call.zig`,
+//! `call_analysis.zig`, `render_sysfunc.zig`), so the two
 //! compute the same bits. A §4.6.4 noise source is 0 in the residual.
 //! Cites: VAMS-2023 §4.5.4, §4.5.13, §4.6.1, §4.6.3, §4.6.4, §5.10.2, §9.10,
-//! §9.11, §9.14, §9.15, §9.18, §9.19; IEEE 1364-2005 §17.8, §17.11.1.
+//! §9.11, §9.14, §9.15, §9.18, §9.19, §9.21; IEEE 1364-2005 §17.8, §17.11.1.
 //!
 //! Contents:
 //! - `pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Air.Inst.Ref) DeclGen.Error!void`
@@ -17,6 +18,7 @@ const InternPool = @import("intern_pool");
 const SysFn = @import("vams").SysFn;
 const DeclGen = @import("DeclGen.zig");
 const Function = @import("Function.zig");
+const state = @import("state.zig");
 const Real = Function.Real;
 const Ref = Air.Inst.Ref;
 const Error = DeclGen.Error;
@@ -139,6 +141,8 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Ref
                 try f.print(")", .{});
             } else try f.print(", 32)", .{});
         },
+        // §9.21 a table lookup (`K.table.zTable`), the old `emitTable`.
+        .@"$table_model" => try table(f, inst, args),
         else => return f.dg.fail("a call of `{s}`", .{@tagName(tag)}), // else: not yet spelled by this backend
     }
 }
@@ -201,6 +205,50 @@ fn simparam(f: *Function, args: []const Ref) Error!void {
     // Not known here (`timeUnit` with no `timescale`, an unknown name).
     if (args.len > 1) return f.real(args[1]);
     try f.print("S.con(0.0)", .{});
+}
+
+/// §9.21 `$table_model(ND, NP, NCOL, dep, "<ctl>", site, previous, in...,
+/// row...)` (`Sema/table.zig`'s shape): the samples go in as `f64` (§9.21.1
+/// fixes them at the first call, so they carry no derivative), the lookup
+/// point as `F.zL(S, m)` at the call's mask.
+fn table(f: *Function, inst: Air.Inst.Index, args: []const Ref) Error!void {
+    const head_fixed = 7;
+    if (args.len < head_fixed) return f.dg.fail("a malformed `$table_model` call", .{});
+    const nd = state.intConst(f.dg, args[0]) orelse 0;
+    const np = state.intConst(f.dg, args[1]) orelse 0;
+    const ncol = state.intConst(f.dg, args[2]) orelse 0;
+    const dep = state.intConst(f.dg, args[3]) orelse 0;
+    const ext = str(f, args[4]) orelse "";
+    const site = state.intConst(f.dg, args[5]) orelse 0;
+    const head = head_fixed + nd;
+    if (nd == 0 or ncol == 0 or args.len != head + np * ncol) return f.dg.fail("a malformed `$table_model` call", .{});
+    const m = f.dg.live.masks[@backingInt(inst)];
+    const i = @backingInt(inst);
+    // `previous` orders the sites; its value is unused.
+    try f.print("tbl{d}: {{ _ = ", .{i});
+    try f.real(args[6]);
+    try f.print("; ", .{});
+    // §9.21.1 an array source's samples are captured at the site's first
+    // call (`state.zig`); a file's are constants.
+    if (site != 0) {
+        f.uses.inst = true;
+        try f.print("if (!inst.table_ready[{d}]) {{ inst.table_{d} = [_]f64{{", .{ site - 1, site - 1 });
+    } else try f.print("const rows = [_]f64{{", .{});
+    for (args[head..], 0..) |v, k| {
+        if (k != 0) try f.print(", ", .{});
+        try f.print("(", .{});
+        try f.real(v);
+        try f.print(").val()", .{});
+    }
+    if (site != 0) try f.print("}}; inst.table_ready[{d}] = true; }} const rows = inst.table_{d};", .{ site - 1, site - 1 }) else try f.print("}};", .{});
+    try f.print(" break :tbl{d} F.zLu(S, 0x{x}, K.table.zTable(F.zL(S, 0x{x}), {d}, {d}, {d}, {d}, \"{f}\", rows, [_]F.zL(S, 0x{x}){{", .{ i, m, m, np, ncol, nd, dep, std.zig.fmtString(ext), m });
+    for (args[head_fixed..head], 0..) |v, k| {
+        if (k != 0) try f.print(", ", .{});
+        try f.print("F.zLw(S, 0x{x}, ", .{m});
+        try f.real(v);
+        try f.print(")", .{});
+    }
+    try f.print("}})); }}", .{});
 }
 
 /// The string constant `ref` reads, or null.

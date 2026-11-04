@@ -60,11 +60,8 @@ verilog-a/ch04_expressions/laplace_zp_dynamic_pole_sampled.va codegen does not s
 verilog-a/ch04_expressions/laplace_zp_lrm_example.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch04_expressions/last_crossing.va codegen does not spell a call of `last_crossing`
 verilog-a/ch04_expressions/last_crossing_in_creating_step.va codegen does not spell a call of `last_crossing`
-verilog-a/ch04_expressions/modulo_integer_display_zero.va codegen does not spell a call of `$rtoi`
-verilog-a/ch04_expressions/modulo_integer_dynamic_nonzero.va the old device evaluates a `%` by zero the residual never reads and traps; the new one drops the dead value
-verilog-a/ch04_expressions/modulo_integer_dynamic_zero.va the old device evaluates a `%` by zero the residual never reads and traps; the new one drops the dead value
-verilog-a/ch04_expressions/modulo_integer_parameter.va codegen does not spell parameter `overridden`'s default does not fold
-verilog-a/ch04_expressions/modulo_integer_unused_zero.va the old device evaluates a `%` by zero the residual never reads and traps; the new one drops the dead value
+verilog-a/ch04_expressions/modulo_integer_display_zero.va the new device stopped the process at point 0 (wait status 0x6), the old device did not
+verilog-a/ch04_expressions/modulo_integer_parameter.va the new device does not build: n5.zig:46: unused function parameter
 verilog-a/ch04_expressions/operator_under_constant_condition.va codegen does not spell a call of `transition`
 verilog-a/ch04_expressions/rc_88_operator_outside_event.va codegen does not spell a §5.10 held variable
 verilog-a/ch04_expressions/rollback_a04_rollback_ops.va codegen does not spell a call of `slew`
@@ -153,64 +150,53 @@ verilog-a/ch08_scheduling/cross_wakeup.va codegen does not spell a §5.10 held v
 verilog-a/ch08_scheduling/event_state.va codegen does not spell a §5.10 held variable
 verilog-a/ch08_scheduling/explicit_guard.va codegen does not spell a §5.10 held variable
 verilog-a/ch08_scheduling/timer_wakeup.va codegen does not spell a §5.10 held variable
-verilog-a/ch09_system_tasks/arandom.va codegen does not spell a call of `$arandom`
-verilog-a/ch09_system_tasks/arandom_no_seed.va codegen does not spell a call of `$arandom`
-verilog-a/ch09_system_tasks/binding_detection.va codegen does not spell a call of `$param_given`
-verilog-a/ch09_system_tasks/binding_source_overrides.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/diagnostic_finish_dc_sweep.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/diagnostic_finish_default.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/diagnostic_finish_initial.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/diagnostic_finish_statistics.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/diagnostic_finish_zero.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/diagnostic_info_dc_sweep.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/diagnostic_info_initial.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/diagnostic_info_transient.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/dist_chi_square.va codegen does not spell a call of `$dist_chi_square`
-verilog-a/ch09_system_tasks/dist_erlang.va codegen does not spell a call of `$dist_erlang`
-verilog-a/ch09_system_tasks/dist_exponential.va codegen does not spell a call of `$dist_exponential`
-verilog-a/ch09_system_tasks/dist_ieee1364_reference_digits.va codegen does not spell a call of `$dist_normal`
-verilog-a/ch09_system_tasks/dist_poisson.va codegen does not spell a call of `$dist_poisson`
-verilog-a/ch09_system_tasks/dist_t.va codegen does not spell a call of `$dist_t`
-verilog-a/ch09_system_tasks/dist_uniform.va codegen does not spell a call of `$dist_uniform`
-verilog-a/ch09_system_tasks/distribution.va codegen does not spell a call of `$dist_normal`
-verilog-a/ch09_system_tasks/error.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
-verilog-a/ch09_system_tasks/fatal.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
-verilog-a/ch09_system_tasks/fatal_finish_number_0_exit_status.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
-verilog-a/ch09_system_tasks/fatal_finish_number_2_exit_status.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
-verilog-a/ch09_system_tasks/fatal_in_iteration_terminates.va codegen does not spell a call of `$simparam`
-verilog-a/ch09_system_tasks/fatal_terminates.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
-verilog-a/ch09_system_tasks/geometry_hierarchical_overrides.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/math_binary.va codegen does not spell a call of a user function (callee 4294967295)
-verilog-a/ch09_system_tasks/math_unary.va codegen does not spell a call of a user function (callee 4294967295)
-verilog-a/ch09_system_tasks/param_given.va codegen does not spell a call of `$param_given`
-verilog-a/ch09_system_tasks/plusargs.va codegen does not spell a call of `$test$plusargs`
-verilog-a/ch09_system_tasks/plusargs_prefix.va codegen does not spell a call of `$test$plusargs`
-verilog-a/ch09_system_tasks/plusargs_value_order.va codegen does not spell a call of `$value$plusargs`
-verilog-a/ch09_system_tasks/port_connected.va codegen does not spell a call of `$port_connected`
-verilog-a/ch09_system_tasks/port_mask.va codegen does not spell a call of `$port_connected`
-verilog-a/ch09_system_tasks/random.va codegen does not spell a call of `$random`
-verilog-a/ch09_system_tasks/random_ieee1364_digits.va codegen does not spell a call of `$random`
-verilog-a/ch09_system_tasks/random_no_seed.va codegen does not spell a call of `$random`
-verilog-a/ch09_system_tasks/rdist_chi_square.va codegen does not spell a call of `$rdist_chi_square`
-verilog-a/ch09_system_tasks/rdist_erlang.va codegen does not spell a call of `$rdist_erlang`
-verilog-a/ch09_system_tasks/rdist_exponential.va codegen does not spell a call of `$rdist_exponential`
-verilog-a/ch09_system_tasks/rdist_normal.va codegen does not spell a call of `$rdist_normal`
-verilog-a/ch09_system_tasks/rdist_poisson.va codegen does not spell a call of `$rdist_poisson`
-verilog-a/ch09_system_tasks/rdist_positive_mean_at_run_time.va codegen does not spell a call of `$rdist_exponential`
-verilog-a/ch09_system_tasks/rdist_t.va codegen does not spell a call of `$rdist_t`
-verilog-a/ch09_system_tasks/rdist_zero_mean_at_run_time_is_an_error.va codegen does not spell a call of `$rdist_exponential`
-verilog-a/ch09_system_tasks/real_distribution.va codegen does not spell a call of `$rdist_uniform`
-verilog-a/ch09_system_tasks/rng_reference_large_count.va codegen does not spell a call of `$rdist_chi_square`
-verilog-a/ch09_system_tasks/rng_short_circuit.va codegen does not spell a call of `$rdist_exponential`
-verilog-a/ch09_system_tasks/severity_tasks.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
-verilog-a/ch09_system_tasks/simparam_fallback_as_parameter_default.va codegen does not spell parameter `lo`'s default does not fold
-verilog-a/ch09_system_tasks/simparam_gmin_source_scale_host_written.va codegen does not spell parameter `g`'s default does not fold
-verilog-a/ch09_system_tasks/simparam_minr_hicum_l2_default.va codegen does not spell parameter `minr`'s default does not fold
-verilog-a/ch09_system_tasks/simparam_newton_tolerances_host_written.va codegen does not spell parameter `rt`'s default does not fold
-verilog-a/ch09_system_tasks/simparam_timescale.va codegen does not spell a call of `$simparam`
-verilog-a/ch09_system_tasks/test_plusargs.va codegen does not spell a call of `$test$plusargs`
-verilog-a/ch09_system_tasks/top_port_connected_controls_ddt.va codegen does not spell a call of `$port_connected`
-verilog-a/ch09_system_tasks/value_plusargs.va codegen does not spell a call of `$value$plusargs`
+verilog-a/ch09_system_tasks/arandom.va codegen: a call of `$arandom`
+verilog-a/ch09_system_tasks/arandom_no_seed.va codegen: a call of `$arandom`
+verilog-a/ch09_system_tasks/binding_detection.va codegen: a call of `$port_connected`
+verilog-a/ch09_system_tasks/dist_chi_square.va codegen: a call of `$dist_chi_square`
+verilog-a/ch09_system_tasks/dist_erlang.va codegen: a call of `$dist_erlang`
+verilog-a/ch09_system_tasks/dist_exponential.va codegen: a call of `$dist_exponential`
+verilog-a/ch09_system_tasks/dist_ieee1364_reference_digits.va codegen: a call of `$dist_normal`
+verilog-a/ch09_system_tasks/dist_poisson.va codegen: a call of `$dist_poisson`
+verilog-a/ch09_system_tasks/dist_t.va codegen: a call of `$dist_t`
+verilog-a/ch09_system_tasks/dist_uniform.va codegen: a call of `$dist_uniform`
+verilog-a/ch09_system_tasks/distribution.va codegen: a call of `$dist_normal`
+verilog-a/ch09_system_tasks/error.va point 0: row 0: old 0e0, new 1.2818376926435355e0
+verilog-a/ch09_system_tasks/fatal.va point 1: row 0: old 0e0, new 2.823830431439182e0
+verilog-a/ch09_system_tasks/fatal_finish_number_0_exit_status.va point 0: row 0: old 0e0, new 4.7942962489144225e-1
+verilog-a/ch09_system_tasks/fatal_finish_number_2_exit_status.va point 0: row 0: old 0e0, new -2.5370237327075364e0
+verilog-a/ch09_system_tasks/fatal_in_iteration_terminates.va point 0: row 0: old 0e0, new -1.6025419903108231e0
+verilog-a/ch09_system_tasks/fatal_terminates.va point 0: row 0: old 0e0, new -2.789674796957345e0
+verilog-a/ch09_system_tasks/math_binary.va codegen: a call of a user function (callee 4294967295)
+verilog-a/ch09_system_tasks/math_unary.va codegen: a call of a user function (callee 4294967295)
+verilog-a/ch09_system_tasks/plusargs.va codegen: a call of `$test$plusargs`
+verilog-a/ch09_system_tasks/plusargs_prefix.va codegen: a call of `$test$plusargs`
+verilog-a/ch09_system_tasks/plusargs_value_order.va codegen: a call of `$value$plusargs`
+verilog-a/ch09_system_tasks/port_connected.va codegen: a call of `$port_connected`
+verilog-a/ch09_system_tasks/port_mask.va codegen: a call of `$port_connected`
+verilog-a/ch09_system_tasks/random.va codegen: a call of `$random`
+verilog-a/ch09_system_tasks/random_ieee1364_digits.va codegen: a call of `$random`
+verilog-a/ch09_system_tasks/random_no_seed.va codegen: a call of `$random`
+verilog-a/ch09_system_tasks/rdist_chi_square.va codegen: a call of `$rdist_chi_square`
+verilog-a/ch09_system_tasks/rdist_erlang.va codegen: a call of `$rdist_erlang`
+verilog-a/ch09_system_tasks/rdist_exponential.va codegen: a call of `$rdist_exponential`
+verilog-a/ch09_system_tasks/rdist_normal.va codegen: a call of `$rdist_normal`
+verilog-a/ch09_system_tasks/rdist_poisson.va codegen: a call of `$rdist_poisson`
+verilog-a/ch09_system_tasks/rdist_positive_mean_at_run_time.va codegen: a call of `$rdist_exponential`
+verilog-a/ch09_system_tasks/rdist_t.va codegen: a call of `$rdist_t`
+verilog-a/ch09_system_tasks/rdist_zero_mean_at_run_time_is_an_error.va codegen: a call of `$rdist_exponential`
+verilog-a/ch09_system_tasks/real_distribution.va codegen: a call of `$rdist_uniform`
+verilog-a/ch09_system_tasks/rng_reference_large_count.va codegen: a call of `$rdist_chi_square`
+verilog-a/ch09_system_tasks/rng_short_circuit.va codegen: a call of `$rdist_exponential`
+verilog-a/ch09_system_tasks/severity_tasks.va point 0: row 0: old 0e0, new 3.3735730291752675e0
+verilog-a/ch09_system_tasks/simparam_fallback_as_parameter_default.va codegen: parameter `lo`'s default does not fold
+verilog-a/ch09_system_tasks/simparam_gmin_source_scale_host_written.va codegen: parameter `g`'s default does not fold
+verilog-a/ch09_system_tasks/simparam_minr_hicum_l2_default.va codegen: parameter `minr`'s default does not fold
+verilog-a/ch09_system_tasks/simparam_newton_tolerances_host_written.va codegen: parameter `rt`'s default does not fold
+verilog-a/ch09_system_tasks/simparam_timescale.va point 0: row 0: old -4.511869783264559e-1, new -4.511869793274559e-1
+verilog-a/ch09_system_tasks/test_plusargs.va codegen: a call of `$test$plusargs`
+verilog-a/ch09_system_tasks/top_port_connected_controls_ddt.va codegen: a call of `$port_connected`
+verilog-a/ch09_system_tasks/value_plusargs.va codegen: a call of `$value$plusargs`
 verilog-a/ch10_directives/compact_modeling_macro.va codegen does not spell a device with no unknowns
 verilog-a/ch10_directives/default_transition_ramp.va codegen does not spell a call of `transition`
 verilog-a/combined/function_branch_system_math.va codegen does not spell a call of a user function (callee 4294967295)
@@ -239,16 +225,8 @@ verilog-ams/ch06_hierarchy/child_initial_block_is_carried.va an `analog initial`
 verilog-ams/ch06_hierarchy/top_initial_block_with_a_child.va an `analog initial` block's values: the old device keeps them (§5.2.1), the new Air reads them as 0
 verilog-ams/ch07_mixed_signal/analog_event.va codegen does not spell a §5.10 held variable
 verilog-ams/ch08_scheduling/analog_digital_initial_order.va codegen does not spell a §5.10 held variable
-verilog-ams/ch09_system_tasks/diagnostic_finish_dc_sweep.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/diagnostic_finish_default.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/diagnostic_finish_initial.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/diagnostic_finish_statistics.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/diagnostic_finish_zero.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/diagnostic_info_dc_sweep.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/diagnostic_info_initial.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/diagnostic_info_transient.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/fatal_in_analog_initial_skips_simulation.va codegen does not spell a §5.10 held variable
-verilog-ams/ch09_system_tasks/port_mask.va codegen does not spell a call of `$port_connected`
+verilog-ams/ch09_system_tasks/fatal_in_analog_initial_skips_simulation.va point 0: row 0: old 0e0, new -1.3104359321989143e0
+verilog-ams/ch09_system_tasks/port_mask.va codegen: a call of `$port_connected`
 verilog-ams/ch10_directives/compact_modeling_macro.va codegen does not spell a device with no unknowns
 verilog-ams/ch11_vpi/analog_system_task_registration.va a §12 user system function: the old device calls the host's systf table (absent here, so it traps); codegen has none
 verilog-ams/ch12_vpi_routines/analog_systf_resistor_call.va a §12 user system function: the old device calls the host's systf table (absent here, so it traps); codegen has none
@@ -264,8 +242,8 @@ verilog-ams/ch12_vpi_routines/sampnhold.va codegen does not spell a potential co
 verilog-ams/ch12_vpi_routines/square_law.va codegen does not spell a call of a user function (callee 4294967295)
 verilog-ams/ch12_vpi_routines/systf_devices.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch12_vpi_routines/two_sites.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch09_system_tasks/say_ops.va §9.7.3 status sites: the old device returns zero rows once a severity task fires (a check past |V| = 10); codegen has no status protocol yet
-verilog-ams/ch09_system_tasks/say_ops.va §9.7.3 status sites: the old device returns zero rows once a severity task fires (a check past |V| = 10); codegen has no status protocol yet
+verilog-a/ch09_system_tasks/say_ops.va point 7: row 0: old 0e0, new 3.364633961015358e-2
+verilog-ams/ch09_system_tasks/say_ops.va point 3: row 0: old 0e0, new 4.6634348525820456e-2
 netlist/hdl/a09_limit_root_transient.assets/a09_limit_ramp.va a §9.17.3 `$limit`
 netlist/hdl/veriloga_limit.assets/va_limit.va a §9.17.3 `$limit`
 netlist/hdl/veriloga_limit.assets/va_limit_state.va a §9.17.3 `$limit`
@@ -311,7 +289,6 @@ verilog-a/ch04_expressions/laplace_nd_zero_padded_coefficients.va a call of `lap
 verilog-a/ch04_expressions/laplace_np_parameter_roots_unpaired_is_nan.va a call of `laplace_np`
 verilog-a/ch04_expressions/laplace_zp_parameter_roots_ac.va a call of `laplace_zp`
 verilog-a/ch04_expressions/laplace_zp_parameter_roots_step.va a call of `laplace_zp`
-verilog-a/ch04_expressions/modulo_integer_dynamic.va a call of `$rtoi`
 verilog-a/ch04_expressions/noise_anticorrelated_coefficient.va a call of `white_noise`
 verilog-a/ch04_expressions/noise_coefficient_beside_a_loop.va a call of `white_noise`
 verilog-a/ch04_expressions/noise_coefficient_through_a_conditional.va a call of `white_noise`
@@ -349,49 +326,33 @@ verilog-a/ch06_hierarchy/inherited_flow_tolerance_minimum.va a potential contrib
 verilog-a/ch06_hierarchy/mfactor_divides_a_flow_probe.va a flow contribution to a potential source's branch
 verilog-a/ch06_hierarchy/oomr_branch_probe_two_levels.va a flow contribution to a potential source's branch
 verilog-a/ch06_hierarchy/paramset_hidden_output_variable_takes_the_fallback.va a call of a user function (callee 4294967295)
-verilog-a/ch09_system_tasks/control_default_filling.va a call of `$table_model`
-verilog-a/ch09_system_tasks/cubic_spline_constant_ends.va a call of `$table_model`
-verilog-a/ch09_system_tasks/cubic_spline_mixed_ends.va a call of `$table_model`
-verilog-a/ch09_system_tasks/cubic_spline_natural_ends.va a call of `$table_model`
-verilog-a/ch09_system_tasks/duplicate_points.va a call of `$table_model`
-verilog-a/ch09_system_tasks/error_extrapolation_inside_is_legal.va a call of `$table_model`
-verilog-a/ch09_system_tasks/error_extrapolation_is_fatal.va a call of `$table_model`
-verilog-a/ch09_system_tasks/ignored_column_and_selector.va a call of `$table_model`
-verilog-a/ch09_system_tasks/kernel_control_tasks_together.va a call of `initial_step`
-verilog-a/ch09_system_tasks/limit.va a call of `$limit`
-verilog-a/ch09_system_tasks/limit_constant_history.va a §9.17.3 `$limit`
-verilog-a/ch09_system_tasks/limit_fetlim_with_vth.va a call of `$limit`
-verilog-a/ch09_system_tasks/limit_flow_probe_returns_probe.va a call of `$limit`
-verilog-a/ch09_system_tasks/limit_initialize_limiting.va a §9.17.3 `$limit`
-verilog-a/ch09_system_tasks/limit_named.va a call of `$limit`
-verilog-a/ch09_system_tasks/limit_newton_convergence.va a §9.17.3 `$limit`
-verilog-a/ch09_system_tasks/limit_omitted_algorithm_neighbour.va a call of `$limit`
-verilog-a/ch09_system_tasks/limit_pnjlim_internal_node_honoured.va a call of `$limit`
-verilog-a/ch09_system_tasks/limit_polarity_sign_argument_honoured.va a call of `$limit`
-verilog-a/ch09_system_tasks/limit_steplim_internal_node_honoured.va a call of `$limit`
-verilog-a/ch09_system_tasks/limit_too_few_arguments_returns_probe.va a call of `$limit`
-verilog-a/ch09_system_tasks/limit_too_many_arguments_returns_probe.va a call of `$limit`
-verilog-a/ch09_system_tasks/limit_under_if_returns_probe.va a call of `$limit`
-verilog-a/ch09_system_tasks/limit_unknown_algorithm_returns_probe.va a call of `$limit`
-verilog-a/ch09_system_tasks/limit_user_function.va a §9.17.3 `$limit`
-verilog-a/ch09_system_tasks/limit_user_function_multiple_sites.va a §9.17.3 `$limit`
-verilog-a/ch09_system_tasks/limit_user_function_previous_iterate.va a §9.17.3 `$limit`
-verilog-a/ch09_system_tasks/limit_with_derivative.va a §9.17.3 `$limit`
-verilog-a/ch09_system_tasks/mixed_interpolation_dimensions.va a call of `$table_model`
-verilog-a/ch09_system_tasks/port_connected_controls_analog_operator.va a call of `transition`
-verilog-a/ch09_system_tasks/quadratic_spline.va a call of `$table_model`
-verilog-a/ch09_system_tasks/simprobe_string_parameter_name_resolves.va a call of a user function (callee 4294967295)
-verilog-a/ch09_system_tasks/spline_derivative_reaches_the_solver.va a call of `$table_model`
-verilog-a/ch09_system_tasks/status_ops.va a call of `white_noise`
-verilog-a/ch09_system_tasks/table_capture_rejected_step_recaptures.va a §5.10 held variable
-verilog-a/ch09_system_tasks/table_model_array_control.va a call of `$table_model`
-verilog-a/ch09_system_tasks/table_model_assignment_pattern_arrays.va a call of `$table_model`
-verilog-a/ch09_system_tasks/table_model_discrete.va a call of `$table_model`
-verilog-a/ch09_system_tasks/table_model_lrm_sample_set.va a call of `$table_model`
-verilog-a/ch09_system_tasks/table_snapshot.va a §5.10 held variable
-verilog-a/ch09_system_tasks/table_snapshot_collapse.va a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
-verilog-a/ch09_system_tasks/table_snapshot_per_instance.va a call of `$table_model`
-verilog-a/ch09_system_tasks/table_status.va a call of `$table_model`
+verilog-a/ch09_system_tasks/kernel_control_tasks_together.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_constant_history.va codegen: a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_fetlim_with_vth.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_flow_probe_returns_probe.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_initialize_limiting.va codegen: a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_named.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_newton_convergence.va codegen: a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_omitted_algorithm_neighbour.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_pnjlim_internal_node_honoured.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_polarity_sign_argument_honoured.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_steplim_internal_node_honoured.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_too_few_arguments_returns_probe.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_too_many_arguments_returns_probe.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_under_if_returns_probe.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_unknown_algorithm_returns_probe.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_user_function.va codegen: a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_user_function_multiple_sites.va codegen: a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_user_function_previous_iterate.va codegen: a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_with_derivative.va codegen: a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/port_connected_controls_analog_operator.va codegen: a call of `transition`
+verilog-a/ch09_system_tasks/simprobe_string_parameter_name_resolves.va codegen: a call of a user function (callee 4294967295)
+verilog-a/ch09_system_tasks/status_ops.va codegen: a call of `ac_stim`
+verilog-a/ch09_system_tasks/table_capture_rejected_step_recaptures.va codegen: a call of `above`
+verilog-a/ch09_system_tasks/table_snapshot.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/table_snapshot_collapse.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch09_system_tasks/table_status.va codegen: a call of `$limit`
 verilog-a/ch10_directives/compact_modeling_nonlin_res_example.va a call of `ddx`
 verilog-a/ch10_directives/predefined_compact_modeling.va a call of `ddx`
 verilog-a/combined/limit_and_discontinuity.va a call of `$limit`
@@ -411,8 +372,8 @@ verilog-ams/ch07_mixed_signal/timer_runtime_body_period.va a call of `timer`
 verilog-ams/ch07_mixed_signal/timer_runtime_controls.va a call of `timer`
 verilog-ams/ch07_mixed_signal/timer_runtime_drift.va a call of `timer`
 verilog-ams/ch07_mixed_signal/timer_runtime_enable.va a call of `timer`
-verilog-ams/ch09_system_tasks/status_ops.va a call of `white_noise`
-verilog-ams/ch09_system_tasks/table_status.va a call of `$table_model`
+verilog-ams/ch09_system_tasks/status_ops.va codegen: a call of `ac_stim`
+verilog-ams/ch09_system_tasks/table_status.va codegen: a call of `$limit`
 verilog-ams/ch12_vpi_routines/rc_ac.va a call of `ac_stim`
 verilog-a/ch02_lexical/duplicate_attribute_last_value_wins.va differs: point 0: d row 0: old 1.951411553231091e1, new 3.103778838143179e1
 verilog-a/ch03_data_types/parameter_default_over_parameter.va the new device does not build: n23.zig:76: unused local constant

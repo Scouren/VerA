@@ -19,7 +19,9 @@
 //!   parameter near its default inside its ranges; a time in [0, 1 ms]):
 //!   the residual rows, their Jacobian (with `jac_const`), the reactive rows
 //!   and theirs, bit for bit (NaN as NaN), save the named libm and fast-math
-//!   ulp bounds below;
+//!   ulp bounds below; where a side stops the process (§4.2.4's zero
+//!   divisor), every side must stop there by the same signal, and the run
+//!   goes on past the point;
 //! - the bsource stack (`codegen.examples.stack`) against `Air.interp`, and
 //!   the contract's hosts (`tests/host`) on the new devices of their
 //!   fixtures (build/rewrite.zig's `codegenHosts`).
@@ -80,6 +82,8 @@ const Tally = struct {
     inside: u64 = 0,
     outside: u64 = 0,
     fast_ulps: u32 = 0,
+    /// Points where every side stopped alike (`compareIsolated`).
+    stops: u32 = 0,
     agreed: u32 = 0,
     xfailed: u32 = 0,
     failed: u32 = 0,
@@ -177,9 +181,9 @@ fn runAll() !void {
         try out.writer.print("{s} {s}: {s}\n", .{ if (agreed) "XPASS" else "STALE", rel, if (agreed) "agrees now; delete its codegen.xfail line" else "codegen.xfail names a fixture that was not compared" });
     }
     tally.agreed = tally.compared - countCompared(&whys, ready.items);
-    std.debug.print("{s}diff-codegen: {d} fixtures ({d} named in lower.xfail, {d} the old side refused, {d} the new side refused), {d} built and compared at {d} points ({d} evaluations bit for bit, {d} values within the libm ulp bound), {d} agree, {d} in codegen.xfail, {d} failures; device text old {d} B, new {d} B (median per device old {d} B, new {d} B); build old {d} ms, new {d} ms; roots .optimized {d}/{d}; versioned units: {d} points inside the box (at most {d} ulps apart), {d} outside (bit for bit)\n", .{
+    std.debug.print("{s}diff-codegen: {d} fixtures ({d} named in lower.xfail, {d} the old side refused, {d} the new side refused), {d} built and compared at {d} points ({d} evaluations bit for bit, {d} values within the libm ulp bound), {d} agree, {d} in codegen.xfail, {d} failures; device text old {d} B, new {d} B (median per device old {d} B, new {d} B); build old {d} ms, new {d} ms; roots .optimized {d}/{d}; versioned units: {d} points inside the box (at most {d} ulps apart), {d} outside (bit for bit); {d} points where every side stopped alike\n", .{
         out.written(),   tally.fixtures,  tally.lower_listed,                   tally.old_refused,                    tally.new_refused,                 tally.compared,                    points,          tally.points, tally.values_libm, tally.agreed,    tally.xfailed, tally.failed,
-        tally.old_bytes, tally.new_bytes, try median(arena, ready.items, .old), try median(arena, ready.items, .new), tally.old_ns / std.time.ns_per_ms, tally.new_ns / std.time.ns_per_ms, tally.optimized, tally.roots,  tally.inside,      tally.fast_ulps, tally.outside,
+        tally.old_bytes, tally.new_bytes, try median(arena, ready.items, .old), try median(arena, ready.items, .new), tally.old_ns / std.time.ns_per_ms, tally.new_ns / std.time.ns_per_ms, tally.optimized, tally.roots,  tally.inside,      tally.fast_ulps, tally.outside, tally.stops,
     });
     if (tally.failed != 0) return error.DiffCodegenFailed;
 }
@@ -313,11 +317,57 @@ fn blame(arena: Allocator, b: std.zig.ErrorBundle, group: []const Ready, left: [
     return named;
 }
 
-/// `compare` in a child process, so a device that traps (an `@trap` on a
-/// zero integer divisor, a safety check) is that fixture's disagreement,
-/// not the oracle's end. The child writes a `u32` record before each call
-/// (point << 1 | side), then `done`, the points it compared and the why.
+/// `compare` in a child process, so a device that stops (§4.2.4's zero
+/// integer divisor reaches a safety check) is compared like a value: where
+/// one side stops, every side must stop, by the same signal; the point is
+/// then skipped and the run goes on past it. A side that stops alone is the
+/// fixture's disagreement. Bounded: each rerun adds a point to `stops`.
 fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, tally: *Tally) !?[]const u8 {
+    const sides_n: u2 = if (ver_fn != null) 3 else 2;
+    const side_names = [3][]const u8{ "old", "new", "versioned" };
+    var stops: std.ArrayList(u32) = .empty;
+    for (0..points + 1) |_| {
+        const first = try child(arena, r, old_fn, new_fn, ver_fn, stops.items, null);
+        const stop = switch (first) {
+            .done => |d| {
+                tally.points += d.counts[0];
+                tally.values_libm += d.counts[1];
+                tally.inside += d.counts[2];
+                tally.outside += d.counts[3];
+                tally.fast_ulps = @max(tally.fast_ulps, d.counts[4]);
+                tally.stops += @intCast(stops.items.len);
+                return d.why;
+            },
+            .stopped => |st| st,
+        };
+        const p = stop.rec >> 2;
+        const side: u2 = @intCast(stop.rec & 3);
+        for (0..sides_n) |o| {
+            if (o == side) continue;
+            const other = try child(arena, r, old_fn, new_fn, ver_fn, stops.items, .{ .point = p, .side = @intCast(o) });
+            switch (other) {
+                .done => return try arena.print("the {s} device stopped the process at point {d} (wait status 0x{x}), the {s} device did not", .{ side_names[side], p, stop.status, side_names[o] }),
+                .stopped => |os| if (os.rec != (stop.rec & ~@as(u32, 3)) | @as(u32, @intCast(o)) or os.status != stop.status)
+                    return try arena.print("at point {d} the {s} device stopped (wait status 0x{x}), the {s} device stopped at record 0x{x} (wait status 0x{x})", .{ p, side_names[side], stop.status, side_names[o], os.rec, os.status }),
+            }
+        }
+        try stops.append(arena, p);
+    }
+    unreachable; // every rerun adds a distinct point below `points`
+}
+
+/// A probe: replay the points before `point`, then evaluate only `side`.
+const Probe = struct { point: u32, side: u2 };
+
+const ChildRun = union(enum) {
+    done: struct { counts: Counts, why: ?[]const u8 },
+    stopped: struct { rec: u32, status: u32 },
+};
+
+/// Runs `compare` in a forked child. The child writes a `u32` record
+/// before each call (point << 2 | side), then `done`, its counts and the
+/// why; a child that dies leaves its last record.
+fn child(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, stops: []const u32, probe: ?Probe) !ChildRun {
     const linux = std.os.linux;
     var fds: [2]i32 = undefined;
     if (linux.errno(linux.pipe2(&fds, .{})) != .SUCCESS) return error.PipeFailed;
@@ -325,8 +375,11 @@ fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver
     if (pid < 0) return error.ForkFailed;
     if (pid == 0) {
         _ = linux.close(fds[0]);
+        // A stopping device is expected here: no core dump (each one took
+        // seconds and a share of the machine's coredump store).
+        _ = linux.prctl(@backingInt(linux.PR.SET_DUMPABLE), 0, 0, 0, 0);
         var counts: Counts = .{ 0, 0, 0, 0, 0 };
-        const why = compare(arena, r, old_fn, new_fn, ver_fn, fds[1], &counts) catch "the oracle ran out of memory";
+        const why = compare(arena, r, old_fn, new_fn, ver_fn, fds[1], &counts, stops, probe) catch "the oracle ran out of memory";
         const tail = [_]u32{done} ++ counts;
         _ = linux.write(fds[1], @ptrCast(&tail), @sizeOf(@TypeOf(tail)));
         if (why) |w| _ = linux.write(fds[1], w.ptr, w.len);
@@ -335,7 +388,7 @@ fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver
     _ = linux.close(fds[1]);
     var got: std.ArrayList(u8) = .empty;
     var buf: [4096]u8 = undefined;
-    // Bounded by what the child writes: two records per point and a why.
+    // Bounded by what the child writes: three records per point and a why.
     while (true) {
         const k = linux.read(fds[0], &buf, buf.len);
         if (linux.errno(k) != .SUCCESS or k == 0) break;
@@ -349,22 +402,19 @@ fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver
     for (0..words) |w| {
         const rec = std.mem.readInt(u32, got.items[4 * w ..][0..4], .little);
         if (rec == done and w + counts_len < words) {
-            tally.points += std.mem.readInt(u32, got.items[4 * w + 4 ..][0..4], .little);
-            tally.values_libm += std.mem.readInt(u32, got.items[4 * w + 8 ..][0..4], .little);
-            tally.inside += std.mem.readInt(u32, got.items[4 * w + 12 ..][0..4], .little);
-            tally.outside += std.mem.readInt(u32, got.items[4 * w + 16 ..][0..4], .little);
-            tally.fast_ulps = @max(tally.fast_ulps, std.mem.readInt(u32, got.items[4 * w + 20 ..][0..4], .little));
-            const why = got.items[4 * w + 4 + 4 * counts_len ..];
-            return if (why.len == 0) null else why;
+            var counts: Counts = undefined;
+            for (&counts, 0..) |*c, i| c.* = std.mem.readInt(u32, got.items[4 * (w + 1 + i) ..][0..4], .little);
+            const why = got.items[4 * (w + 1 + counts_len) ..];
+            return .{ .done = .{ .counts = counts, .why = if (why.len == 0) null else why } };
         }
         last = rec;
     }
-    return try arena.print("the {s} device stopped the process at point {d} (wait status 0x{x})", .{ ([3][]const u8{ "old", "new", "versioned" })[last & 3], last >> 2, status });
+    return .{ .stopped = .{ .rec = last, .status = @bitCast(status) } };
 }
 
 /// Evaluates both devices at `points` seeded points, writing a progress
 /// record to `fd` before each call; returns the first difference, or null.
-fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, fd: i32, counts: *Counts) !?[]const u8 {
+fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, fd: i32, counts: *Counts, stops: []const u32, probe: ?Probe) !?[]const u8 {
     const libm = for (libm_kernels) |k| {
         if (std.mem.find(u8, r.new, k) != null) break true;
     } else false;
@@ -394,7 +444,15 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?Ru
         // outside, its strict body runs and every bit must match.
         const inside = if (r.card.box) |box| admitted(box, x, args) else false;
         if (ver_fn != null) counts[if (inside) 2 else 3] += 1;
+        // A point where every side stops is drawn but not evaluated.
+        if (std.mem.findScalar(u32, stops, @intCast(p)) != null) continue;
         const fns = [3]?RunFn{ old_fn, new_fn, ver_fn };
+        if (probe) |pr| if (pr.point == p) {
+            const rec: u32 = @intCast(p << 2 | pr.side);
+            _ = std.os.linux.write(fd, @ptrCast(&rec), 4);
+            _ = fns[pr.side].?(names.ptr, vals.ptr, @intCast(vals.len), x.ptr, n, t, @intCast(p), outs[pr.side].ptr, @intCast(len));
+            return null;
+        };
         for (fns[0..sides_n], outs[0..sides_n], ([3][]const u8{ "old", "new", "versioned" })[0..sides_n], 0..) |f, out, side, s| {
             const rec: u32 = @intCast(p << 2 | s);
             _ = std.os.linux.write(fd, @ptrCast(&rec), 4);

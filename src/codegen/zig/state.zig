@@ -4,27 +4,34 @@
 //! point, and `State` keeps the last committed copy for `stateCtl`'s
 //! revert (the old device's `held` protocol, `src/codegen/device/codegen/
 //! state.zig`). Fields are named `<name>__held` (`__<k>` per element of a
-//! held array); no host reads them by name.
+//! held array); no host reads them by name. The §9.21.1 `$table_model`
+//! snapshots ride the same protocol (`table_<k>`, `table_ready`,
+//! `table_kept`, the old `instance.zig`/`state_ctl.zig` names).
 //! Cites: VAMS-2023 §5.10 (variables keep their value between
-//! evaluations), §3.2 (a declaration initializer), §8.2 (it runs once).
+//! evaluations), §3.2 (a declaration initializer), §8.2 (it runs once),
+//! §9.21.1 (an array source is read at the first call).
 //!
 //! Contents:
 //! - `pub fn plan(dg: *DeclGen) DeclGen.Error!void`
 //! - `pub fn genInstanceFields(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void`
 //! - `pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void`
+//! - `pub fn intConst(dg: *const DeclGen, ref: Air.Inst.Ref) ?usize`
 
 const std = @import("std");
 const assert = std.debug.assert;
 const Air = @import("air");
 const InternPool = @import("intern_pool");
+const SysFn = @import("vams").SysFn;
 const DeclGen = @import("DeclGen.zig");
 const Function = @import("Function.zig");
 const Ident = @import("Ident.zig");
 const Real = Function.Real;
 
-/// Fills `dg.held_field`: per `alloc`, its `Instance` field when held.
+/// Fills `dg.held_field` (per `alloc`, its `Instance` field when held) and
+/// `dg.table_len` (per §9.21.1 snapshot site, its sample count).
 pub fn plan(dg: *DeclGen) DeclGen.Error!void {
     const d = dg.device;
+    try planTables(dg);
     dg.held_field = try dg.arena.alloc(?[]const u8, dg.air.instructions.len);
     @memset(dg.held_field, null);
     for (d.held.items(.name), d.held.items(.slot), d.held.items(.count)) |n, slot, count| {
@@ -40,8 +47,12 @@ pub fn plan(dg: *DeclGen) DeclGen.Error!void {
     }
 }
 
-/// The held fields of `Instance`, each at its §3.2 initializer (0 without).
+/// The held fields of `Instance`, each at its §3.2 initializer (0 without),
+/// then the §9.21.1 snapshots: each site's samples, `table_ready` (captured
+/// this evaluation) and `table_kept` (captured at an accepted point).
 pub fn genInstanceFields(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
+    for (dg.table_len, 0..) |n, k| w.print("    table_{d}: [{d}]f64 = @splat(0.0),\n", .{ k, n }) catch return error.OutOfMemory;
+    if (dg.table_len.len != 0) w.print("    table_ready: [{0d}]bool = @splat(false),\n    table_kept: [{0d}]bool = @splat(false),\n", .{dg.table_len.len}) catch return error.OutOfMemory;
     for (dg.held_field, 0..) |field, i| if (field) |f| {
         w.print("    {s}: {s} = ", .{ f, typeName(dg, i) }) catch return error.OutOfMemory;
         try writeInit(dg, w, i);
@@ -50,40 +61,81 @@ pub fn genInstanceFields(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
 }
 
 /// `State`, `initState`, `updateState`, `stateCtl` and `state_class` when
-/// the device holds a variable.
+/// the device holds a variable or snapshots a table (then `mutable_eval`).
 pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
-    var any = false;
-    for (dg.held_field) |f| any = any or f != null;
-    if (!any) return;
+    var held = false;
+    for (dg.held_field) |f| held = held or f != null;
+    const tables = dg.table_len.len != 0;
+    if (!held and !tables) return;
     const p = struct {
         fn f(out: *std.Io.Writer, comptime fmt: []const u8, args: anytype) DeclGen.Error!void {
             out.print(fmt, args) catch return error.OutOfMemory;
         }
     }.f;
+    // §9.21.1 the first call of a site captures its samples into `inst`.
+    if (tables) try p(w, "\npub const mutable_eval = true;\n", .{});
     try p(w, "\n/// §5.10 the held values as last committed (`stateCtl`).\npub const State = struct {{\n", .{});
+    if (tables) try p(w, "    table_kept: [{d}]bool = @splat(false),\n", .{dg.table_len.len});
     for (dg.held_field, 0..) |field, i| if (field) |f| {
         try p(w, "    {s}: {s} = ", .{ f, typeName(dg, i) });
         try writeInit(dg, w, i);
         try p(w, ",\n", .{});
     };
-    try p(w, "}};\n\n/// Every held value back to its initializer: the start of an analysis.\npub fn initState(_: *const Model, inst: *Instance) State {{\n", .{});
+    try p(w, "}};\n\n/// Every held value back to its initializer: the start of an analysis.\npub fn initState(_: *const Model, {s}: *Instance) State {{\n", .{if (held) "inst" else "_"});
     for (dg.held_field, 0..) |field, i| if (field) |f| {
         try p(w, "    inst.{s} = ", .{f});
         try writeInit(dg, w, i);
         try p(w, ";\n", .{});
     };
-    try p(w, "    return .{{}};\n}}\n\n/// §5.10 an accepted point: the body's held values become the instance's.\npub fn updateState(comptime S: type, model: *const Model, inst: *Instance, x: [n_u]f64, _: *State, sim: contract.SimState) contract.UpdateResult {{\n    const m = run(S, &x, D.zProbe(S, &x), model, inst, sim);\n", .{});
+    try p(w, "    return .{{}};\n}}\n\n/// §5.10 an accepted point: the body's held values become the instance's.\npub fn updateState(comptime S: type, model: *const Model, inst: *Instance, x: [n_u]f64, _: *State, sim: contract.SimState) contract.UpdateResult {{\n", .{});
+    // §9.21.1 a capture an iterate made is kept only at an accepted point:
+    // the body runs once more at `x` while a site is uncaptured.
+    if (tables) try p(w, "    if (std.mem.findScalar(bool, &inst.table_kept, false) != null) {{\n        _ = run(S, &x, D.zProbe(S, &x), model, inst, sim);\n        inst.table_kept = inst.table_ready;\n    }}\n", .{});
+    if (held) try p(w, "    const m = run(S, &x, D.zProbe(S, &x), model, inst, sim);\n", .{});
     for (dg.held_field, 0..) |field, i| if (field) |f| {
         try p(w, "    inst.{s} = m.h{d}{s};\n", .{ f, i, if (isInt(dg, i)) "" else ".val()" });
     };
     try p(w, "    return .ok;\n}}\n\n/// `commit` keeps the instance's held values; `revert` restores them.\npub fn stateCtl(_: *const Model, inst: *Instance, state: *State, op: contract.StateCtlOp) bool {{\n    switch (op) {{\n        .query => {{}},\n        .commit => {{\n", .{});
+    if (tables) try p(w, "            state.table_kept = inst.table_kept;\n            inst.table_ready = inst.table_kept;\n", .{});
     for (dg.held_field) |field| if (field) |f| try p(w, "            state.{s} = inst.{s};\n", .{ f, f });
     try p(w, "        }},\n        .revert => {{\n", .{});
+    if (tables) try p(w, "            inst.table_kept = state.table_kept;\n            inst.table_ready = inst.table_kept;\n", .{});
     for (dg.held_field) |field| if (field) |f| try p(w, "            inst.{s} = state.{s};\n", .{ f, f });
     try p(w, "        }},\n    }}\n    return false;\n}}\n\npub const state_class: contract.StateClass = .history;\n", .{});
 }
 
 // ---- private ----
+
+/// `dg.table_len`: each `$table_model` call's snapshot site (`args[5]`,
+/// 1-based; 0 for a file source) and its `NP * NCOL` samples.
+fn planTables(dg: *DeclGen) DeclGen.Error!void {
+    var len: std.ArrayList(u32) = .empty;
+    const air = dg.air;
+    for (air.instructions.items(.tag), air.instructions.items(.data)) |tag, data| {
+        if (tag != .call) continue;
+        const x = air.extraData(Air.Call, data.ty_pl.payload);
+        if (x.data.callee != @backingInt(SysFn.Tag.@"$table_model") or x.data.args_len < 7) continue;
+        const args: []const Air.Inst.Ref = @ptrCast(air.extra[x.end..][0..x.data.args_len]);
+        const site = intConst(dg, args[5]) orelse continue;
+        if (site == 0) continue;
+        const n = (intConst(dg, args[1]) orelse 0) * (intConst(dg, args[2]) orelse 0);
+        while (len.items.len < site) try len.append(dg.arena, 0);
+        len.items[site - 1] = @intCast(n);
+    }
+    dg.table_len = len.items;
+}
+
+/// The non-negative integer constant `ref` reads, or null.
+pub fn intConst(dg: *const DeclGen, ref: Air.Inst.Ref) ?usize {
+    const i = ref.toInterned() orelse return null;
+    return switch (dg.ip.indexToKey(i)) {
+        .int => |n| switch (n.storage) {
+            .small => |v| if (v >= 0) @intCast(v) else null,
+            .big => null, // past any table's size
+        },
+        else => null, // else: not an integer literal
+    };
+}
 
 fn isInt(dg: *const DeclGen, i: usize) bool {
     const ty = dg.air.instructions.items(.data)[i].ty;

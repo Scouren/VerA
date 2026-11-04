@@ -26,7 +26,8 @@ const math = @import("math.zig");
 /// The family helpers of a device with `n_u` unknowns that reads the
 /// derivative lanes `deriv_reads` (`contract.derivReads`).
 pub fn Family(comptime n_u: u16, comptime deriv_reads: contract.MaskOf(n_u)) type {
-    comptime assert(n_u >= 1);
+    // `n_u == 0` is §6.2's module with no ports or nets: every row empty.
+    comptime assert(@bitSizeOf(contract.MaskOf(n_u)) >= n_u);
     return struct {
         /// One bit per unknown.
         pub const Mask = contract.MaskOf(n_u);

@@ -130,6 +130,40 @@ test "a card of a shape parameter is a compile-time value (§3.4)" {
     try std.testing.expectEqualStrings(want, got);
 }
 
+test "a nonlinear branch's Jacobian comes from its derivative lanes (§4.3.1 abs)" {
+    // Oracle: d|v|/dv = sign(v), by hand. `I(p,n) <+ abs(V(p,n))` at
+    // V(p) = -2.5, V(n) = 0: I = 2.5 leaves p, and d I/d V(p) = -1, so
+    // d res[p]/d x[p] = -1, d res[p]/d x[n] = +1, and res[n] the negation.
+    // No jac_const covers it: every entry is a lane's.
+    var a: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer a.deinit();
+    const arena = a.allocator();
+    const src =
+        \\`include "disciplines.vams"
+        \\module rect(p, n);
+        \\  inout p, n;
+        \\  electrical p, n;
+        \\  analog I(p, n) <+ abs(V(p, n));
+        \\endmodule
+        \\//! bias V(p) = -2.5
+        \\
+    ;
+    const got = try runText(arena, "rect.va", src);
+    try std.testing.expectEqualStrings(
+        \\=== rect ===
+        \\--- point 0 ---
+        \\  x[p] = -2.500000e0
+        \\  x[n] = 0.000000e0
+        \\  res[p] = 2.500000e0
+        \\    d res[p]/d x[p] = -1.000000e0
+        \\    d res[p]/d x[n] = 1.000000e0
+        \\  res[n] = -2.500000e0
+        \\    d res[n]/d x[p] = 1.000000e0
+        \\    d res[n]/d x[n] = -1.000000e0
+        \\
+    , got);
+}
+
 test "a psweep gives each point its own card (§8.2)" {
     // Oracle: Ohm's law by hand at V(p) = 3 for r = 1, 3, 6.
     var a: std.heap.ArenaAllocator = .init(std.testing.allocator);

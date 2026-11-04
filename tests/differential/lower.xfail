@@ -5,19 +5,18 @@ spice/spice_paramset_shadow_warning.va tables row 6: old `param chained.pmodel.g
 spice/spice_passive_primitives.va codes: old {}, new E0512 (E0512: a port access of an instance's port (`<u.p>`) is not lowered by Sema yet)
 verilog-a/annex_a_syntax/abstol_nature_identifier.va codes: old {}, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
 verilog-a/annex_a_syntax/analog_function_default_type.va contribution 0 resist: old 7.573134526231753e0, new 8e0
-verilog-a/annex_a_syntax/analog_function_integer_string.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/annex_a_syntax/analog_function_integer_string.va Air.Verify: types at instruction 32
 verilog-a/annex_a_syntax/branch_array.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/annex_a_syntax/concatenated_port.va tables row 0: old `node 0 a net port`, new `node 0 n net port`
-verilog-a/annex_a_syntax/declarations.va contribution 0 resist: old 4.458340070620748e0, new had no value (Unsupported)
 verilog-a/annex_a_syntax/escaped_system_identifier_rejected.va codes: old E0314, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
-verilog-a/annex_a_syntax/expression_composites.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
+verilog-a/annex_a_syntax/expression_composites.va codes: old {}, new E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
 verilog-a/annex_a_syntax/jump_statements.va codes: old E0403, new E0512 (E0512: `return` outside a function)
 verilog-a/annex_a_syntax/null_port_connects_nothing.va tables row 1: old `node 1 	null2 net port`, new `node 1 n net port`
-verilog-a/annex_a_syntax/parameter_declarations.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/annex_a_syntax/parameter_declarations.va tables row 7: old `param signed_value integer = 5`, new `param signed_value unspecified = 5`
 verilog-a/annex_a_syntax/pattern_empty_element_rejected.va codes: old E0894, new {}
-verilog-a/annex_a_syntax/replication.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
+verilog-a/annex_a_syntax/replication.va codes: old {}, new E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
 verilog-a/annex_a_syntax/sum_chain_past_the_old_parser_limit.va codes: old {}, new E0241 (E0241: 4096 levels deep)
-verilog-a/annex_a_syntax/system_task_null_argument_space.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/annex_a_syntax/system_task_null_argument_space.va tables row 3: old `held s1`, new `limit_slots 0`
 verilog-a/annex_b_keywords/escaped_keyword_name_positions.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
 verilog-a/annex_d_standard_definitions/discrete_disciplines.va codes: old E0501, new {}
 verilog-a/annex_d_standard_definitions/literal_logic_discipline.va codes: old E0501, new {}
@@ -37,7 +36,7 @@ verilog-a/ch02_lexical/attribute_block_item_and_function_port.va codes: old {}, 
 verilog-a/ch02_lexical/escaped_system_identifier_rejected.va codes: old E0314, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
 verilog-a/ch02_lexical/long_digits_truncate.va codes: old {}, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
 verilog-a/ch02_lexical/operating_point_report_attributes.va tables row 3: old `param m real = 1e0`, new `contrib flow direct br0 p n`
-verilog-a/ch02_lexical/size_truncation_and_padding.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
+verilog-a/ch02_lexical/size_truncation_and_padding.va codes: old {}, new E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
 verilog-a/ch03_data_types/access_name_shadow.va codes: old {}, new E0408,E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch03_data_types/alias_identifier_collision.va codes: old E0331, new {}
 verilog-a/ch03_data_types/aliasparam_mfactor.va tables row 2: old `param m real = 1e0`, new `contrib flow direct br0 p n`
@@ -73,7 +72,7 @@ verilog-a/ch03_data_types/duplicate_nature_name.va codes: old E0342, new {}
 verilog-a/ch03_data_types/duplicate_user_attribute.va codes: old E0343, new {}
 verilog-a/ch03_data_types/dynamic_multidim_order.va codes: old {}, new E0313,E0512 (E0512: `a whole array read as a value` is not lowered by Sema yet)
 verilog-a/ch03_data_types/dynamic_multidim_parameter_index.va codes: old {}, new E0512 (E0512: an array of more than 8 dimensions)
-verilog-a/ch03_data_types/dynamic_multidim_scope.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch03_data_types/dynamic_multidim_scope.va tables row 3: old `held a[1][2]`, new `held a`
 verilog-a/ch03_data_types/forward_parameter_reference.va codes: old E0314, new {}
 verilog-a/ch03_data_types/genvar_assigned_outside_loop.va codes: old E0313, new E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch03_data_types/genvar_nonstatic_loop_control.va codes: old E0419, new E0512 (E0512: an assignment to a name with no slot)
@@ -88,14 +87,13 @@ verilog-a/ch03_data_types/implicit_net_discipline_from_connected_ports.va codes:
 verilog-a/ch03_data_types/incompatible_flow_natures_rejected.va the old side refused, the new side lowered
 verilog-a/ch03_data_types/incompatible_nets_access.va the old side refused, the new side lowered
 verilog-a/ch03_data_types/integer_conversion_saturates.va tables row 2: old `param big integer = 1e300`, new `param big integer = ?`
-verilog-a/ch03_data_types/integer_parameter_precision_conditional.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch03_data_types/integer_parameter_precision_conditional.va tables row 1: old `param code integer local = 5281116304131903312`, new `param code unspecified local = 5281116304131903312`
 verilog-a/ch03_data_types/integer_parameter_precision_derive.va tables row 0: old `param literal_quotient integer = 0`, new `param literal_quotient integer = ?`
 verilog-a/ch03_data_types/integer_parameter_precision_host.va tables row 0: old `param base integer = 9007199254740993`, new `param base unspecified = 9007199254740993`
 verilog-a/ch03_data_types/integer_parameter_precision_override.va tables row 0: old `param child.code integer local = 4702394921427289928`, new `param child.code unspecified local = 4702394921427289928`
 verilog-a/ch03_data_types/integer_parameter_precision_real_dependents_host.va tables row 4: old `param aa[1] integer = 1`, new `param aa[1] integer = 4294967297`
 verilog-a/ch03_data_types/integer_parameter_precision_real_dependents.va tables row 3: old `param aa[1] integer = 1`, new `param aa[1] integer = 4294967297`
-verilog-a/ch03_data_types/integer_parameter_precision.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch03_data_types/multidimensional_strings.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch03_data_types/integer_parameter_precision.va tables row 0: old `param base integer = 9007199254740993`, new `param base unspecified = 9007199254740993`
 verilog-a/ch03_data_types/nature_access_as_string.va codes: old E0340, new {}
 verilog-a/ch03_data_types/nature_discipline_namespace_collision.va codes: old E0336, new {}
 verilog-a/ch03_data_types/natureless_net_behavioral.va codes: old E0501, new {}
@@ -104,12 +102,11 @@ verilog-a/ch03_data_types/nodeset_hierarchical_declaration.va tables row 3: old 
 verilog-a/ch03_data_types/nodeset_hierarchical_not_constant_rejected.va codes: old E0365, new {}
 verilog-a/ch03_data_types/nodeset_not_constant.va codes: old E0365, new {}
 verilog-a/ch03_data_types/nonconstant_array_dimension.va codes: old E0308,E0309, new E0352,E0512 (E0352: an array bound is not constant)
-verilog-a/ch03_data_types/nonconstant_replication_to_integral.va codes: old E0354, new E0512 (E0512: `a replication by a count known only while the device runs` is not lowered by Sema yet)
+verilog-a/ch03_data_types/nonconstant_replication_to_integral.va codes: old E0354, new {}
 verilog-a/ch03_data_types/nonconstant_user_attribute.va codes: old E0340, new {}
 verilog-a/ch03_data_types/parameter_assigned_at_runtime.va codes: old E0312, new E0313 (E0313: an assignment to a name that is not a variable)
 verilog-a/ch03_data_types/parameter_default_not_constant_rejected.va codes: old E0363, new {}
 verilog-a/ch03_data_types/parameter_override_type.va tables row 0: old `param child.becomes_real real local = 4e0`, new `param child.becomes_real unspecified local = 4e0`
-verilog-a/ch03_data_types/parameter_types.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch03_data_types/parameter_units_are_documentation.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
 verilog-a/ch03_data_types/port_branch_on_internal_net_rejected.va codes: old E0372, new {}
 verilog-a/ch03_data_types/range_first_expression_larger.va codes: old {}, new E0361 (E0361: `gain` is 5, outside the declared range)
@@ -118,28 +115,12 @@ verilog-a/ch03_data_types/real_scalar_is_not_indexable_rejected.va codes: old E0
 verilog-a/ch03_data_types/reject_3_6_2_5_flow_override_without_flow_nature.va codes: old E0370, new {}
 verilog-a/ch03_data_types/reject_vera_scratch_on_genvar.va codes: old E0535, new E0426,E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch03_data_types/reject_vera_scratch_parameter_value.va codes: old E0534, new {}
-verilog-a/ch03_data_types/replication_nonconstant_real_multiplier_rejected.va codes: old E0327, new E0512 (E0512: `a replication by a count known only while the device runs` is not lowered by Sema yet)
 verilog-a/ch03_data_types/same_nature_both_bindings.va codes: old E0338, new {}
-verilog-a/ch03_data_types/string_arrays.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch03_data_types/string_comparison_context.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch03_data_types/string_comparison_in_a_constant_expression.va codes: old {}, new E0321,E0512 (E0512: an assignment to a name with no slot)
-verilog-a/ch03_data_types/string_comparisons.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch03_data_types/string_concatenation_runtime_operand.va codes: old {}, new E0321,E0512 (E0512: `concat` is not lowered by Sema yet)
-verilog-a/ch03_data_types/string_concatenation.va codes: old {}, new E0321,E0512 (E0512: `concat` is not lowered by Sema yet)
-verilog-a/ch03_data_types/string_literal_operand_is_a_number.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch03_data_types/string_nul_removal.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch03_data_types/string_comparison_in_a_constant_expression.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch03_data_types/string_parameter_from_numeric.va codes: old E0345, new {}
-verilog-a/ch03_data_types/string_parameter_range.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch03_data_types/string_parameter_untyped.va codes: old E0346, new {}
-verilog-a/ch03_data_types/string_range_overrides.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch03_data_types/string_replication_4096_bytes.va codes: old {}, new E0321,E0512 (E0512: `concat` is not lowered by Sema yet)
-verilog-a/ch03_data_types/string_replication_parameter_multiplier.va codes: old {}, new E0321,E0512 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch03_data_types/string_replication_past_4096_bytes.va codes: old {}, new E0321,E0512 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch03_data_types/string_replication_runtime_multiplier.va codes: old {}, new E0321,E0512 (E0512: `a replication by a count known only while the device runs` is not lowered by Sema yet)
-verilog-a/ch03_data_types/string_replication.va codes: old {}, new E0321,E0512 (E0512: `a replication by a count known only while the device runs` is not lowered by Sema yet)
 verilog-a/ch03_data_types/string_to_integral_rejected.va codes: old E0354, new {}
 verilog-a/ch03_data_types/string_variable_bitwise_rejected.va codes: old E0322, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch03_data_types/string_variables.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch03_data_types/untyped_parameter_type_derivation.va tables row 2: old `param counted integer = 4`, new `param counted unspecified = 4`
 verilog-a/ch03_data_types/variable_in_parameter_initializer.va codes: old E0314,E0363, new {}
 verilog-a/ch03_data_types/vector_branches.va codes: old {}, new E0512 (E0512: an access of a name with no node)
@@ -152,7 +133,6 @@ verilog-a/ch04_expressions/13b_generic_access.va codes: old {}, new E0512 (E0512
 verilog-a/ch04_expressions/absdelay_missing_td_rejected.va codes: old E0505, new E0506 (E0506: `absdelay` takes 2 to 3, given 1)
 verilog-a/ch04_expressions/access_bus_genvar_index.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch04_expressions/access_bus_variable_index_rejected.va codes: old E0352, new E0512 (E0512: an access of a vector element at a run-time index)
-verilog-a/ch04_expressions/ac_stim_label_inactive_in_large_signal.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch04_expressions/analog_function_four_return_mechanisms.va codes: old {}, new E0512 (E0512: `return` with a value is not lowered by Sema yet)
 verilog-a/ch04_expressions/analog_operator_in_short_circuit_operand.va codes: old {}, new E0514 (E0514: `slew`)
 verilog-a/ch04_expressions/analysis_numeric_argument_rejected.va codes: old E0574, new {}
@@ -162,8 +142,8 @@ verilog-a/ch04_expressions/assignment_pattern_group.va codes: old {}, new E0313,
 verilog-a/ch04_expressions/assignment_pattern_replication_count_over_parameter.va codes: old {}, new E0313,E0349,E0512 (E0349: initialising array parameter `steps`)
 verilog-a/ch04_expressions/assignment_pattern_replication_count_variable_rejected.va codes: old E0223, new E0313,E0512 (E0512: `pattern_repl` is not lowered by Sema yet)
 verilog-a/ch04_expressions/assignment_pattern_replication.va codes: old {}, new E0349 (E0349: initialising array parameter `data2`)
-verilog-a/ch04_expressions/concatenation_real_operand_rejected.va codes: old E0327, new E0512 (E0512: `concat` is not lowered by Sema yet)
-verilog-a/ch04_expressions/concatenation.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
+verilog-a/ch04_expressions/concatenation_real_operand_rejected.va codes: old E0327, new E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
+verilog-a/ch04_expressions/concatenation.va codes: old {}, new E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
 verilog-a/ch04_expressions/constant_expression_reads_a_probe_rejected.va codes: old E0337,E0363, new {}
 verilog-a/ch04_expressions/ddt_abstol_dynamic_rejected.va codes: old E0515, new {}
 verilog-a/ch04_expressions/ddt_idt_nature_tolerance.va codes: old {}, new E0512 (E0512: `str_ref` is not lowered by Sema yet)
@@ -186,8 +166,8 @@ verilog-a/ch04_expressions/function_local_parameter_shadow.va codes: old {}, new
 verilog-a/ch04_expressions/function_nonlocal_variable.va codes: old E0314, new {}
 verilog-a/ch04_expressions/function_output_nonvariable.va codes: old E0316, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch04_expressions/function_reads_genvar_rejected.va codes: old E0314, new E0426,E0512 (E0512: an assignment to a name with no slot)
-verilog-a/ch04_expressions/function_return.va codes: old {}, new E0321,E0512 (E0512: `return` with a value is not lowered by Sema yet)
-verilog-a/ch04_expressions/function_string_output_starts_empty.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch04_expressions/function_return.va codes: old {}, new E0512 (E0512: `return` with a value is not lowered by Sema yet)
+verilog-a/ch04_expressions/function_string_output_starts_empty.va Air.Verify: types at instruction 8
 verilog-a/ch04_expressions/idt_abstol_dynamic_rejected.va codes: old E0515, new {}
 verilog-a/ch04_expressions/idtmod.va codes: old {}, new E0514 (E0514: `idtmod`)
 verilog-a/ch04_expressions/laplace_dynamic_coefficient_sampled.va codes: old {}, new E0512 (E0512: a user task enable is not lowered by Sema yet)
@@ -214,12 +194,12 @@ verilog-a/ch04_expressions/reject_absdelay_vera_interp_value.va codes: old E0524
 verilog-a/ch04_expressions/reject_vera_nodiff_contribution.va codes: old E0526, new {}
 verilog-a/ch04_expressions/reject_vera_nodiff_parameter.va codes: old E0525, new {}
 verilog-a/ch04_expressions/replication_lhs_rejected.va codes: old E0317, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
-verilog-a/ch04_expressions/replication_real_count.va codes: old {}, new E0321,E0512 (E0512: `concat` is not lowered by Sema yet)
-verilog-a/ch04_expressions/replication.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
-verilog-a/ch04_expressions/replication_zero_alone_rejected.va codes: old E0326, new E0512 (E0512: `concat` is not lowered by Sema yet)
-verilog-a/ch04_expressions/replication_zero_beside_sized_operand.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
+verilog-a/ch04_expressions/replication_real_count.va codes: old {}, new E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
+verilog-a/ch04_expressions/replication.va codes: old {}, new E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
+verilog-a/ch04_expressions/replication_zero_alone_rejected.va codes: old E0326, new E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
+verilog-a/ch04_expressions/replication_zero_beside_sized_operand.va codes: old {}, new E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
 verilog-a/ch04_expressions/replication_zero_effect.va codes: old {}, new E0512 (E0512: a user task enable is not lowered by Sema yet)
-verilog-a/ch04_expressions/replication_zero_width.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
+verilog-a/ch04_expressions/replication_zero_width.va codes: old {}, new E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
 verilog-a/ch04_expressions/revert_ops.va tables row 34: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-a/ch04_expressions/select_on_probe_call_rejected.va codes: old E0330, new E0512 (E0512: a select of this is not lowered by Sema yet)
 verilog-a/ch04_expressions/slice_index_is_dynamic.va codes: old {}, new E0309,E0313,E0512 (E0309: 1 subscripts for 2 dimensions)
@@ -249,7 +229,7 @@ verilog-a/ch05_analog_behavior/double_throw_switch_topology.va contribution 2 re
 verilog-a/ch05_analog_behavior/event_control_undeclared_event_rejected.va codes: old E0705, new E0512 (E0512: this event expression is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/generic_access.va codes: old {}, new E0408,E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/genvar_loop_condition_reads_a_probe_rejected.va codes: old E0418, new E0426,E0512 (E0512: an assignment to a name with no slot)
-verilog-a/ch05_analog_behavior/held_sformat_string_survives_rejected_step.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch05_analog_behavior/held_sformat_string_survives_rejected_step.va tables row 5: old `held s`, new `limit_slots 0`
 verilog-a/ch05_analog_behavior/held_through_output_actual_seed_and_scan.va tables row 4: old `held b`, new `held n`
 verilog-a/ch05_analog_behavior/hierarchical_contribution_closes_a_source_triangle_rejected.va codes: old E0477, new {}
 verilog-a/ch05_analog_behavior/hierarchical_contribution_voltage_loop_rejected.va codes: old E0477, new {}
@@ -293,13 +273,10 @@ verilog-a/ch05_analog_behavior/return_expression_of_the_function_type.va codes: 
 verilog-a/ch05_analog_behavior/return_outside_analog_function_rejected.va codes: old E0403, new E0512 (E0512: `return` outside a function)
 verilog-a/ch05_analog_behavior/return_string_from_integer_function_rejected.va codes: old E0354, new E0512 (E0512: `return` with a value is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/sequential_ifs_10000.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
-verilog-a/ch05_analog_behavior/simparam_dynamic_name.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch05_analog_behavior/simparam_str_hierarchy_names.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch05_analog_behavior/string_written_in_event_body_is_held.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch05_analog_behavior/string_written_in_event_body_is_held.va tables row 4: old `held t`, new `limit_slots 0`
 verilog-a/ch05_analog_behavior/timer_body_array_controls.va tables row 6: old `held rate[0]`, new `held rate`
 verilog-a/ch05_analog_behavior/timer_body_array_function_controls.va codes: old {}, new E0512 (E0512: `a whole array read as a value` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/timer_body_constant_effect_controls.va tables row 11: old `held visits`, new `held stamp`
-verilog-a/ch05_analog_behavior/timer_body_context_controls.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch05_analog_behavior/timer_body_effect_controls.va tables row 12: old `held visits`, new `held stamp`
 verilog-a/ch05_analog_behavior/timer_body_precomputed_controls.va tables row 12: old `held visits`, new `held stamp`
 verilog-a/ch05_analog_behavior/timer_body_reg_controls.va codes: old E0316, new {}
@@ -311,7 +288,6 @@ verilog-a/ch05_analog_behavior/timer_changed_effectful_random_function_input_rej
 verilog-a/ch05_analog_behavior/timer_effectful_file_leaf.va tables row 6: old `held line`, new `limit_slots 0`
 verilog-a/ch05_analog_behavior/value_retention.va contribution 0 resist: old 7e0, new 8e0
 verilog-a/ch05_analog_behavior/vector_net_index_not_constant_rejected.va codes: old E0352, new E0512 (E0512: an access of a vector element at a run-time index)
-verilog-a/ch06_hierarchy/conditional_direct_nesting_is_not_a_scope.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch06_hierarchy/defparam_rhs_not_constant_rejected.va codes: old E0363, new {}
 verilog-a/ch06_hierarchy/defparam_upward_collect_first.va tables row 2: old `param gt real local = 2e0`, new `param gt real = 2e0`
 verilog-a/ch06_hierarchy/duplicate_parameter_rejected.va codes: old E0362, new {}
@@ -381,7 +357,7 @@ verilog-a/ch06_hierarchy/port_select_ordered_of_a_parent_port.va codes: old {}, 
 verilog-a/ch06_hierarchy/rc_h01_paramset_chain_far_link_parameter.va tables row 2: old `param u.rc_h01p_slow.jval real local = 2e0`, new `param u.j real local = 2e0`
 verilog-a/ch06_hierarchy/reject_6_4_1_paramset_variable_assigns_parameter.va codes: old E0237, new {}
 verilog-a/ch06_hierarchy/undeclared_interconnect_port_binding.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
-verilog-a/ch06_hierarchy/unnamed_generate_block_external_names.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch06_hierarchy/unnamed_generate_block_external_names.va tables row 11: old `display $strobe`, new `(none)`
 verilog-a/ch06_hierarchy/unnamed_generate_instance_reference_rejected.va codes: old E0998, new {}
 verilog-a/ch06_hierarchy/unnamed_generate_reference_from_within.va codes: old {}, new E0901 (E0901: `u1.gain` names nothing in the elaborated design)
 verilog-a/ch06_hierarchy/untyped_child_port_behavioral_use_rejected.va codes: old E0337, new {}
@@ -392,8 +368,8 @@ verilog-a/ch06_hierarchy/vector_port_scalar_net_width_mismatch_rejected.va codes
 verilog-a/ch06_hierarchy/vector_ports.va codes: old E0350, new {}
 verilog-a/ch08_scheduling/continuous_variable_interpolation_host.va tables row 3: old `held x`, new `held held`
 verilog-a/ch09_system_tasks/aliasparam_mfactor.va tables row 2: old `param m real = 1e0`, new `contrib flow direct br0 p n`
-verilog-a/ch09_system_tasks/analog_decimal_is_auto_sized.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/analog_radix_of_integer_expression_is_32_bits.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/analog_decimal_is_auto_sized.va tables row 5: old `held t`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/analog_radix_of_integer_expression_is_32_bits.va tables row 4: old `held t`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/append_writes_at_end_of_file.va tables row 6: old `held value`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/arandom_negative_seed.va tables row 4: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/arandom_parameter_seed.va tables row 5: old `held $rng.0.seed`, new `limit_slots 0`
@@ -402,11 +378,11 @@ verilog-a/ch09_system_tasks/clog2_nested_contexts.va codes: old {}, new E0130 (E
 verilog-a/ch09_system_tasks/clog2_unsigned_width.va codes: old {}, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
 verilog-a/ch09_system_tasks/conversion_constant_expressions.va tables row 0: old `param cp integer = 1`, new `param cp integer = ?`
 verilog-a/ch09_system_tasks/display_argument_pairing_rejected.va codes: old E0810, new {}
-verilog-a/ch09_system_tasks/display_argument_runs.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/display_c_format_flags.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/display_argument_runs.va tables row 4: old `held t`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/display_c_format_flags.va tables row 4: old `held t`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/display_formats.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/display_library_binding.va tables row 4: old `held text`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/display_radix_of_integer_is_32_bits.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/display_radix_of_integer_is_32_bits.va tables row 4: old `held t`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/distribution_arity_rejected.va codes: old {}, new E0506 (E0506: `$rdist_uniform` takes 3 to 4, given 2)
 verilog-a/ch09_system_tasks/dist_type_string_inside_paramset.va tables row 3: old `param u.ka integer local = -2146999808`, new `param u.ka integer local = ?`
 verilog-a/ch09_system_tasks/dist_type_string_misspelled_rejected.va the old side refused, the new side lowered
@@ -418,11 +394,11 @@ verilog-a/ch09_system_tasks/fdisplay.va tables row 5: old `display $fopen`, new 
 verilog-a/ch09_system_tasks/feof.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/feof_without_descriptor_rejected.va codes: old E0887, new E0506 (E0506: `$feof` takes 1 to 1, given 0)
 verilog-a/ch09_system_tasks/ferror_into_real_rejected.va codes: old E0813, new {}
-verilog-a/ch09_system_tasks/ferror.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/ferror.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/fflush_two_descriptors_rejected.va codes: old E0887, new {}
 verilog-a/ch09_system_tasks/fflush.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/fgets_into_real_rejected.va codes: old E0813, new {}
-verilog-a/ch09_system_tasks/fgets_line_over_4096.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/fgets_line_over_4096.va tables row 5: old `held line`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/fgets_on_write_only_fd_fails.va tables row 4: old `held s`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/fgets.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/file_io_categories_in_analog_context.va tables row 4: old `held a`, new `limit_slots 0`
@@ -433,13 +409,13 @@ verilog-a/ch09_system_tasks/file_position_status.va tables row 10: old `held mes
 verilog-a/ch09_system_tasks/file_read_scan.va tables row 4: old `held value`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/finish_two_arguments_rejected.va codes: old E0887, new {}
 verilog-a/ch09_system_tasks/fmonitor.va tables row 5: old `display $fopen`, new `display $strobe`
-verilog-a/ch09_system_tasks/fopen_multichannel_descriptor.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/fopen_multichannel_descriptor.va tables row 4: old `held line`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/fopen_type_not_in_table_9_24_rejected.va codes: old E0889, new {}
 verilog-a/ch09_system_tasks/format_conversion_type_mismatch_rejected.va codes: old E0819, new {}
 verilog-a/ch09_system_tasks/format_field_past_its_limit_rejected.va codes: old E0828, new {}
-verilog-a/ch09_system_tasks/fscanf_destination_preservation.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/fscanf_destination_preservation.va tables row 5: old `display $fopen`, new `display $fwrite`
 verilog-a/ch09_system_tasks/fscanf_directive_spans_lines.va tables row 4: old `held a`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/fscanf_failed_match_leaves_input.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/fscanf_failed_match_leaves_input.va tables row 4: old `held got`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/fscanf_real_descriptor_rejected.va codes: old E0888, new {}
 verilog-a/ch09_system_tasks/fscanf_real_destination.va tables row 4: old `held count`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/fscanf_successive_scans_on_one_line.va tables row 4: old `held a`, new `limit_slots 0`
@@ -458,42 +434,42 @@ verilog-a/ch09_system_tasks/geometry_state_read_rejected.va codes: old E0363, ne
 verilog-a/ch09_system_tasks/geometry_top_alias_host.va tables row 0: old `param placement_x real = 0e0`, new `charge_sites 0`
 verilog-a/ch09_system_tasks/hash_flag_without_alternative_form_rejected.va codes: old E0825, new {}
 verilog-a/ch09_system_tasks/input_position_restore_failure.va tables row 5: old `held sample`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/integer_default_fields.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/l_format_library_cell.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/integer_default_fields.va tables row 4: old `held text`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/l_format_library_cell.va tables row 4: old `held lower`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/limit_omitted_algorithm_rejected.va codes: old E0894, new {}
 verilog-a/ch09_system_tasks/limit_user_function_output_arg_rejected.va codes: old E0814, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/long_record_is_not_truncated.va tables row 4: old `held line`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/mcd_channels_exhausted_at_bit_31.va tables row 10: old `held name`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/m_format_hierarchical_name.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/m_format_hierarchical_name.va tables row 4: old `held t`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/monitor_ignores_abstime.va tables row 6: old `display $fopen`, new `display $fmonitor`
 verilog-a/ch09_system_tasks/monitor_reports_every_change.va tables row 6: old `display $fopen`, new `display $fmonitor`
 verilog-a/ch09_system_tasks/monitor_suppresses_an_unchanged_step.va tables row 6: old `display $fopen`, new `display $fmonitor`
 verilog-a/ch09_system_tasks/node_alias_outside_initial_rejected.va codes: old E0812, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-a/ch09_system_tasks/null_argument_consumed_by_d_rejected.va codes: old E0819, new {}
-verilog-a/ch09_system_tasks/null_argument_consumed_by_s.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/null_argument_consumed_by_s.va tables row 4: old `held t`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/numeric_string_arithmetic_width_rejected.va codes: old E0819, new {}
-verilog-a/ch09_system_tasks/numeric_string_local_width.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/numeric_string_local_width.va tables row 2: old `param wide integer local = 4702394921427289928`, new `param wide unspecified local = 4702394921427289928`
 verilog-a/ch09_system_tasks/numeric_string_mixed_width_rejected.va codes: old E0819, new {}
 verilog-a/ch09_system_tasks/numeric_string_negation_width_rejected.va codes: old E0819, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
 verilog-a/ch09_system_tasks/numeric_string_real_rejected.va codes: old E0819, new {}
-verilog-a/ch09_system_tasks/numeric_string.va codes: old {}, new E0130,E0321,E0512 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/numeric_string.va codes: old {}, new E0130,E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/numeric_string_width_rejected.va codes: old E0819, new {}
-verilog-a/ch09_system_tasks/numeric_string_width.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/numeric_string_width.va tables row 2: old `param select integer = 1`, new `param select unspecified = 1`
 verilog-a/ch09_system_tasks/param_given_variable_rejected.va codes: old E0822, new {}
-verilog-a/ch09_system_tasks/percent_escape_prints_one_percent.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/percent_escape_prints_one_percent.va tables row 4: old `held a`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/percent_escape_with_width_rejected.va codes: old E0826, new {}
 verilog-a/ch09_system_tasks/rdist_domain_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/rdist_real_seed_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/rdist_type_string_outside_paramset_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/rdist_uniform_start_end_rejected.va the old side refused, the new side lowered
-verilog-a/ch09_system_tasks/real_conversion_rounds_half_to_even.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/real_conversion_rounds_half_to_even.va tables row 4: old `held two_five`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/real_engineering_notation.va tables row 4: old `held milli`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/real_flags_sign_before_zero_fill.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/real_format_fields.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/real_g_conversion_is_significant_digits.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/real_hash_flag_e_always_prints_the_point.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/real_hash_flag_f_always_prints_the_point.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/real_hash_flag_g_keeps_trailing_zeros.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/real_flags_sign_before_zero_fill.va tables row 4: old `held plus_zero`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/real_format_fields.va tables row 4: old `held text`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/real_g_conversion_is_significant_digits.va tables row 4: old `held a`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/real_hash_flag_e_always_prints_the_point.va tables row 4: old `held plain`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/real_hash_flag_f_always_prints_the_point.va tables row 4: old `held plain`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/real_hash_flag_g_keeps_trailing_zeros.va tables row 4: old `held plain`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/real_hash_flag_string_operand_rejected.va codes: old E0819, new {}
 verilog-a/ch09_system_tasks/reject_9_16_simprobe_unresolved_without_fallback.va codes: old E0817, new {}
 verilog-a/ch09_system_tasks/reject_9_5_3_swrite_into_real.va codes: old E0813, new {}
@@ -503,7 +479,6 @@ verilog-a/ch09_system_tasks/reject_clog2_wide_arithmetic_default.va codes: old E
 verilog-a/ch09_system_tasks/reject_clog2_wide_arithmetic.va codes: old E0893, new {}
 verilog-a/ch09_system_tasks/reject_clog2_wide_widening.va codes: old E0893, new {}
 verilog-a/ch09_system_tasks/rejected_iterations_leave_no_file_side_effects.va tables row 5: old `held s`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/reject_simprobe_runtime_name.va Air.Verify: types at instruction 18
 verilog-a/ch09_system_tasks/reserved_system_function_name_rejected.va codes: old E1014, new {}
 verilog-a/ch09_system_tasks/rewind.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/rng_count_range_rejected.va the old side refused, the new side lowered
@@ -513,48 +488,39 @@ verilog-a/ch09_system_tasks/rng_paramset_nonfinite_integer_rejected.va the old s
 verilog-a/ch09_system_tasks/rng_skipped_arity_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/rng_skipped_seed_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/rng_skipped_type_string_rejected.va the old side refused, the new side lowered
-verilog-a/ch09_system_tasks/scan_destination_preservation.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/sformat_32_conversions.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/sformat_33_conversions.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/sformat_field_width_over_4096.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/sformat_runtime_width_past_its_row_rejected.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/sformat_runtime_width_within_its_row.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/sformat_32_conversions.va tables row 4: old `held s`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/sformat_33_conversions.va tables row 6: old `held s`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/sformat_field_width_over_4096.va tables row 4: old `held a`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/sformat_runtime_width_past_its_row_rejected.va tables row 4: old `held s`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/sformat_runtime_width_within_its_row.va tables row 4: old `held s`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/sformat_variable_format_mismatch_continues.va tables row 4: old `held t`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/sformat.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/simparam_spice_option_not_known_rejected.va codes: old E0811, new {}
-verilog-a/ch09_system_tasks/simparam_str_analysis_name_host_table.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/simparam_str_analysis_type_tran_op.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/simparam_str_cwd_and_analysis_name.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/simparam_str_cwd_host_table.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/simparam_string.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch09_system_tasks/simparam_str_unknown_name_rejected.va codes: old E0811, new {}
 verilog-a/ch09_system_tasks/simparam_unknown_no_fallback_rejected.va codes: old E0811, new {}
 verilog-a/ch09_system_tasks/simprobe.va contribution 0 resist: old -6.498062873668107e-1, new -3.1498062873668107e0
 verilog-a/ch09_system_tasks/sscanf_conversion_rules.va tables row 4: old `held second`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/sscanf_engineering_and_path_codes.va tables row 4: old `held v`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/sscanf_from_real_rejected.va codes: old E0813, new {}
-verilog-a/ch09_system_tasks/sscanf_invalid_conversion_runtime_choice.va Air.Verify: types at instruction 8
 verilog-a/ch09_system_tasks/sscanf_nul_is_whitespace.va tables row 7: old `held k`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/sscanf_reads_a_string_variable.va tables row 4: old `held k`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/sscanf_uppercase_conversion_rejected.va codes: old E0813, new {}
 verilog-a/ch09_system_tasks/sscanf.va tables row 4: old `held value`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/string_concat_past_4096_bytes.va codes: old {}, new E0321,E0512 (E0512: `concat` is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/string_formatting.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/string_concat_past_4096_bytes.va tables row 4: old `held s`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/string_formatting.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/strobe_flow_read_inside_array_pattern_argument.va codes: old {}, new E0512 (E0512: a user task enable is not lowered by Sema yet)
-verilog-a/ch09_system_tasks/swrite_s_with_argument.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/swrite_s_without_argument_rejected.va codes: old E0810, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-a/ch09_system_tasks/swrite_s_with_argument.va tables row 4: old `held t`, new `limit_slots 0`
+verilog-a/ch09_system_tasks/swrite_s_without_argument_rejected.va codes: old E0810, new {}
 verilog-a/ch09_system_tasks/swrite.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/table_snapshot_function.va codes: old {}, new E0512,E0815 (E0512: `a whole array read as a value` is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/two_instances_hold_distinct_channels.va tables row 9: old `held a.got`, new `held b.fd`
 verilog-a/ch09_system_tasks/value_plusargs_without_variable_rejected.va codes: old E0887, new E0506 (E0506: `$value$plusargs` takes 2 to 2, given 1)
 verilog-a/ch09_system_tasks/write_mode_path_65_opens.va tables row 10: old `held name`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/write_mode_reopen_appends_across_analyses.va tables row 5: old `held s`, new `limit_slots 0`
-verilog-a/ch10_directives/compact_modeling_extension_set.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch10_directives/compact_modeling_macro_implies_its_extensions.va tables row 7: old `held fold`, new `limit_slots 0`
 verilog-a/ch10_directives/default_nettype_crosses_a_file_boundary.va codes: old E0367, new {}
 verilog-a/ch10_directives/default_nettype_none_rejects_an_implicit_net.va codes: old E0367, new {}
 verilog-a/ch10_directives/default_nettype_none_rejects_an_undeclared_probe.va codes: old E0367, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
-verilog-a/ch10_directives/file_macro_is_the_opened_path.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch10_directives/unconnected_drive_pulls_an_input_high.va tables row 2: old `contrib potential direct br0 u.a gnd`, new `contrib flow direct br0 p u.a`
 verilog-a/ch10_directives/unconnected_drive_pulls_an_input_low.va tables row 2: old `contrib potential direct br0 u.a gnd`, new `contrib flow direct br0 p u.a`
 verilog-a/ch10_directives/unconnected_drive_reaches_a_named_port_connection.va tables row 4: old `contrib potential direct br0 u1.a gnd`, new `contrib flow direct br0 p u1.a`
@@ -609,7 +575,7 @@ verilog-ams/ch04_expressions/function_called_outside_analog_rejected.va codes: o
 verilog-ams/ch04_expressions/operator_in_always_rejected.va codes: old E0422, new {}
 verilog-ams/ch04_expressions/operator_in_initial.va codes: old E0422, new {}
 verilog-ams/ch04_expressions/revert_ops.va tables row 34: old `held $rng.0.seed`, new `limit_slots 0`
-verilog-ams/ch04_expressions/table_4_1_every_operator.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
+verilog-ams/ch04_expressions/table_4_1_every_operator.va codes: old {}, new E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
 verilog-ams/ch05_analog_behavior/absdelta_without_delta_rejected.va codes: old E0517, new {}
 verilog-ams/ch05_analog_behavior/analog_initial_digital_access_rejected.va codes: old E0431, new {}
 verilog-ams/ch05_analog_behavior/analog_initial_event_rejected.va codes: old E0702, new E0707 (E0707: )
@@ -620,7 +586,6 @@ verilog-ams/ch05_analog_behavior/node_alias_reevaluated_when_a_parameter_changes
 verilog-ams/ch05_analog_behavior/timer_body_array_controls.va tables row 6: old `held rate[0]`, new `held rate`
 verilog-ams/ch05_analog_behavior/timer_body_array_function_controls.va codes: old {}, new E0512 (E0512: `a whole array read as a value` is not lowered by Sema yet)
 verilog-ams/ch05_analog_behavior/timer_body_constant_effect_controls.va tables row 11: old `held visits`, new `held stamp`
-verilog-ams/ch05_analog_behavior/timer_body_context_controls.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-ams/ch05_analog_behavior/timer_body_effect_controls.va tables row 12: old `held visits`, new `held stamp`
 verilog-ams/ch05_analog_behavior/timer_body_precomputed_controls.va tables row 12: old `held visits`, new `held stamp`
 verilog-ams/ch05_analog_behavior/timer_body_reg_controls.va codes: old E0316, new {}
@@ -678,7 +643,7 @@ verilog-ams/ch07_mixed_signal/discrete_bus_part_select_32_rejected.va codes: old
 verilog-ams/ch07_mixed_signal/discrete_bus_part_select_above_31_analog_assigned.va codes: old E0316, new E0512 (E0512: `slice` is not lowered by Sema yet)
 verilog-ams/ch07_mixed_signal/discrete_bus_part_select_above_31.va codes: old {}, new E0512 (E0512: `slice` is not lowered by Sema yet)
 verilog-ams/ch07_mixed_signal/discrete_real_from_analog.va contribution 0 resist: old 1.25e0, new 0e0
-verilog-ams/ch07_mixed_signal/display_binary_operand_analog.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-ams/ch07_mixed_signal/display_binary_operand_analog.va tables row 3: old `held a`, new `limit_slots 0`
 verilog-ams/ch07_mixed_signal/driver_count_excludes_connectmodule.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/driver_delay_and_next_state.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/driver_state_histogram.va codes: old {}, new E0512 (E0512: an access of a name with no node)
@@ -771,7 +736,7 @@ verilog-ams/ch09_system_tasks/driver_delay_in_connectmodule_analog_block_rejecte
 verilog-ams/ch09_system_tasks/driver_strength_next_strength_type.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch09_system_tasks/error_in_analog_initial_stops_after_initialization.va tables row 8: old `display $fatal`, new `display $strobe`
 verilog-ams/ch09_system_tasks/fdebug_writes_in_rejected_iterations.va tables row 5: old `held s`, new `limit_slots 0`
-verilog-ams/ch09_system_tasks/file_descriptor_shared_across_contexts.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-ams/ch09_system_tasks/file_descriptor_shared_across_contexts.va tables row 5: old `held text`, new `limit_slots 0`
 verilog-ams/ch09_system_tasks/ieee_1364_system_functions_in_both_contexts.va tables row 2: old `contrib flow direct br0 p n`, new `param from_digital integer = 0`
 verilog-ams/ch09_system_tasks/input_position_restore_failure.va tables row 5: old `held sample`, new `limit_slots 0`
 verilog-ams/ch09_system_tasks/kernel_control_in_digital_context_rejected.va codes: old E0484,E0821, new {}
@@ -789,7 +754,7 @@ verilog-ams/ch09_system_tasks/port_alias_resolves.va codes: old {}, new E0315,E0
 verilog-ams/ch09_system_tasks/port_alias_to_a_net_returns_zero.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch09_system_tasks/receiver_segregation_ignored_without_driver_value.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch09_system_tasks/reject_clog2_reg_width.va codes: old E0222, new {}
-verilog-ams/ch09_system_tasks/r_format_in_the_digital_context.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
+verilog-ams/ch09_system_tasks/r_format_in_the_digital_context.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-ams/ch09_system_tasks/r_format_in_the_digital_context_without_argument_rejected.va codes: old E0810, new {}
 verilog-ams/ch09_system_tasks/rng_constant_distribution_stream.va tables row 3: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-ams/ch09_system_tasks/severity_task_digital_context_rejected.va codes: old E0821, new {}

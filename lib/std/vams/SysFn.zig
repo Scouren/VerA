@@ -218,6 +218,11 @@ pub const Tag = enum(u8) {
     // §5.2.1 the first evaluation of an analysis: the guard of an `analog
     // initial` body (1 then, 0 after).
     @"analog$initial",
+    // §3.3 Table 3-3 over strings known only while the device runs: the
+    // order of two (-1, 0, 1), their concatenation, N copies of one.
+    @"str$cmp",
+    @"str$cat",
+    @"str$repeat",
 
     /// The tag `spelling` names, or null for a user system function.
     pub fn fromName(spelling: []const u8) ?Tag {
@@ -490,6 +495,9 @@ pub const table = std.EnumArray(Tag, Info).init(.{
     .@"limit$old" = .{ .ty = .real, .args = .exactly(1), .family = .kernel, .context = .analog },
     .@"limit$uf" = .{ .ty = .real, .args = .exactly(2), .family = .kernel, .context = .analog },
     .@"analog$initial" = .{ .ty = .int, .args = .exactly(0), .family = .event, .context = .analog },
+    .@"str$cmp" = .{ .ty = .int, .args = .exactly(2), .family = .string },
+    .@"str$cat" = .{ .ty = .str, .args = .{ .min = 2 }, .family = .string },
+    .@"str$repeat" = .{ .ty = .str, .args = .exactly(2), .family = .string },
 });
 
 const display: Info = .{ .ty = .none, .family = .display };

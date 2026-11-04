@@ -68,17 +68,19 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
         if (unit.held.contains(first)) {
             const init: InternPool.Index = if (v.init.len == 0) .undef else if (try decl.foldBody(s, unit, v.init)) |k| try decl.intern(s, k) else .undef;
             try addHeld(s, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, vir.string(v.name) }), bind, init);
-        } else if (v.init.len != 0 and bind == .slot and bind.slot.ty != .string) {
+        } else if (v.init.len != 0 and bind == .slot) {
             // §3.2 a variable no evaluation leaves for the next starts each
             // one from its initializer (its folded value when it folds).
-            // ponytail: a `string` slot's initializer waits for strings in Air.
             var eb: Block = .{ .parent = null, .unit = unit };
             const init = vir.body(v.init);
             const expr = @import("expr.zig");
             const val: Sema.Value = if (try decl.foldBody(s, unit, v.init)) |k| switch (k) {
                 .int => .{ .ref = .fromIntern(try decl.intern(s, k)), .ty = .integer },
                 .real => .{ .ref = .fromIntern(try decl.intern(s, k)), .ty = .real },
-                .str => .{ .ref = .fromIntern(try decl.intern(s, .{ .int = @import("kernels").fold.strToInt(k.str, 64) })), .ty = .integer },
+                .str => if (ty == .string)
+                    .{ .ref = .fromIntern(try decl.intern(s, k)), .ty = .string }
+                else
+                    .{ .ref = .fromIntern(try decl.intern(s, .{ .int = @import("kernels").fold.strToInt(k.str, 64) })), .ty = .integer },
             } else try expr.lower(s, &eb, init[init.len - 1].toRef());
             const r = try expr.coerce(s, &eb, val, bind.slot.ty);
             _ = try s.addInst(&eb, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(bind.slot.alloc), .rhs = r } } });

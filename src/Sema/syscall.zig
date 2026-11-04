@@ -103,6 +103,7 @@ pub fn task(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error
     };
     const info = SysFn.get(tag);
     if (try refuseContext(s, b, tag, src)) return;
+    if (tag == .@"$sformat" or tag == .@"$swrite") return @import("string.zig").write(s, b, tag, args, src);
     switch (info.family) {
         .display, .file_out, .simctl, .string => {},
         else => {

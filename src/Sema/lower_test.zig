@@ -83,7 +83,8 @@ const Watch = struct {
     fn call(_: *anyopaque, callee: u32, _: []const Air.interp.Value) Air.interp.Error!Air.interp.Value {
         if (callee > std.math.maxInt(@typeInfo(vams.SysFn.Tag).@"enum".tag_type)) return .{ .real = 0 };
         return switch (vams.SysFn.get(@fromBackingInt(@intCast(callee))).ty) {
-            .int, .str => .{ .int = 0 },
+            .int => .{ .int = 0 },
+            .str => .{ .str = "" },
             .real, .none => .{ .real = 0 },
         };
     }

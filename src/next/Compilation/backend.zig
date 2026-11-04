@@ -136,7 +136,7 @@ pub fn link(comp: *Compilation, task: @FieldType(Job, "link")) !?Job {
             };
             defer Io.Dir.cwd().deleteTree(comp.io, dir) catch {};
             var err: Io.Writer.Allocating = .init(a);
-            const f: link_mod.File = .{ .kind = .check, .work_dir = dir, .name = "check", .optimize = c.optimize, .modules = &engine, .zig_exe = c.zig_exe };
+            const f: link_mod.File = .{ .kind = .check, .work_dir = dir, .name = "check", .optimize = c.optimize, .modules = &engine, .zig_exe = c.zig_exe, .check_pause = c.check_pause };
             const v = link_mod.typeCheck(f, comp.gpa, comp.io, &q, comp.device.?.text, c.paths[0], &err.writer) catch |e| {
                 try comp.outputs.err.print(a, "error: {s}: type check failed: {t}\n", .{ c.paths[0], e });
                 comp.outputs.status = 1;

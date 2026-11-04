@@ -72,6 +72,7 @@ pub fn typeCheck(f: File, gpa: Allocator, io: Io, q: *Queue, device: []const u8,
     try tmp.writeFile(io, .{ .sub_path = dev_name, .data = device });
     const root_name = try arena.print("{s}.check.zig", .{stem});
     try tmp.writeFile(io, .{ .sub_path = root_name, .data = check_root });
+    if (f.check_pause.nanoseconds != 0) try io.sleep(f.check_pause, .awake);
     const contract = f.modules[0];
     const deps = try arena.alloc([]const u8, f.modules.len);
     for (deps, f.modules) |*d, m| d.* = m.name;

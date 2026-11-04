@@ -116,6 +116,7 @@ fn one(tree: *const Ast, e: Ast.Error, w: *Diag.Wip) Allocator.Error!void {
         var b = w.build(.parse, .E0236, loc);
         return b.emit();
     }
+    if (try refined(tree, e, loc, w)) return;
     var b = w.build(.parse, code(e.tag), loc);
     switch (e.tag) {
         .expected_token => {
@@ -131,11 +132,80 @@ fn one(tree: *const Ast, e: Ast.Error, w: *Diag.Wip) Allocator.Error!void {
         .expected_description => b.msg("`{s}`", .{found(tree, tok)}),
         .invalid_number => b.msg("`{s}`", .{text}),
         .scale_factor_in_delay => b.msg("`{s}` in a digital delay; use decimal or scientific notation in the module's time units", .{text}),
-        .directive_inside_design_element => b.msg("`{s} inside a module", .{text[@min(1, text.len)..]}),
+        .directive_inside_design_element => b.msg("`{s} inside a {s}", .{ text[@min(1, text.len)..], enclosing(tree, tok) }),
+        .unknown_keyword_set => b.msg("`{s}`", .{std.mem.trim(u8, text, "\"")}),
+        .begin_at_module_scope => b.msg("found {s}", .{found(tree, tok)}),
+        .library_text_in_source => b.msg("`{s}` is a library_description, and this file is source_text", .{std.mem.trimStart(u8, text, "`")}),
+        .specify_outside_module => b.msg("a specify block outside a module (§14.1)", .{}),
+        .unmatched_end_keywords, .null_statement, .not_a_generate_item => {},
         // else: a refusal whose old text names the site; diff-parse's debt.
         else => b.msg("{s}", .{@tagName(e.tag)}),
     }
     try b.emit();
+}
+
+/// The refusals whose old code or text the error's token and its
+/// neighbours decide; true when it emitted one.
+fn refined(tree: *const Ast, e: Ast.Error, loc: Diag.Loc, w: *Diag.Wip) Allocator.Error!bool {
+    const tok = e.token;
+    const tag = tree.tokenTag(tok);
+    const prev: Token.Tag = if (tok == 0) .eof else tree.tokenTag(tok - 1);
+    var b: Diag.Wip.Builder = switch (e.tag) {
+        // A.6.4: each digital statement form has its own code.
+        .digital_statement_in_analog => switch (tag) {
+            .hash => w.build(.parse, .E0254, loc),
+            .keyword_wait => w.build(.parse, .E0255, loc),
+            .keyword_forever => w.build(.parse, .E0256, loc),
+            .keyword_assign, .keyword_deassign, .keyword_force, .keyword_release => blk: {
+                var x = w.build(.parse, .E0258, loc);
+                x.msg("`{s}`", .{tree.tokenSlice(tok)});
+                break :blk x;
+            },
+            else => return false, // else: the fork-join and the rest keep E0249
+        },
+        // Syntax 6-8: a parameter declaration has its own code.
+        .not_a_generate_item => if (tag == .keyword_parameter or tag == .keyword_localparam) w.build(.parse, .E0229, loc) else return false,
+        // An initial or always construct takes a statement: E0209.
+        .null_statement => if (prev == .keyword_initial or prev == .keyword_always) blk: {
+            var x = w.build(.parse, .E0209, loc);
+            x.msg("found `;`: an {s} construct takes a statement, not a null one", .{if (prev == .keyword_always) "always" else "initial"});
+            break :blk x;
+        } else return false,
+        // A.1.4: a keyword with no dedicated tag in module item position.
+        .expected_module_item => if (Token.Tag.isKeyword(tag) and !quoted_keywords.has(tree.tokenSlice(tok))) blk: {
+            var x = w.build(.parse, .E0205, loc);
+            x.msg("found {s}", .{found(tree, tok)});
+            break :blk x;
+        } else return false,
+        // A.6.5: `initial_step()`/`final_step()` names the event.
+        .empty_step_event_list => blk: {
+            var k = tok;
+            // Bounded by three tokens: the keyword, `(`, `)`.
+            while (k > 0 and tok - k < 3 and tree.tokenTag(k) != .keyword_initial_step and tree.tokenTag(k) != .keyword_final_step) k -= 1;
+            var x = w.build(.parse, .E0220, loc);
+            x.msg("after `{s}`", .{tree.tokenSlice(k)});
+            break :blk x;
+        },
+        else => return false, // else: the generic rendering below
+    };
+    try b.emit();
+    return true;
+}
+
+/// The design element a directive sits inside, by the nearest opening
+/// keyword before `i`.
+fn enclosing(tree: *const Ast, i: Ast.TokenIndex) []const u8 {
+    var k = i;
+    // Bounded by `i`: each turn moves one token back.
+    while (k > 0) {
+        k -= 1;
+        switch (tree.tokenTag(k)) {
+            .keyword_paramset => return "paramset",
+            .keyword_module, .keyword_macromodule, .keyword_connectmodule => return "module",
+            else => {},
+        }
+    }
+    return "module";
 }
 
 /// The old parser's name for token `i`: a name or literal as written, a
@@ -146,7 +216,8 @@ fn found(tree: *const Ast, i: Ast.TokenIndex) []const u8 {
     return switch (tag) {
         .eof => "end of file",
         .invalid => "invalid token",
-        .identifier, .escaped_identifier, .system_identifier, .number_literal, .string_literal => text,
+        .identifier, .system_identifier, .number_literal, .string_literal => text,
+        .escaped_identifier => std.mem.trimEnd(u8, text[@min(1, text.len)..], " \t\r\n"),
         else => if (!Token.Tag.isKeyword(tag) and tag != .keyword_builtin)
             desc(tag)
         else if (quoted_keywords.has(text))

@@ -15,7 +15,7 @@
 //! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Why = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
-//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `reject`, `rejectArg`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
+//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `reject`, `rejectFmt`, `rejectArg`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
 //! - `pub const none: u32`
 //! - `pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Lowered`
 
@@ -211,6 +211,9 @@ pub const Lower = struct {
     sdf: bool = false,
     /// A function body is being compiled (§10.4.4: its fork runs in order).
     in_function: bool = false,
+    /// §10.2.1 every slot of an automatic subroutine's storage (each
+    /// activation copy's too).
+    auto_slots: std.AutoHashMapUnmanaged(u32, void) = .empty,
     /// An automatic subroutine's activation storage is being laid out: its
     /// named blocks' items join it (`sub.zig`'s `storage`).
     laying_out: bool = false,
@@ -265,6 +268,14 @@ pub const Lower = struct {
         const tree = l.options.sources[@backingInt(l.fileOf(f))].tree;
         const n = vir.instructions.items(.data)[@backingInt(i)].pl_node.src_node;
         if (tree.nodeTag(n) == .call) l.why_at = tree.tokenStart(tree.nodeMainToken(tree.nodeData(n).node_and_extra[0]));
+        return error.Rejected;
+    }
+
+    /// `reject` with a formatted message.
+    pub fn rejectFmt(l: *Lower, f: u32, r: Inst.Ref, comptime fmt: []const u8, args: anytype) Error {
+        const msg = try std.fmt.allocPrint(l.a, fmt, args);
+        l.reject(f, r, "") catch {};
+        l.why = msg;
         return error.Rejected;
     }
 

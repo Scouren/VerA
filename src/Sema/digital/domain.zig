@@ -17,6 +17,7 @@
 //! - `pub fn isProbe(l: *Lower, i: Inst.Index) bool`
 //! - `pub fn probe(l: *Lower, i: Inst.Index) Error!u32`
 //! - `pub fn monitor(l: *Lower, i: Inst.Index) Error!?u32`
+//! - `pub const Bridge = struct`, `pub fn bridgeOf(l: *Lower, k: u32) Error!?Bridge`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -43,6 +44,11 @@ pub const Domain = struct {
     /// declared without their initializer, for the host to write.
     a2d: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty,
 };
+
+/// A VAMS §7.8 connect module instance's place: the instance whose mixed
+/// port it bridges, under the same parent, and that port's connection
+/// there (`Zcu.ports`, in the parent's Vir).
+pub const Bridge = struct { child: u32, actual: Inst.Ref };
 
 /// The domains of the variables of module `body` (`root`: the design's
 /// root instance's, the only one an analog value is written into).
@@ -154,6 +160,26 @@ pub fn monitor(l: *Lower, i: Inst.Index) Error!?u32 {
     return event;
 }
 
+/// The bridge instance `k` is (`Zcu.inserts`), or null when it is none.
+pub fn bridgeOf(l: *Lower, k: u32) Error!?Bridge {
+    const zcu = l.zcu;
+    const parents = zcu.instances.items(.parent);
+    for (zcu.inserts.items(.bridge), zcu.inserts.items(.instance), zcu.inserts.items(.port)) |b, at, port| {
+        if (@backingInt(b) != k) continue;
+        const child: u32 = @backingInt(at);
+        // §7.8.5.1 a primitive's terminal: the row names the parent itself.
+        if (parents[child] != parents[k]) return l.refuse("a connect module on a primitive's terminal");
+        const d = zcu.instances.items(.module)[child];
+        const vir = zcu.fileVir(d.file);
+        const formals = vir.body(Lower.payload(vir, Inst.Module, zcu.declRow(d).inst).ports);
+        const pos = std.mem.findScalar(Inst.Index, formals, port) orelse return l.refuse("a connect module on a port its module does not list");
+        const rows = zcu.instances.items(.ports)[child];
+        if (pos >= rows.len) return l.refuse("a connect module on an unconnected port");
+        return .{ .child = child, .actual = zcu.ports.items(.actual)[rows.start + pos] };
+    }
+    return null;
+}
+
 // ---- private ----
 
 /// A probe terminal's name as the source writes it.
@@ -192,6 +218,7 @@ fn below(l: *Lower, scope: u32, out: *std.ArrayList(u8)) Error!void {
 /// over each payload's operands and bodies, so no statement form is missed
 /// and a deep expression costs no stack.
 fn reads(a: Allocator, vir: *const Vir, b: Vir.Body, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void {
+    const before = out.count();
     var stack: std.ArrayList(Inst.Index) = .empty;
     var seen: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
     try stack.appendSlice(a, vir.body(b));
@@ -207,7 +234,8 @@ fn reads(a: Allocator, vir: *const Vir, b: Vir.Body, out: *std.AutoHashMapUnmana
             },
         }
     }
-    assert(seen.count() >= out.count() or out.count() == 0);
+    // Each name this call added came from an instruction it visited.
+    assert(out.count() - before <= seen.count());
 }
 
 /// Pushes payload `p`'s operands and the instructions of its bodies.

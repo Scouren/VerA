@@ -253,3 +253,53 @@ test "§19.8 a mixed design's modules ahead of its first `timescale take it (lib
     // The design's tick is the finest precision: 1 ps, 10^-12 s.
     try std.testing.expectEqual(@as(i32, -12), lowered.program.finest);
 }
+
+test "§7.8 an inserted connect module's discrete port joins the digital net it bridges (net_read_by_digital_code_resolves_digital.va)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const lowered = try lowerSource(arena_state.allocator(), prelude ++
+        \\connectmodule a2d(el, cm);
+        \\  input el; output cm; electrical el; ddiscrete cm; reg cm;
+        \\  analog I(el) <+ V(el) / 1000.0;
+        \\  initial cm = 1'b0;
+        \\endmodule
+        \\module src(p); output p; electrical p; analog I(p) <+ -1.0e-3; endmodule
+        \\module top;
+        \\  ddiscrete n; wire n;
+        \\  reg seen;
+        \\  src u1(n);
+        \\  always @(n) seen = n;
+        \\endmodule
+        \\connectrules rules; connect a2d; endconnectrules
+        \\
+    , true);
+    // §7.8.3 one bridge under `top` on `n`. Its `cm` is an output `reg`
+    // port: its own slot, driving `n` through the port (§12.3.9.2). `el`
+    // and `u1.p` are continuous, not the digital half's.
+    var n_slot: ?u32 = null;
+    var cm_slot: ?u32 = null;
+    for (lowered.names) |x| {
+        if (std.mem.eql(u8, x.path, "n")) n_slot = x.slot;
+        if (std.mem.endsWith(u8, x.path, ".cm")) cm_slot = x.slot;
+        try std.testing.expect(!std.mem.endsWith(u8, x.path, ".el") and !std.mem.eql(u8, x.path, "u1.p"));
+    }
+    const p = &lowered.program;
+    const drives = for (p.drivers) |d| {
+        if (p.nets[d.net].slot != n_slot.?) continue;
+        if (d.source == .bridge and d.source.bridge.src == cm_slot.?) break true;
+    } else false;
+    try std.testing.expect(drives);
+}
+
+test "§7.2.2 a process naming fewer instructions than the names read before it (regression: specify_paths_design_runs.va crashed)" {
+    try expectSameProgram(prelude ++
+        \\module mx(/*<*/vo/*>*/);
+        \\  /*<*/inout vo; electrical vo;/*>*/
+        \\  reg a, b, c, d, e, f, g, h, i, j;
+        \\  initial begin a = 0; b = 0; c = 0; d = 0; e = 0; f = 0; g = 0; h = 0; i = 0; j = 0; end
+        \\  always #1 ;
+        \\  /*<*/analog V(vo) <+ a;/*>*/
+        \\endmodule
+        \\
+    );
+}

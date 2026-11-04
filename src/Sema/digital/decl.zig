@@ -184,6 +184,14 @@ fn instance(w: *Walk, k: u32) Error!void {
     env.hier = zcu.instances.items(.hier)[k];
     const time = l.module_times.get(d).?;
     const parent = zcu.instances.items(.parent)[k];
+    // VAMS §7.8 an inserted connect module: no instance instruction places
+    // it; it sits beside the instance whose mixed port it bridges.
+    const bridge = if (l.options.mixed and parent != .none and w.placed[k].scope == none) try domain_mod.bridgeOf(l, k) else null;
+    if (bridge) |b| {
+        const by = w.placed[b.child];
+        if (by.scope == none) return l.refuse("a connect module beside an instance its parent's walk did not reach");
+        w.placed[k] = .{ .scope = by.scope, .frame = by.frame, .inst = by.inst, .name = zcu.intern_pool.stringToSlice(zcu.instances.items(.name)[k]), .at = by.at };
+    }
     const scope = if (parent == .none) root: {
         const s = try newScope(l, none, vir.string(row.name), null, time, 0, true);
         try l.roots.append(l.a, s);
@@ -207,7 +215,9 @@ fn instance(w: *Walk, k: u32) Error!void {
     const formals = vir.body(m.ports);
     const grouped = ports.expressionPorts(vir, formals);
     for (formals, 0..) |formal, at| {
-        const actual: Inst.Ref = if (rows.len == 0) .none else zcu.ports.items(.actual)[rows.start + at];
+        // A bridge's every port takes the bridged port's connection: its
+        // continuous one is skipped (`analogNet`), its discrete one joins it.
+        const actual: Inst.Ref = if (bridge) |b| b.actual else if (rows.len == 0) .none else zcu.ports.items(.actual)[rows.start + at];
         const conn: ports.Conn = .{ .actual = actual, .frame = if (actual == .none) none else w.placed[k].frame, .lane = w.placed[k].lane };
         const inner: Inst.Index = switch (Lower.tag(vir, formal)) {
             .io => formal,

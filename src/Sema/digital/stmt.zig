@@ -339,7 +339,7 @@ fn caseStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
     const scope = l.frames.items[l.frame].scope;
     const c = Lower.payload(vir, Inst.Case, i);
     const arms = vir.list(Inst.Arm, c.arms);
-    if (arms.len == 0) return l.refuse("§9.5 a case statement with no item");
+    if (arms.len == 0) return l.reject(l.frame, i.toRef(), "a case statement requires at least one item");
     var ty = try expr.typeValue(l, c.operand);
     for (arms) |arm| for (vir.list(Inst.Ref, arm.values)) |v| {
         ty = expr.common(ty, try expr.typeValue(l, v));

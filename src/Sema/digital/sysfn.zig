@@ -144,11 +144,11 @@ pub fn sysReal(l: *Lower, i: Inst.Index) Error!u32 {
         .itor => if ((try expr.typeOf(l, s.args[0])).real) l.b.expr(.math1, rt, try expr.real(l, s.args[0]), @backingInt(Program.Math.itor)) else l.b.expr(.real_of_int, rt, try expr.self_(l, s.args[0], 0), 0),
         .bitstoreal => l.b.expr(.bitstoreal, rt, try expr.self_(l, s.args[0], 64), 0),
         inline .ln, .log10, .exp, .ln1p, .expm1, .sqrt, .floor, .ceil, .sin, .cos, .tan, .asin, .acos, .atan, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh => |m| blk: {
-            if (s.args.len != 1) return l.refuse("a math function with the wrong argument count");
+            if (s.args.len != 1) return l.reject(l.frame, i.toRef(), "wrong number of arguments to a §17.11.2 math function");
             break :blk l.b.expr(.math1, rt, try expr.real(l, s.args[0]), @backingInt(@field(Program.Math, @tagName(m))));
         },
         inline .pow, .atan2, .hypot => |m| blk: {
-            if (s.args.len != 2) return l.refuse("a math function with the wrong argument count");
+            if (s.args.len != 2) return l.reject(l.frame, i.toRef(), "wrong number of arguments to a §17.11.2 math function");
             const pair = try l.b.listOf(&.{ try expr.real(l, s.args[0]), try expr.real(l, s.args[1]) });
             break :blk l.b.expr(.math2, rt, pair.start, @backingInt(@field(Program.Math, @tagName(m))));
         },
@@ -277,7 +277,7 @@ fn fread(l: *Lower, args: []const Inst.Ref) Error!u32 {
     const n = try expr.nameOf(l, args[0]);
     if (n != null and n.?.dims.len != 0) {
         const m = n.?;
-        if (m.dims.len != 1) return l.refuse("§17.2.4.4 $fread into a memory of more than one dimension");
+        if (m.dims.len != 1) return l.reject(l.frame, args[0], "§17.2.4.4: $fread loads a one-dimensional memory");
         fr.base = m.slot;
         fr.low = m.dims[0].low;
         fr.high = m.dims[0].high;

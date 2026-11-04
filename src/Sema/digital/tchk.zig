@@ -335,7 +335,10 @@ fn nonNegative(l: *Lower, f: u32, r: Inst.Ref, name: []const u8, what: []const u
 fn notifier(l: *Lower, r: Inst.Ref) Error!u32 {
     if (r == .none) return none;
     const n = (try expr.nameOf(l, r)) orelse return l.refuse("a notifier that is no name");
-    if (n.kind != .variable or n.ty.real or n.dims.len != 0) return l.refuse("§15.5.2 a notifier that is no reg");
+    if (n.kind != .variable or n.ty.real or n.dims.len != 0) {
+        l.why_code = .E1147;
+        return l.reject(l.frame, r, "this notifier is not a reg (IEEE 1364-2005 §15.5: \"The notifier is a reg\")");
+    }
     return n.slot;
 }
 

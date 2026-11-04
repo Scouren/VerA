@@ -72,7 +72,10 @@ pub fn instance(l: *Lower, f: u32, i: Inst.Index) Error!void {
     const resistive = kw[0] == 'r';
     const base = if (resistive) kw[1..] else kw;
     if (std.mem.eql(u8, base, "nmos") or std.mem.eql(u8, base, "pmos") or std.mem.eql(u8, base, "cmos")) return mos(l, f, base, resistive, t, lanes, arrayed, d);
-    if (std.mem.startsWith(u8, base, "tran")) return tran(l, f, base, resistive, t, lanes, d);
+    if (std.mem.startsWith(u8, base, "tran")) {
+        if (d.values[2] != .none) return l.reject(f, i.toRef(), "§7.6: a pass switch takes at most two delays");
+        return tran(l, f, base, resistive, t, lanes, d);
+    }
     return l.refuseFmt("the primitive `{s}`", .{kw});
 }
 
@@ -303,7 +306,6 @@ fn mos(l: *Lower, f: u32, base: []const u8, resistive: bool, t: []const Inst.Ref
 fn tran(l: *Lower, f: u32, base: []const u8, resistive: bool, t: []const Inst.Ref, lanes: u32, d: nets.Delay3) Error!void {
     const gated = base.len != 4;
     if (t.len != @as(usize, if (gated) 3 else 2)) return l.refuse("a pass switch with the wrong number of terminals");
-    if (d.values[2] != .none) return l.refuse("§7.6 a pass switch with three delays");
     for (0..lanes) |k| {
         const a = try terminal(l, t[0], lanes, @intCast(k));
         const b = try terminal(l, t[1], lanes, @intCast(k));

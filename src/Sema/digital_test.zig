@@ -496,3 +496,15 @@ test "§7.8.5.1 split on a gate array's output: each lane drives its own bridge'
     }
     try std.testing.expect(seen[0] and seen[1]);
 }
+
+test "§7.2.2 a mixed design's string parameter is the analog block's (supply_sensitive_bridge_via_connect_rule.va)" {
+    try expectSameProgram(prelude ++
+        \\module mx(/*<*/vo/*>*/);
+        \\  /*<*/inout vo; electrical vo;/*>*/
+        \\  /*<*/parameter string name = "(not_given)";/*>*/
+        \\  reg r; initial r = 1'b1;
+        \\  /*<*/analog V(vo) <+ r;/*>*/
+        \\endmodule
+        \\
+    );
+}

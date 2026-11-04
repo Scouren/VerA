@@ -265,6 +265,9 @@ pub fn compileDrivers(l: *Lower) Error!void {
             .pull => |bit| .{ .pull = bit },
             .gate => |g| blk: {
                 const rows = try l.a.alloc(u32, g.ins.len);
+                // VAMS §7.8.5.1 an array lane reads its own bridge's segment.
+                l.gate_lane = g.lane orelse 0;
+                defer l.gate_lane = none;
                 for (g.ins, rows) |x, *row| {
                     row.* = try expr.self_(l, x, 1);
                     try expr.reads(l, x, &sensitivity);
@@ -348,6 +351,12 @@ pub fn sink(l: *Lower, r: Inst.Ref) Error!Sink {
             const w = l.nets.items[at].width;
             if (first < 0 or first + s.count > w) return l.refuse("§12.3.9.2 a select outside its net");
             return .{ .net = at, .lo = @intCast(first), .width = s.count };
+        },
+        // A.8.5 a one-operand concatenation is its operand (`tran ({a}, b)`).
+        .concat => {
+            const ops = vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i));
+            if (ops.len != 1) return l.refuse("a continuous assignment to an expression");
+            return sink(l, ops[0]);
         },
         else => return l.refuse("a continuous assignment to an expression"),
     }

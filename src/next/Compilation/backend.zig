@@ -49,7 +49,40 @@ pub fn semaAnalog(comp: *Compilation) !bool {
         try zcu.answerData(try findData(comp, want));
     } else return error.OutOfMemory;
     comp.analysis = a;
-    return checkTop(comp);
+    if (!try checkTop(comp)) return false;
+    // §3.4 a testbench card of a shape parameter is a compile-time value
+    // (the old spine's `shapeCards`): elaborate again with it as a
+    // `--param`, which a `--param` of the same name beats. Once: the
+    // second pass finds every such card already given.
+    if (try shapeCards(comp)) {
+        comp.analysis.?.deinit(comp.gpa);
+        comp.analysis = null;
+        comp.zcu.deinit();
+        comp.zcu = try .init(comp.gpa);
+        if (!try frontend.semaTop(comp)) return false;
+        return semaAnalog(comp);
+    }
+    // VAMS §7, §8: a mixed design's digital half, for the §8 runner.
+    if (a.mixed and (comp.config.target == .exe or comp.config.target == .run)) {
+        const sources = try comp.arena().alloc(sema.digital.Source, comp.units.items.len);
+        const out = try comp.arena().create(vams.Preprocessor.Output);
+        out.* = comp.pp.output();
+        for (sources, comp.units.items) |*s, *u| s.* = .{ .tree = &u.tree, .pp = out };
+        var why: sema.digital.Why = .{};
+        comp.analysis.?.digital = sema.digital.lower(comp.arena(), zcu, .{ .sources = sources, .mixed = true }, &why) catch |e| switch (e) {
+            // The §8 runner has no digital half to run: not built, named.
+            error.Unsupported => {
+                try frontend.notBuilt(comp, .exe, try comp.arena().print("the mixed-signal testbench's digital half ({s})", .{why.text}));
+                return false;
+            },
+            error.Rejected => {
+                try comp.wip.add(.lower, why.code, errors.relocate(out.*, why.at, why.at), "{s}", .{why.text});
+                return false;
+            },
+            error.OutOfMemory => return error.OutOfMemory,
+        };
+    }
+    return true;
 }
 
 /// The float verdict over codegen's roots (§11.9), each parameter's
@@ -89,8 +122,7 @@ pub fn analogBackend(comp: *Compilation) !?Job {
 pub fn codegen(comp: *Compilation, b: Compilation.Backend) !?Job {
     const c = comp.config;
     switch (b) {
-        .zig => {},
-        .exe => return notBuilt(comp, b, "the analog testbench (--emit-exe, --run)"),
+        .zig, .exe => {},
         .verilog => return notBuilt(comp, b, "the behavioural Verilog backend (--emit-verilog)"),
         .osdi => return notBuilt(comp, b, "the OSDI backend (--emit-osdi)"),
         .rtlil => return notBuilt(comp, b, "the RTLIL backend (--emit-rtlil)"),
@@ -99,6 +131,8 @@ pub fn codegen(comp: *Compilation, b: Compilation.Backend) !?Job {
         .libmap => unreachable, // Refused before preprocessing.
     }
     const an = &comp.analysis.?;
+    // §8: the mixed runner needs the digital half Sema lowers beside it.
+    if (b == .exe and an.mixed and digitalOf(an) == null) return notBuilt(comp, b, "the mixed-signal testbench (VAMS §8, a design with a digital half)");
     var r = try codegen_mod.generate(comp.gpa, .zig, .{
         .air = &an.air,
         .ip = &comp.zcu.intern_pool,
@@ -115,6 +149,7 @@ pub fn codegen(comp: *Compilation, b: Compilation.Backend) !?Job {
         },
         .ok => |out| comp.device = out,
     }
+    if (b == .exe) return testbench(comp);
     if (c.check or c.target == .check) return .{ .link = .check };
     if (c.target == .so) return .{ .link = .so };
     try writeText(comp);
@@ -270,6 +305,101 @@ fn engineModules(a: Allocator, contract: []const u8) ![3]link_mod.Module {
         .{ .name = "std_kernels", .root = try std.fs.path.join(a, &.{ tree, "lib", "std", "kernels.zig" }), .deps = &.{ "contract", "gompute_math" } },
         .{ .name = "gompute_math", .root = try std.fs.path.join(a, &.{ tree, "gompute", "math.zig" }) },
     };
+}
+
+/// `--emit-exe`/`--run`: the runner over the device (`codegen.bench`),
+/// built beside it through `link` as the old spine did (under
+/// `--work-dir`, default `.zig-cache/vera-tb`, named for the top module);
+/// `main` prints the binary's path or runs it.
+fn testbench(comp: *Compilation) !?Job {
+    const c = comp.config;
+    const a = comp.arena();
+    const bench = codegen_mod.bench;
+    const spec = &comp.bench.?;
+    const an = &comp.analysis.?;
+    // The mixed runner places a point at each event; the fixed grid does not.
+    if (!an.mixed) if (bench.gridEvent(&an.air)) |i| {
+        const s = an.srcs[@backingInt(i)];
+        const loc: vams.Diag.Loc = if (s.src == .none) .none else errors.instLoc(comp.pp.output(), &comp.units.items[@backingInt(s.file)], s.src);
+        try comp.wip.add(.codegen, .W0750, loc, "the testbench inserts no timepoint at it", .{});
+        // `--deny=W0750` refuses before anything is built.
+        if (comp.wip.failed()) return null;
+    };
+    var facts = try bench.facts(a, &an.device);
+    facts.validate_contract = c.validate_contract;
+    if (an.mixed) {
+        const low = digitalOf(an).?;
+        const names = try a.alloc(bench.Digital.Name, low.names.len);
+        for (names, low.names) |*n, x| n.* = .{ .path = x.path, .slot = x.slot, .real = x.ty.real };
+        facts.mixed = try bench.digital(a, &low.program, names);
+    }
+    var runner: Io.Writer.Allocating = .init(a);
+    bench.writeRunner(&runner.writer, std.fs.path.stem(c.paths[0]), &spec.bench, facts) catch |e| switch (e) {
+        error.TooManyPoints => return refuse(comp, 2, try a.print("error: {s}: `//!` directive: the sweeps expand to more than {d} points\n", .{ c.paths[0], bench.points_max })),
+        error.OutOfMemory, error.WriteFailed => return error.OutOfMemory,
+    };
+    const slots = try a.alloc(link_mod.Server, c.thread_limit);
+    var q: link_mod.Queue = .init(slots);
+    const engine = try engineModules(a, c.contract.?);
+    // The runner is `std_sim.bench` (and the old `kernels` `std_sim`
+    // imports), from the same tree as the contract.
+    const tree = std.fs.path.dirname(std.fs.path.dirname(c.contract.?) orelse ".") orelse ".";
+    const sim_mods = engine ++ [_]link_mod.Module{
+        .{ .name = "std_sim", .root = try std.fs.path.join(a, &.{ tree, "lib", "std", "sim.zig" }), .deps = &.{ "kernels", "contract" } },
+        .{ .name = "kernels", .root = try std.fs.path.join(a, &.{ tree, "lib", "kernels", "root.zig" }), .deps = &.{"contract"} },
+    };
+    const top = comp.zcu.intern_pool.stringToSlice(comp.zcu.instances.items(.name)[0]);
+    const f: link_mod.File = .{ .kind = .exe, .work_dir = c.work_dir orelse ".zig-cache/vera-tb", .name = top, .optimize = c.optimize, .modules = &sim_mods, .zig_exe = c.zig_exe, .debug_info = c.debug_info, .out_path = c.out_path };
+    var built = link_mod.buildExe(f, comp.gpa, comp.io, &q, comp.device.?.text, runner.written()) catch |e| {
+        try comp.outputs.err.print(a, "error: {s}: building the testbench failed: {t}\n", .{ c.paths[0], e });
+        comp.outputs.status = 1;
+        return null;
+    };
+    defer built.deinit(comp.gpa);
+    switch (built) {
+        .ok => |p| {
+            comp.outputs.exe = try a.dupe(u8, p);
+            comp.outputs.plusargs = spec.harness.plusargs;
+        },
+        .failed => |bundle| {
+            try comp.outputs.err.print(a, "error: {s}: the generated testbench does not compile — this is an engine bug, not a problem with the model:\n", .{c.paths[0]});
+            var w: Io.Writer.Allocating = .init(a);
+            try bundle.renderToWriter(.{}, &w.writer);
+            try comp.outputs.err.appendSlice(a, w.written());
+            comp.outputs.status = 1;
+        },
+    }
+    return null;
+}
+
+/// Appends each `//! param` card naming one of the root's shape
+/// parameters (`Zcu.shape_params`) that no override names to the config's
+/// overrides; whether it appended one.
+fn shapeCards(comp: *Compilation) Allocator.Error!bool {
+    const spec = comp.bench orelse return false;
+    const ip = &comp.zcu.intern_pool;
+    var all: std.ArrayList(Compilation.Config.Override) = .empty;
+    try all.appendSlice(comp.arena(), comp.config.overrides);
+    for (spec.bench.params) |card| {
+        const shape = for (comp.zcu.shape_params.keys()) |n| {
+            if (std.mem.eql(u8, ip.stringToSlice(n), card.name)) break true;
+        } else false;
+        if (!shape) continue;
+        const given = for (all.items) |o| {
+            if (std.mem.eql(u8, o.name, card.name)) break true;
+        } else false;
+        if (!given) try all.append(comp.arena(), .{ .name = card.name, .text = try comp.arena().print("{d}", .{card.value}), .value = card.value });
+    }
+    assert(all.items.len >= comp.config.overrides.len);
+    if (all.items.len == comp.config.overrides.len) return false;
+    comp.config.overrides = all.items;
+    return true;
+}
+
+/// The analysis' lowered digital half (`Analysis.digital`), or null when
+/// the digital lowering does not express it yet.
+fn digitalOf(an: *const sema.Sema.Analysis) ?*const sema.digital.Lowered {
+    return if (an.digital) |*d| d else null;
 }
 
 fn refuse(comp: *Compilation, status: u8, line: []const u8) !?Job {

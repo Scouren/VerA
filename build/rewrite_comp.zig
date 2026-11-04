@@ -54,6 +54,14 @@ pub fn add(g: Graph, all: *Build.Step) void {
     b.step("comp-check-race", "Eight concurrent `vera-next --emit-zig --check` runs of one model in one directory all succeed (lib/TODO.md §12)").dependOn(&race.step);
     all.dependOn(&race.step);
 
+    // bench-run: `vera-next --run` over hand-derived benches (docs/rewrite/exe.md).
+    const bench_mod = g.m.make("tests/differential/bench_run.zig", &.{});
+    bench_mod.addOptions("comp_options", o);
+    const bench = testRun(b, "bench-run", bench_mod, g.runner, g.results_dir);
+    bench.has_side_effects = true; // Spawns vera-next, which spawns zig.
+    b.step("bench-run", "vera-next --run on a swept and re-carded resistor: every transcript line against Ohm's law").dependOn(&bench.step);
+    all.dependOn(&bench.step);
+
     // conformance-next: the suite's harness with vera-next as the tool.
     const conform = b.addExecutable(.{ .name = "conform", .root_module = b.createModule(.{ .target = g.m.target, .optimize = .ReleaseSafe, .link_libc = true }) });
     conform.root_module.addCSourceFile(.{ .file = b.path("tests/conformance/harness/conform.c"), .flags = &.{ "-std=gnu11", "-D_GNU_SOURCE" } });

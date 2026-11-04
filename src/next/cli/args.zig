@@ -340,6 +340,7 @@ pub fn config(cli: *const Options, paths: []const []const u8, thread_limit: u32)
         .negative_timing = cli.negative_timing,
         .target = target,
         .check = cli.check,
+        .validate_contract = cli.validate_contract,
         .zig = cli.emit_zig,
         .expect_module = cli.expect_module,
         .out_path = cli.out_path,

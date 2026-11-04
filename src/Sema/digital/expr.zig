@@ -33,6 +33,8 @@ const place = @import("place.zig");
 const sysfn = @import("sysfn.zig");
 const sub = @import("sub.zig");
 const hier = @import("hier.zig");
+const domain = @import("domain.zig");
+const ports = @import("ports.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -141,7 +143,7 @@ pub fn typeOf(l: *Lower, r: Inst.Ref) Error!Type {
             break :blk .{ .width = std.math.mul(u32, count, operand.width) catch return l.refuse("a replication past 2^32 bits"), .signed = false };
         },
         .call_sys => sysfn.sysType(l, i),
-        .call => sub.resultType(l, i),
+        .call => if (domain.isProbe(l, i)) Type.real_type else sub.resultType(l, i),
         else => l.refuseFmt("the expression form `{t}`", .{Lower.tag(vir, i)}),
     };
 }
@@ -333,7 +335,7 @@ pub fn real(l: *Lower, r: Inst.Ref) Error!u32 {
         },
         .mintypmax => return real(l, Lower.payload(vir, Inst.Triple, i).b),
         .call_sys => return sysfn.sysReal(l, i),
-        .call => return l.b.expr(.call, rt, try sub.callRow(l, i), 0),
+        .call => return if (domain.isProbe(l, i)) domain.probe(l, i) else l.b.expr(.call, rt, try sub.callRow(l, i), 0),
         else => return l.refuseFmt("the real expression form `{t}`", .{tg}),
     }
 }
@@ -367,7 +369,8 @@ pub fn reads(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
         },
         .concat => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |x| try reads(l, x, out),
         .call_sys => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.SysCall, i).args)) |x| try reads(l, x, out),
-        .call => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Call, i).args)) |x| try reads(l, x, out),
+        // A probe reads the analog solution, no slot (the host's to watch).
+        .call => if (!domain.isProbe(l, i)) for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Call, i).args)) |x| try reads(l, x, out),
         else => return l.refuseFmt("the slots read by `{t}`", .{Lower.tag(vir, i)}),
     }
 }
@@ -409,6 +412,14 @@ pub fn declName(l: *Lower, d: Inst.Index) Error!Name {
 /// net of its instance, or a §12.5 hierarchical `field`) is bound to from
 /// `Lower.frame`.
 pub fn leafName(l: *Lower, i: Inst.Index) Error!Name {
+    // VAMS §7.8.5.1 a bridged primitive terminal is its bridge's segment
+    // (its lane's, for an array whose lanes take one each).
+    if (l.segment_refs.count() != 0) {
+        const key: digital.SegmentRef = .{ .instance = @backingInt(l.frames.items[l.frame].instance), .inst = i };
+        // Outside a lane (a type query) any lane's: every segment is 1 bit.
+        const lane = if (l.lane_split.contains(key) and l.gate_lane != none) l.gate_lane else 0;
+        if (l.segment_refs.get(.{ .instance = key.instance, .inst = i, .lane = lane })) |b| return ports.segment(l, b, 1);
+    }
     const vir = l.virOf(l.frame);
     const data = vir.instructions.items(.data)[@backingInt(i)];
     if (Lower.tag(vir, i) == .decl_ref) return declName(l, data.decl_tok.decl);

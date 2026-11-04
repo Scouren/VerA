@@ -25,6 +25,7 @@ const Allocator = std.mem.Allocator;
 const vams = @import("vams");
 const sema = @import("sema");
 const InternPool = @import("intern_pool");
+const bench = @import("codegen").bench;
 const Compilation = @import("../Compilation.zig");
 const Zcu = sema.Zcu;
 
@@ -66,6 +67,16 @@ pub fn readInputs(comp: *Compilation) !bool {
         comp.pp.options.protect_keys = vams.Preprocessor.protect.parseKeys(comp.arena(), text) catch |e| {
             try comp.outputs.err.print(comp.arena(), "error: --protect-keys {s}: not a key file ({t})\n", .{ p, e });
             comp.outputs.status = 1;
+            return false;
+        };
+    }
+    // The testbench's `//!` directives, read up front as the old spine
+    // does: a malformed one refuses before anything is analysed.
+    if ((c.target == .exe or c.target == .run) and !c.digital()) {
+        comp.bench = bench.Spec.parse(comp.arena(), (try comp.read(c.paths[0])).bytes, null) catch |e| {
+            if (e == error.OutOfMemory) return error.OutOfMemory;
+            try comp.outputs.err.print(comp.arena(), "error: {s}: `//!` directive: {t}\n", .{ c.paths[0], e });
+            comp.outputs.status = 2;
             return false;
         };
     }

@@ -95,7 +95,7 @@ verilog-a/annex_a_syntax/abstol_nature_identifier.va rw-lower (analog lowering):
 verilog-a/annex_a_syntax/analog_function.va not built: backend exe
 verilog-a/annex_a_syntax/analog_function_default_type.va not built: backend exe
 verilog-a/annex_a_syntax/analog_function_formal_typed_by_item.va not built: backend exe
-verilog-a/annex_a_syntax/analog_function_integer_string.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/annex_a_syntax/analog_function_integer_string.va not built: backend exe
 verilog-a/annex_a_syntax/analog_function_type_before_direction.va not built: backend exe
 verilog-a/annex_a_syntax/attributes_comments_identifiers.va not built: backend exe
 verilog-a/annex_a_syntax/behavioral_statements.va not built: backend exe
@@ -136,7 +136,7 @@ verilog-a/annex_a_syntax/null_port_connects_nothing.va not built: backend exe
 verilog-a/annex_a_syntax/null_statement_in_analog_event_block.va not built: backend exe
 verilog-a/annex_a_syntax/operators.va not built: backend exe
 verilog-a/annex_a_syntax/output_variable_type_unsupported.va not built: backend exe
-verilog-a/annex_a_syntax/parameter_declarations.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/annex_a_syntax/parameter_declarations.va not built: backend exe
 verilog-a/annex_a_syntax/parameter_port_list.va not built: backend exe
 verilog-a/annex_a_syntax/paramset.va not built: backend exe
 verilog-a/annex_a_syntax/pattern_empty_element_rejected.va not built: backend exe
@@ -150,7 +150,7 @@ verilog-a/annex_a_syntax/replication.va rw-lower (analog lowering): exit status 
 verilog-a/annex_a_syntax/source_text.va not built: backend exe
 verilog-a/annex_a_syntax/string_literal.va not built: backend exe
 verilog-a/annex_a_syntax/sum_chain_past_the_old_parser_limit.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/annex_a_syntax/system_task_null_argument_space.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/annex_a_syntax/system_task_null_argument_space.va not built: backend exe
 verilog-a/annex_a_syntax/system_task_null_arguments.va not built: backend exe
 verilog-a/annex_a_syntax/white_space.va not built: backend exe
 verilog-a/annex_b_keywords/all_case_keywords.va not built: backend exe
@@ -399,7 +399,7 @@ verilog-a/ch03_data_types/dynamic_multidim_guards.va not built: backend exe
 verilog-a/ch03_data_types/dynamic_multidim_numeric.va not built: backend exe
 verilog-a/ch03_data_types/dynamic_multidim_order.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch03_data_types/dynamic_multidim_parameter_index.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch03_data_types/dynamic_multidim_scope.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch03_data_types/dynamic_multidim_scope.va not built: backend exe
 verilog-a/ch03_data_types/flow_on_potential_only_net.va rw-lower (analog lowering) location: stderr: line 5: old `   |         ^^^`, new `   |         ^`
 verilog-a/ch03_data_types/forward_parameter_reference.va not built: backend exe
 verilog-a/ch03_data_types/from_range_without_bracket.va rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found 5`, new `error[E0209]: expected an expression: found 5`
@@ -426,8 +426,8 @@ verilog-a/ch03_data_types/integer_conversion_saturates.va not built: backend exe
 verilog-a/ch03_data_types/integer_negate_and_abs_wrap_in_a_constant.va not built: backend exe
 verilog-a/ch03_data_types/integer_overflow_wrap.va not built: backend exe
 verilog-a/ch03_data_types/integer_param_low32.va not built: backend exe
-verilog-a/ch03_data_types/integer_parameter_precision.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch03_data_types/integer_parameter_precision_conditional.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch03_data_types/integer_parameter_precision.va not built: backend exe
+verilog-a/ch03_data_types/integer_parameter_precision_conditional.va not built: backend exe
 verilog-a/ch03_data_types/integer_parameter_precision_control.va not built: backend exe
 verilog-a/ch03_data_types/integer_parameter_precision_derive.va not built: backend exe
 verilog-a/ch03_data_types/integer_parameter_precision_host.va not built: backend exe
@@ -439,7 +439,7 @@ verilog-a/ch03_data_types/local_parameter.va not built: backend exe
 verilog-a/ch03_data_types/localparam_override_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0907]: override names no parameter of the module: `derived` is a localparam of `localparam_override_target``, new `error[E0907]: override names no parameter of the module: `derived` is not a parameter of `localparam_override_target``
 verilog-a/ch03_data_types/module_without_parameters.va not built: backend exe
 verilog-a/ch03_data_types/multidimensional_array.va not built: backend exe
-verilog-a/ch03_data_types/multidimensional_strings.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch03_data_types/multidimensional_strings.va not built: backend exe
 verilog-a/ch03_data_types/multiple_aliases_point_to_one_parameter.va not built: backend exe
 verilog-a/ch03_data_types/named_branches.va not built: backend exe
 verilog-a/ch03_data_types/nature_access_as_string.va not built: backend exe
@@ -463,7 +463,7 @@ verilog-a/ch03_data_types/nodeset_not_constant.va not built: backend exe
 verilog-a/ch03_data_types/nodeset_over_parameter.va not built: backend exe
 verilog-a/ch03_data_types/nodeset_unclamped_solution.va not built: backend exe
 verilog-a/ch03_data_types/nonconstant_array_dimension.va rw-lower (analog lowering): stderr: line 1: old `error[E0308]: array bound is not a constant expression: in the bounds of `vals``, new `error[E0352]: vector index is not a constant inside the declared range: an array bound is not constant`
-verilog-a/ch03_data_types/nonconstant_replication_to_integral.va rw-lower (analog lowering): stderr: line 1: old `error[E0354]: a string value cannot be assigned to a numeric variable: assigning a string to integer`, new `error[E0512]: unknown function: `a replication by a count known only while the device runs` is not lowered by Sema yet`
+verilog-a/ch03_data_types/nonconstant_replication_to_integral.va not built: backend exe
 verilog-a/ch03_data_types/nonconstant_user_attribute.va not built: backend exe
 verilog-a/ch03_data_types/output_variable_access_from_sibling.va not built: backend exe
 verilog-a/ch03_data_types/output_variable_description_and_units.va not built: backend exe
@@ -486,7 +486,7 @@ verilog-a/ch03_data_types/parameter_range_excluded_closed_endpoint.va rw-lower (
 verilog-a/ch03_data_types/parameter_range_excluded_interior.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0361]: overridden parameter value is outside its range: `interior.val3` is 15, which the declared range excludes`, new `error[E0361]: overridden parameter value is outside its range: `val3` is 15, which the declared range excludes`
 verilog-a/ch03_data_types/parameter_range_legal_endpoints.va not built: backend exe
 verilog-a/ch03_data_types/parameter_ranges.va not built: backend exe
-verilog-a/ch03_data_types/parameter_types.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch03_data_types/parameter_types.va not built: backend exe
 verilog-a/ch03_data_types/parameter_units_are_documentation.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch03_data_types/paramset.va not built: backend exe
 verilog-a/ch03_data_types/port_branch.va not built: backend exe
@@ -508,44 +508,44 @@ verilog-a/ch03_data_types/reject_vera_scratch_on_net.va rw-lower (analog lowerin
 verilog-a/ch03_data_types/reject_vera_scratch_on_parameter.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch03_data_types/reject_vera_scratch_on_parameter.va:14:6`, new `  --> verilog-a/ch03_data_types/reject_vera_scratch_on_parameter.va:14:37`
 verilog-a/ch03_data_types/reject_vera_scratch_parameter_value.va not built: backend exe
 verilog-a/ch03_data_types/reject_vera_scratch_unknown_string.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch03_data_types/reject_vera_scratch_unknown_string.va:16:6`, new `  --> verilog-a/ch03_data_types/reject_vera_scratch_unknown_string.va:16:45`
-verilog-a/ch03_data_types/replication_nonconstant_real_multiplier_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0327]: concatenation operand has no bit width: a nonconstant replication multiplier shall be of integral type, got real`, new `error[E0512]: unknown function: `a replication by a count known only while the device runs` is not lowered by Sema ye
+verilog-a/ch03_data_types/replication_nonconstant_real_multiplier_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0327]: concatenation operand has no bit width: a nonconstant replication multiplier shall be of integral type, got real`, new `error[E0327]: concatenation operand has no bit width: a nonconstant replication multiplier shall be of integr
 verilog-a/ch03_data_types/retained_builtin_constant_display.va not built: backend exe
 verilog-a/ch03_data_types/same_nature_both_bindings.va not built: backend exe
 verilog-a/ch03_data_types/scalar_nets.va not built: backend exe
 verilog-a/ch03_data_types/spice_nodeset_cubic.va not built: backend exe
 verilog-a/ch03_data_types/string_arithmetic_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0321]: arithmetic on a string operand: a string variable or parameter is not a number; §3.3 Table 3-3 gives it no arithmetic`, new `error[E0321]: arithmetic on a string operand: a string is not a number; §3.3 Table 3-3 gives it no ari
-verilog-a/ch03_data_types/string_arrays.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch03_data_types/string_comparison_context.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch03_data_types/string_arrays.va not built: backend exe
+verilog-a/ch03_data_types/string_comparison_context.va not built: backend exe
 verilog-a/ch03_data_types/string_comparison_in_a_constant_expression.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch03_data_types/string_comparisons.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch03_data_types/string_concatenation.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch03_data_types/string_concatenation_runtime_operand.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch03_data_types/string_comparisons.va not built: backend exe
+verilog-a/ch03_data_types/string_concatenation.va not built: backend exe
+verilog-a/ch03_data_types/string_concatenation_runtime_operand.va not built: backend exe
 verilog-a/ch03_data_types/string_literal_equality.va not built: backend exe
-verilog-a/ch03_data_types/string_literal_operand_is_a_number.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch03_data_types/string_literal_operand_is_a_number.va not built: backend exe
 verilog-a/ch03_data_types/string_literal_to_integral.va not built: backend exe
-verilog-a/ch03_data_types/string_nul_removal.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch03_data_types/string_nul_removal.va not built: backend exe
 verilog-a/ch03_data_types/string_parameter_from_numeric.va not built: backend exe
-verilog-a/ch03_data_types/string_parameter_range.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch03_data_types/string_parameter_range.va not built: backend exe
 verilog-a/ch03_data_types/string_parameter_untyped.va not built: backend exe
 verilog-a/ch03_data_types/string_range_empty_excluded.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0361]: overridden parameter value is outside its range: `u.filename` is "", which the declared range excludes`, new `error[E0361]: overridden parameter value is outside its range: `filename` is "", which the declared range excludes`
 verilog-a/ch03_data_types/string_range_excluded_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0361]: overridden parameter value is outside its range: `u.kind` is "PNP", which the declared range excludes`, new `error[E0361]: overridden parameter value is outside its range: `kind` is "PNP", which the declared range excludes`
 verilog-a/ch03_data_types/string_range_outside_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0361]: overridden parameter value is outside its range: `u.kind` is "npn", outside the declared range`, new `error[E0361]: overridden parameter value is outside its range: `kind` is "npn", outside the declared range`
-verilog-a/ch03_data_types/string_range_overrides.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch03_data_types/string_replication.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch03_data_types/string_replication_4096_bytes.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch03_data_types/string_replication_parameter_multiplier.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch03_data_types/string_replication_past_4096_bytes.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch03_data_types/string_replication_runtime_multiplier.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch03_data_types/string_range_overrides.va not built: backend exe
+verilog-a/ch03_data_types/string_replication.va not built: backend exe
+verilog-a/ch03_data_types/string_replication_4096_bytes.va not built: backend exe
+verilog-a/ch03_data_types/string_replication_parameter_multiplier.va not built: backend exe
+verilog-a/ch03_data_types/string_replication_past_4096_bytes.va not built: backend exe
+verilog-a/ch03_data_types/string_replication_runtime_multiplier.va not built: backend exe
 verilog-a/ch03_data_types/string_to_integral_rejected.va not built: backend exe
 verilog-a/ch03_data_types/string_variable_arithmetic_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0321]: arithmetic on a string operand: a string variable or parameter is not a number; §3.3 Table 3-3 gives it no arithmetic`, new `error[E0321]: arithmetic on a string operand: a string is not a number; §3.3 Table 3-3 gives it no ari
 verilog-a/ch03_data_types/string_variable_bitwise_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0322]: bitwise and shift operators require integer operands: got a string and integer`, new `error[E0321]: arithmetic on a string operand: a string is not a number; §3.3 Table 3-3 gives it no arithmetic`
 verilog-a/ch03_data_types/string_variable_compared_with_number_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0321]: arithmetic on a string operand: §3.3 Table 3-3 compares a string only with a string or a string literal; the other operand is integer`, new `error[E0321]: arithmetic on a string operand: a string is not a number; §3.3 Table 3-3
-verilog-a/ch03_data_types/string_variables.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch03_data_types/string_variables.va not built: backend exe
 verilog-a/ch03_data_types/time_realtime_parameters.va not built: backend exe
 verilog-a/ch03_data_types/untyped_parameter_type_derivation.va not built: backend exe
 verilog-a/ch03_data_types/user_defined_nature_attribute_read.va not built: backend exe
 verilog-a/ch03_data_types/variable_arrays.va not built: backend exe
-verilog-a/ch03_data_types/variable_in_parameter_initializer.va not built: backend exe
+verilog-a/ch03_data_types/variable_in_parameter_initializer.va rw-lower (analog lowering): stderr: line 10: old `error[E0314]: unknown identifier: `scratch``, new `error: could not compile due to 1 previous error(s)`
 verilog-a/ch03_data_types/vector_branch_on_part_select.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch03_data_types/vector_branch_part_select_reversed_rejected.va not built: backend exe
 verilog-a/ch03_data_types/vector_branch_size_mismatch.va not built: backend exe
@@ -579,7 +579,7 @@ verilog-a/ch04_expressions/absdelay_zero_delay_rejected.va rw-lower (analog lowe
 verilog-a/ch04_expressions/ac_stim.va not built: backend exe
 verilog-a/ch04_expressions/ac_stim_ac_analysis.va not built: backend exe
 verilog-a/ch04_expressions/ac_stim_dynamic_magnitude.va not built: backend exe
-verilog-a/ch04_expressions/ac_stim_label_inactive_in_large_signal.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch04_expressions/ac_stim_label_inactive_in_large_signal.va not built: backend exe
 verilog-a/ch04_expressions/ac_stim_long_node_names.va not built: backend exe
 verilog-a/ch04_expressions/ac_stim_name_not_literal_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch04_expressions/ac_stim_name_not_literal_rejected.va:43:50`, new `  --> verilog-a/ch04_expressions/ac_stim_name_not_literal_rejected.va:43:42`
 verilog-a/ch04_expressions/ac_stim_noise_analysis.va not built: backend exe
@@ -616,13 +616,13 @@ verilog-a/ch04_expressions/bitwise_xor.va not built: backend exe
 verilog-a/ch04_expressions/c_math_values_at_run_time.va not built: backend exe
 verilog-a/ch04_expressions/ceil.va not built: backend exe
 verilog-a/ch04_expressions/concatenation.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch04_expressions/concatenation_real_operand_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0327]: concatenation operand has no bit width: only sized constants and strings can be concatenated`, new `error[E0512]: unknown function: `concat` is not lowered by Sema yet`
-verilog-a/ch04_expressions/concatenation_unsized_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0216]: concatenation operand has no bit width`, new `error[E0512]: unknown function: `concat` is not lowered by Sema yet`
+verilog-a/ch04_expressions/concatenation_real_operand_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0327]: concatenation operand has no bit width: only sized constants and strings can be concatenated`, new `error[E0512]: unknown function: a concatenation of sized integers is not lowered by Sema yet`
+verilog-a/ch04_expressions/concatenation_unsized_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0216]: concatenation operand has no bit width`, new `error[E0512]: unknown function: a concatenation of sized integers is not lowered by Sema yet`
 verilog-a/ch04_expressions/conditional_capacitance_not_constant.va not built: backend exe
 verilog-a/ch04_expressions/conditional_conductance_not_constant.va not built: backend exe
 verilog-a/ch04_expressions/conditional_operator.va not built: backend exe
 verilog-a/ch04_expressions/constant_expression_of_parameters_and_operators.va not built: backend exe
-verilog-a/ch04_expressions/constant_expression_reads_a_probe_rejected.va not built: backend exe
+verilog-a/ch04_expressions/constant_expression_reads_a_probe_rejected.va rw-lower (analog lowering): stderr: line 10: old `error[E0337]: net has no declared discipline: `p` has no discipline, so `V` names nothing on it`, new `error: could not compile due to 1 previous error(s)`
 verilog-a/ch04_expressions/correlated_noise.va not built: backend exe
 verilog-a/ch04_expressions/cos.va not built: backend exe
 verilog-a/ch04_expressions/cosh.va not built: backend exe
@@ -679,7 +679,7 @@ verilog-a/ch04_expressions/function_output_inout.va not built: backend exe
 verilog-a/ch04_expressions/function_output_nonvariable.va rw-lower (analog lowering): stderr: line 1: old `error[E0316]: unsupported assignment target: only `x` and `x[<constant>]` can be assigned to`, new `error[E0512]: unknown function: an assignment to a select is not lowered by Sema yet`
 verilog-a/ch04_expressions/function_reads_genvar_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0314]: unknown identifier: `k``, new `error[E0512]: unknown function: an assignment to a name with no slot`
 verilog-a/ch04_expressions/function_return.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch04_expressions/function_string_output_starts_empty.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch04_expressions/function_string_output_starts_empty.va not built: backend exe
 verilog-a/ch04_expressions/function_unassigned_output_inout.va not built: backend exe
 verilog-a/ch04_expressions/function_untyped_argument.va rw-comp (astgen) notes: stderr: line 8: old `   = help: add `real x;` to the function body`, new `   = help: run `vera --explain E0225` for a detailed explanation`
 verilog-a/ch04_expressions/greater_equal.va not built: backend exe
@@ -839,10 +839,10 @@ verilog-a/ch04_expressions/reject_vera_nodiff_parameter.va not built: backend ex
 verilog-a/ch04_expressions/relational_logical.va not built: backend exe
 verilog-a/ch04_expressions/replication.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/replication_lhs_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0317]: a concatenation is not an assignment target`, new `error[E0512]: unknown function: an assignment to a select is not lowered by Sema yet`
-verilog-a/ch04_expressions/replication_negative_count_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch04_expressions/replication_negative_count_rejected.va:18:10`, new `  --> verilog-a/ch04_expressions/replication_negative_count_rejected.va:18:9`
+verilog-a/ch04_expressions/replication_negative_count_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0327]: concatenation operand has no bit width: a replication constant shall be non-negative, got -1`, new `error[E0327]: concatenation operand has no bit width: a replication constant shall be non-negative`
 verilog-a/ch04_expressions/replication_real_count.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch04_expressions/replication_real_count_negative_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch04_expressions/replication_real_count_negative_rejected.va:19:14`, new `  --> verilog-a/ch04_expressions/replication_real_count_negative_rejected.va:19:13`
-verilog-a/ch04_expressions/replication_zero_alone_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0326]: empty concatenation`, new `error[E0512]: unknown function: `concat` is not lowered by Sema yet`
+verilog-a/ch04_expressions/replication_real_count_negative_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0327]: concatenation operand has no bit width: a replication constant shall be non-negative, got -2`, new `error[E0327]: concatenation operand has no bit width: a replication constant shall be non-negative`
+verilog-a/ch04_expressions/replication_zero_alone_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0326]: empty concatenation`, new `error[E0512]: unknown function: a concatenation of sized integers is not lowered by Sema yet`
 verilog-a/ch04_expressions/replication_zero_beside_sized_operand.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/replication_zero_effect.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/replication_zero_width.va rw-lower (analog lowering): exit status old 0, new 1
@@ -1034,7 +1034,7 @@ verilog-a/ch05_analog_behavior/held_array_after_a_pruned_held_scalar.va not buil
 verilog-a/ch05_analog_behavior/held_array_element_between_events.va not built: backend exe
 verilog-a/ch05_analog_behavior/held_counter_advances_outside_its_event.va not built: backend exe
 verilog-a/ch05_analog_behavior/held_integer_through_nested_joins.va not built: backend exe
-verilog-a/ch05_analog_behavior/held_sformat_string_survives_rejected_step.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch05_analog_behavior/held_sformat_string_survives_rejected_step.va not built: backend exe
 verilog-a/ch05_analog_behavior/held_survives_an_inout_function_argument.va not built: backend exe
 verilog-a/ch05_analog_behavior/held_through_output_actual_seed_and_scan.va not built: backend exe
 verilog-a/ch05_analog_behavior/held_value_is_visible_before_its_event_statement.va not built: backend exe
@@ -1137,8 +1137,8 @@ verilog-a/ch05_analog_behavior/rlc.va not built: backend exe
 verilog-a/ch05_analog_behavior/sequential_block.va not built: backend exe
 verilog-a/ch05_analog_behavior/sequential_ifs_10000.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch05_analog_behavior/shadowed_block_locals_hold_independently.va not built: backend exe
-verilog-a/ch05_analog_behavior/simparam_dynamic_name.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch05_analog_behavior/simparam_str_hierarchy_names.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch05_analog_behavior/simparam_dynamic_name.va not built: backend exe
+verilog-a/ch05_analog_behavior/simparam_str_hierarchy_names.va not built: backend exe
 verilog-a/ch05_analog_behavior/simprobe_reads_a_sibling_output_variable.va not built: backend exe
 verilog-a/ch05_analog_behavior/simprobe_scope_is_the_parent.va not built: backend exe
 verilog-a/ch05_analog_behavior/single_terminal_branch.va not built: backend exe
@@ -1150,7 +1150,7 @@ verilog-a/ch05_analog_behavior/spice_sine_source.va not built: backend exe
 verilog-a/ch05_analog_behavior/spice_timer_steps_device.va not built: backend exe
 verilog-a/ch05_analog_behavior/static_switch_elision.va not built: backend exe
 verilog-a/ch05_analog_behavior/static_switch_port_probe.va not built: backend exe
-verilog-a/ch05_analog_behavior/string_written_in_event_body_is_held.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch05_analog_behavior/string_written_in_event_body_is_held.va not built: backend exe
 verilog-a/ch05_analog_behavior/switch_branch.va not built: backend exe
 verilog-a/ch05_analog_behavior/switch_branch_solved.va not built: backend exe
 verilog-a/ch05_analog_behavior/timer_changed_effectful_file_function_input_rejected.va not built: backend exe
@@ -1184,7 +1184,7 @@ verilog-a/ch06_hierarchy/analog_only_child_flattens_unchanged.va not built: back
 verilog-a/ch06_hierarchy/ansi_ports.va not built: backend exe
 verilog-a/ch06_hierarchy/blank_ordered_connection_unsupported.va not built: backend exe
 verilog-a/ch06_hierarchy/compatible_port_disciplines_share_potential.va not built: backend exe
-verilog-a/ch06_hierarchy/conditional_direct_nesting_is_not_a_scope.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch06_hierarchy/conditional_direct_nesting_is_not_a_scope.va not built: backend exe
 verilog-a/ch06_hierarchy/continuous_net_without_potential_nature_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: `ionly` is of discipline `current`, which binds no potential nature, so `ionly` has no potential to access`, new `   = help: run `vera --explain E0501` for a detailed explanation`
 verilog-a/ch06_hierarchy/defparam_instance_array_element.va not built: backend exe
 verilog-a/ch06_hierarchy/defparam_path_names_nothing_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0907]: override names no parameter of the module: `m.no_such_scope.u1.g` names no parameter of the elaborated design`, new `error[E0907]: override names no parameter of the module: `no_such_scope.u1.g` names no parameter of the elaborated design`
@@ -1423,7 +1423,7 @@ verilog-a/ch06_hierarchy/uncoerced_implicit_net_hierarchical_reference_rejected.
 verilog-a/ch06_hierarchy/undeclared_interconnect_port_binding.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch06_hierarchy/unknown_geometry_system_parameter_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0907]: override names no parameter of the module: `child.$temperature` names no parameter of the elaborated design`, new `error[E0907]: override names no parameter of the module: `$temperature` is not a parameter of `ch6_geom_unknown_child``
 verilog-a/ch06_hierarchy/unknown_named_port_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch06_hierarchy/unknown_named_port_rejected.va:17:17`, new `  --> verilog-a/ch06_hierarchy/unknown_named_port_rejected.va:17:15`
-verilog-a/ch06_hierarchy/unnamed_generate_block_external_names.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch06_hierarchy/unnamed_generate_block_external_names.va not built: backend exe
 verilog-a/ch06_hierarchy/unnamed_generate_instance_reference_rejected.va not built: backend exe
 verilog-a/ch06_hierarchy/unnamed_generate_reference_from_within.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch06_hierarchy/untyped_child_port_behavioral_use_rejected.va not built: backend exe
@@ -1460,15 +1460,15 @@ verilog-a/ch09_system_tasks/abstime.va not built: backend exe
 verilog-a/ch09_system_tasks/acos.va not built: backend exe
 verilog-a/ch09_system_tasks/acosh.va not built: backend exe
 verilog-a/ch09_system_tasks/aliasparam_mfactor.va not built: backend exe
-verilog-a/ch09_system_tasks/analog_decimal_is_auto_sized.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/analog_radix_of_integer_expression_is_32_bits.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/analog_decimal_is_auto_sized.va not built: backend exe
+verilog-a/ch09_system_tasks/analog_radix_of_integer_expression_is_32_bits.va not built: backend exe
 verilog-a/ch09_system_tasks/angle.va not built: backend exe
 verilog-a/ch09_system_tasks/append_writes_at_end_of_file.va not built: backend exe
 verilog-a/ch09_system_tasks/arandom.va not built: backend exe
 verilog-a/ch09_system_tasks/arandom_negative_seed.va not built: backend exe
 verilog-a/ch09_system_tasks/arandom_no_seed.va not built: backend exe
 verilog-a/ch09_system_tasks/arandom_parameter_seed.va not built: backend exe
-verilog-a/ch09_system_tasks/arandom_type_string_outside_paramset_rejected.va not built: backend exe
+verilog-a/ch09_system_tasks/arandom_type_string_outside_paramset_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/arandom_type_string_outside_paramset_rejected.va:31:21`, new `  = note: LRM 9.13`
 verilog-a/ch09_system_tasks/asin.va not built: backend exe
 verilog-a/ch09_system_tasks/asinh.va not built: backend exe
 verilog-a/ch09_system_tasks/atan.va not built: backend exe
@@ -1500,14 +1500,14 @@ verilog-a/ch09_system_tasks/discontinuity.va not built: backend exe
 verilog-a/ch09_system_tasks/discontinuity_nonconstant_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/discontinuity_nonconstant_rejected.va:26:33`, new `  --> verilog-a/ch09_system_tasks/discontinuity_nonconstant_rejected.va:26:5`
 verilog-a/ch09_system_tasks/discontinuity_reject_is_limit_verdict.va not built: backend exe
 verilog-a/ch09_system_tasks/display_argument_pairing_rejected.va not built: backend exe
-verilog-a/ch09_system_tasks/display_argument_runs.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/display_c_format_flags.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/display_argument_runs.va not built: backend exe
+verilog-a/ch09_system_tasks/display_c_format_flags.va not built: backend exe
 verilog-a/ch09_system_tasks/display_debug.va not built: backend exe
 verilog-a/ch09_system_tasks/display_display.va not built: backend exe
 verilog-a/ch09_system_tasks/display_formats.va not built: backend exe
 verilog-a/ch09_system_tasks/display_library_binding.va not built: backend exe
 verilog-a/ch09_system_tasks/display_monitor.va not built: backend exe
-verilog-a/ch09_system_tasks/display_radix_of_integer_is_32_bits.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/display_radix_of_integer_is_32_bits.va not built: backend exe
 verilog-a/ch09_system_tasks/display_strobe.va not built: backend exe
 verilog-a/ch09_system_tasks/display_write.va not built: backend exe
 verilog-a/ch09_system_tasks/dist_chi_square.va not built: backend exe
@@ -1546,13 +1546,13 @@ verilog-a/ch09_system_tasks/fdebug.va not built: backend exe
 verilog-a/ch09_system_tasks/fdisplay.va not built: backend exe
 verilog-a/ch09_system_tasks/feof.va not built: backend exe
 verilog-a/ch09_system_tasks/feof_without_descriptor_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0887]: wrong number of arguments to a system task or function: `$feof` takes 1 argument, got 0`, new `error[E0506]: wrong number of arguments to a math function or analog operator: `$feof` takes 1 to 1, given 0`
-verilog-a/ch09_system_tasks/ferror.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/ferror.va not built: backend exe
 verilog-a/ch09_system_tasks/ferror_into_real_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/fflush.va not built: backend exe
 verilog-a/ch09_system_tasks/fflush_two_descriptors_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/fgets.va not built: backend exe
 verilog-a/ch09_system_tasks/fgets_into_real_rejected.va not built: backend exe
-verilog-a/ch09_system_tasks/fgets_line_over_4096.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/fgets_line_over_4096.va not built: backend exe
 verilog-a/ch09_system_tasks/fgets_on_write_only_fd_fails.va not built: backend exe
 verilog-a/ch09_system_tasks/file_io_categories_in_analog_context.va not built: backend exe
 verilog-a/ch09_system_tasks/file_loaded_on_first_executed_call.va not built: backend exe
@@ -1569,14 +1569,14 @@ verilog-a/ch09_system_tasks/finish_terminates.va not built: backend exe
 verilog-a/ch09_system_tasks/finish_two_arguments_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/floor.va not built: backend exe
 verilog-a/ch09_system_tasks/fmonitor.va not built: backend exe
-verilog-a/ch09_system_tasks/fopen_multichannel_descriptor.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/fopen_multichannel_descriptor.va not built: backend exe
 verilog-a/ch09_system_tasks/fopen_type_not_in_table_9_24_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/format_conversion_type_mismatch_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/format_field_past_its_limit_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/fscanf.va not built: backend exe
-verilog-a/ch09_system_tasks/fscanf_destination_preservation.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/fscanf_destination_preservation.va not built: backend exe
 verilog-a/ch09_system_tasks/fscanf_directive_spans_lines.va not built: backend exe
-verilog-a/ch09_system_tasks/fscanf_failed_match_leaves_input.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/fscanf_failed_match_leaves_input.va not built: backend exe
 verilog-a/ch09_system_tasks/fscanf_real_descriptor_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/fscanf_real_destination.va not built: backend exe
 verilog-a/ch09_system_tasks/fscanf_successive_scans_on_one_line.va not built: backend exe
@@ -1605,10 +1605,10 @@ verilog-a/ch09_system_tasks/hierarchical_parameters.va not built: backend exe
 verilog-a/ch09_system_tasks/hypot.va not built: backend exe
 verilog-a/ch09_system_tasks/ignored_column_and_selector.va not built: backend exe
 verilog-a/ch09_system_tasks/info.va not built: backend exe
-verilog-a/ch09_system_tasks/integer_default_fields.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/integer_default_fields.va not built: backend exe
 verilog-a/ch09_system_tasks/iteration_without_limiter.va not built: backend exe
 verilog-a/ch09_system_tasks/kernel_control_tasks_together.va not built: backend exe
-verilog-a/ch09_system_tasks/l_format_library_cell.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/l_format_library_cell.va not built: backend exe
 verilog-a/ch09_system_tasks/limit.va not built: backend exe
 verilog-a/ch09_system_tasks/limit_constant_history.va not built: backend exe
 verilog-a/ch09_system_tasks/limit_fetlim_with_vth.va not built: backend exe
@@ -1637,7 +1637,7 @@ verilog-a/ch09_system_tasks/ln.va not built: backend exe
 verilog-a/ch09_system_tasks/ln1p.va not built: backend exe
 verilog-a/ch09_system_tasks/log10.va not built: backend exe
 verilog-a/ch09_system_tasks/long_record_is_not_truncated.va not built: backend exe
-verilog-a/ch09_system_tasks/m_format_hierarchical_name.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/m_format_hierarchical_name.va not built: backend exe
 verilog-a/ch09_system_tasks/math_2023.va not built: backend exe
 verilog-a/ch09_system_tasks/math_binary.va not built: backend exe
 verilog-a/ch09_system_tasks/math_system_function_arity_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0506]: wrong number of arguments to a math function or analog operator: `$pow()` takes 2`, new `error[E0506]: wrong number of arguments to a math function or analog operator: `$pow` takes 2 to 2, given 1`
@@ -1655,20 +1655,20 @@ verilog-a/ch09_system_tasks/monitor_suppresses_an_unchanged_step.va not built: b
 verilog-a/ch09_system_tasks/net_name_display_argument_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0315]: net must be read through an access function: `p``, new `error[E0315]: net must be read through an access function: a net or branch is not a value; read it through an access function`
 verilog-a/ch09_system_tasks/node_alias_outside_initial_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0812]: invalid use of a node alias system function: `$analog_node_alias` is used outside an analog initial block`, new `error[E0315]: net must be read through an access function: a net or branch is not a value; read it through an access functio
 verilog-a/ch09_system_tasks/null_argument_consumed_by_d_rejected.va not built: backend exe
-verilog-a/ch09_system_tasks/null_argument_consumed_by_s.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/null_argument_consumed_by_s.va not built: backend exe
 verilog-a/ch09_system_tasks/numeric_string.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch09_system_tasks/numeric_string_arithmetic_width_rejected.va not built: backend exe
-verilog-a/ch09_system_tasks/numeric_string_local_width.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/numeric_string_local_width.va not built: backend exe
 verilog-a/ch09_system_tasks/numeric_string_mixed_width_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/numeric_string_negation_width_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0819]: format conversion does not match the operand's type: numeric `%s` needs a preserved integral width; this expression's sizing is not implemented`, new `error[E0130]: literal requires digital value support in the execution backend: the ana
 verilog-a/ch09_system_tasks/numeric_string_real_rejected.va not built: backend exe
-verilog-a/ch09_system_tasks/numeric_string_width.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/numeric_string_width.va not built: backend exe
 verilog-a/ch09_system_tasks/numeric_string_width_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/param_given.va not built: backend exe
 verilog-a/ch09_system_tasks/param_given_not_overridden.va not built: backend exe
 verilog-a/ch09_system_tasks/param_given_override_equals_default.va not built: backend exe
 verilog-a/ch09_system_tasks/param_given_variable_rejected.va not built: backend exe
-verilog-a/ch09_system_tasks/percent_escape_prints_one_percent.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/percent_escape_prints_one_percent.va not built: backend exe
 verilog-a/ch09_system_tasks/percent_escape_with_width_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/plusargs.va not built: backend exe
 verilog-a/ch09_system_tasks/plusargs_prefix.va not built: backend exe
@@ -1682,26 +1682,26 @@ verilog-a/ch09_system_tasks/random.va not built: backend exe
 verilog-a/ch09_system_tasks/random_ieee1364_digits.va not built: backend exe
 verilog-a/ch09_system_tasks/random_no_seed.va not built: backend exe
 verilog-a/ch09_system_tasks/rdist_chi_square.va not built: backend exe
-verilog-a/ch09_system_tasks/rdist_domain_rejected.va not built: backend exe
+verilog-a/ch09_system_tasks/rdist_domain_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0816]: a $9.13 probabilistic distribution argument: `$rdist_erlang`'s `k_stage` shall be greater than zero, got 0`, new `error[E0816]: a $9.13 probabilistic distribution argument: `$rdist_erlang`'s parameter 1 shall be greater than zero
 verilog-a/ch09_system_tasks/rdist_erlang.va not built: backend exe
 verilog-a/ch09_system_tasks/rdist_exponential.va not built: backend exe
 verilog-a/ch09_system_tasks/rdist_normal.va not built: backend exe
 verilog-a/ch09_system_tasks/rdist_poisson.va not built: backend exe
 verilog-a/ch09_system_tasks/rdist_positive_mean_at_run_time.va not built: backend exe
-verilog-a/ch09_system_tasks/rdist_real_seed_rejected.va not built: backend exe
+verilog-a/ch09_system_tasks/rdist_real_seed_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/rdist_real_seed_rejected.va:35:28`, new `  = note: LRM 9.13`
 verilog-a/ch09_system_tasks/rdist_t.va not built: backend exe
-verilog-a/ch09_system_tasks/rdist_type_string_outside_paramset_rejected.va not built: backend exe
-verilog-a/ch09_system_tasks/rdist_uniform_start_end_rejected.va not built: backend exe
+verilog-a/ch09_system_tasks/rdist_type_string_outside_paramset_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/rdist_type_string_outside_paramset_rejected.va:31:39`, new `  = note: LRM 9.13`
+verilog-a/ch09_system_tasks/rdist_uniform_start_end_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/rdist_uniform_start_end_rejected.va:36:30`, new `  = note: LRM 9.13`
 verilog-a/ch09_system_tasks/rdist_zero_mean_at_run_time_is_an_error.va not built: backend exe
-verilog-a/ch09_system_tasks/real_conversion_rounds_half_to_even.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/real_conversion_rounds_half_to_even.va not built: backend exe
 verilog-a/ch09_system_tasks/real_distribution.va not built: backend exe
 verilog-a/ch09_system_tasks/real_engineering_notation.va not built: backend exe
-verilog-a/ch09_system_tasks/real_flags_sign_before_zero_fill.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/real_format_fields.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/real_g_conversion_is_significant_digits.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/real_hash_flag_e_always_prints_the_point.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/real_hash_flag_f_always_prints_the_point.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/real_hash_flag_g_keeps_trailing_zeros.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/real_flags_sign_before_zero_fill.va not built: backend exe
+verilog-a/ch09_system_tasks/real_format_fields.va not built: backend exe
+verilog-a/ch09_system_tasks/real_g_conversion_is_significant_digits.va not built: backend exe
+verilog-a/ch09_system_tasks/real_hash_flag_e_always_prints_the_point.va not built: backend exe
+verilog-a/ch09_system_tasks/real_hash_flag_f_always_prints_the_point.va not built: backend exe
+verilog-a/ch09_system_tasks/real_hash_flag_g_keeps_trailing_zeros.va not built: backend exe
 verilog-a/ch09_system_tasks/real_hash_flag_string_operand_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/realtobits.va not built: backend exe
 verilog-a/ch09_system_tasks/receiver_count_outside_connectmodule_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: §9.22: "Driver access functions can only be called from connect modules." This is a `module``, new `   = help: run `vera --explain E0818` for a detailed explanation`
@@ -1718,8 +1718,8 @@ verilog-a/ch09_system_tasks/reject_simprobe_runtime_name.va not built: backend e
 verilog-a/ch09_system_tasks/rejected_iterations_leave_no_file_side_effects.va not built: backend exe
 verilog-a/ch09_system_tasks/reserved_system_function_name_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/rewind.va not built: backend exe
-verilog-a/ch09_system_tasks/rng_count_range_rejected.va not built: backend exe
-verilog-a/ch09_system_tasks/rng_fractional_count_rejected.va not built: backend exe
+verilog-a/ch09_system_tasks/rng_count_range_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0816]: a $9.13 probabilistic distribution argument: `$rdist_t`'s fractional or out-of-range `degree_of_freedom` is unsupported; the reference count domai`, new `error[E0816]: a $9.13 probabilistic distribution argument: `$rdist_t`'s fra
+verilog-a/ch09_system_tasks/rng_fractional_count_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0816]: a $9.13 probabilistic distribution argument: `$rdist_chi_square`'s fractional or out-of-range `degree_of_freedom` is unsupported; the reference co`, new `error[E0816]: a $9.13 probabilistic distribution argument: `$rdist_chi_squa
 verilog-a/ch09_system_tasks/rng_paramset_fractional_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0816]: a $9.13 probabilistic distribution argument: `$rdist_erlang`'s fractional or out-of-range `k_stage` is unsupported; the reference count domain is `, new `error[E0816]: a $9.13 probabilistic distribution argument: `$rdist_erlang`'
 verilog-a/ch09_system_tasks/rng_reference_large_count.va not built: backend exe
 verilog-a/ch09_system_tasks/rng_short_circuit.va not built: backend exe
@@ -1728,15 +1728,15 @@ verilog-a/ch09_system_tasks/rng_skipped_seed_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/rng_skipped_type_string_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/say_debug_every_iteration.va not built: backend exe
 verilog-a/ch09_system_tasks/say_device_records.va not built: backend exe
-verilog-a/ch09_system_tasks/scan_destination_preservation.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/scan_destination_preservation.va not built: backend exe
 verilog-a/ch09_system_tasks/severity_in_rejected_iteration_has_no_effect.va not built: backend exe
 verilog-a/ch09_system_tasks/severity_tasks.va not built: backend exe
 verilog-a/ch09_system_tasks/sformat.va not built: backend exe
-verilog-a/ch09_system_tasks/sformat_32_conversions.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/sformat_33_conversions.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/sformat_field_width_over_4096.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/sformat_runtime_width_past_its_row_rejected.va rw-lower (analog lowering): stderr: line 1: old `=== sformat_runtime_width_past_its_row_rejected ===`, new `error[E0321]: arithmetic on a string operand: a string is not a number; §3.3 Table 3-3 gives it no arithmetic`
-verilog-a/ch09_system_tasks/sformat_runtime_width_within_its_row.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/sformat_32_conversions.va not built: backend exe
+verilog-a/ch09_system_tasks/sformat_33_conversions.va not built: backend exe
+verilog-a/ch09_system_tasks/sformat_field_width_over_4096.va not built: backend exe
+verilog-a/ch09_system_tasks/sformat_runtime_width_past_its_row_rejected.va not built: backend exe
+verilog-a/ch09_system_tasks/sformat_runtime_width_within_its_row.va not built: backend exe
 verilog-a/ch09_system_tasks/sformat_variable_format_mismatch_continues.va not built: backend exe
 verilog-a/ch09_system_tasks/simparam.va not built: backend exe
 verilog-a/ch09_system_tasks/simparam_dt_is_the_host_step.va not built: backend exe
@@ -1745,12 +1745,12 @@ verilog-a/ch09_system_tasks/simparam_gmin_source_scale_host_written.va not built
 verilog-a/ch09_system_tasks/simparam_minr_hicum_l2_default.va not built: backend exe
 verilog-a/ch09_system_tasks/simparam_newton_tolerances_host_written.va not built: backend exe
 verilog-a/ch09_system_tasks/simparam_spice_option_not_known_rejected.va not built: backend exe
-verilog-a/ch09_system_tasks/simparam_str_analysis_name_host_table.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/simparam_str_analysis_type_tran_op.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/simparam_str_cwd_and_analysis_name.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/simparam_str_cwd_host_table.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/simparam_str_analysis_name_host_table.va not built: backend exe
+verilog-a/ch09_system_tasks/simparam_str_analysis_type_tran_op.va not built: backend exe
+verilog-a/ch09_system_tasks/simparam_str_cwd_and_analysis_name.va not built: backend exe
+verilog-a/ch09_system_tasks/simparam_str_cwd_host_table.va not built: backend exe
 verilog-a/ch09_system_tasks/simparam_str_unknown_name_rejected.va not built: backend exe
-verilog-a/ch09_system_tasks/simparam_string.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/simparam_string.va not built: backend exe
 verilog-a/ch09_system_tasks/simparam_timescale.va not built: backend exe
 verilog-a/ch09_system_tasks/simparam_unknown_no_fallback_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/simprobe.va not built: backend exe
@@ -1773,12 +1773,12 @@ verilog-a/ch09_system_tasks/sscanf_reads_a_string_variable.va not built: backend
 verilog-a/ch09_system_tasks/sscanf_uppercase_conversion_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/stop.va not built: backend exe
 verilog-a/ch09_system_tasks/stop_terminates.va not built: backend exe
-verilog-a/ch09_system_tasks/string_concat_past_4096_bytes.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/string_formatting.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch09_system_tasks/string_concat_past_4096_bytes.va not built: backend exe
+verilog-a/ch09_system_tasks/string_formatting.va not built: backend exe
 verilog-a/ch09_system_tasks/strobe_flow_read_inside_array_pattern_argument.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch09_system_tasks/swrite.va not built: backend exe
-verilog-a/ch09_system_tasks/swrite_s_with_argument.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/swrite_s_without_argument_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0810]: not enough arguments for the format specifiers: the format string has 1 consuming format specifiers but 0 arguments follow it`, new `error[E0321]: arithmetic on a string operand: a string is not a number; §3.3 Table 3-3 gives it no arit
+verilog-a/ch09_system_tasks/swrite_s_with_argument.va not built: backend exe
+verilog-a/ch09_system_tasks/swrite_s_without_argument_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/table_capture_rejected_step_recaptures.va not built: backend exe
 verilog-a/ch09_system_tasks/table_model.va not built: backend exe
 verilog-a/ch09_system_tasks/table_model_array_control.va not built: backend exe
@@ -1800,7 +1800,7 @@ verilog-a/ch09_system_tasks/test_plusargs.va not built: backend exe
 verilog-a/ch09_system_tasks/top_port_connected_controls_ddt.va not built: backend exe
 verilog-a/ch09_system_tasks/two_instances_hold_distinct_channels.va not built: backend exe
 verilog-a/ch09_system_tasks/value_plusargs.va not built: backend exe
-verilog-a/ch09_system_tasks/value_plusargs_without_variable_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0887]: wrong number of arguments to a system task or function: `$value$plusargs` takes 2 arguments, got 1`, new `error[E0506]: wrong number of arguments to a math function or analog operator: `$value$plusargs` takes 2 to 2, given 1`
+verilog-a/ch09_system_tasks/value_plusargs_without_variable_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/vflip.va not built: backend exe
 verilog-a/ch09_system_tasks/vt_ambient.va not built: backend exe
 verilog-a/ch09_system_tasks/vt_temperature.va not built: backend exe
@@ -1819,7 +1819,7 @@ verilog-a/ch10_directives/begin_keywords_region_survives_the_include_that_opened
 verilog-a/ch10_directives/begin_keywords_unterminated.va not built: backend exe
 verilog-a/ch10_directives/begin_keywords_vams_2_3_accepted.va not built: backend exe
 verilog-a/ch10_directives/begin_keywords_verilog.va not built: backend exe
-verilog-a/ch10_directives/compact_modeling_extension_set.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch10_directives/compact_modeling_extension_set.va not built: backend exe
 verilog-a/ch10_directives/compact_modeling_macro_implies_its_extensions.va not built: backend exe
 verilog-a/ch10_directives/compact_modeling_nonlin_res_example.va not built: backend exe
 verilog-a/ch10_directives/default_keyword_set_without_begin_keywords.va not built: backend exe
@@ -1839,7 +1839,7 @@ verilog-a/ch10_directives/define_vams_prefixed_name.va not built: backend exe
 verilog-a/ch10_directives/elsif.va not built: backend exe
 verilog-a/ch10_directives/escaped_macro_name.va not built: backend exe
 verilog-a/ch10_directives/file_macro.va not built: backend exe
-verilog-a/ch10_directives/file_macro_is_the_opened_path.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-a/ch10_directives/file_macro_is_the_opened_path.va not built: backend exe
 verilog-a/ch10_directives/ifdef_else.va not built: backend exe
 verilog-a/ch10_directives/ifdef_without_endif_rejected.va rw-comp (preprocess) message: stderr: line 1: old `error[E0101]: unterminated `ifdef`, new `error[E0101]: unterminated `ifdef: `ifdef at offset 41 is never closed`
 verilog-a/ch10_directives/ifndef.va not built: backend exe
@@ -2038,16 +2038,16 @@ verilog-ams/annex_f_resolution/conflicting_declarations.va not built: backend ex
 verilog-ams/annex_f_resolution/conflicting_ooc_declarations.va rw-comp (elab) message: stderr: line 1: old `error[E0902]: more than one discipline declaration for one net: `mid.leaf.p` already has the out-of-context discipline `annex_f_a``, new `error[E0902]: more than one discipline declaration for one net: `annex_f_ooc_top.mid.leaf.p` already has the out-of-c
 verilog-ams/annex_f_resolution/continuous_discipline.va not built: backend exe
 verilog-ams/annex_f_resolution/continuous_domain_wins.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/annex_f_resolution/detail_behavioral_net_stays_digital.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/annex_f_resolution/detail_step4_analog_child_beats_digital_parent.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/annex_f_resolution/detail_step4_behavioral_net_is_digital.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/annex_f_resolution/detail_top_down_parent_before_child.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/annex_f_resolution/digital_behavioral_net_is_digital.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/annex_f_resolution/detail_behavioral_net_stays_digital.va not built: backend exe
+verilog-ams/annex_f_resolution/detail_step4_analog_child_beats_digital_parent.va not built: backend exe
+verilog-ams/annex_f_resolution/detail_step4_behavioral_net_is_digital.va not built: backend exe
+verilog-ams/annex_f_resolution/detail_top_down_parent_before_child.va not built: backend exe
+verilog-ams/annex_f_resolution/digital_behavioral_net_is_digital.va not built: backend exe
 verilog-ams/annex_f_resolution/exclude_resolution.va rw-comp (elab) message: stderr: line 1: old `error[E0917]: disciplines excluded by a connect resolution share a net: the disciplines of `sig` match `connect ... resolveto exclude``, new `error[E0917]: disciplines excluded by a connect resolution share a net: the disciplines of a net of `annex_f_excl
 verilog-ams/annex_f_resolution/hierarchy_resolution.va not built: backend exe
 verilog-ams/annex_f_resolution/in_context_declaration.va not built: backend exe
 verilog-ams/annex_f_resolution/in_context_declaration_reaches_all_instances.va not built: backend exe
-verilog-ams/annex_f_resolution/net_read_by_digital_code_resolves_digital.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/annex_f_resolution/net_read_by_digital_code_resolves_digital.va not built: backend exe
 verilog-ams/annex_f_resolution/out_of_context_declaration.va not built: backend exe
 verilog-ams/annex_f_resolution/out_of_context_declaration_detail.va not built: backend exe
 verilog-ams/annex_f_resolution/out_of_context_internal_net.va not built: backend exe
@@ -2098,7 +2098,7 @@ verilog-ams/ch05_analog_behavior/absdelta_time_tol_filters.va not built: backend
 verilog-ams/ch05_analog_behavior/absdelta_without_delta_rejected.va not built: backend exe
 verilog-ams/ch05_analog_behavior/analog_initial.va not built: backend exe
 verilog-ams/ch05_analog_behavior/analog_initial_digital_access_rejected.va not built: backend exe
-verilog-ams/ch05_analog_behavior/analog_initial_event_rejected.va not built: backend exe
+verilog-ams/ch05_analog_behavior/analog_initial_event_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0702]: event control is not allowed in this context: not allowed in an analog initial block`, new `error[E0707]: event control statement under a runtime condition or in a loop`
 verilog-ams/ch05_analog_behavior/analog_initial_integer.va not built: backend exe
 verilog-ams/ch05_analog_behavior/analog_initial_real.va not built: backend exe
 verilog-ams/ch05_analog_behavior/array_assignment_from_packed_vector_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0429]: incompatible array assignment: `A` is an unpacked array and the right-hand side is not`, new `error[E0313]: unknown variable: an assignment to a name that is not a variable`
@@ -2113,14 +2113,14 @@ verilog-ams/ch05_analog_behavior/named_event_unsupported.va not built: backend e
 verilog-ams/ch05_analog_behavior/node_alias_reevaluated_when_a_parameter_changes.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch06_hierarchy/analog_port_expression_actual_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0906]: port connections do not match the module's ports: a port connection must be a net reference`, new `error[E0906]: port connections do not match the module's ports: port `i` is continuous and its connection is an expression, not a net`
 verilog-ams/ch06_hierarchy/child_initial_block_is_carried.va not built: backend exe
-verilog-ams/ch06_hierarchy/connect_insertion_follows_paramset_selection.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch06_hierarchy/connect_insertion_follows_paramset_selection.va not built: backend exe
 verilog-ams/ch06_hierarchy/digital_port_expression_actual.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch06_hierarchy/generate_block_event_declaration.va not built: backend exe
 verilog-ams/ch06_hierarchy/generate_block_gate.va not built: backend exe
 verilog-ams/ch06_hierarchy/genvar_set_to_x_rejected.va not built: backend exe
 verilog-ams/ch06_hierarchy/hierarchical_analog_probes_from_digital.va not built: backend exe
 verilog-ams/ch06_hierarchy/net_variable_same_name_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: §6.8: one identifier declares one item in a scope — the earlier declaration is unreachable`, new `   = help: run `vera --explain E0362` for a detailed explanation`
-verilog-ams/ch06_hierarchy/paramset_outer_defparam_connect_array.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch06_hierarchy/paramset_outer_defparam_connect_array.va not built: backend exe
 verilog-ams/ch06_hierarchy/real_valued_wreal_port.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch06_hierarchy/top_initial_block_with_a_child.va not built: backend exe
 verilog-ams/ch06_hierarchy/wreal_net_with_two_drivers_rejected.va rw-comp (astgen) location: stderr: line 5: old `   |          ^`, new `   |          ^^^^`
@@ -2148,15 +2148,15 @@ verilog-ams/ch07_mixed_signal/analog_probe_in_a_digital_expression.va not built:
 verilog-ams/ch07_mixed_signal/analog_read_of_digital_variable.va not built: backend exe
 verilog-ams/ch07_mixed_signal/analog_reads_integer.va not built: backend exe
 verilog-ams/ch07_mixed_signal/analog_signal_is_never_segmented.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/auto_insertion_figure_7_6_basic_merged.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/auto_insertion_figure_7_6_case2_detail_merged.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/auto_insertion_figure_7_6_detail_merged.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/auto_insertion_figure_7_6_detail_split.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/auto_insertion_figure_7_6_basic_merged.va not built: backend exe
+verilog-ams/ch07_mixed_signal/auto_insertion_figure_7_6_case2_detail_merged.va not built: backend exe
+verilog-ams/ch07_mixed_signal/auto_insertion_figure_7_6_detail_merged.va not built: backend exe
+verilog-ams/ch07_mixed_signal/auto_insertion_figure_7_6_detail_split.va not built: backend exe
 verilog-ams/ch07_mixed_signal/bare_signal_change_event_in_analog.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/basic_resolution_continuous_beats_discrete.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/both_contexts_assignment_rejected.va not built: backend exe
 verilog-ams/ch07_mixed_signal/both_contexts_output_actual_rejected.va not built: backend exe
-verilog-ams/ch07_mixed_signal/both_halves_of_the_bridge_execute.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/both_halves_of_the_bridge_execute.va not built: backend exe
 verilog-ams/ch07_mixed_signal/case_equality.va not built: backend exe
 verilog-ams/ch07_mixed_signal/case_equality_has_equality_precedence.va not built: backend exe
 verilog-ams/ch07_mixed_signal/changed_analog_assignment_fires.va not built: backend exe
@@ -2183,9 +2183,9 @@ verilog-ams/ch07_mixed_signal/connect_module_manually_inserted.va rw-lower (anal
 verilog-ams/ch07_mixed_signal/connect_override_incompatible_discipline_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0915]: connect insertion names no connect module: `magnetic` cannot stand for `ch7_ovr_a2d`'s `electrical` (3.11.1 Potential Incompatibility Rule: the tw`, new `error[E0915]: connect insertion names no connect module: `magnetic` cannot stand for `c
 verilog-ams/ch07_mixed_signal/connect_parameter_accepted.va not built: backend exe
 verilog-ams/ch07_mixed_signal/connect_parameter_not_declared_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0907]: override names no parameter of the module: `vth` is not a parameter of connect module `ch7_a2d_np``, new `error[E0907]: override names no parameter of the module: `vth` is not an overridable parameter of connect module `ch7_a2d_np``
-verilog-ams/ch07_mixed_signal/connect_plain_discipline_override.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/connect_plain_discipline_override.va not built: backend exe
 verilog-ams/ch07_mixed_signal/connect_rule_exact_then_subset_resolution.va not built: backend exe
-verilog-ams/ch07_mixed_signal/connect_rule_parameter_is_applied.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/connect_rule_parameter_is_applied.va not built: backend exe
 verilog-ams/ch07_mixed_signal/connect_supply_accepted.va not built: backend exe
 verilog-ams/ch07_mixed_signal/connectmodule_accepted.va not built: backend exe
 verilog-ams/ch07_mixed_signal/connectrules_accepted.va not built: backend exe
@@ -2209,10 +2209,10 @@ verilog-ams/ch07_mixed_signal/digital_initial_accepted.va not built: backend exe
 verilog-ams/ch07_mixed_signal/digital_primary_uses_the_last_tick.va not built: backend exe
 verilog-ams/ch07_mixed_signal/digital_tick_is_the_timescale_precision.va not built: backend exe
 verilog-ams/ch07_mixed_signal/digital_value_has_zero_derivative.va not built: backend exe
-verilog-ams/ch07_mixed_signal/direction_override_redirects_a_bridge.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/discipline_and_direction_overrides.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/discipline_resolution_basic_figure_7_3.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/discipline_resolution_detail_figure_7_4.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/direction_override_redirects_a_bridge.va not built: backend exe
+verilog-ams/ch07_mixed_signal/discipline_and_direction_overrides.va not built: backend exe
+verilog-ams/ch07_mixed_signal/discipline_resolution_basic_figure_7_3.va not built: backend exe
+verilog-ams/ch07_mixed_signal/discipline_resolution_detail_figure_7_4.va not built: backend exe
 verilog-ams/ch07_mixed_signal/discipline_resolution_detail_one_level.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/discrete_bus_31.va not built: backend exe
 verilog-ams/ch07_mixed_signal/discrete_bus_narrow.va not built: backend exe
@@ -2223,11 +2223,11 @@ verilog-ams/ch07_mixed_signal/discrete_bus_part_select_above_31.va rw-lower (ana
 verilog-ams/ch07_mixed_signal/discrete_bus_part_select_above_31_analog_assigned.va rw-lower (analog lowering): stderr: line 1: old `error[E0316]: unsupported assignment target: `r` is a reg: an analog procedural assignment targets an integer, real or string (§5.7)`, new `error[E0512]: unknown function: `slice` is not lowered by Sema yet`
 verilog-ams/ch07_mixed_signal/discrete_discipline.va not built: backend exe
 verilog-ams/ch07_mixed_signal/discrete_real_from_analog.va not built: backend exe
-verilog-ams/ch07_mixed_signal/display_binary_operand_analog.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/driver_count_excludes_connectmodule.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/driver_delay_and_next_state.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/driver_state_histogram.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/driver_update_without_resolved_change.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/display_binary_operand_analog.va not built: backend exe
+verilog-ams/ch07_mixed_signal/driver_count_excludes_connectmodule.va not built: backend exe
+verilog-ams/ch07_mixed_signal/driver_delay_and_next_state.va not built: backend exe
+verilog-ams/ch07_mixed_signal/driver_state_histogram.va not built: backend exe
+verilog-ams/ch07_mixed_signal/driver_update_without_resolved_change.va not built: backend exe
 verilog-ams/ch07_mixed_signal/event_bounds_absdelta_negative_delta_rejected.va not built: backend exe
 verilog-ams/ch07_mixed_signal/event_bounds_absdelta_negative_expr_tol_rejected.va not built: backend exe
 verilog-ams/ch07_mixed_signal/event_bounds_absdelta_negative_time_tol_rejected.va not built: backend exe
@@ -2250,14 +2250,14 @@ verilog-ams/ch07_mixed_signal/incompatible_disciplines_rejected.va not built: ba
 verilog-ams/ch07_mixed_signal/incompatible_port_discipline_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0355]: incompatible disciplines: port `u.a` is of discipline `rotational` and is connected to `p`, of discipline `electrical` (3.11.1 Potential Incompati`, new `error[E0355]: incompatible disciplines: port `a` is `rotational` and its net `p` is `el
 verilog-ams/ch07_mixed_signal/inf_contribution.va not built: backend exe
 verilog-ams/ch07_mixed_signal/initial_untimed_process_runs.va not built: backend exe
-verilog-ams/ch07_mixed_signal/inserted_at_upper_connection_level.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/inserted_at_upper_connection_level.va not built: backend exe
 verilog-ams/ch07_mixed_signal/kcl_node_solved_at_every_mixed_point.va not built: backend exe
 verilog-ams/ch07_mixed_signal/last_tick_is_a_floor_on_a_long_run.va not built: backend exe
 verilog-ams/ch07_mixed_signal/local_discipline_accessors_across_hierarchy.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/macro_process_runs_after_nba.va not built: backend exe
-verilog-ams/ch07_mixed_signal/merged_generated_name_defparam.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/merged_generated_name_defparam.va not built: backend exe
 verilog-ams/ch07_mixed_signal/merged_groups_per_connect_module.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/merged_is_the_default_one_instance.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/merged_is_the_default_one_instance.va not built: backend exe
 verilog-ams/ch07_mixed_signal/mixed_event_parameters_defaults.va not built: backend exe
 verilog-ams/ch07_mixed_signal/mixed_event_parameters_instance.va not built: backend exe
 verilog-ams/ch07_mixed_signal/mixed_event_parameters_override.va not built: backend exe
@@ -2286,23 +2286,23 @@ verilog-ams/ch07_mixed_signal/primitive_generated_ports_unsupported.va rw-lower 
 verilog-ams/ch07_mixed_signal/probe_in_continuous_assign_refused.va not built: backend exe
 verilog-ams/ch07_mixed_signal/probe_in_procedural_read.va not built: backend exe
 verilog-ams/ch07_mixed_signal/probe_of_a_discrete_net_in_digital_rejected.va not built: backend exe
-verilog-ams/ch07_mixed_signal/receiver_count_reports_ordinary_receivers.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/receiver_default_bypass.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/receiver_reads_loaded_analog_state.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/receiver_value_set_by_connectmodule.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/receiver_count_reports_ordinary_receivers.va not built: backend exe
+verilog-ams/ch07_mixed_signal/receiver_default_bypass.va not built: backend exe
+verilog-ams/ch07_mixed_signal/receiver_reads_loaded_analog_state.va not built: backend exe
+verilog-ams/ch07_mixed_signal/receiver_value_set_by_connectmodule.va not built: backend exe
 verilog-ams/ch07_mixed_signal/reject_ambiguous_connect_statements.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-ams/ch07_mixed_signal/reject_ambiguous_connect_statements.va:90:14`, new `  --> verilog-ams/ch07_mixed_signal/reject_ambiguous_connect_statements.va:90:11`
 verilog-ams/ch07_mixed_signal/reject_display_x_operand_analog.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0130]: literal requires digital value support in the execution backend: `1'bx`: the analog backend cannot execute this 1-bit four-state literal`, new `error[E0130]: literal requires digital value support in the execution backend: the an
 verilog-ams/ch07_mixed_signal/reject_mixed_port_no_connect_statement.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-ams/ch07_mixed_signal/reject_mixed_port_no_connect_statement.va:34:33`, new `  --> verilog-ams/ch07_mixed_signal/reject_mixed_port_no_connect_statement.va:34:26`
 verilog-ams/ch07_mixed_signal/reject_vera_scratch_digital_variable.va not built: backend exe
 verilog-ams/ch07_mixed_signal/rejected_trials_deliver_once.va not built: backend exe
 verilog-ams/ch07_mixed_signal/resolution_connect_accepted.va not built: backend exe
-verilog-ams/ch07_mixed_signal/resolution_precedes_insertion.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/resolution_precedes_insertion.va not built: backend exe
 verilog-ams/ch07_mixed_signal/resolveto_two_exact_rules_warn.va not built: backend exe
 verilog-ams/ch07_mixed_signal/resolveto_two_subset_rules_warn.va not built: backend exe
 verilog-ams/ch07_mixed_signal/same_value_analog_assignment_fires.va not built: backend exe
 verilog-ams/ch07_mixed_signal/special_float_values_in_digital_expressions.va not built: backend exe
-verilog-ams/ch07_mixed_signal/split_generated_names_defparam.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/split_one_instance_per_port.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/split_generated_names_defparam.va not built: backend exe
+verilog-ams/ch07_mixed_signal/split_one_instance_per_port.va not built: backend exe
 verilog-ams/ch07_mixed_signal/split_segments_keep_own_state.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/supply_hierarchical_connectmodule.va not built: backend exe
 verilog-ams/ch07_mixed_signal/supply_sensitive_bridge_via_connect_rule.va rw-lower (analog lowering): exit status old 0, new 1
@@ -2365,15 +2365,15 @@ verilog-ams/ch09_system_tasks/arandom_execution_paths.va not built: backend exe
 verilog-ams/ch09_system_tasks/clog2_inferred_parameter_width.va not built: backend exe
 verilog-ams/ch09_system_tasks/clog2_reg_analog_conversion.va not built: backend exe
 verilog-ams/ch09_system_tasks/connectmodule_driver_access_example.va not built: backend exe
-verilog-ams/ch09_system_tasks/driver_delay_in_connectmodule_analog_block_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0806]: system task is not supported in the analog context: `$driver_delay` in the analog block of a connect module`, new `error[E0512]: unknown function: an access of a name with no node`
-verilog-ams/ch09_system_tasks/driver_strength_next_strength_type.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch09_system_tasks/driver_delay_in_connectmodule_analog_block_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: §9.2 Tables 9-19/9-20: "Supported in analog context of connectmodule: No"; call it from an `always` or `initial` block of the connect module`, new `   = help: run `vera --explain E0806` for a detailed explanation`
+verilog-ams/ch09_system_tasks/driver_strength_next_strength_type.va not built: backend exe
 verilog-ams/ch09_system_tasks/driver_update_connectmodule.va not built: backend exe
 verilog-ams/ch09_system_tasks/driver_update_in_analog_event_rejected.va rw-comp (parse): stderr: line 1: old `error[E0209]: expected an expression: found `driver_update``, new `error[E0207]: unexpected token: driver_update_outside_connect_module`
 verilog-ams/ch09_system_tasks/driver_update_in_ordinary_module_rejected.va rw-comp (parse): stderr: line 1: old `error[E0818]: driver access function outside a connect module: `driver_update` in a module that is not a connect module`, new `error[E0207]: unexpected token: driver_update_outside_connect_module`
 verilog-ams/ch09_system_tasks/error_in_analog_initial_stops_after_initialization.va not built: backend exe
 verilog-ams/ch09_system_tasks/fatal_in_analog_initial_skips_simulation.va not built: backend exe
 verilog-ams/ch09_system_tasks/fdebug_writes_in_rejected_iterations.va not built: backend exe
-verilog-ams/ch09_system_tasks/file_descriptor_shared_across_contexts.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch09_system_tasks/file_descriptor_shared_across_contexts.va not built: backend exe
 verilog-ams/ch09_system_tasks/finish_in_analog_initial_skips_simulation.va not built: backend exe
 verilog-ams/ch09_system_tasks/ieee_1364_system_functions_in_both_contexts.va not built: backend exe
 verilog-ams/ch09_system_tasks/kernel_control_in_digital_context_rejected.va not built: backend exe
@@ -2390,11 +2390,11 @@ verilog-ams/ch09_system_tasks/node_alias_whole_vector_reference.va rw-lower (ana
 verilog-ams/ch09_system_tasks/pla_array_in_digital_context.va not built: backend exe
 verilog-ams/ch09_system_tasks/port_alias_resolves.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch09_system_tasks/port_alias_to_a_net_returns_zero.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch09_system_tasks/r_format_in_the_digital_context.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch09_system_tasks/r_format_in_the_digital_context.va not built: backend exe
 verilog-ams/ch09_system_tasks/r_format_in_the_digital_context_without_argument_rejected.va not built: backend exe
 verilog-ams/ch09_system_tasks/random_digital_context_seed_kinds.va not built: backend exe
 verilog-ams/ch09_system_tasks/receiver_net_resolution_assign.va not built: backend exe
-verilog-ams/ch09_system_tasks/receiver_segregation_ignored_without_driver_value.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch09_system_tasks/receiver_segregation_ignored_without_driver_value.va not built: backend exe
 verilog-ams/ch09_system_tasks/reject_clog2_reg_width.va not built: backend exe
 verilog-ams/ch09_system_tasks/rng_constant_distribution_stream.va not built: backend exe
 verilog-ams/ch09_system_tasks/severity_task_digital_context_rejected.va not built: backend exe

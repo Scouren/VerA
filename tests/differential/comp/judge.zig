@@ -3,9 +3,12 @@
 //! directory), and the two runs compared: the exit status, stderr (the
 //! whole diagnostic stream, byte for byte), stdout, and every file the run
 //! wrote outside `.zig-cache`. A disagreement is named with the agent and
-//! stage that owns it, from the first diagnostic code the two streams
-//! disagree on (`tests/differential/stages.zig`'s table, then the code's
-//! class), so a `comp.xfail` line says whose debt it is.
+//! stage that owns it: of the diagnostic codes one stream has and the
+//! other lacks, the one the earliest stage owns (`tests/differential/
+//! stages.zig`'s table) decides, since a later stage's code is downstream
+//! of an earlier stage's (an old W0650 the new side lacks because it
+//! stopped in Sema is Sema's debt), so a `comp.xfail` line says whose debt
+//! it is.
 //! No LRM clause: this checks VerA's rewrite against VerA.
 //!
 //! Contents:
@@ -20,6 +23,7 @@ const assert = std.debug.assert;
 const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const stages = @import("../stages.zig");
+const Code = @import("vams").Diag.Code;
 
 /// One driver's run of one fixture.
 pub const Run = struct {
@@ -93,17 +97,14 @@ pub fn compare(arena: Allocator, old: Run, new: Run, digital: bool) !?[]const u8
     return null;
 }
 
-/// The agent and stage a disagreement belongs to: the first diagnostic
-/// code one stream has and the other lacks decides; with the same codes,
+/// The agent and stage a disagreement belongs to: of the diagnostic codes
+/// one stream has and the other lacks, the earliest stage's decides; with the same codes,
 /// the driver's own text (a location, a plain line) is the spine's, and a
 /// different transcript or status the lowering's.
 pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool) ![]const u8 {
     const a = try codes(arena, old.stderr);
     const b = try codes(arena, new.stderr);
-    const n = @min(a.len, b.len);
-    for (a[0..n], b[0..n]) |x, y| if (!std.mem.eql(u8, x, y)) return ownerOf(x, digital);
-    if (a.len > n) return ownerOf(a[n], digital);
-    if (b.len > n) return ownerOf(b[n], digital);
+    if (try earliestUnmatched(arena, a, b)) |c| return ownerOf(c, digital);
     if (std.mem.find(u8, new.stderr, "codegen refused") != null or std.mem.find(u8, new.stderr, "does not compile") != null) return "rw-codegen (codegen)";
     if (a.len != 0 and !std.mem.eql(u8, old.stderr, new.stderr)) return try std.fmt.allocPrint(arena, "{s} {s}", .{ ownerOf(a[0], digital), part(old.stderr, new.stderr) });
     return if (digital) "rw-dlower (digital lowering)" else "rw-lower (analog lowering)";
@@ -111,11 +112,43 @@ pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool) ![]const u8 {
 
 // ---- private ----
 
+/// Of the codes in `a` and not `b` or in `b` and not `a` (as multisets),
+/// the one the earliest stage owns; null when the two agree. A code the
+/// catalogue lacks counts as the run stage's.
+fn earliestUnmatched(arena: Allocator, a: []const []const u8, b: []const []const u8) !?[]const u8 {
+    const used = try arena.alloc(bool, b.len);
+    @memset(used, false);
+    var best: ?[]const u8 = null;
+    for (a) |x| {
+        const hit = for (b, used) |y, *u| {
+            if (!u.* and std.mem.eql(u8, x, y)) {
+                u.* = true;
+                break true;
+            }
+        } else false;
+        if (!hit and earlier(x, best)) best = x;
+    }
+    for (b, used) |y, u| if (!u and earlier(y, best)) {
+        best = y;
+    };
+    return best;
+}
+
+fn earlier(code: []const u8, than: ?[]const u8) bool {
+    const t = than orelse return true;
+    return @intFromEnum(stageOf(code)) < @intFromEnum(stageOf(t));
+}
+
+fn stageOf(code: []const u8) stages.Owner {
+    const c = std.meta.stringToEnum(Code, code) orelse return .run;
+    return stages.owner(c);
+}
+
 /// The stage that owns `code` (`E0405`) by `stages.owner`, and its agent:
 /// the front end is rw-comp's, Sema's lowering rw-lower's or rw-dlower's.
 fn ownerOf(code: []const u8, digital: bool) []const u8 {
     assert(code.len == 5);
-    const c = std.meta.stringToEnum(@import("vams").Diag.Code, code) orelse return "rw-comp (driver)";
+    const c = std.meta.stringToEnum(Code, code) orelse return "rw-comp (driver)";
     return switch (stages.owner(c)) {
         .preprocess => "rw-comp (preprocess)",
         .parse => "rw-comp (parse)",

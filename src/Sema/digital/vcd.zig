@@ -38,6 +38,11 @@ pub fn task(l: *Lower, i: Inst.Index, op: Program.DumpOp, args: []const Inst.Ref
     var call: Program.List = .empty;
     var targets: std.ArrayList(u32) = .empty;
     switch (op) {
+        .file => if (args.len > 1) return l.reject(l.frame, i.toRef(), "$dumpfile takes at most one filename"),
+        .off, .on, .all, .flush => if (args.len != 0) return l.reject(l.frame, i.toRef(), "$dumpoff, $dumpon, $dumpall and $dumpflush take no arguments"),
+        else => {}, // else: checked below
+    }
+    switch (op) {
         .file => if (args.len == 1) {
             arg = try expr.self_(l, args[0], 0);
             call = try l.b.string(try callText(l, i));

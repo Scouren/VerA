@@ -153,10 +153,6 @@ verilog/15_timing_checks/removal_negative_limit_rejected.v lowering: §15 a nega
 verilog/15_timing_checks/setup_negative_limit_rejected.v lowering: §15 a negative limit where a non-negative one is required
 verilog/15_timing_checks/setuphold_signal_limit_rejected.v lowering: a timing check limit Sema/eval.zig does not fold
 verilog/17_system_tasks/c_flag_on_integer_rejected.v old run failed (E0827: `%-5d`: IEEE 1364-2005 §17.1.1.2 grants C's '-', '+' and ' ' flags to the real conversions only), new run completed
-verilog/17_system_tasks/clog2_arguments_rejected.v old run failed (E1100: $clog2 takes exactly one argument), new run completed
-verilog/17_system_tasks/clog2_real_rejected.v old run failed (E1100: §17.11.1: $clog2 takes an integer or vector argument, not a real), new run completed
-verilog/17_system_tasks/conversion_arguments_rejected.v old run failed (E1100: a §17.8 conversion takes exactly one argument), new run completed
-verilog/17_system_tasks/descending_personality_rejected.v old run failed (E1100: §17.5.3: a PLA personality's bit range is ascending, as in reg [1:n]), new run completed
 verilog/17_system_tasks/display_missing_argument_rejected.v lowering: a format with a missing argument
 verilog/17_system_tasks/dist_seed_constant_rejected.v lowering: an lvalue form
 verilog/17_system_tasks/fclose_two_descriptors_rejected.v lowering: $fclose without one argument
@@ -166,32 +162,19 @@ verilog/17_system_tasks/fread_multidim_rejected.v lowering: §17.2.4.4 $fread in
 verilog/17_system_tasks/fwrite_no_descriptor_rejected.v lowering: a file task with no descriptor
 verilog/17_system_tasks/malformed_format_trailing_percent_rejected.v lowering: an unterminated format
 verilog/17_system_tasks/math_arguments_rejected.v lowering: a math function with the wrong argument count
-verilog/17_system_tasks/monitoroff_argument_rejected.v old run failed (E1100: $monitoron and $monitoroff take no arguments), new run completed
 verilog/17_system_tasks/output_term_net_rejected.v old run failed (E1100: a net is driven by a continuous assignment; there is no procedural assignment to a net), new run completed
 verilog/17_system_tasks/percent_escape_with_width_rejected.v lowering: a format with a missing argument
 verilog/17_system_tasks/printtimescale_unknown_scope_rejected.v lowering: a hierarchical name whose first part names no scope
-verilog/17_system_tasks/q_exam_code_rejected.v old run failed (E1100: §17.6.5: a $q_exam q_stat_code is one of Table 17-15's codes 1 to 6), new run completed
 verilog/17_system_tasks/random_seed_constant_rejected.v lowering: an lvalue form
-verilog/17_system_tasks/realtime_argument_rejected.v old run failed (E1100: $realtime and $abstime take no arguments), new run completed
 verilog/17_system_tasks/sscanf_to_net_rejected.v old run failed (E1100: a net is driven by a continuous assignment; there is no procedural assignment to a net), new run completed
-verilog/17_system_tasks/stime_argument_rejected.v old run failed (E1100: $time and $stime take no arguments), new run completed
 verilog/17_system_tasks/stop_two_arguments_rejected.v lowering: $finish/$stop with more than one argument
 verilog/17_system_tasks/strength_vector_rejected.v old run failed (E1100: §17.1.1.5: %v takes a scalar net reference), new run completed
 verilog/17_system_tasks/string_missing_argument_rejected.v lowering: a format with a missing argument
 verilog/17_system_tasks/strobe_missing_argument_rejected.v lowering: a format with a missing argument
 verilog/17_system_tasks/swrite_to_net_rejected.v old run failed (E1100: a net is driven by a continuous assignment; there is no procedural assignment to a net), new run completed
-verilog/17_system_tasks/test_plusargs_arguments_rejected.v old run failed (E1100: $test$plusargs takes (string) and $value$plusargs (format, variable)), new run completed
-verilog/17_system_tasks/test_plusargs_real_rejected.v old run failed (E1100: §17.10: the plusarg string is a string or a nonreal variable), new run completed
-verilog/17_system_tasks/time_argument_rejected.v old run failed (E1100: $time and $stime take no arguments), new run completed
-verilog/17_system_tasks/timeformat_units_range_rejected.v old run failed (E1100: §17.3.2: $timeformat's units number shall be in the range from 0 to -15), new run completed
 verilog/17_system_tasks/too_few_arguments_rejected.v lowering: a format with a missing argument
-verilog/17_system_tasks/value_plusargs_arguments_rejected.v old run failed (E1100: $test$plusargs takes (string) and $value$plusargs (format, variable)), new run completed
 verilog/17_system_tasks/value_plusargs_format_rejected.v old run failed (E1100: §17.10.2: a $value$plusargs format is one of %d %o %h %b %e %f %g %s, not `%t`), new run completed
-verilog/18_vcd/dumpall_argument_rejected.v old run failed (E1100: $dumpoff, $dumpon, $dumpall and $dumpflush take no arguments), new run completed
-verilog/18_vcd/dumpfile_two_names_rejected.v old run failed (E1100: $dumpfile takes at most one filename), new run completed
-verilog/18_vcd/dumpflush_argument_rejected.v old run failed (E1100: $dumpoff, $dumpon, $dumpall and $dumpflush take no arguments), new run completed
 verilog/18_vcd/dumplimit_without_size_rejected.v lowering: $dumplimit without one argument
-verilog/18_vcd/dumpoff_argument_rejected.v old run failed (E1100: $dumpoff, $dumpon, $dumpall and $dumpflush take no arguments), new run completed
 verilog/18_vcd/dumpports_duplicate_scope_rejected.v old run failed (E1100: §18.3.1: each $dumpports scope shall be unique), new run completed
 verilog/18_vcd/dumpports_variable_scope_rejected.v old run failed (E1100: §18.3.1: a $dumpports scope is a module instance: only modules are allowed, not variables), new run completed
 verilog/18_vcd/dumpvars_memory_word_rejected.v lowering: a $dumpvars argument that names no scope or variable

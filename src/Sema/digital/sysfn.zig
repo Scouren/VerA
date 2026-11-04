@@ -59,8 +59,7 @@ pub fn sysType(l: *Lower, i: Inst.Index) Error!Type {
     const vir = l.virOf(l.frame);
     const s = try sysOf(l, vir, i);
     // §17.2.4.4 `$fread(mem, fd, , count)` omits its start.
-    // §17.6.4 `$q_full(q_id, status)`.
-    if (s.f == .q_full and (s.args.len != 2 or s.args[0] == .none or s.args[1] == .none)) return l.reject(l.frame, i.toRef(), "$q_full takes (q_id, status)");
+    try argumentForms(l, i, s.f, s.args);
     for (s.args, 0..) |a, k| if (a == .none and !(s.f == .fread and k == 2)) return l.refuse("an omitted system function argument");
     return switch (s.f) {
         // §17.2.1 a descriptor is 32 bits, its MSB set for an `fd`.
@@ -141,6 +140,30 @@ pub fn sysReal(l: *Lower, i: Inst.Index) Error!u32 {
 }
 
 // ---- private ----
+
+/// §17's argument forms lib/sim/digital checks before any process runs.
+fn argumentForms(l: *Lower, i: Inst.Index, f: SysFn, args: []const Inst.Ref) Error!void {
+    const at = i.toRef();
+    const one = args.len == 1 and args[0] != .none;
+    switch (f) {
+        // §17.6.4 `$q_full(q_id, status)`.
+        .q_full => if (args.len != 2 or args[0] == .none or args[1] == .none) return l.reject(l.frame, at, "$q_full takes (q_id, status)"),
+        .time, .stime => if (args.len != 0) return l.reject(l.frame, at, "$time and $stime take no arguments"),
+        .realtime, .abstime => if (args.len != 0) return l.reject(l.frame, at, "$realtime and $abstime take no arguments"),
+        .rtoi, .itor, .realtobits, .bitstoreal => if (!one) return l.reject(l.frame, at, "a §17.8 conversion takes exactly one argument"),
+        .clog2 => {
+            if (!one) return l.reject(l.frame, at, "$clog2 takes exactly one argument");
+            if ((try expr.typeValue(l, args[0])).real) return l.rejectArg(l.frame, i, 0, "§17.11.1: $clog2 takes an integer or vector argument, not a real");
+        },
+        .test_plusargs, .value_plusargs => {
+            const want: usize = if (f == .test_plusargs) 1 else 2;
+            if (args.len != want or args[0] == .none) return l.reject(l.frame, at, "$test$plusargs takes (string) and $value$plusargs (format, variable)");
+            // §17.10.1 "either a string or a nonreal variable".
+            if ((try expr.typeValue(l, args[0])).real) return l.rejectArg(l.frame, i, 0, "§17.10: the plusarg string is a string or a nonreal variable");
+        },
+        else => {}, // else: checked where lowered
+    }
+}
 
 /// §17.9 a `$random` or `$dist_*` call: its seed (an inout variable written
 /// back; none for a seedless `$random`) and its two parameters.

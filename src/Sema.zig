@@ -76,6 +76,10 @@ contrib_rows: std.AutoHashMapUnmanaged(ContribKey, Air.Device.Contribution.Index
 param_args: std.ArrayList(Value) = .empty,
 /// How deep the expression being lowered nests (expr.zig).
 expr_depth: u32 = 0,
+/// The Vir expression being lowered (expr.zig's `lower`), and each Air
+/// instruction's, by index (`addInst`): `Analysis.srcs`.
+expr_src: Inst.Ref = .none,
+inst_srcs: std.ArrayList(Analysis.Src) = .empty,
 /// Each node row's one `probe`, in the prologue (contrib.zig).
 probes: std.AutoHashMapUnmanaged(Air.Device.Node.Index, Air.Inst.Ref) = .empty,
 /// §3.6.2 every access function name and the quantity it reads under a
@@ -132,10 +136,18 @@ pub const Config = struct {
 pub const Analysis = struct {
     air: Air,
     device: Air.Device,
+    /// One per `air` instruction: the Vir expression it was lowered from,
+    /// where a later stage's diagnostic about it points (`Air.Float`'s
+    /// `Input.locs`); `.none` for one no expression wrote.
+    srcs: []const Src,
+
+    /// A source: a file and a Vir instruction in it.
+    pub const Src = struct { file: Zcu.File.Index, src: Inst.Ref };
 
     pub fn deinit(a: *Analysis, gpa: Allocator) void {
         a.air.deinit(gpa);
         a.device.deinit(gpa);
+        gpa.free(a.srcs);
         a.* = undefined;
     }
 };
@@ -304,14 +316,22 @@ pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis {
         s.device.deinit(zcu.gpa);
         return null;
     };
-    const air = try s.air.finish(zcu.gpa, main);
+    var air = try s.air.finish(zcu.gpa, main);
+    errdefer air.deinit(zcu.gpa);
     assert(air.mainBody().len == main.len);
-    return .{ .air = air, .device = s.device };
+    const srcs = try zcu.gpa.alloc(Analysis.Src, air.instructions.len);
+    @memset(srcs, .{ .file = @fromBackingInt(0), .src = .none });
+    const n = @min(srcs.len, s.inst_srcs.items.len);
+    @memcpy(srcs[0..n], s.inst_srcs.items[0..n]);
+    return .{ .air = air, .device = s.device, .srcs = srcs };
 }
 
 /// Appends `inst` to `b`'s body and returns it as an operand.
 pub fn addInst(s: *Sema, b: *Block, inst: Air.Inst) Allocator.Error!Air.Inst.Ref {
     const i = try s.air.addInst(s.gpa, inst);
+    const k = @backingInt(i);
+    if (s.inst_srcs.items.len <= k) try s.inst_srcs.appendNTimes(s.arena, .{ .file = b.unit.file, .src = .none }, k + 1 - s.inst_srcs.items.len);
+    s.inst_srcs.items[k] = .{ .file = b.unit.file, .src = s.expr_src };
     try b.insts.append(s.arena, i);
     assert(b.insts.items[b.insts.items.len - 1] == i);
     return .fromIndex(i);

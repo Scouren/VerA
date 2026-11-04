@@ -92,6 +92,10 @@ pub const Tag = enum(u8) {
     @"$vt",
     @"$mfactor",
     @"$abstime",
+    // §4.3.1 Table 4-14's `abs`, `min`, `max` under their system spellings.
+    @"$abs",
+    @"$min",
+    @"$max",
     @"$realtime",
     @"$simparam",
     @"$simparam$str",
@@ -211,6 +215,9 @@ pub const Tag = enum(u8) {
     @"idt$hold",
     @"limit$old",
     @"limit$uf",
+    // §5.2.1 the first evaluation of an analysis: the guard of an `analog
+    // initial` body (1 then, 0 after).
+    @"analog$initial",
 
     /// The tag `spelling` names, or null for a user system function.
     pub fn fromName(spelling: []const u8) ?Tag {
@@ -371,6 +378,9 @@ pub const table = std.EnumArray(Tag, Info).init(.{
     .@"$vt" = query(.real, .{ .max = 1 }),
     .@"$mfactor" = query(.real, .exactly(0)),
     .@"$abstime" = query(.real, .exactly(0)),
+    .@"$abs" = math1(.abs),
+    .@"$min" = .{ .ty = .real, .args = .exactly(2), .family = .math, .math = .min },
+    .@"$max" = .{ .ty = .real, .args = .exactly(2), .family = .math, .math = .max },
     .@"$realtime" = .{ .ty = .real, .args = .{ .max = 1 }, .family = .query, .context = .digital },
     .@"$simparam" = query(.real, .{ .min = 1, .max = 2 }),
     .@"$simparam$str" = query(.str, .{ .min = 1, .max = 2 }),
@@ -479,6 +489,7 @@ pub const table = std.EnumArray(Tag, Info).init(.{
     .@"idt$hold" = .{ .ty = .real, .args = .exactly(3), .family = .analog_op, .context = .analog },
     .@"limit$old" = .{ .ty = .real, .args = .exactly(1), .family = .kernel, .context = .analog },
     .@"limit$uf" = .{ .ty = .real, .args = .exactly(2), .family = .kernel, .context = .analog },
+    .@"analog$initial" = .{ .ty = .int, .args = .exactly(0), .family = .event, .context = .analog },
 });
 
 const display: Info = .{ .ty = .none, .family = .display };

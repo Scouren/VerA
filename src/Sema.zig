@@ -225,6 +225,9 @@ pub const Block = struct {
     function: ?Air.Inst.Index = null,
     /// The innermost enclosing named block (control.zig).
     label: ?*const Label = null,
+    /// VerA's `vera_nodiff` (§2.9) is on here: an assigned real carries no
+    /// derivative (control.zig).
+    nodiff: bool = false,
 
     /// A loop's targets: the `block` a `break` leaves and the one a
     /// `continue` leaves (the step follows it).
@@ -243,7 +246,7 @@ pub const Block = struct {
 
     /// A child of `parent`: the same instance and restrictions, no instructions.
     pub fn child(parent: *Block) Block {
-        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .runtime = parent.runtime, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path, .function = parent.function, .label = parent.label };
+        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .runtime = parent.runtime, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path, .function = parent.function, .label = parent.label, .nodiff = parent.nodiff };
     }
 };
 

@@ -47,7 +47,7 @@ pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Erro
     const args = vir.list(Inst.Ref, c.args);
     const tag = SysFn.Tag.fromName(name) orelse {
         if (try refuseForeign(s, b, name, src)) return expr.poison;
-        return userCall(s, b, args, .real);
+        return userCall(s, b, name, args, .real);
     };
     const info = SysFn.get(tag);
     if (try refuseContext(s, b, tag, src)) return expr.poison;
@@ -98,7 +98,7 @@ pub fn task(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error
     const args = vir.list(Inst.Ref, c.args);
     const tag = SysFn.Tag.fromName(name) orelse {
         if (try refuseForeign(s, b, name, src)) return;
-        _ = try userCall(s, b, args, null);
+        _ = try userCall(s, b, name, args, null);
         return;
     };
     const info = SysFn.get(tag);
@@ -252,9 +252,12 @@ fn lowerArgs(s: *Sema, b: *Block, args: []const Inst.Ref) Allocator.Error![]cons
     return out;
 }
 
-fn userCall(s: *Sema, b: *Block, args: []const Inst.Ref, ty: ?Sema.Ty) Allocator.Error!Value {
+/// §12 a user system function or task: a `call` of `user_callee`, its name
+/// in `device.systf` for the host's table.
+fn userCall(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, ty: ?Sema.Ty) Allocator.Error!Value {
     const refs = try lowerArgs(s, b, args);
     const r = try expr.call(s, b, expr.user_callee, ty, refs);
+    try s.device.systf.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .call = r.toIndex().? });
     return .{ .ref = r, .ty = ty orelse .real };
 }
 

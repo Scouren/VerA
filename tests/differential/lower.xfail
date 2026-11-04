@@ -1,7 +1,3 @@
-# Fixtures whose Sema lowering still differs from src/analog's (`zig build
-# diff-lower`, tests/differential/lower.zig). One line each: the fixture path
-# under tests/conformance/tests, then the first disagreement the oracle found.
-# A listed fixture that agrees fails the run until its line goes.
 netlist/hdl/veriloga_wide_ladder.assets/ladder70.va codes: old {}, new E0426,E0512 (E0512: an assignment to a name with no slot)
 spice/primitive_segment_discipline.va codes: old {}, new E0512 (E0512: a port access of an instance's port (`<u.p>`) is not lowered by Sema yet)
 spice/reject_limit_vera_seed_attr_not_constant.va codes: old E0357, new {}
@@ -395,7 +391,6 @@ verilog-a/ch06_hierarchy/vector_port_past_256_unknowns.va codes: old {}, new E04
 verilog-a/ch06_hierarchy/vector_port_scalar_net_width_mismatch_rejected.va codes: old E0925, new {}
 verilog-a/ch06_hierarchy/vector_ports.va codes: old E0350, new {}
 verilog-a/ch08_scheduling/continuous_variable_interpolation_host.va tables row 3: old `held x`, new `held held`
-verilog-a/ch09_system_tasks/abs.va contribution 0 resist: old 3.3637570688444276e0, new 1.3637570688444276e0
 verilog-a/ch09_system_tasks/aliasparam_mfactor.va tables row 2: old `param m real = 1e0`, new `contrib flow direct br0 p n`
 verilog-a/ch09_system_tasks/analog_decimal_is_auto_sized.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch09_system_tasks/analog_radix_of_integer_expression_is_32_bits.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
@@ -468,10 +463,8 @@ verilog-a/ch09_system_tasks/l_format_library_cell.va codes: old {}, new E0321 (E
 verilog-a/ch09_system_tasks/limit_omitted_algorithm_rejected.va codes: old E0894, new {}
 verilog-a/ch09_system_tasks/limit_user_function_output_arg_rejected.va codes: old E0814, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/long_record_is_not_truncated.va tables row 4: old `held line`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/max.va contribution 0 resist: old 8.05201432855025e-2, new 4.026007164275125e-2
 verilog-a/ch09_system_tasks/mcd_channels_exhausted_at_bit_31.va tables row 10: old `held name`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/m_format_hierarchical_name.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
-verilog-a/ch09_system_tasks/min.va contribution 0 resist: old -5.996453579659319e0, new -2.9982267898296593e0
 verilog-a/ch09_system_tasks/monitor_ignores_abstime.va tables row 6: old `display $fopen`, new `display $fmonitor`
 verilog-a/ch09_system_tasks/monitor_reports_every_change.va tables row 6: old `display $fopen`, new `display $fmonitor`
 verilog-a/ch09_system_tasks/monitor_suppresses_an_unchanged_step.va tables row 6: old `display $fopen`, new `display $fmonitor`
@@ -619,7 +612,7 @@ verilog-ams/ch04_expressions/revert_ops.va tables row 34: old `held $rng.0.seed`
 verilog-ams/ch04_expressions/table_4_1_every_operator.va codes: old {}, new E0512 (E0512: `concat` is not lowered by Sema yet)
 verilog-ams/ch05_analog_behavior/absdelta_without_delta_rejected.va codes: old E0517, new {}
 verilog-ams/ch05_analog_behavior/analog_initial_digital_access_rejected.va codes: old E0431, new {}
-verilog-ams/ch05_analog_behavior/analog_initial_event_rejected.va codes: old E0702, new {}
+verilog-ams/ch05_analog_behavior/analog_initial_event_rejected.va codes: old E0702, new E0707 (E0707: )
 verilog-ams/ch05_analog_behavior/array_assignment_from_packed_vector_rejected.va codes: old E0429, new E0313 (E0313: an assignment to a name that is not a variable)
 verilog-ams/ch05_analog_behavior/final_step_in_digital_context_rejected.va codes: old E0708, new {}
 verilog-ams/ch05_analog_behavior/initial_step_in_digital_context_rejected.va codes: old E0708, new {}

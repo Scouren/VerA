@@ -26,7 +26,7 @@
 //! §5.6.7, §5.10, §9.4, §9.17.3.
 //!
 //! Contents:
-//! - fields `nodes`, `num_ports`, `branches`, `params`, `ranges`, `contributions`, `charge_sites`, `held`, `limit_slots`, `flows`, `table_samples`, `noise`, `kernel`, `displays`
+//! - fields `nodes`, `num_ports`, `branches`, `params`, `ranges`, `contributions`, `charge_sites`, `held`, `limit_slots`, `flows`, `table_samples`, `noise`, `kernel`, `systf`, `displays`
 //! - `pub const Instance`, `pub const Node` (`Index`, `Kind`), `pub const Branch` (`Index`), `pub const Param` (`Index`, `Type`), `pub const Range`
 //! - `pub const Access`, `pub const Contribution` (`Index`, `Kind`), `pub const ChargeSite`, `pub const Held`, `pub const Flow` (`Kind`), `pub const LimitSlot`, `pub const Noise` (`Kind`), `pub const Kernel`, `pub const Display`
 //! - `pub const rows_max: u32`
@@ -71,6 +71,9 @@ table_samples: std.ArrayList(u32) = .empty,
 noise: std.MultiArrayList(Noise) = .empty,
 /// §9.17 the kernel-control slots the host reads after an accepted step.
 kernel: Kernel = .{},
+/// §12 every user system function or task call (a VPI systf), in source
+/// order: its name and its `call` (whose callee is `user_callee`).
+systf: std.MultiArrayList(Display) = .empty,
 /// §9.4 the display and file tasks, in source order.
 displays: std.MultiArrayList(Display) = .empty,
 
@@ -255,6 +258,7 @@ pub fn deinit(d: *Device, gpa: Allocator) void {
     d.held.deinit(gpa);
     d.limit_slots.deinit(gpa);
     d.noise.deinit(gpa);
+    d.systf.deinit(gpa);
     d.flows.deinit(gpa);
     d.table_samples.deinit(gpa);
     d.displays.deinit(gpa);

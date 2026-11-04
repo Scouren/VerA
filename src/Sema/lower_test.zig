@@ -69,7 +69,8 @@ const Out = struct {
     }
 };
 
-/// The last value each slot was assigned; every call (a print) is 0.
+/// The last value each slot was assigned; every call is a 0 of its
+/// `SysFn` type (a user call's is real).
 const Watch = struct {
     finals: []?Air.interp.Value,
     air: *const Air,
@@ -79,8 +80,12 @@ const Watch = struct {
         if (w.air.instructions.items(.tag)[i] != .assign) return;
         w.finals[@backingInt(w.air.instructions.items(.data)[i].bin_op.lhs.toIndex().?)] = v;
     }
-    fn call(_: *anyopaque, _: u32, _: []const Air.interp.Value) Air.interp.Error!Air.interp.Value {
-        return .{ .real = 0 };
+    fn call(_: *anyopaque, callee: u32, _: []const Air.interp.Value) Air.interp.Error!Air.interp.Value {
+        if (callee > std.math.maxInt(@typeInfo(vams.SysFn.Tag).@"enum".tag_type)) return .{ .real = 0 };
+        return switch (vams.SysFn.get(@fromBackingInt(@intCast(callee))).ty) {
+            .int, .str => .{ .int = 0 },
+            .real, .none => .{ .real = 0 },
+        };
     }
 };
 
@@ -138,6 +143,13 @@ fn expectCode(comptime body: []const u8, want: Diag.Code) !void {
         std.debug.print("want {t}, got {any}\n", .{ want, o.codes });
         return error.TestUnexpectedResult;
     }
+}
+
+/// How many instructions of `tag` the body holds.
+fn countTag(o: *const Out, tag: Air.Inst.Tag) usize {
+    var n: usize = 0;
+    for (o.analysis.?.air.instructions.items(.tag)) |t| n += @intFromBool(t == tag);
+    return n;
 }
 
 test "§6.5 the ports are the first rows, in header order, a vector msb first; then the nets" {
@@ -375,4 +387,35 @@ test "§3.4 a default over another parameter keeps its expression for the host (
     // b's derive is a * 3.0 over a's arg: an fmul, not the folded 6.0.
     const i = d[1].toIndex().?;
     try std.testing.expectEqual(Air.Inst.Tag.fmul, o.analysis.?.air.instructions.items(.tag)[@backingInt(i)]);
+}
+
+test "§2.9 vera_nodiff stops an assigned real's derivative; a nearer spec turns it back on" {
+    var o = try lower(
+        \\module m(p); inout p; electrical p; real a, b;
+        \\  analog begin
+        \\    (* vera_nodiff *) a = V(p) * V(p);
+        \\    (* vera_nodiff *) begin (* vera_nodiff = 0 *) b = V(p); end
+        \\    I(p) <+ a + b;
+        \\  end
+        \\endmodule
+    );
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{}, o.codes);
+    // `a` only: `b`'s nearer spec is off.
+    try std.testing.expectEqual(@as(usize, 1), countTag(&o, .dstop));
+}
+
+test "§5.2.1 an analog initial body runs under the host's first-evaluation flag" {
+    var o = try lower(
+        \\module m(p); inout p; electrical p; real r;
+        \\  analog initial r = 1.0;
+        \\  analog I(p) <+ r * V(p);
+        \\endmodule
+    );
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{}, o.codes);
+    // The body sits in a `cond_br` on `analog$initial`, so with the host
+    // answering 0 (not the first evaluation) r keeps its zero start.
+    try std.testing.expectEqual(@as(usize, 1), countTag(&o, .cond_br));
+    try std.testing.expectEqual(@as(f64, 0), try o.value(0, 0, &.{1.0}));
 }

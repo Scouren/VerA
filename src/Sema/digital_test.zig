@@ -303,3 +303,42 @@ test "§7.2.2 a process naming fewer instructions than the names read before it 
         \\
     );
 }
+
+test "§7.8 a digital port meeting a continuous net: the net is the digital segment between the port and its bridge (both_halves_of_the_bridge_execute.va)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const lowered = try lowerSource(arena_state.allocator(), prelude ++
+        \\connectmodule d2a(cm, el);
+        \\  input cm; output el; ddiscrete cm; electrical el;
+        \\  reg lvl; always @(cm) lvl = cm;
+        \\  analog I(el) <+ 0.0;
+        \\endmodule
+        \\module inv(d, q); input d; output q; ddiscrete d, q; reg q; initial q = 1'b0; always @(d) q = ~d; endmodule
+        \\module top;
+        \\  electrical y1; ddiscrete s; reg r;
+        \\  assign s = r;
+        \\  inv u1(s, y1);
+        \\  analog I(y1) <+ V(y1) / 1000.0;
+        \\endmodule
+        \\connectrules rules; connect d2a; endconnectrules
+        \\
+    , true);
+    // `u1.q` (an output reg) drives `y1` through its port (§12.3.9.2), and
+    // the bridge's input net `cm`, joined to the whole of `y1`, is `y1`.
+    var y1: ?u32 = null;
+    var q: ?u32 = null;
+    var cm: ?u32 = null;
+    for (lowered.names) |x| {
+        if (std.mem.eql(u8, x.path, "y1")) y1 = x.slot;
+        if (std.mem.eql(u8, x.path, "u1.q")) q = x.slot;
+        if (std.mem.endsWith(u8, x.path, ".cm")) cm = x.slot;
+    }
+    try std.testing.expect(y1 != null and q != null);
+    try std.testing.expectEqual(y1, cm);
+    const p = &lowered.program;
+    const drives = for (p.drivers) |d| {
+        if (p.nets[d.net].slot != y1.?) continue;
+        if (d.source == .bridge and d.source.bridge.src == q.?) break true;
+    } else false;
+    try std.testing.expect(drives);
+}

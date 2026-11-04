@@ -64,8 +64,10 @@ const Walk = struct {
     groups: std.ArrayList(ports.Group) = .empty,
     /// Its module's list of ports.
     list: Vir.Body = .empty,
-    /// A mixed design's module variables by domain (`domain.of`).
+    /// A mixed design's module variables by domain (`domain.of`), and its
+    /// continuous nets a bridge makes digital segments (`domain.segments`).
     domain: domain_mod.Domain = .{},
+    segments: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty,
 };
 
 /// Walks every instance in `Zcu.instances` order: its scope, its frame, its
@@ -265,7 +267,10 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
     }
     for (later.values()) |decls| try redecl.check(l, f, decls.items, .module, w.list);
     const top = l.frames.items[f].parent == none;
-    if (top and l.options.mixed) w.domain = try domain_mod.of(l.a, vir, body, w.index == 0);
+    if (top and l.options.mixed) {
+        w.domain = try domain_mod.of(l.a, vir, body, w.index == 0);
+        w.segments = try domain_mod.segments(l, w.index);
+    }
     w.deferred.clearRetainingCapacity();
     for (later.keys(), later.values()) |first, decls| try signal(w, f, first, decls.items, if (top) w.conns.get(first) else null);
     if (top) for (w.groups.items) |g| try ports.group(l, f, g, &w.deferred);
@@ -484,7 +489,7 @@ fn analogNet(l: *Lower, vir: *const Vir, decls: []const Inst.Index) Error!bool {
 fn signal(w: *Walk, f: u32, first: Inst.Index, decls: []const Inst.Index, conn: ?ports.Conn) Error!void {
     const l = w.l;
     const vir = l.virOf(f);
-    if (l.options.mixed and try analogNet(l, vir, decls)) return;
+    if (l.options.mixed and !w.segments.contains(first) and try analogNet(l, vir, decls)) return;
     if (w.domain.analog.contains(first)) return; // VAMS §7.2.2 the analog block's
     var storage: Inst.Storage = .none;
     var dir: Inst.Direction = .none;

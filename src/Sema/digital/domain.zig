@@ -18,6 +18,7 @@
 //! - `pub fn probe(l: *Lower, i: Inst.Index) Error!u32`
 //! - `pub fn monitor(l: *Lower, i: Inst.Index) Error!?u32`
 //! - `pub const Bridge = struct`, `pub fn bridgeOf(l: *Lower, k: u32) Error!?Bridge`
+//! - `pub fn segments(l: *Lower, k: u32) Error!std.AutoHashMapUnmanaged(Inst.Index, void)`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -169,18 +170,46 @@ pub fn bridgeOf(l: *Lower, k: u32) Error!?Bridge {
         const child: u32 = @backingInt(at);
         // §7.8.5.1 a primitive's terminal: the row names the parent itself.
         if (parents[child] != parents[k]) return l.refuse("a connect module on a primitive's terminal");
-        const d = zcu.instances.items(.module)[child];
-        const vir = zcu.fileVir(d.file);
-        const formals = vir.body(Lower.payload(vir, Inst.Module, zcu.declRow(d).inst).ports);
-        const pos = std.mem.findScalar(Inst.Index, formals, port) orelse return l.refuse("a connect module on a port its module does not list");
-        const rows = zcu.instances.items(.ports)[child];
-        if (pos >= rows.len) return l.refuse("a connect module on an unconnected port");
-        return .{ .child = child, .actual = zcu.ports.items(.actual)[rows.start + pos] };
+        return .{ .child = child, .actual = try actualOf(l, child, port) };
     }
     return null;
 }
 
+/// VAMS §7.8 the continuous nets of instance `k`'s module that a bridge
+/// joins to a discrete port below: each the digital segment between that
+/// port and its bridge (lib/sim/digital mints one there), so the digital
+/// half declares it, a plain wire. By first declaration.
+pub fn segments(l: *Lower, k: u32) Error!std.AutoHashMapUnmanaged(Inst.Index, void) {
+    const zcu = l.zcu;
+    const parents = zcu.instances.items(.parent);
+    var out: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
+    for (zcu.inserts.items(.bridge), zcu.inserts.items(.instance), zcu.inserts.items(.port)) |b, at, port| {
+        if (parents[@backingInt(b)] != @as(@TypeOf(parents[0]), @fromBackingInt(k))) continue;
+        const child: u32 = @backingInt(at);
+        if (parents[child] != parents[@backingInt(b)]) continue; // a primitive's terminal: `bridgeOf` refuses it
+        const actual = try actualOf(l, child, port);
+        const i = actual.toIndex() orelse continue;
+        const pv = zcu.fileVir(zcu.instances.items(.module)[k].file);
+        if (Lower.tag(pv, i) != .decl_ref) continue; // a select or concatenation: the net is not one name
+        try out.put(l.a, decl.canonical(pv, pv.instructions.items(.data)[@backingInt(i)].decl_tok.decl), {});
+    }
+    return out;
+}
+
 // ---- private ----
+
+/// Formal `port` of instance `child`'s module: its connection in the
+/// parent (`Zcu.ports`).
+fn actualOf(l: *Lower, child: u32, port: Inst.Index) Error!Inst.Ref {
+    const zcu = l.zcu;
+    const d = zcu.instances.items(.module)[child];
+    const vir = zcu.fileVir(d.file);
+    const formals = vir.body(Lower.payload(vir, Inst.Module, zcu.declRow(d).inst).ports);
+    const pos = std.mem.findScalar(Inst.Index, formals, port) orelse return l.refuse("a connect module on a port its module does not list");
+    const rows = zcu.instances.items(.ports)[child];
+    if (pos >= rows.len) return l.refuse("a connect module on an unconnected port");
+    return zcu.ports.items(.actual)[rows.start + pos];
+}
 
 /// A probe terminal's name as the source writes it.
 fn terminal(l: *Lower, r: Inst.Ref) Error!Program.List {

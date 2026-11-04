@@ -11,6 +11,7 @@
 //! - `pub fn bundle(comp: *Compilation) Allocator.Error!Diag`
 //! - `pub fn sources(comp: *Compilation) Allocator.Error![]const Diag.Source`
 //! - `pub fn relocate(out: vams.Preprocessor.Output, start: u32, end: u32) Diag.Loc`
+//! - `pub fn instLoc(out: vams.Preprocessor.Output, u: *const Compilation.Unit, src: Inst.Ref) Diag.Loc`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -118,7 +119,7 @@ fn source(out: vams.Preprocessor.Output, file: vams.Preprocessor.File.Index, off
 /// Where Vir instruction `src` of unit `u` was written, as the old
 /// compiler located it: a statement `<+` at its target's first byte (no
 /// width), a call at its callee's name, anything else at its main token.
-fn instLoc(out: vams.Preprocessor.Output, u: *const Compilation.Unit, src: Inst.Ref) Diag.Loc {
+pub fn instLoc(out: vams.Preprocessor.Output, u: *const Compilation.Unit, src: Inst.Ref) Diag.Loc {
     const i = src.toIndex() orelse return .none;
     const tag = u.vir.instructions.items(.tag)[@backingInt(i)];
     if (tag == .contrib or tag == .contrib_indirect) {

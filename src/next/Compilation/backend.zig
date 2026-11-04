@@ -60,9 +60,14 @@ pub fn airPasses(comp: *Compilation) !bool {
     const roots = try codegen_mod.floatRoots(a, &an.air, &an.device);
     const params = try a.alloc(Air.Float.Param, an.device.params.len);
     for (params, 0..) |*p, k| p.* = .{ .ranges = try floatRanges(a, an.device.paramRanges(@fromBackingInt(@intCast(k)))) };
+    // Where each instruction's diagnostic points: the expression Sema
+    // lowered it from.
+    const locs = try a.alloc(vams.Diag.Loc, an.srcs.len);
+    for (locs, an.srcs) |*l, s| l.* = if (s.src == .none) .none else errors.instLoc(comp.pp.output(), &comp.units.items[@backingInt(s.file)], s.src);
     comp.float = try Air.Float.analyze(comp.gpa, an.air, &comp.zcu.intern_pool, .{
         .params = params,
         .roots = roots,
+        .locs = locs,
         .unknown_bound = comp.config.unknown_bound,
     }, &comp.wip);
     return !comp.wip.failed();

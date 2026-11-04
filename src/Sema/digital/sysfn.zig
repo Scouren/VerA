@@ -59,6 +59,8 @@ pub fn sysType(l: *Lower, i: Inst.Index) Error!Type {
     const vir = l.virOf(l.frame);
     const s = try sysOf(l, vir, i);
     // §17.2.4.4 `$fread(mem, fd, , count)` omits its start.
+    // §17.6.4 `$q_full(q_id, status)`.
+    if (s.f == .q_full and (s.args.len != 2 or s.args[0] == .none or s.args[1] == .none)) return l.reject(l.frame, i.toRef(), "$q_full takes (q_id, status)");
     for (s.args, 0..) |a, k| if (a == .none and !(s.f == .fread and k == 2)) return l.refuse("an omitted system function argument");
     return switch (s.f) {
         // §17.2.1 a descriptor is 32 bits, its MSB set for an `fd`.

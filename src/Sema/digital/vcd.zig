@@ -63,6 +63,11 @@ pub fn task(l: *Lower, i: Inst.Index, op: Program.DumpOp, args: []const Inst.Ref
 /// the instance, and its `$scope`/`$var port` header.
 pub fn ports(l: *Lower, i: Inst.Index, op: Program.PortsOp, all: []const Inst.Ref) Error!u32 {
     const args = if (all.len == 1 and all[0] == .none) all[0..0] else all;
+    switch (op) {
+        .limit => if (args.len == 0 or args.len > 2) return l.reject(l.frame, i.toRef(), "$dumpportslimit takes a filesize, then optionally a file_pathname"),
+        .off, .on, .all, .flush => if (args.len > 1) return l.reject(l.frame, i.toRef(), "$dumpportsoff, $dumpportson, $dumpportsall and $dumpportsflush take at most one file_pathname argument"),
+        .ports => {},
+    }
     if (op != .ports) {
         var c: Program.PortsCall = .{ .op = op, .ports = 0, .name = none, .size = none };
         if (args.len != 0 and (op != .limit or args.len == 2)) c.name = try expr.self_(l, args[args.len - 1], 0);

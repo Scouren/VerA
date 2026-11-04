@@ -8,7 +8,13 @@
 //! rewrite replaces it. A fixture agrees when both transcripts are
 //! byte-equal, both runs end the same way (completed, or a runtime error),
 //! the same timing checks report violations (W1199's sites), and both write
-//! the same files. A known difference is a line of `sim.xfail` (`<path
+//! the same files. Each fixture is compared in a child process of its
+//! own (Linux), so one that crashes either side is a difference of its
+//! own and its memory is not this test's. A `//! reject` fixture agrees when both sides refuse
+//! it: the new side at a stage before the lowering (that stage's oracle
+//! owns its codes), or the lowering raising E1100 with lib/sim/digital's
+//! message at its byte, or the run failing as the old run does; a crash,
+//! or a lowering that refuses it as unsupported, is a difference. A known difference is a line of `sim.xfail` (`<path
 //! under the fixture root> <reason>`); a listed fixture that agrees, or
 //! that is not in the corpus, fails the run until its line goes.
 //! Cites: IEEE 1364-2005 §9, §11, §13, §17 (through both implementations).
@@ -16,6 +22,7 @@
 //! Contents: tests only.
 
 const std = @import("std");
+const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 const sim = @import("sim");
 const std_sim = @import("std_sim");
@@ -37,13 +44,16 @@ const Side = struct { out: []const u8, failed: bool, why: []const u8 = "", sites
 
 /// The new side's compile, from source: the `Program` and its check sites,
 /// or why it stopped.
-const Compiled = union(enum) { lowered: sema.digital.Lowered, refused: []const u8 };
+/// `earlier`: a stage before the lowering raised an error; `refused`: the
+/// lowering does not express the design yet (or the harness cannot run
+/// it); `rejected`: the lowering raised E1100.
+const Compiled = union(enum) { lowered: sema.digital.Lowered, refused: []const u8, earlier: []const u8, rejected: sema.digital.Why };
 
 // ---- private ----
 
-/// Every `.v` with a `.expected.txt` golden or an `//! expect vcd` line, and
-/// no `//! reject` line, under `dirs`, relative to `root` and sorted
-/// (diff-sim's corpus). `pli/` is the VPI suite's.
+/// Every `.v` with a `.expected.txt` golden, an `//! expect vcd` line or a
+/// `//! reject` line under `dirs`, relative to `root` and sorted (the
+/// `suite -- devices` corpus). `pli/` is the VPI suite's.
 fn collect(arena: Allocator, io: std.Io, root: []const u8) ![]const []const u8 {
     var list: std.ArrayList([]const u8) = .empty;
     for (dirs) |sub| {
@@ -60,8 +70,7 @@ fn collect(arena: Allocator, io: std.Io, root: []const u8) ![]const []const u8 {
             const golden = try std.fmt.allocPrint(arena, "{s}.expected.txt", .{stem});
             const has_golden = if (dir.access(io, golden, .{})) |_| true else |_| false;
             const source = try dir.readFileAlloc(io, entry.path, arena, .limited(1 << 22));
-            if (negative(source)) continue;
-            if (!has_golden and std.mem.find(u8, source, "//! expect vcd") == null) continue;
+            if (!negative(source) and !has_golden and std.mem.find(u8, source, "//! expect vcd") == null) continue;
             try list.append(arena, try std.fs.path.join(arena, &.{ sub, entry.path }));
         }
     }
@@ -191,11 +200,11 @@ fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, op
     };
     const out = try a.create(vams.Preprocessor.Output);
     out.* = pp.output();
-    if (out.failed) return .{ .refused = try a.print("the vams preprocessor refuses it ({s})", .{out.diagnostics[out.diagnostics.len - 1].code}) };
+    if (out.failed) return .{ .earlier = try a.print("the vams preprocessor refuses it ({s})", .{out.diagnostics[out.diagnostics.len - 1].code}) };
     const text = try a.dupeSentinel(u8, out.text, 0);
     const tree = try a.create(vams.Ast);
     tree.* = try vams.Ast.parse(a, text, .{ .keywords = std.meta.stringToEnum(vams.Ast.KeywordSet, @tagName(opts.language)).? });
-    if (tree.errors.len != 0) return .{ .refused = try a.print("the vams parser refuses it ({t})", .{tree.errors[0].tag}) };
+    if (tree.errors.len != 0) return .{ .earlier = try a.print("the vams parser refuses it ({t})", .{tree.errors[0].tag}) };
     const vir = try vams.AstGen.generate(a, tree, .{ .directives = out.directives });
     // `SIM_DUMP=1` with `SIM_ONLY`: the fixture's Vir on stderr.
     if (std.process.Environ.getPosix(std.testing.environ, "SIM_DUMP") != null) {
@@ -205,17 +214,18 @@ fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, op
     }
     for (vir.diag.messages()) |m| {
         const code = vir.diag.message(m).tag.code;
-        if (@tagName(code)[0] == 'E') return .{ .refused = try a.print("AstGen refuses it ({t})", .{code}) };
+        if (@tagName(code)[0] == 'E') return .{ .earlier = try a.print("AstGen refuses it ({t})", .{code}) };
     }
     var zcu: Zcu = try .init(a);
     const file = try zcu.addFile(path, vir, 0);
     if (std.mem.find(u8, source, "//@ libmap") != null or std.mem.find(u8, source, "//@ liblist") != null)
         try libraries(a, &zcu, file, tree, out.unit_starts, opts);
     try sema.Sema.elaborate(&zcu, .{ .roots = .all, .ieee1364 = true });
-    for (zcu.failed.items(.code)) |code| if (@tagName(code)[0] == 'E') return .{ .refused = try a.print("elaboration refuses it ({t})", .{code}) };
-    var why: []const u8 = "";
+    for (zcu.failed.items(.code)) |code| if (@tagName(code)[0] == 'E') return .{ .earlier = try a.print("elaboration refuses it ({t})", .{code}) };
+    var why: sema.digital.Why = .{};
     const lowered = sema.digital.lower(a, &zcu, .{ .sources = &.{.{ .tree = tree, .pp = out }} }, &why) catch |e| switch (e) {
-        error.Unsupported => return .{ .refused = try a.print("lowering: {s}", .{why}) },
+        error.Unsupported => return .{ .refused = try a.print("lowering: {s}", .{why.text}) },
+        error.Rejected => return .{ .rejected = why },
         error.OutOfMemory => return e,
     };
     return .{ .lowered = lowered };
@@ -271,10 +281,12 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
     const source = try std.Io.Dir.cwd().readFileAlloc(io, path, a, .limited(1 << 22));
     const opts = try options(a, io, source, path) orelse return "a `//@` line the cli refuses";
     const compiled = try compileNew(a, io, source, path, opts);
-    const lowered = switch (compiled) {
+    const reject = negative(source);
+    switch (compiled) {
         .refused => |why| return why,
-        .lowered => |l| l,
-    };
+        .earlier => |why| if (!reject) return why,
+        .rejected, .lowered => {},
+    }
 
     // Each side runs in a scratch directory of its own, so the files a
     // fixture writes are compared too and never land in the tree.
@@ -286,11 +298,9 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
     defer home.close(io);
     defer std.process.setCurrentDir(io, home) catch {};
 
-    try std.process.setCurrentDir(io, new_dir.dir);
-    const new = try runProgram(a, io, &lowered.program, lowered.check_sites, opts.event_budget);
-
     try std.process.setCurrentDir(io, old_dir.dir);
     var old_out: std.Io.Writer.Allocating = .init(a);
+    var first: ?struct { code: diag.Code, at: u32, message: []const u8 } = null;
     const old: Side = old: {
         var bag: diag.Bag = .init(a);
         const failed = if (digital.run(a, source, opts, &bag, &old_out.writer)) |_| bag.failed() else |e| switch (e) {
@@ -301,10 +311,27 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
         for (0..bag.count()) |k| {
             const d = bag.at(k);
             if (d.code == .W1199) try sites.append(a, d.span.start);
+            if (first == null and d.severity == .err) first = .{ .code = d.code, .at = d.span.start, .message = d.message };
         }
         break :old .{ .out = old_out.written(), .failed = failed, .sites = try uniqueSorted(sites.items) };
     };
+    const lowered = switch (compiled) {
+        .lowered => |l| l,
+        .earlier => |why| return if (old.failed) "" else std.fmt.allocPrint(a, "old run completed, new {s}", .{why}),
+        .rejected => |why| {
+            const f = first orelse return std.fmt.allocPrint(a, "old run completed, the new lowering raised E1100 at byte {d}: {s}", .{ why.at, why.text });
+            if (f.code != .E1100 or !std.mem.endsWith(u8, f.message, why.text) or f.at != why.at)
+                return std.fmt.allocPrint(a, "old {t} at byte {d}: {s}; new E1100 at byte {d}: {s}", .{ f.code, f.at, f.message, why.at, why.text });
+            return "";
+        },
+        .refused => unreachable, // returned above
+    };
 
+    try std.process.setCurrentDir(io, new_dir.dir);
+    const new = try runProgram(a, io, &lowered.program, lowered.check_sites, opts.event_budget);
+
+    if (old.failed and !new.failed) if (first) |f|
+        return std.fmt.allocPrint(a, "old run failed ({t}: {s}), new run completed", .{ f.code, f.message });
     if (old.failed != new.failed)
         return std.fmt.allocPrint(a, "old run {s}, new run {s} ({s})", .{ if (old.failed) "failed" else "completed", if (new.failed) "failed" else "completed", new.why });
     if (!std.mem.eql(u8, old.out, new.out)) return textDiff(a, old.out, new.out);
@@ -312,6 +339,45 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
         return std.fmt.allocPrint(a, "the timing checks that violated differ: old at bytes {any}, new {any}", .{ old.sites, new.sites });
     try std.process.setCurrentDir(io, home);
     return sameFiles(a, io, old_dir.dir, new_dir.dir);
+}
+
+/// `compare` in a forked child (Linux): its verdict through a pipe, or the
+/// signal that ended it, so a crash is that fixture's difference and the
+/// child's memory never this process's.
+fn isolated(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const u8 {
+    if (builtin.os.tag != .linux) return compare(a, io, root, rel);
+    const linux = std.os.linux;
+    var fds: [2]linux.fd_t = undefined;
+    if (linux.errno(linux.pipe2(&fds, .{ .CLOEXEC = true })) != .SUCCESS) return error.PipeFailed;
+    const pid = linux.fork();
+    if (linux.errno(pid) != .SUCCESS) return error.ForkFailed;
+    if (pid == 0) {
+        _ = linux.close(fds[0]);
+        const why = compare(a, io, root, rel) catch |e| @errorName(e);
+        var at: usize = 0;
+        while (at < why.len) {
+            const n = linux.write(fds[1], why[at..].ptr, why.len - at);
+            if (linux.errno(n) != .SUCCESS) linux.exit_group(2);
+            at += n;
+        }
+        linux.exit_group(0);
+    }
+    _ = linux.close(fds[1]);
+    defer _ = linux.close(fds[0]);
+    var out: std.ArrayList(u8) = .empty;
+    var buf: [4096]u8 = undefined;
+    while (true) {
+        const n = linux.read(fds[0], &buf, buf.len);
+        if (linux.errno(n) == .INTR) continue;
+        if (linux.errno(n) != .SUCCESS) return error.ReadFailed;
+        if (n == 0) break;
+        try out.appendSlice(a, buf[0..n]);
+    }
+    var status: u32 = 0;
+    while (linux.errno(linux.waitpid(@intCast(pid), @ptrCast(&status), 0)) == .INTR) {}
+    if (linux.W.IFSIGNALED(status)) return std.fmt.allocPrint(a, "the comparison crashed ({t})", .{linux.W.TERMSIG(status)});
+    if (linux.W.EXITSTATUS(status) != 0) return std.fmt.allocPrint(a, "the comparison exited {d}", .{linux.W.EXITSTATUS(status)});
+    return out.items;
 }
 
 /// "" when both runs wrote the same files with the same bytes, else the
@@ -410,7 +476,7 @@ test "diff-sim: Sema's digital Program runs every .v fixture as lib/sim/digital 
         _ = fixture_arena.reset(.retain_capacity);
         const a = fixture_arena.allocator();
         try seen.put(ra, rel, {});
-        const why = try compare(a, io, root, rel);
+        const why = try isolated(a, io, root, rel);
         const reason = xfail.get(rel);
         if (why.len != 0) {
             if (reason) |r| {

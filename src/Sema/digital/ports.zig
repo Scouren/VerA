@@ -191,7 +191,7 @@ pub fn declareNet(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Inde
     // §12.3 a port joined to one whole net of its width is that net.
     // §12.1.2 an instance array's element takes its own slice of an
     // expression as wide as the port times the elements.
-    const slice: ?u32 = if (conn) |c| if (c.lane) |ln| if (c.actual != .none and try actualWidth(l, c) == width * ln[1]) ln[0] * width else null else null else null;
+    const slice: ?u32 = if (conn) |c| try laneSlice(l, c, width) else null;
     if (slice == null) if (conn) |c| if (c.actual != .none) if (try wholeNet(l, c)) |outer| {
         // VAMS §3.7 a wreal joined to a wire or tri: one wreal net.
         const outer_wreal = l.nets.items[outer.net].kind == .wreal;
@@ -352,6 +352,22 @@ fn netArray(l: *Lower, f: u32, first: Inst.Index, proto: Name, kind: net.NetKind
 /// The whole net (not an array, not a select) `c.actual` names in its
 /// frame, or null.
 /// The self-determined width of `c.actual` in its frame.
+/// §12.1.2 the lowest bit of `c`'s slice an instance array element of a
+/// `width`-bit port takes: null when `c` is as wide as the port (connected
+/// to every element whole), or when it is no array element.
+fn laneSlice(l: *Lower, c: Conn, width: u32) Error!?u32 {
+    const ln = c.lane orelse return null;
+    if (c.actual == .none) return null;
+    assert(ln[0] < ln[1]);
+    const whole = try actualWidth(l, c);
+    if (whole == width) return null;
+    // §7.1.6 "Too many or too few bits to connect to all the instances
+    // shall be considered an error"; the product is sized in u64, as a
+    // mismatch past u32 is the same error.
+    if (@as(u64, width) * ln[1] != whole) return l.reject(c.frame, c.actual, "§12.1.2: only an expression as wide as the port or as the port times the array size is connected across an instance array");
+    return ln[0] * width;
+}
+
 fn actualWidth(l: *Lower, c: Conn) Error!u32 {
     const saved = l.frame;
     defer l.frame = saved;

@@ -156,6 +156,8 @@ pub fn task(l: *Lower, i: Inst.Index) Error!void {
         },
         .fflush => .{ .kind = .fflush, .a = 0 },
         .queue => |op| blk: {
+            for (args) |a| if (a == .none) return l.reject(l.frame, i.toRef(), "the §17.6 queue tasks take four arguments");
+            if (args.len != 4) return l.reject(l.frame, i.toRef(), "the §17.6 queue tasks take four arguments");
             // §17.6.1-§17.6.5 which arguments each task writes.
             const outs: []const bool = switch (op) {
                 .initialize, .add => &.{ false, false, false, true },

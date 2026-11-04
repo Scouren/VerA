@@ -4,7 +4,6 @@
 # (`lowering: ...`), a stage before it that refuses the fixture, or the first
 # transcript difference. A listed fixture that agrees fails the run until its
 # line goes.
-verilog-ams/digital/driver_count_in_an_ordinary_module_rejected.v lowering: the system function `$driver_count`
 verilog-ams/digital/reject_wreal_connected_to_wand.v old run failed (E0919: `n` is a wand and port `o` is a wreal), new run completed
 verilog-ams/digital/vams_digital_temperature_refused.v lowering: the system function `$temperature`
 verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v old run failed (E1100: §3.8: an attribute value must be a constant expression), new run completed

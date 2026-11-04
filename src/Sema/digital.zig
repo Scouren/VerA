@@ -195,6 +195,9 @@ pub const Lower = struct {
     /// read only lane by lane (`gate_lane`), and the lane being compiled
     /// (`none` outside a gate's inputs).
     lane_split: std.AutoHashMapUnmanaged(SegmentRef, void) = .empty,
+    /// VAMS §7.9 a segment a connect module drives: its receivers' net, by
+    /// its drivers' net (`domain.segregate`).
+    receivers: std.AutoHashMapUnmanaged(u32, Name) = .empty,
     gate_lane: u32 = none,
     names: std.ArrayList(Name) = .empty,
     frames: std.ArrayList(Frame) = .empty,
@@ -489,6 +492,7 @@ fn spine(l: *Lower) Error!void {
     if (pp.files.len != 0) l.b.p.file_name = try l.b.string(pp.files[0].name);
     try timeScales(l);
     try decl.declare(l);
+    if (l.options.mixed) try @import("digital/drivers.zig").segregate(l);
     try stmt.compileAll(l);
 }
 

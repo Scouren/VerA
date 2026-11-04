@@ -1,22 +1,4 @@
 # diff-elab known differences: `<path under the fixture root> <reason>`, one per line.
-# A listed fixture that agrees, or is not compared, fails the run.
-verilog-a/ch03_data_types/aliasparam_hierarchical_read_rejected.va E0373 on a hierarchical read of an aliasparam (`u.alias`) is expression analysis, the per-instance stage of Sema (stage 5), not built yet
-verilog-a/ch03_data_types/aliasparam_hierarchical_system_rejected.va E0373 on a hierarchical read of an aliasparam (`u.alias`) is expression analysis, the per-instance stage of Sema (stage 5), not built yet
-verilog-a/ch06_hierarchy/generate_block_unselected_in_a_parent_module_rejected.va E0901 a hierarchical name into an unselected generate block is expression analysis, the per-instance stage of Sema (stage 5), not built yet
-verilog-a/ch06_hierarchy/generate_if_instantiates_one_arm.va §6.6.2 the old flatten inlines both arms of an if-generate under gates; the new walk evaluates the scheme and elaborates the selected arm only
-verilog-a/ch06_hierarchy/if_generate_values_drive_paramset_selection.va §6.6.2 the old flatten inlines both arms of an if-generate under gates; the new walk evaluates the scheme and elaborates the selected arm only
-verilog-a/ch06_hierarchy/paramset_defparam_hierarchy_legal.va §6.6.2 the old flatten inlines both arms of an if-generate under gates; the new walk evaluates the scheme and elaborates the selected arm only
-verilog-a/ch06_hierarchy/paramset_oomr_nonlocal_parameter_rejected.va E0907 an out-of-module reference in a paramset statement is expression analysis, the per-instance stage of Sema (stage 5), not built yet
-verilog-a/ch06_hierarchy/paramset_selected_after_generate.va §6.6.2 the old flatten inlines both arms of an if-generate under gates; the new walk evaluates the scheme and elaborates the selected arm only
-verilog-a/ch06_hierarchy/paramset_selected_by_generate_localparam.va §6.6.2 the old flatten inlines both arms of an if-generate under gates; the new walk evaluates the scheme and elaborates the selected arm only
-verilog-a/ch06_hierarchy/reject_6_4_1_paramset_variable_assigns_parameter.va E0237 a paramset variable assigning a parameter is statement analysis, the per-instance stage of Sema (stage 5), not built yet
-verilog-a/ch06_hierarchy/untyped_child_port_behavioral_use_rejected.va E0337 an undeclared child port used behaviorally is access analysis, the per-instance stage of Sema (stage 5), not built yet
-verilog-a/ch09_system_tasks/dist_type_string_misspelled_rejected.va E0816 a §9.13 distribution in a paramset statement is folded by the device rng (old paramset_dist), not by the comptime evaluator yet
-verilog-a/ch09_system_tasks/geometry_state_read_rejected.va E0363 a hierarchical system parameter override reading state is expression analysis, the per-instance stage of Sema (stage 5), not built yet
-verilog-a/ch09_system_tasks/rng_paramset_fractional_rejected.va E0816 a §9.13 distribution in a paramset statement is folded by the device rng (old paramset_dist), not by the comptime evaluator yet
-verilog-a/ch09_system_tasks/rng_paramset_nonfinite_integer_rejected.va E0816 a §9.13 distribution in a paramset statement is folded by the device rng (old paramset_dist), not by the comptime evaluator yet
-verilog-ams/annex_a_syntax/udp_declared_and_instantiated.va W0252 (a UDP or gate instance computes nothing in an analog device) is the analog backend's notice, raised by its per-instance lowering, not by elaboration
-verilog-ams/annex_a_syntax/udp_named_instance_delay2.va W0252 (a UDP or gate instance computes nothing in an analog device) is the analog backend's notice, raised by its per-instance lowering, not by elaboration
-verilog-ams/ch02_lexical/digital_scaled_udp_delay_rejected.va W0252 (a UDP instance computes nothing in an analog device) is the analog backend's notice, raised by its per-instance lowering; elaboration's E0247 agrees
-verilog-ams/ch07_mixed_signal/child_wrong_flow_rejected.va E0501 an access function across a port join is access analysis, the per-instance stage of Sema (stage 5), not built yet
-verilog-ams/ch07_mixed_signal/child_wrong_potential_rejected.va E0501 an access function across a port join is access analysis, the per-instance stage of Sema (stage 5), not built yet
+# A listed fixture that agrees, or is not compared, fails the run. A later stage's codes
+# are compared one way (stages.zig), and a difference the LRM settles for the
+# new side is a line of elab.rulings, not of this file.

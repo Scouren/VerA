@@ -32,7 +32,7 @@ const payloadOf = walk.payloadOf;
 /// What an instance elaborates: its module, the first paramset selected on
 /// the way (`Decl.none` for a module target), the module's given values and
 /// the last paramset level's §9.18 values (null for a module target).
-pub const Picked = struct { module: Zcu.Decl, paramset: Zcu.Decl, givens: walk.Run, base: ?Zcu.Hier };
+pub const Picked = struct { module: Zcu.Decl, paramset: Zcu.Decl, givens: walk.Run, base: ?Zcu.Hier, own: InternPool.Index = .none };
 
 /// §6.4.2's tie-breaking rules, in the clause's order.
 const TieRule = enum { un_overridden, ranged_locals, unconnected_ports };
@@ -50,11 +50,12 @@ pub fn resolve(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, target: InternPool
     var name = target;
     var run = givens;
     var first: Zcu.Decl = .none;
+    var own: InternPool.Index = .none;
     var base: ?Zcu.Hier = null;
     for (0..zcu.paramsets.items.len + 1) |_| {
         // Annex E: a user paramset shadows a shipped primitive of its name.
         if (zcu.modules.get(name)) |d| if (!zcu.isBuiltin(d) or !try hasParamset(s, name))
-            return .{ .module = d, .paramset = first, .givens = run, .base = base };
+            return .{ .module = d, .paramset = first, .givens = run, .base = base, .own = own };
         const level_dps = if (std.meta.eql(first, Zcu.Decl.none)) dps else &.{};
         const ps = (try select(s, file, src, name, list.items[run.start..][0..run.len], level_dps)) orelse return null;
         if (std.meta.eql(first, Zcu.Decl.none)) first = ps;
@@ -66,6 +67,11 @@ pub fn resolve(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, target: InternPool
         try defparam.applyDefparams(s, &env, level_dps, decl.name);
         env.hier = try walk.hierValues(s, &env, if (base) |*b| b else parent, list.items[run.start..][0..run.len], level_dps, file, src);
         base = env.hier;
+        // The first level's own parameters, kept for the instance's rows.
+        if (own == .none) {
+            for (env.positions.keys()) |param_inst| _ = try env.param(param_inst);
+            own = try zcu.intern_pool.get(s.gpa, .{ .aggregate = .{ .ty = .none, .elems = env.values.items } });
+        }
         // §6.4.1 each `.name = expr ;` gives the next level a value.
         const start: u32 = @intCast(list.items.len);
         for (vir.body(decl.body)) |i| if (vir.instructions.items(.tag)[@backingInt(i)] == .ps_override) {

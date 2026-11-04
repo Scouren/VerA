@@ -331,6 +331,8 @@ pub const Io = extern struct {
     dims: Body,
     init: Body,
     defaults: List(Default),
+    /// The §2.9 attribute specs of the instances prefixing the declaration.
+    attrs: List(Attr) = .empty,
 };
 
 /// A net: `strength` the A.2.2.2 words as written ("strong0,pull1"),
@@ -346,6 +348,8 @@ pub const Net = extern struct {
     delay: Exprs,
     init: Body,
     defaults: List(Default),
+    /// The §2.9 attribute specs of the instances prefixing the declaration.
+    attrs: List(Attr) = .empty,
 };
 
 /// A variable; `discipline` a `reg`'s optional one.
@@ -357,6 +361,8 @@ pub const Variable = extern struct {
     range: Body,
     dims: Body,
     init: Body,
+    /// The §2.9 attribute specs of the instances prefixing the declaration.
+    attrs: List(Attr) = .empty,
 };
 
 /// A parameter; `local` is a localparam or, by IEEE 1364-2005 §4.10.1, a
@@ -369,6 +375,8 @@ pub const Param = extern struct {
     dims: Body,
     value: Body,
     ranges: List(ValueRange),
+    /// The §2.9 attribute specs of the instances prefixing the declaration.
+    attrs: List(Attr) = .empty,
 };
 
 /// §3.4.2 `from`/`exclude`: `lo` alone for a bare value or a string set

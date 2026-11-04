@@ -1,0 +1,13 @@
+# diff-elab rulings (tests/differential/settle.zig): a fixture where the LRM
+# sides with the new elaboration and not the old one.
+# `<path> | <clause> | new | <expected> | <why>`. <expected> is what the new
+# tree must be: `drops` and the paths of the old tree's instances it omits,
+# sorted, derived by hand from the fixture's parameters (the old flatten
+# inlined both arms of an if-generate and gated them; the new walk evaluates
+# the scheme and elaborates the selected arm only). The clause is one the
+# fixture's `//! lrm` lines cite. A ruling that settles nothing fails the run.
+verilog-a/ch06_hierarchy/generate_if_instantiates_one_arm.va | 6.6.2 | new | drops ch6_generate_if_instance.on.u_on | §6.6 "a conditional generate ... At most one generate block instantiated from a set of alternatives"; `sel = 0` selects the else arm, so `on.u_on` does not exist
+verilog-a/ch06_hierarchy/if_generate_values_drive_paramset_selection.va | 6.9.2 | new | drops b4_pgi_top.g1.u2 b4_pgi_top.g2.u3 | §6.9.2 "paramset selection is performed after the generate construct has been evaluated"; `wide = 1` selects g1's then arm (u1) and g2's else arm (u4), so u2 and u3 do not exist
+verilog-a/ch06_hierarchy/paramset_defparam_hierarchy_legal.va | 6.6.2 | new | drops ps_dp_legal_top.absent.inactive ps_dp_legal_top.absent.inactive.child ps_dp_legal_top.valid.absent_child.bad ps_dp_legal_top.valid.absent_child.bad.child | §6.6.2 instantiates only a selected arm ("unselected arms create no such hierarchy", the fixture's reading): `select = 0` drops `absent` and the paramset's `.enabled = 0` drops `absent_child`, with their descendants
+verilog-a/ch06_hierarchy/paramset_selected_after_generate.va | 6.9.2 | new | drops ch6_psg_top.g1.u2 ch6_psg_top.g2.u3 | §6.9.2 "paramset selection is performed after the generate construct has been evaluated"; `big = 1` selects g1's then arm (u1) and g2's else arm (u4), so u2 and u3 do not exist
+verilog-a/ch06_hierarchy/paramset_selected_by_generate_localparam.va | 6.6.2 | new | drops ch6_pgl_top.g1.u2 ch6_pgl_top.g2.u3 | §6.6.2 a generate block is a scope with its own localparams, and only the selected one is instantiated; `big = 1` selects g1's then arm (u1) and g2's else arm (u4), so u2 and u3 do not exist

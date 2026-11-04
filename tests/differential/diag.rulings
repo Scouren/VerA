@@ -1,0 +1,16 @@
+# diff-diag rulings (tests/differential/settle.zig): a fixture whose new bundle
+# the LRM supports where the old bag's rendering differs.
+# `<path> | <clause> | new | <expected> | <why>`. <expected> is the new bundle's
+# rows in order, `CODE@line:col` in the original file, derived by hand from
+# the fixture: each row sits on its macro's invocation (the backtick). The
+# clause is one the fixture's `//! lrm` lines cite. A ruling that settles
+# nothing fails the run.
+#
+# All three come from include/check.vh, whose CHECK macros expand GOT twice
+# ("GOT AND WANT ARE EXPANDED TWICE ... §10.3 makes a macro textual
+# substitution"): the old bag kept a row per expanded copy, at offsets in the
+# preprocessed text; a new Loc is a location in the original file, where both
+# copies are one construct at one invocation.
+verilog-a/ch02_lexical/octal_escape_above_377_rejected.va | 2.7 | new | E0148@20:9 | §2.7 Table 2-2: "Implementations may issue an error if the character represented is greater than \377": the error is the escape's, and the source holds one "\477", in the one `CHECKI on line 20, so one row
+verilog-a/ch06_hierarchy/unnamed_generate_instance_reference_rejected.va | 6.6.2 | new | E0998@43:5 | §6.6.2 "the declarations within it cannot be referenced using hierarchical names other than from within the hierarchy instantiated by the generate block itself": the error is the reference's, and the source holds one `genblk1.u1.gain`, in the one `CHECKX on line 43, so one row
+verilog-a/ch02_lexical/undefined_escape_keeps_character.va | 2.7 | new | W0149@23:9 W0850@23:9 W0149@24:9 W0850@24:9 W0149@25:9 W0850@25:9 | §2.7 Table 2-2 lists five escapes and W0149 marks any other; each `CHECKI on lines 23-25 holds one such escape (W0149) and one $strobe a device drops (W0850), so each line has one row of each; the LRM orders no diagnostics, and at one location the new bundle orders by end, then code, where the old ordered by offset in the expanded text

@@ -1,0 +1,7 @@
+# diff-astgen rulings (tests/differential/settle.zig): a fixture where the LRM
+# sides with AstGen's codes and not the old compiler's.
+# `<path> | <clause> | new | <expected> | <why>`. <expected> is the set of
+# codes AstGen owns that Vir must hold, comma-separated and sorted. The clause
+# is one the fixture's `//! lrm` lines cite. A ruling that settles nothing
+# fails the run.
+verilog/12_hierarchy/listed_port_undeclared_rejected.v | 6.5.2.2 | new | E0376 | §6.5.2.2 "Each port shall be declared as input, output, or inout" (IEEE 1364-2005 §12.3.3: each listed port "shall also be declared in the body of the module as one of the following port declarations: input, output, or inout"); E0376 is that rule's code in every language, where the old digital route refused the omission at elaboration with E1100, its catch-all for "unsupported forms" that "does not make legal unsupported Verilog-AMS forms illegal"

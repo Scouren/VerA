@@ -78,7 +78,7 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
             const val: Sema.Value = if (try decl.foldBody(s, unit, v.init)) |k| switch (k) {
                 .int => .{ .ref = .fromIntern(try decl.intern(s, k)), .ty = .integer },
                 .real => .{ .ref = .fromIntern(try decl.intern(s, k)), .ty = .real },
-                .str => .{ .ref = .fromIntern(try decl.intern(s, .{ .int = @import("kernels").fold.strToInt(k.str, 64) })), .ty = .integer },
+                .str => .{ .ref = .fromIntern(try decl.intern(s, .{ .int = @import("std_kernels").fold.strToInt(k.str, 64) })), .ty = .integer },
             } else try expr.lower(s, &eb, init[init.len - 1].toRef());
             const r = try expr.coerce(s, &eb, val, bind.slot.ty);
             _ = try s.addInst(&eb, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(bind.slot.alloc), .rhs = r } } });

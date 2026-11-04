@@ -101,6 +101,23 @@ test "a local name resolves to its declaration; another file's name stays a stri
     , out);
 }
 
+test "IEEE 1364-2005 Annex B `string` is a variable's name under 1364-2005, not its type" {
+    const gpa = std.testing.allocator;
+    var tree = try Ast.parse(gpa, "module m; reg string; endmodule\n", .{ .keywords = .v1364_2005 });
+    defer tree.deinit(gpa);
+    try std.testing.expectEqual(@as(usize, 0), tree.errors.len);
+    var vir = try AstGen.generate(gpa, &tree, .{});
+    defer vir.deinit(gpa);
+    var seen: u32 = 0;
+    for (vir.instructions.items(.tag), vir.instructions.items(.data)) |t, d| if (t == .variable) {
+        const v = vir.extraData(Vir.Inst.Variable, d.pl_node.payload_index);
+        try std.testing.expectEqualStrings("string", vir.string(v.name));
+        try std.testing.expectEqual(Vir.Inst.Storage.reg, v.flags.storage);
+        seen += 1;
+    };
+    try std.testing.expectEqual(@as(u32, 1), seen);
+}
+
 test "IEEE 1364-2005 §12.4.3 an unnamed generate block is genblk<n>, zero-padded past a clash" {
     const gpa = std.testing.allocator;
     var vir = try gen(

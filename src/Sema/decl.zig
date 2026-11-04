@@ -329,7 +329,7 @@ fn items(s: *Sema, main: *Block, env: *eval.Env, body: Vir.Body, depth: u32) All
                 if (arm.flags.default and arm_body == null) arm_body = arm.body;
                 for (vir.list(Inst.Ref, arm.values)) |l| {
                     const label = (try env.ref(l)) orelse continue;
-                    const eq = @import("kernels").fold.binary(.eq, operand, label, null) orelse continue;
+                    const eq = @import("std_kernels").fold.binary(.eq, operand, label, null) orelse continue;
                     if (eq.isTrue()) {
                         arm_body = arm.body;
                         break;

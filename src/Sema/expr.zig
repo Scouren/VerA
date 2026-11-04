@@ -26,7 +26,7 @@ const Allocator = std.mem.Allocator;
 const vams = @import("vams");
 const InternPool = @import("intern_pool");
 const Air = @import("air");
-const fold = @import("kernels").fold;
+const fold = @import("std_kernels").fold;
 const sema_fold = @import("fold.zig");
 const Sema = @import("../Sema.zig");
 const decl = @import("decl.zig");
@@ -63,6 +63,9 @@ pub fn lower(s: *Sema, b: *Block, r: Inst.Ref) Allocator.Error!Value {
     }
     s.expr_depth += 1;
     defer s.expr_depth -= 1;
+    const outer = s.expr_src;
+    s.expr_src = r;
+    defer s.expr_src = outer;
     const v = try inst(s, b, i);
     assert(v.ref != .none);
     return v;

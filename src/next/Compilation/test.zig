@@ -120,6 +120,27 @@ test "an error stops the queue and is located in the file the user wrote" {
     try std.testing.expectEqualStrings("nope", src[m.loc.start..m.loc.end]);
 }
 
+test "a §4.3.2 error from the air passes is located at the operator the user wrote" {
+    // Oracle: the text itself (the old driver points E0601 at the `%`):
+    // Sema records where each Air instruction came from and `Air.Float`
+    // reports there.
+    const gpa = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var paths: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer paths.deinit();
+    const src = "`include \"disciplines.vams\"\nmodule m(p, n); inout p, n; electrical p, n; real f;\n  analog begin f = 5.5 % 0.0; I(p, n) <+ f; end\nendmodule\n";
+    const comp = try compileText(paths.allocator(), &tmp, "mod.va", src, .{ .target = .zig });
+    defer comp.destroy();
+    var errors = try comp.getAllErrors();
+    defer errors.deinit(gpa);
+    try std.testing.expect(errors.failed());
+    const m = errors.message(errors.messages()[0]);
+    try std.testing.expectEqual(vams.Diag.Code.E0601, m.tag.code);
+    try std.testing.expect(!m.loc.isNone());
+    try std.testing.expectEqualStrings("%", src[m.loc.start..m.loc.end]);
+}
+
 test "a backend that is not built is named, with not_built_status" {
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();

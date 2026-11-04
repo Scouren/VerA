@@ -6,6 +6,7 @@
 //! - `pub const Zcu`
 //! - `pub const Sema`
 //! - `pub const digital`
+//! - `pub const fold`
 
 /// The compilation unit's tables.
 pub const Zcu = @import("Zcu.zig");
@@ -13,6 +14,9 @@ pub const Zcu = @import("Zcu.zig");
 pub const Sema = @import("Sema.zig");
 /// The digital lowering: the elaborated design as one `std_sim.Program`.
 pub const digital = @import("Sema/digital.zig");
+/// Emit-time constant folding of Air value tags (diff-kernels holds it to
+/// the device's kernels).
+pub const fold = @import("Sema/fold.zig");
 
 test {
     _ = Zcu;

@@ -1,9 +1,9 @@
 //! The comptime evaluator (Zig's `Sema.resolveConstValue`): one Vir
 //! expression of one instance in, its folded value out, or null when it has
 //! none at elaboration (a net, a variable, an x/z digit, a value wider than
-//! 64 bits, a call no table folds). Every operator is `kernels.fold`'s, the
-//! fold the old compiler's five folders share, so a parameter folds here as
-//! a device computes it. A parameter reads its given value (an override, a
+//! 64 bits, a call no table folds). Every operator is `std_kernels.fold`'s,
+//! whose §4.3 functions are the device's (Gompute), so a parameter folds
+//! here as a device computes it. A parameter reads its given value (an override, a
 //! defparam, a paramset statement) or its default, converted to its
 //! declared type and range; a genvar reads its current value.
 //! Cites: VAMS-2023 §2.6.1, §2.6.2, §2.7, §3.2, §3.4, §3.4.6, §4.2, §4.3
@@ -13,18 +13,23 @@
 //! - `pub const Const`
 //! - `pub const Env = struct` (`init`, `deinit`, `body`, `bodyValue`, `ref`, `param`, `named`, `systemNamed`, `toConst`, `intern`, `arraySize`, `dependsOn`)
 //! - `pub const eval_depth_max: u32`
+//! - `pub const v1364` (the IEEE 1364 mode: four-state values of any width, constant functions)
 
 const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const vams = @import("vams");
 const InternPool = @import("intern_pool");
-const fold = @import("kernels").fold;
+const fold = @import("std_kernels").fold;
 const Zcu = @import("../Zcu.zig");
+/// The IEEE 1364 mode of this evaluator (`eval_1364.zig`): four-state
+/// values of any width, sized as §5.4/§5.5 size them, and §10.4.5 constant
+/// functions. The VAMS mode (`Env.ref`) is unchanged by it.
+pub const v1364 = @import("eval_1364.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 
-/// A folded value: an integer, a real or a string (`kernels.fold.Const`).
+/// A folded value: an integer, a real or a string (`std_kernels.fold.Const`).
 pub const Const = fold.Const;
 
 /// The deepest chain of parameter reads and nested expressions one

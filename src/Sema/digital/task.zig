@@ -156,6 +156,11 @@ pub fn task(l: *Lower, i: Inst.Index) Error!void {
         },
         .fflush => .{ .kind = .fflush, .a = 0 },
         .queue => |op| blk: {
+            for (args) |a| if (a == .none) return l.reject(l.frame, i.toRef(), "the §17.6 queue tasks take four arguments");
+            if (args.len != 4) return l.reject(l.frame, i.toRef(), "the §17.6 queue tasks take four arguments");
+            // §17.6.5 Table 17-15 defines codes 1 to 6.
+            if (op == .exam) if (try l.constOf(l.frame, args[1])) |code| if (code == .int and (code.int < 1 or code.int > 6))
+                return l.rejectArg(l.frame, i, 1, "§17.6.5: a $q_exam q_stat_code is one of Table 17-15's codes 1 to 6");
             // §17.6.1-§17.6.5 which arguments each task writes.
             const outs: []const bool = switch (op) {
                 .initialize, .add => &.{ false, false, false, true },
@@ -168,8 +173,10 @@ pub fn task(l: *Lower, i: Inst.Index) Error!void {
         .dump => |op| .{ .kind = .dump, .a = try vcd.task(l, i, op, args) },
         .ports => |op| .{ .kind = .ports, .a = try vcd.ports(l, i, op, args) },
         .sdf => .{ .kind = .sdf, .a = try sdf.task(l, args) },
-        .monitor_on => .{ .kind = .monitor_on, .a = 0 },
-        .monitor_off => .{ .kind = .monitor_off, .a = 0 },
+        .monitor_on, .monitor_off => blk: {
+            if (args.len != 0) return l.reject(l.frame, i.toRef(), "$monitoron and $monitoroff take no arguments");
+            break :blk .{ .kind = if (kind == .monitor_on) .monitor_on else .monitor_off, .a = 0 };
+        },
         .finish, .stop => blk: {
             if (args.len > 1) return l.refuse("$finish/$stop with more than one argument");
             const verbose: u32 = if (args.len == 0) none else try expr.self_(l, args[0], 0);
@@ -181,6 +188,9 @@ pub fn task(l: *Lower, i: Inst.Index) Error!void {
             const s = args[2].toIndex() orelse return l.refuse("$timeformat without a suffix");
             if (Lower.tag(vir, s) != .str) return l.refuse("$timeformat with a suffix that is no string literal");
             const sd = vir.instructions.items(.data)[@backingInt(s)].str;
+            // §17.3.2 "the range from 0 to -15" (Table 17-10).
+            if (try l.constOf(l.frame, args[0])) |units| if (units == .int and (units.int > 0 or units.int < -15))
+                return l.rejectArg(l.frame, i, 0, "§17.3.2: $timeformat's units number shall be in the range from 0 to -15");
             const tf = try l.b.extraOf(Program.TimeFormat{
                 .units = try expr.self_(l, args[0], 0),
                 .precision = try expr.self_(l, args[1], 0),
@@ -302,6 +312,7 @@ fn plaCall(l: *Lower, args: []const Inst.Ref, logic: Program.PlaLogic, plane: bo
     if (args.len != 3) return l.refuse("a PLA task without three arguments");
     const n = (try expr.nameOf(l, args[0])) orelse return l.refuse("a PLA personality that is no memory");
     if (n.dims.len != 1 or n.kind != .variable) return l.refuse("a PLA personality that is no one-dimensional memory");
+    if (n.msb > n.lsb) return l.reject(l.frame, args[0], "§17.5.3: a PLA personality's bit range is ascending, as in reg [1:n]");
     return l.b.extraOf(Program.PlaCall{
         .logic = logic,
         .plane = plane,
@@ -449,12 +460,12 @@ fn netOf(l: *Lower, e: Inst.Ref) Error!u32 {
     return n.net;
 }
 
-/// §17.1.1.6 `%l`: `library.cell` of the module of `Lower.frame`, every
-/// design in the default library (a library map is refused before here).
+/// §17.1.1.6 `%l`: `library.cell` of the module of `Lower.frame`, its
+/// library the map's (§13.2.3, `work` without one).
 fn cellName(l: *Lower) Error![]const u8 {
     const d = l.zcu.instances.items(.module)[@backingInt(l.frames.items[l.frame].instance)];
     const vir = l.zcu.fileVir(d.file);
-    return std.fmt.allocPrint(l.a, "work.{s}", .{vir.string(l.zcu.declRow(d).name)});
+    return std.fmt.allocPrint(l.a, "{s}.{s}", .{ l.zcu.libraryOf(d), vir.string(l.zcu.declRow(d).name) });
 }
 
 /// A `$sformat` format that is no literal: read at each call, its

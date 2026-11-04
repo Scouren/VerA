@@ -55,6 +55,8 @@ pub fn of(a: Allocator, vir: *const Vir, body: Vir.Body, root: bool) Allocator.E
             try discrete.writes(vir, p, &written, a, 0);
             try reads(a, vir, p, &read);
         },
+        // A continuous assignment's value is a digital read too.
+        .assign => try reads(a, vir, decl.payloadOf(vir, Inst.Assign, i).rhs, &read),
         else => {}, // else: not a discrete process
     };
     var d: Domain = .{};

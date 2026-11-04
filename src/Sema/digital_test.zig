@@ -17,12 +17,14 @@ const Sema = @import("../Sema.zig");
 const digital = @import("digital.zig");
 const Program = std_sim.Program;
 
-/// The discipline the mixed examples' continuous nets take.
+/// The disciplines the mixed examples' nets take: a continuous one and a
+/// discrete one (VAMS §3.6.2.2).
 const prelude =
     \\`timescale 1ns/1ns
     \\nature Voltage; access = V; units = "V"; abstol = 1e-6; endnature
     \\nature Current; access = I; units = "A"; abstol = 1e-12; endnature
     \\discipline electrical; potential Voltage; flow Current; enddiscipline
+    \\discipline ddiscrete; domain discrete; enddiscipline
     \\
 ;
 
@@ -205,4 +207,31 @@ test "§7.3 the mixed host's names: each variable and net by its path below the 
     try std.testing.expectEqualStrings("u.clk", n[1].path);
     for (n) |x| try std.testing.expectEqual(Program.Ty.int(1, false), x.ty);
     try std.testing.expect(n[0].slot != n[1].slot);
+}
+
+test "§7.2.1 a net of a discrete discipline and a reg's discipline declaration are the digital half's (regression: driver_state_histogram.va crashed)" {
+    try expectSameProgram(prelude ++
+        \\module mx(/*<*/vo/*>*/);
+        \\  /*<*/inout vo; electrical vo;/*>*/
+        \\  /*<*/ddiscrete d;/*>*/ wire d;
+        \\  /*<*/ddiscrete o;/*>*/ reg o;
+        \\  assign d = o;
+        \\  initial o = 1'b1;
+        \\  /*<*/analog V(vo) <+ d;/*>*/
+        \\endmodule
+        \\
+    );
+}
+
+test "§7.3.6.4 an analog variable a continuous assignment reads is the digital half's to receive (analog_event_variable_drives_continuous_assign.va)" {
+    try expectSameProgram(prelude ++
+        \\module mx(/*<*/vo/*>*/);
+        \\  /*<*/inout vo; electrical vo;/*>*/
+        \\  real level;
+        \\  wire hi;
+        \\  assign hi = level > 0.5;
+        \\  /*<*/analog begin @(initial_step) level = 0.75; V(vo) <+ hi; end/*>*/
+        \\endmodule
+        \\
+    );
 }

@@ -166,7 +166,9 @@ pub fn declareNet(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Inde
             if (n.flags.net != .none) kind = n.flags.net;
             signed = signed or n.flags.signed;
             if (range.len == 0) range = n.range;
-            if (n.discipline != .empty) return l.refuse("a disciplined net");
+            // VAMS §7.2.1 a mixed design's discrete net is the digital
+            // kernel's (`decl.analogNet` skipped every continuous one).
+            if (n.discipline != .empty and !l.options.mixed) return l.refuse("a disciplined net");
             decl_net = n;
         },
         else => unreachable, // else: `declare.items` groups only nets and ports here

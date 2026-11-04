@@ -133,16 +133,40 @@ pub fn write(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
     try @import("control.zig").assignTo(s, b, args[0], .{ .ref = v, .ty = .string }, src);
 }
 
-/// §9.5.4 `$sscanf`/`$fscanf`/`$fgets` and §9.12 `$value$plusargs`: an
-/// integer `call` of the operands it reads (its count or status), then
-/// each destination (argument `first`, and every one after it for a scan)
-/// assigned `scan$item(call, k)` (a number, coerced) or `scan$str(call, k)`.
+/// §9.5.4 `$sscanf`/`$fscanf`/`$fgets`, §9.5.7 `$ferror` and §9.12
+/// `$value$plusargs`: an integer `call` of the operands it reads (its count
+/// or status), then each destination (argument `first`, and every one after
+/// it for a scan) assigned `scan$item(call, k)` (a number, coerced) or
+/// `scan$str(call, k)`. E0813 (the old `string_io`'s): a scan with no source
+/// or format, a `$sscanf` source that is no string, a literal format with a
+/// code §9.5.4.2 does not list, a `$fgets`/`$ferror` destination that is no
+/// `string`; the value is then 0.
 pub fn read(s: *Sema, b: *Block, tag: SysFn.Tag, first: usize, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
+    const file = b.unit.file;
+    const zero: Value = .{ .ref = .fromIntern(.zero), .ty = .integer };
     const many = first >= 2;
+    if (many and (args.len < 2 or args[0] == .none or args[1] == .none)) {
+        try s.fail(.E0813, file, src, "`{t}` needs a source and a format string", .{tag});
+        return zero;
+    }
+    if (many) if (try decl.foldRef(s, b.unit, args[1])) |c| if (c == .str) if (badScanCode(c.str)) |code| {
+        try s.fail(.E0813, file, src, "`{t}` does not support the conversion `%{c}`; §9.5.4.2's codes are %d %o %h %x %b %c %f %e %g %s %r %m", .{ tag, code });
+        return zero;
+    };
+    if (tag == .@"$fgets" or tag == .@"$ferror") if (args.len > first) if (slotType(b, args[first])) |t| if (t != .string) {
+        try s.fail(.E0813, file, src, "`{t}` writes into a `string` variable, and this one is {t}", .{ tag, t });
+        return zero;
+    };
     var ops: std.ArrayList(Ref) = .empty;
     for (args, 0..) |a, k| {
         if (k == first or (many and k > first)) continue;
-        try ops.append(s.arena, if (a == .none) .fromIntern(.zero_real) else (try expr.lower(s, b, a)).ref);
+        const v: Value = if (a == .none) .{ .ref = .fromIntern(.zero_real), .ty = .real } else try expr.lower(s, b, a);
+        // §9.5.4.2 "a string variable, string parameter, or string literal".
+        if (tag == .@"$sscanf" and k == 0 and v.ty != .string) {
+            try s.fail(.E0813, file, src, "`$sscanf` reads from a string variable, string parameter or string literal, and this one is {t}", .{v.ty});
+            return zero;
+        }
+        try ops.append(s.arena, v.ref);
     }
     const r = try expr.call(s, b, @backingInt(tag), .integer, ops.items);
     for (args, 0..) |a, k| {
@@ -159,6 +183,27 @@ pub fn read(s: *Sema, b: *Block, tag: SysFn.Tag, first: usize, args: []const Ins
 }
 
 // ---- private ----
+
+/// The first conversion code of scan format `fmt` that §9.5.4.2's table
+/// does not list (case-sensitive, as the scanner compares it), or null.
+fn badScanCode(fmt: []const u8) ?u8 {
+    var i: usize = 0;
+    while (std.mem.findScalarPos(u8, fmt, i, '%')) |p| {
+        i = p + 1;
+        if (i >= fmt.len) return null;
+        if (fmt[i] == '%') { // a literal percent, matched not converted
+            i += 1;
+            continue;
+        }
+        if (fmt[i] == '*') i += 1;
+        while (i < fmt.len and std.ascii.isDigit(fmt[i])) i += 1;
+        if (i >= fmt.len) return null;
+        const conv = fmt[i];
+        i += 1;
+        if (std.mem.findScalar(u8, "dohxbcfegsrm", conv) == null) return conv;
+    }
+    return null;
+}
 
 /// The type of the variable (or array element) `r` names, or null.
 fn slotType(b: *Block, r: Inst.Ref) ?Sema.Ty {

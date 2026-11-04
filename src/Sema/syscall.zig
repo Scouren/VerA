@@ -226,6 +226,7 @@ fn readFrom(tag: SysFn.Tag) ?usize {
     return switch (tag) {
         .@"$sscanf", .@"$fscanf" => 2,
         .@"$fgets" => 0,
+        .@"$ferror" => 1,
         .@"$value$plusargs" => 1,
         else => null, // else: no destination argument
     };

@@ -376,11 +376,9 @@ verilog-a/ch09_system_tasks/fdebug.va tables row 5: old `display $fopen`, new `d
 verilog-a/ch09_system_tasks/fdisplay.va tables row 5: old `display $fopen`, new `display $strobe`
 verilog-a/ch09_system_tasks/feof.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/feof_without_descriptor_rejected.va codes: old E0887, new E0506 (E0506: `$feof` takes 1 to 1, given 0)
-verilog-a/ch09_system_tasks/ferror_into_real_rejected.va codes: old E0813, new {}
 verilog-a/ch09_system_tasks/ferror.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/fflush_two_descriptors_rejected.va codes: old E0887, new {}
 verilog-a/ch09_system_tasks/fflush.va tables row 5: old `display $fopen`, new `display $strobe`
-verilog-a/ch09_system_tasks/fgets_into_real_rejected.va codes: old E0813, new {}
 verilog-a/ch09_system_tasks/fgets_line_over_4096.va tables row 7: old `display $fopen`, new `display $fwrite`
 verilog-a/ch09_system_tasks/fgets_on_write_only_fd_fails.va tables row 4: old `held s`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/fgets.va tables row 4: old `held text`, new `limit_slots 0`
@@ -447,9 +445,7 @@ verilog-a/ch09_system_tasks/simparam_unknown_no_fallback_rejected.va codes: old 
 verilog-a/ch09_system_tasks/simprobe.va contribution 0 resist: old -6.498062873668107e-1, new -3.1498062873668107e0
 verilog-a/ch09_system_tasks/sscanf_conversion_rules.va tables row 6: old `held junk`, new `held fval`
 verilog-a/ch09_system_tasks/sscanf_engineering_and_path_codes.va tables row 9: old `held path`, new `limit_slots 0`
-verilog-a/ch09_system_tasks/sscanf_from_real_rejected.va codes: old E0813, new {}
 verilog-a/ch09_system_tasks/sscanf_nul_is_whitespace.va tables row 13: old `display $fopen`, new `display $fwrite`
-verilog-a/ch09_system_tasks/sscanf_uppercase_conversion_rejected.va codes: old E0813, new {}
 verilog-a/ch09_system_tasks/strobe_flow_read_inside_array_pattern_argument.va codes: old {}, new E0512 (E0512: a user task enable is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/swrite.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/table_snapshot_function.va codes: old {}, new E0512,E0815 (E0512: `a whole array read as a value` is not lowered by Sema yet)

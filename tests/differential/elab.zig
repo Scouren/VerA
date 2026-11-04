@@ -40,11 +40,9 @@ const diag = @import("diag");
 const elab = @import("elab");
 const sim = @import("sim");
 const options = @import("rewrite_options");
+const settle = @import("settle.zig");
 const Zcu = sema.Zcu;
 const Sema = sema.Sema;
-
-/// Every code the old `src/elab` reports: the codes this oracle compares.
-const elab_codes = [_][]const u8{ "E0235", "E0237", "E0239", "E0247", "E0337", "E0347", "E0355", "E0358", "E0363", "E0371", "E0373", "E0375", "E0376", "E0501", "E0816", "E0890", "E0901", "E0902", "E0903", "E0904", "E0905", "E0906", "E0907", "E0908", "E0909", "E0911", "E0914", "E0915", "E0916", "E0917", "E0921", "E0922", "E0923", "E0927", "E0929", "E0952", "E0982", "E0997", "W0252", "W0950", "W0951", "W1152" };
 
 const Tally = struct {
     compared: u32 = 0,
@@ -54,13 +52,14 @@ const Tally = struct {
     skipped_new: u32 = 0,
     digital_refused: u32 = 0,
     agreed: u32 = 0,
+    ruled: u32 = 0,
     xfailed: u32 = 0,
     failed: u32 = 0,
 };
 
 /// What one fixture gave: skipped, or a verdict (null when every check
 /// agrees, else the first disagreement) and whether a tree was compared.
-const Outcome = union(enum) { old_refused, new_refused, verdict: struct { why: ?[]const u8, tree: bool, digital_refused: bool = false, params: u32 = 0 } };
+const Outcome = union(enum) { old_refused, new_refused, verdict: struct { why: ?[]const u8, tree: bool, digital_refused: bool = false, params: u32 = 0, ruled: bool = false } };
 
 /// One side's answer: the tree as `path module` lines, the codes as a
 /// sorted, deduplicated list; `tree` is null when that side has none.
@@ -94,6 +93,8 @@ fn runAll() !void {
         try xfail.put(arena, line[0..sp], line[sp + 1 ..]);
     }
 
+    var rulings = try settle.Rulings.read(arena, io, options.repo_root, "elab");
+    var later: settle.Later = .{ .arena = arena };
     const fixtures = try collect(arena, io);
     var tally: Tally = .{};
     var seen: std.StringHashMapUnmanaged(void) = .empty;
@@ -103,7 +104,7 @@ fn runAll() !void {
     defer per.deinit();
     for (fixtures) |rel| {
         _ = per.reset(.retain_capacity);
-        const v = switch (try checkFixture(per.allocator(), io, rel)) {
+        const v = switch (try checkFixture(per.allocator(), io, rel, &rulings, &later)) {
             .old_refused => {
                 tally.skipped_old += 1;
                 continue;
@@ -118,6 +119,7 @@ fn runAll() !void {
         tally.trees += @intFromBool(v.tree);
         tally.params += v.params;
         tally.digital_refused += @intFromBool(v.digital_refused);
+        tally.ruled += @intFromBool(v.ruled);
         const listed = xfail.get(rel) != null;
         if (listed) try seen.put(arena, rel, {});
         if (v.why) |why| {
@@ -137,7 +139,9 @@ fn runAll() !void {
         tally.failed += 1;
         try out.writer.print("STALE {s}: elab.xfail names a fixture that was not compared\n", .{k.*});
     };
-    std.debug.print("{s}diff-elab: {d} fixtures compared ({d} trees, {d} digital parameters), {d} agree, {d} listed in elab.xfail, {d} skipped (old front end refused), {d} skipped (new parser refused), {d} .v the old digital route refused, {d} failures\n", .{ out.written(), tally.compared, tally.trees, tally.params, tally.agreed, tally.xfailed, tally.skipped_old, tally.skipped_new, tally.digital_refused, tally.failed });
+    tally.failed += try rulings.finish(&out.writer);
+    try later.print(&out.writer, "diff-elab");
+    std.debug.print("{s}diff-elab: {d} fixtures compared ({d} trees, {d} digital parameters), {d} agree ({d} by a ruling), {d} listed in elab.xfail, {d} skipped (old front end refused), {d} skipped (new parser refused), {d} .v the old digital route refused, {d} failures\n", .{ out.written(), tally.compared, tally.trees, tally.params, tally.agreed, tally.ruled, tally.xfailed, tally.skipped_old, tally.skipped_new, tally.digital_refused, tally.failed });
     if (tally.failed != 0) return error.DiffElabFailed;
 }
 
@@ -162,7 +166,10 @@ fn lessThan(_: void, a: []const u8, b: []const u8) bool {
     return std.mem.order(u8, a, b) == .lt;
 }
 
-fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8) !Outcome {
+/// Compares one fixture. A later stage's codes the old side raised and the
+/// new one did not go in `later`; a tree that differs is settled by a
+/// ruling in `rulings` or not at all.
+fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, rulings: *settle.Rulings, later: *settle.Later) !Outcome {
     const path = try std.fs.path.join(arena, &.{ options.fixture_root, rel });
     const dir = std.fs.path.dirname(path).?;
     const include = options.fixture_root ++ "/include";
@@ -201,13 +208,20 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8) !Outcome {
     const refused = digital and old.tree == null;
     if (!sameLines(new.codes, again.codes) or !sameLines(new.tree.?, again.tree.?))
         return .{ .verdict = .{ .why = "determinism: two elaborations differ", .tree = false, .digital_refused = refused } };
-    if (!digital and old.judged and !sameLines(old.codes, new.codes))
-        return .{ .verdict = .{ .why = try arena.print("codes: old {s}, new {s}", .{ try join(arena, old.codes), try join(arena, new.codes) }), .tree = false } };
+    const cited = try settle.clauses(arena, source);
+    if (!digital and old.judged) {
+        const c = try settle.codesDiffer(arena, old.codes, new.codes, .{ .first = .elab, .last = .elab }, cited);
+        if (c.why) |why| return .{ .verdict = .{ .why = why, .tree = false } };
+        try later.add(c.later, cited);
+    }
     var compared: u32 = 0;
     if (try paramsDiffer(arena, &old.params, &new.params, &compared)) |why| return .{ .verdict = .{ .why = why, .tree = false } };
     const want = old.tree orelse return .{ .verdict = .{ .why = null, .tree = false, .digital_refused = refused } };
     const got = new.tree.?;
-    return .{ .verdict = .{ .why = try treeDiffer(arena, want, got), .tree = true, .params = compared } };
+    const why = try treeDiffer(arena, want, got) orelse return .{ .verdict = .{ .why = null, .tree = true, .params = compared } };
+    if (rulings.get(rel) == null) return .{ .verdict = .{ .why = why, .tree = true, .params = compared } };
+    const no = try rulings.settle(arena, rel, cited, try dropped(arena, want, got)) orelse return .{ .verdict = .{ .why = null, .tree = true, .params = compared, .ruled = true } };
+    return .{ .verdict = .{ .why = try arena.print("{s}; {s}", .{ why, no }), .tree = true, .params = compared } };
 }
 
 /// The old analog route up to `elab.elaborate`, as `Compilation/analyze.zig`
@@ -395,10 +409,7 @@ fn newSide(arena: std.mem.Allocator, path: []const u8, text: [:0]const u8, digit
     }
     var codes: std.ArrayList([]const u8) = .empty;
     for (zcu.failed.items(.code)) |c| try codes.append(arena, @tagName(c));
-    for (vir.diag.messages()) |m| {
-        const name = @tagName(vir.diag.message(m).tag.code);
-        for (elab_codes) |c| if (std.mem.eql(u8, c, name)) try codes.append(arena, name);
-    }
+    for (vir.diag.messages()) |m| try codes.append(arena, @tagName(vir.diag.message(m).tag.code));
     return .{ .tree = lines.items, .codes = try setOf(arena, codes.items), .params = params };
 }
 
@@ -441,6 +452,22 @@ fn sameLines(a: []const []const u8, b: []const []const u8) bool {
 
 fn join(arena: std.mem.Allocator, codes: []const []const u8) ![]const u8 {
     return if (codes.len == 0) "{}" else std.mem.join(arena, ",", codes);
+}
+
+/// What a ruling compares on a tree: `drops` and the paths of the old
+/// rows the new tree omits, sorted, when the new tree is the old one less
+/// those rows; else `differs`.
+fn dropped(arena: std.mem.Allocator, old: []const []const u8, new: []const []const u8) ![]const u8 {
+    var gone: std.ArrayList([]const u8) = .empty;
+    var k: usize = 0;
+    for (old) |row| {
+        if (k < new.len and std.mem.eql(u8, row, new[k])) {
+            k += 1;
+        } else try gone.append(arena, row[0..std.mem.findScalar(u8, row, ' ').?]);
+    }
+    if (k != new.len or gone.items.len == 0) return "differs";
+    std.mem.sort([]const u8, gone.items, {}, lessThan);
+    return try std.mem.concat(arena, u8, &.{ "drops ", try std.mem.join(arena, " ", gone.items) });
 }
 
 /// The first line where the trees differ, or null.

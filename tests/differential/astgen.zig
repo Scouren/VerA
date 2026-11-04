@@ -5,11 +5,15 @@
 //! disagrees). The old preprocessor makes the new side's text, as in
 //! diff-parse; a fixture it refuses, or the new parser refuses, is skipped
 //! and counted. Checks, in order:
-//! - codes: the set of per-file codes (`per_file`) the old compiler reports
-//!   (`vera.analyze` on a `.va`/`.vams`; on a `.v`, which `analyze` does
-//!   not compile, the digital route's parse stage: the old parser under
-//!   `vera`'s default set and the §3.7 wreal rule, plus the analysis
-//!   spine's §8.1.1 UDP rule) equals the set in `Vir.diag`;
+//! - codes: the codes the old compiler reports (`vera.analyze` on a
+//!   `.va`/`.vams`; on a `.v`, which `analyze` does not compile, the digital
+//!   route's parse stage: the old parser under `vera`'s default set and the
+//!   §3.7 wreal rule, plus the analysis spine's §8.1.1 UDP rule) against the
+//!   set in `Vir.diag`, by stage (`settle.codesDiffer`): AstGen's own codes
+//!   both ways, a later stage's one way (Vir raised it only where the old
+//!   side did; the old side's others are named in the summary), an earlier
+//!   stage's not at all. A disagreement the LRM settles for the new side is
+//!   a line of `astgen.rulings`, whose expected result is AstGen's codes;
 //! - declarations: Vir's declaration table, per kind in order, names the
 //!   design units of the old `Ast.SourceFile`, past the old prelude's
 //!   built-in modules;
@@ -26,10 +30,8 @@ const frontend = @import("frontend");
 const diag = @import("diag");
 const vera = @import("vera");
 const options = @import("rewrite_options");
+const settle = @import("settle.zig");
 const Vir = vams.Vir;
-
-/// The codes a file can judge alone: AstGen's, the rest stay Sema's.
-const per_file = [_][]const u8{ "E0206", "E0218", "E0225", "E0230", "E0238", "E0245", "E0248", "E0295", "E0373", "E0376", "E0918", "E1100" };
 
 /// Workers of the N-thread determinism pass (the machine is shared: `-j4`).
 const threads = 4;
@@ -43,6 +45,7 @@ const Tally = struct {
     skipped_pp: u32 = 0,
     skipped_parse: u32 = 0,
     agreed: u32 = 0,
+    ruled: u32 = 0,
     xfailed: u32 = 0,
     failed: u32 = 0,
 };
@@ -52,7 +55,7 @@ const Tally = struct {
 const Job = struct { text: [:0]const u8, digital: bool, hash: u64 };
 
 /// What one fixture gave: skipped, or a verdict.
-const Outcome = union(enum) { pp_refused, parse_refused, verdict: Verdict };
+const Outcome = union(enum) { pp_refused, parse_refused, ruled, verdict: Verdict };
 
 // ---- private ----
 
@@ -77,6 +80,8 @@ fn runAll() !void {
         try xfail.put(arena, line[0..sp], line[sp + 1 ..]);
     }
 
+    var rulings = try settle.Rulings.read(arena, io, options.repo_root, "astgen");
+    var later: settle.Later = .{ .arena = arena };
     const fixtures = try collect(arena, io);
     var tally: Tally = .{};
     var seen: std.StringHashMapUnmanaged(void) = .empty;
@@ -87,7 +92,7 @@ fn runAll() !void {
     defer per.deinit();
     for (fixtures) |rel| {
         _ = per.reset(.retain_capacity);
-        const outcome = try checkFixture(per.allocator(), arena, io, rel, &jobs);
+        const outcome = try checkFixture(per.allocator(), arena, io, rel, &jobs, &rulings, &later);
         const verdict = switch (outcome) {
             .pp_refused => {
                 tally.skipped_pp += 1;
@@ -96,6 +101,10 @@ fn runAll() !void {
             .parse_refused => {
                 tally.skipped_parse += 1;
                 continue;
+            },
+            .ruled => blk: {
+                tally.ruled += 1;
+                break :blk null;
             },
             .verdict => |v| v,
         };
@@ -119,12 +128,14 @@ fn runAll() !void {
         tally.failed += 1;
         try out.writer.print("STALE {s}: astgen.xfail names a fixture that was not compared\n", .{k.*});
     };
+    tally.failed += try rulings.finish(&out.writer);
+    try later.print(&out.writer, "diff-astgen");
     const differ = try threaded(jobs.items);
     if (differ != 0) {
         tally.failed += 1;
         try out.writer.print("FAIL determinism: {d} fixtures give other bytes on {d} threads than on 1\n", .{ differ, threads });
     }
-    std.debug.print("{s}diff-astgen: {d} fixtures compared, {d} agree, {d} listed in astgen.xfail, {d} skipped (old preprocessor refused), {d} skipped (new parser refused), {d} regenerated on {d} threads, {d} failures\n", .{ out.written(), tally.compared, tally.agreed, tally.xfailed, tally.skipped_pp, tally.skipped_parse, jobs.items.len, threads, tally.failed });
+    std.debug.print("{s}diff-astgen: {d} fixtures compared, {d} agree ({d} by a ruling), {d} listed in astgen.xfail, {d} skipped (old preprocessor refused), {d} skipped (new parser refused), {d} regenerated on {d} threads, {d} failures\n", .{ out.written(), tally.compared, tally.agreed, tally.ruled, tally.xfailed, tally.skipped_pp, tally.skipped_parse, jobs.items.len, threads, tally.failed });
     if (tally.failed != 0) return error.DiffAstGenFailed;
 }
 
@@ -150,8 +161,10 @@ fn collect(arena: std.mem.Allocator, io: Io) ![]const []const u8 {
 }
 
 /// Compares one fixture; a fixture both sides parse is queued in `jobs`
-/// (its text on `keep`) for the N-thread pass.
-fn checkFixture(arena: std.mem.Allocator, keep: std.mem.Allocator, io: Io, rel: []const u8, jobs: *std.ArrayList(Job)) !Outcome {
+/// (its text on `keep`) for the N-thread pass. A later stage's codes the
+/// old side raised and Vir did not go in `later`; codes that differ are
+/// settled by a ruling in `rulings` or not at all.
+fn checkFixture(arena: std.mem.Allocator, keep: std.mem.Allocator, io: Io, rel: []const u8, jobs: *std.ArrayList(Job), rulings: *settle.Rulings, later: *settle.Later) !Outcome {
     const gpa = std.heap.smp_allocator;
     const path = try std.fs.path.join(arena, &.{ options.fixture_root, rel });
     const dir = std.fs.path.dirname(path).?;
@@ -222,35 +235,40 @@ fn checkFixture(arena: std.mem.Allocator, keep: std.mem.Allocator, io: Io, rel: 
         }
         try keepCodes(arena, &old_codes, &analyze_bag);
     }
-    if (try codesDiffer(arena, &old_codes, &new_codes)) |why| return .{ .verdict = why };
-    const file = old_file orelse return .{ .verdict = null };
-    const builtins: u32 = if (digital) 0 else frontend.annex_e.spice_module_count + pp.netlist_modules;
-    return .{ .verdict = try declsDiffer(arena, &file, builtins, &vir) };
-}
-
-/// The per-file codes among `bag`'s rows.
-fn keepCodes(arena: std.mem.Allocator, set: *std.StringArrayHashMapUnmanaged(void), bag: *const diag.Bag) !void {
-    for (0..bag.count()) |i| {
-        const name = @tagName(bag.at(i).code);
-        for (per_file) |c| if (std.mem.eql(u8, c, name)) try set.put(arena, c, {});
+    const cited = try settle.clauses(arena, source);
+    const old_set = try sorted(arena, old_codes.keys());
+    const new_set = try sorted(arena, new_codes.keys());
+    const c = try settle.codesDiffer(arena, old_set, new_set, .{ .first = .astgen, .last = .astgen }, cited);
+    var ruled = false;
+    if (c.why) |why| {
+        if (rulings.get(rel) == null) return .{ .verdict = why };
+        var own: std.ArrayList([]const u8) = .empty;
+        for (new_set) |n| if (settle.stages.ownerUnder(std.meta.stringToEnum(vams.Diag.Code, n).?, cited) == .astgen) try own.append(arena, n);
+        const got = if (own.items.len == 0) "{}" else try std.mem.join(arena, ",", own.items);
+        if (try rulings.settle(arena, rel, cited, got)) |no| return .{ .verdict = try arena.print("{s}; {s}", .{ why, no }) };
+        ruled = true;
     }
+    try later.add(c.later, cited);
+    const file = old_file orelse return if (ruled) .ruled else .{ .verdict = null };
+    const builtins: u32 = if (digital) 0 else frontend.annex_e.spice_module_count + pp.netlist_modules;
+    const decls = try declsDiffer(arena, &file, builtins, &vir);
+    return if (ruled and decls == null) .ruled else .{ .verdict = decls };
 }
 
-fn codesDiffer(arena: std.mem.Allocator, old: *const std.StringArrayHashMapUnmanaged(void), new: *const std.StringArrayHashMapUnmanaged(void)) !Verdict {
-    var same = old.count() == new.count();
-    for (old.keys()) |k| same = same and new.contains(k);
-    if (same) return null;
-    return try arena.print("codes: old {s}, new {s}", .{ try setText(arena, old), try setText(arena, new) });
+/// Every code among `bag`'s rows.
+fn keepCodes(arena: std.mem.Allocator, set: *std.StringArrayHashMapUnmanaged(void), bag: *const diag.Bag) !void {
+    for (0..bag.count()) |i| try set.put(arena, @tagName(bag.at(i).code), {});
 }
 
-fn setText(arena: std.mem.Allocator, set: *const std.StringArrayHashMapUnmanaged(void)) ![]const u8 {
-    const keys = try arena.dupe([]const u8, set.keys());
-    std.mem.sort([]const u8, keys, {}, struct {
+/// A sorted copy of `keys`.
+fn sorted(arena: std.mem.Allocator, keys: []const []const u8) ![]const []const u8 {
+    const out = try arena.dupe([]const u8, keys);
+    std.mem.sort([]const u8, out, {}, struct {
         fn lt(_: void, a: []const u8, b: []const u8) bool {
             return std.mem.order(u8, a, b) == .lt;
         }
     }.lt);
-    return if (keys.len == 0) "{}" else try std.mem.join(arena, ",", keys);
+    return out;
 }
 
 /// The declaration table against the old file's lists, per kind in order.

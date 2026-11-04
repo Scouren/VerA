@@ -38,7 +38,8 @@ pub fn add(g: Graph, all: *Build.Step) void {
     o.addOption(u32, "jobs", b.option(u32, "comp-jobs", "diff-comp: fixtures compared at once (default 4; the machine is shared)") orelse 4);
     o.addOption(u32, "j1_sample", b.option(u32, "comp-j1", "diff-comp: also run this many fixtures' new side at -j1 and compare the bytes with -jN (default 200)") orelse 200);
     o.addOption(bool, "rebaseline", b.option(bool, "comp-rebaseline", "diff-comp: write every disagreement to zig-out/comp.xfail.new instead of failing on it") orelse false);
-    const mod = g.m.make("tests/differential/comp.zig", &.{});
+    // `vams`: the stage-ownership table (`stages.zig`) names codes by `Diag.Code`.
+    const mod = g.m.make("tests/differential/comp.zig", &.{.{ .name = "vams", .module = byName(g.mods, "vams") }});
     mod.addOptions("comp_options", o);
     const r = testRun(b, "diff-comp", mod, g.runner, g.results_dir);
     r.has_side_effects = true; // Reads the fixture tree and runs both drivers.

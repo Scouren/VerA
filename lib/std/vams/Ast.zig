@@ -516,6 +516,68 @@ pub const Error = struct {
         gate_output,
         /// A.4.1.1: a module instance with no name; `arg` its terminal count.
         instance_unnamed,
+        /// A.4.1: ordered and named parameter assignments in one list.
+        param_list_mixed,
+        /// A.2.2.3: a delay's list not closed by `)` after its last value.
+        delay_close,
+        /// A.2.5: `from` with a bare value, which only `exclude` takes.
+        value_range_bare_from,
+        /// A.9.1: a keyword as an attribute name.
+        attr_keyword_name,
+        /// A.1.6: a parent nature access that is no `potential`/`flow`.
+        nature_parent_access,
+        /// A.1.7: a domain that is no `continuous`/`discrete`.
+        discipline_domain,
+        /// A.1.7: a token that begins no discipline_item.
+        discipline_item,
+        /// §7.8.3: a connect_mode that is no `merged`/`split`.
+        connect_mode,
+        /// §10.6: a Verilog-AMS construct under a 1364 language; `arg` the
+        /// language (`KeywordSet`).
+        vams_under_language,
+        /// IEEE 1364-2005 §15.1: a timing check as a procedural statement.
+        timing_check_in_procedure,
+        /// A.1.5: a configuration whose first statement is no `design`.
+        config_design_first,
+        /// A.1.5: end of file before `endconfig`.
+        config_no_endconfig,
+        /// A.1.5: a token that begins no config_rule_statement.
+        config_rule_start,
+        /// IEEE 1364-2005 §13.3.1.2: a second default clause.
+        config_two_defaults,
+        /// §13.3.1.4: a library-qualified cell clause with a liblist.
+        config_lib_liblist,
+        /// A.1.5: a rule with no expansion clause; `arg` the rule's token.
+        config_expansion,
+        /// A.1.5: a use_clause's `:` not followed by `config`.
+        config_use_suffix,
+        /// A.5.1: a udp_body that opens with no `table`.
+        udp_body,
+        /// A.5.3: end of file before `endtable`.
+        udp_no_endtable,
+        /// A.5.3: an entry not closed by `;`.
+        udp_entry_semicolon,
+        /// A.5.3: an entry's colon count other than 1 or 2; `arg` the count.
+        udp_colons,
+        /// A.5.3: an entry whose body differs from the first entry's; `arg`
+        /// 1 when this entry is sequential.
+        udp_body_mixed,
+        /// A.5.3: an edge in a combinational entry; `arg` the character.
+        udp_comb_edge,
+        /// §8.4: two input transitions in a sequential entry.
+        udp_two_edges,
+        /// A.5.3: an input that is no level or edge symbol; `arg` the character.
+        udp_input_symbol,
+        /// A.5.3: an edge_indicator that is no `( level level )`.
+        udp_edge_shape,
+        /// A.5.3: a current_state that is no level symbol; `arg` the character.
+        udp_state_symbol,
+        /// A.5.3: a current_state of other than one symbol; `arg` the count.
+        udp_state_count,
+        /// A.5.3: an output of other than one symbol; `arg` the count.
+        udp_output_count,
+        /// A.5.3: an output that is no output symbol; `arg` the character.
+        udp_output_symbol,
     };
 
     pub const Tag = enum(u8) {

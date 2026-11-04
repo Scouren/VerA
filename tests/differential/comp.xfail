@@ -142,7 +142,7 @@ verilog-a/annex_a_syntax/paramset.va not built: backend exe
 verilog-a/annex_a_syntax/pattern_empty_element_rejected.va not built: backend exe
 verilog-a/annex_a_syntax/pattern_every_element_written.va not built: backend exe
 verilog-a/annex_a_syntax/ranged_parameter_unsupported.va not built: backend exe
-verilog-a/annex_a_syntax/reject_A_1_5_config_without_design_statement.va rw-comp (parse): stderr: line 1: old `error[E0250]: a construct outside the Verilog-A subset: `config` under --sim=verilogA`, new `error[E0243]: a configuration rule IEEE 1364-2005 §13.3 forbids: invalid_config_rule`
+verilog-a/annex_a_syntax/reject_A_1_5_config_without_design_statement.va rw-comp (parse): stderr: line 1: old `error[E0250]: a construct outside the Verilog-A subset: `config` under --sim=verilogA`, new `error[E0207]: unexpected token: found `default`: a config_declaration begins with its `design` statement`
 verilog-a/annex_a_syntax/reject_A_2_6_function_output_formal.va rw-comp (parse): stderr: line 1: old `error[E0250]: a construct outside the Verilog-A subset: `function` under --sim=verilogA`, new `error[E0207]: unexpected token: found `output`: A.2.6 gives a function `input` formals only; an `analog function` or a task takes `output``
 verilog-a/annex_a_syntax/reject_A_4_1_module_instance_without_name.va rw-lower (analog lowering): stderr: line 10: old `warning[W0252]: gate primitive accepted, and it computes nothing: named_instance_child primitive`, new `error: could not compile due to 1 previous error(s)`
 verilog-a/annex_a_syntax/reject_A_4_1_ordered_and_named_connections.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/annex_a_syntax/reject_A_4_1_ordered_and_named_connections.va:26:27`, new `  --> verilog-a/annex_a_syntax/reject_A_4_1_ordered_and_named_connections.va:26:21`
@@ -264,7 +264,6 @@ verilog-a/ch02_lexical/analog_statement_attributes.va not built: backend exe
 verilog-a/ch02_lexical/attribute_block_item_and_function_port.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch02_lexical/attribute_default_and_multiple.va not built: backend exe
 verilog-a/ch02_lexical/attribute_keyword_name_escaped.va not built: backend exe
-verilog-a/ch02_lexical/attribute_keyword_name_rejected.va rw-comp (parse) message: stderr: line 1: old `error[E0208]: expected an identifier: found keyword `module`: an attribute name is an identifier`, new `error[E0208]: expected an identifier: found `module``
 verilog-a/ch02_lexical/attribute_value_not_constant_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch02_lexical/attribute_value_not_constant_rejected.va:43:8`, new `  --> verilog-a/ch02_lexical/attribute_value_not_constant_rejected.va:43:32`
 verilog-a/ch02_lexical/attributes.va not built: backend exe
 verilog-a/ch02_lexical/base_apostrophe_whitespace_rejected.va rw-comp (parse) location: stderr: line 5: old `   |                    ^`, new `   |                    ^^`
@@ -381,9 +380,7 @@ verilog-a/ch03_data_types/desc_units_output_variable_rows.va not built: backend 
 verilog-a/ch03_data_types/desc_units_parameter_rows.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch03_data_types/discipline_binds_undeclared_nature_rejected.va not built: backend exe
 verilog-a/ch03_data_types/discipline_declarations.va not built: backend exe
-verilog-a/ch03_data_types/discipline_domain_is_continuous_or_discrete_rejected.va rw-comp (parse): stderr: line 1: old `error[E0212]: expected 'continuous' or 'discrete': found `analog``, new `error[E0208]: expected an identifier: found `analog``
 verilog-a/ch03_data_types/discipline_duplicate_user_attribute_rejected.va not built: backend exe
-verilog-a/ch03_data_types/discipline_item_needs_a_binding_keyword_rejected.va rw-comp (parse): stderr: line 1: old `error[E0213]: expected a discipline item: found Voltage`, new `error[E0240]: not a module item: found Voltage`
 verilog-a/ch03_data_types/discipline_nonconstant_user_attribute_rejected.va not built: backend exe
 verilog-a/ch03_data_types/discipline_override.va not built: backend exe
 verilog-a/ch03_data_types/discipline_overrides_flow_abstol.va not built: backend exe
@@ -402,7 +399,6 @@ verilog-a/ch03_data_types/dynamic_multidim_parameter_index.va rw-lower (analog l
 verilog-a/ch03_data_types/dynamic_multidim_scope.va not built: backend exe
 verilog-a/ch03_data_types/flow_on_potential_only_net.va rw-lower (analog lowering) location: stderr: line 5: old `   |         ^^^`, new `   |         ^`
 verilog-a/ch03_data_types/forward_parameter_reference.va not built: backend exe
-verilog-a/ch03_data_types/from_range_without_bracket.va rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found 5`, new `error[E0209]: expected an expression: found 5`
 verilog-a/ch03_data_types/genvar.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch03_data_types/genvar_assigned_outside_loop.va rw-lower (analog lowering): stderr: line 1: old `error[E0313]: unknown variable: `index``, new `error[E0512]: unknown function: an assignment to a name with no slot`
 verilog-a/ch03_data_types/genvar_nonstatic_loop_control.va rw-lower (analog lowering): stderr: line 1: old `error[E0419]: genvar loop step is not a constant expression`, new `error[E0512]: unknown function: an assignment to a name with no slot`
@@ -446,7 +442,6 @@ verilog-a/ch03_data_types/nature_access_as_string.va not built: backend exe
 verilog-a/ch03_data_types/nature_compatibility_rules.va not built: backend exe
 verilog-a/ch03_data_types/nature_declarations.va not built: backend exe
 verilog-a/ch03_data_types/nature_discipline_namespace_collision.va not built: backend exe
-verilog-a/ch03_data_types/nature_parent_access_must_be_potential_or_flow_rejected.va rw-comp (parse): stderr: line 1: old `error[E0211]: expected 'potential' or 'flow': found voltage`, new `error[E0208]: expected an identifier: found voltage`
 verilog-a/ch03_data_types/nature_units_as_identifier.va not built: backend exe
 verilog-a/ch03_data_types/natureless_discipline.va not built: backend exe
 verilog-a/ch03_data_types/natureless_domainless_port_compatibility.va not built: backend exe
@@ -1326,7 +1321,6 @@ verilog-a/ch06_hierarchy/param_given_of_a_variable_rejected.va not built: backen
 verilog-a/ch06_hierarchy/parameter_default.va not built: backend exe
 verilog-a/ch06_hierarchy/parameter_in_ternary_else_arm.va not built: backend exe
 verilog-a/ch06_hierarchy/parameter_list_forms.va not built: backend exe
-verilog-a/ch06_hierarchy/parameter_list_mixed_reverse_rejected.va rw-comp (parse) message: stderr: line 1: old `error[E0246]: invalid module parameter list: instance mixes ordered and named parameter assignments`, new `error[E0246]: invalid module parameter list: an empty parameter value assignment has no expression or named assignment`
 verilog-a/ch06_hierarchy/parameter_port_list.va not built: backend exe
 verilog-a/ch06_hierarchy/parameter_variable_same_name_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: §6.8: one identifier declares one item in a scope — the earlier declaration is unreachable`, new `   = help: run `vera --explain E0362` for a detailed explanation`
 verilog-a/ch06_hierarchy/parameterized_instantiation_unsupported.va not built: backend exe
@@ -1963,7 +1957,6 @@ verilog-ams/annex_a_syntax/digital_declaration_forms_in_va.va not built: backend
 verilog-ams/annex_a_syntax/digital_statements_in_initial.va not built: backend exe
 verilog-ams/annex_a_syntax/drive_strength_resolves.va not built: backend exe
 verilog-ams/annex_a_syntax/drive_strength_unsupported.va not built: backend exe
-verilog-ams/annex_a_syntax/fork_in_analog_rejected.va rw-comp (parse) message: stderr: line 1: old `error[E0249]: a fork-join block in an analog block`, new `error[E0249]: a fork-join block in an analog block: digital_statement_in_analog`
 verilog-ams/annex_a_syntax/function_input_formals_only.va not built: backend exe
 verilog-ams/annex_a_syntax/gate_instantiation_one_input.va not built: backend exe
 verilog-ams/annex_a_syntax/gate_instantiation_truth_table.va not built: backend exe
@@ -1983,14 +1976,13 @@ verilog-ams/annex_a_syntax/primitive_strengths_unsupported.va not built: backend
 verilog-ams/annex_a_syntax/pull_gate_strength_resolves.va not built: backend exe
 verilog-ams/annex_a_syntax/reg_undeclared_discipline_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0371]: net declared with an undeclared discipline: `nosuch` in the declaration of the reg `r``, new `error[E0371]: net declared with an undeclared discipline: `nosuch` in the declaration of `r``
 verilog-ams/annex_a_syntax/reject_A_2_2_2_drive_strength_two_zero_sides.va rw-lower (analog lowering): stderr: line 10: old `warning[W0252]: gate primitive accepted, and it computes nothing: `buf` primitive`, new `error: could not compile due to 1 previous error(s)`
-verilog-ams/annex_a_syntax/reject_A_2_2_3_net_with_four_delays.va rw-comp (parse): stderr: line 1: old `error[E0210]: expected ')': found `,``, new `error[E0207]: unexpected token: found `,``
+verilog-ams/annex_a_syntax/reject_A_2_2_3_net_with_four_delays.va rw-lower (analog lowering): stderr: line 10: old `warning[W0252]: gate primitive accepted, and it computes nothing: `buf` primitive`, new `error: could not compile due to 1 previous error(s)`
 verilog-ams/annex_a_syntax/reject_A_3_1_buf_with_one_terminal.va rw-lower (analog lowering): stderr: line 1: old `warning[W0252]: gate primitive accepted, and it computes nothing: `buf` primitive`, new `error[E0209]: expected an expression: a buf/not gate needs at least one output and one input`
 verilog-ams/annex_a_syntax/reject_A_3_2_pullup_with_zero_strength.va rw-lower (analog lowering): stderr: line 1: old `warning[W0252]: gate primitive accepted, and it computes nothing: pullup primitive`, new `error[E0207]: unexpected token: a single-strength bracket on this gate is A.3.2's `( strength1 )``
 verilog-ams/annex_a_syntax/reject_A_3_3_constant_output_terminal.va rw-lower (analog lowering): stderr: line 1: old `warning[W0252]: gate primitive accepted, and it computes nothing: `and` primitive`, new `error[E0207]: unexpected token: found 1'b0: a gate's output terminal is a net_lvalue (A.3.3), a net the gate can drive`
 verilog-ams/annex_a_syntax/reject_A_3_4_gate_type_fixes_the_terminal_count.va rw-lower (analog lowering): stderr: line 1: old `warning[W0252]: gate primitive accepted, and it computes nothing: `bufif0` primitive`, new `error[E0209]: expected an expression: an enable gate takes an output, a data input and an enable`
-verilog-ams/annex_a_syntax/reject_A_5_1_udp_without_table.va rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found endprimitive: a udp_body is a `table … endtable``, new `error[E0233]: a UDP table symbol is outside the alphabet its column admits: invalid_udp`
-verilog-ams/annex_a_syntax/reject_A_5_2_udp_inout_port.va rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found `inout`: a udp_body is a `table … endtable``, new `error[E0233]: a UDP table symbol is outside the alphabet its column admits: invalid_udp`
-verilog-ams/annex_a_syntax/reject_A_5_3_udp_combinational_edge.va rw-comp (parse): stderr: line 1: old `error[E0234]: a UDP table does not derive from one udp_body: an edge indicator `(` in a combinational UDP table entry: A.5.3 reaches `edge_input_list` only from`, new `error[E0233]: a UDP table symbol is outside the alphabet its column admits: invalid_udp`
+verilog-ams/annex_a_syntax/reject_A_5_1_udp_without_table.va rw-lower (analog lowering): stderr: line 10: old `warning[W0252]: gate primitive accepted, and it computes nothing: `buf` primitive`, new `error: could not compile due to 1 previous error(s)`
+verilog-ams/annex_a_syntax/reject_A_5_2_udp_inout_port.va rw-lower (analog lowering): stderr: line 10: old `warning[W0252]: gate primitive accepted, and it computes nothing: `buf` primitive`, new `error: could not compile due to 1 previous error(s)`
 verilog-ams/annex_a_syntax/reject_A_6_1_assign_to_variable.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-ams/annex_a_syntax/reject_A_6_1_assign_to_variable.va:35:10`, new `  --> verilog-ams/annex_a_syntax/reject_A_6_1_assign_to_variable.va:35:12`
 verilog-ams/annex_a_syntax/reject_A_7_1_gate_inside_specify.va rw-lower (analog lowering): stderr: line 1: old `warning[W0252]: gate primitive accepted, and it computes nothing: `buf` primitive`, new `error[E0207]: unexpected token: found `buf`, which begins no A.7.1 specify_item`
 verilog-ams/annex_a_syntax/reject_A_7_1_pulsestyle_parenthesized.va rw-codegen (run): stderr: line 1: old `warning[W0251]: specify block read, and part or all of it is not modelled`, new `error[E0207]: unexpected token: found `(`: A.7.1's `pulsestyle_onevent` takes list_of_path_outputs, written without parentheses`
@@ -2025,7 +2017,6 @@ verilog-ams/annex_c_analog_subset/continuous_assign_accepted.va not built: backe
 verilog-ams/annex_c_analog_subset/default_discipline_accepted.va not built: backend exe
 verilog-ams/annex_c_analog_subset/digital_event_control_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-ams/annex_c_analog_subset/digital_event_control_rejected.va:51:11`, new `  --> verilog-ams/annex_c_analog_subset/digital_event_control_rejected.va:51:9`
 verilog-ams/annex_c_analog_subset/digital_initial_accepted.va not built: backend exe
-verilog-ams/annex_c_analog_subset/digital_procedural_rejected.va rw-comp (parse) message: stderr: line 10: old `error[E0249]: a fork-join block in an analog block`, new `error[E0249]: a fork-join block in an analog block: digital_statement_in_analog`
 verilog-ams/annex_c_analog_subset/discrete_domain_binding_accepted.va not built: backend exe
 verilog-ams/annex_c_analog_subset/named_event_in_subset.va not built: backend exe
 verilog-ams/annex_c_analog_subset/real_value_inout_port_accepted.va not built: backend exe
@@ -2178,7 +2169,6 @@ verilog-ams/ch07_mixed_signal/connect_insertion_upper_from_generate_block.va rw-
 verilog-ams/ch07_mixed_signal/connect_insertion_upper_from_instance_array.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/connect_insertion_upper_from_ooc_below.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/connect_mode_accepted.va not built: backend exe
-verilog-ams/ch07_mixed_signal/connect_mode_not_merged_or_split_rejected.va rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found segmented: a connect_mode is `merged` or `split``, new `error[E0208]: expected an identifier: found segmented`
 verilog-ams/ch07_mixed_signal/connect_module_manually_inserted.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/connect_override_incompatible_discipline_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0915]: connect insertion names no connect module: `magnetic` cannot stand for `ch7_ovr_a2d`'s `electrical` (3.11.1 Potential Incompatibility Rule: the tw`, new `error[E0915]: connect insertion names no connect module: `magnetic` cannot stand for `c
 verilog-ams/ch07_mixed_signal/connect_parameter_accepted.va not built: backend exe
@@ -2368,8 +2358,6 @@ verilog-ams/ch09_system_tasks/connectmodule_driver_access_example.va not built: 
 verilog-ams/ch09_system_tasks/driver_delay_in_connectmodule_analog_block_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: §9.2 Tables 9-19/9-20: "Supported in analog context of connectmodule: No"; call it from an `always` or `initial` block of the connect module`, new `   = help: run `vera --explain E0806` for a detailed explanation`
 verilog-ams/ch09_system_tasks/driver_strength_next_strength_type.va not built: backend exe
 verilog-ams/ch09_system_tasks/driver_update_connectmodule.va not built: backend exe
-verilog-ams/ch09_system_tasks/driver_update_in_analog_event_rejected.va rw-comp (parse): stderr: line 1: old `error[E0209]: expected an expression: found `driver_update``, new `error[E0207]: unexpected token: driver_update_outside_connect_module`
-verilog-ams/ch09_system_tasks/driver_update_in_ordinary_module_rejected.va rw-comp (parse): stderr: line 1: old `error[E0818]: driver access function outside a connect module: `driver_update` in a module that is not a connect module`, new `error[E0207]: unexpected token: driver_update_outside_connect_module`
 verilog-ams/ch09_system_tasks/error_in_analog_initial_stops_after_initialization.va not built: backend exe
 verilog-ams/ch09_system_tasks/fatal_in_analog_initial_skips_simulation.va not built: backend exe
 verilog-ams/ch09_system_tasks/fdebug_writes_in_rejected_iterations.va not built: backend exe
@@ -2540,7 +2528,6 @@ verilog-ams/digital/driver_count_in_an_ordinary_module_rejected.v not built: bac
 verilog-ams/digital/reject_wreal_connected_to_wand.v rw-comp (elab): exit status old 1, new 0
 verilog-ams/digital/scaled_delay_udp_rejected.v rw-lower (analog lowering): stderr: line 2: old `  --> verilog-ams/digital/scaled_delay_udp_rejected.v:18:25`, new `  --> verilog-ams/digital/scaled_delay_udp_rejected.v:18:29`
 verilog-ams/digital/std_1364_ams_keywords_reserved_by_default.v rw-comp (parse): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `error[E0219]: a null statement is not an analog statement`
-verilog-ams/digital/std_1364_analog_block_rejected.v rw-comp (parse): stderr: line 1: old `error[E0242]: a Verilog-AMS construct under an IEEE 1364 language: `analog` under "1364-2005"`, new `error[E0207]: unexpected token: vams_construct_under_1364`
 verilog-ams/digital/vams_digital_temperature_refused.v not built: backend digital_device
 verilog/03_lexical_conventions/attribute_positions.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_3_8_2_inv` primitive`
 verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v rw-comp (astgen): exit status old 1, new 0
@@ -2587,13 +2574,7 @@ verilog/05_expressions/variable_part_select_rejected.v not built: backend digita
 verilog/06_assignments/array_declaration_assignment_rejected.v not built: backend digital_device
 verilog/06_assignments/continuous_assign_to_integer_rejected.v not built: backend digital_device
 verilog/06_assignments/real_array_initializer_rejected.v not built: backend digital_device
-verilog/06_assignments/reject_delay4.v rw-comp (parse): stderr: line 1: old `error[E0210]: expected ')': found `,``, new `error[E0207]: unexpected token: found `,``
 verilog/06_assignments/task_variable_initializer_rejected.v not built: backend digital_device
-verilog/07_gate_switch_level/and_gate_three_delays_rejected.v rw-comp (parse): stderr: line 1: old `error[E0210]: expected ')': found `,``, new `error[E0207]: unexpected token: found `,``
-verilog/07_gate_switch_level/buf_gate_three_delays_rejected.v rw-comp (parse): stderr: line 1: old `error[E0210]: expected ')': found `,``, new `error[E0207]: unexpected token: found `,``
-verilog/07_gate_switch_level/four_net_delays_rejected.v rw-comp (parse): stderr: line 1: old `error[E0210]: expected ')': found `,``, new `error[E0207]: unexpected token: found `,``
-verilog/07_gate_switch_level/mos_drive_strength_rejected.v rw-comp (parse): stderr: line 1: old `error[E0208]: expected an identifier: found strong1`, new `error[E0209]: expected an expression: found strong1`
-verilog/07_gate_switch_level/pull_gate_two_terminals_rejected.v rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found `,``, new `error[E0209]: expected an expression: an n-input gate takes an output and at least one input`
 verilog/07_gate_switch_level/split_array_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/07_gate_switch_level/switch_three_delays_rejected.v not built: backend digital_device
 verilog/07_gate_switch_level/unknown_gate_keyword_rejected.v rw-comp (astgen): stderr: line 1: old `error[E1100]: digital source execution failed: undeclared module in instantiation: no library of the search order (work) holds cell `AND``, new `error[E0904]: instance names no module: `AND``
@@ -2604,21 +2585,16 @@ verilog/08_udp/definition_placement.v rw-dlower (digital lowering): stderr: line
 verilog/08_udp/header_forms.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `and_a` primitive`
 verilog/08_udp/initial_to_input_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/08_udp/initial_values.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `i0` primitive`
-verilog/08_udp/inout_port_rejected.v rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found `inout`: a udp_body is a `table … endtable``, new `error[E0233]: a UDP table symbol is outside the alphabet its column admits: invalid_udp`
 verilog/08_udp/input_minimums.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `and10` primitive`
 verilog/08_udp/instance_array.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv` primitive`
 verilog/08_udp/instances.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `gt` primitive`
 verilog/08_udp/jk_edge_ff.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `jk_edge_ff` primitive`
 verilog/08_udp/multibit_initial_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/08_udp/multiplexer.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `multiplexer` primitive`
-verilog/08_udp/no_change_in_combinational_rejected.v rw-comp (parse) message: stderr: line 1: old `error[E0233]: a UDP table symbol is outside the alphabet its column admits: `-` is not a UDP output symbol`, new `error[E0233]: a UDP table symbol is outside the alphabet its column admits: invalid_udp`
 verilog/08_udp/output_bit_select.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv` primitive`
 verilog/08_udp/output_not_first_rejected.v rw-comp (astgen) message: stderr: line 1: old `error[E1100]: digital source execution failed: §8.1.1: the output port shall be the first port of a UDP`, new `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port, and it is the first port`
 verilog/08_udp/output_reg_initializer.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `hdr` primitive`
 verilog/08_udp/overlapping_entries_agree.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `nand_overlap` primitive`
-verilog/08_udp/question_in_output_rejected.v rw-comp (parse) message: stderr: line 1: old `error[E0233]: a UDP table symbol is outside the alphabet its column admits: `?` is not a UDP output symbol`, new `error[E0233]: a UDP table symbol is outside the alphabet its column admits: invalid_udp`
-verilog/08_udp/reject_udp_comb_edge.v rw-comp (parse): stderr: line 1: old `error[E0234]: a UDP table does not derive from one udp_body: an edge indicator `(` in a combinational UDP table entry: A.5.3 reaches `edge_input_list` only from`, new `error[E0233]: a UDP table symbol is outside the alphabet its column admits: invalid_udp`
-verilog/08_udp/reject_udp_z_output.v rw-comp (parse) message: stderr: line 1: old `error[E0233]: a UDP table symbol is outside the alphabet its column admits: `z` is not a UDP output symbol`, new `error[E0233]: a UDP table symbol is outside the alphabet its column admits: invalid_udp`
 verilog/08_udp/sequential_64_inputs.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `seq64` primitive`
 verilog/08_udp/sequential_hold_agrees.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `latch_agree` primitive`
 verilog/08_udp/sequential_hold_conflict_rejected.v rw-comp (astgen) location: stderr: line 2: old `  --> verilog/08_udp/sequential_hold_conflict_rejected.v:13:1`, new `  --> verilog/08_udp/sequential_hold_conflict_rejected.v:13:11`
@@ -2632,12 +2608,10 @@ verilog/08_udp/udp_comb.v rw-dlower (digital lowering): stderr: line 1: old ``, 
 verilog/08_udp/udp_conflicting_rows_rejected.v rw-comp (astgen) location: stderr: line 2: old ` --> verilog/08_udp/udp_conflicting_rows_rejected.v:5:1`, new ` --> verilog/08_udp/udp_conflicting_rows_rejected.v:5:11`
 verilog/08_udp/udp_dff.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `udp_dff` primitive`
 verilog/08_udp/udp_header_order.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `audit_header_udp` primitive`
-verilog/08_udp/udp_input_z_rejected.v rw-comp (parse) message: stderr: line 1: old `error[E0233]: a UDP table symbol is outside the alphabet its column admits: `z` is not a UDP input symbol`, new `error[E0233]: a UDP table symbol is outside the alphabet its column admits: invalid_udp`
 verilog/08_udp/udp_latch.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `udp_latch` primitive`
 verilog/08_udp/udp_named_terminal_rejected.v not built: backend digital_device
 verilog/08_udp/udp_null_terminal_rejected.v not built: backend digital_device
 verilog/08_udp/udp_potential_edges_dominance.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `audit_edges_udp` primitive`
-verilog/08_udp/udp_two_edges_rejected.v rw-comp (parse): stderr: line 1: old `error[E0234]: a UDP table does not derive from one udp_body: a sequential UDP table entry permits at most one input transition descriptor`, new `error[E0233]: a UDP table symbol is outside the alphabet its column admits: invalid_udp`
 verilog/09_behavioral_modeling/assign_bit_select_rejected.v not built: backend digital_device
 verilog/09_behavioral_modeling/assign_memory_word_rejected.v not built: backend digital_device
 verilog/09_behavioral_modeling/assign_to_net_rejected.v not built: backend digital_device
@@ -2718,38 +2692,29 @@ verilog/12_hierarchy/unknown_parameter_name_rejected.v rw-comp (astgen): stderr:
 verilog/12_hierarchy/unknown_port_name_rejected.v rw-comp (astgen): stderr: line 1: old `error[E1100]: digital source execution failed: the instantiated module has no such port`, new `error[E0906]: port connections do not match the module's ports: `zz` is not a port of `m``
 verilog/12_hierarchy/unnamed_block_referenced_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/13_configuration/cell_not_in_its_library_rejected.v not built: backend libmap
-verilog/13_configuration/cell_without_expansion_rejected.v rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found `;`: a cell pairs with `liblist` or `use``, new `error[E0243]: a configuration rule IEEE 1364-2005 §13.3 forbids: invalid_config_rule`
 verilog/13_configuration/cfg1_default_liblist.v not built: backend libmap
 verilog/13_configuration/cfg2_gate_first.v not built: backend libmap
 verilog/13_configuration/cfg3_cell_use.v not built: backend libmap
 verilog/13_configuration/cfg4_instance_liblist.v not built: backend libmap
 verilog/13_configuration/cfg6_hierarchical.v not built: backend libmap
 verilog/13_configuration/command_line_search_order.v not built: backend libmap
-verilog/13_configuration/config_default_use_rejected.v rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found use: a default pairs with `liblist``, new `error[E0243]: a configuration rule IEEE 1364-2005 §13.3 forbids: invalid_config_rule`
 verilog/13_configuration/config_in_map_rejected.v not built: backend libmap
 verilog/13_configuration/config_overrides_command_line.v not built: backend libmap
 verilog/13_configuration/default_search_order.v not built: backend libmap
-verilog/13_configuration/design_after_rule_rejected.v rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found `default`: a config_declaration begins with its `design` statement`, new `error[E0243]: a configuration rule IEEE 1364-2005 §13.3 forbids: invalid_config_rule`
 verilog/13_configuration/design_cell_missing_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/13_configuration/design_names_config_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/13_configuration/every_config_referenced_rejected.v rw-comp (elab): exit status old 1, new 0
 verilog/13_configuration/include_map.v not built: backend libmap
-verilog/13_configuration/instance_without_expansion_rejected.v rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found `;`: a instance pairs with `liblist` or `use``, new `error[E0243]: a configuration rule IEEE 1364-2005 §13.3 forbids: invalid_config_rule`
-verilog/13_configuration/library_with_liblist_rejected.v rw-comp (elab) message: stderr: line 1: old `error[E0243]: a configuration rule IEEE 1364-2005 §13.3 forbids: a cell clause with a library name takes `use`, not `liblist` (IEEE 1364-2005 §13.3.1.4)`, new `error[E0243]: a configuration rule IEEE 1364-2005 §13.3 forbids: invalid_config_rule`
 verilog/13_configuration/library_without_path_rejected.v not built: backend libmap
-verilog/13_configuration/missing_endconfig_rejected.v rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found end of file: no `endconfig` closes the configuration`, new `error[E0243]: a configuration rule IEEE 1364-2005 §13.3 forbids: invalid_config_rule`
 verilog/13_configuration/parent_library_by_map.v not built: backend libmap
 verilog/13_configuration/resolution_order.v not built: backend libmap
 verilog/13_configuration/rule_inside_other_config_rejected.v rw-comp (elab): exit status old 1, new 0
 verilog/13_configuration/same_name_cell_last_wins.v rw-comp (elab) message: stderr: line 1: old `warning[W1152]: two cells with one name in one library: `work.leaf` is defined again; this later definition is the cell`, new `warning[W1152]: two cells with one name in one library: `leaf` is defined again; this later definition is the module`
 verilog/13_configuration/source_text_in_map_rejected.v not built: backend libmap
-verilog/13_configuration/two_default_liblists_rejected.v rw-comp (elab) message: stderr: line 1: old `error[E0243]: a configuration rule IEEE 1364-2005 §13.3 forbids: more than one default clause specifies a liblist (IEEE 1364-2005 §13.3.1.2)`, new `error[E0243]: a configuration rule IEEE 1364-2005 §13.3 forbids: invalid_config_rule`
-verilog/13_configuration/two_design_statements_rejected.v rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found design, which begins no A.1.5 config_rule_statement`, new `error[E0243]: a configuration rule IEEE 1364-2005 §13.3 forbids: invalid_config_rule`
 verilog/13_configuration/two_libraries_match_rejected.v not built: backend libmap
 verilog/13_configuration/two_unreferenced_configs_rejected.v rw-comp (elab): exit status old 1, new 0
 verilog/13_configuration/unbound_instance_rejected.v rw-comp (astgen): stderr: line 1: old `error[E1100]: digital source execution failed: undeclared module in instantiation: no library of the search order (work) holds cell `absent``, new `error[E0904]: instance names no module: `absent``
 verilog/13_configuration/undeclared_library_rejected.v not built: backend libmap
-verilog/13_configuration/use_suffix_not_config_rejected.v rw-comp (parse) message: stderr: line 1: old `error[E0207]: unexpected token: found `module`: a use_clause's `:` is followed by the word `config``, new `error[E0207]: unexpected token: found `module``
 verilog/14_specify_blocks/inconsistent_port_reference_rejected.v rw-comp (astgen) location: stderr: line 11: old `  --> verilog/14_specify_blocks/inconsistent_port_reference_rejected.v:32:7`, new `  --> verilog/14_specify_blocks/inconsistent_port_reference_rejected.v:31:5`
 verilog/15_timing_checks/conditions.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in b_15_6_conditions.u: timestamp event at 20, timecheck event at 22`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/fullskew_checks_both_orders.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$fullskew` in fullskew_checks_both_orders.forward: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
@@ -2776,7 +2741,6 @@ verilog/15_timing_checks/skew_late_data_notifies.v rw-dlower (run) message: stde
 verilog/15_timing_checks/skew_waits_for_data_event.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$skew` in skew_waits_for_data_event.u: timestamp event at 10, timecheck event at 30`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/timeskew_missing_event_and_rearm.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$timeskew` in timeskew_missing_event_and_rearm.u: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/timeskew_remain_active.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$timeskew` in timeskew_remain_active.u: timestamp event at 10, timecheck event at 14`, new `warning[W1199]: timing violation: a timing check reported a violation`
-verilog/15_timing_checks/timing_check_in_procedure_rejected.v rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: `$setup` is a timing check, which only a specify block holds (§15.1)`, new `error[E0214]: expected '<+' or '=': found $setup`
 verilog/15_timing_checks/vector.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in b_15_7_vector.u: timestamp event at 100, timecheck event at 105`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/width.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$width` in b_15_3_4_width.u: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/16_sdf/sdf_timing_check_limit.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in sdf_timing_check_limit.u: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
@@ -2854,12 +2818,10 @@ verilog/A_formal_syntax/b_A_1_1_incdir.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_library_text.v not built: backend libmap
-verilog/A_formal_syntax/b_A_1_5_missing_design_rejected.v rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found `default`: a config_declaration begins with its `design` statement`, new `error[E0243]: a configuration rule IEEE 1364-2005 §13.3 forbids: invalid_config_rule`
 verilog/A_formal_syntax/b_A_2_2_1_dimension_and_initializer_rejected.v not built: backend digital_device
 verilog/A_formal_syntax/b_A_2_6_function_output_port_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function argument is an input, not an output or inout`, new `error[E0207]: unexpected token: found `output`: A.2.6 gives a function `input` formals only; an `analog function` or a task takes `output``
 verilog/A_formal_syntax/b_A_2_8_net_block_item_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found `;``, new `error: could not compile due to 1 previous error(s)`
 verilog/A_formal_syntax/b_A_4_1_mixed_port_connections_rejected.v rw-comp (astgen): stderr: line 1: old `error[E1100]: digital source execution failed: §12.3.6: an instance mixes ordered and named port connections`, new `error[E0906]: port connections do not match the module's ports: a named connection in a list of ordered connections`
-verilog/A_formal_syntax/b_A_5_1_missing_udp_body_rejected.v rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found endprimitive: a udp_body is a `table … endtable``, new `error[E0233]: a UDP table symbol is outside the alphabet its column admits: invalid_udp`
 verilog/A_formal_syntax/b_A_5_1_udp_declarations.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_A_5_1_mux` primitive`
 verilog/A_formal_syntax/b_A_5_2_two_outputs_rejected.v rw-comp (astgen) message: stderr: line 1: old `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port`, new `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port, and it is the first port`
 verilog/A_formal_syntax/b_A_5_3_udp_body.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_A_5_3_xor` primitive`

@@ -32,7 +32,11 @@ pub fn bundle(comp: *Compilation) Allocator.Error!Diag {
     for (out.diagnostics) |d| {
         const code = std.meta.stringToEnum(Diag.Code, d.code) orelse unreachable; // The preprocessor reports catalogue codes.
         const loc: Diag.Loc = if (d.file == .none) .none else .{ .file = @fromBackingInt(@backingInt(d.file)), .start = source(out, d.file, d.start), .end = source(out, d.file, d.end) };
-        try w.add(.preprocess, code, loc, "{s}", .{d.message});
+        var b = w.build(.preprocess, code, loc);
+        b.msg("{s}", .{d.message});
+        for (d.notes) |n| b.note("{s}", .{n});
+        if (d.label) |l| b.label(.{ .file = loc.file, .start = source(out, d.file, l.start), .end = source(out, d.file, l.end) }, "{s}", .{l.text});
+        try b.emit();
     }
     if (comp.netlist) |*n| try n.output().report(&w, @fromBackingInt(pp_files));
     for (comp.units.items) |*u| {
@@ -80,6 +84,24 @@ pub fn relocate(out: vams.Preprocessor.Output, start: u32, end: u32) Diag.Loc {
     return .{ .file = @fromBackingInt(@backingInt(s.file)), .start = from, .end = @max(from, to) };
 }
 
+/// Where Vir instruction `src` of unit `u` was written, as the old
+/// compiler located it: a statement `<+` at its target's first byte (no
+/// width), a call at its callee's name, anything else at its main token.
+pub fn instLoc(out: vams.Preprocessor.Output, u: *const Compilation.Unit, src: Inst.Ref) Diag.Loc {
+    const i = src.toIndex() orelse return .none;
+    const tag = u.vir.instructions.items(.tag)[@backingInt(i)];
+    if (tag == .contrib or tag == .contrib_indirect) {
+        const at_payload = u.vir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index;
+        const lhs = if (tag == .contrib) u.vir.extraData(Inst.Bin, at_payload).lhs else u.vir.extraData(Inst.Triple, at_payload).a;
+        const t = instToken(u, lhs) orelse return .none;
+        const at = u.tree.tokenStart(t);
+        return relocate(out, at, at);
+    }
+    const t = instToken(u, src) orelse return .none;
+    const at = u.tree.tokenStart(t);
+    return relocate(out, at, at + @as(u32, @intCast(u.tree.tokenSlice(t).len)));
+}
+
 // ---- private ----
 
 /// Every message of `d`, located in a unit's preprocessed text, into `w`.
@@ -114,24 +136,6 @@ fn move(out: ?vams.Preprocessor.Output, loc: Diag.Loc) Diag.Loc {
 /// A stripped-text offset of `file` as an offset of its original bytes.
 fn source(out: vams.Preprocessor.Output, file: vams.Preprocessor.File.Index, offset: u32) u32 {
     return vams.Preprocessor.toSourceOffset(out.files[@backingInt(file)].marks, offset);
-}
-
-/// Where Vir instruction `src` of unit `u` was written, as the old
-/// compiler located it: a statement `<+` at its target's first byte (no
-/// width), a call at its callee's name, anything else at its main token.
-pub fn instLoc(out: vams.Preprocessor.Output, u: *const Compilation.Unit, src: Inst.Ref) Diag.Loc {
-    const i = src.toIndex() orelse return .none;
-    const tag = u.vir.instructions.items(.tag)[@backingInt(i)];
-    if (tag == .contrib or tag == .contrib_indirect) {
-        const at_payload = u.vir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index;
-        const lhs = if (tag == .contrib) u.vir.extraData(Inst.Bin, at_payload).lhs else u.vir.extraData(Inst.Triple, at_payload).a;
-        const t = instToken(u, lhs) orelse return .none;
-        const at = u.tree.tokenStart(t);
-        return relocate(out, at, at);
-    }
-    const t = instToken(u, src) orelse return .none;
-    const at = u.tree.tokenStart(t);
-    return relocate(out, at, at + @as(u32, @intCast(u.tree.tokenSlice(t).len)));
 }
 
 /// The token instruction `ref` names: its main token, or for a call (whose

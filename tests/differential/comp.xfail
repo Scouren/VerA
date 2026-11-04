@@ -2864,3 +2864,52 @@ verilog/pli/vpi_invalid_time_callback.c not built: backend vpi
 verilog/pli/vpi_invalid_time_callback.v not built: backend vpi
 verilog/pli/vpi_value_formats.c not built: backend vpi
 verilog/pli/vpi_value_formats.v not built: backend vpi
+verilog-a/ch03_data_types/parameter_default_not_constant_rejected.va not built: backend exe
+verilog-a/ch04_expressions/limexp_not_a_constant_expression_rejected.va not built: backend exe
+verilog-a/ch09_system_tasks/distribution_arity_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0816]: a $9.13 probabilistic distribution argument: `$rdist_uniform` takes 3 arguments, got 2`, new `error[E0506]: wrong number of arguments to a math function or analog operator: `$rdist_uniform` takes 3 to 4, given 2`
+verilog/03_lexical_conventions/escaped_same_as_plain_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/04_data_types/net_redeclared_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/04_data_types/variable_redeclared_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/04_data_types/variable_redefined_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/06_assignments/net_declared_twice_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/06_assignments/procedural_assign_to_net_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/09_behavioral_modeling/nonblocking_to_net_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/09_behavioral_modeling/procedural_assign_wire_array_element_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/09_behavioral_modeling/procedural_to_net_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/10_tasks_functions/automatic_assign_rhs_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/10_tasks_functions/automatic_force_rhs_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/10_tasks_functions/automatic_monitor_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/10_tasks_functions/automatic_nba_event_control_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/10_tasks_functions/automatic_nonblocking_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/10_tasks_functions/automatic_procedural_assign_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/10_tasks_functions/automatic_task_item_hierarchical_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/10_tasks_functions/nonansi_task_complete_port_redeclared_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/10_tasks_functions/nonansi_task_duplicate_port_variable_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/10_tasks_functions/nonansi_task_port_range_mismatch_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/12_hierarchy/complete_port_redeclared_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/12_hierarchy/nonansi_port_integer_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/12_hierarchy/nonansi_port_reg_range_mismatch_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/12_hierarchy/nonansi_port_scalar_vs_vector_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/12_hierarchy/nonansi_port_time_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/12_hierarchy/nonansi_port_vector_vs_scalar_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/12_hierarchy/port_completed_net_redeclared_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/12_hierarchy/port_range_mismatch_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/15_timing_checks/hold_negative_limit_rejected.v not built: backend digital_device
+verilog/15_timing_checks/recovery_negative_limit_rejected.v not built: backend digital_device
+verilog/15_timing_checks/removal_negative_limit_rejected.v not built: backend digital_device
+verilog/15_timing_checks/setup_negative_limit_rejected.v not built: backend digital_device
+verilog/17_system_tasks/c_flag_on_integer_rejected.v rw-dlower (run): exit status old 1, new 0
+verilog/17_system_tasks/display_missing_argument_rejected.v not built: backend digital_device
+verilog/17_system_tasks/finish_two_arguments_rejected.v not built: backend digital_device
+verilog/17_system_tasks/fopen_type_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/17_system_tasks/malformed_format_trailing_percent_rejected.v not built: backend digital_device
+verilog/17_system_tasks/output_term_net_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/17_system_tasks/percent_escape_with_width_rejected.v not built: backend digital_device
+verilog/17_system_tasks/sscanf_to_net_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/17_system_tasks/stop_two_arguments_rejected.v not built: backend digital_device
+verilog/17_system_tasks/strength_vector_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/17_system_tasks/string_missing_argument_rejected.v not built: backend digital_device
+verilog/17_system_tasks/strobe_missing_argument_rejected.v not built: backend digital_device
+verilog/17_system_tasks/swrite_to_net_rejected.v rw-comp (astgen): exit status old 1, new 0
+verilog/17_system_tasks/too_few_arguments_rejected.v not built: backend digital_device
+verilog/17_system_tasks/value_plusargs_format_rejected.v rw-comp (astgen): exit status old 1, new 0

@@ -1,7 +1,8 @@
 //! Emit-time constant folding of `Air` value tags (the old
 //! `src/ir/opcode.zig` fold rows): a tag over constant operands in, its
-//! value out, computed by `kernels.fold`, the kernel the old MIR's run-time
-//! ops share, so a folded value is the value the old interpreter computes.
+//! value out, computed by `std_kernels.fold`, whose §4.3 functions are the
+//! ones the device runs (Gompute), so a folded value is the value the
+//! device computes (lib/TODO.md §7; diff-kernels' fold-equals-device test).
 //! Cites: VAMS-2023 §4.2, §4.2.1.1, §4.3 (Tables 4-14, 4-15).
 //!
 //! Contents:
@@ -9,7 +10,7 @@
 
 const std = @import("std");
 const Air = @import("air");
-const fold = @import("kernels").fold;
+const fold = @import("std_kernels").fold;
 
 /// The old `src/ir/opcode.zig` fold rows, per Air tag: which kernel, over
 /// which operand type, wrapped to §3.2's 32 bits or not.

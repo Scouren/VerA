@@ -327,7 +327,7 @@ fn genCase(w: *Walk, f: u32, scope: u32, g: Inst.GenCase, prefix: []const u8) Er
         if (arm.flags.default) default = arm.body;
         for (vir.list(Inst.Ref, arm.values)) |r| {
             const label = (try env.ref(r)) orelse continue;
-            const eq = kernels.fold.binary(.eq, operand, label, null) orelse continue;
+            const eq = @import("std_kernels").fold.binary(.eq, operand, label, null) orelse continue;
             if (eq.isTrue()) return armBlock(w, f, scope, arm.body, prefix);
         }
     }

@@ -298,8 +298,12 @@ fn atanQ(x: f128) f128 {
 
 fn atan2Q(y: f64, x: f64) ?f128 {
     if (std.math.isNan(x) or std.math.isInf(x) or std.math.isInf(y)) return null;
-    if (x == 0 or y == 0) return null;
     const pi: f128 = 2 * (pio2[0] + pio2[1] + pio2[2]);
+    // On an axis (C99 F.10.1.4): ±pi/2 on the y axis, ±0 or ±pi on the
+    // x axis by the sign of y; the origin's value is a convention.
+    if (x == 0 and y != 0) return std.math.copysign(pi / 2, @as(f128, y));
+    if (y == 0 and x != 0) return std.math.copysign(if (x > 0) 0 else pi, @as(f128, y));
+    if (x == 0 or y == 0) return null;
     const a = atanQ(@as(f128, y) / @as(f128, x));
     if (x > 0) return a;
     return if (y > 0) a + pi else a - pi;

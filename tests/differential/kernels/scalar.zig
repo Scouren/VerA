@@ -19,6 +19,7 @@ const sk = @import("std_kernels");
 const old = @import("old_text");
 const ok = @import("kernels");
 const math = @import("math.zig");
+const reference = @import("reference.zig");
 
 const cmp = g.cmp;
 const R = g.AnyReal;
@@ -83,6 +84,14 @@ pub fn run(rep: *g.Report) void {
 
 // ---- private ----
 
+/// Every lane of `n` equals `o`'s, where `o`'s is finite.
+fn lanesKept(o: K, n: K) bool {
+    const od: [2]f64 = o.v.d;
+    const nd: [2]f64 = n.v.d;
+    for (od, nd) |x, y| if (std.math.isFinite(x) and x != y) return false;
+    return true;
+}
+
 fn mathText(rep: *g.Report) void {
     cmp(rep, "math.zMinF", old.zMinF, sk.math.zMinF, .{}, .{ R, R });
     cmp(rep, "math.zMaxF", old.zMaxF, sk.math.zMaxF, .{}, .{ R, R });
@@ -101,7 +110,7 @@ fn mathText(rep: *g.Report) void {
             }
         }.judge);
     cmp(rep, "math.zDevPow", old.zDevPow, sk.math.zDevPow, .{}, .{ R, g.Real(-30, 30) });
-    inline for (.{ "zMin", "zMax", "zHypot", "zAtan2" }) |f|
+    inline for (.{ "zMin", "zMax", "zHypot" }) |f|
         cmp(rep, "math." ++ f, @field(old, f), @field(sk.math, f), .{K}, .{ KSpec, KSpec });
     inline for (.{ "zTan", "zSqrtD", "zLnD", "zLn1pD", "zAsin", "zAcos", "zAsinh", "zAcosh", "zAtanh", "zFloor", "zCeil" }) |f|
         cmp(rep, "math." ++ f, @field(old, f), @field(sk.math, f), .{K}, .{KSpec});
@@ -114,7 +123,23 @@ fn mathText(rep: *g.Report) void {
                 return math.judgeAt("log10", args[0].v.v, 0, a.v.v, b.v.v);
             }
         }.judge);
-    cmp(rep, "math.zFmod", old.zFmod, sk.math.zFmod, .{K}, .{ KSpec, KNonZero });
+    // zAtan2 and zFmod lost their value to a NaN carrier (a subnormal
+    // hypot's overflowed slope; an infinite divisor): the value is judged by
+    // the f128 reference (fmod's is exact), every lane must equal the old
+    // one where the old was finite.
+    g.cmpJudged(rep, "math.zAtan2", old.zAtan2, sk.math.zAtan2, .{K}, .{ KSpec, KSpec }, struct {
+        fn judge(args: struct { K, K }, a: K, b: K) ?g.Judgement {
+            if (!lanesKept(a, b)) return null;
+            return math.judgeAt("atan2", args[0].v.v, args[1].v.v, a.v.v, b.v.v);
+        }
+    }.judge);
+    g.cmpJudged(rep, "math.zFmod", old.zFmod, sk.math.zFmod, .{K}, .{ KSpec, KNonZero }, struct {
+        fn judge(args: struct { K, K }, a: K, b: K) ?g.Judgement {
+            if (!lanesKept(a, b)) return null;
+            const q: f128 = @rem(args[0].v.v, args[1].v.v);
+            return .{ .old_err = reference.ulpErr(a.v.v, q), .new_err = reference.ulpErr(b.v.v, q), .bound = 0 };
+        }
+    }.judge);
     inline for (.{ true, false }) |ve| {
         const pw = struct {
             fn o(a: K, b: K) K {

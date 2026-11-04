@@ -14,7 +14,7 @@
 //! and printed per name with each side's largest error. Any other difference passes only when a line of
 //! `kernels.xfail` names it with a bound in ulps that covers the largest
 //! difference seen; a line whose name never differs fails the run (an
-//! unexpected pass).
+//! unexpected pass). (3) Fold equals device: `kernels/fold_device.zig`.
 //! Cites: none of its own (`kernels/*.zig` name theirs).
 //!
 //! Contents: none public; tests only.
@@ -24,6 +24,7 @@ const g = @import("kernels/gen.zig");
 const scalar = @import("kernels/scalar.zig");
 const math = @import("kernels/math.zig");
 const state = @import("kernels/state.zig");
+const fold_device = @import("kernels/fold_device.zig");
 
 /// One line of `kernels.xfail`: `<name> <ulps> <reason>`.
 const Allowed = struct { name: []const u8, ulps: u64, line: u32 };
@@ -95,4 +96,8 @@ test "diff-kernels: std_kernels against lib/kernels, the old kernel text and gm"
     std.debug.print("diff-kernels: {d} names, {d} comparisons, {d} settled by the f128 reference (old-side bugs), {d} listed differences, {d} failures\n", .{ rep.rows.count(), compared, old_bugs, listed_differ, failures });
     try std.testing.expect(rep.rows.count() > 300);
     try std.testing.expectEqual(@as(u32, 0), failures);
+}
+
+test "diff-kernels: Sema's folded constant equals the device's run-time value" {
+    try std.testing.expectEqual(@as(u32, 0), fold_device.run());
 }

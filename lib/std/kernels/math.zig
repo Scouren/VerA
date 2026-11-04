@@ -457,8 +457,13 @@ pub fn zAtan2(comptime S: type, y: S, x: S) S {
     if (yv == 0.0 and xv > 0.0) return y.div(x);
     const h = std.math.hypot(xv, yv);
     var r = S.con(atan2(yv, xv));
-    if (h != 0.0 and std.math.isFinite(h))
-        r = r.add(y.addC(-yv).scale((xv / h) / h)).sub(x.addC(-xv).scale((yv / h) / h));
+    if (h == 0.0 or !std.math.isFinite(h)) return r;
+    // A slope that overflows (h subnormal) has none worth propagating, as
+    // in `zGraft`: its zero-valued carrier times inf would make the value NaN.
+    const gy = (xv / h) / h;
+    const gx = (yv / h) / h;
+    if (std.math.isFinite(gy)) r = r.add(y.addC(-yv).scale(gy));
+    if (std.math.isFinite(gx)) r = r.sub(x.addC(-xv).scale(gx));
     return r;
 }
 /// §4.3.1 floor, derivative 0 almost everywhere.
@@ -473,16 +478,17 @@ pub fn zCeil(comptime S: type, a: S) S {
 /// §4.2.4 `%` keeps the sign of the first operand: C's fmod, which `@rem`
 /// on f64 is, exactly. k = trunc(a/b) is constant almost everywhere, so
 /// d = da − k·db, carried by zero-valued grafts so the exact value
-/// survives; a non-finite k (b = 0, or a/b overflowed) degrades to da
-/// alone. A zero `b` is §4.2.4's error (`zModZero`), real operands
-/// included, rather than @rem's NaN.
+/// survives (but for a zero's sign: an exact multiple's -0 is +0); a
+/// non-finite k (b = 0, or a/b overflowed) or b degrades to da alone (an
+/// infinite b's carrier is NaN: fmod(a, inf) = a). A zero `b` is §4.2.4's
+/// error (`zModZero`), real operands included, rather than @rem's NaN.
 pub fn zFmod(comptime S: type, a: S, b: S) S {
     const av = a.val();
     const bv = b.val();
     if (bv == 0.0) zModZero();
     const k = @trunc(av / bv);
     var r = S.con(@rem(av, bv)).add(a.addC(-av));
-    if (std.math.isFinite(k)) r = r.sub(b.addC(-bv).scale(k));
+    if (std.math.isFinite(k) and std.math.isFinite(bv)) r = r.sub(b.addC(-bv).scale(k));
     return r;
 }
 

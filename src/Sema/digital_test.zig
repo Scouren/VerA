@@ -235,3 +235,21 @@ test "§7.3.6.4 an analog variable a continuous assignment reads is the digital 
         \\
     );
 }
+
+test "§19.8 a mixed design's modules ahead of its first `timescale take it (lib/sim/digital's mixedTimescales)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    // `ana` and the disciplines come before any directive, as the shipped
+    // prelude's modules do; the source's `timescale is 1ns/1ps.
+    const lowered = try lowerSource(arena_state.allocator(),
+        \\nature Voltage; access = V; units = "V"; abstol = 1e-6; endnature
+        \\nature Current; access = I; units = "A"; abstol = 1e-12; endnature
+        \\discipline electrical; potential Voltage; flow Current; enddiscipline
+        \\module ana(p); inout p; electrical p; analog V(p) <+ 0.0; endmodule
+        \\`timescale 1ns/1ps
+        \\module mx(vo); inout vo; electrical vo; reg r; initial #1 r = 1; ana u(vo); endmodule
+        \\
+    , true);
+    // The design's tick is the finest precision: 1 ps, 10^-12 s.
+    try std.testing.expectEqual(@as(i32, -12), lowered.program.finest);
+}

@@ -479,27 +479,33 @@ fn spine(l: *Lower) Error!void {
 
 /// IEEE 1364-2005 §19.8: each module's `timescale (the last before it, or
 /// none); some modules with one and some without is an error. The design's
-/// tick is the finest precision of all of them, `s` when none is given.
+/// tick is the finest precision of all of them, `s` when none is given. A
+/// mixed design's modules before its first `timescale take that one, as
+/// lib/sim/digital's `mixedTimescales` moves it to the text's start: the
+/// shipped prelude's modules come ahead of every directive the source wrote.
 fn timeScales(l: *Lower) Error!void {
     const zcu = l.zcu;
+    const first = if (l.options.mixed) firstTimescale(l) else null;
     var finest: i32 = 0;
     var set: u32 = 0;
     var total: u32 = 0;
+    var ahead = true;
     for (0..zcu.files.len) |f| {
         const vir = zcu.fileVir(@fromBackingInt(@intCast(f)));
         for (vir.decls()) |d| {
             if (d.kind != .module and d.kind != .macromodule and d.kind != .connectmodule) continue;
             const m = Lower.payload(vir, Inst.Module, d.inst);
             total += 1;
-            if (!m.stamp.flags.has_timescale) continue;
+            const stamp = stampOf(m, first, &ahead) orelse continue;
             set += 1;
-            const p = try quantum(l, m.stamp.precision.get());
+            const p = try quantum(l, stamp.precision.get());
             finest = @min(finest, @backingInt(p));
         }
     }
     if (set != 0 and set != total) return l.refuse("§19.8 some modules with a `timescale and some without");
     l.b.p.finest = finest;
     const global: std_sim.time.Quantum = @fromBackingInt(@intCast(finest));
+    ahead = true;
     for (0..zcu.files.len) |f| {
         const file: Zcu.File.Index = @fromBackingInt(@intCast(f));
         const vir = zcu.fileVir(file);
@@ -507,17 +513,39 @@ fn timeScales(l: *Lower) Error!void {
             if (d.kind != .module and d.kind != .macromodule and d.kind != .connectmodule and d.kind != .primitive) continue;
             var unit: std_sim.time.Quantum = .s;
             var precision: std_sim.time.Quantum = .s;
-            if (d.kind != .primitive) {
-                const m = Lower.payload(vir, Inst.Module, d.inst);
-                if (m.stamp.flags.has_timescale) {
-                    unit = try quantum(l, m.stamp.unit.get());
-                    precision = try quantum(l, m.stamp.precision.get());
-                }
-            }
+            if (d.kind != .primitive) if (stampOf(Lower.payload(vir, Inst.Module, d.inst), first, &ahead)) |stamp| {
+                unit = try quantum(l, stamp.unit.get());
+                precision = try quantum(l, stamp.precision.get());
+            };
             const scale = std_sim.time.Scale.init(unit, precision, global) catch return l.refuse("an invalid timescale");
             try l.module_times.put(l.a, .{ .file = file, .index = @fromBackingInt(@intCast(k)) }, .{ .scale = scale, .unit_exp = @backingInt(unit) });
         }
     }
+}
+
+/// The stamp of a mixed design's first module with a `timescale.
+fn firstTimescale(l: *Lower) ?Inst.Module.Stamp {
+    assert(l.options.mixed);
+    for (0..l.zcu.files.len) |f| {
+        const vir = l.zcu.fileVir(@fromBackingInt(@intCast(f)));
+        for (vir.decls()) |d| {
+            if (d.kind != .module and d.kind != .macromodule and d.kind != .connectmodule) continue;
+            const m = Lower.payload(vir, Inst.Module, d.inst);
+            if (m.stamp.flags.has_timescale) return m.stamp;
+        }
+    }
+    return null;
+}
+
+/// Module `m`'s `timescale: its own, else `first` (a mixed design's) while
+/// no module before it had one (`ahead`, cleared at the first that does),
+/// else none.
+fn stampOf(m: Inst.Module, first: ?Inst.Module.Stamp, ahead: *bool) ?Inst.Module.Stamp {
+    if (m.stamp.flags.has_timescale) {
+        ahead.* = false;
+        return m.stamp;
+    }
+    return if (ahead.*) first else null;
 }
 
 fn quantum(l: *Lower, seconds: f64) Error!std_sim.time.Quantum {

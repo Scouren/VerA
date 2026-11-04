@@ -16,6 +16,7 @@
 //! - `pub fn finishParams(l: *Lower, p: *Program) Error!void`
 
 const std = @import("std");
+const assert = std.debug.assert;
 const vams = @import("vams");
 const std_sim = @import("std_sim");
 const walk = @import("../walk.zig");
@@ -75,7 +76,10 @@ pub fn variable(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Index)
             if (range.len == 0) range = v.range;
             if (dims.len == 0) dims = v.dims;
         },
-        else => unreachable, // else: `signal` passes only these two
+        // VAMS §3.6.2 a discipline declaration of a reg (`ddiscrete o; reg
+        // o;`) names its discipline only: no storage, no type.
+        .net => assert(Lower.payload(vir, Inst.Net, d).flags.net == .none),
+        else => unreachable, // else: `signal` passes only these three
     };
     var n: Name = .{ .kind = .variable };
     switch (storage) {

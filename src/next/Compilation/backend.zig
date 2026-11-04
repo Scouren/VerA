@@ -195,7 +195,7 @@ pub fn semaDigital(comp: *Compilation) !?Job {
     comp.lowered = sema.digital.lower(comp.arena(), &comp.zcu, .{ .sources = sources }, &why) catch |e| switch (e) {
         error.Unsupported => return notBuiltFmt(comp, "the digital lowering", why.text),
         error.Rejected => {
-            try comp.wip.add(.run, .E1100, errors.relocate(out.*, why.at, why.at), "{s}", .{why.text});
+            try comp.wip.add(.lower, .E1100, errors.relocate(out.*, why.at, why.at), "{s}", .{why.text});
             return null;
         },
         error.OutOfMemory => return error.OutOfMemory,

@@ -12,6 +12,8 @@
 
 const std = @import("std");
 const contract = @import("contract");
+/// The family's transcendentals: Gompute's, the rewrite's (`RefOptions.math`).
+const math = @import("std_kernels").math;
 
 /// Every device of the bundle is held to `contract.validate` (link's shim
 /// reads this from the dyn).
@@ -30,8 +32,8 @@ pub fn exportDevice(comptime B: type, comptime name: []const u8) void {
 fn Run(comptime D: type) type {
     return struct {
         const n = contract.nU(D);
-        const S = contract.RefFamily(f64, &std.simd.iota(u8, n), .{});
-        const V = contract.RefFamily(f64, &@as([n]u8, @splat(contract.no_lane)), .{});
+        const S = contract.RefFamily(f64, &std.simd.iota(u8, n), .{ .math = math });
+        const V = contract.RefFamily(f64, &@as([n]u8, @splat(contract.no_lane)), .{ .math = math });
 
         /// Sets the card (`names[k]` = `vals[k]`), evaluates at `x` and time
         /// `t`, and writes `2n + 2n²` reals to `out`: the rows, their

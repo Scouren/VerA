@@ -124,6 +124,8 @@ pub fn add(g: Graph) void {
         .{ .name = "contract", .module = byName(mods, "contract") },
         .{ .name = "gompute_math", .module = b.dependency("gompute", .{}).module("math") },
         .{ .name = "old_text", .module = old_text },
+        .{ .name = "sema", .module = byName(mods, "sema") },
+        .{ .name = "air", .module = byName(mods, "air") },
     });
     const kr = testRun(b, "diff-kernels", kmod, g.runner, g.results_dir);
     const kt = b.step("kernels-targets", "std_kernels built for x86_64, aarch64, NVPTX and AMDGCN, its f64 math held to no fused multiply-add on each");

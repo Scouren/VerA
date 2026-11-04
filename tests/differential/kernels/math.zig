@@ -20,6 +20,7 @@ const gmath = @import("gompute_math");
 const sk = @import("std_kernels");
 const ok = @import("kernels");
 const old = @import("old_text");
+const fold_device = @import("fold_device.zig");
 
 const R = g.AnyReal;
 
@@ -32,6 +33,9 @@ const bounds = std.StaticStringMap(f64).initComptime(.{
     .{ "sinh", 1.75 },
     // "<= 2 ulp vs glibc (log10's slack is glibc's own)"
     .{ "log10", 2.0 },
+    // gm's atan2, which Gompute's is bit for bit: "under 2 ulp" (VD-123,
+    // contract/gm.zig).
+    .{ "atan2", 2.0 },
 });
 
 pub fn run(rep: *g.Report) void {
@@ -139,7 +143,7 @@ fn folds(rep: *g.Report) void {
             const b = NF.math(nf, na[0..f.arity()]);
             const d = g.dist(a, b);
             rep.record("fold.math." ++ @tagName(f), d, .{ oa[0], oa[1 % f.arity()] });
-            if (d != 0) rep.judge("fold.math." ++ @tagName(f), foldJudge(f, oa[0], a, b));
+            if (d != 0) rep.judge("fold.math." ++ @tagName(f), foldJudge(f, oa[0..f.arity()], a, b));
         }
     }
     inline for (comptime std.enums.values(OF.UnaryOp)) |op| {
@@ -172,22 +176,38 @@ fn folds(rep: *g.Report) void {
 /// A fold's difference judged as its function: VAMS `log` is base 10, and
 /// an integer operand is its real value; null for any other function or a
 /// non-real answer.
-fn foldJudge(comptime f: ok.fold.MathFn, arg: ok.fold.Const, a: ?ok.fold.Const, b: ?sk.fold.Const) ?g.Judgement {
+fn foldJudge(comptime f: ok.fold.MathFn, args: []const ok.fold.Const, a: ?ok.fold.Const, b: ?sk.fold.Const) ?g.Judgement {
+    for (args) |c| if (c == .str) return null;
+    const x = args[0].asReal();
+    const y = if (args.len > 1) args[1].asReal() else 0;
     const name = switch (f) {
         .cosh => "cosh",
         .sinh => "sinh",
         .log => "log10",
+        // A fold that now gives the device's value (lib/TODO.md §7).
+        .abs => return byDevice(.fabs, x, y, a, b),
         else => return null,
-    };
-    const x: f64 = switch (arg) {
-        .int => |v| @floatFromInt(v),
-        .real => |v| v,
-        .str => return null,
     };
     const av = a orelse return null;
     const bv = b orelse return null;
     if (av != .real or bv != .real) return null;
     return judgeAt(name, x, 0, av.real, bv.real);
+}
+
+/// A fold difference judged by the device (`fold_device.value`): the new
+/// fold settles it by equalling the device's value where the old does not
+/// (0 or 1 "ulp", bound 0); null for a non-real answer.
+fn byDevice(comptime t: @import("air").Inst.Tag, x: f64, y: f64, a: anytype, b: ?sk.fold.Const) ?g.Judgement {
+    const av = a orelse return null;
+    const bv = b orelse return null;
+    if (av != .real or bv != .real) return null;
+    const dev = fold_device.value(t, x, y);
+    const err = struct {
+        fn of(v: f64, want: f64) f64 {
+            return if (same(v, want) and std.math.signbit(v) == std.math.signbit(want)) 0 else 1;
+        }
+    }.of;
+    return .{ .old_err = err(av.real, dev), .new_err = err(bv.real, dev), .bound = 0 };
 }
 
 /// Equal, or both NaN.

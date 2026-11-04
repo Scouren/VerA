@@ -16,6 +16,7 @@
 //! - `pub const Error = error{ NoValue, LoopCap, Unsupported, OutOfMemory }`
 //! - `pub fn run(scratch: Allocator, air: Air, ip: *const InternPool, inputs: Inputs) Error!Value`
 //! - `pub fn unary(tag: Inst.Tag, a: Value) Error!Value`, `pub fn binary(tag: Inst.Tag, a: Value, b: Value) Error!Value`
+//! - `pub const Math = enum { exact, device }`, `pub fn deviceLib(tag: Inst.Tag, x: f64, y: f64) ?f64`
 
 const std = @import("std");
 const math = std.math;
@@ -24,6 +25,7 @@ const Allocator = std.mem.Allocator;
 const InternPool = @import("intern_pool");
 const Air = @import("../Air.zig");
 const tan_q = @import("tan.zig");
+const fold = @import("std_kernels").fold;
 const Inst = Air.Inst;
 
 /// A value of a §3.2 `integer` or `real`, or a §3.2.2 array version.
@@ -67,6 +69,17 @@ pub const Inputs = struct {
     /// §5.6.1.2 the path latches at their first evaluation: `path_prev` and
     /// `path_acc` read 0 instead of `error.Unsupported`.
     paths_zero: bool = false,
+    /// The §4.3 library functions' math.
+    math: Math = .exact,
+};
+
+/// Which values a run's §4.3 library functions (`deviceLib`'s tags) take.
+pub const Math = enum {
+    /// This interpreter's own: exp, log10, tan and pow rounded once from
+    /// f128, the rest `std.math`'s.
+    exact,
+    /// The device's (`deviceLib`): what the Air passes' bounds must hold.
+    device,
 };
 
 /// Why a run has no value.
@@ -191,8 +204,17 @@ const Run = struct {
             },
             .path_prev, .path_acc => if (r.inputs.paths_zero) .{ .real = 0 } else error.Unsupported,
             else => switch (Air.tag_info.getPtrConst(tag).class) {
-                .un_op => unary(tag, try r.get(data.un_op)),
-                .bin_op => binary(tag, try r.get(data.bin_op.lhs), try r.get(data.bin_op.rhs)),
+                .un_op => blk: {
+                    const a = try r.get(data.un_op);
+                    if (r.inputs.math == .device and a == .real) if (deviceLib(tag, a.real, 0)) |v| break :blk .{ .real = v };
+                    break :blk unary(tag, a);
+                },
+                .bin_op => blk: {
+                    const a = try r.get(data.bin_op.lhs);
+                    const b = try r.get(data.bin_op.rhs);
+                    if (r.inputs.math == .device and a == .real and b == .real) if (deviceLib(tag, a.real, b.real)) |v| break :blk .{ .real = v };
+                    break :blk binary(tag, a, b);
+                },
                 .pl_op, .ty_pl, .ty, .ty_index, .br, .repeat => unreachable, // each has its prong above or in `body`
             },
         };
@@ -359,6 +381,21 @@ pub fn binary(tag: Inst.Tag, a: Value, b: Value) Error!Value {
             },
         },
     };
+}
+
+/// The value a device computes for library tag `tag` at `x` (and `y`):
+/// `std_kernels.fold.math`, which diff-kernels holds bit for bit to the
+/// device's run-time value (`kernels/fold_device.zig`; the family
+/// primitives are the reference family's). Null for any other tag.
+pub fn deviceLib(tag: Inst.Tag, x: f64, y: f64) ?f64 {
+    const f: fold.MathFn = switch (tag) {
+        .ln => .ln,
+        .log10 => .log,
+        inline .exp, .expm1, .ln1p, .sin, .cos, .tan, .asin, .acos, .atan, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh, .pow, .hypot, .atan2 => |t| @field(fold.MathFn, @tagName(t)),
+        else => return null, // else: not a library function; the rest are exact
+    };
+    const args = [2]fold.Const{ .{ .real = x }, .{ .real = y } };
+    return (fold.math(f, args[0..f.arity()]) orelse unreachable).real; // real arguments of the right count always fold
 }
 
 // ---- private ----

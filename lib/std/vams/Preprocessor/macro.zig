@@ -162,7 +162,10 @@ pub fn expand(pp: *Pass, text: []const u8, at: usize, after_name: usize, name: [
         if (args.len != m.params.len)
             return pp.fail(sp, "E0117", "expected {d}, found {d}", .{ m.params.len, args.len });
     }
-    if (pp.expanding_set.contains(name)) return pp.fail(sp, "E0118", "`{s}`", .{name});
+    if (pp.expanding_set.contains(name)) {
+        const note = try pp.arena.print("expansion chain: {s}", .{try pp.joinChain(pp.expanding.items, name)});
+        return pp.failNoted(sp, "E0118", "`{s}`", .{name}, try pp.arena.dupe([]const u8, &.{note}));
+    }
 
     // Arguments expand fully before substitution, before `name` is pushed:
     // a nested use in an actual is not recursion, a self-use in the body is.

@@ -187,6 +187,10 @@ pub const Diagnostic = struct {
     start: u32,
     end: u32,
     message: []const u8,
+    /// Each rendered as a `note:` row under the message, in order.
+    notes: []const []const u8 = &.{},
+    /// A second span of `file`, labelled with `text` (E0101's `ifdef).
+    label: ?struct { start: u32, end: u32, text: []const u8 } = null,
 };
 
 /// The longest text a later stage can address: offsets are u32. A file or
@@ -325,7 +329,9 @@ fn runUnits(pp: *Pass, units: []const Unit) Pass.Error!void {
         pp.cur_file = top.file;
         pp.expand_site = null;
         const len: u32 = @intCast(pp.file(top.file).text.len);
-        return pp.fail(.point(len), "E0101", "`ifdef at offset {d} is never closed", .{top.span.start});
+        const e = pp.fail(.point(len), "E0101", "", .{});
+        if (e == error.PreprocessFailed) pp.diags.items[pp.diags.items.len - 1].label = .{ .start = top.span.start, .end = top.span.end, .text = "unclosed" };
+        return e;
     }
     assert(pp.expanding.items.len == 0);
 }

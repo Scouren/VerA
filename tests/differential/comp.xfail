@@ -677,7 +677,6 @@ verilog-a/ch04_expressions/function_reads_genvar_rejected.va rw-lower (analog lo
 verilog-a/ch04_expressions/function_return.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/function_string_output_starts_empty.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/function_unassigned_output_inout.va not built: backend exe
-verilog-a/ch04_expressions/function_untyped_argument.va rw-comp (astgen) notes: stderr: line 8: old `   = help: add `real x;` to the function body`, new `   = help: run `vera --explain E0225` for a detailed explanation`
 verilog-a/ch04_expressions/greater_equal.va not built: backend exe
 verilog-a/ch04_expressions/greater_than.va not built: backend exe
 verilog-a/ch04_expressions/hypot.va not built: backend exe
@@ -1826,7 +1825,6 @@ verilog-a/ch10_directives/default_nettype_none_rejects_an_undeclared_probe.va rw
 verilog-a/ch10_directives/default_transition.va not built: backend exe
 verilog-a/ch10_directives/default_transition_inside_module_rejected.va rw-comp (parse) location: stderr: line 5: old `   |   ^^^^^^^^^^^^^^^^^^^`, new `   |   ^^^^^^^^^^^^^^^^^^^^^^`
 verilog-a/ch10_directives/default_transition_ramp.va not built: backend exe
-verilog-a/ch10_directives/default_transition_requires_an_operand.va rw-comp (preprocess) notes: stderr: line 8: old `   = note: Syntax 10-2 is `default_transition transition_time, and the operand is not optional`, new `   = help: run `vera --explain E0129` for a detailed explanation`
 verilog-a/ch10_directives/default_transition_rise_only_sets_fall.va not built: backend exe
 verilog-a/ch10_directives/default_transition_supersedes.va not built: backend exe
 verilog-a/ch10_directives/define_function.va not built: backend exe
@@ -1838,27 +1836,20 @@ verilog-a/ch10_directives/escaped_macro_name.va not built: backend exe
 verilog-a/ch10_directives/file_macro.va not built: backend exe
 verilog-a/ch10_directives/file_macro_is_the_opened_path.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch10_directives/ifdef_else.va not built: backend exe
-verilog-a/ch10_directives/ifdef_without_endif_rejected.va rw-comp (preprocess) message: stderr: line 1: old `error[E0101]: unterminated `ifdef`, new `error[E0101]: unterminated `ifdef: `ifdef at offset 41 is never closed`
 verilog-a/ch10_directives/ifndef.va not built: backend exe
 verilog-a/ch10_directives/include_constants.va not built: backend exe
-verilog-a/ch10_directives/include_cycle_rejected.va rw-comp (preprocess) notes: stderr: line 8: old `   = note: include cycle: include_cycle_rejected.va -> include_cycle_rejected.va`, new `   = help: run `vera --explain E0125` for a detailed explanation`
-verilog-a/ch10_directives/include_file_not_found_rejected.va rw-comp (preprocess) notes: stderr: line 8: old `   = note: searched, in order: verilog-a/ch10_directives, include, verilog-a/ch10_directives`, new `   = help: run `vera --explain E0126` for a detailed explanation`
-verilog-a/ch10_directives/include_including_dir_is_per_file_rejected.va rw-comp (preprocess) notes: stderr: line 8: old `   = note: searched, in order: verilog-a/ch10_directives, include, verilog-a/ch10_directives`, new `   = help: run `vera --explain E0126` for a detailed explanation`
 verilog-a/ch10_directives/include_searches_the_including_files_directory.va not built: backend exe
 verilog-a/ch10_directives/include_self_guarded_past_the_old_limit.va not built: backend exe
 verilog-a/ch10_directives/include_through_a_macro_numbers_its_own_lines.va not built: backend exe
-verilog-a/ch10_directives/include_unknown_header_name_rejected.va rw-comp (preprocess) notes: stderr: line 8: old `   = note: searched, in order: verilog-a/ch10_directives, include, verilog-a/ch10_directives`, new `   = help: run `vera --explain E0126` for a detailed explanation`
 verilog-a/ch10_directives/include_verilog_a_1_0_header_names.va not built: backend exe
 verilog-a/ch10_directives/line_macro.va not built: backend exe
 verilog-a/ch10_directives/line_macro_past_32_bits.va not built: backend exe
 verilog-a/ch10_directives/line_macro_remapping.va not built: backend exe
 verilog-a/ch10_directives/logic_is_an_identifier_vams_2023.va not built: backend exe
-verilog-a/ch10_directives/macro_direct_recursion_rejected.va rw-comp (preprocess) notes: stderr: line 8: old `  = note: expansion chain: AUDIT_CYCLE -> AUDIT_CYCLE`, new `  = help: run `vera --explain E0118` for a detailed explanation`
 verilog-a/ch10_directives/macro_doubling_expands.va not built: backend exe
 verilog-a/ch10_directives/macro_empty_and_spacing.va not built: backend exe
 verilog-a/ch10_directives/macro_escaped_actual.va not built: backend exe
 verilog-a/ch10_directives/macro_expansion_past_the_old_128_limit.va not built: backend exe
-verilog-a/ch10_directives/macro_indirect_recursion_rejected.va rw-comp (preprocess) notes: stderr: line 8: old `  = note: expansion chain: AUDIT_FIRST -> AUDIT_SECOND -> AUDIT_FIRST`, new `  = help: run `vera --explain E0118` for a detailed explanation`
 verilog-a/ch10_directives/macro_late_binding.va not built: backend exe
 verilog-a/ch10_directives/nested_conditionals.va not built: backend exe
 verilog-a/ch10_directives/nested_macro_argument.va not built: backend exe
@@ -1871,10 +1862,8 @@ verilog-a/ch10_directives/predefined_compact_modeling.va not built: backend exe
 verilog-a/ch10_directives/predefined_vams_enable.va not built: backend exe
 verilog-a/ch10_directives/resetall_inside_a_module_rejected.va rw-comp (parse): stderr: line 1: old `error[E0250]: a construct outside the Verilog-A subset: `default_discipline under --sim=verilogA`, new `error[E0236]: `resetall inside a module`
 verilog-a/ch10_directives/the_tool_specific_predefined_macro.va not built: backend exe
-verilog-a/ch10_directives/timescale_precision_is_not_coarser_than_the_unit.va rw-comp (preprocess) notes: stderr: line 8: old `   = note: §19.8: "The time precision shall be at least as precise as the time unit"`, new `   = help: run `vera --explain E0142` for a detailed explanation`
 verilog-a/ch10_directives/transition_arguments_override_default.va not built: backend exe
 verilog-a/ch10_directives/transition_without_default.va not built: backend exe
-verilog-a/ch10_directives/unconnected_drive_operand_grammar.va rw-comp (preprocess) notes: stderr: line 8: old `   = note: §19.9 is `unconnected_drive pull1 | pull0; the form with no operand is `nounconnected_drive`, new `   = help: run `vera --explain E0141` for a detailed explanation`
 verilog-a/ch10_directives/unconnected_drive_pulls_an_input_high.va not built: backend exe
 verilog-a/ch10_directives/unconnected_drive_pulls_an_input_low.va not built: backend exe
 verilog-a/ch10_directives/unconnected_drive_reaches_a_named_port_connection.va not built: backend exe
@@ -2117,7 +2106,6 @@ verilog-ams/ch06_hierarchy/net_variable_same_name_rejected.va rw-lower (analog l
 verilog-ams/ch06_hierarchy/paramset_outer_defparam_connect_array.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch06_hierarchy/real_valued_wreal_port.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch06_hierarchy/top_initial_block_with_a_child.va not built: backend exe
-verilog-ams/ch06_hierarchy/wreal_net_with_two_drivers_rejected.va rw-comp (astgen) location: stderr: line 5: old `   |          ^`, new `   |          ^^^^`
 verilog-ams/ch07_mixed_signal/a2d_case_equality_over_x_and_z.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/a2d_case_statement_four_state_labels.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/a2d_example_undriven_dnet_equality_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0130]: literal requires digital value support in the execution backend: `1'bz`: the analog backend cannot execute this 1-bit four-state literal`, new `error[E0315]: net must be read through an access function: a net or branch is not a value; re
@@ -2399,11 +2387,9 @@ verilog-ams/ch10_directives/default_discipline.va not built: backend exe
 verilog-ams/ch10_directives/default_discipline_crosses_a_file_boundary.va not built: backend exe
 verilog-ams/ch10_directives/default_discipline_empty_reset.va not built: backend exe
 verilog-ams/ch10_directives/default_discipline_qualified.va not built: backend exe
-verilog-ams/ch10_directives/default_discipline_qualifier_grammar.va rw-comp (preprocess) notes: stderr: line 8: old `   = note: Syntax 10-1 allows one of: integer, real, reg, wreal, wire, tri, wand, triand, wor, trior, trireg, tri0, tri1, supply0, supply1`, new `   = help: run `vera --explain E0127` for a detailed explanation`
 verilog-ams/ch10_directives/default_discipline_reset_leaves_no_default.va rw-lower (analog lowering): stderr: line 8: old `   = note: §3.6.2.4 treats a net with no discipline that is referenced in behavioral code as discrete; declare one, e.g. `electrical p;``, new `   = help: run `vera --explain E0337` for a detailed explanation`
 verilog-ams/ch10_directives/default_discipline_two_qualifiers.va not built: backend exe
 verilog-ams/ch10_directives/default_discipline_undeclared_net.va not built: backend exe
-verilog-ams/ch10_directives/default_nettype_value_grammar.va rw-comp (preprocess) notes: stderr: line 8: old `   = note: §19.2 allows one of: wire, tri, tri0, tri1, wand, triand, wor, trior, trireg, uwire, none`, new `   = help: run `vera --explain E0140` for a detailed explanation`
 verilog-ams/ch10_directives/default_nettype_wire_restores_implicit_nets.va not built: backend exe
 verilog-ams/ch10_directives/escaped_names_in_directives.va not built: backend exe
 verilog-ams/ch10_directives/ignored_standard_directives.va not built: backend exe
@@ -2586,10 +2572,8 @@ verilog/06_assignments/real_array_initializer_rejected.v not built: backend digi
 verilog/06_assignments/task_variable_initializer_rejected.v not built: backend digital_device
 verilog/07_gate_switch_level/split_array_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/07_gate_switch_level/switch_three_delays_rejected.v not built: backend digital_device
-verilog/07_gate_switch_level/terminal_width_mismatch_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
 verilog/07_gate_switch_level/unknown_gate_keyword_rejected.v rw-comp (astgen): stderr: line 1: old `error[E1100]: digital source execution failed: undeclared module in instantiation: no library of the search order (work) holds cell `AND``, new `error[E0904]: instance names no module: `AND``
 verilog/08_udp/combinational_reg_rejected.v rw-comp (astgen): exit status old 1, new 0
-verilog/08_udp/conflicting_entries_rejected.v rw-comp (astgen) location: stderr: line 2: old `  --> verilog/08_udp/conflicting_entries_rejected.v:12:1`, new `  --> verilog/08_udp/conflicting_entries_rejected.v:12:11`
 verilog/08_udp/definition_inside_module_rejected.v rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `q``, new `error[E0205]: unsupported module item: found table`
 verilog/08_udp/definition_placement.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv_before` primitive`
 verilog/08_udp/header_forms.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `and_a` primitive`
@@ -2607,7 +2591,6 @@ verilog/08_udp/output_reg_initializer.v rw-dlower (digital lowering): stderr: li
 verilog/08_udp/overlapping_entries_agree.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `nand_overlap` primitive`
 verilog/08_udp/sequential_64_inputs.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `seq64` primitive`
 verilog/08_udp/sequential_hold_agrees.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `latch_agree` primitive`
-verilog/08_udp/sequential_hold_conflict_rejected.v rw-comp (astgen) location: stderr: line 2: old `  --> verilog/08_udp/sequential_hold_conflict_rejected.v:13:1`, new `  --> verilog/08_udp/sequential_hold_conflict_rejected.v:13:11`
 verilog/08_udp/sequential_without_reg_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/08_udp/table_symbols.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `pn` primitive`
 verilog/08_udp/three_delays_rejected.v rw-comp (astgen): stderr: line 1: old `error[E1100]: digital source execution failed: §8.6: a UDP instance takes at most two delays`, new `error[E0239]: a UDP instance's delay is more than a delay2: `inv #(…) g`: 3 value(s)`
@@ -2615,7 +2598,6 @@ verilog/08_udp/two_delays.v rw-dlower (digital lowering): stderr: line 1: old ``
 verilog/08_udp/two_outputs_rejected.v rw-comp (astgen) message: stderr: line 1: old `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port`, new `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port, and it is the first port`
 verilog/08_udp/udp_65_inputs.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `and65` primitive`
 verilog/08_udp/udp_comb.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `udp_mux` primitive`
-verilog/08_udp/udp_conflicting_rows_rejected.v rw-comp (astgen) location: stderr: line 2: old ` --> verilog/08_udp/udp_conflicting_rows_rejected.v:5:1`, new ` --> verilog/08_udp/udp_conflicting_rows_rejected.v:5:11`
 verilog/08_udp/udp_dff.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `udp_dff` primitive`
 verilog/08_udp/udp_header_order.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `audit_header_udp` primitive`
 verilog/08_udp/udp_latch.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `udp_latch` primitive`
@@ -2693,7 +2675,6 @@ verilog/12_hierarchy/generate_loop_repeated_genvar_rejected.v not built: backend
 verilog/12_hierarchy/generate_nonterminating_rejected.v not built: backend digital_device
 verilog/12_hierarchy/hierarchy_simple_name_stops_at_module_rejected.v not built: backend digital_device
 verilog/12_hierarchy/input_declared_reg_rejected.v not built: backend digital_device
-verilog/12_hierarchy/instance_array_width_product_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
 verilog/12_hierarchy/instance_select_out_of_range_rejected.v not built: backend digital_device
 verilog/12_hierarchy/listed_port_undeclared_rejected.v rw-comp (astgen): stderr: line 1: old `error[E1100]: digital source execution failed: §12.3.3: port `b` has no direction declaration`, new `error[E0376]: port has no direction declaration: port `b` of module `m` is not declared `input`, `output` or `inout``
 verilog/12_hierarchy/localparam_override_rejected.v rw-comp (astgen): exit status old 1, new 0
@@ -2747,7 +2728,6 @@ verilog/13_configuration/two_libraries_match_rejected.v not built: backend libma
 verilog/13_configuration/two_unreferenced_configs_rejected.v rw-comp (elab): exit status old 1, new 0
 verilog/13_configuration/unbound_instance_rejected.v rw-comp (astgen): stderr: line 1: old `error[E1100]: digital source execution failed: undeclared module in instantiation: no library of the search order (work) holds cell `absent``, new `error[E0904]: instance names no module: `absent``
 verilog/13_configuration/undeclared_library_rejected.v not built: backend libmap
-verilog/14_specify_blocks/inconsistent_port_reference_rejected.v rw-comp (astgen) location: stderr: line 11: old `  --> verilog/14_specify_blocks/inconsistent_port_reference_rejected.v:32:7`, new `  --> verilog/14_specify_blocks/inconsistent_port_reference_rejected.v:31:5`
 verilog/15_timing_checks/conditions.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in b_15_6_conditions.u: timestamp event at 20, timecheck event at 22`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/fullskew_checks_both_orders.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$fullskew` in fullskew_checks_both_orders.forward: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/hold.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$hold` in b_15_2_2_hold.u: timestamp event at 10, timecheck event at 10`, new `warning[W1199]: timing violation: a timing check reported a violation`
@@ -2777,11 +2757,7 @@ verilog/15_timing_checks/vector.v rw-dlower (run) message: stderr: line 1: old `
 verilog/15_timing_checks/width.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$width` in b_15_3_4_width.u: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/16_sdf/sdf_timing_check_limit.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in sdf_timing_check_limit.u: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/17_system_tasks/c_flag_on_integer_rejected.v rw-dlower (run): exit status old 1, new 0
-verilog/17_system_tasks/clog2_arguments_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
-verilog/17_system_tasks/clog2_real_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
 verilog/17_system_tasks/closed_channel_not_written.v rw-dlower (run): stderr: line 1: old `warning[W1154]: file output not written: no file this descriptor names is open for writing: the output is not written`, new ``
-verilog/17_system_tasks/conversion_arguments_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
-verilog/17_system_tasks/descending_personality_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
 verilog/17_system_tasks/display_missing_argument_rejected.v not built: backend digital_device
 verilog/17_system_tasks/dist_nonpositive_warning.v rw-dlower (run): stderr: line 1: old `warning[W1151]: probabilistic distribution argument not positive: a $dist_ mean, degree of freedom or k_stage is not positive: the result is 0 and the seed is u`, new ``
 verilog/17_system_tasks/dist_seed_constant_rejected.v not built: backend digital_device
@@ -2792,17 +2768,10 @@ verilog/17_system_tasks/fread_multidim_rejected.v not built: backend digital_dev
 verilog/17_system_tasks/fwrite_no_descriptor_rejected.v not built: backend digital_device
 verilog/17_system_tasks/malformed_format_trailing_percent_rejected.v not built: backend digital_device
 verilog/17_system_tasks/math_arguments_rejected.v not built: backend digital_device
-verilog/17_system_tasks/monitoroff_argument_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
 verilog/17_system_tasks/native_sformat_dynamic.v rw-dlower (run): stderr: line 1: old `warning[W1153]: format specifiers and arguments do not pair up: $sformat: the format's specifiers and the arguments after it do not pair up`, new ``
 verilog/17_system_tasks/output_term_net_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/17_system_tasks/percent_escape_with_width_rejected.v not built: backend digital_device
 verilog/17_system_tasks/printtimescale_unknown_scope_rejected.v not built: backend digital_device
-verilog/17_system_tasks/q_add_arguments_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
-verilog/17_system_tasks/q_exam_arguments_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
-verilog/17_system_tasks/q_exam_code_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
-verilog/17_system_tasks/q_full_arguments_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
-verilog/17_system_tasks/q_initialize_arguments_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
-verilog/17_system_tasks/q_remove_arguments_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
 verilog/17_system_tasks/random_seed_constant_rejected.v not built: backend digital_device
 verilog/17_system_tasks/readmem_address_outside_memory.v rw-dlower (run): stderr: line 1: old `warning[W1156]: memory file address outside the memory: memory file address @8 is outside the memory's declared range [0:3]; its words are skipped`, new ``
 verilog/17_system_tasks/readmem_address_outside_task_range.v rw-dlower (run): stderr: line 1: old `warning[W1157]: a $readmem load terminated: §17.2.9: memory file address @3 is outside the load range [0:1] the task gives (the words before it stay loaded); t`, new ``
@@ -2836,52 +2805,31 @@ verilog/17_system_tasks/readmem_warn_hex_excess_down.v rw-dlower (run): stderr: 
 verilog/17_system_tasks/readmem_warn_hex_excess_up.v rw-dlower (run): stderr: line 1: old `warning[W1150]: memory file word count mismatch: memory file data word count does not match load range: found 5, expected 4`, new ``
 verilog/17_system_tasks/readmem_warn_hex_short_down.v rw-dlower (run): stderr: line 1: old `warning[W1150]: memory file word count mismatch: memory file data word count does not match load range: found 2, expected 4`, new ``
 verilog/17_system_tasks/readmem_warn_hex_short_up.v rw-dlower (run): stderr: line 1: old `warning[W1150]: memory file word count mismatch: memory file data word count does not match load range: found 2, expected 4`, new ``
-verilog/17_system_tasks/realtime_argument_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
 verilog/17_system_tasks/sdf_annotate_rejected.v rw-comp (astgen): stderr: line 1: old `error[E1102]: an SDF file the annotator cannot read: sdf_annotate_rejected.sdf: the SDF file cannot be read`, new `error[E1100]: digital source execution failed: sdf_annotate_rejected.sdf: the SDF file cannot be read`
 verilog/17_system_tasks/sformat_excess_argument_warning.v rw-dlower (run): stderr: line 1: old `warning[W1153]: format specifiers and arguments do not pair up: $sformat: the format's specifiers and the arguments after it do not pair up`, new ``
 verilog/17_system_tasks/sscanf_to_net_rejected.v rw-comp (astgen): exit status old 1, new 0
-verilog/17_system_tasks/stime_argument_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
 verilog/17_system_tasks/stop_suspends.v rw-dlower (digital lowering): stderr: line 1: old `$stop at tick 1, verilog/17_system_tasks/stop_suspends.v byte 107`, new `$stop at tick 1, verilog/17_system_tasks/stop_suspends.v byte 797`
 verilog/17_system_tasks/stop_two_arguments_rejected.v not built: backend digital_device
 verilog/17_system_tasks/strength_vector_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/17_system_tasks/string_missing_argument_rejected.v not built: backend digital_device
 verilog/17_system_tasks/strobe_missing_argument_rejected.v not built: backend digital_device
 verilog/17_system_tasks/swrite_to_net_rejected.v rw-comp (astgen): exit status old 1, new 0
-verilog/17_system_tasks/test_plusargs_arguments_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
-verilog/17_system_tasks/test_plusargs_real_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
-verilog/17_system_tasks/time_argument_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
-verilog/17_system_tasks/timeformat_units_range_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
 verilog/17_system_tasks/too_few_arguments_rejected.v not built: backend digital_device
-verilog/17_system_tasks/value_plusargs_arguments_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
 verilog/17_system_tasks/value_plusargs_format_rejected.v rw-comp (astgen): exit status old 1, new 0
-verilog/18_vcd/dumpall_argument_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
-verilog/18_vcd/dumpfile_two_names_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
-verilog/18_vcd/dumpflush_argument_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
 verilog/18_vcd/dumplimit_without_size_rejected.v not built: backend digital_device
-verilog/18_vcd/dumpoff_argument_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
 verilog/18_vcd/dumpports_duplicate_scope_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/18_vcd/dumpports_same_file_rejected.v rw-comp (astgen) location: stderr: line 2: old `  --> verilog/18_vcd/dumpports_same_file_rejected.v:28:19`, new `  = note: LRM 8.5`
 verilog/18_vcd/dumpports_variable_scope_rejected.v rw-comp (astgen): exit status old 1, new 0
-verilog/18_vcd/dumpportsall_two_files_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
-verilog/18_vcd/dumpportsflush_two_files_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
-verilog/18_vcd/dumpportslimit_without_size_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
-verilog/18_vcd/dumpportsoff_two_files_rejected.v rw-comp (astgen) message: stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new ``
 verilog/18_vcd/dumpvars_later_time_rejected.v rw-comp (astgen) location: stderr: line 2: old `  --> verilog/18_vcd/dumpvars_later_time_rejected.v:11:8`, new `  = note: LRM 8.5`
 verilog/18_vcd/dumpvars_memory_word_rejected.v not built: backend digital_device
 verilog/18_vcd/dumpvars_unknown_scope_rejected.v not built: backend digital_device
 verilog/18_vcd/part_select_rejected.v not built: backend digital_device
 verilog/19_compiler_directives/default_nettype_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^`
-verilog/19_compiler_directives/macro_text_1800_forms_warn.v rw-comp (preprocess) location: stderr: line 2: old `  --> verilog/19_compiler_directives/macro_text_1800_forms_warn.v:11:34`, new `  --> verilog/19_compiler_directives/macro_text_1800_forms_warn.v:11:1`
-verilog/19_compiler_directives/magnitude_rejected.v rw-comp (preprocess) message: stderr: line 1: old `error[E0142]: malformed `timescale: `5 ns / 1 ns` is not a `timescale`, new `error[E0142]: malformed `timescale: `5 ns / 1 ns` is not a `timescale <time_unit>/<time_precision>`
 verilog/19_compiler_directives/mixed_timescale_rejected.v not built: backend digital_device
 verilog/19_compiler_directives/none_implicit_net_rejected.v not built: backend digital_device
-verilog/19_compiler_directives/precision_coarser_rejected.v rw-comp (preprocess) notes: stderr: line 8: old `   = note: §19.8: "The time precision shall be at least as precise as the time unit"`, new `   = help: run `vera --explain E0142` for a detailed explanation`
-verilog/19_compiler_directives/pull_value_rejected.v rw-comp (preprocess) notes: stderr: line 8: old `   = note: §19.9 is `unconnected_drive pull1 | pull0; the form with no operand is `nounconnected_drive`, new `   = help: run `vera --explain E0141` for a detailed explanation`
-verilog/19_compiler_directives/recursive_macro_rejected.v rw-comp (preprocess) notes: stderr: line 8: old `   = note: expansion chain: ping -> pong -> ping`, new `   = help: run `vera --explain E0118` for a detailed explanation`
 verilog/19_compiler_directives/some_modules_without_rejected.v not built: backend digital_device
 verilog/19_compiler_directives/timescale_inside_module_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/19_compiler_directives/unconnected_drive_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^^^^`
-verilog/19_compiler_directives/value_rejected.v rw-comp (preprocess) notes: stderr: line 8: old `   = note: §19.2 allows one of: wire, tri, tri0, tri1, wand, triand, wor, trior, trireg, uwire, none`, new `   = help: run `vera --explain E0140` for a detailed explanation`
 verilog/A_formal_syntax/b_A_1_1_incdir.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v not built: backend libmap

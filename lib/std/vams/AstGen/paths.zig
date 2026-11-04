@@ -52,7 +52,7 @@ pub fn check(ag: *AstGen, f: *const Facts) Error!void {
         const p = tree.extraData(tree.nodeData(n).extra, Node.Path);
         v.* = .{
             .node = n,
-            .tok = tree.nodeMainToken(n),
+            .tok = openParen(tree, p.arrow),
             .full = tree.tokenTag(p.arrow) == .asterisk_angle_bracket_right,
             .ifnone = tree.tokenTag(tree.nodeMainToken(n)) == .keyword_ifnone,
             .cond = p.cond,
@@ -99,6 +99,25 @@ pub fn check(ag: *AstGen, f: *const Facts) Error!void {
 }
 
 // ---- private ----
+
+/// The `(` that opens the path description whose arrow is `arrow`: where
+/// the old parser reported the rules of a whole path.
+fn openParen(tree: *const Ast, arrow: Ast.TokenIndex) Ast.TokenIndex {
+    var depth: u32 = 0;
+    var k = arrow;
+    // Bounded by `arrow`: each turn moves one token back.
+    while (k > 0) {
+        k -= 1;
+        switch (tree.tokenTag(k)) {
+            .r_paren => depth += 1,
+            .l_paren => if (depth == 0) return k else {
+                depth -= 1;
+            },
+            else => {},
+        }
+    }
+    unreachable; // A path description opens with `(` (A.7.2).
+}
 
 fn portNamed(f: *const Facts, n: []const u8) ?check_file.Port {
     return f.ports.items[f.port_index.get(n) orelse return null];

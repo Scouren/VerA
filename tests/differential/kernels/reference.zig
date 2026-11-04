@@ -40,7 +40,7 @@ var two_over_pi_cache: ?std.math.big.int.Managed = null;
 pub fn of(comptime name: []const u8, x: f64, y: f64) ?f128 {
     if (std.math.isNan(x) or std.math.isInf(x)) return null;
     const q: f128 = x;
-    const E = enum { exp, log, pow, sin, cos, tan, tanh, sinh, cosh, expm1, log1p, atan, log10, asinh, acosh, atanh, atan2 };
+    const E = enum { exp, log, pow, sin, cos, tan, tanh, sinh, cosh, expm1, log1p, atan, log10, asinh, acosh, atanh, atan2, asin, acos, hypot };
     return switch (@field(E, name)) {
         .exp => expQ(q),
         .log => if (x > 0) logQ(q) else null,
@@ -59,6 +59,10 @@ pub fn of(comptime name: []const u8, x: f64, y: f64) ?f128 {
         .acosh => if (x >= 1) log1pQ((q - 1) + @sqrt((q - 1) * (q + 1))) else null,
         .atanh => if (@abs(x) < 1) log1pQ(2 * q / (1 - q)) / 2 else null,
         .atan2 => atan2Q(x, y),
+        .asin => asinQ(q),
+        .acos => if (asinQ(q)) |s| (pio2[0] + pio2[1] + pio2[2]) - s else null,
+        // x² and y² are exact in f128 (106 bits), the sum and root round once.
+        .hypot => if (std.math.isFinite(y)) @sqrt(q * q + @as(f128, y) * y) else null,
     };
 }
 
@@ -294,6 +298,13 @@ fn atanQ(x: f128) f128 {
         term *= -tt;
     }
     return 8 * sum;
+}
+
+/// asin(x) = atan(x / sqrt((1 - x)(1 + x))) for |x| < 1, ±pi/2 at ±1.
+fn asinQ(x: f128) ?f128 {
+    if (@abs(x) > 1) return null;
+    if (@abs(x) == 1) return std.math.copysign(pio2[0] + pio2[1] + pio2[2], x);
+    return atanQ(x / @sqrt((1 - x) * (1 + x)));
 }
 
 fn atan2Q(y: f64, x: f64) ?f128 {

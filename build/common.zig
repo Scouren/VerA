@@ -41,7 +41,7 @@ pub const module_specs = [_]struct {
     // alone (`zig build test-<name>`), importing only std or the rows above.
     .{ .name = "vams", .path = "lib/std/vams.zig" },
     .{ .name = "intern_pool", .path = "src/InternPool.zig" },
-    .{ .name = "air", .path = "src/Air.zig", .imports = &.{ "intern_pool", "vams" } },
+    .{ .name = "air", .path = "src/Air.zig", .imports = &.{ "intern_pool", "vams", "std_kernels" } },
     .{ .name = "base", .path = "lib/base/root.zig" },
     .{ .name = "kernels", .path = "lib/kernels/root.zig", .imports = &.{"contract"} },
     .{ .name = "std_sim", .path = "lib/std/sim.zig", .imports = &.{ "kernels", "contract" } },

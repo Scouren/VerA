@@ -497,7 +497,6 @@ verilog-ams/ch03_data_types/wire_without_discipline_in_analog_rejected.va codes:
 verilog-ams/ch03_data_types/wreal_wire_port_merge.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/ch04_expressions/revert_ops.va tables row 34: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-ams/ch04_expressions/table_4_1_every_operator.va codes: old {}, new E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
-verilog-ams/ch05_analog_behavior/analog_initial_digital_access_rejected.va codes: old E0431, new {}
 verilog-ams/ch05_analog_behavior/analog_initial_event_rejected.va codes: old E0702, new E0707 (E0707: )
 verilog-ams/ch05_analog_behavior/array_assignment_from_packed_vector_rejected.va codes: old E0429, new E0313 (E0313: an assignment to a name that is not a variable)
 verilog-ams/ch05_analog_behavior/node_alias_reevaluated_when_a_parameter_changes.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
@@ -558,7 +557,6 @@ verilog-ams/ch07_mixed_signal/driver_update_without_resolved_change.va tables ro
 verilog-ams/ch07_mixed_signal/explicit_d2a_per_delta_cycle.va codes: old {}, new E0706 (E0706: )
 verilog-ams/ch07_mixed_signal/explicit_d2a_reads_post_active.va codes: old {}, new E0704 (E0704: )
 verilog-ams/ch07_mixed_signal/figure_7_2_resolveto_two_levels.va codes: old {}, new E0512,E0901 (E0901: `NetA.potential.abstol` names nothing in the elaborated design)
-verilog-ams/ch07_mixed_signal/free_variable_in_digital_event_control_rejected.va codes: old E0484, new {}
 verilog-ams/ch07_mixed_signal/gate_connect_bridge_drives_gate_input.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/gate_generated_connect_name_defparam.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-ams/ch07_mixed_signal/glitch_absorbed_at_one_tick.va codes: old {}, new E0706 (E0706: )

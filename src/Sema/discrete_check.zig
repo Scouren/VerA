@@ -11,7 +11,8 @@
 //! "arguments ... are in the continuous context" (§7.3.5): its argument
 //! rules hold (E0517), and a digital function called in its arguments is
 //! called from the analog context (E0436, §7.3.7). Then the analog blocks:
-//! a variable the digital processes also assign (E0432, §7.2.2).
+//! a variable the digital processes also assign (E0432, §7.2.2), and in an
+//! `analog initial` block a read of one (E0431, §5.2.1).
 //! Cites: VAMS-2023 §4.5.15, §4.7.3, §5.10, §5.10.3.1-§5.10.3.4, §7.2.2,
 //! §7.3, §7.3.5, §7.3.7, §8.5.1, §9.2, A.6.2.
 //!
@@ -37,6 +38,8 @@ const depth_max: u32 = 1 << 12;
 /// An instruction of a digital process, in context `where`.
 const Digital = struct {
     where: []const u8,
+    /// The variables an analog block assigns outside every event statement.
+    free: *const Set,
 
     fn inst(d: Digital, s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
         const vir = unit.vir;
@@ -56,8 +59,10 @@ const Digital = struct {
             .store_timed, .store_nb_timed => try netWrite(s, unit, decl.payloadOf(vir, Inst.Timed, i).lhs, src),
             .deassign => try netWrite(s, unit, vir.instructions.items(.data)[@backingInt(i)].un_node.operand, src),
             // §8.5.1 "A2D events must be analog event controlled statements".
-            .event_wait => if (try probeOutside(s, unit, decl.payloadOf(vir, Inst.EventWait, i).event, 0)) |p|
-                try s.fail(.E0484, file, p, "a probe in the event control of {s}", .{d.where}),
+            // §7.3.6.1 admits "analog variables that are only assigned values
+            // in analog event statements"; any other changes as a probe does.
+            .event_wait => if (try probeOutside(s, unit, decl.payloadOf(vir, Inst.EventWait, i).event, d.free, 0)) |p|
+                try s.fail(.E0484, file, p, "a probe, or a variable the analog block assigns outside any event statement, in the event control of {s}", .{d.where}),
             .call_sys => {
                 const c = decl.payloadOf(vir, Inst.SysCall, i);
                 const name = vir.string(c.name);
@@ -83,12 +88,62 @@ const Digital = struct {
     }
 };
 
+/// The variables an analog block assigns outside every event statement
+/// (an event body is not entered).
+const Free = struct {
+    out: *Set,
+
+    fn skips(_: Free, tag: Inst.Tag) bool {
+        return tag == .event_wait;
+    }
+
+    fn inst(f: Free, s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
+        const vir = unit.vir;
+        const lhs = switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+            .store, .store_nb => decl.payloadOf(vir, Inst.Bin, i).lhs,
+            else => return, // else: assigns nothing
+        };
+        const d = discrete.base(vir, lhs) orelse return;
+        if (vir.instructions.items(.tag)[@backingInt(d)] == .variable) try f.out.put(s.arena, d, {});
+    }
+};
+
+const Set = std.AutoHashMapUnmanaged(Inst.Index, void);
+
+/// The assignment targets of an analog block, by instruction.
+const Targets = struct {
+    out: *Set,
+
+    fn inst(t: Targets, s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
+        const vir = unit.vir;
+        switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+            .store, .store_nb => if (decl.payloadOf(vir, Inst.Bin, i).lhs.toIndex()) |l| try t.out.put(s.arena, l, {}),
+            else => {}, // else: assigns nothing
+        }
+    }
+};
+
+/// §5.2.1 "digital values cannot be accessed from the analog initial block
+/// as they have not yet been assigned": a read there of a variable in
+/// `vars` the digital processes assign (E0431); `targets` are writes.
+const Initial = struct {
+    vars: *const Set,
+    targets: *const Set,
+
+    fn inst(n: Initial, s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
+        const vir = unit.vir;
+        if (vir.instructions.items(.tag)[@backingInt(i)] != .decl_ref or n.targets.contains(i)) return;
+        const d = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl);
+        if (n.vars.contains(d)) try s.fail(.E0431, unit.file, i.toRef(), "`{s}` is assigned in the discrete context", .{vir.string(decl.nameOf(vir, d))});
+    }
+};
+
 /// An instruction of an analog block, against the variables `vars` the
 /// digital processes assign: §7.2.2 "It shall be an error to assign to a
 /// given variable in both contexts" (E0432), through an assignment or an
 /// analog function's `output`/`inout` actual.
 const Analog = struct {
-    vars: *const std.AutoHashMapUnmanaged(Inst.Index, void),
+    vars: *const Set,
 
     fn inst(a: Analog, s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
         const vir = unit.vir;
@@ -118,6 +173,11 @@ const Analog = struct {
 /// analog block's writes against the variables those bodies assign.
 pub fn check(s: *Sema, unit: *Unit) Allocator.Error!void {
     const vir = unit.vir;
+    var free: Set = .empty;
+    for (vir.body(unit.module.body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .analog, .analog_initial => try walk(s, unit, decl.payloadOf(vir, Inst.Process, i).body, Free{ .out = &free }, 0),
+        else => {}, // else: no analog block
+    };
     var owned: std.ArrayList(Inst.Index) = .empty;
     // ponytail: a process inside a generate scope is not walked; walk the
     // generate bodies when a fixture puts an analog construct there.
@@ -125,15 +185,22 @@ pub fn check(s: *Sema, unit: *Unit) Allocator.Error!void {
         const tag = vir.instructions.items(.tag)[@backingInt(i)];
         if (tag != .initial and tag != .always) continue;
         const b = decl.payloadOf(vir, Inst.Process, i).body;
-        const d: Digital = .{ .where = if (tag == .always) "an always block" else "an initial block" };
+        const d: Digital = .{ .where = if (tag == .always) "an always block" else "an initial block", .free = &free };
         try walk(s, unit, b, d, 0);
         try discrete.writes(vir, b, &owned, s.arena, 0);
     }
-    var vars: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
+    var vars: Set = .empty;
     for (owned.items) |d| if (vir.instructions.items(.tag)[@backingInt(d)] == .variable) try vars.put(s.arena, d, {});
     if (vars.count() == 0) return;
     for (vir.body(unit.module.body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .analog, .analog_initial => try walk(s, unit, decl.payloadOf(vir, Inst.Process, i).body, Analog{ .vars = &vars }, 0),
+        .analog => try walk(s, unit, decl.payloadOf(vir, Inst.Process, i).body, Analog{ .vars = &vars }, 0),
+        .analog_initial => {
+            const b = decl.payloadOf(vir, Inst.Process, i).body;
+            try walk(s, unit, b, Analog{ .vars = &vars }, 0);
+            var targets: Set = .empty;
+            try walk(s, unit, b, Targets{ .out = &targets }, 0);
+            try walk(s, unit, b, Initial{ .vars = &vars, .targets = &targets }, 0);
+        },
         else => {}, // else: no analog block
     };
 }
@@ -141,12 +208,13 @@ pub fn check(s: *Sema, unit: *Unit) Allocator.Error!void {
 // ---- private ----
 
 /// `body`'s instructions, and those of every body nested in one, each
-/// handed to `v.inst`.
+/// handed to `v.inst` (a body under an instruction `v.skips` is not).
 fn walk(s: *Sema, unit: *Unit, b: Vir.Body, v: anytype, depth: u32) Allocator.Error!void {
     if (depth > depth_max) return;
     const vir = unit.vir;
     for (vir.body(b)) |i| {
         try v.inst(s, unit, i);
+        if (@hasDecl(@TypeOf(v), "skips") and v.skips(vir.instructions.items(.tag)[@backingInt(i)])) continue;
         const data = vir.instructions.items(.data)[@backingInt(i)];
         switch (vir.instructions.items(.tag)[@backingInt(i)]) {
             inline else => |t| if (comptime Inst.dataKind(t) == .pl_node) {
@@ -179,9 +247,10 @@ fn netWrite(s: *Sema, unit: *Unit, lhs: Inst.Ref, src: Inst.Ref) Allocator.Error
     try s.fail(.E0482, unit.file, src, "`{s}` is a net, and a procedural assignment writes a variable", .{vir.string(decl.nameOf(vir, d))});
 }
 
-/// The first branch or port probe in event expression `r` that no analog
-/// event function (`cross`, `above`, `timer`, `absdelta`) encloses, or null.
-fn probeOutside(s: *Sema, unit: *Unit, r: Inst.Ref, depth: u32) Allocator.Error!?Inst.Ref {
+/// The first branch or port probe, or read of a variable in `free`, in
+/// event expression `r` that no analog event function (`cross`, `above`,
+/// `timer`, `absdelta`) encloses, or null.
+fn probeOutside(s: *Sema, unit: *Unit, r: Inst.Ref, free: *const Set, depth: u32) Allocator.Error!?Inst.Ref {
     if (depth > depth_max) return null;
     const i = r.toIndex() orelse return null;
     const vir = unit.vir;
@@ -195,12 +264,13 @@ fn probeOutside(s: *Sema, unit: *Unit, r: Inst.Ref, depth: u32) Allocator.Error!
         },
         .call => if (try @import("contrib.zig").accessCall(s, unit, r) != null) return r,
         .port_branch => return r,
+        .decl_ref => if (free.contains(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl))) return r,
         else => {}, // else: searched through its operands
     }
     var ops: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
     try control.operands(s, vir, i, &ops);
     var it = ops.keyIterator();
-    while (it.next()) |o| if (try probeOutside(s, unit, o.toRef(), depth + 1)) |p| return p;
+    while (it.next()) |o| if (try probeOutside(s, unit, o.toRef(), free, depth + 1)) |p| return p;
     return null;
 }
 

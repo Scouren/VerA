@@ -68,9 +68,9 @@ pub fn parseDriveStrength(p: *Parse) Error!void {
     const b = p.tok_i;
     p.tok_i += 1;
     _ = try p.expect(.r_paren);
-    if (sa == sb or sa == 2 or sb == 2) return p.failAt(.expected_strength, a);
+    if (sa == sb or sa == 2 or sb == 2) return p.failSite(.expected_strength, .strength_sides, a, 0);
     if (p.tokenTag(a) == .keyword_highz0 or p.tokenTag(a) == .keyword_highz1) {
-        if (p.tokenTag(b) == .keyword_highz0 or p.tokenTag(b) == .keyword_highz1) return p.failAt(.expected_strength, a);
+        if (p.tokenTag(b) == .keyword_highz0 or p.tokenTag(b) == .keyword_highz1) return p.failSite(.expected_strength, .strength_highz, a, 0);
     }
 }
 
@@ -79,10 +79,11 @@ pub fn parseDriveStrength(p: *Parse) Error!void {
 pub fn parseChargeStrength(p: *Parse, trireg: bool) Error!void {
     _ = try p.expect(.l_paren);
     const tok = p.tok_i;
-    const side = strengthSide(p.tokenTag(tok)) orelse return p.fail(.expected_strength);
+    const side = strengthSide(p.tokenTag(tok)) orelse return p.failSite(.expected_strength, .charge_strength_word, tok, 0);
     p.tok_i += 1;
     _ = try p.expect(.r_paren);
-    if (!trireg or side != 2) return p.failAt(.invalid_net_declaration, tok);
+    if (side != 2) return p.failSite(.invalid_net_declaration, .charge_strength_word, tok, 0);
+    if (!trireg) return p.failSite(.invalid_net_declaration, .charge_strength_net, tok, 0);
 }
 
 /// A.2.2.3 `# delay_value` or `# ( mintypmax {, mintypmax} )` with at
@@ -130,7 +131,7 @@ pub fn parseGates(p: *Parse) Error!Node.Index {
             const side = strengthSide(p.tokenTag(p.tok_i)).?;
             p.tok_i += 1;
             _ = try p.expect(.r_paren);
-            if (side != @intFromBool(tag == .keyword_pullup)) return p.failAt(.expected_strength, p.tok_i - 2);
+            if (side != @intFromBool(tag == .keyword_pullup)) return p.failSite(.expected_strength, .strength_single, p.tok_i - 2, @intFromBool(tag == .keyword_pullup));
         } else try parseDriveStrength(p);
     }
     const delay: Node.OptionalIndex = if (shape.delay != 0 and p.tokenTag(p.tok_i) == .hash) (try parseDelay(p, shape.delay)).toOptional() else .none;
@@ -151,9 +152,9 @@ pub fn parseGates(p: *Parse) Error!Node.Index {
         }
         _ = try p.expect(.r_paren);
         const terms: []const u32 = p.scratch.items[terms_top..];
-        if (terms.len < shape.min or terms.len > shape.max) return p.failAt(.invalid_gate_terminals, inst);
+        if (terms.len < shape.min or terms.len > shape.max) return p.failSite(.invalid_gate_terminals, .gate_count, inst, kw);
         const outs = if (shape.lvalues == all_but_last) terms.len - 1 else shape.lvalues;
-        for (terms[0..outs]) |t| if (!isNetLvalue(p, @fromBackingInt(t))) return p.failAt(.invalid_gate_terminals, inst);
+        for (terms[0..outs]) |t| if (!isNetLvalue(p, @fromBackingInt(t))) return p.failSite(.invalid_gate_terminals, .gate_output, p.nodes.items(.main_token)[t], 0);
         const span = try p.spanFrom(terms_top);
         const extra = try p.addExtra(Node.GateInstance{ .range = range, .terms_start = span.start, .terms_end = span.end });
         try p.push(try p.addNode(.gate_instance, inst, .{ .extra = extra }));
@@ -253,7 +254,7 @@ fn parseSpecifyItem(p: *Parse) Error!Node.Index {
         .keyword_pulsestyle_onevent, .keyword_pulsestyle_ondetect, .keyword_showcancelled, .keyword_noshowcancelled => {
             p.tok_i += 1;
             // §14.6.4.2 writes the list without parentheses.
-            if (p.tokenTag(p.tok_i) == .l_paren) try p.warn(.invalid_specify_item);
+            if (p.tokenTag(p.tok_i) == .l_paren) try p.warnSite(.invalid_specify_item, .specify_list_parenthesized, p.tok_i, 0);
             const paren = p.eat(.l_paren) != null;
             const terms = try terminalList(p);
             if (paren) _ = try p.expect(.r_paren);
@@ -270,12 +271,12 @@ fn parseSpecifyItem(p: *Parse) Error!Node.Index {
             const cond = try expr.parseExpr(p);
             _ = try p.expect(.r_paren);
             // §14.2.4.1 Table 14-1: a condition's operators.
-            if (badOperator(p, cond)) |at| try p.warnAt(.invalid_specify_item, at);
+            if (badOperator(p, cond)) |at| try p.warnSite(.invalid_specify_item, .specify_condition_operator, at, 0);
             return parsePath(p, tok, cond.toOptional());
         },
         .l_paren => return parsePath(p, tok, .none),
         .system_identifier => return parseTimingCheck(p),
-        else => return p.fail(.invalid_specify_item),
+        else => return p.failSite(.invalid_specify_item, .specify_item, tok, 0),
     }
 }
 
@@ -296,16 +297,17 @@ fn terminalList(p: *Parse) Error!Node.SubRange {
 /// delays ;` or the edge-sensitive `=> ( outputs [polarity] : data )`.
 /// `=>` joins one input to one output; the delays are 1, 2, 3, 6 or 12.
 fn parsePath(p: *Parse, first: TokenIndex, cond: Node.OptionalIndex) Error!Node.Index {
-    _ = try p.expect(.l_paren);
+    const open = try p.expect(.l_paren);
     _ = p.eat(.keyword_posedge) orelse p.eat(.keyword_negedge);
     const inputs = try terminalList(p);
     const polarity = p.eat(.plus) orelse p.eat(.minus);
     const arrow = p.tok_i;
-    if (p.eat(.equal_angle_bracket_right) == null and p.eat(.asterisk_angle_bracket_right) == null) return p.fail(.invalid_specify_item);
+    if (p.eat(.equal_angle_bracket_right) == null and p.eat(.asterisk_angle_bracket_right) == null) return p.failSite(.invalid_specify_item, .specify_path_arrow, p.tok_i, 0);
     var data: Node.OptionalIndex = .none;
     // Syntax 14-4 puts an edge-sensitive path's polarity after the
     // destination; Syntax 14-5's `ifnone` takes a simple path.
-    if (p.tokenTag(p.tok_i) == .l_paren and (polarity != null or p.tokenTag(first) == .keyword_ifnone)) try p.warnAt(.invalid_specify_item, first);
+    if (p.tokenTag(p.tok_i) == .l_paren and p.tokenTag(first) == .keyword_ifnone) try p.warnSite(.invalid_specify_item, .specify_ifnone_edge, open, 0);
+    if (p.tokenTag(p.tok_i) == .l_paren and polarity != null and p.tokenTag(first) != .keyword_ifnone) try p.warnSite(.invalid_specify_item, .specify_polarity_placement, first, 0);
     const outputs = if (p.eat(.l_paren) != null) edge: {
         const outs = try terminalList(p);
         _ = p.eat(.plus) orelse p.eat(.minus);
@@ -315,7 +317,9 @@ fn parsePath(p: *Parse, first: TokenIndex, cond: Node.OptionalIndex) Error!Node.
         break :edge outs;
     } else try terminalList(p);
     const parallel = p.tokenTag(arrow) == .equal_angle_bracket_right;
-    if (parallel and (@backingInt(inputs.end) - @backingInt(inputs.start) != 1 or @backingInt(outputs.end) - @backingInt(outputs.start) != 1)) return p.fail(.invalid_specify_item);
+    const n_in: u32 = @backingInt(inputs.end) - @backingInt(inputs.start);
+    const n_out: u32 = @backingInt(outputs.end) - @backingInt(outputs.start);
+    if (parallel and (n_in != 1 or n_out != 1)) return p.failSite(.invalid_specify_item, .specify_parallel_list, open + 1, (@as(u32, @min(n_in, 0xffff)) << 16) | @min(n_out, 0xffff));
     _ = try p.expect(.r_paren);
     _ = try p.expect(.equal);
     const bracketed = p.eat(.l_paren) != null;
@@ -328,7 +332,7 @@ fn parsePath(p: *Parse, first: TokenIndex, cond: Node.OptionalIndex) Error!Node.
     }
     switch (p.scratch.items.len - top) {
         1, 2, 3, 6, 12 => {},
-        else => return p.failAt(.invalid_specify_item, delay_at),
+        else => |n| return p.failSite(.invalid_specify_item, .specify_delay_count, delay_at, @intCast(n)),
     }
     try checkScaleFactors(p, delay_at, p.tok_i);
     if (bracketed) _ = try p.expect(.r_paren);
@@ -353,7 +357,7 @@ fn parsePath(p: *Parse, first: TokenIndex, cond: Node.OptionalIndex) Error!Node.
 fn parseTimingCheck(p: *Parse) Error!Node.Index {
     const tok = p.tok_i;
     const name = p.tokenText(tok);
-    const arity = timing_checks.get(name) orelse return p.fail(.invalid_specify_item);
+    const arity = timing_checks.get(name) orelse return p.failSite(.invalid_specify_item, .specify_timing_check_name, tok, 0);
     const controlled_first = std.mem.eql(u8, name, "$period") or std.mem.eql(u8, name, "$width");
     const events: u8 = if (controlled_first) 1 else 2;
     const notifier: u8 = if (std.mem.eql(u8, name, "$width")) 4 else arity[0] + 1;
@@ -366,7 +370,8 @@ fn parseTimingCheck(p: *Parse) Error!Node.Index {
         n +|= 1;
         const arg = p.tok_i;
         if (p.tokenTag(arg) == .comma or p.tokenTag(arg) == .r_paren) {
-            if (n <= arity[0] or std.mem.eql(u8, name, "$width")) return p.failAt(.invalid_specify_item, arg);
+            if (std.mem.eql(u8, name, "$width")) return p.failSite(.invalid_specify_item, .specify_width_null, arg, 0);
+            if (n <= arity[0]) return p.failAt(.invalid_specify_item, arg);
             try p.pushOpt(.none);
         } else {
             const edge = p.tokenTag(arg) == .keyword_posedge or p.tokenTag(arg) == .keyword_negedge or p.tokenTag(arg) == .keyword_edge;
@@ -386,15 +391,15 @@ fn parseTimingCheck(p: *Parse) Error!Node.Index {
             };
             const cond: Node.OptionalIndex = if (p.eat(.ampersand_ampersand_ampersand) != null) (try expr.parseExpr(p)).toOptional() else .none;
             if (n > events and (edge or cond != .none)) return p.failAt(.invalid_specify_item, arg);
-            if (n == 1 and controlled_first and !edge) return p.failAt(.invalid_specify_item, arg);
-            if (n == notifier and !(p.tok_i == arg + 1 and (p.tokenTag(arg) == .identifier or p.tokenTag(arg) == .escaped_identifier))) return p.failAt(.invalid_specify_item, arg);
+            if (n == 1 and controlled_first and !edge) return p.failSite(.invalid_specify_item, .specify_event_control, arg, tok);
+            if (n == notifier and !(p.tok_i == arg + 1 and (p.tokenTag(arg) == .identifier or p.tokenTag(arg) == .escaped_identifier))) return p.failSite(.invalid_specify_item, .specify_notifier, arg, tok);
             try p.push(if (edge or cond != .none) try p.addNode(.timing_event, arg, .{ .node_and_opt_node = .{ term, cond } }) else term);
         }
         if (p.eat(.comma) == null) break;
     };
     _ = try p.expect(.r_paren);
     _ = try p.expect(.semicolon);
-    if (n < arity[0] or n > arity[1]) return p.failAt(.invalid_specify_item, tok);
+    if (n < arity[0] or n > arity[1]) return p.failSite(.invalid_specify_item, .specify_arity, tok, @as(u32, n) | @as(u32, arity[0]) << 8 | @as(u32, arity[1]) << 16);
     return p.addNode(.timing_check, tok, .{ .extra_range = try p.spanFrom(top) });
 }
 
@@ -418,7 +423,7 @@ fn edgeControl(p: *Parse) Error!void {
                 len += 1;
             }
         }
-        if (len != 2 or !edgeDescriptor(d[0], d[1])) return p.failAt(.invalid_specify_item, at);
+        if (len != 2 or !edgeDescriptor(d[0], d[1])) return p.failSite(.invalid_specify_item, .specify_edge_descriptor, at, p.tok_i);
         if (p.eat(.r_bracket) != null) return;
         p.tok_i += 1;
     }

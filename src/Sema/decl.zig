@@ -81,9 +81,12 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     for (s.units.items) |*u| try @import("attr.zig").check(s, u);
     for (s.units.items) |*u| try variable.declare(s, u);
     var main: Block = .{ .parent = null, .unit = &s.units.items[0] };
-    // The old flattener's order: an instance's blocks where its instance
-    // statement stands; then any unit no statement places (an inserted
-    // connect module), in preorder.
+    // The old flattener's order (`elab/instance.zig` inlineInstance,
+    // `Flatten.run`): each placed instance's blocks as the walk reaches it,
+    // in preorder; the top's after every child's (§5.4.2.2: a parent reads
+    // a child's flow after its contribution); then any unit no statement
+    // places (an inserted connect module), in preorder.
+    for (s.units.items[1..]) |*u| if (zcu.instances.items(.src)[@backingInt(u.instance)] != .none) try lowerUnit(s, &main, u, 0);
     try lowerUnit(s, &main, &s.units.items[0], 0);
     for (s.units.items) |*u| if (!u.lowered) try lowerUnit(s, &main, u, 0);
     try syscall.finishDisplays(s, &main);
@@ -283,8 +286,8 @@ fn units(s: *Sema) Allocator.Error!void {
     }
 }
 
-/// Lowers `u`'s analog blocks (and its children's, where their instance
-/// statements stand) into `main`.
+/// Lowers `u`'s own analog blocks into `main` (its children's are lowered
+/// in `run`'s order).
 fn lowerUnit(s: *Sema, main: *Block, u: *Unit, depth: u32) Allocator.Error!void {
     assert(!u.lowered);
     u.lowered = true;
@@ -297,8 +300,7 @@ fn lowerUnit(s: *Sema, main: *Block, u: *Unit, depth: u32) Allocator.Error!void 
 }
 
 /// The analog blocks of a body, in source order, generate schemes unrolled
-/// with their genvars bound (§6.6): each block lowered into `main`; an
-/// instance statement lowers its instances' blocks there.
+/// with their genvars bound (§6.6): each block lowered into `main`.
 fn items(s: *Sema, main: *Block, env: *eval.Env, body: Vir.Body, depth: u32) Allocator.Error!void {
     const unit = main.unit;
     const vir = unit.vir;
@@ -323,14 +325,6 @@ fn items(s: *Sema, main: *Block, env: *eval.Env, body: Vir.Body, depth: u32) All
             try main.insts.appendSlice(s.arena, b.insts.items);
         },
         .gen_block => try items(s, main, env, payloadOf(vir, Inst.GenBlock, i).body, depth + 1),
-        .instance => {
-            const zcu = s.zcu;
-            for (s.units.items) |*c| {
-                if (c.lowered or zcu.instances.items(.parent)[@backingInt(c.instance)] != unit.instance) continue;
-                if (zcu.instances.items(.src)[@backingInt(c.instance)] != i.toRef()) continue;
-                try lowerUnit(s, main, c, depth + 1);
-            }
-        },
         .gen_if => {
             const g = payloadOf(vir, Inst.GenIf, i);
             const c = (try env.body(g.cond)) orelse continue;

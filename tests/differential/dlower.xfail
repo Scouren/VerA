@@ -19,10 +19,3 @@ verilog/13_configuration/parent_library_by_map.v Compilation's libmap: a library
 verilog/13_configuration/resolution_order.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
 verilog/A_formal_syntax/b_A_1_1_incdir.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
 verilog/A_formal_syntax/b_A_1_1_library_text.v Compilation's libmap: a library map or list (`//@ libmap`, `//@ liblist`) the Compilation spine reads
-verilog-ams/digital/realtobits_bitstoreal_bridge.v lowering: a wreal net
-verilog-ams/digital/vams_digital_abstime_math.v lowering: the system function `$abstime`
-verilog-ams/digital/wreal_event_on_change.v lowering: a wreal net
-verilog-ams/digital/wreal_port_round_trip.v lowering: a wreal net
-verilog-ams/digital/wreal_single_driver_tracks.v lowering: a wreal net
-verilog-ams/digital/wreal_undriven_zero.v lowering: a wreal net
-verilog-ams/digital/wreal_wire_port_resolves_wreal.v lowering: a wreal net

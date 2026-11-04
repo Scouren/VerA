@@ -30,6 +30,7 @@ const eval = @import("eval.zig");
 const decl = @import("digital/decl.zig");
 const stmt = @import("digital/stmt.zig");
 const nets = @import("digital/nets.zig");
+const time0 = @import("digital/time0.zig");
 const sub = @import("digital/sub.zig");
 const vars = @import("digital/vars.zig");
 const gates = @import("digital/gates.zig");
@@ -371,7 +372,7 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *[]const u8) Er
         why.* = l.why;
         return e;
     };
-    nets.finish(&l, &program) catch |e| {
+    time0.finish(&l, &program) catch |e| {
         why.* = l.why;
         return e;
     };

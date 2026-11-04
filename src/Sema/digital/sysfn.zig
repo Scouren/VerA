@@ -30,7 +30,7 @@ const Vir = vams.Vir;
 const Inst = Vir.Inst;
 
 /// §17 the system functions `ctx` lowers, by name.
-const SysFn = enum { time, stime, realtime, signed, unsigned, clog2, rtoi, itor, realtobits, bitstoreal, random, test_plusargs, value_plusargs, ln, log10, exp, sqrt, floor, ceil, sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh, pow, atan2, hypot, fopen, fgets, ferror, fgetc, ungetc, ftell, rewind, fseek, feof, sscanf, fscanf, fread, dist_uniform, dist_normal, dist_exponential, dist_poisson, dist_chi_square, dist_t, dist_erlang, q_full };
+const SysFn = enum { time, stime, realtime, abstime, ln1p, expm1, signed, unsigned, clog2, rtoi, itor, realtobits, bitstoreal, random, test_plusargs, value_plusargs, ln, log10, exp, sqrt, floor, ceil, sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh, pow, atan2, hypot, fopen, fgets, ferror, fgetc, ungetc, ftell, rewind, fseek, feof, sscanf, fscanf, fread, dist_uniform, dist_normal, dist_exponential, dist_poisson, dist_chi_square, dist_t, dist_erlang, q_full };
 
 const sys_fns = std.StaticStringMap(SysFn).initComptime(.{
     .{ "$time", .time },                         .{ "$stime", .stime },               .{ "$realtime", .realtime },
@@ -51,6 +51,8 @@ const sys_fns = std.StaticStringMap(SysFn).initComptime(.{
     .{ "$fread", .fread },                       .{ "$dist_uniform", .dist_uniform }, .{ "$dist_normal", .dist_normal },
     .{ "$dist_exponential", .dist_exponential }, .{ "$dist_poisson", .dist_poisson }, .{ "$dist_chi_square", .dist_chi_square },
     .{ "$dist_t", .dist_t },                     .{ "$dist_erlang", .dist_erlang },   .{ "$q_full", .q_full },
+    // VAMS §9.10 Table 9-7 and §4.3.2 Table 4-15, in a digital process too.
+    .{ "$abstime", .abstime },                   .{ "$ln1p", .ln1p },                 .{ "$expm1", .expm1 },
 });
 
 pub fn sysType(l: *Lower, i: Inst.Index) Error!Type {
@@ -65,7 +67,7 @@ pub fn sysType(l: *Lower, i: Inst.Index) Error!Type {
         .dist_uniform, .dist_normal, .dist_exponential, .dist_poisson, .dist_chi_square, .dist_t, .dist_erlang => .{ .width = 32, .signed = true },
         .time => .{ .width = 64, .signed = false },
         .stime => .{ .width = 32, .signed = false },
-        .realtime, .itor, .bitstoreal => Type.real_type,
+        .realtime, .abstime, .itor, .bitstoreal => Type.real_type,
         .signed, .unsigned => blk: {
             if (s.args.len != 1) return l.refuse("$signed/$unsigned without one argument");
             const t = try expr.typeValue(l, s.args[0]);
@@ -120,9 +122,10 @@ pub fn sysReal(l: *Lower, i: Inst.Index) Error!u32 {
     const scope = l.frames.items[l.frame].scope;
     return switch (s.f) {
         .realtime => l.b.expr(.realtime, rt, scope, 0),
+        .abstime => l.b.expr(.abstime, rt, 0, 0),
         .itor => if ((try expr.typeOf(l, s.args[0])).real) l.b.expr(.math1, rt, try expr.real(l, s.args[0]), @backingInt(Program.Math.itor)) else l.b.expr(.real_of_int, rt, try expr.self_(l, s.args[0], 0), 0),
         .bitstoreal => l.b.expr(.bitstoreal, rt, try expr.self_(l, s.args[0], 64), 0),
-        inline .ln, .log10, .exp, .sqrt, .floor, .ceil, .sin, .cos, .tan, .asin, .acos, .atan, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh => |m| blk: {
+        inline .ln, .log10, .exp, .ln1p, .expm1, .sqrt, .floor, .ceil, .sin, .cos, .tan, .asin, .acos, .atan, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh => |m| blk: {
             if (s.args.len != 1) return l.refuse("a math function with the wrong argument count");
             break :blk l.b.expr(.math1, rt, try expr.real(l, s.args[0]), @backingInt(@field(Program.Math, @tagName(m))));
         },

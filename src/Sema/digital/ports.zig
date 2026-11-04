@@ -182,21 +182,33 @@ pub fn declareNet(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Inde
         width = r.width;
     } else n.scalar = true;
     n.ty = .{ .width = width, .signed = signed };
+    // VAMS §3.7 a wreal holds a real.
+    if (nk == .wreal) {
+        n.ty = digital.Type.real_type;
+        width = 64;
+    }
     if (decl_net) |dn| if (dn.dims.len != 0) return netArray(l, f, first, n, nk, dn);
     // §12.3 a port joined to one whole net of its width is that net.
     // §12.1.2 an instance array's element takes its own slice of an
     // expression as wide as the port times the elements.
     const slice: ?u32 = if (conn) |c| if (c.lane) |ln| if (c.actual != .none and try actualWidth(l, c) == width * ln[1]) ln[0] * width else null else null else null;
-    if (slice == null) if (conn) |c| if (c.actual != .none) if (try wholeNet(l, c)) |outer| if (outer.ty.width == width) {
-        // A port's net declaration assignment drives the merged net.
-        if (decl_net) |dn| if (dn.init.len != 0) try netOf(l, f, outer.net, nk, dn);
-        // §12.3.10.1 the merged net takes the dominating type (a `tri0`
-        // inside a `wire` stays a tri0 and reads 0 undriven).
-        if (nets.internalDominates(nk, l.nets.items[outer.net].kind)) try nets.retype(l, outer.net, nk);
-        var joined = outer;
-        joined.ty.signed = signed;
-        _ = try l.bind(f, first, joined);
-        return;
+    if (slice == null) if (conn) |c| if (c.actual != .none) if (try wholeNet(l, c)) |outer| {
+        // VAMS §3.7 a wreal joined to a wire or tri: one wreal net.
+        const outer_wreal = l.nets.items[outer.net].kind == .wreal;
+        const merging = (nk == .wreal) != outer_wreal;
+        if (merging or outer.ty.width == width) {
+            // A port's net declaration assignment drives the merged net.
+            if (decl_net) |dn| if (dn.init.len != 0) try netOf(l, f, outer.net, nk, dn);
+            // §12.3.10.1 the merged net takes the dominating type (a `tri0`
+            // inside a `wire` stays a tri0 and reads 0 undriven).
+            if (merging) {
+                if (!outer_wreal) try nets.promoteWreal(l, outer.net);
+            } else if (nets.internalDominates(nk, l.nets.items[outer.net].kind)) try nets.retype(l, outer.net, nk);
+            var joined = outer;
+            if (merging or outer_wreal) joined.ty = digital.Type.real_type else joined.ty.signed = signed;
+            _ = try l.bind(f, first, joined);
+            return;
+        }
     };
     n.net = try nets.mintNet(l, nk, width, signed);
     n.slot = l.nets.items[n.net].slot;

@@ -10,12 +10,14 @@
 //! - `pub const random_per_fn: usize`
 //! - `pub const specials: [26]f64`
 //! - `pub const Rng = std.Random`
+//! - `pub const Judgement = struct { old_err, new_err, bound }`, `pub fn both`
 //! - `pub const Report = struct` (`Row`, `record`, `judge`, `random`)
 //! - argument specs: each a struct with `pub const T` (the argument's type) and `pub fn gen`
 //! - `pub fn Real(comptime lo: f64, comptime hi: f64) type`, `pub fn RealIn(...)`, `pub const AnyReal`
 //! - `pub fn Int(comptime T: type, comptime lo: T, comptime hi: T) type`
 //! - `pub fn Of(comptime T: type) type`: a spec's default for a plain type
 //! - `pub fn cmp(rep: *Report, comptime name: []const u8, comptime old_f: anytype, comptime new_f: anytype, comptime pre: anytype, comptime Specs: anytype) void`
+//! - `pub fn cmpJudged(...)`: `cmp`, each difference judged by a reference
 //! - `pub fn dist(a: anytype, b: anytype) u64`
 //! - `pub fn ulps(a: f64, b: f64) u64`
 
@@ -40,9 +42,26 @@ pub const Rng = std.Random;
 /// A real anywhere: the specials and random bits, else |x| < 1e3.
 pub const AnyReal = Real(-1e3, 1e3);
 
-/// Every comparison's outcome by name, held to `kernels.xfail`: a name that
-/// differs must have a line whose bound covers its largest distance, and a
-/// line whose name never differs fails the run (an unexpected pass).
+/// One differing input judged by the f128 reference: each side's error in
+/// ulps and the new side's documented bound, which the new side must keep
+/// on every input. Two faithful libraries each round some inputs the other
+/// way, so "at least as close as the old side" is judged per name on the
+/// worst case (`Row.new_err <= Row.old_err`), with each side's count of
+/// strictly closer inputs printed.
+pub const Judgement = struct {
+    old_err: f64,
+    new_err: f64,
+    bound: f64,
+
+    fn settles(j: Judgement) bool {
+        return j.new_err <= j.bound;
+    }
+};
+
+/// Every comparison's outcome by name: a name that differs passes when the
+/// reference settles each difference for the new side (an old-side bug,
+/// counted), else only when `kernels.xfail` has a line whose bound covers
+/// its largest distance; a line whose name never differs fails the run.
 pub const Report = struct {
     gpa: std.mem.Allocator,
     rows: std.StringArrayHashMapUnmanaged(Row) = .empty,
@@ -62,17 +81,27 @@ pub const Report = struct {
         new_err: f64 = 0,
         old_closer: u64 = 0,
         new_closer: u64 = 0,
+        /// Differences the reference could not judge, or where the new side
+        /// is past its bound; a name passes on the reference alone at 0
+        /// and with its worst case no farther than the old one's.
+        unsettled: u64 = 0,
     };
 
-    /// Records the reference's verdict on one differing input of `name`.
-    pub fn judge(rep: *Report, name: []const u8, old_err: f64, new_err: f64) void {
+    /// Records the reference's verdict on one differing input of `name`;
+    /// null is an input it cannot judge.
+    pub fn judge(rep: *Report, name: []const u8, j: ?Judgement) void {
         const row = rep.rows.getPtr(name).?;
         assert(row.differ >= 1);
+        const v = j orelse {
+            row.unsettled += 1;
+            return;
+        };
         row.judged += 1;
-        row.old_err = @max(row.old_err, old_err);
-        row.new_err = @max(row.new_err, new_err);
-        if (old_err < new_err) row.old_closer += 1;
-        if (new_err < old_err) row.new_closer += 1;
+        row.old_err = @max(row.old_err, v.old_err);
+        row.new_err = @max(row.new_err, v.new_err);
+        if (v.old_err < v.new_err) row.old_closer += 1;
+        if (v.new_err < v.old_err) row.new_closer += 1;
+        if (!v.settles()) row.unsettled += 1;
         assert(row.judged <= row.differ);
     }
 
@@ -98,6 +127,16 @@ pub const Report = struct {
 
 const inf = std.math.inf(f64);
 const nan = std.math.nan(f64);
+
+/// Two parts of one answer judged apart (a value and the factor of its
+/// lanes): settled only when both are; the larger errors either way.
+pub fn both(a: ?Judgement, b: ?Judgement) ?Judgement {
+    const x = a orelse return null;
+    const y = b orelse return null;
+    if (!x.settles()) return x;
+    if (!y.settles()) return y;
+    return .{ .old_err = @max(x.old_err, y.old_err), .new_err = @max(x.new_err, y.new_err), .bound = @max(x.bound, y.bound) };
+}
 
 /// The default spec for a plain argument type.
 pub fn Of(comptime A: type) type {
@@ -173,6 +212,27 @@ pub fn cmp(rep: *Report, comptime name: []const u8, comptime old_f: anytype, com
         const a = @call(.auto, old_f, pre ++ args);
         const b = @call(.auto, new_f, pre ++ args);
         rep.record(name, dist(a, b), args);
+    }
+}
+
+/// `cmp`, each difference judged by `judge(args, old, new) ?Judgement`.
+pub fn cmpJudged(rep: *Report, comptime name: []const u8, comptime old_f: anytype, comptime new_f: anytype, comptime pre: anytype, comptime Specs: anytype, comptime judge: anytype) void {
+    comptime var types: [Specs.len]type = undefined;
+    inline for (Specs, 0..) |Sp, k| types[k] = Sp.T;
+    const Args = @Tuple(&types);
+    const r = rep.random();
+    const n = specials.len + random_per_fn;
+    for (0..n) |i| {
+        var args: Args = undefined;
+        inline for (Specs, 0..) |Sp, k| {
+            const idx = if (i < specials.len * specials.len) (i / std.math.pow(usize, specials.len, k)) % specials.len else n;
+            args[k] = Sp.gen(r, idx);
+        }
+        const a = @call(.auto, old_f, pre ++ args);
+        const b = @call(.auto, new_f, pre ++ args);
+        const d = dist(a, b);
+        rep.record(name, d, args);
+        if (d != 0) rep.judge(name, judge(args, a, b));
     }
 }
 

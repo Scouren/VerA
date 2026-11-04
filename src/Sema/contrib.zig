@@ -112,6 +112,8 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
     if (b.restricted()) |ctx| return s.fail(.E0405, file, src, "not allowed in {s}", .{ctx});
     if (b.in_event) return s.fail(.E0406, file, src, "", .{});
     if (b.loop != null) return s.fail(.E0426, file, src, "", .{});
+    // `vera_nodiff` would leave the branch with no Jacobian.
+    if (b.nodiff) return s.fail(.E0526, file, src, "", .{});
     // §5.4.3 a port access is read-only: it measures what the world outside
     // the module drives in.
     for (vir.list(Inst.Ref, c.args)) |a| if (isPortBranch(b.unit, a)) return s.fail(.E0407, file, src, "a contribution to a port access", .{});
@@ -153,6 +155,7 @@ pub fn indirect(s: *Sema, b: *Block, x: Inst.Triple, src: Inst.Ref) Allocator.Er
     if (b.restricted()) |ctx| return s.fail(.E0410, file, src, "not allowed in {s}", .{ctx});
     if (b.in_event) return s.fail(.E0411, file, src, "", .{});
     if (b.conditional != 0 or b.loop != null) return s.fail(.E0412, file, src, "the condition is not a constant expression", .{});
+    if (b.nodiff) return s.fail(.E0526, file, src, "", .{});
     const lhs = (try accessCall(s, unit, x.a)) orelse return s.fail(.E0413, file, src, "", .{});
     if (!try indirectProbe(s, unit, x.b)) return s.fail(.E0414, file, src, "", .{});
     const t = (try target(s, b, lhs.name, lhs.args, src)) orelse return;

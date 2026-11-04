@@ -14,362 +14,18 @@ netlist/hdl/a09_idt_bystander_reject.assets/a09_idt_ramp.va codegen does not spe
 netlist/hdl/a09_idt_lte_reject.assets/a09_idt_ramp.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 netlist/hdl/a09_idt_ramp_clean.assets/a09_idt_ramp.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 netlist/hdl/a09_idt_self_reject.assets/a09_idt_latched.va codegen does not spell a §5.10 held variable
+netlist/hdl/a09_limit_root_transient.assets/a09_limit_ramp.va a §9.17.3 `$limit`
 netlist/hdl/veriloga_idt_ac.assets/va_idt.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+netlist/hdl/veriloga_limit.assets/va_limit.va a §9.17.3 `$limit`
+netlist/hdl/veriloga_limit.assets/va_limit_state.va a §9.17.3 `$limit`
 netlist/hdl/veriloga_simparam.assets/va_gtol.va codegen does not spell a call of `$simparam`
 netlist/hdl/veriloga_simparam_homotopy.assets/va_ghom.va codegen does not spell a call of `$simparam`
+netlist/hdl/veriloga_table_snapshot.assets/va_table_snapshot.va a call of `$table_model`
 netlist/hdl/veriloga_timer_rearm.assets/va_tick.va codegen does not spell a §5.10 held variable
 netlist/hdl/veriloga_transition_reject.assets/va_cmp.va codegen does not spell a §5.10 held variable
 netlist/hdl/veriloga_vpi_app.assets/va_vpi_gain.va codegen does not spell a call of a user function (callee 4294967295)
 netlist/hdl/veriloga_vpi_callbacks.assets/va_vpi_scaled.va codegen does not spell a call of a user function (callee 4294967295)
 netlist/invalid/veriloga_systf.assets/va_systf_value.va codegen does not spell a call of a user function (callee 4294967295)
-netlist/qpss/idt_lowpass_two_tone.assets/va_idt_lp.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/annex_a_syntax/event_control.va codegen does not spell a §5.10 held variable
-verilog-a/annex_a_syntax/module_ports.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/annex_a_syntax/null_statement_in_analog_event_block.va codegen does not spell a §5.10 held variable
-verilog-a/annex_c_analog_subset/analog_context_system_functions.va codegen does not spell a call of `$rtoi`
-verilog-a/annex_c_analog_subset/analog_event.va codegen does not spell a §5.10 held variable
-verilog-a/annex_d_standard_definitions/electrical_definitions.va §1.3.4.2 a flow-only signal-flow net's row is `x - c`: Air.Device has no discipline facts to tell it
-verilog-a/annex_g_change_history/null_event_body.va codegen does not spell a call of `initial_step`
-verilog-a/annex_g_change_history/system_math_style.va codegen does not spell a call of a user function (callee 4294967295)
-verilog-a/annex_h_glossary/node_port_terminal.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch01_intro/flow_signal_flow.va §1.3.4.2 a flow-only signal-flow net's row is `x - c`: Air.Device has no discipline facts to tell it
-verilog-a/ch01_intro/mixed_conservative_signal_flow.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch01_intro/nature_scope_boundaries.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch01_intro/potential_probe.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch01_intro/potential_signal_flow.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch01_intro/reference_ground.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch01_intro/series_potentials.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch01_intro/signal_flow_single_nature_contributions.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch01_intro/voltage_source.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch03_data_types/access_half_follows_net_discipline_flow_first.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch03_data_types/access_half_follows_net_discipline_potential_first.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch03_data_types/dependent_control_divisor.va codegen does not spell a device with no unknowns
-verilog-a/ch03_data_types/dependent_control_guarded.va codegen does not spell a device with no unknowns
-verilog-a/ch03_data_types/dependent_control_mixed_guard.va codegen does not spell a device with no unknowns
-verilog-a/ch03_data_types/dependent_control_operators.va codegen does not spell a device with no unknowns
-verilog-a/ch03_data_types/dependent_control_rg.va codegen does not spell a device with no unknowns
-verilog-a/ch03_data_types/dependent_control_shift_sign.va codegen does not spell a device with no unknowns
-verilog-a/ch03_data_types/dependent_control_unknown_local.va codegen does not spell parameter `amount`'s default does not fold
-verilog-a/ch03_data_types/derived_nature_inheritance.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch03_data_types/discipline_declarations.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch03_data_types/ground_reference_solution.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch03_data_types/idt_nature_related_overrides.va codegen does not spell a call of `op$static`
-verilog-a/ch03_data_types/idt_nature_self_reference.va codegen does not spell a call of `op$static`
-verilog-a/ch03_data_types/integer_parameter_precision_control.va codegen does not spell a call of `absdelay`
-verilog-a/ch03_data_types/local_parameter.va a parameter whose value reads another parameter: Air has no derive body, so moving the base parameter leaves it at its folded default (asked of rw-lower: Param.derive)
-verilog-a/ch03_data_types/nature_compatibility_rules.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch03_data_types/natureless_domainless_port_compatibility.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch03_data_types/operator_equation_tolerances.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch03_data_types/output_variable_access_from_sibling.va codegen does not spell a call of a user function (callee 4294967295)
-verilog-a/ch03_data_types/retained_builtin_constant_display.va codegen does not spell a device with no unknowns
-verilog-a/ch03_data_types/spice_nodeset_cubic.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch04_expressions/absdelay.va codegen does not spell a call of `absdelay`
-verilog-a/ch04_expressions/absdelay_ac_phase.va codegen does not spell a call of `absdelay`
-verilog-a/ch04_expressions/absdelay_history_beyond_capacity.va codegen does not spell a call of `absdelay`
-verilog-a/ch04_expressions/absdelay_maxdelay_substitution.va codegen does not spell a call of `absdelay`
-verilog-a/ch04_expressions/absdelay_td_frozen_without_maxdelay.va codegen does not spell a call of `absdelay`
-verilog-a/ch04_expressions/absdelay_vera_interp_linear.va codegen does not spell a call of `absdelay`
-verilog-a/ch04_expressions/analog_operator_keeps_internal_state.va codegen does not spell a call of `op$static`
-verilog-a/ch04_expressions/analysis.va codegen does not spell a call of `analysis`
-verilog-a/ch04_expressions/constant_expression_of_parameters_and_operators.va a parameter whose value reads another parameter: Air has no derive body, so moving the base parameter leaves it at its folded default (asked of rw-lower: Param.derive)
-verilog-a/ch04_expressions/dc_sweep_nodeset_only_first_point.va codegen does not spell a §5.10 held variable
-verilog-a/ch04_expressions/dc_sweep_variables_carry_to_next_point.va codegen does not spell a §5.10 held variable
-verilog-a/ch04_expressions/ddt_of_a_ramp_held_in_a_variable.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch04_expressions/filter_null_zeros_argument.va codegen does not spell a call of `laplace_zp`
-verilog-a/ch04_expressions/idt.va codegen does not spell a call of `op$static`
-verilog-a/ch04_expressions/idt_assert_release_resumes.va codegen does not spell a call of `op$static`
-verilog-a/ch04_expressions/idt_hold_revert.va codegen does not spell a call of `op$static`
-verilog-a/ch04_expressions/idt_is_a_charge_site.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch04_expressions/idt_no_ic_dc_feedback.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch04_expressions/idt_reset_rejected.va codegen does not spell a call of `op$static`
-verilog-a/ch04_expressions/idtmod_ic_forces_dc_solution.va codegen does not spell a call of `idtmod`
-verilog-a/ch04_expressions/idtmod_offset_window_negative_integrand.va codegen does not spell a call of `op$static`
-verilog-a/ch04_expressions/laplace_ac_response.va codegen does not spell a call of `laplace_nd`
-verilog-a/ch04_expressions/laplace_filters.va codegen does not spell a call of `laplace_zp`
-verilog-a/ch04_expressions/laplace_nd_dc_gain.va codegen does not spell a call of `laplace_nd`
-verilog-a/ch04_expressions/laplace_nd_ramp_response.va codegen does not spell a call of `laplace_nd`
-verilog-a/ch04_expressions/laplace_nd_slow_pole_holds_dc_gain.va codegen does not spell a call of `laplace_nd`
-verilog-a/ch04_expressions/laplace_np_dc_gain.va codegen does not spell a call of `laplace_np`
-verilog-a/ch04_expressions/laplace_np_real_pole_zero_imaginary.va codegen does not spell a call of `laplace_np`
-verilog-a/ch04_expressions/laplace_transcendental_coefficient.va codegen does not spell a call of `laplace_nd`
-verilog-a/ch04_expressions/laplace_zd_conjugate_zeros.va codegen does not spell a call of `laplace_zd`
-verilog-a/ch04_expressions/laplace_zp_dynamic_pole_sampled.va codegen does not spell a call of `laplace_zp`
-verilog-a/ch04_expressions/laplace_zp_lrm_example.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch04_expressions/last_crossing.va codegen does not spell a call of `last_crossing`
-verilog-a/ch04_expressions/last_crossing_in_creating_step.va codegen does not spell a call of `last_crossing`
-verilog-a/ch04_expressions/modulo_integer_display_zero.va codegen does not spell a call of `$rtoi`
-verilog-a/ch04_expressions/modulo_integer_dynamic_nonzero.va the old device evaluates a `%` by zero the residual never reads and traps; the new one drops the dead value
-verilog-a/ch04_expressions/modulo_integer_dynamic_zero.va the old device evaluates a `%` by zero the residual never reads and traps; the new one drops the dead value
-verilog-a/ch04_expressions/modulo_integer_parameter.va codegen does not spell parameter `overridden`'s default does not fold
-verilog-a/ch04_expressions/modulo_integer_unused_zero.va the old device evaluates a `%` by zero the residual never reads and traps; the new one drops the dead value
-verilog-a/ch04_expressions/new_analysis_reinitializes_variables.va codegen does not spell a §5.10 held variable
-verilog-a/ch04_expressions/nodeset_phase_has_no_evaluation.va codegen does not spell a §5.10 held variable
-verilog-a/ch04_expressions/operator_under_constant_condition.va codegen does not spell a call of `transition`
-verilog-a/ch04_expressions/rc_88_operator_outside_event.va codegen does not spell a §5.10 held variable
-verilog-a/ch04_expressions/rollback_a04_rollback_ops.va codegen does not spell a call of `slew`
-verilog-a/ch04_expressions/slew.va codegen does not spell a call of `slew`
-verilog-a/ch04_expressions/slew_small_signal.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch04_expressions/standard_math_system.va codegen does not spell a call of a user function (callee 4294967295)
-verilog-a/ch04_expressions/tran_op_is_ic_and_static.va codegen does not spell a §5.10 held variable
-verilog-a/ch04_expressions/transition.va codegen does not spell a call of `transition`
-verilog-a/ch04_expressions/transition_interrupted_falling_higher.va codegen does not spell a call of `transition`
-verilog-a/ch04_expressions/transition_interrupted_falling_lower.va codegen does not spell a call of `transition`
-verilog-a/ch04_expressions/transition_interrupted_rising.va codegen does not spell a call of `transition`
-verilog-a/ch04_expressions/transition_interrupted_rising_higher.va codegen does not spell a call of `transition`
-verilog-a/ch04_expressions/transition_resolution.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch04_expressions/transition_simulator_default.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch04_expressions/transition_transport_delay.va codegen does not spell a call of `transition`
-verilog-a/ch04_expressions/two_independent_dc_sweeps_reinitialize_variables.va codegen does not spell a §5.10 held variable
-verilog-a/ch04_expressions/z_transform_filters.va codegen does not spell a call of `zi_nd`
-verilog-a/ch04_expressions/zi_ac_response.va codegen does not spell a call of `zi_nd`
-verilog-a/ch04_expressions/zi_dc_gains.va codegen does not spell a call of `zi_zp`
-verilog-a/ch04_expressions/zi_nd_output_at_sample_instant.va codegen does not spell a call of `zi_nd`
-verilog-a/ch04_expressions/zi_sampling_period.va codegen does not spell a call of `zi_zp`
-verilog-a/ch04_expressions/zi_transition_time_and_first_transition.va codegen does not spell a call of `zi_nd`
-verilog-a/ch05_analog_behavior/above_enable_integer.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/above_fires_in_dc_sweep_cross_does_not.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/batch_per_instance_state.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/block_local_is_static_between_events.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/conditional_potential_open.va codegen does not spell a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
-verilog-a/ch05_analog_behavior/conditional_variable_retains.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/controlled_voltage_source.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch05_analog_behavior/cross_direction_out_of_range_is_inert.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/cross_does_not_fire_at_time_zero.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/cross_string_literal_is_an_integer.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/cross_tolerances_are_not_the_enable.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/current_controlled_voltage.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch05_analog_behavior/direct_potential.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch05_analog_behavior/event_above.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_above_enable.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_above_tolerance.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_bounds_cross_legal.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_cross.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_cross_any.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_cross_enable.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_cross_falling.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_cross_fires.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_cross_fires_on_a_time_grid.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_cross_param_direction.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_cross_rising_and_falling.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_cross_runtime_direction.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_initial_or_cross.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_list_comma_equals_or.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_or.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_timer.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_timer_enable.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/event_timer_one_shot.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/final_step.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/final_step_on_finish.va codegen does not spell a call of `final_step`
-verilog-a/ch05_analog_behavior/function_locals_have_no_lifetime.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/held_integer_through_nested_joins.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/held_survives_an_inout_function_argument.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/held_value_is_visible_before_its_event_statement.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/implicit_zero_contribution.va codegen does not spell a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
-verilog-a/ch05_analog_behavior/initial_final_analysis_lists.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/initial_step.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/initial_step_unknown_analysis.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/many_timers_instance_defaults.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/potential_source.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch05_analog_behavior/rc_event_cross_tolerance_with_direction.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/rlc.va codegen does not spell a call of `op$static`
-verilog-a/ch05_analog_behavior/shadowed_block_locals_hold_independently.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/spice_cross_latch_device.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/spice_timer_steps_device.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/static_switch_elision.va codegen does not spell a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
-verilog-a/ch05_analog_behavior/switch_branch.va codegen does not spell a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
-verilog-a/ch05_analog_behavior/switch_branch_solved.va codegen does not spell a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
-verilog-a/ch05_analog_behavior/timer_body_clog2_controls.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/timer_body_controls.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/timer_body_function_controls.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/timer_controls.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/timer_dynamic.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/timer_dynamic_period.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/timer_enable_integer.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/timer_enable_resumes_on_grid.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/timer_fixed.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/timer_nonpositive_period_fires_once.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/timer_start_rearmed_earlier.va codegen does not spell a §5.10 held variable
-verilog-a/ch05_analog_behavior/unassigned_switch_arm.va codegen does not spell a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
-verilog-a/ch05_analog_behavior/vector_access.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch06_hierarchy/ansi_ports.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch06_hierarchy/defparam_unsupported.va a parameter whose value reads another parameter: Air has no derive body, so moving the base parameter leaves it at its folded default (asked of rw-lower: Param.derive)
-verilog-a/ch06_hierarchy/dependent_parameters.va a parameter whose value reads another parameter: Air has no derive body, so moving the base parameter leaves it at its folded default (asked of rw-lower: Param.derive)
-verilog-a/ch06_hierarchy/dynamic_parameter_dc_sweep.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch06_hierarchy/elaboration_order_defparam_before_generate.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch06_hierarchy/geometric_system_parameters.va codegen does not spell a call of `$xposition`
-verilog-a/ch06_hierarchy/header_body_parameter_dependency.va codegen does not spell a device with no unknowns
-verilog-a/ch06_hierarchy/hierarchy_empty_named_semantics.va a parameter whose value reads another parameter: Air has no derive body, so moving the base parameter leaves it at its folded default (asked of rw-lower: Param.derive)
-verilog-a/ch06_hierarchy/localparam_dependency.va a parameter whose value reads another parameter: Air has no derive body, so moving the base parameter leaves it at its folded default (asked of rw-lower: Param.derive)
-verilog-a/ch06_hierarchy/mfactor_conditional_only.va codegen does not spell a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
-verilog-a/ch06_hierarchy/mfactor_flow_probe.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch06_hierarchy/named_block_local_is_per_instance.va codegen does not spell a §5.10 held variable
-verilog-a/ch06_hierarchy/nonansi_ports.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch06_hierarchy/output_port.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch06_hierarchy/param_given.va codegen does not spell a call of `$param_given`
-verilog-a/ch06_hierarchy/param_given_absent.va codegen does not spell a call of `$param_given`
-verilog-a/ch06_hierarchy/port_directions.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch06_hierarchy/string_derived_parameter.va codegen does not spell parameter `u.mode` is not a number
-verilog-a/ch06_hierarchy/three_dependent_parameters.va a parameter whose value reads another parameter: Air has no derive body, so moving the base parameter leaves it at its folded default (asked of rw-lower: Param.derive)
-verilog-a/ch08_scheduling/above_initial_event.va codegen does not spell a §5.10 held variable
-verilog-a/ch08_scheduling/absdelta_unconsumed_events_rejected.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch08_scheduling/analog_event.va codegen does not spell a §5.10 held variable
-verilog-a/ch08_scheduling/cross_pending_host_observations.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch08_scheduling/cross_wakeup.va codegen does not spell a §5.10 held variable
-verilog-a/ch08_scheduling/event_state.va codegen does not spell a §5.10 held variable
-verilog-a/ch08_scheduling/explicit_guard.va codegen does not spell a §5.10 held variable
-verilog-a/ch08_scheduling/integrator_state.va codegen does not spell a call of `op$static`
-verilog-a/ch08_scheduling/timer_wakeup.va codegen does not spell a §5.10 held variable
-verilog-a/ch09_system_tasks/angle.va codegen does not spell a call of `$angle`
-verilog-a/ch09_system_tasks/arandom.va codegen does not spell a call of `$arandom`
-verilog-a/ch09_system_tasks/arandom_no_seed.va codegen does not spell a call of `$arandom`
-verilog-a/ch09_system_tasks/binding_detection.va codegen does not spell a call of `$param_given`
-verilog-a/ch09_system_tasks/binding_source_overrides.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/bitstoreal.va codegen does not spell a call of `$bitstoreal`
-verilog-a/ch09_system_tasks/clog2.va codegen does not spell a call of `$clog2`
-verilog-a/ch09_system_tasks/conversion_functions.va codegen does not spell a call of `$realtobits`
-verilog-a/ch09_system_tasks/diagnostic_finish_dc_sweep.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/diagnostic_finish_default.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/diagnostic_finish_initial.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/diagnostic_finish_statistics.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/diagnostic_finish_zero.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/diagnostic_info_dc_sweep.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/diagnostic_info_initial.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/diagnostic_info_transient.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/dist_chi_square.va codegen does not spell a call of `$dist_chi_square`
-verilog-a/ch09_system_tasks/dist_erlang.va codegen does not spell a call of `$dist_erlang`
-verilog-a/ch09_system_tasks/dist_exponential.va codegen does not spell a call of `$dist_exponential`
-verilog-a/ch09_system_tasks/dist_ieee1364_reference_digits.va codegen does not spell a call of `$dist_normal`
-verilog-a/ch09_system_tasks/dist_poisson.va codegen does not spell a call of `$dist_poisson`
-verilog-a/ch09_system_tasks/dist_t.va codegen does not spell a call of `$dist_t`
-verilog-a/ch09_system_tasks/dist_uniform.va codegen does not spell a call of `$dist_uniform`
-verilog-a/ch09_system_tasks/distribution.va codegen does not spell a call of `$dist_normal`
-verilog-a/ch09_system_tasks/driver_type_unavailable.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch09_system_tasks/error.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
-verilog-a/ch09_system_tasks/fatal.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
-verilog-a/ch09_system_tasks/fatal_finish_number_0_exit_status.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
-verilog-a/ch09_system_tasks/fatal_finish_number_2_exit_status.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
-verilog-a/ch09_system_tasks/fatal_in_iteration_terminates.va codegen does not spell a call of `$simparam`
-verilog-a/ch09_system_tasks/fatal_terminates.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
-verilog-a/ch09_system_tasks/geometry_hierarchical_overrides.va codegen does not spell a device with no unknowns
-verilog-a/ch09_system_tasks/hflip.va codegen does not spell a call of `$hflip`
-verilog-a/ch09_system_tasks/hierarchical_parameters.va codegen does not spell a call of `$xposition`
-verilog-a/ch09_system_tasks/math_binary.va codegen does not spell a call of a user function (callee 4294967295)
-verilog-a/ch09_system_tasks/math_unary.va codegen does not spell a call of a user function (callee 4294967295)
-verilog-a/ch09_system_tasks/param_given.va codegen does not spell a call of `$param_given`
-verilog-a/ch09_system_tasks/plusargs.va codegen does not spell a call of `$test$plusargs`
-verilog-a/ch09_system_tasks/plusargs_prefix.va codegen does not spell a call of `$test$plusargs`
-verilog-a/ch09_system_tasks/plusargs_value_order.va codegen does not spell a call of `$value$plusargs`
-verilog-a/ch09_system_tasks/port_connected.va codegen does not spell a call of `$port_connected`
-verilog-a/ch09_system_tasks/port_mask.va codegen does not spell a call of `$port_connected`
-verilog-a/ch09_system_tasks/random.va codegen does not spell a call of `$random`
-verilog-a/ch09_system_tasks/random_ieee1364_digits.va codegen does not spell a call of `$random`
-verilog-a/ch09_system_tasks/random_no_seed.va codegen does not spell a call of `$random`
-verilog-a/ch09_system_tasks/rdist_chi_square.va codegen does not spell a call of `$rdist_chi_square`
-verilog-a/ch09_system_tasks/rdist_erlang.va codegen does not spell a call of `$rdist_erlang`
-verilog-a/ch09_system_tasks/rdist_exponential.va codegen does not spell a call of `$rdist_exponential`
-verilog-a/ch09_system_tasks/rdist_normal.va codegen does not spell a call of `$rdist_normal`
-verilog-a/ch09_system_tasks/rdist_poisson.va codegen does not spell a call of `$rdist_poisson`
-verilog-a/ch09_system_tasks/rdist_positive_mean_at_run_time.va codegen does not spell a call of `$rdist_exponential`
-verilog-a/ch09_system_tasks/rdist_t.va codegen does not spell a call of `$rdist_t`
-verilog-a/ch09_system_tasks/rdist_zero_mean_at_run_time_is_an_error.va codegen does not spell a call of `$rdist_exponential`
-verilog-a/ch09_system_tasks/real_distribution.va codegen does not spell a call of `$rdist_uniform`
-verilog-a/ch09_system_tasks/realtobits.va codegen does not spell a call of `$realtobits`
-verilog-a/ch09_system_tasks/rng_reference_large_count.va codegen does not spell a call of `$rdist_chi_square`
-verilog-a/ch09_system_tasks/rng_short_circuit.va codegen does not spell a call of `$rdist_exponential`
-verilog-a/ch09_system_tasks/severity_tasks.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
-verilog-a/ch09_system_tasks/simparam.va codegen does not spell a call of `$simparam`
-verilog-a/ch09_system_tasks/simparam_dt_is_the_host_step.va codegen does not spell a call of `$simparam`
-verilog-a/ch09_system_tasks/simparam_fallback_as_parameter_default.va codegen does not spell parameter `lo`'s default does not fold
-verilog-a/ch09_system_tasks/simparam_gmin_source_scale_host_written.va codegen does not spell parameter `g`'s default does not fold
-verilog-a/ch09_system_tasks/simparam_minr_hicum_l2_default.va codegen does not spell parameter `minr`'s default does not fold
-verilog-a/ch09_system_tasks/simparam_newton_tolerances_host_written.va codegen does not spell parameter `rt`'s default does not fold
-verilog-a/ch09_system_tasks/simparam_timescale.va codegen does not spell a call of `$simparam`
-verilog-a/ch09_system_tasks/test_plusargs.va codegen does not spell a call of `$test$plusargs`
-verilog-a/ch09_system_tasks/top_port_connected_controls_ddt.va codegen does not spell a call of `$port_connected`
-verilog-a/ch09_system_tasks/value_plusargs.va codegen does not spell a call of `$value$plusargs`
-verilog-a/ch09_system_tasks/vflip.va codegen does not spell a call of `$vflip`
-verilog-a/ch09_system_tasks/xposition.va codegen does not spell a call of `$xposition`
-verilog-a/ch09_system_tasks/yposition.va codegen does not spell a call of `$yposition`
-verilog-a/ch10_directives/compact_modeling_macro.va codegen does not spell a device with no unknowns
-verilog-a/ch10_directives/default_transition_ramp.va codegen does not spell a call of `transition`
-verilog-a/combined/analysis_modes_and_severity.va codegen does not spell a call of `analysis`
-verilog-a/combined/function_branch_system_math.va codegen does not spell a call of a user function (callee 4294967295)
-verilog-a/combined/macro_function_math.va codegen does not spell a call of a user function (callee 4294967295)
-verilog-a/combined/optional_port_environment.va codegen does not spell a call of `$port_connected`
-verilog-a/combined/optional_port_hierarchy.va codegen does not spell a call of `$xposition`
-verilog-a/combined/parameter_binding_environment.va codegen does not spell a call of `$param_given`
-verilog-a/combined/piecewise_param_model.va codegen does not spell a call of `$param_given`
-verilog-a/exhaustive/bit_conversions.va codegen does not spell a call of `$realtobits`
-verilog-a/exhaustive/event_hold.va codegen does not spell a §5.10 held variable
-verilog-a/exhaustive/idt_integral.va codegen does not spell a call of `op$static`
-verilog-a/exhaustive/laplace_dc_gain.va codegen does not spell a call of `laplace_nd`
-verilog-a/exhaustive/timer_breakpoint_one_shot.va codegen does not spell a §5.10 held variable
-verilog-a/exhaustive/timer_breakpoint_periodic.va codegen does not spell a §5.10 held variable
-verilog-a/exhaustive/voltage_source.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/exhaustive/zi_sample_hold.va codegen does not spell a call of `zi_nd`
-verilog-ams/annex_a_syntax/analog_initial.va codegen does not spell a §5.10 held variable
-verilog-ams/ch03_data_types/integer_real_default_init.va codegen does not spell a §5.10 held variable
-verilog-ams/ch03_data_types/operator_equation_tolerances.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch04_expressions/slew_small_signal.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch04_expressions/transition_resolution.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch04_expressions/transition_simulator_default.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch05_analog_behavior/analog_initial.va codegen does not spell a §5.10 held variable
-verilog-ams/ch05_analog_behavior/analog_initial_integer.va codegen does not spell a §5.10 held variable
-verilog-ams/ch05_analog_behavior/analog_initial_real.va codegen does not spell a §5.10 held variable
-verilog-ams/ch05_analog_behavior/multiple_analog_initial_blocks_concatenate.va codegen does not spell a §5.10 held variable
-verilog-ams/ch05_analog_behavior/timer_body_clog2_controls.va codegen does not spell a §5.10 held variable
-verilog-ams/ch05_analog_behavior/timer_body_controls.va codegen does not spell a §5.10 held variable
-verilog-ams/ch05_analog_behavior/timer_body_function_controls.va codegen does not spell a §5.10 held variable
-verilog-ams/ch05_analog_behavior/timer_controls.va codegen does not spell a §5.10 held variable
-verilog-ams/ch05_analog_behavior/timer_dynamic.va codegen does not spell a §5.10 held variable
-verilog-ams/ch05_analog_behavior/timer_fixed.va codegen does not spell a §5.10 held variable
-verilog-ams/ch06_hierarchy/child_initial_block_is_carried.va an `analog initial` block's values: the old device keeps them (§5.2.1), the new Air reads them as 0
-verilog-ams/ch06_hierarchy/top_initial_block_with_a_child.va an `analog initial` block's values: the old device keeps them (§5.2.1), the new Air reads them as 0
-verilog-ams/ch07_mixed_signal/analog_event.va codegen does not spell a §5.10 held variable
-verilog-ams/ch07_mixed_signal/analog_port.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch07_mixed_signal/probe_in_continuous_assign_refused.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch07_mixed_signal/probe_in_procedural_read.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch08_scheduling/absdelta_unconsumed_events_rejected.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch08_scheduling/analog_digital_initial_order.va codegen does not spell a §5.10 held variable
-verilog-ams/ch08_scheduling/analog_initial_order.va codegen does not spell a §5.10 held variable
-verilog-ams/ch08_scheduling/analog_initial_parameter_sweep.va codegen does not spell a §5.10 held variable
-verilog-ams/ch08_scheduling/cross_pending_host_observations.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch08_scheduling/declaration_assignment_order.va codegen does not spell a §5.10 held variable
-verilog-ams/ch08_scheduling/monitor_at_analog_only_solutions.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch09_system_tasks/diagnostic_finish_dc_sweep.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/diagnostic_finish_default.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/diagnostic_finish_initial.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/diagnostic_finish_statistics.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/diagnostic_finish_zero.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/diagnostic_info_dc_sweep.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/diagnostic_info_initial.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/diagnostic_info_transient.va codegen does not spell a device with no unknowns
-verilog-ams/ch09_system_tasks/driver_type_unavailable.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch09_system_tasks/fatal_in_analog_initial_skips_simulation.va codegen does not spell a §5.10 held variable
-verilog-ams/ch09_system_tasks/finish_in_analog_initial_skips_simulation.va codegen does not spell a §5.10 held variable
-verilog-ams/ch09_system_tasks/port_mask.va codegen does not spell a call of `$port_connected`
-verilog-ams/ch10_directives/compact_modeling_macro.va codegen does not spell a device with no unknowns
-verilog-ams/ch11_vpi/analog_system_task_registration.va a §12 user system function: the old device calls the host's systf table (absent here, so it traps); codegen has none
-verilog-ams/ch11_vpi/callback_call_site.va codegen does not spell a §5.10 held variable
-verilog-ams/ch12_vpi_routines/analog_systf_resistor_call.va a §12 user system function: the old device calls the host's systf table (absent here, so it traps); codegen has none
-verilog-ams/ch12_vpi_routines/analog_systf_sampler_call.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch12_vpi_routines/cap_ramp.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch12_vpi_routines/cube_solve.va a §12 user system function: the old device calls the host's systf table (absent here, so it traps); codegen has none
-verilog-ams/ch12_vpi_routines/dc_divider.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch12_vpi_routines/env_probe.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch12_vpi_routines/env_twin.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch12_vpi_routines/functype.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch12_vpi_routines/ramp_load.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch12_vpi_routines/sampnhold.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch12_vpi_routines/square_law.va codegen does not spell a call of a user function (callee 4294967295)
-verilog-ams/ch12_vpi_routines/systf_devices.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-ams/ch12_vpi_routines/two_sites.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
-verilog-a/ch09_system_tasks/say_ops.va §9.7.3 status sites: the old device returns zero rows once a severity task fires (a check past |V| = 10); codegen has no status protocol yet
-verilog-ams/ch09_system_tasks/say_ops.va §9.7.3 status sites: the old device returns zero rows once a severity task fires (a check past |V| = 10); codegen has no status protocol yet
-netlist/hdl/a09_limit_root_transient.assets/a09_limit_ramp.va a §9.17.3 `$limit`
-netlist/hdl/veriloga_limit.assets/va_limit.va a §9.17.3 `$limit`
-netlist/hdl/veriloga_limit.assets/va_limit_state.va a §9.17.3 `$limit`
-netlist/hdl/veriloga_table_snapshot.assets/va_table_snapshot.va a call of `$table_model`
 netlist/noise/va_noise.assets/coeff_res.va a call of `white_noise`
 netlist/noise/va_noise.assets/corr_res.va a call of `white_noise`
 netlist/noise/va_noise.assets/ground_res.va a call of `white_noise`
@@ -377,6 +33,7 @@ netlist/noise/va_noise.assets/ntab_card.va a call of `noise_table`
 netlist/noise/va_noise.assets/ntab_lin.va a call of `noise_table`
 netlist/noise/va_noise.assets/ntab_log.va a call of `noise_table_log`
 netlist/noise/va_noise.assets/vseries_res.va a call of `white_noise`
+netlist/qpss/idt_lowpass_two_tone.assets/va_idt_lp.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 spice/limit_fet.va a call of `$limit`
 spice/limit_pnj.va a call of `$limit`
 spice/limit_pnjlimds_bsim_pmos_von_at_old.va a call of `$limit`
@@ -403,37 +60,144 @@ spice/primitive_vsine.va a §5.6.1.3 potential contribution that runs under a co
 spice/spice_network_primitives.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 spice/spice_source_primitives.va a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 spice/vsine_dc_is_the_operating_point_value.va a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/annex_a_syntax/declarations.va codegen does not spell a slot of type 2 (a string)
+verilog-a/annex_a_syntax/event_control.va codegen does not spell a §5.10 held variable
+verilog-a/annex_a_syntax/expressions.va the old device's entry returned -3
 verilog-a/annex_a_syntax/indirect_contribution.va a §5.6.7 indirect contribution
+verilog-a/annex_a_syntax/module_ports.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/annex_a_syntax/null_statement_in_analog_event_block.va codegen does not spell a §5.10 held variable
+verilog-a/annex_a_syntax/pattern_every_element_written.va the old device's entry returned -3
+verilog-a/annex_a_syntax/system_task_null_argument_space.va codegen does not spell a §5.10 held variable
+verilog-a/annex_c_analog_subset/analog_context_system_functions.va codegen does not spell a call of `$rtoi`
+verilog-a/annex_c_analog_subset/analog_event.va codegen does not spell a §5.10 held variable
+verilog-a/annex_d_standard_definitions/electrical_definitions.va §1.3.4.2 a flow-only signal-flow net's row is `x - c`: Air.Device has no discipline facts to tell it
+verilog-a/annex_g_change_history/null_event_body.va codegen does not spell a call of `initial_step`
 verilog-a/annex_g_change_history/real_array_range_after_name.va a §5.10 held variable
+verilog-a/annex_h_glossary/node_port_terminal.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch01_intro/flow_signal_flow.va §1.3.4.2 a flow-only signal-flow net's row is `x - c`: Air.Device has no discipline facts to tell it
+verilog-a/ch01_intro/mixed_conservative_signal_flow.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch01_intro/nature_scope_boundaries.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch01_intro/potential_probe.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch01_intro/potential_signal_flow.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch01_intro/reference_ground.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch01_intro/series_potentials.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch01_intro/signal_flow_bound_to_conservative_node.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch01_intro/signal_flow_single_nature_contributions.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch01_intro/voltage_source.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch03_data_types/access_half_follows_net_discipline_flow_first.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch03_data_types/access_half_follows_net_discipline_potential_first.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch03_data_types/aliasparam_source_bindings.va codegen does not spell a device with no unknowns
+verilog-a/ch03_data_types/dependent_control_divisor.va codegen does not spell a device with no unknowns
+verilog-a/ch03_data_types/dependent_control_guarded.va codegen does not spell a device with no unknowns
 verilog-a/ch03_data_types/dependent_control_host.va a device with no unknowns
+verilog-a/ch03_data_types/dependent_control_mixed_guard.va codegen does not spell a device with no unknowns
+verilog-a/ch03_data_types/dependent_control_operators.va codegen does not spell a device with no unknowns
+verilog-a/ch03_data_types/dependent_control_rg.va codegen does not spell a device with no unknowns
+verilog-a/ch03_data_types/dependent_control_shift_sign.va codegen does not spell a device with no unknowns
+verilog-a/ch03_data_types/dependent_control_unknown_local.va codegen does not spell parameter `amount`'s default does not fold
+verilog-a/ch03_data_types/derived_nature_inheritance.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch03_data_types/discipline_declarations.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch03_data_types/dynamic_multidim_numeric.va a §5.10 held variable
+verilog-a/ch03_data_types/ground_reference_solution.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch03_data_types/idt_nature_related_overrides.va codegen does not spell a call of `op$static`
+verilog-a/ch03_data_types/idt_nature_self_reference.va codegen does not spell a call of `op$static`
+verilog-a/ch03_data_types/integer_parameter_precision_control.va codegen does not spell a call of `absdelay`
+verilog-a/ch03_data_types/local_parameter.va a parameter whose value reads another parameter: Air has no derive body, so moving the base parameter leaves it at its folded default (asked of rw-lower: Param.derive)
+verilog-a/ch03_data_types/multidimensional_strings.va codegen does not spell a slot of type 2 (a string)
 verilog-a/ch03_data_types/multiple_aliases_point_to_one_parameter.va a device with no unknowns
+verilog-a/ch03_data_types/nature_compatibility_rules.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch03_data_types/natureless_domainless_port_compatibility.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch03_data_types/operator_equation_tolerances.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch03_data_types/output_variable_access_from_sibling.va codegen does not spell a call of a user function (callee 4294967295)
+verilog-a/ch03_data_types/parameter_array.va the old device's entry returned -3
 verilog-a/ch03_data_types/parameter_array_exact_override.va a device with no unknowns
 verilog-a/ch03_data_types/parameter_array_resize_with_value.va a device with no unknowns
+verilog-a/ch03_data_types/parameter_default_over_parameter.va the new device does not build: n23.zig:76: unused local constant
+verilog-a/ch03_data_types/parameter_types.va codegen does not spell parameter `string_parameter` is not a number
+verilog-a/ch03_data_types/retained_builtin_constant_display.va codegen does not spell a device with no unknowns
+verilog-a/ch03_data_types/spice_nodeset_cubic.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch03_data_types/string_arrays.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_comparison_context.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_comparisons.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_concatenation.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_concatenation_runtime_operand.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_literal_operand_is_a_number.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_nul_removal.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_parameter_range.va codegen does not spell parameter `device_type` is not a number
+verilog-a/ch03_data_types/string_range_overrides.va codegen does not spell parameter `u.kind` is not a number
+verilog-a/ch03_data_types/string_replication.va codegen does not spell a §5.10 held variable
+verilog-a/ch03_data_types/string_replication_4096_bytes.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_replication_parameter_multiplier.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_replication_past_4096_bytes.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_replication_runtime_multiplier.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_variables.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/vera_scratch_starts_each_evaluation.va codegen does not spell a §5.10 held variable
+verilog-a/ch04_expressions/absdelay.va codegen does not spell a call of `absdelay`
+verilog-a/ch04_expressions/absdelay_ac_phase.va codegen does not spell a call of `absdelay`
+verilog-a/ch04_expressions/absdelay_history_beyond_capacity.va codegen does not spell a call of `absdelay`
+verilog-a/ch04_expressions/absdelay_maxdelay_substitution.va codegen does not spell a call of `absdelay`
+verilog-a/ch04_expressions/absdelay_td_frozen_without_maxdelay.va codegen does not spell a call of `absdelay`
+verilog-a/ch04_expressions/absdelay_vera_interp_linear.va codegen does not spell a call of `absdelay`
 verilog-a/ch04_expressions/absdelay_vera_interp_quadratic.va a call of `absdelay`
 verilog-a/ch04_expressions/absdelay_vera_interp_quadratic_uneven.va a call of `absdelay`
 verilog-a/ch04_expressions/ac_stim.va a call of `ac_stim`
 verilog-a/ch04_expressions/ac_stim_ac_analysis.va a call of `ac_stim`
 verilog-a/ch04_expressions/ac_stim_dynamic_magnitude.va a call of `ac_stim`
+verilog-a/ch04_expressions/ac_stim_label_inactive_in_large_signal.va codegen does not spell a slot of type 2 (a string)
 verilog-a/ch04_expressions/ac_stim_long_node_names.va a call of `ac_stim`
 verilog-a/ch04_expressions/ac_stim_noise_analysis.va a call of `ac_stim`
 verilog-a/ch04_expressions/ac_stim_quadrature.va a call of `ac_stim`
+verilog-a/ch04_expressions/analog_operator_keeps_internal_state.va codegen does not spell a call of `op$static`
+verilog-a/ch04_expressions/analysis.va codegen does not spell a call of `analysis`
+verilog-a/ch04_expressions/assignment_pattern.va the old device's entry returned -3
+verilog-a/ch04_expressions/constant_expression_of_parameters_and_operators.va a parameter whose value reads another parameter: Air has no derive body, so moving the base parameter leaves it at its folded default (asked of rw-lower: Param.derive)
 verilog-a/ch04_expressions/correlated_noise.va a call of `white_noise`
+verilog-a/ch04_expressions/dc_sweep_nodeset_only_first_point.va codegen does not spell a §5.10 held variable
+verilog-a/ch04_expressions/dc_sweep_variables_carry_to_next_point.va codegen does not spell a §5.10 held variable
+verilog-a/ch04_expressions/ddt_of_a_ramp_held_in_a_variable.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch04_expressions/ddx.va a call of `ddx`
 verilog-a/ch04_expressions/ddx_flow_column_in_eval.va a call of `ddx`
 verilog-a/ch04_expressions/ddx_in_noise_power.va a call of `ddx`
 verilog-a/ch04_expressions/ddx_runtime_indexed_array_element.va a §5.10 held variable
 verilog-a/ch04_expressions/diode_noise_sources_in_dc.va a call of `white_noise`
 verilog-a/ch04_expressions/discontinuity_real_degree.va a call of `$simparam`
+verilog-a/ch04_expressions/filter_null_zeros_argument.va codegen does not spell a call of `laplace_zp`
 verilog-a/ch04_expressions/filter_parameter_arrays.va a call of `laplace_nd`
 verilog-a/ch04_expressions/flicker_noise_topology.va a call of `flicker_noise`
 verilog-a/ch04_expressions/flicker_psd_frequency.va a call of `flicker_noise`
+verilog-a/ch04_expressions/idt.va codegen does not spell a call of `op$static`
+verilog-a/ch04_expressions/idt_assert_release_resumes.va codegen does not spell a call of `op$static`
+verilog-a/ch04_expressions/idt_hold_revert.va codegen does not spell a call of `op$static`
+verilog-a/ch04_expressions/idt_is_a_charge_site.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch04_expressions/idt_no_ic_dc_feedback.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch04_expressions/idt_reset_rejected.va codegen does not spell a call of `op$static`
+verilog-a/ch04_expressions/idtmod_ic_forces_dc_solution.va codegen does not spell a call of `idtmod`
+verilog-a/ch04_expressions/idtmod_offset_window_negative_integrand.va codegen does not spell a call of `op$static`
+verilog-a/ch04_expressions/laplace_ac_response.va codegen does not spell a call of `laplace_nd`
+verilog-a/ch04_expressions/laplace_filters.va codegen does not spell a call of `laplace_zp`
+verilog-a/ch04_expressions/laplace_nd_dc_gain.va codegen does not spell a call of `laplace_nd`
+verilog-a/ch04_expressions/laplace_nd_ramp_response.va codegen does not spell a call of `laplace_nd`
+verilog-a/ch04_expressions/laplace_nd_slow_pole_holds_dc_gain.va codegen does not spell a call of `laplace_nd`
 verilog-a/ch04_expressions/laplace_nd_zero_padded_coefficients.va a call of `laplace_nd`
+verilog-a/ch04_expressions/laplace_np_dc_gain.va codegen does not spell a call of `laplace_np`
 verilog-a/ch04_expressions/laplace_np_parameter_roots_unpaired_is_nan.va a call of `laplace_np`
+verilog-a/ch04_expressions/laplace_np_real_pole_zero_imaginary.va codegen does not spell a call of `laplace_np`
+verilog-a/ch04_expressions/laplace_transcendental_coefficient.va codegen does not spell a call of `laplace_nd`
+verilog-a/ch04_expressions/laplace_zd_conjugate_zeros.va codegen does not spell a call of `laplace_zd`
+verilog-a/ch04_expressions/laplace_zp_dynamic_pole_sampled.va codegen does not spell a call of `laplace_zp`
+verilog-a/ch04_expressions/laplace_zp_lrm_example.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch04_expressions/laplace_zp_parameter_roots_ac.va a call of `laplace_zp`
 verilog-a/ch04_expressions/laplace_zp_parameter_roots_step.va a call of `laplace_zp`
+verilog-a/ch04_expressions/last_crossing.va codegen does not spell a call of `last_crossing`
+verilog-a/ch04_expressions/last_crossing_in_creating_step.va codegen does not spell a call of `last_crossing`
+verilog-a/ch04_expressions/modulo_integer_display_zero.va codegen does not spell a call of `$rtoi`
 verilog-a/ch04_expressions/modulo_integer_dynamic.va a call of `$rtoi`
+verilog-a/ch04_expressions/modulo_integer_dynamic_nonzero.va the old device evaluates a `%` by zero the residual never reads and traps; the new one drops the dead value
+verilog-a/ch04_expressions/modulo_integer_dynamic_zero.va the old device evaluates a `%` by zero the residual never reads and traps; the new one drops the dead value
+verilog-a/ch04_expressions/modulo_integer_parameter.va codegen does not spell parameter `overridden`'s default does not fold
+verilog-a/ch04_expressions/modulo_integer_unused_zero.va the old device evaluates a `%` by zero the residual never reads and traps; the new one drops the dead value
+verilog-a/ch04_expressions/new_analysis_reinitializes_variables.va codegen does not spell a §5.10 held variable
+verilog-a/ch04_expressions/nodeset_phase_has_no_evaluation.va codegen does not spell a §5.10 held variable
 verilog-a/ch04_expressions/noise_anticorrelated_coefficient.va a call of `white_noise`
 verilog-a/ch04_expressions/noise_coefficient_beside_a_loop.va a call of `white_noise`
 verilog-a/ch04_expressions/noise_coefficient_through_a_conditional.va a call of `white_noise`
@@ -450,65 +214,234 @@ verilog-a/ch04_expressions/noise_table_log_device.va a call of `noise_table_log`
 verilog-a/ch04_expressions/noise_table_log_topology.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch04_expressions/noise_table_sorts_pairs.va a call of `noise_table`
 verilog-a/ch04_expressions/noise_table_topology.va a call of `noise_table`
+verilog-a/ch04_expressions/operator_under_constant_condition.va codegen does not spell a call of `transition`
 verilog-a/ch04_expressions/parameterized_dimension_override.va a §5.10 held variable
 verilog-a/ch04_expressions/partially_correlated_noise.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch04_expressions/psd_bias_dependent.va a call of `white_noise`
 verilog-a/ch04_expressions/psd_white_flicker_export.va a call of `white_noise`
+verilog-a/ch04_expressions/rc_88_operator_outside_event.va codegen does not spell a §5.10 held variable
+verilog-a/ch04_expressions/rollback_a04_rollback_ops.va codegen does not spell a call of `slew`
+verilog-a/ch04_expressions/slew.va codegen does not spell a call of `slew`
+verilog-a/ch04_expressions/slew_small_signal.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch04_expressions/small_signal_linearization.va a call of `ac_stim`
 verilog-a/ch04_expressions/spice_noise_rc_white.va a call of `white_noise`
 verilog-a/ch04_expressions/spice_noise_series_resistor.va a call of `white_noise`
 verilog-a/ch04_expressions/spice_noise_shared_pair.va a call of `white_noise`
 verilog-a/ch04_expressions/status_site_beside_noise.va a call of `white_noise`
+verilog-a/ch04_expressions/tran_op_is_ic_and_static.va codegen does not spell a §5.10 held variable
+verilog-a/ch04_expressions/transition.va codegen does not spell a call of `transition`
+verilog-a/ch04_expressions/transition_interrupted_falling_higher.va codegen does not spell a call of `transition`
+verilog-a/ch04_expressions/transition_interrupted_falling_lower.va codegen does not spell a call of `transition`
+verilog-a/ch04_expressions/transition_interrupted_rising.va codegen does not spell a call of `transition`
+verilog-a/ch04_expressions/transition_interrupted_rising_higher.va codegen does not spell a call of `transition`
+verilog-a/ch04_expressions/transition_resolution.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch04_expressions/transition_simulator_default.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch04_expressions/transition_transport_delay.va codegen does not spell a call of `transition`
+verilog-a/ch04_expressions/two_independent_dc_sweeps_reinitialize_variables.va codegen does not spell a §5.10 held variable
 verilog-a/ch04_expressions/white_noise_declaration_initializer.va a call of `white_noise`
 verilog-a/ch04_expressions/white_noise_topology.va a call of `white_noise`
+verilog-a/ch04_expressions/z_transform_filters.va codegen does not spell a call of `zi_nd`
+verilog-a/ch04_expressions/zi_ac_response.va codegen does not spell a call of `zi_nd`
+verilog-a/ch04_expressions/zi_dc_gains.va codegen does not spell a call of `zi_zp`
+verilog-a/ch04_expressions/zi_nd_output_at_sample_instant.va codegen does not spell a call of `zi_nd`
+verilog-a/ch04_expressions/zi_np_parameter_roots_dc_gain.va the old device's entry returned -3
+verilog-a/ch04_expressions/zi_sampling_period.va codegen does not spell a call of `zi_zp`
+verilog-a/ch04_expressions/zi_transition_time_and_first_transition.va codegen does not spell a call of `zi_nd`
+verilog-a/ch05_analog_behavior/above_enable_integer.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/above_fires_in_dc_sweep_cross_does_not.va codegen does not spell a §5.10 held variable
 verilog-a/ch05_analog_behavior/absdelay_short_delay.va a call of `absdelay`
 verilog-a/ch05_analog_behavior/analog_signals_nets_branches_contributions.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch05_analog_behavior/batch_per_instance_state.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/block_local_is_static_between_events.va codegen does not spell a §5.10 held variable
 verilog-a/ch05_analog_behavior/child_named_branch_potential_and_flow_access.va a flow contribution to a potential source's branch
+verilog-a/ch05_analog_behavior/conditional_potential_open.va codegen does not spell a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch05_analog_behavior/conditional_variable_retains.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/controlled_voltage_source.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch05_analog_behavior/cross_direction_out_of_range_is_inert.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/cross_does_not_fire_at_time_zero.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/cross_string_literal_is_an_integer.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/cross_tolerances_are_not_the_enable.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/current_controlled_voltage.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch05_analog_behavior/direct_potential.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch05_analog_behavior/disable_inner_versus_outer_named_block.va a §5.10 held variable
 verilog-a/ch05_analog_behavior/disable_keeps_contributions_already_made.va a call of `initial_step`
 verilog-a/ch05_analog_behavior/disable_resumes_after_the_named_block.va a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_above.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_above_enable.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_above_tolerance.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_bounds_cross_legal.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_cross.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_cross_any.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_cross_enable.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_cross_falling.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_cross_fires.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_cross_fires_on_a_time_grid.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_cross_param_direction.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_cross_rising_and_falling.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_cross_runtime_direction.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_initial_or_cross.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_list_comma_equals_or.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_or.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_timer.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_timer_enable.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/event_timer_one_shot.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/final_step.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/final_step_on_finish.va codegen does not spell a call of `final_step`
+verilog-a/ch05_analog_behavior/function_locals_have_no_lifetime.va codegen does not spell a §5.10 held variable
 verilog-a/ch05_analog_behavior/held_array_after_a_pruned_held_scalar.va a §5.10 held variable
 verilog-a/ch05_analog_behavior/held_array_element_between_events.va a §5.10 held variable
 verilog-a/ch05_analog_behavior/held_counter_advances_outside_its_event.va a §5.10 held variable
+verilog-a/ch05_analog_behavior/held_integer_through_nested_joins.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/held_sformat_string_survives_rejected_step.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/held_survives_an_inout_function_argument.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/held_value_is_visible_before_its_event_statement.va codegen does not spell a §5.10 held variable
 verilog-a/ch05_analog_behavior/hierarchical_access_unsupported.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch05_analog_behavior/hierarchical_contribution_creates_a_new_branch.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch05_analog_behavior/hierarchical_contribution_unsupported.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch05_analog_behavior/hierarchical_net_reference_probes_solve.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch05_analog_behavior/implicit_zero_contribution.va codegen does not spell a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch05_analog_behavior/indirect_and_direct_on_different_pairs.va a §5.6.7 indirect contribution
 verilog-a/ch05_analog_behavior/indirect_contribution.va a §5.6.7 indirect contribution
 verilog-a/ch05_analog_behavior/indirect_equation_lhs_tolerance.va a §5.6.7 indirect contribution
+verilog-a/ch05_analog_behavior/initial_final_analysis_lists.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/initial_step.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/initial_step_unknown_analysis.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/many_timers_instance_defaults.va codegen does not spell a §5.10 held variable
 verilog-a/ch05_analog_behavior/multiple_indirect.va a §5.6.7 indirect contribution
+verilog-a/ch05_analog_behavior/potential_source.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch05_analog_behavior/rc_event_cross_tolerance_with_direction.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/rlc.va codegen does not spell a call of `op$static`
+verilog-a/ch05_analog_behavior/shadowed_block_locals_hold_independently.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/simparam_dynamic_name.va codegen does not spell a slot of type 2 (a string)
 verilog-a/ch05_analog_behavior/simprobe_reads_a_sibling_output_variable.va a call of a user function (callee 4294967295)
 verilog-a/ch05_analog_behavior/simprobe_scope_is_the_parent.va a call of a user function (callee 4294967295)
+verilog-a/ch05_analog_behavior/spice_cross_latch_device.va codegen does not spell a §5.10 held variable
 verilog-a/ch05_analog_behavior/spice_sine_source.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch05_analog_behavior/spice_timer_steps_device.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/static_switch_elision.va codegen does not spell a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch05_analog_behavior/static_switch_port_probe.va a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch05_analog_behavior/string_written_in_event_body_is_held.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/switch_branch.va codegen does not spell a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch05_analog_behavior/switch_branch_solved.va codegen does not spell a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch05_analog_behavior/timer_body_clog2_controls.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/timer_body_context_controls.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/timer_body_controls.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/timer_body_function_controls.va codegen does not spell a §5.10 held variable
 verilog-a/ch05_analog_behavior/timer_body_index_controls.va a §5.10 held variable
+verilog-a/ch05_analog_behavior/timer_controls.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/timer_dynamic.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/timer_dynamic_period.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/timer_enable_integer.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/timer_enable_resumes_on_grid.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/timer_fixed.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/timer_nonpositive_period_fires_once.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/timer_start_rearmed_earlier.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/unassigned_switch_arm.va codegen does not spell a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch05_analog_behavior/vector_access.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch05_analog_behavior/vera_reject_step_retry.va a §5.10 held variable
 verilog-a/ch05_analog_behavior/vera_timepoint_cache.va a §5.10 held variable
 verilog-a/ch05_analog_behavior/vera_timepoint_held_history.va a §5.10 held variable
+verilog-a/ch06_hierarchy/ansi_ports.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch06_hierarchy/conditional_direct_nesting_is_not_a_scope.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch06_hierarchy/defparam_unsupported.va a parameter whose value reads another parameter: Air has no derive body, so moving the base parameter leaves it at its folded default (asked of rw-lower: Param.derive)
+verilog-a/ch06_hierarchy/dependent_parameters.va a parameter whose value reads another parameter: Air has no derive body, so moving the base parameter leaves it at its folded default (asked of rw-lower: Param.derive)
 verilog-a/ch06_hierarchy/disable_in_a_child_instance.va a §5.10 held variable
+verilog-a/ch06_hierarchy/dynamic_parameter_dc_sweep.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch06_hierarchy/elaboration_order_defparam_before_generate.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch06_hierarchy/elaboration_parameter_and_connectivity_binding.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch06_hierarchy/geometric_system_parameters.va codegen does not spell a call of `$xposition`
+verilog-a/ch06_hierarchy/header_body_parameter_dependency.va codegen does not spell a device with no unknowns
+verilog-a/ch06_hierarchy/hierarchy_empty_named_semantics.va a parameter whose value reads another parameter: Air has no derive body, so moving the base parameter leaves it at its folded default (asked of rw-lower: Param.derive)
 verilog-a/ch06_hierarchy/inherited_flow_tolerance_minimum.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch06_hierarchy/localparam_dependency.va a parameter whose value reads another parameter: Air has no derive body, so moving the base parameter leaves it at its folded default (asked of rw-lower: Param.derive)
+verilog-a/ch06_hierarchy/mfactor_conditional_only.va codegen does not spell a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch06_hierarchy/mfactor_divides_a_flow_probe.va a flow contribution to a potential source's branch
 verilog-a/ch06_hierarchy/mfactor_divides_named_branch_potential_noise_power.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch06_hierarchy/mfactor_divides_potential_noise_power.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch06_hierarchy/mfactor_flow_noise.va a call of `white_noise`
+verilog-a/ch06_hierarchy/mfactor_flow_probe.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch06_hierarchy/mfactor_multiplies_flow_noise_power.va a call of `white_noise`
 verilog-a/ch06_hierarchy/mfactor_multiplies_named_branch_flow_noise_power.va a call of `white_noise`
 verilog-a/ch06_hierarchy/mfactor_potential_noise.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch06_hierarchy/named_block_local_is_per_instance.va codegen does not spell a §5.10 held variable
+verilog-a/ch06_hierarchy/nonansi_ports.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch06_hierarchy/oomr_branch_probe_two_levels.va a flow contribution to a potential source's branch
+verilog-a/ch06_hierarchy/output_port.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch06_hierarchy/param_given.va codegen does not spell a call of `$param_given`
+verilog-a/ch06_hierarchy/param_given_absent.va codegen does not spell a call of `$param_given`
 verilog-a/ch06_hierarchy/paramset_hidden_output_variable_takes_the_fallback.va a call of a user function (callee 4294967295)
+verilog-a/ch06_hierarchy/paramset_outer_defparam_selection_parameter.va rw-lower: a paramset or overridden child parameter carries no Param.derive, so it does not follow the card (point 0: row 0: old -4.790351634458477e0, new -5.8077535073955335e0)
+verilog-a/ch06_hierarchy/paramset_outer_defparam_shape.va codegen does not spell parameter `mode` is not a number
+verilog-a/ch06_hierarchy/paramset_output_reads_a_module_output.va codegen does not spell a call of a user function (callee 4294967295)
+verilog-a/ch06_hierarchy/paramset_string_range_selection.va codegen does not spell parameter `u.h01_type_ps.t` is not a number
+verilog-a/ch06_hierarchy/paramset_under_parameter_sweep.va rw-lower: a paramset or overridden child parameter carries no Param.derive, so it does not follow the card (point 0: row 0: old 1.2510878312513327e0, new 1.3221247534776226e0)
+verilog-a/ch06_hierarchy/paramset_variable_is_an_output_variable.va codegen does not spell a call of a user function (callee 4294967295)
+verilog-a/ch06_hierarchy/port_directions.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch06_hierarchy/string_derived_parameter.va codegen does not spell parameter `u.mode` is not a number
+verilog-a/ch06_hierarchy/three_dependent_parameters.va a parameter whose value reads another parameter: Air has no derive body, so moving the base parameter leaves it at its folded default (asked of rw-lower: Param.derive)
+verilog-a/ch08_scheduling/above_initial_event.va codegen does not spell a §5.10 held variable
 verilog-a/ch08_scheduling/absdelta_d2a_discards_pending.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch08_scheduling/absdelta_unconsumed_events_rejected.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch08_scheduling/analog_event.va codegen does not spell a §5.10 held variable
+verilog-a/ch08_scheduling/cross_pending_host_observations.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/ch08_scheduling/cross_wakeup.va codegen does not spell a §5.10 held variable
+verilog-a/ch08_scheduling/event_state.va codegen does not spell a §5.10 held variable
+verilog-a/ch08_scheduling/explicit_guard.va codegen does not spell a §5.10 held variable
+verilog-a/ch08_scheduling/integrator_state.va codegen does not spell a call of `op$static`
+verilog-a/ch08_scheduling/timer_wakeup.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/analog_decimal_is_auto_sized.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/analog_radix_of_integer_expression_is_32_bits.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/angle.va codegen does not spell a call of `$angle`
+verilog-a/ch09_system_tasks/arandom.va codegen does not spell a call of `$arandom`
+verilog-a/ch09_system_tasks/arandom_no_seed.va codegen does not spell a call of `$arandom`
+verilog-a/ch09_system_tasks/binding_detection.va codegen does not spell a call of `$param_given`
+verilog-a/ch09_system_tasks/binding_source_overrides.va codegen does not spell a device with no unknowns
+verilog-a/ch09_system_tasks/bitstoreal.va codegen does not spell a call of `$bitstoreal`
+verilog-a/ch09_system_tasks/clog2.va codegen does not spell a call of `$clog2`
 verilog-a/ch09_system_tasks/control_default_filling.va a call of `$table_model`
+verilog-a/ch09_system_tasks/conversion_functions.va codegen does not spell a call of `$realtobits`
 verilog-a/ch09_system_tasks/cubic_spline_constant_ends.va a call of `$table_model`
 verilog-a/ch09_system_tasks/cubic_spline_mixed_ends.va a call of `$table_model`
 verilog-a/ch09_system_tasks/cubic_spline_natural_ends.va a call of `$table_model`
+verilog-a/ch09_system_tasks/diagnostic_finish_dc_sweep.va codegen does not spell a device with no unknowns
+verilog-a/ch09_system_tasks/diagnostic_finish_default.va codegen does not spell a device with no unknowns
+verilog-a/ch09_system_tasks/diagnostic_finish_initial.va codegen does not spell a device with no unknowns
+verilog-a/ch09_system_tasks/diagnostic_finish_statistics.va codegen does not spell a device with no unknowns
+verilog-a/ch09_system_tasks/diagnostic_finish_zero.va codegen does not spell a device with no unknowns
+verilog-a/ch09_system_tasks/diagnostic_info_dc_sweep.va codegen does not spell a device with no unknowns
+verilog-a/ch09_system_tasks/diagnostic_info_initial.va codegen does not spell a device with no unknowns
+verilog-a/ch09_system_tasks/diagnostic_info_transient.va codegen does not spell a device with no unknowns
+verilog-a/ch09_system_tasks/display_argument_runs.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/display_c_format_flags.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/display_formats.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/display_library_binding.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/display_radix_of_integer_is_32_bits.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/dist_chi_square.va codegen does not spell a call of `$dist_chi_square`
+verilog-a/ch09_system_tasks/dist_erlang.va codegen does not spell a call of `$dist_erlang`
+verilog-a/ch09_system_tasks/dist_exponential.va codegen does not spell a call of `$dist_exponential`
+verilog-a/ch09_system_tasks/dist_ieee1364_reference_digits.va codegen does not spell a call of `$dist_normal`
+verilog-a/ch09_system_tasks/dist_poisson.va codegen does not spell a call of `$dist_poisson`
+verilog-a/ch09_system_tasks/dist_t.va codegen does not spell a call of `$dist_t`
+verilog-a/ch09_system_tasks/dist_uniform.va codegen does not spell a call of `$dist_uniform`
+verilog-a/ch09_system_tasks/distribution.va codegen does not spell a call of `$dist_normal`
+verilog-a/ch09_system_tasks/driver_type_unavailable.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-a/ch09_system_tasks/duplicate_points.va a call of `$table_model`
+verilog-a/ch09_system_tasks/error.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
 verilog-a/ch09_system_tasks/error_extrapolation_inside_is_legal.va a call of `$table_model`
 verilog-a/ch09_system_tasks/error_extrapolation_is_fatal.va a call of `$table_model`
+verilog-a/ch09_system_tasks/fatal.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
+verilog-a/ch09_system_tasks/fatal_finish_number_0_exit_status.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
+verilog-a/ch09_system_tasks/fatal_finish_number_2_exit_status.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
+verilog-a/ch09_system_tasks/fatal_in_iteration_terminates.va codegen does not spell a call of `$simparam`
+verilog-a/ch09_system_tasks/fatal_terminates.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
 verilog-a/ch09_system_tasks/finish_in_rejected_iteration_has_no_effect.va a call of `$simparam`
+verilog-a/ch09_system_tasks/geometry_hierarchical_overrides.va codegen does not spell a device with no unknowns
+verilog-a/ch09_system_tasks/hflip.va codegen does not spell a call of `$hflip`
+verilog-a/ch09_system_tasks/hierarchical_parameters.va codegen does not spell a call of `$xposition`
 verilog-a/ch09_system_tasks/ignored_column_and_selector.va a call of `$table_model`
+verilog-a/ch09_system_tasks/integer_default_fields.va codegen does not spell a §5.10 held variable
 verilog-a/ch09_system_tasks/kernel_control_tasks_together.va a call of `initial_step`
+verilog-a/ch09_system_tasks/l_format_library_cell.va codegen does not spell a §5.10 held variable
 verilog-a/ch09_system_tasks/limit.va a call of `$limit`
 verilog-a/ch09_system_tasks/limit_constant_history.va a §9.17.3 `$limit`
 verilog-a/ch09_system_tasks/limit_fetlim_with_vth.va a call of `$limit`
@@ -529,13 +462,74 @@ verilog-a/ch09_system_tasks/limit_user_function_multiple_sites.va a §9.17.3 `$l
 verilog-a/ch09_system_tasks/limit_user_function_previous_iterate.va a §9.17.3 `$limit`
 verilog-a/ch09_system_tasks/limit_veto_after_correction.va a call of `$simparam`
 verilog-a/ch09_system_tasks/limit_with_derivative.va a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/m_format_hierarchical_name.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/math_unary.va codegen does not spell a call of a user function (callee 4294967295)
 verilog-a/ch09_system_tasks/mixed_interpolation_dimensions.va a call of `$table_model`
+verilog-a/ch09_system_tasks/null_argument_consumed_by_s.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/param_given.va codegen does not spell a call of `$param_given`
+verilog-a/ch09_system_tasks/percent_escape_prints_one_percent.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/plusargs.va codegen does not spell a call of `$test$plusargs`
+verilog-a/ch09_system_tasks/plusargs_prefix.va codegen does not spell a call of `$test$plusargs`
+verilog-a/ch09_system_tasks/plusargs_value_order.va codegen does not spell a call of `$value$plusargs`
+verilog-a/ch09_system_tasks/port_connected.va codegen does not spell a call of `$port_connected`
 verilog-a/ch09_system_tasks/port_connected_controls_analog_operator.va a call of `transition`
+verilog-a/ch09_system_tasks/port_mask.va codegen does not spell a call of `$port_connected`
 verilog-a/ch09_system_tasks/quadratic_spline.va a call of `$table_model`
+verilog-a/ch09_system_tasks/random.va codegen does not spell a call of `$random`
+verilog-a/ch09_system_tasks/random_ieee1364_digits.va codegen does not spell a call of `$random`
+verilog-a/ch09_system_tasks/random_no_seed.va codegen does not spell a call of `$random`
+verilog-a/ch09_system_tasks/rdist_chi_square.va codegen does not spell a call of `$rdist_chi_square`
+verilog-a/ch09_system_tasks/rdist_erlang.va codegen does not spell a call of `$rdist_erlang`
+verilog-a/ch09_system_tasks/rdist_exponential.va codegen does not spell a call of `$rdist_exponential`
+verilog-a/ch09_system_tasks/rdist_normal.va codegen does not spell a call of `$rdist_normal`
+verilog-a/ch09_system_tasks/rdist_poisson.va codegen does not spell a call of `$rdist_poisson`
+verilog-a/ch09_system_tasks/rdist_positive_mean_at_run_time.va codegen does not spell a call of `$rdist_exponential`
+verilog-a/ch09_system_tasks/rdist_t.va codegen does not spell a call of `$rdist_t`
+verilog-a/ch09_system_tasks/rdist_zero_mean_at_run_time_is_an_error.va codegen does not spell a call of `$rdist_exponential`
+verilog-a/ch09_system_tasks/real_conversion_rounds_half_to_even.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/real_distribution.va codegen does not spell a call of `$rdist_uniform`
+verilog-a/ch09_system_tasks/real_engineering_notation.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/real_flags_sign_before_zero_fill.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/real_format_fields.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/real_g_conversion_is_significant_digits.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/real_hash_flag_e_always_prints_the_point.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/real_hash_flag_f_always_prints_the_point.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/real_hash_flag_g_keeps_trailing_zeros.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/realtobits.va codegen does not spell a call of `$realtobits`
+verilog-a/ch09_system_tasks/reject_simprobe_runtime_name.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/rng_reference_large_count.va codegen does not spell a call of `$rdist_chi_square`
+verilog-a/ch09_system_tasks/rng_short_circuit.va codegen does not spell a call of `$rdist_exponential`
+verilog-a/ch09_system_tasks/say_ops.va §9.7.3 status sites: the old device returns zero rows once a severity task fires (a check past |V| = 10); codegen has no status protocol yet
+verilog-a/ch09_system_tasks/scan_destination_preservation.va codegen does not spell a slot of type 2 (a string)
 verilog-a/ch09_system_tasks/severity_in_rejected_iteration_has_no_effect.va a call of `$simparam`
+verilog-a/ch09_system_tasks/severity_tasks.va §9.7.3 status sites: the old device returns zero rows once a severity task fires; codegen has no status protocol yet
+verilog-a/ch09_system_tasks/sformat_32_conversions.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/sformat_field_width_over_4096.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/sformat_runtime_width_past_its_row_rejected.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/sformat_runtime_width_within_its_row.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/sformat_variable_format_mismatch_continues.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/simparam.va codegen does not spell a call of `$simparam`
+verilog-a/ch09_system_tasks/simparam_dt_is_the_host_step.va codegen does not spell a call of `$simparam`
+verilog-a/ch09_system_tasks/simparam_fallback_as_parameter_default.va codegen does not spell parameter `lo`'s default does not fold
+verilog-a/ch09_system_tasks/simparam_gmin_source_scale_host_written.va codegen does not spell parameter `g`'s default does not fold
+verilog-a/ch09_system_tasks/simparam_minr_hicum_l2_default.va codegen does not spell parameter `minr`'s default does not fold
+verilog-a/ch09_system_tasks/simparam_newton_tolerances_host_written.va codegen does not spell parameter `rt`'s default does not fold
+verilog-a/ch09_system_tasks/simparam_str_analysis_name_host_table.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/simparam_str_analysis_type_tran_op.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/simparam_str_cwd_and_analysis_name.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/simparam_str_cwd_host_table.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/simparam_string.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/simparam_timescale.va codegen does not spell a call of `$simparam`
 verilog-a/ch09_system_tasks/simprobe_string_parameter_name_resolves.va a call of a user function (callee 4294967295)
 verilog-a/ch09_system_tasks/spline_derivative_reaches_the_solver.va a call of `$table_model`
+verilog-a/ch09_system_tasks/sscanf.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/sscanf_invalid_conversion_runtime_choice.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/sscanf_literal_and_excess_arguments.va codegen does not spell a call of `$sscanf`
+verilog-a/ch09_system_tasks/sscanf_reads_a_string_variable.va codegen does not spell a §5.10 held variable
 verilog-a/ch09_system_tasks/status_ops.va a call of `white_noise`
+verilog-a/ch09_system_tasks/string_concat_past_4096_bytes.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/string_formatting.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/swrite_s_with_argument.va codegen does not spell a §5.10 held variable
 verilog-a/ch09_system_tasks/table_capture_rejected_step_recaptures.va a §5.10 held variable
 verilog-a/ch09_system_tasks/table_model_array_control.va a call of `$table_model`
 verilog-a/ch09_system_tasks/table_model_assignment_pattern_arrays.va a call of `$table_model`
@@ -545,17 +539,46 @@ verilog-a/ch09_system_tasks/table_snapshot.va a §5.10 held variable
 verilog-a/ch09_system_tasks/table_snapshot_collapse.va a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch09_system_tasks/table_snapshot_per_instance.va a call of `$table_model`
 verilog-a/ch09_system_tasks/table_status.va a call of `$table_model`
+verilog-a/ch09_system_tasks/test_plusargs.va codegen does not spell a call of `$test$plusargs`
+verilog-a/ch09_system_tasks/top_port_connected_controls_ddt.va codegen does not spell a call of `$port_connected`
+verilog-a/ch09_system_tasks/value_plusargs.va codegen does not spell a call of `$value$plusargs`
+verilog-a/ch09_system_tasks/vflip.va codegen does not spell a call of `$vflip`
+verilog-a/ch09_system_tasks/xposition.va codegen does not spell a call of `$xposition`
+verilog-a/ch09_system_tasks/yposition.va codegen does not spell a call of `$yposition`
+verilog-a/ch10_directives/compact_modeling_extension_set.va codegen does not spell a §5.10 held variable
+verilog-a/ch10_directives/compact_modeling_macro.va codegen does not spell a device with no unknowns
 verilog-a/ch10_directives/compact_modeling_nonlin_res_example.va a call of `ddx`
+verilog-a/ch10_directives/default_transition_ramp.va codegen does not spell a call of `transition`
+verilog-a/ch10_directives/file_macro_is_the_opened_path.va codegen does not spell a slot of type 2 (a string)
 verilog-a/ch10_directives/predefined_compact_modeling.va a call of `ddx`
+verilog-a/combined/analysis_modes_and_severity.va codegen does not spell a call of `analysis`
 verilog-a/combined/limit_and_discontinuity.va a call of `$limit`
 verilog-a/combined/named_limiter_nonlinear.va a call of `$limit`
 verilog-a/combined/noise_and_analysis.va a call of `analysis`
 verilog-a/combined/noise_temperature_analysis.va a call of `analysis`
+verilog-a/combined/optional_port_environment.va codegen does not spell a call of `$port_connected`
+verilog-a/combined/optional_port_hierarchy.va codegen does not spell a call of `$xposition`
+verilog-a/combined/parameter_binding_environment.va codegen does not spell a call of `$param_given`
+verilog-a/combined/piecewise_param_model.va codegen does not spell a call of `$param_given`
+verilog-a/exhaustive/bit_conversions.va codegen does not spell a call of `$realtobits`
+verilog-a/exhaustive/event_hold.va codegen does not spell a §5.10 held variable
+verilog-a/exhaustive/idt_integral.va codegen does not spell a call of `op$static`
 verilog-a/exhaustive/indirect_contribution.va a §5.6.7 indirect contribution
+verilog-a/exhaustive/laplace_dc_gain.va codegen does not spell a call of `laplace_nd`
+verilog-a/exhaustive/timer_breakpoint_one_shot.va codegen does not spell a §5.10 held variable
+verilog-a/exhaustive/timer_breakpoint_periodic.va codegen does not spell a §5.10 held variable
+verilog-a/exhaustive/voltage_source.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-a/exhaustive/zi_sample_hold.va codegen does not spell a call of `zi_nd`
+verilog-ams/annex_a_syntax/analog_initial.va codegen does not spell a §5.10 held variable
 verilog-ams/annex_a_syntax/named_event_trigger.va a §5.10 held variable
 verilog-ams/annex_c_analog_subset/named_event_in_subset.va a §5.10 held variable
 verilog-ams/ch03_data_types/discrete_disciplines_compatible.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch03_data_types/integer_real_default_init.va codegen does not spell a §5.10 held variable
+verilog-ams/ch03_data_types/operator_equation_tolerances.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch03_data_types/wire_without_discipline_is_discrete.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch04_expressions/slew_small_signal.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch04_expressions/transition_resolution.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch04_expressions/transition_simulator_default.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch05_analog_behavior/absdelta_direction_change.va a call of `final_step`
 verilog-ams/ch05_analog_behavior/absdelta_dynamic_controls.va a call of `final_step`
 verilog-ams/ch05_analog_behavior/absdelta_enable_transitions.va a call of `final_step`
@@ -563,13 +586,26 @@ verilog-ams/ch05_analog_behavior/absdelta_interpolated_events.va a potential con
 verilog-ams/ch05_analog_behavior/absdelta_self_disable.va a call of `final_step`
 verilog-ams/ch05_analog_behavior/absdelta_time_tol_below_precision.va a call of `final_step`
 verilog-ams/ch05_analog_behavior/absdelta_time_tol_filters.va a call of `final_step`
+verilog-ams/ch05_analog_behavior/analog_initial.va codegen does not spell a §5.10 held variable
+verilog-ams/ch05_analog_behavior/analog_initial_integer.va codegen does not spell a §5.10 held variable
+verilog-ams/ch05_analog_behavior/analog_initial_real.va codegen does not spell a §5.10 held variable
 verilog-ams/ch05_analog_behavior/cross_expr_tol_and_time_tol_both_hold.va a §5.10 held variable
 verilog-ams/ch05_analog_behavior/event_array_index_change_is_not_an_event.va a §5.10 held variable
 verilog-ams/ch05_analog_behavior/indirect_equation_lhs_tolerance.va a §5.6.7 indirect contribution
+verilog-ams/ch05_analog_behavior/multiple_analog_initial_blocks_concatenate.va codegen does not spell a §5.10 held variable
 verilog-ams/ch05_analog_behavior/named_event_has_no_time_duration.va a §5.10 held variable
 verilog-ams/ch05_analog_behavior/named_event_unsupported.va a §5.10 held variable
+verilog-ams/ch05_analog_behavior/timer_body_clog2_controls.va codegen does not spell a §5.10 held variable
+verilog-ams/ch05_analog_behavior/timer_body_context_controls.va codegen does not spell a §5.10 held variable
+verilog-ams/ch05_analog_behavior/timer_body_controls.va codegen does not spell a §5.10 held variable
+verilog-ams/ch05_analog_behavior/timer_body_function_controls.va codegen does not spell a §5.10 held variable
 verilog-ams/ch05_analog_behavior/timer_body_index_controls.va a §5.10 held variable
+verilog-ams/ch05_analog_behavior/timer_controls.va codegen does not spell a §5.10 held variable
+verilog-ams/ch05_analog_behavior/timer_dynamic.va codegen does not spell a §5.10 held variable
+verilog-ams/ch05_analog_behavior/timer_fixed.va codegen does not spell a §5.10 held variable
+verilog-ams/ch06_hierarchy/child_initial_block_is_carried.va an `analog initial` block's values: the old device keeps them (§5.2.1), the new Air reads them as 0
 verilog-ams/ch06_hierarchy/hierarchical_analog_probes_from_digital.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch06_hierarchy/top_initial_block_with_a_child.va an `analog initial` block's values: the old device keeps them (§5.2.1), the new Air reads them as 0
 verilog-ams/ch07_mixed_signal/a2d_tick_quantization.va a §5.10 held variable
 verilog-ams/ch07_mixed_signal/absdelta_interpolated_a2d.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/absdelta_runtime_default_tolerances.va a call of `final_step`
@@ -579,6 +615,8 @@ verilog-ams/ch07_mixed_signal/absdelta_runtime_enable.va a call of `final_step`
 verilog-ams/ch07_mixed_signal/absdelta_runtime_reversal.va a call of `final_step`
 verilog-ams/ch07_mixed_signal/absdelta_runtime_time_precision.va a call of `final_step`
 verilog-ams/ch07_mixed_signal/absdelta_runtime_time_tol.va a call of `final_step`
+verilog-ams/ch07_mixed_signal/analog_event.va codegen does not spell a §5.10 held variable
+verilog-ams/ch07_mixed_signal/analog_port.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/analog_probe_in_a_digital_expression.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/child_always_block_in_a_mixed_design.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/closely_spaced_crossings.va a potential contribution whose flow unknown is not `flow(hi,lo)`
@@ -586,6 +624,9 @@ verilog-ams/ch07_mixed_signal/cross_enable_and_dir_disable_the_event.va a potent
 verilog-ams/ch07_mixed_signal/cross_time_tol_below_time_resolution.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/dc_time_zero_settle.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/digital_value_has_zero_derivative.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/display_binary_operand_analog.va codegen does not spell a §5.10 held variable
+verilog-ams/ch07_mixed_signal/driver_count_excludes_connectmodule.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/driver_delay_and_next_state.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/event_bounds_mixed_legal.va a call of `final_step`
 verilog-ams/ch07_mixed_signal/implicit_d2a_bus.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/macro_process_runs_after_nba.va a potential contribution whose flow unknown is not `flow(hi,lo)`
@@ -593,6 +634,11 @@ verilog-ams/ch07_mixed_signal/mixed_long_net_names.va a potential contribution w
 verilog-ams/ch07_mixed_signal/mixed_top_with_an_analog_child.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/named_event_from_analog_reaches_digital.va a call of `timer`
 verilog-ams/ch07_mixed_signal/onebit_dac_reads_a_discrete_wire.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/probe_in_continuous_assign_refused.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/probe_in_procedural_read.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/receiver_count_reports_ordinary_receivers.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/receiver_default_bypass.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/receiver_value_set_by_connectmodule.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/rejected_trials_deliver_once.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch07_mixed_signal/timer_runtime_body_period.va a call of `timer`
 verilog-ams/ch07_mixed_signal/timer_runtime_controls.va a call of `timer`
@@ -600,28 +646,50 @@ verilog-ams/ch07_mixed_signal/timer_runtime_drift.va a call of `timer`
 verilog-ams/ch07_mixed_signal/timer_runtime_enable.va a call of `timer`
 verilog-ams/ch07_mixed_signal/zero_delay_settles_before_the_macro_process.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch08_scheduling/absdelta_d2a_discards_pending.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch08_scheduling/absdelta_unconsumed_events_rejected.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch08_scheduling/analog_digital_initial_order.va codegen does not spell a §5.10 held variable
+verilog-ams/ch08_scheduling/analog_initial_order.va codegen does not spell a §5.10 held variable
+verilog-ams/ch08_scheduling/analog_initial_parameter_sweep.va codegen does not spell a §5.10 held variable
+verilog-ams/ch08_scheduling/cross_pending_host_observations.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch08_scheduling/declaration_assignment_order.va codegen does not spell a §5.10 held variable
 verilog-ams/ch08_scheduling/macro_process_one_solve_for_coincident_events.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch08_scheduling/monitor_after_macro_process.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch08_scheduling/monitor_at_analog_only_solutions.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch08_scheduling/one_solve_consumes_simultaneous_d2a.va a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch08_scheduling/strobe_after_macro_process.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch09_system_tasks/diagnostic_finish_dc_sweep.va codegen does not spell a device with no unknowns
+verilog-ams/ch09_system_tasks/diagnostic_finish_default.va codegen does not spell a device with no unknowns
+verilog-ams/ch09_system_tasks/diagnostic_finish_initial.va codegen does not spell a device with no unknowns
+verilog-ams/ch09_system_tasks/diagnostic_finish_statistics.va codegen does not spell a device with no unknowns
+verilog-ams/ch09_system_tasks/diagnostic_finish_zero.va codegen does not spell a device with no unknowns
+verilog-ams/ch09_system_tasks/diagnostic_info_dc_sweep.va codegen does not spell a device with no unknowns
+verilog-ams/ch09_system_tasks/diagnostic_info_initial.va codegen does not spell a device with no unknowns
+verilog-ams/ch09_system_tasks/diagnostic_info_transient.va codegen does not spell a device with no unknowns
+verilog-ams/ch09_system_tasks/driver_strength_next_strength_type.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch09_system_tasks/driver_type_unavailable.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch09_system_tasks/fatal_in_analog_initial_skips_simulation.va codegen does not spell a §5.10 held variable
+verilog-ams/ch09_system_tasks/finish_in_analog_initial_skips_simulation.va codegen does not spell a §5.10 held variable
 verilog-ams/ch09_system_tasks/pla_array_in_digital_context.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch09_system_tasks/port_mask.va codegen does not spell a call of `$port_connected`
+verilog-ams/ch09_system_tasks/receiver_segregation_ignored_without_driver_value.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch09_system_tasks/say_ops.va §9.7.3 status sites: the old device returns zero rows once a severity task fires (a check past |V| = 10); codegen has no status protocol yet
 verilog-ams/ch09_system_tasks/status_ops.va a call of `white_noise`
 verilog-ams/ch09_system_tasks/table_status.va a call of `$table_model`
 verilog-ams/ch09_system_tasks/timescale_tasks_in_digital_context.va a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch10_directives/compact_modeling_macro.va codegen does not spell a device with no unknowns
+verilog-ams/ch11_vpi/analog_system_task_registration.va a §12 user system function: the old device calls the host's systf table (absent here, so it traps); codegen has none
+verilog-ams/ch11_vpi/callback_call_site.va codegen does not spell a §5.10 held variable
+verilog-ams/ch12_vpi_routines/analog_systf_resistor_call.va a §12 user system function: the old device calls the host's systf table (absent here, so it traps); codegen has none
+verilog-ams/ch12_vpi_routines/analog_systf_sampler_call.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch12_vpi_routines/cap_ramp.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch12_vpi_routines/cube_solve.va a §12 user system function: the old device calls the host's systf table (absent here, so it traps); codegen has none
+verilog-ams/ch12_vpi_routines/dc_divider.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch12_vpi_routines/env_probe.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch12_vpi_routines/env_twin.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch12_vpi_routines/functype.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch12_vpi_routines/ramp_load.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch12_vpi_routines/rc_ac.va a call of `ac_stim`
-verilog-a/annex_a_syntax/expressions.va the old device's entry returned -3
-verilog-a/annex_a_syntax/pattern_every_element_written.va the old device's entry returned -3
-verilog-a/ch02_lexical/duplicate_attribute_last_value_wins.va differs: point 0: d row 0: old 1.951411553231091e1, new 3.103778838143179e1
-verilog-a/ch03_data_types/parameter_default_over_parameter.va the new device does not build: n23.zig:76: unused local constant
-verilog-a/ch03_data_types/parameter_array.va the old device's entry returned -3
-verilog-a/ch04_expressions/assignment_pattern.va the old device's entry returned -3
-verilog-a/ch04_expressions/ddx_vera_nodiff_assignment.va differs: point 0: d row 0: old 3.069199822529498e-2, new -3.592690991994424e-1
-verilog-a/ch04_expressions/zi_np_parameter_roots_dc_gain.va the old device's entry returned -3
-verilog-a/ch03_data_types/aliasparam_source_bindings.va a device with no unknowns
-verilog-a/ch03_data_types/vera_scratch_starts_each_evaluation.va a §5.10 held variable
-verilog-a/ch06_hierarchy/paramset_outer_defparam_shape.va parameter `mode` is not a number
-verilog-a/ch06_hierarchy/paramset_output_reads_a_module_output.va a call of a user function (callee 4294967295)
-verilog-a/ch06_hierarchy/paramset_string_range_selection.va parameter `u.h01_type_ps.t` is not a number
-verilog-a/ch06_hierarchy/paramset_variable_is_an_output_variable.va a call of a user function (callee 4294967295)
-verilog-a/ch06_hierarchy/paramset_outer_defparam_selection_parameter.va differs: point 0: row 0: old -4.790351634458477e0, new -5.8077535073955335e0
-verilog-a/ch06_hierarchy/paramset_under_parameter_sweep.va differs: point 0: row 0: old 1.2510878312513327e0, new 1.3221247534776226e0
+verilog-ams/ch12_vpi_routines/sampnhold.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch12_vpi_routines/square_law.va codegen does not spell a call of a user function (callee 4294967295)
+verilog-ams/ch12_vpi_routines/systf_devices.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch12_vpi_routines/two_sites.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`

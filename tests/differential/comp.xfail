@@ -476,7 +476,6 @@ verilog-a/ch03_data_types/parameter_array_resize_with_value.va not built: backen
 verilog-a/ch03_data_types/parameter_array_resize_without_value_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0921]: parameter array value is not the size its range declares: an override resized `child.coefficients` to 3 elements, and no array of the new size was`, new `error[E0921]: parameter array value is not the size its range declares: an override res
 verilog-a/ch03_data_types/parameter_array_short_override_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0921]: parameter array value is not the size its range declares: the array assigned to `child.coefficients` has 2 elements, and its declared range has 3`, new `error[E0921]: parameter array value is not the size its range declares: the array assign
 verilog-a/ch03_data_types/parameter_assigned_at_runtime.va rw-lower (analog lowering): stderr: line 1: old `error[E0312]: cannot assign to a parameter: `gain``, new `error[E0313]: unknown variable: an assignment to a name that is not a variable`
-verilog-a/ch03_data_types/parameter_default_not_constant_rejected.va not built: backend exe
 verilog-a/ch03_data_types/parameter_default_over_parameter.va not built: backend exe
 verilog-a/ch03_data_types/parameter_desc_attribute_numeric_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch03_data_types/parameter_desc_attribute_numeric_rejected.va:25:8`, new `  --> verilog-a/ch03_data_types/parameter_desc_attribute_numeric_rejected.va:25:49`
 verilog-a/ch03_data_types/parameter_override_reaches_pow_exponent.va not built: backend exe
@@ -733,7 +732,6 @@ verilog-a/ch04_expressions/less_equal.va not built: backend exe
 verilog-a/ch04_expressions/less_than.va not built: backend exe
 verilog-a/ch04_expressions/limexp.va not built: backend exe
 verilog-a/ch04_expressions/limexp_is_exp_at_a_converged_point.va not built: backend exe
-verilog-a/ch04_expressions/limexp_not_a_constant_expression_rejected.va not built: backend exe
 verilog-a/ch04_expressions/ln.va not built: backend exe
 verilog-a/ch04_expressions/ln1p_domain_rejected.va not built: backend exe
 verilog-a/ch04_expressions/ln1p_expm1.va not built: backend exe
@@ -1522,7 +1520,6 @@ verilog-a/ch09_system_tasks/dist_type_string_inside_paramset.va not built: backe
 verilog-a/ch09_system_tasks/dist_type_string_misspelled_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/dist_type_string_misspelled_rejected.va:30:35`, new `  = note: LRM 9.13`
 verilog-a/ch09_system_tasks/dist_uniform.va not built: backend exe
 verilog-a/ch09_system_tasks/distribution.va not built: backend exe
-verilog-a/ch09_system_tasks/distribution_arity_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0816]: a $9.13 probabilistic distribution argument: `$rdist_uniform` takes 3 arguments, got 2`, new `error[E0506]: wrong number of arguments to a math function or analog operator: `$rdist_uniform` takes 3 to 4, given 2`
 verilog-a/ch09_system_tasks/driver_access.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: §9.22: "Driver access functions can only be called from connect modules." This is a `module``, new `   = help: run `vera --explain E0818` for a detailed explanation`
 verilog-a/ch09_system_tasks/driver_count_connectmodule_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: §9.22: "Driver access functions can only be called from connect modules." This is a `module``, new `   = help: run `vera --explain E0818` for a detailed explanation`
 verilog-a/ch09_system_tasks/driver_delay_connectmodule_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: §9.22: "Driver access functions can only be called from connect modules." This is a `module``, new `   = help: run `vera --explain E0818` for a detailed explanation`

@@ -190,6 +190,7 @@ pub fn declareArray(s: *Sema, unit: *Unit, first: Inst.Index, dims_body: Vir.Bod
     const vir = unit.vir;
     var env = try envOf(s, unit);
     defer env.deinit();
+    env.shaping += 1;
     var dims: std.ArrayList([2]i64) = .empty;
     var cells: u64 = 1;
     for (vir.body(dims_body)) |d| {
@@ -201,6 +202,7 @@ pub fn declareArray(s: *Sema, unit: *Unit, first: Inst.Index, dims_body: Vir.Bod
         cells = std.math.mul(u64, cells, @abs(msb - lsb) + 1) catch return s.fail(.E1015, unit.file, first.toRef(), "the array is too large", .{});
     }
     if (cells > array_cells_max) return s.fail(.E1015, unit.file, first.toRef(), "the array has {d} elements, past {d}", .{ cells, array_cells_max });
+    if (s.zcu.instances.items(.parent)[@backingInt(unit.instance)] == .none) try @import("walk.zig").rootShapes(s, &env);
     const slots = try s.arena.alloc(Air.Inst.Index, @intCast(cells));
     for (slots) |*slot| slot.* = try addAlloc(s, ty);
     try unit.binds.put(s.arena, first, .{ .array = .{ .slots = slots, .dims = dims.items, .ty = ty } });

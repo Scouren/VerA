@@ -88,6 +88,10 @@ data_files: std.StringHashMapUnmanaged(?[]const u8) = .empty,
 /// The data file the last `Sema.analyze` stopped on, on `gpa`, until
 /// `answerData`.
 data_want: ?[]const u8 = null,
+/// §3.4 the root's parameters a shape folded (an array bound, a generate
+/// scheme, an instance array's range): a testbench card of one of these is
+/// a compile-time value, so the driver elaborates again with it.
+shape_params: std.AutoArrayHashMapUnmanaged(InternPool.String, void) = .empty,
 /// IEEE 1364-2005 §13.2.3 the library each design unit maps into, from
 /// the caller's library map; a unit it lacks is in `work`. Empty: no map,
 /// and cells bind by name alone.
@@ -299,6 +303,7 @@ pub fn deinit(zcu: *Zcu) void {
     zcu.instance_map.deinit(gpa);
     zcu.ports.deinit(gpa);
     zcu.defparams.deinit(gpa);
+    zcu.shape_params.deinit(gpa);
     zcu.defparam_sources.deinit(gpa);
     zcu.net_discipline.deinit(gpa);
     zcu.inserts.deinit(gpa);

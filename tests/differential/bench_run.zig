@@ -101,6 +101,35 @@ test "a flow unknown is named as the device spells it, in a directive and in the
     try std.testing.expect(std.mem.find(u8, got, "flow(") == null);
 }
 
+test "a card of a shape parameter is a compile-time value (§3.4)" {
+    // Oracle: Ohm's law by hand. `N` sizes a generate loop of unit
+    // conductances, so N = 5 from the card is 5 S in parallel at V(p) = 1;
+    // the declaration's 3 would print 3 S.
+    var a: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer a.deinit();
+    const arena = a.allocator();
+    const src =
+        \\`include "disciplines.vams"
+        \\module res(p, n);
+        \\  inout p, n;
+        \\  electrical p, n;
+        \\  genvar i;
+        \\  parameter integer N = 3;
+        \\  generate
+        \\    for (i = 0; i < N; i = i + 1) begin : s
+        \\      analog I(p, n) <+ V(p, n);
+        \\    end
+        \\  endgenerate
+        \\endmodule
+        \\//! param N = 5
+        \\//! bias V(p) = 1
+        \\
+    ;
+    const got = try runText(arena, "res.va", src);
+    const want = try std.mem.concat(arena, u8, &.{ "=== res ===\n", try point(arena, 0, 1, 0.2) });
+    try std.testing.expectEqualStrings(want, got);
+}
+
 test "a psweep gives each point its own card (§8.2)" {
     // Oracle: Ohm's law by hand at V(p) = 3 for r = 1, 3, 6.
     var a: std.heap.ArenaAllocator = .init(std.testing.allocator);

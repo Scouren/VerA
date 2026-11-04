@@ -50,6 +50,18 @@ pub fn semaAnalog(comp: *Compilation) !bool {
     } else return error.OutOfMemory;
     comp.analysis = a;
     if (!try checkTop(comp)) return false;
+    // §3.4 a testbench card of a shape parameter is a compile-time value
+    // (the old spine's `shapeCards`): elaborate again with it as a
+    // `--param`, which a `--param` of the same name beats. Once: the
+    // second pass finds every such card already given.
+    if (try shapeCards(comp)) {
+        comp.analysis.?.deinit(comp.gpa);
+        comp.analysis = null;
+        comp.zcu.deinit();
+        comp.zcu = try .init(comp.gpa);
+        if (!try frontend.semaTop(comp)) return false;
+        return semaAnalog(comp);
+    }
     // VAMS §7, §8: a mixed design's digital half, for the §8 runner.
     if (a.mixed and (comp.config.target == .exe or comp.config.target == .run)) {
         const sources = try comp.arena().alloc(sema.digital.Source, comp.units.items.len);
@@ -357,6 +369,30 @@ fn testbench(comp: *Compilation) !?Job {
         },
     }
     return null;
+}
+
+/// Appends each `//! param` card naming one of the root's shape
+/// parameters (`Zcu.shape_params`) that no override names to the config's
+/// overrides; whether it appended one.
+fn shapeCards(comp: *Compilation) Allocator.Error!bool {
+    const spec = comp.bench orelse return false;
+    const ip = &comp.zcu.intern_pool;
+    var all: std.ArrayList(Compilation.Config.Override) = .empty;
+    try all.appendSlice(comp.arena(), comp.config.overrides);
+    for (spec.bench.params) |card| {
+        const shape = for (comp.zcu.shape_params.keys()) |n| {
+            if (std.mem.eql(u8, ip.stringToSlice(n), card.name)) break true;
+        } else false;
+        if (!shape) continue;
+        const given = for (all.items) |o| {
+            if (std.mem.eql(u8, o.name, card.name)) break true;
+        } else false;
+        if (!given) try all.append(comp.arena(), .{ .name = card.name, .text = try comp.arena().print("{d}", .{card.value}), .value = card.value });
+    }
+    assert(all.items.len >= comp.config.overrides.len);
+    if (all.items.len == comp.config.overrides.len) return false;
+    comp.config.overrides = all.items;
+    return true;
 }
 
 /// The analysis' lowered digital half (`Analysis.digital`), or null when

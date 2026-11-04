@@ -287,9 +287,13 @@ pub fn real(s: *State, a: Allocator, e: u32) Error!f64 {
         },
         .realtime => p.times[d.a].scale.realAt(s.scheduler.now),
         .abstime => time.secondsAt(s.scheduler.now, p.finest),
-        // VAMS §7.3.6.3: the mixed host's callback lands with State's
-        // mixed-signal hooks; until then a run with a probe has no host.
-        .probe => return s.fail("an analog probe needs the mixed-signal kernel", .{}),
+        // VAMS §7.3.6.3: V(a) or V(a, b) of the analog solution, from the
+        // mixed host (`analog.Link.probe`); a run with no host fails.
+        .probe => blk: {
+            const probe = s.analog.probe orelse return s.fail("an analog probe needs the mixed-signal kernel", .{});
+            const pr = p.extraData(Program.Probe, d.a);
+            break :blk try probe(s.analog.probe_ctx, p.str(pr.a), if (pr.b.len == 0) null else p.str(pr.b));
+        },
         .bitstoreal => @bitCast((try eval(s, a, d.a)).values()[0]),
         .math1 => math1(@fromBackingInt(@intCast(d.b)), try real(s, a, d.a)),
         .math2 => blk: {

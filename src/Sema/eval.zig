@@ -69,6 +69,10 @@ pub const Env = struct {
     /// §9.18 this instance's hierarchical system parameters, once known.
     hier: Zcu.Hier = .initFill(.undef),
     depth: u32 = 0,
+    /// While nonzero, a parameter read is a §3.4 shape read (`shapes`).
+    shaping: u32 = 0,
+    /// The parameters a shape read (`shaping`), by declaration.
+    shapes: std.AutoArrayHashMapUnmanaged(Inst.Index, void) = .empty,
 
     /// An environment over `vir` whose module-level parameters are those of
     /// `params` (bodies holding `param` instructions, in order).
@@ -179,6 +183,7 @@ pub const Env = struct {
     /// given value or its default, in its declared type and range.
     pub fn param(env: *Env, p: Inst.Index) Allocator.Error!?Const {
         assert(env.vir.instructions.items(.tag)[@backingInt(p)] == .param);
+        if (env.shaping != 0) try env.shapes.put(env.arena, p, {});
         const pos = env.positions.get(p);
         if (pos) |k| if (env.values.items[k] != .none) return env.toConst(env.values.items[k]);
         if (env.busy.contains(p)) {

@@ -4,7 +4,8 @@
 //! harness gives it (`comp/fixture.zig`), each in a fresh directory, and
 //! compared on exit status, stderr byte for byte, stdout and every file
 //! written (`comp/judge.zig`). A disagreement is a line of `comp.xfail`
-//! (`<path> <owner>: <reason>`), or a ruling of `comp.rulings` (`<path>
+//! (`<path> <owner>: <reason>`, covering it only while that owner's
+//! difference is the first; a -j1/-jN difference is never covered), or a ruling of `comp.rulings` (`<path>
 //! <clause>`: the old side is wrong and the new one agrees with the
 //! fixture's own verdict, its `//! reject` or its gold). A fixture whose
 //! input needs a backend `vera-next` has not got (exit status 126) is
@@ -191,11 +192,14 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
         const key = flat[0 .. std.mem.find(u8, flat, ":") orelse flat.len];
         const gop = try by_owner.getOrPut(arena, key);
         gop.value_ptr.* = if (gop.found_existing) gop.value_ptr.* + 1 else 1;
-        if (xfail.contains(f.rel)) {
+        // A line covers its fixture only while its owner is the one that
+        // differs now, and never a -j1/-jN difference.
+        const listed = if (xfail.get(f.rel)) |r| o != .nondeterministic and std.mem.eql(u8, key, r[0 .. std.mem.find(u8, r, ":") orelse r.len]) else false;
+        if (listed) {
             t.listed += 1;
-        } else if (!options.rebaseline) {
+        } else if (!options.rebaseline or o == .nondeterministic) {
             t.failed += 1;
-            try out.writer.print("FAIL {s} {s}\n", .{ f.rel, flat });
+            try out.writer.print("FAIL {s} {s}{s}\n", .{ f.rel, flat, if (xfail.contains(f.rel)) " (its comp.xfail line names another owner)" else "" });
         }
     }
     if (options.filter.len == 0) {
@@ -258,18 +262,18 @@ fn oneLine(arena: Allocator, l: []const u8) ![]const u8 {
 
 /// The fixture paths a list file names (`<path> <reason>` lines, `#`
 /// comments).
-fn readList(arena: Allocator, io: Io, rel: []const u8) !std.StringHashMapUnmanaged(void) {
+fn readList(arena: Allocator, io: Io, rel: []const u8) !std.StringHashMapUnmanaged([]const u8) {
     const path = try std.fs.path.join(arena, &.{ options.repo_root, rel });
     const text = Io.Dir.cwd().readFileAlloc(io, path, arena, .limited(1 << 24)) catch |e| switch (e) {
         error.FileNotFound => return .empty,
         else => return e,
     };
-    var set: std.StringHashMapUnmanaged(void) = .empty;
+    var set: std.StringHashMapUnmanaged([]const u8) = .empty;
     var lines = std.mem.splitScalar(u8, text, '\n');
     while (lines.next()) |line| {
         if (line.len == 0 or line[0] == '#') continue;
         const sp = std.mem.findScalar(u8, line, ' ') orelse return error.ListLineHasNoReason;
-        try set.put(arena, line[0..sp], {});
+        try set.put(arena, line[0..sp], line[sp + 1 ..]);
     }
     return set;
 }

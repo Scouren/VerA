@@ -2096,7 +2096,6 @@ verilog-ams/annex_f_resolution/resolveto_resolution.va not built: backend exe
 verilog-ams/annex_f_resolution/unknown_discipline_mixed_port.va rw-comp (elab) message: stderr: line 1: old `error[E0903]: unknown discipline on a net with a mixed-port connection: `sig` has candidate disciplines {`annex_f_a`, `annex_f_b`} and no matching `resolveto``, new `error[E0903]: unknown discipline on a net with a mixed-port connection: a net of `annex_f
 verilog-ams/annex_g_change_history/forever_is_a_digital_loop.va not built: backend exe
 verilog-ams/ch01_intro/analog_and_digital_declarations_coexist.va not built: backend exe
-verilog-ams/ch01_intro/reject_1_2_contribution_from_always_block.va not built: backend exe
 verilog-ams/ch02_lexical/attributes_on_module_items.va not built: backend exe
 verilog-ams/ch02_lexical/digital_delay_notation.va not built: backend exe
 verilog-ams/ch02_lexical/digital_scaled_udp_delay_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-ams/ch02_lexical/digital_scaled_udp_delay_rejected.va:18:29`, new `  --> verilog-ams/ch02_lexical/digital_scaled_udp_delay_rejected.va:18:40`
@@ -2177,7 +2176,6 @@ verilog-ams/ch07_mixed_signal/analog_event.va not built: backend exe
 verilog-ams/ch07_mixed_signal/analog_event_variable_drives_continuous_assign.va not built: backend exe
 verilog-ams/ch07_mixed_signal/analog_event_variable_drives_wreal_assign.va not built: backend exe
 verilog-ams/ch07_mixed_signal/analog_function_from_digital_rejected.va not built: backend exe
-verilog-ams/ch07_mixed_signal/analog_net_written_from_a_digital_process_rejected.va not built: backend exe
 verilog-ams/ch07_mixed_signal/analog_port.va not built: backend exe
 verilog-ams/ch07_mixed_signal/analog_probe_in_a_digital_expression.va not built: backend exe
 verilog-ams/ch07_mixed_signal/analog_read_of_digital_variable.va not built: backend exe

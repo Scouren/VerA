@@ -10,6 +10,8 @@
 //! Contents:
 //! - `pub fn mark(s: *Sema, unit: *Unit) Allocator.Error!void`
 //! - `pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void`
+//! - `pub fn base(vir: *const Vir, r: Inst.Ref) ?Inst.Index`
+//! - `pub fn writes(vir: *const Vir, b: Vir.Body, out: *std.ArrayList(Inst.Index), arena: Allocator, depth: u32) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -108,6 +110,47 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
     assert(s.param_args.items.len == s.device.params.len);
 }
 
+/// The declaration an assignment target names (through its selects).
+pub fn base(vir: *const Vir, r: Inst.Ref) ?Inst.Index {
+    var at = r;
+    for (0..depth_max) |_| {
+        const i = at.toIndex() orelse return null;
+        switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+            .decl_ref => return decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl),
+            .elem => at = decl.payloadOf(vir, Inst.Bin, i).lhs,
+            .slice, .slice_up, .slice_down => at = decl.payloadOf(vir, Inst.Triple, i).a,
+            else => return null, // else: a concatenation target or no name
+        }
+    }
+    return null;
+}
+
+/// Appends every declaration a digital body writes, in order.
+pub fn writes(vir: *const Vir, b: Vir.Body, out: *std.ArrayList(Inst.Index), arena: Allocator, depth: u32) Allocator.Error!void {
+    if (depth > depth_max) return;
+    for (vir.body(b)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .store, .store_nb, .proc_assign, .force => if (base(vir, decl.payloadOf(vir, Inst.Bin, i).lhs)) |d| try out.append(arena, d),
+        .store_timed, .store_nb_timed => if (base(vir, decl.payloadOf(vir, Inst.Timed, i).lhs)) |d| try out.append(arena, d),
+        .block => try writes(vir, decl.payloadOf(vir, Inst.Block, i).body, out, arena, depth + 1),
+        .condbr => {
+            const x = decl.payloadOf(vir, Inst.CondBr, i);
+            try writes(vir, x.then, out, arena, depth + 1);
+            try writes(vir, x.@"else", out, arena, depth + 1);
+        },
+        .case => for (vir.list(Inst.Arm, decl.payloadOf(vir, Inst.Case, i).arms)) |arm| try writes(vir, arm.body, out, arena, depth + 1),
+        .loop => {
+            const x = decl.payloadOf(vir, Inst.Loop, i);
+            try writes(vir, x.body, out, arena, depth + 1);
+            try writes(vir, x.step, out, arena, depth + 1);
+        },
+        .repeat => try writes(vir, decl.payloadOf(vir, Inst.Repeat, i).body, out, arena, depth + 1),
+        .wait => try writes(vir, decl.payloadOf(vir, Inst.Wait, i).body, out, arena, depth + 1),
+        .delay => try writes(vir, decl.payloadOf(vir, Inst.Delay, i).body, out, arena, depth + 1),
+        .event_wait => try writes(vir, decl.payloadOf(vir, Inst.EventWait, i).body, out, arena, depth + 1),
+        else => {}, // else: writes nothing
+    };
+}
+
 // ---- private ----
 
 /// §7.2.2 whether the digital half runs on the mixed kernel: a continuous
@@ -170,47 +213,6 @@ fn continuous(s: *Sema, unit: *const Unit, d: Inst.Index) Allocator.Error!bool {
         else => {}, // else: an attribute
     };
     return bound;
-}
-
-/// The declaration an assignment target names (through its selects).
-fn base(vir: *const Vir, r: Inst.Ref) ?Inst.Index {
-    var at = r;
-    for (0..depth_max) |_| {
-        const i = at.toIndex() orelse return null;
-        switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-            .decl_ref => return decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl),
-            .elem => at = decl.payloadOf(vir, Inst.Bin, i).lhs,
-            .slice, .slice_up, .slice_down => at = decl.payloadOf(vir, Inst.Triple, i).a,
-            else => return null, // else: a concatenation target or no name
-        }
-    }
-    return null;
-}
-
-/// Appends every declaration a digital body writes, in order.
-fn writes(vir: *const Vir, b: Vir.Body, out: *std.ArrayList(Inst.Index), arena: Allocator, depth: u32) Allocator.Error!void {
-    if (depth > depth_max) return;
-    for (vir.body(b)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .store, .store_nb, .proc_assign, .force => if (base(vir, decl.payloadOf(vir, Inst.Bin, i).lhs)) |d| try out.append(arena, d),
-        .store_timed, .store_nb_timed => if (base(vir, decl.payloadOf(vir, Inst.Timed, i).lhs)) |d| try out.append(arena, d),
-        .block => try writes(vir, decl.payloadOf(vir, Inst.Block, i).body, out, arena, depth + 1),
-        .condbr => {
-            const x = decl.payloadOf(vir, Inst.CondBr, i);
-            try writes(vir, x.then, out, arena, depth + 1);
-            try writes(vir, x.@"else", out, arena, depth + 1);
-        },
-        .case => for (vir.list(Inst.Arm, decl.payloadOf(vir, Inst.Case, i).arms)) |arm| try writes(vir, arm.body, out, arena, depth + 1),
-        .loop => {
-            const x = decl.payloadOf(vir, Inst.Loop, i);
-            try writes(vir, x.body, out, arena, depth + 1);
-            try writes(vir, x.step, out, arena, depth + 1);
-        },
-        .repeat => try writes(vir, decl.payloadOf(vir, Inst.Repeat, i).body, out, arena, depth + 1),
-        .wait => try writes(vir, decl.payloadOf(vir, Inst.Wait, i).body, out, arena, depth + 1),
-        .delay => try writes(vir, decl.payloadOf(vir, Inst.Delay, i).body, out, arena, depth + 1),
-        .event_wait => try writes(vir, decl.payloadOf(vir, Inst.EventWait, i).body, out, arena, depth + 1),
-        else => {}, // else: writes nothing
-    };
 }
 
 /// Every variable or net the analog body `b` reads by name: an access

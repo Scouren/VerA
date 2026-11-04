@@ -1,14 +1,19 @@
 //! §7.2.2 the discrete context's rules (the old `analog/discrete_check.zig`,
 //! in part): an instance's `initial`/`always` bodies in, a diagnostic out
 //! for each analog construct written there: an analog operator (E0422,
-//! §4.5.15 "can not be used inside an initial or always block"), a system
-//! call whose §9.2 digital cell is No (E0821), `initial_step`/`final_step`
-//! (E0708, §5.10). A monitored event there is §5.10.3's function, whose
+//! §4.5.15 "can not be used inside an initial or always block"), an analog
+//! function call (E0430, §4.7.3), a contribution (E0435, §7.3: "Write
+//! operations ... are only allowed from the context of their domain"), a
+//! system call whose §9.2 digital cell is No (E0821), `initial_step`/
+//! `final_step` (E0708, §5.10), a procedural write to a net (E0482, A.6.2),
+//! a probe outside an analog event function in an event control (E0484,
+//! §8.5.1). A monitored event there is §5.10.3's function, whose
 //! "arguments ... are in the continuous context" (§7.3.5): its argument
 //! rules hold (E0517), and a digital function called in its arguments is
-//! called from the analog context (E0436, §7.3.7).
-//! Cites: VAMS-2023 §4.5.15, §5.10, §5.10.3.1-§5.10.3.4, §7.2.2, §7.3.5,
-//! §7.3.7, §9.2.
+//! called from the analog context (E0436, §7.3.7). Then the analog blocks:
+//! a variable the digital processes also assign (E0432, §7.2.2).
+//! Cites: VAMS-2023 §4.5.15, §4.7.3, §5.10, §5.10.3.1-§5.10.3.4, §7.2.2,
+//! §7.3, §7.3.5, §7.3.7, §8.5.1, §9.2, A.6.2.
 //!
 //! Contents:
 //! - `pub fn check(s: *Sema, unit: *Unit) Allocator.Error!void`
@@ -20,6 +25,7 @@ const vams = @import("vams");
 const Sema = @import("../Sema.zig");
 const decl = @import("decl.zig");
 const control = @import("control.zig");
+const discrete = @import("discrete.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const SysFn = vams.SysFn;
@@ -28,27 +34,119 @@ const Unit = Sema.Unit;
 /// The deepest statement or expression nesting the walks follow.
 const depth_max: u32 = 1 << 12;
 
-/// Judges each `initial` and `always` body of `unit`'s module.
+/// An instruction of a digital process, in context `where`.
+const Digital = struct {
+    where: []const u8,
+
+    fn inst(d: Digital, s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
+        const vir = unit.vir;
+        const file = unit.file;
+        const src = i.toRef();
+        switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+            .step_event => {
+                const final = decl.payloadOf(vir, Inst.StepEvent, i).flags.final;
+                try s.fail(.E0708, file, src, "`{s}` in {s}, the digital context", .{ if (final) "final_step" else "initial_step", d.where });
+            },
+            .call => if (function(vir, i)) |f| if (decl.payloadOf(vir, Inst.Function, f).flags.analog)
+                try s.fail(.E0430, file, src, "`{s}`: an analog function shall only be called from an analog block or from another analog function", .{vir.string(decl.payloadOf(vir, Inst.Function, f).name)}),
+            .contrib, .contrib_indirect => try s.fail(.E0435, file, src, "contributed from {s}", .{d.where}),
+            // A.6.2: a blocking, nonblocking or procedural `assign`/`deassign`
+            // writes a `variable_lvalue`; only `force`/`release` take a net.
+            .store, .store_nb, .proc_assign => try netWrite(s, unit, decl.payloadOf(vir, Inst.Bin, i).lhs, src),
+            .store_timed, .store_nb_timed => try netWrite(s, unit, decl.payloadOf(vir, Inst.Timed, i).lhs, src),
+            .deassign => try netWrite(s, unit, vir.instructions.items(.data)[@backingInt(i)].un_node.operand, src),
+            // §8.5.1 "A2D events must be analog event controlled statements".
+            .event_wait => if (try probeOutside(s, unit, decl.payloadOf(vir, Inst.EventWait, i).event, 0)) |p|
+                try s.fail(.E0484, file, p, "a probe in the event control of {s}", .{d.where}),
+            .call_sys => {
+                const c = decl.payloadOf(vir, Inst.SysCall, i);
+                const name = vir.string(c.name);
+                const args = vir.list(Inst.Ref, c.args);
+                if (analogOnly(name)) try s.fail(.E0821, file, src, "`{s}` in {s}", .{ name, d.where });
+                if (std.mem.eql(u8, name, "absdelta")) {
+                    try absdelta(s, unit, args, src);
+                    for (args) |a| try digitalCalls(s, unit, a, 0);
+                    return;
+                }
+                const tag = SysFn.Tag.fromName(name) orelse return;
+                switch (SysFn.get(tag).family) {
+                    .analog_op => try s.fail(.E0422, file, src, "not allowed in {s}", .{d.where}),
+                    .event => if (tag == .cross or tag == .above or tag == .timer) {
+                        _ = try control.eventArgs(s, unit, tag, args, src);
+                        for (args) |a| try digitalCalls(s, unit, a, 0);
+                    },
+                    else => {}, // else: no rule of the discrete context
+                }
+            },
+            else => {}, // else: no analog construct
+        }
+    }
+};
+
+/// An instruction of an analog block, against the variables `vars` the
+/// digital processes assign: §7.2.2 "It shall be an error to assign to a
+/// given variable in both contexts" (E0432), through an assignment or an
+/// analog function's `output`/`inout` actual.
+const Analog = struct {
+    vars: *const std.AutoHashMapUnmanaged(Inst.Index, void),
+
+    fn inst(a: Analog, s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
+        const vir = unit.vir;
+        switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+            .store, .store_nb => try a.write(s, unit, decl.payloadOf(vir, Inst.Bin, i).lhs),
+            .call => if (function(vir, i)) |f| {
+                const formals = vir.body(decl.payloadOf(vir, Inst.Function, f).formals);
+                const args = vir.list(Inst.Ref, decl.payloadOf(vir, Inst.Call, i).args);
+                for (formals[0..@min(formals.len, args.len)], args[0..@min(formals.len, args.len)]) |formal, arg| {
+                    switch (decl.payloadOf(vir, Inst.Io, formal).flags.dir) {
+                        .output, .inout => try a.write(s, unit, arg),
+                        .none, .input => {},
+                    }
+                }
+            },
+            else => {}, // else: writes no variable
+        }
+    }
+
+    fn write(a: Analog, s: *Sema, unit: *Unit, lhs: Inst.Ref) Allocator.Error!void {
+        const d = discrete.base(unit.vir, lhs) orelse return;
+        if (a.vars.contains(d)) try s.fail(.E0432, unit.file, lhs, "`{s}` is also assigned in the discrete context", .{unit.vir.string(decl.nameOf(unit.vir, d))});
+    }
+};
+
+/// Judges each `initial` and `always` body of `unit`'s module, then each
+/// analog block's writes against the variables those bodies assign.
 pub fn check(s: *Sema, unit: *Unit) Allocator.Error!void {
     const vir = unit.vir;
+    var owned: std.ArrayList(Inst.Index) = .empty;
     // ponytail: a process inside a generate scope is not walked; walk the
     // generate bodies when a fixture puts an analog construct there.
     for (vir.body(unit.module.body)) |i| {
         const tag = vir.instructions.items(.tag)[@backingInt(i)];
         if (tag != .initial and tag != .always) continue;
-        const where = if (tag == .always) "an always block" else "an initial block";
-        try body(s, unit, decl.payloadOf(vir, Inst.Process, i).body, where, 0);
+        const b = decl.payloadOf(vir, Inst.Process, i).body;
+        const d: Digital = .{ .where = if (tag == .always) "an always block" else "an initial block" };
+        try walk(s, unit, b, d, 0);
+        try discrete.writes(vir, b, &owned, s.arena, 0);
     }
+    var vars: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
+    for (owned.items) |d| if (vir.instructions.items(.tag)[@backingInt(d)] == .variable) try vars.put(s.arena, d, {});
+    if (vars.count() == 0) return;
+    for (vir.body(unit.module.body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .analog, .analog_initial => try walk(s, unit, decl.payloadOf(vir, Inst.Process, i).body, Analog{ .vars = &vars }, 0),
+        else => {}, // else: no analog block
+    };
 }
 
 // ---- private ----
 
-fn body(s: *Sema, unit: *Unit, b: Vir.Body, where: []const u8, depth: u32) Allocator.Error!void {
+/// `body`'s instructions, and those of every body nested in one, each
+/// handed to `v.inst`.
+fn walk(s: *Sema, unit: *Unit, b: Vir.Body, v: anytype, depth: u32) Allocator.Error!void {
     if (depth > depth_max) return;
     const vir = unit.vir;
     for (vir.body(b)) |i| {
-        try inst(s, unit, i, where);
-        // The statement's nested bodies.
+        try v.inst(s, unit, i);
         const data = vir.instructions.items(.data)[@backingInt(i)];
         switch (vir.instructions.items(.tag)[@backingInt(i)]) {
             inline else => |t| if (comptime Inst.dataKind(t) == .pl_node) {
@@ -57,44 +155,53 @@ fn body(s: *Sema, unit: *Unit, b: Vir.Body, where: []const u8, depth: u32) Alloc
                 const p = vir.extraData(P, data.pl_node.payload_index);
                 inline for (@typeInfo(P).@"struct".field_names) |name| {
                     const F = @FieldType(P, name);
-                    if (F == Vir.Body) try body(s, unit, @field(p, name), where, depth + 1);
-                    if (F == Vir.List(Inst.Arm)) for (vir.list(Inst.Arm, @field(p, name))) |arm| try body(s, unit, arm.body, where, depth + 1);
+                    if (F == Vir.Body) try walk(s, unit, @field(p, name), v, depth + 1);
+                    if (F == Vir.List(Inst.Arm)) for (vir.list(Inst.Arm, @field(p, name))) |arm| try walk(s, unit, arm.body, v, depth + 1);
                 }
             },
         }
     }
 }
 
-fn inst(s: *Sema, unit: *Unit, i: Inst.Index, where: []const u8) Allocator.Error!void {
+/// The function call `i` names, or null for none of the module's.
+fn function(vir: *const Vir, i: Inst.Index) ?Inst.Index {
+    const ci = decl.payloadOf(vir, Inst.Call, i).callee.toIndex() orelse return null;
+    if (vir.instructions.items(.tag)[@backingInt(ci)] != .decl_ref) return null;
+    const f = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(ci)].decl_tok.decl);
+    return if (vir.instructions.items(.tag)[@backingInt(f)] == .function) f else null;
+}
+
+/// E0482 when procedural assignment target `lhs` is a net.
+fn netWrite(s: *Sema, unit: *Unit, lhs: Inst.Ref, src: Inst.Ref) Allocator.Error!void {
     const vir = unit.vir;
-    const file = unit.file;
+    const d = discrete.base(vir, lhs) orelse return;
+    if (vir.instructions.items(.tag)[@backingInt(d)] != .net) return;
+    try s.fail(.E0482, unit.file, src, "`{s}` is a net, and a procedural assignment writes a variable", .{vir.string(decl.nameOf(vir, d))});
+}
+
+/// The first branch or port probe in event expression `r` that no analog
+/// event function (`cross`, `above`, `timer`, `absdelta`) encloses, or null.
+fn probeOutside(s: *Sema, unit: *Unit, r: Inst.Ref, depth: u32) Allocator.Error!?Inst.Ref {
+    if (depth > depth_max) return null;
+    const i = r.toIndex() orelse return null;
+    const vir = unit.vir;
     switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .step_event => {
-            const final = decl.payloadOf(vir, Inst.StepEvent, i).flags.final;
-            try s.fail(.E0708, file, i.toRef(), "`{s}` in {s}, the digital context", .{ if (final) "final_step" else "initial_step", where });
-        },
         .call_sys => {
-            const c = decl.payloadOf(vir, Inst.SysCall, i);
-            const name = vir.string(c.name);
-            const args = vir.list(Inst.Ref, c.args);
-            if (analogOnly(name)) try s.fail(.E0821, file, i.toRef(), "`{s}` in {s}", .{ name, where });
-            if (std.mem.eql(u8, name, "absdelta")) {
-                try absdelta(s, unit, args, i.toRef());
-                for (args) |a| try digitalCalls(s, unit, a, 0);
-                return;
-            }
-            const tag = SysFn.Tag.fromName(name) orelse return;
-            switch (SysFn.get(tag).family) {
-                .analog_op => try s.fail(.E0422, file, i.toRef(), "not allowed in {s}", .{where}),
-                .event => if (tag == .cross or tag == .above or tag == .timer) {
-                    _ = try control.eventArgs(s, unit, tag, args, i.toRef());
-                    for (args) |a| try digitalCalls(s, unit, a, 0);
-                },
-                else => {}, // else: no rule of the discrete context
-            }
+            const name = vir.string(decl.payloadOf(vir, Inst.SysCall, i).name);
+            const event = for ([_][]const u8{ "cross", "above", "timer", "absdelta" }) |e| {
+                if (std.mem.eql(u8, e, name)) break true;
+            } else false;
+            if (event) return null;
         },
-        else => {}, // else: no analog construct
+        .call => if (try @import("contrib.zig").accessCall(s, unit, r) != null) return r,
+        .port_branch => return r,
+        else => {}, // else: searched through its operands
     }
+    var ops: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
+    try control.operands(s, vir, i, &ops);
+    var it = ops.keyIterator();
+    while (it.next()) |o| if (try probeOutside(s, unit, o.toRef(), depth + 1)) |p| return p;
+    return null;
 }
 
 /// §9.2's digital column: the names whose "Supported in digital context"
@@ -134,14 +241,10 @@ fn digitalCalls(s: *Sema, unit: *Unit, r: Inst.Ref, depth: u32) Allocator.Error!
     if (depth > depth_max) return;
     const i = r.toIndex() orelse return;
     const vir = unit.vir;
-    if (vir.instructions.items(.tag)[@backingInt(i)] == .call) {
-        const callee = decl.payloadOf(vir, Inst.Call, i).callee.toIndex();
-        if (callee) |ci| if (vir.instructions.items(.tag)[@backingInt(ci)] == .decl_ref) {
-            const f = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(ci)].decl_tok.decl);
-            if (vir.instructions.items(.tag)[@backingInt(f)] == .function and !decl.payloadOf(vir, Inst.Function, f).flags.analog)
-                try s.fail(.E0436, unit.file, r, "`{s}`", .{vir.string(decl.payloadOf(vir, Inst.Function, f).name)});
-        };
-    }
+    if (vir.instructions.items(.tag)[@backingInt(i)] == .call) if (function(vir, i)) |f| {
+        if (!decl.payloadOf(vir, Inst.Function, f).flags.analog)
+            try s.fail(.E0436, unit.file, r, "`{s}`", .{vir.string(decl.payloadOf(vir, Inst.Function, f).name)});
+    };
     var ops: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
     try control.operands(s, vir, i, &ops);
     var it = ops.keyIterator();

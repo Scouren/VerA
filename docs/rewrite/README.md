@@ -130,6 +130,8 @@ Load these skills first (Skill tool): `zig`, `data-oriented-design`,
 
 ## Finishing
 
+Before each commit, run the new modules' tests together: `zig build check test-unit test-vams test-sema test-air test-intern_pool test-link test-std_sim test-std_kernels test-codegen test-comp`, plus every `diff-*` your change can move. A printer or Vir field you add changes other modules' expectations.
+
 Commit on your branch, in steps that each pass their tests (one commit per
 coherent piece; message: what and why, the oracle, the numbers). Do not push,
 do not merge, do not touch `main`. Finish only with your `.xfail` empty; a

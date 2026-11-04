@@ -52,10 +52,12 @@ const check_root =
 /// Proves only that the file parses and its `comptime` blocks hold: analysis
 /// is lazy and `contract.validate` is reflection, so a type error inside an
 /// `eval`/`q` body passes here. Fails as `CheckError` says. Asserts that `f`
-/// is `.check` with one module and `source_path` is not empty.
+/// is `.check` with at least one module and `source_path` is not empty.
+/// `f.modules[0]` is the `contract`; every module is the device's
+/// dependency (the rewrite's devices import `std_kernels` too).
 pub fn typeCheck(f: File, gpa: Allocator, io: Io, q: *Queue, device: []const u8, source_path: []const u8, err: *Io.Writer) CheckError!Verdict {
     assert(f.kind == .check);
-    assert(f.modules.len == 1);
+    assert(f.modules.len >= 1);
     assert(source_path.len > 0);
     const cwd = Io.Dir.cwd();
     try cwd.createDirPath(io, f.work_dir);
@@ -71,16 +73,18 @@ pub fn typeCheck(f: File, gpa: Allocator, io: Io, q: *Queue, device: []const u8,
     const root_name = try arena.print("{s}.check.zig", .{stem});
     try tmp.writeFile(io, .{ .sub_path = root_name, .data = check_root });
     const contract = f.modules[0];
+    const deps = try arena.alloc([]const u8, f.modules.len);
+    for (deps, f.modules) |*d, m| d.* = m.name;
+    const head = [_]Zig.Module{
+        .{ .name = "root", .root = try std.fs.path.join(arena, &.{ f.work_dir, root_name }), .deps = &.{ "device", contract.name } },
+        .{ .name = "device", .root = try std.fs.path.join(arena, &.{ f.work_dir, dev_name }), .deps = deps },
+    };
     const a = try Zig.argv(arena, .{
         .zig_exe = f.zig_exe,
         .verb = "build-obj",
         .kind = &.{"-fno-emit-bin"},
         .cache_dir = ".zig-cache",
-        .modules = &.{
-            .{ .name = "root", .root = try std.fs.path.join(arena, &.{ f.work_dir, root_name }), .deps = &.{ "device", contract.name } },
-            .{ .name = "device", .root = try std.fs.path.join(arena, &.{ f.work_dir, dev_name }), .deps = &.{contract.name} },
-            contract,
-        },
+        .modules = try std.mem.concat(arena, Zig.Module, &.{ &head, f.modules }),
     });
 
     const s = &q.slots[0];

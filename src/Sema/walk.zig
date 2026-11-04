@@ -556,7 +556,7 @@ fn genCase(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, g: 
         if (arm.flags.default) default = arm.body;
         for (vir.list(Inst.Ref, arm.values)) |l| {
             const label = (try env.ref(l)) orelse continue;
-            const eq = eval.Const.isTrue(@import("kernels").fold.binary(.eq, operand, label, null) orelse continue);
+            const eq = eval.Const.isTrue(@import("std_kernels").fold.binary(.eq, operand, label, null) orelse continue);
             if (eq) return items(w, env, index, file, arm.body, prefix);
         }
     }

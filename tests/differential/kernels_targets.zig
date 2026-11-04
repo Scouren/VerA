@@ -20,7 +20,7 @@ const contract = @import("contract");
 const options = @import("kernels_targets_options");
 
 const m = k.math;
-const Ref = contract.RefFamily(f64, &[2]u8{ 0, 1 }, .{});
+const Ref = contract.RefFamily(f64, &[2]u8{ 0, 1 }, .{ .math = k.math });
 const K = k.family.Family(2, ~@as(u64, 0)).zL(Ref, 3);
 
 comptime {

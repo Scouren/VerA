@@ -80,7 +80,8 @@ const depth_max: u32 = 1 << 12;
 pub fn declare(l: *Lower, f: u32, scope: u32, i: Inst.Index) Error!void {
     const vir = l.virOf(f);
     const s = Lower.payload(vir, Inst.Function, i);
-    if (s.flags.analog) return l.refuse("an analog function");
+    // VAMS §4.7 an analog function is the analog block's to call.
+    if (s.flags.analog) return if (l.options.mixed) {} else l.refuse("an analog function");
     const sc = try decl.newScope(l, scope, vir.string(s.name), null, l.b.times.items[scope], l.srcOffset(f, i), false);
     const own = try storage(l, f, sc, i);
     const row: u32 = @intCast(l.subs.items.len);

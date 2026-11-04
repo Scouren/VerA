@@ -33,6 +33,7 @@ const place = @import("place.zig");
 const sysfn = @import("sysfn.zig");
 const sub = @import("sub.zig");
 const hier = @import("hier.zig");
+const domain = @import("domain.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -141,7 +142,7 @@ pub fn typeOf(l: *Lower, r: Inst.Ref) Error!Type {
             break :blk .{ .width = std.math.mul(u32, count, operand.width) catch return l.refuse("a replication past 2^32 bits"), .signed = false };
         },
         .call_sys => sysfn.sysType(l, i),
-        .call => sub.resultType(l, i),
+        .call => if (domain.isProbe(l, i)) Type.real_type else sub.resultType(l, i),
         else => l.refuseFmt("the expression form `{t}`", .{Lower.tag(vir, i)}),
     };
 }
@@ -333,7 +334,7 @@ pub fn real(l: *Lower, r: Inst.Ref) Error!u32 {
         },
         .mintypmax => return real(l, Lower.payload(vir, Inst.Triple, i).b),
         .call_sys => return sysfn.sysReal(l, i),
-        .call => return l.b.expr(.call, rt, try sub.callRow(l, i), 0),
+        .call => return if (domain.isProbe(l, i)) domain.probe(l, i) else l.b.expr(.call, rt, try sub.callRow(l, i), 0),
         else => return l.refuseFmt("the real expression form `{t}`", .{tg}),
     }
 }
@@ -367,7 +368,8 @@ pub fn reads(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
         },
         .concat => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |x| try reads(l, x, out),
         .call_sys => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.SysCall, i).args)) |x| try reads(l, x, out),
-        .call => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Call, i).args)) |x| try reads(l, x, out),
+        // A probe reads the analog solution, no slot (the host's to watch).
+        .call => if (!domain.isProbe(l, i)) for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Call, i).args)) |x| try reads(l, x, out),
         else => return l.refuseFmt("the slots read by `{t}`", .{Lower.tag(vir, i)}),
     }
 }

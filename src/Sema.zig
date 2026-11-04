@@ -185,6 +185,9 @@ pub const Unit = struct {
     discrete: std.ArrayList(Inst.Index) = .empty,
     /// Its analog blocks are lowered (decl.zig).
     lowered: bool = false,
+    /// A paramset instance's paramset scope: its declarations bound to
+    /// their rows (param.zig).
+    paramset: ?*Unit = null,
     /// The variables whose value an `analog initial` or `@(...)` body
     /// leaves for a later evaluation's read (held.zig).
     carried: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty,

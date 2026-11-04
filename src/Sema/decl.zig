@@ -73,6 +73,7 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     for (s.units.items[1..]) |*u| try net.bindChildPorts(s, u);
     for (s.units.items) |*u| try param.declare(s, u);
     for (s.units.items) |*u| try discrete.declare(s, u);
+    for (s.units.items[1..]) |*u| try @import("derive.zig").child(s, u);
     for (s.units.items) |*u| try branches(s, u);
     for (s.units.items) |*u| try held.mark(s, u);
     for (s.units.items) |*u| try @import("attr.zig").check(s, u);

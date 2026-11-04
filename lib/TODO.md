@@ -1416,3 +1416,22 @@ src/
   the caches are shared on purpose. Oracle: one model, one cwd, N concurrent
   `vera --emit-zig --check` runs in a test, all of which succeed. Tell
   espice-8a the tag when v0.30.0 ships.
+
+- **The goal (user, 2026-11-03, overnight):** "the complete rewrite, passing at 0 xfails, all green."
+  This means:
+  - every `tests/differential/*.xfail` is empty;
+  - `vera-next` passes conformance 6818/6818;
+  - `zig build test` is green with the new pipeline as the product;
+  - the old pipeline is deleted.
+
+  "Then a final audit using AGENTS.md over the codegen code part to make sure it
+  codegens performance critical code." The audit covers:
+  - the assembly probes (FOLDED/IDENTICAL/EQUIVALENT/NEGATIVE; RESIDUE fails);
+  - dispatch per batch;
+  - SoA with size assertions;
+  - versioned units that actually take the fast body;
+  - a benchmark behind every speed claim.
+
+  Order: rw-zero, rw-dlower, rw-codegen, rw-lower and rw-comp (`docs/rewrite/comp.md`)
+  run now, at most 5 agents at once. The backends follow as slots free: exe,
+  verilog, osdi, digital native, rtlil, VPI. Then the switch-over, then the audit.

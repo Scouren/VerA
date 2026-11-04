@@ -1451,3 +1451,7 @@ src/
     - Interval's library margin is derived from the device kernel's measured error,
       not a flat 2 ulps.
     - The float falsifier evaluates with std_kernels rather than interp.
+- **Backends (2026-11-04):** `comp.xfail` lists 1752 fixtures under "not built: backend exe",
+  114 under vpi and 100 under digital_device. rw-zero takes exe
+  (`docs/rewrite/exe.md`, new `src/codegen/bench/`, renamed to `exe` at the switch-over).
+  VPI and digital_device follow as slots free.

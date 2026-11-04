@@ -94,7 +94,7 @@ const Watch = struct {
         const x: f64 = switch (v) {
             .real => |x| x,
             .int => |n| @floatFromInt(n),
-            .array => return,
+            .array, .str => return,
         };
         const tag = w.air.instructions.items(.tag)[i];
         if (v == .real and !math.isFinite(x) and rule3(tag) and w.operandsFinite(i)) w.overflow = true;
@@ -116,7 +116,7 @@ const Watch = struct {
         if (ref.toIndex()) |i| return switch (w.last[@backingInt(i)]) {
             .real => |x| x,
             .int => |n| @floatFromInt(n),
-            .array => math.nan(f64),
+            .array, .str => math.nan(f64),
         };
         return switch (w.ip.indexToKey(ref.toInterned().?)) {
             .float => |x| x,

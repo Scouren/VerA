@@ -71,7 +71,7 @@ pub fn run(arena: Allocator, io: Io, exe: []const u8, args: []const []const u8, 
         .exited => |c| c,
         else => 255,
     };
-    return .{ .status = status, .stdout = r.stdout, .stderr = r.stderr, .files = try written(arena, io, work) };
+    return .{ .status = status, .stdout = r.stdout, .stderr = try unthreaded(arena, r.stderr), .files = try written(arena, io, work) };
 }
 
 /// The backend `vera-next` named as not built (exit status 126), or null.
@@ -203,6 +203,16 @@ fn firstDiff(arena: Allocator, a: []const u8, b: []const u8) ![]const u8 {
         const ys = y orelse "<end>";
         if (!std.mem.eql(u8, xs, ys)) return std.fmt.allocPrint(arena, "line {d}: old `{s}`, new `{s}`", .{ n, xs[0..@min(xs.len, 160)], ys[0..@min(ys.len, 160)] });
     }
+}
+
+/// `text` with a panic's `thread <id> panic` as `thread panic`: the id is
+/// the OS's, not the compiler's output.
+fn unthreaded(arena: Allocator, text: []const u8) ![]const u8 {
+    const at = std.mem.find(u8, text, "thread ") orelse return text;
+    var k = at + "thread ".len;
+    while (k < text.len and std.ascii.isDigit(text[k])) k += 1;
+    if (k == at + "thread ".len or !std.mem.startsWith(u8, text[k..], " panic")) return text;
+    return std.mem.concat(arena, u8, &.{ text[0 .. at + "thread".len], text[k..] });
 }
 
 /// A dump past its `$date ... $end` section; any other file whole.

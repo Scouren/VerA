@@ -42,6 +42,8 @@ const Refusal = std.meta.Child(@FieldType(OldInterp, "refusal"));
 const Observe = struct {
     finals: []?Air.interp.Value,
     air: *const Air,
+    /// Where a host call's string result lives.
+    scratch: std.mem.Allocator,
     fn seen(ctx: *anyopaque, inst: Air.Inst.Index, val: Air.interp.Value) void {
         const o: *Observe = @ptrCast(@alignCast(ctx));
         const i = @backingInt(inst);
@@ -84,10 +86,10 @@ pub fn compareValues(arena: std.mem.Allocator, rel: []const u8, mir: *Mir, lw: *
     const rand = prng.random();
     const args = try arena.alloc(Air.interp.Value, d.params.len);
     // Each `arg`'s type, which the value handed to it must have.
-    const int_args = try arena.alloc(bool, d.params.len);
-    @memset(int_args, false);
+    const arg_types = try arena.alloc(InternPool.Index, d.params.len);
+    @memset(arg_types, .real_type);
     for (a.air.instructions.items(.tag), a.air.instructions.items(.data)) |tag, data| {
-        if (tag == .arg) int_args[data.ty_index.index] = data.ty_index.ty == InternPool.Index.integer_type;
+        if (tag == .arg) arg_types[data.ty_index.index] = data.ty_index.ty;
     }
     const finals = try arena.alloc(?Air.interp.Value, a.air.instructions.len);
     // Whether the body computes exp, pow, tan or log10 at run time.
@@ -113,19 +115,27 @@ pub fn compareValues(arena: std.mem.Allocator, rel: []const u8, mir: *Mir, lw: *
             error.OutOfMemory => return e,
             error.Refused => false,
         };
-        for (args, refs, int_args) |*x, r, int| {
+        for (args, refs, arg_types) |*x, r, ty| {
             const c = (old.get(r) catch null) orelse {
-                x.* = if (int) .{ .int = 0 } else .{ .real = 0 };
+                x.* = switch (ty) {
+                    .integer_type => .{ .int = 0 },
+                    .string_type => .{ .str = "" },
+                    else => .{ .real = 0 }, // else: a real
+                };
                 continue;
             };
-            x.* = if (int) .{ .int = switch (c.c) {
-                .int => |i| i,
-                .real => |f| std.math.lossyCast(i64, @round(f)),
-                .str => 0,
-            } } else .{ .real = c.c.asReal() };
+            x.* = switch (ty) {
+                .integer_type => .{ .int = switch (c.c) {
+                    .int => |i| i,
+                    .real => |f| std.math.lossyCast(i64, @round(f)),
+                    .str => 0,
+                } },
+                .string_type => .{ .str = if (c.c == .str) c.c.str else "" },
+                else => .{ .real = c.c.asReal() }, // else: a real
+            };
         }
         @memset(finals, null);
-        var obs: Observe = .{ .finals = finals, .air = &a.air };
+        var obs: Observe = .{ .finals = finals, .air = &a.air, .scratch = scratch.allocator() };
         const new_result = Air.interp.run(scratch.allocator(), a.air, &zcu.intern_pool, .{
             .args = args,
             .probes = volts,
@@ -178,7 +188,7 @@ pub fn compareValues(arena: std.mem.Allocator, rel: []const u8, mir: *Mir, lw: *
 /// the run reaches the roots that are. A file, random or query call is not
 /// modelled (a loop on `$feof` would never end).
 fn hostCall(ctx: *anyopaque, callee: u32, args: []const Air.interp.Value) Air.interp.Error!Air.interp.Value {
-    _ = ctx;
+    const o: *Observe = @ptrCast(@alignCast(ctx));
     if (callee > std.math.maxInt(@typeInfo(vams.SysFn.Tag).@"enum".tag_type)) return .{ .real = 0 };
     const tag: vams.SysFn.Tag = @fromBackingInt(@intCast(callee));
     switch (tag) {
@@ -187,12 +197,37 @@ fn hostCall(ctx: *anyopaque, callee: u32, args: []const Air.interp.Value) Air.in
         .@"$mfactor" => return .{ .real = 1 },
         .@"$temperature" => return .{ .real = 300.15 },
         .@"op$static" => return .{ .int = 0 },
+        // A reader's destinations: the old interpreter refuses the reader.
+        .@"scan$item" => return .{ .real = 0 },
+        .@"scan$str" => return .{ .str = "" },
+        // §3.3 Table 3-3 over strings, as the old `$str$cat`/`$str$repeat`
+        // and string comparison compute them.
+        .@"str$cmp" => return if (args[0] != .str or args[1] != .str) error.Unsupported else .{ .int = switch (std.mem.order(u8, args[0].str, args[1].str)) {
+            .lt => -1,
+            .eq => 0,
+            .gt => 1,
+        } },
+        .@"str$cat" => {
+            var out: std.ArrayList(u8) = .empty;
+            for (args) |x| try out.appendSlice(o.scratch, if (x == .str) x.str else return error.Unsupported);
+            return .{ .str = out.items };
+        },
+        .@"str$repeat" => {
+            var out: std.ArrayList(u8) = .empty;
+            if (args[0] != .int or args[1] != .str) return error.Unsupported;
+            for (0..@intCast(@max(args[0].int, 0))) |_| try out.appendSlice(o.scratch, args[1].str);
+            return .{ .str = out.items };
+        },
         .@"$vt" => return .{ .real = 1.380649e-23 * (if (args.len > 0) realOf(args[0]) else 300.15) / 1.602176634e-19 },
         else => {}, // else: by family below
     }
     const info = vams.SysFn.get(tag);
     return switch (info.family) {
-        .display, .simctl, .file_out, .string => .{ .real = 0 },
+        .display, .simctl, .file_out, .string => switch (info.ty) {
+            .str => .{ .str = "" },
+            .int => .{ .int = 0 },
+            .real, .none => .{ .real = 0 },
+        },
         .analog_op, .event, .kernel => if (info.ty == .int) .{ .int = 0 } else .{ .real = 0 },
         .math, .query, .convert, .file_func, .random => error.Unsupported,
     };
@@ -202,7 +237,7 @@ fn realOf(x: Air.interp.Value) f64 {
     return switch (x) {
         .real => |f| f,
         .int => |i| @floatFromInt(i),
-        .array => std.math.nan(f64),
+        .array, .str => std.math.nan(f64),
     };
 }
 

@@ -17,7 +17,7 @@
 //! - `pub const KeywordSet`
 //! - `pub const ParseOptions = struct`
 //! - `pub const Node = struct`: `Node.Tag`, `Node.Data`, `Node.Index` (`toOptional`), `Node.OptionalIndex`, `Node.SubRange`, and the extra payloads `Module`, `Decl`, `NetDecl`, `ParamAssign`, `ValueRange`, `Branch`, `Instantiation`, `Instance`, `GateInstance`, `Function`, `Udp`, `Insertion`, `For`, `If`, `Timed`, `Indirect`, `MinTypMax`, `Ternary`, `Pair`, `Path`
-//! - `pub const Error = struct` (`Error.Tag`)
+//! - `pub const Error = struct` (`Error.Tag`, `Error.Site`)
 //! - `pub const full`, `pub const parse_errors` (`report`, `code`)
 //! - `pub fn parse(gpa: Allocator, source: [:0]const u8, options: ParseOptions) Allocator.Error!Ast`
 //! - `pub fn deinit(tree: *Ast, gpa: Allocator) void`
@@ -437,6 +437,86 @@ pub const Error = struct {
     tag: Tag,
     token: TokenIndex,
     extra: union { none: void, expected_tag: Token.Tag } = .{ .none = {} },
+    /// Which rule of `tag` refused, where its report names it
+    /// (`parse_errors`); `.generic` otherwise.
+    site: Site = .generic,
+    /// What the site's report names beside `token`: a token (a timing
+    /// check's name) or packed counts; the site's doc says which.
+    arg: u32 = 0,
+
+    /// The rules a coarse `Tag` covers whose reports differ.
+    pub const Site = enum(u8) {
+        generic,
+        /// A.7.1: `pulsestyle_*` / `*showcancelled` list in parentheses.
+        specify_list_parenthesized,
+        /// §14.2.4.1 Table 14-1: an operator a state-dependent path's
+        /// condition may not use.
+        specify_condition_operator,
+        /// A.7.1: a token that begins no specify item.
+        specify_item,
+        /// A.7.2: no `=>` or `*>` after the path's inputs.
+        specify_path_arrow,
+        /// Syntax 14-4: polarity before the arrow of an edge-sensitive path.
+        specify_polarity_placement,
+        /// Syntax 14-5: `ifnone` with an edge-sensitive path.
+        specify_ifnone_edge,
+        /// A.7.2: `=>` with a list; `arg` is sources << 16 | destinations.
+        specify_parallel_list,
+        /// A.7.4: a delay count other than 1, 2, 3, 6, 12; `arg` the count.
+        specify_delay_count,
+        /// A.7.5.1: a system name that is no timing check.
+        specify_timing_check_name,
+        /// §15.3.4: `$width`'s threshold or notifier left null.
+        specify_width_null,
+        /// A.7.5.3: `$period`/`$width` reference event without a control;
+        /// `arg` the check's name token.
+        specify_event_control,
+        /// A.7.5.2: a notifier that is no variable name; `arg` the name token.
+        specify_notifier,
+        /// A.7.5.1: the argument count; `arg` is n | min << 8 | max << 16.
+        specify_arity,
+        /// A.7.5.3: an edge descriptor outside the table; `arg` the token
+        /// after it.
+        specify_edge_descriptor,
+        /// A.2.1.2: `reg`/`integer`/`time` on a port that is no `output`.
+        port_variable_type,
+        /// A.2.6: an analog function formal's type; `arg` its direction token.
+        port_analog_typed,
+        /// A.2.6: a digital function formal that is no `input`.
+        function_input_only,
+        /// A.2.7: a task or function port list that opens with a name.
+        tf_port_list_direction,
+        /// A.1.3: a port declaration after a `list_of_ports` port.
+        port_after_list,
+        /// A.2.1.3: two net types in one declaration.
+        net_two_types,
+        /// §4.3.2: `scalared`/`vectored` with no range.
+        net_advised_no_range,
+        /// A.2.1.3: the range after the delay.
+        net_range_after_delay,
+        /// §3.6.3.2: initialized and plain names mixed; `arg` 1 when this
+        /// name has the initializer.
+        net_mixed_init,
+        /// §4.4: a drive strength with no assignment.
+        net_drive_no_init,
+        /// A.2.1.3: a charge strength on a net that is no `trireg`.
+        charge_strength_net,
+        /// A.2.2.2: a charge strength word that is none.
+        charge_strength_word,
+        /// §6.1.4: a drive strength not one 0-side and one 1-side.
+        strength_sides,
+        /// §6.1.4: both drive strengths high impedance.
+        strength_highz,
+        /// A.3.2: a pull gate's single strength on the other side; `arg` 1
+        /// for `pullup`.
+        strength_single,
+        /// A.3.1: a gate's terminal count; `arg` the gate keyword's token.
+        gate_count,
+        /// A.3.3: a gate output that is no net_lvalue.
+        gate_output,
+        /// A.4.1.1: a module instance with no name; `arg` its terminal count.
+        instance_unnamed,
+    };
 
     pub const Tag = enum(u8) {
         /// `extra.expected_tag` was wanted at `token`.

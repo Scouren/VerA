@@ -488,7 +488,9 @@ pub const PulseStyle = extern struct { keyword: String, terms: Exprs };
 pub const Override = extern struct { name: String, value: Body };
 
 /// A named or unnamed `begin`/`fork` block.
-pub const Block = extern struct { name: String, flags: packed struct(u32) { fork: bool, _: u31 = 0 }, body: Body };
+/// `attrs`: the §2.9 specs prefixing the block, or the one statement
+/// AstGen wrapped in an unnamed block to carry them (`(* vera_nodiff *) x = e;`).
+pub const Block = extern struct { name: String, flags: packed struct(u32) { fork: bool, _: u31 = 0 }, body: Body, attrs: List(Attr) = .empty };
 
 pub const CondBr = extern struct { cond: Ref, then: Body, @"else": Body };
 pub const Case = extern struct { flags: packed struct(u32) { kind: enum(u2) { case, casex, casez }, _: u30 = 0 }, operand: Ref, arms: List(Arm) };

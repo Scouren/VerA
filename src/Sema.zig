@@ -15,7 +15,7 @@
 //! - `pub const Config = struct` (`Roots`, `Override`)
 //! - `pub fn elaborate(zcu: *Zcu, config: Config) Allocator.Error!void`
 //! - `pub const Analysis = struct` (`deinit`)
-//! - lowering's types: `pub const Ty`, `pub const Value`, `pub const Slot`, `pub const Bind`, `pub const Unit`, `pub const ContribKey`, `pub const Block` (`Loop`, `Label`, `restricted`, `child`)
+//! - lowering's types: `pub const Ty`, `pub const Value`, `pub const Slot`, `pub const Bind`, `pub const Unit`, `pub const Bridged`, `pub const ContribKey`, `pub const Block` (`Loop`, `Label`, `restricted`, `child`)
 //! - `pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis`
 //! - `pub fn addInst(s: *Sema, b: *Block, inst: Air.Inst) Allocator.Error!Air.Inst.Ref`
 //! - `pub fn fail(s: *Sema, code: Diag.Code, file: Zcu.File.Index, src: Vir.Inst.Ref, comptime fmt: []const u8, args: anytype) Allocator.Error!void`
@@ -68,6 +68,9 @@ units: std.ArrayList(Unit) = .empty,
 node_rows: std.AutoHashMapUnmanaged(InternPool.String, Air.Device.Node.Index) = .empty,
 /// §5.4.2 a node pair to its flow unknown (contrib.zig).
 flow_rows: std.AutoHashMapUnmanaged([2]Air.Device.Node.Index, Air.Device.Node.Index) = .empty,
+/// §7.8.4 each bridged child port to its bridge's lower net and (once
+/// bound) its connection's net (net.zig).
+bridged: std.AutoHashMapUnmanaged(struct { Zcu.Instance.Index, Vir.Inst.Index }, Bridged) = .empty,
 /// §5.4.3 a port's row to its port flow unknown (contrib.zig).
 port_rows: std.AutoHashMapUnmanaged(Air.Device.Node.Index, Air.Device.Node.Index) = .empty,
 /// §5.6 a contribution target to its row (contrib.zig).
@@ -76,6 +79,10 @@ contrib_rows: std.AutoHashMapUnmanaged(ContribKey, Air.Device.Contribution.Index
 param_args: std.ArrayList(Value) = .empty,
 /// How deep the expression being lowered nests (expr.zig).
 expr_depth: u32 = 0,
+/// The Vir expression being lowered (expr.zig's `lower`), and each Air
+/// instruction's, by index (`addInst`): `Analysis.srcs`.
+expr_src: Inst.Ref = .none,
+inst_srcs: std.ArrayList(Analysis.Src) = .empty,
 /// Each node row's one `probe`, in the prologue (contrib.zig).
 probes: std.AutoHashMapUnmanaged(Air.Device.Node.Index, Air.Inst.Ref) = .empty,
 /// §3.6.2 every access function name and the quantity it reads under a
@@ -132,10 +139,18 @@ pub const Config = struct {
 pub const Analysis = struct {
     air: Air,
     device: Air.Device,
+    /// One per `air` instruction: the Vir expression it was lowered from,
+    /// where a later stage's diagnostic about it points (`Air.Float`'s
+    /// `Input.locs`); `.none` for one no expression wrote.
+    srcs: []const Src,
+
+    /// A source: a file and a Vir instruction in it.
+    pub const Src = struct { file: Zcu.File.Index, src: Inst.Ref };
 
     pub fn deinit(a: *Analysis, gpa: Allocator) void {
         a.air.deinit(gpa);
         a.device.deinit(gpa);
+        gpa.free(a.srcs);
         a.* = undefined;
     }
 };
@@ -196,10 +211,16 @@ pub const Unit = struct {
     discrete: std.ArrayList(Inst.Index) = .empty,
     /// Its analog blocks are lowered (decl.zig).
     lowered: bool = false,
+    /// A paramset instance's paramset scope: its declarations bound to
+    /// their rows (param.zig).
+    paramset: ?*Unit = null,
     /// The variables whose value an `analog initial` or `@(...)` body
     /// leaves for a later evaluation's read (held.zig).
     carried: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty,
 };
+
+/// One bridged port's two sides (`Sema.bridged`).
+pub const Bridged = struct { lower: Air.Device.Node.Index, upper: Air.Device.Node.Index, bridge: Zcu.Instance.Index };
 
 /// §5.6 what makes two contributions one row.
 pub const ContribKey = struct {
@@ -236,6 +257,9 @@ pub const Block = struct {
     function: ?Air.Inst.Index = null,
     /// The innermost enclosing named block (control.zig).
     label: ?*const Label = null,
+    /// VerA's `vera_nodiff` (§2.9) is on here: an assigned real carries no
+    /// derivative (control.zig).
+    nodiff: bool = false,
 
     /// A loop's targets: the `block` a `break` leaves and the one a
     /// `continue` leaves (the step follows it).
@@ -254,7 +278,7 @@ pub const Block = struct {
 
     /// A child of `parent`: the same instance and restrictions, no instructions.
     pub fn child(parent: *Block) Block {
-        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .runtime = parent.runtime, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path, .function = parent.function, .label = parent.label };
+        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .runtime = parent.runtime, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path, .function = parent.function, .label = parent.label, .nodiff = parent.nodiff };
     }
 };
 
@@ -304,14 +328,22 @@ pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis {
         s.device.deinit(zcu.gpa);
         return null;
     };
-    const air = try s.air.finish(zcu.gpa, main);
+    var air = try s.air.finish(zcu.gpa, main);
+    errdefer air.deinit(zcu.gpa);
     assert(air.mainBody().len == main.len);
-    return .{ .air = air, .device = s.device };
+    const srcs = try zcu.gpa.alloc(Analysis.Src, air.instructions.len);
+    @memset(srcs, .{ .file = @fromBackingInt(0), .src = .none });
+    const n = @min(srcs.len, s.inst_srcs.items.len);
+    @memcpy(srcs[0..n], s.inst_srcs.items[0..n]);
+    return .{ .air = air, .device = s.device, .srcs = srcs };
 }
 
 /// Appends `inst` to `b`'s body and returns it as an operand.
 pub fn addInst(s: *Sema, b: *Block, inst: Air.Inst) Allocator.Error!Air.Inst.Ref {
     const i = try s.air.addInst(s.gpa, inst);
+    const k = @backingInt(i);
+    if (s.inst_srcs.items.len <= k) try s.inst_srcs.appendNTimes(s.arena, .{ .file = b.unit.file, .src = .none }, k + 1 - s.inst_srcs.items.len);
+    s.inst_srcs.items[k] = .{ .file = b.unit.file, .src = s.expr_src };
     try b.insts.append(s.arena, i);
     assert(b.insts.items[b.insts.items.len - 1] == i);
     return .fromIndex(i);

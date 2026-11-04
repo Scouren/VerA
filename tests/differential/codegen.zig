@@ -6,9 +6,11 @@
 //! - a fixture `lower.xfail` names is diff-lower's business: skipped, counted;
 //! - the OLD device: `vera.analyze` + `Result.generate`, every unit strict;
 //!   the NEW device: Sema's `Air` + `Air.Device`, `Air.Float` over
-//!   `codegen.floatRoots`, `codegen.generate` (strict, or versioned with
-//!   `-Dcodegen-versioned`); a side that refuses the source is skipped and
-//!   counted; codegen failing on the new side is a disagreement;
+//!   `codegen.floatRoots`, `codegen.generate` strict, and again versioned
+//!   (§11.9) when a root is `.optimized`: the VERSIONED device, held to the
+//!   old one bit for bit outside its box, within `fast_ulps` inside it, and
+//!   red when no point lands inside; a side that refuses the source is
+//!   skipped and counted; codegen failing on the new side is a disagreement;
 //! - both devices are built by `link` (ReleaseFast, LLVM), each side's
 //!   devices of a batch to one library, under `codegen/dyn.zig` (which holds
 //!   every device to `contract.validate`), loaded, and evaluated in a forked
@@ -90,10 +92,10 @@ const Tally = struct {
 };
 
 /// A fixture both sides wrote a device for.
-const Ready = struct { rel: []const u8, old: []const u8, new: []const u8, card: sides.Card };
+const Ready = struct { rel: []const u8, old: []const u8, new: []const u8, ver: ?[]const u8, card: sides.Card };
 
 /// The C entry `dyn.zig` exports per device.
-const RunFn = *const fn ([*]const [*:0]const u8, [*]const f64, u32, [*]const f64, u32, f64, [*]f64, u32) callconv(.c) i32;
+const RunFn = *const fn ([*]const [*:0]const u8, [*]const f64, u32, [*]const f64, u32, f64, u32, [*]f64, u32) callconv(.c) i32;
 
 // ---- private ----
 
@@ -129,13 +131,13 @@ fn runAll() !void {
             tally.old_refused += 1;
             continue;
         };
-        switch (try sides.new(gpa, arena, io, path, source, &dirs, !options.codegen_versioned)) {
+        switch (try sides.new(gpa, arena, io, path, source, &dirs)) {
             .refused => tally.new_refused += 1,
             .fail => |why| try whys.put(arena, rel, try arena.print("codegen: {s}", .{why})),
             .ok => |n| {
                 tally.optimized += n.optimized;
                 tally.roots += n.roots;
-                try ready.append(arena, .{ .rel = rel, .old = old, .new = n.text, .card = n.card });
+                try ready.append(arena, .{ .rel = rel, .old = old, .new = n.text, .ver = n.versioned, .card = n.card });
             },
         }
     }
@@ -157,6 +159,7 @@ fn runAll() !void {
     for (whys.keys(), whys.values()) |rel, why| {
         if (xfail.contains(rel)) {
             tally.xfailed += 1;
+            if (options.codegen_why) try out.writer.print("LISTED {s} {s}\n", .{ rel, why });
         } else {
             tally.failed += 1;
             try out.writer.print("FAIL {s} {s}\n", .{ rel, why });
@@ -210,8 +213,8 @@ fn runBatch(gpa: Allocator, arena: Allocator, io: Io, q: *link.Queue, work: []co
     const dyn = try std.fs.path.join(arena, &.{ options.repo_root, "tests", "differential", "codegen", "dyn.zig" });
     var index: Io.Writer.Allocating = .init(arena);
     for (group, 0..) |r, k| {
-        for ([2][]const u8{ "o", "n" }, [2][]const u8{ r.old, r.new }) |side, text|
-            try Io.Dir.cwd().writeFile(io, .{ .sub_path = try arena.print("{s}/{s}{d}.zig", .{ dir, side, k }), .data = text });
+        for ([3][]const u8{ "o", "n", "v" }, [3]?[]const u8{ r.old, r.new, r.ver }) |side, text| if (text) |t|
+            try Io.Dir.cwd().writeFile(io, .{ .sub_path = try arena.print("{s}/{s}{d}.zig", .{ dir, side, k }), .data = t });
         try index.writer.print("{d} {s}\n", .{ k, r.rel });
         tally.old_bytes += r.old.len;
         tally.new_bytes += r.new.len;
@@ -236,9 +239,11 @@ fn runBatch(gpa: Allocator, arena: Allocator, io: Io, q: *link.Queue, work: []co
             });
             var devices: Io.Writer.Allocating = .init(arena);
             var names: Io.Writer.Allocating = .init(arena);
-            for (left, 0..) |l, k| if (l) {
-                const name = try arena.print("{s}{d}", .{ side, k });
-                try mods.append(arena, .{ .name = name, .root = try arena.print("{s}/{s}.zig", .{ dir, name }), .deps = if (side[0] == 'o') &.{"contract"} else &.{ "contract", "std_kernels" } });
+            for (left, group, 0..) |l, r, k| if (l) for ([2]u8{ side[0], 'v' }) |c| {
+                // The versioned device rides in the new side's library.
+                if (c == 'v' and (side[0] == 'o' or r.ver == null)) continue;
+                const name = try arena.print("{c}{d}", .{ c, k });
+                try mods.append(arena, .{ .name = name, .root = try arena.print("{s}/{s}.zig", .{ dir, name }), .deps = if (c == 'o') &.{"contract"} else &.{ "contract", "std_kernels" } });
                 try devices.writer.print(" @import(\"{s}\"),", .{name});
                 try names.writer.print(" \"{s}\",", .{name});
             };
@@ -269,7 +274,16 @@ fn runBatch(gpa: Allocator, arena: Allocator, io: Io, q: *link.Queue, work: []co
         for (group, left, 0..) |r, l, k| if (l) {
             const old_fn = libs[0].lookup(RunFn, try arena.printSentinel("cg_o{d}", .{k}, 0)).?;
             const new_fn = libs[1].lookup(RunFn, try arena.printSentinel("cg_n{d}", .{k}, 0)).?;
-            if (try compareIsolated(arena, r, old_fn, new_fn, tally)) |why| try whys.put(arena, r.rel, why);
+            const ver_fn = if (r.ver != null) libs[1].lookup(RunFn, try arena.printSentinel("cg_v{d}", .{k}, 0)).? else null;
+            const NuFn = *const fn () callconv(.c) u32;
+            const nu = [2]u32{ libs[0].lookup(NuFn, try arena.printSentinel("cg_o{d}_nu", .{k}, 0)).?(), libs[1].lookup(NuFn, try arena.printSentinel("cg_n{d}_nu", .{k}, 0)).?() };
+            if (nu[0] != nu[1]) {
+                try whys.put(arena, r.rel, try arena.print("the unknowns differ: old {d}, new {d}", .{ nu[0], nu[1] }));
+                continue;
+            }
+            var rn = r;
+            rn.card.n_u = nu[0];
+            if (try compareIsolated(arena, rn, old_fn, new_fn, ver_fn, tally)) |why| try whys.put(arena, r.rel, why);
         };
         return;
     }
@@ -285,12 +299,16 @@ fn blame(arena: Allocator, b: std.zig.ErrorBundle, group: []const Ready, left: [
         if (msg.src_loc == .none) continue;
         const loc = b.getSourceLocation(msg.src_loc);
         const base = std.fs.path.basename(b.nullTerminatedString(loc.src_path));
-        if (base.len < 2 or (base[0] != 'o' and base[0] != 'n')) continue;
+        if (base.len < 2 or (base[0] != 'o' and base[0] != 'n' and base[0] != 'v')) continue;
         const k = std.fmt.parseInt(usize, std.fs.path.stem(base)[1..], 10) catch continue;
         if (k >= group.len or !left[k]) continue;
         left[k] = false;
         named = true;
-        try whys.put(arena, group[k].rel, try arena.print("the {s} device does not build: {s}:{d}: {s}", .{ if (base[0] == 'o') "old" else "new", base, loc.line + 1, b.nullTerminatedString(msg.msg) }));
+        try whys.put(arena, group[k].rel, try arena.print("the {s} device does not build: {s}:{d}: {s}", .{ switch (base[0]) {
+            'o' => "old",
+            'n' => "new",
+            else => "versioned",
+        }, base, loc.line + 1, b.nullTerminatedString(msg.msg) }));
     }
     return named;
 }
@@ -299,7 +317,7 @@ fn blame(arena: Allocator, b: std.zig.ErrorBundle, group: []const Ready, left: [
 /// zero integer divisor, a safety check) is that fixture's disagreement,
 /// not the oracle's end. The child writes a `u32` record before each call
 /// (point << 1 | side), then `done`, the points it compared and the why.
-fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, tally: *Tally) !?[]const u8 {
+fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, tally: *Tally) !?[]const u8 {
     const linux = std.os.linux;
     var fds: [2]i32 = undefined;
     if (linux.errno(linux.pipe2(&fds, .{})) != .SUCCESS) return error.PipeFailed;
@@ -308,7 +326,7 @@ fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, tal
     if (pid == 0) {
         _ = linux.close(fds[0]);
         var counts: Counts = .{ 0, 0, 0, 0, 0 };
-        const why = compare(arena, r, old_fn, new_fn, fds[1], &counts) catch "the oracle ran out of memory";
+        const why = compare(arena, r, old_fn, new_fn, ver_fn, fds[1], &counts) catch "the oracle ran out of memory";
         const tail = [_]u32{done} ++ counts;
         _ = linux.write(fds[1], @ptrCast(&tail), @sizeOf(@TypeOf(tail)));
         if (why) |w| _ = linux.write(fds[1], w.ptr, w.len);
@@ -341,18 +359,18 @@ fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, tal
         }
         last = rec;
     }
-    return try arena.print("the {s} device stopped the process at point {d} (wait status 0x{x})", .{ if (last & 1 == 0) "old" else "new", last >> 1, status });
+    return try arena.print("the {s} device stopped the process at point {d} (wait status 0x{x})", .{ ([3][]const u8{ "old", "new", "versioned" })[last & 3], last >> 2, status });
 }
 
 /// Evaluates both devices at `points` seeded points, writing a progress
 /// record to `fd` before each call; returns the first difference, or null.
-fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, fd: i32, counts: *Counts) !?[]const u8 {
+fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, fd: i32, counts: *Counts) !?[]const u8 {
     const libm = for (libm_kernels) |k| {
         if (std.mem.find(u8, r.new, k) != null) break true;
     } else false;
     const n = r.card.n_u;
     const len = 2 * n + 2 * n * n;
-    const outs = [2][]f64{ try arena.alloc(f64, len), try arena.alloc(f64, len) };
+    const outs = [3][]f64{ try arena.alloc(f64, len), try arena.alloc(f64, len), try arena.alloc(f64, len) };
     const x = try arena.alloc(f64, n);
     const vals = try arena.alloc(f64, r.card.names.len);
     const names = try arena.alloc([*:0]const u8, r.card.names.len);
@@ -360,6 +378,7 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, fd: i32, co
     var prng: std.Random.DefaultPrng = .init(std.hash.Wyhash.hash(0, r.rel));
     const rand = prng.random();
     const args = try arena.dupe(f64, r.card.args);
+    const sides_n: usize = if (ver_fn != null) 3 else 2;
     for (0..points) |p| {
         // Every fourth point reaches past `default_unknown_bound` (10), so
         // a versioned unit's strict body runs there.
@@ -367,34 +386,39 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, fd: i32, co
         for (x) |*v| v.* = (rand.float(f64) - 0.5) * span;
         for (vals, r.card.defaults, r.card.ranges) |*v, def, ranges| v.* = drawIn(rand, def, ranges);
         for (r.card.arg_of, vals) |k, v| args[k] = v;
-        const t = rand.float(f64) * 1e-3;
-        // Inside the box the fast-math body ran: its values may move by
-        // fast-math's reassociation, bounded by `fast_ulps`; outside, the
-        // strict body ran and every bit must match.
+        // A transient: the points in time order, each accepted.
+        const t = @as(f64, @floatFromInt(p)) * 1e-6;
+        _ = rand.float(f64);
+        // The versioned device's fast body runs inside the box: its values
+        // may move by fast-math's reassociation, bounded by `fast_ulps`;
+        // outside, its strict body runs and every bit must match.
         const inside = if (r.card.box) |box| admitted(box, x, args) else false;
-        if (r.card.box != null) counts[if (inside) 2 else 3] += 1;
-        for ([2]RunFn{ old_fn, new_fn }, outs, [2][]const u8{ "old", "new" }, 0..) |f, out, side, s| {
-            const rec: u32 = @intCast(p << 1 | s);
+        if (ver_fn != null) counts[if (inside) 2 else 3] += 1;
+        const fns = [3]?RunFn{ old_fn, new_fn, ver_fn };
+        for (fns[0..sides_n], outs[0..sides_n], ([3][]const u8{ "old", "new", "versioned" })[0..sides_n], 0..) |f, out, side, s| {
+            const rec: u32 = @intCast(p << 2 | s);
             _ = std.os.linux.write(fd, @ptrCast(&rec), 4);
-            const rc = f(names.ptr, vals.ptr, @intCast(vals.len), x.ptr, n, t, out.ptr, @intCast(len));
-            if (rc != 0) return try arena.print("the {s} device's entry returned {d}", .{ side, rc });
+            const rc = f.?(names.ptr, vals.ptr, @intCast(vals.len), x.ptr, n, t, @intCast(p), out.ptr, @intCast(len));
+            if (rc != 0) return try arena.print("the {s} device's entry returned {d} (card: {s})", .{ side, rc, try std.mem.join(arena, ",", @ptrCast(r.card.names)) });
         }
-        for (outs[0], outs[1], 0..) |a, b, i| {
+        for (1..sides_n) |s| for (outs[0], outs[s], 0..) |a, b, i| {
             if (sameBits(a, b)) continue;
-            if (libm and ulpsApart(a, b) <= libm_ulps) {
+            const apart = ulpsApart(a, b);
+            if (libm and apart <= libm_ulps) {
                 counts[1] += 1;
                 continue;
             }
-            const apart = ulpsApart(a, b);
-            if (inside and apart <= fast_ulps) {
+            if (s == 2 and inside and apart <= fast_ulps) {
                 counts[4] = @max(counts[4], @as(u32, @intCast(apart)));
                 continue;
             }
             const part, const at = if (i < n) .{ "row", i } else if (i < n + n * n) .{ "d row", i - n } else if (i < 2 * n + n * n) .{ "q row", i - n - n * n } else .{ "d q row", i - 2 * n - n * n };
-            return try arena.print("point {d}: {s} {d}: old {e}, new {e}", .{ p, part, at, a, b });
-        }
+            return try arena.print("point {d}: {s} {d}: old {e}, {s} {e}{s}", .{ p, part, at, a, if (s == 1) "new" else "versioned", b, if (s == 2 and !inside) " (outside the box: the strict body ran)" else "" });
+        };
         counts[0] += 1;
     }
+    // A device versioned on a box no point reached proved nothing.
+    if (ver_fn != null and counts[2] == 0) return "the versioned device's box admitted none of the points";
     return null;
 }
 

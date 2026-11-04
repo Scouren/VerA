@@ -21,10 +21,27 @@ pub const vera_validate_contract = true;
 /// of bundle `B`'s `devices`, named by its `names`. `name` is the library's, unused.
 pub fn exportDevice(comptime B: type, comptime name: []const u8) void {
     _ = name;
-    inline for (B.devices, B.names) |D, n| @export(&Run(D).run, .{ .name = "cg_" ++ n });
+    @export(&pinMath, .{ .name = "cg_pin_math" });
+    inline for (B.devices, B.names) |D, n| {
+        @export(&Run(D).run, .{ .name = "cg_" ++ n });
+        @export(&Run(D).unknowns, .{ .name = "cg_" ++ n ++ "_nu" });
+    }
 }
 
 // ---- private ----
+
+/// Pins which libm both sides' libraries call. A shared library whose code
+/// needs any compiler_rt helper (an `i128` division, a stack probe) links
+/// compiler_rt's archive member, and with it compiler_rt's musl-ported
+/// `cos`, `sincos` and `exp`, which then bind every math call in the
+/// library; one that needs none binds glibc's libm. The two differ in the
+/// last bit (cos.va at point 82: glibc correctly rounded, musl 1 ulp off),
+/// so a batch's old library and new library computed different `cos`
+/// values from the same source. This `__divti3` makes every library pull
+/// compiler_rt, so both sides call one `cos`.
+fn pinMath(a: *const i128, b: *const i128) callconv(.c) i128 {
+    return @divTrunc(a.*, b.*);
+}
 
 /// The entry of device `D`.
 fn Run(comptime D: type) type {
@@ -33,21 +50,40 @@ fn Run(comptime D: type) type {
         const S = contract.RefFamily(f64, &std.simd.iota(u8, n), .{});
         const V = contract.RefFamily(f64, &@as([n]u8, @splat(contract.no_lane)), .{});
 
-        /// Sets the card (`names[k]` = `vals[k]`), evaluates at `x` and time
-        /// `t`, and writes `2n + 2n²` reals to `out`: the rows, their
-        /// Jacobian (row-major), the reactive rows, theirs. Returns 0; -1
-        /// when `n_x` is not |U|, -2 when `out` is short, -3 when a name is
-        /// no field of `Model`.
-        fn run(names: [*]const [*:0]const u8, vals: [*]const f64, n_params: u32, x: [*]const f64, n_x: u32, t: f64, out: [*]f64, out_len: u32) callconv(.c) i32 {
+        /// |U|.
+        fn unknowns() callconv(.c) u32 {
+            return n;
+        }
+
+        /// The instance and state a transient carries from one step to the next.
+        var inst: D.Instance = .{};
+        var state: if (@hasDecl(D, "State")) D.State else void = undefined;
+
+        /// Step `step` of a transient: sets the card (`names[k]` =
+        /// `vals[k]`), evaluates at `x` and time `t`, writes `2n + 2n²`
+        /// reals to `out` (the rows, their Jacobian row-major, the reactive
+        /// rows, theirs), then accepts the point (`updateState`, `stateCtl
+        /// .commit`), as a host does. Step 0 starts a fresh instance
+        /// (`initState`) in `analog initial` (§5.2.1). Returns 0; -1 when
+        /// `n_x` is not |U|, -2 when `out` is short, -3 when a name is no
+        /// field of `Model`.
+        fn run(names: [*]const [*:0]const u8, vals: [*]const f64, n_params: u32, x: [*]const f64, n_x: u32, t: f64, step: u32, out: [*]f64, out_len: u32) callconv(.c) i32 {
             if (n_x != n) return -1;
             if (out_len < 2 * n + 2 * n * n) return -2;
             var m: D.Model = .{};
-            for (names[0..n_params], vals[0..n_params]) |nm, v| if (!set(&m, std.mem.span(nm), v)) return -3;
+            // A host names every card entry it writes (§9.19, `setGiven`).
+            for (names[0..n_params], vals[0..n_params]) |nm, v| {
+                if (!set(&m, std.mem.span(nm), v)) return -3;
+                if (@hasDecl(D.Model, "setGiven")) D.Model.setGiven(&m, std.mem.span(nm));
+            }
             if (@hasDecl(D, "derive")) D.derive(V, &m);
             if (@hasDecl(D, "setup")) D.setup(V, &m);
-            var inst: D.Instance = .{};
+            if (step == 0) {
+                inst = .{};
+                if (@hasDecl(D, "initState")) state = D.initState(&m, &inst);
+            }
             if (@hasDecl(D, "setupInstance")) D.setupInstance(&m, &inst);
-            const sim: contract.SimState = .{ .t = t, .dt = 1e-9, .kind = .tran, .analog_initial = false, .iteration = 2 };
+            const sim: contract.SimState = .{ .t = t, .dt = 1e-9, .kind = .tran, .analog_initial = step == 0, .initial_step = step == 0, .iteration = 2 };
             const xv: [n]f64 = x[0..n].*;
             const r = D.eval(S, &xv, &m, &inst, sim);
             inline for (0..n) |i| {
@@ -71,6 +107,10 @@ fn Run(comptime D: type) type {
                 out[n + at] += e.g;
                 qo[n + at] += e.c;
             };
+            if (@hasDecl(D, "updateState")) {
+                _ = D.updateState(V, &m, &inst, xv, &state, sim);
+                if (@hasDecl(D, "stateCtl")) _ = D.stateCtl(&m, &inst, &state, .commit);
+            }
             return 0;
         }
 

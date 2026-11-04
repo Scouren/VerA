@@ -47,7 +47,7 @@ pub fn add(g: Graph) void {
     o.addOption(bool, "full_oracles", b.option(bool, "full-oracles", "diff-air-passes: the nightly's full sweep (10^4 programs x 10^3 points) instead of the merge tier's") orelse false);
     o.addOption([]const u8, "codegen_filter", b.option([]const u8, "codegen-filter", "diff-codegen: only the fixtures whose path holds this") orelse "");
     o.addOption(bool, "codegen_keep", b.option(bool, "codegen-keep", "diff-codegen: keep the built devices under zig-out/codegen-work") orelse false);
-    o.addOption(bool, "codegen_versioned", b.option(bool, "codegen-versioned", "diff-codegen: the new devices' units versioned by the float verdict instead of forced strict") orelse false);
+    o.addOption(bool, "codegen_why", b.option(bool, "codegen-why", "diff-codegen: print why each fixture codegen.xfail names still differs") orelse false);
     // diff-codegen builds devices that import std_kernels, which imports Gompute's math.
     o.addOptionPath("gompute_math", b.dependency("gompute", .{}).module("math").root_source_file.?);
     // `libc`: the root loads libraries (`dynlib` needs glibc on Linux).

@@ -129,6 +129,7 @@ pub fn codegen(comp: *Compilation, b: Compilation.Backend) !?Job {
         .digital_device => return notBuilt(comp, b, "the digital device backend (a .v --emit-zig, --check, --emit-so)"),
         .digital_exe => return notBuilt(comp, b, "the native digital executable (a .v --emit-exe)"),
         .libmap => unreachable, // Refused before preprocessing.
+        .digital_lowering => unreachable, // A stage, not a backend: `semaDigital` names it.
     }
     const an = &comp.analysis.?;
     // §8: the mixed runner needs the digital half Sema lowers beside it.
@@ -415,7 +416,7 @@ fn notBuilt(comp: *Compilation, b: Compilation.Backend, what: []const u8) !?Job 
 
 fn notBuiltFmt(comp: *Compilation, stage: []const u8, why: []const u8) !?Job {
     const what = try comp.arena().print("{s} of {s}", .{ stage, why });
-    try frontend.notBuilt(comp, .digital_device, what);
+    try frontend.notBuilt(comp, .digital_lowering, what);
     return null;
 }
 

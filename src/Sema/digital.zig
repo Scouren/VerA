@@ -204,6 +204,9 @@ pub const Lower = struct {
     sdf: bool = false,
     /// A function body is being compiled (§10.4.4: its fork runs in order).
     in_function: bool = false,
+    /// An automatic subroutine's activation storage is being laid out: its
+    /// named blocks' items join it (`sub.zig`'s `storage`).
+    laying_out: bool = false,
     /// The nets, their drivers (compiled after the walk), per slot its
     /// net, and each driver's `.continuous` pc.
     nets: std.ArrayList(nets.NetRow) = .empty,

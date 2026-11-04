@@ -13,6 +13,7 @@
 //! - `pub fn newScope(l: *Lower, parent: u32, name: []const u8, index: ?i64, time: Program.Time, at: u32, queued: bool) Error!u32`
 //! - `pub fn newFrame(l: *Lower, parent: u32, instance: Zcu.Instance.Index, scope: u32, genvars: []const Frame.Genvar) Error!u32`
 //! - `pub fn blockFrame(l: *Lower, outer: u32, i: Inst.Index) Error!u32`
+//! - `pub fn preBlocks(l: *Lower, f: u32, b: Vir.Body, depth: u32) Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -115,22 +116,20 @@ pub fn blockFrame(l: *Lower, outer: u32, i: Inst.Index) Error!u32 {
     const outer_scope = l.frames.items[outer].scope;
     const s = try newScope(l, outer_scope, vir.string(blk.name), null, l.b.times.items[outer_scope], l.srcOffset(outer, i), false);
     const f = try newFrame(l, outer, l.frames.items[outer].instance, s, l.frames.items[outer].genvars);
-    // §10.2.1 an automatic subroutine's block items are per activation,
-    // which its storage (laid out at its declaration) does not hold.
+    // §10.2.1 an automatic subroutine's block items are per activation:
+    // they are laid out with its storage, never after it.
     l.frames.items[f].automatic = l.frames.items[outer].automatic;
     gop.value_ptr.* = f;
     const slots_before = l.b.p.slots.len;
     try vars.locals(l, f, blk.body);
-    if (l.frames.items[outer].automatic and l.b.p.slots.len != slots_before) return l.refuse("a named block declaring storage in an automatic subroutine");
+    if (l.frames.items[outer].automatic and !l.laying_out and l.b.p.slots.len != slots_before) return l.refuse("a named block declaring storage outside its automatic subroutine's activation");
     return f;
 }
-
-// ---- private ----
 
 /// §12.5 the named blocks of a process body, made at the walk (as
 /// lib/sim/digital's elaboration binds them), so a hierarchical name in any
 /// process reaches them.
-fn preBlocks(l: *Lower, f: u32, b: Vir.Body, depth: u32) Error!void {
+pub fn preBlocks(l: *Lower, f: u32, b: Vir.Body, depth: u32) Error!void {
     if (depth >= 1 << 12) return l.refuse("statements nested past 4096 levels");
     const vir = l.virOf(f);
     for (vir.body(b)) |i| switch (Lower.tag(vir, i)) {
@@ -157,6 +156,8 @@ fn preBlocks(l: *Lower, f: u32, b: Vir.Body, depth: u32) Error!void {
         else => {}, // else: no other statement nests one
     };
 }
+
+// ---- private ----
 
 /// One instance: its env (its module's parameters as `Zcu` folded them),
 /// its scope and frame, then its module's items.

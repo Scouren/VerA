@@ -2754,20 +2754,16 @@ verilog/14_specify_blocks/inconsistent_port_reference_rejected.v rw-comp (astgen
 verilog/15_timing_checks/conditions.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in b_15_6_conditions.u: timestamp event at 20, timecheck event at 22`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/fullskew_checks_both_orders.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$fullskew` in fullskew_checks_both_orders.forward: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/hold.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$hold` in b_15_2_2_hold.u: timestamp event at 10, timecheck event at 10`, new `warning[W1199]: timing violation: a timing check reported a violation`
-verilog/15_timing_checks/hold_negative_limit_rejected.v not built: backend digital_device
 verilog/15_timing_checks/negative_timing_disabled_copies_signals.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setuphold` in negative_timing_disabled_copies_signals.u: timestamp event at 10, timecheck event at 10`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/nochange_high_window.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$nochange` in nochange_high_window.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/notifier.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in b_15_5_notifier.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/notifier_net_rejected.v not built: backend digital_device
 verilog/15_timing_checks/period.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$period` in b_15_3_5_period.u: timestamp event at 20, timecheck event at 28`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/recovery.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$recovery` in b_15_2_5_recovery.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
-verilog/15_timing_checks/recovery_negative_limit_rejected.v not built: backend digital_device
 verilog/15_timing_checks/recrem.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$recrem` in b_15_2_6_recrem.u: timestamp event at 10, timecheck event at 11`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/recrem_signal_limit_rejected.v not built: backend digital_device
 verilog/15_timing_checks/removal.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$removal` in b_15_2_4_removal.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
-verilog/15_timing_checks/removal_negative_limit_rejected.v not built: backend digital_device
 verilog/15_timing_checks/setup.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in b_15_2_1_setup.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
-verilog/15_timing_checks/setup_negative_limit_rejected.v not built: backend digital_device
 verilog/15_timing_checks/setuphold.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setuphold` in b_15_2_3_setuphold.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/setuphold_signal_limit_rejected.v not built: backend digital_device
 verilog/15_timing_checks/setuphold_timecheck_condition.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setuphold` in b_15_5_2_setuphold_timecheck_condition.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
@@ -2780,17 +2776,14 @@ verilog/15_timing_checks/timing_check_in_procedure_rejected.v rw-comp (parse): s
 verilog/15_timing_checks/vector.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in b_15_7_vector.u: timestamp event at 100, timecheck event at 105`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/width.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$width` in b_15_3_4_width.u: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/16_sdf/sdf_timing_check_limit.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in sdf_timing_check_limit.u: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
-verilog/17_system_tasks/c_flag_on_integer_rejected.v rw-dlower (run): exit status old 1, new 0
 verilog/17_system_tasks/closed_channel_not_written.v rw-dlower (run): stderr: line 1: old `warning[W1154]: file output not written: no file this descriptor names is open for writing: the output is not written`, new ``
 verilog/17_system_tasks/dist_nonpositive_warning.v rw-dlower (run): stderr: line 1: old `warning[W1151]: probabilistic distribution argument not positive: a $dist_ mean, degree of freedom or k_stage is not positive: the result is 0 and the seed is u`, new ``
 verilog/17_system_tasks/dist_seed_constant_rejected.v not built: backend digital_device
 verilog/17_system_tasks/fclose_two_descriptors_rejected.v not built: backend digital_device
-verilog/17_system_tasks/fopen_type_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/17_system_tasks/fread_multidim_rejected.v not built: backend digital_device
 verilog/17_system_tasks/fwrite_no_descriptor_rejected.v not built: backend digital_device
 verilog/17_system_tasks/math_arguments_rejected.v not built: backend digital_device
 verilog/17_system_tasks/native_sformat_dynamic.v rw-dlower (run): stderr: line 1: old `warning[W1153]: format specifiers and arguments do not pair up: $sformat: the format's specifiers and the arguments after it do not pair up`, new ``
-verilog/17_system_tasks/percent_escape_with_width_rejected.v not built: backend digital_device
 verilog/17_system_tasks/printtimescale_unknown_scope_rejected.v not built: backend digital_device
 verilog/17_system_tasks/random_seed_constant_rejected.v not built: backend digital_device
 verilog/17_system_tasks/readmem_address_outside_memory.v rw-dlower (run): stderr: line 1: old `warning[W1156]: memory file address outside the memory: memory file address @8 is outside the memory's declared range [0:3]; its words are skipped`, new ``
@@ -2828,8 +2821,6 @@ verilog/17_system_tasks/readmem_warn_hex_short_up.v rw-dlower (run): stderr: lin
 verilog/17_system_tasks/sdf_annotate_rejected.v rw-comp (astgen): stderr: line 1: old `error[E1102]: an SDF file the annotator cannot read: sdf_annotate_rejected.sdf: the SDF file cannot be read`, new `error[E1100]: digital source execution failed: sdf_annotate_rejected.sdf: the SDF file cannot be read`
 verilog/17_system_tasks/sformat_excess_argument_warning.v rw-dlower (run): stderr: line 1: old `warning[W1153]: format specifiers and arguments do not pair up: $sformat: the format's specifiers and the arguments after it do not pair up`, new ``
 verilog/17_system_tasks/stop_suspends.v rw-dlower (digital lowering): stderr: line 1: old `$stop at tick 1, verilog/17_system_tasks/stop_suspends.v byte 107`, new `$stop at tick 1, verilog/17_system_tasks/stop_suspends.v byte 797`
-verilog/17_system_tasks/strength_vector_rejected.v rw-comp (astgen): exit status old 1, new 0
-verilog/17_system_tasks/value_plusargs_format_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/18_vcd/dumplimit_without_size_rejected.v not built: backend digital_device
 verilog/18_vcd/dumpports_duplicate_scope_rejected.v rw-comp (astgen): exit status old 1, new 0
 verilog/18_vcd/dumpports_same_file_rejected.v rw-comp (astgen) location: stderr: line 2: old `  --> verilog/18_vcd/dumpports_same_file_rejected.v:28:19`, new `  = note: LRM 8.5`

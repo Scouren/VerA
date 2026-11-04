@@ -455,3 +455,44 @@ test "§7.8.5.1 split on a gate array: each lane reads its own bridge's segment 
     }
     try std.testing.expect(seen[0] and seen[1]);
 }
+
+test "§7.8.5.1 split on a gate array's output: each lane drives its own bridge's segment (lib/sim/digital's lane rows)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const lowered = try lowerSource(arena_state.allocator(), prelude ++
+        \\connectmodule d2a(cm, el);
+        \\  input cm; output el; ddiscrete cm; electrical el;
+        \\  reg lvl; always @(cm) lvl = cm;
+        \\  analog I(el) <+ 0.0;
+        \\endmodule
+        \\`default_discipline ddiscrete
+        \\module top;
+        \\  electrical a;
+        \\  reg [1:0] b, c;
+        \\  and g[1:0] (a, b, c);
+        \\  initial begin b = 2'b11; c = 2'b10; end
+        \\  analog I(a) <+ V(a) / 1000.0;
+        \\endmodule
+        \\`default_discipline
+        \\connectrules rules; connect d2a split; endconnectrules
+        \\
+    , true);
+    // §7.8.5 split names `a__g[L]__out`; §12.1.2 `g[1]` is bit 1. Each
+    // lane's gate drives the bridge input `cm` of its own name, one bit.
+    var cm = [2]?u32{ null, null };
+    for (lowered.names) |x| {
+        if (std.mem.eql(u8, x.path, "a__g[0]__out.cm")) cm[0] = x.slot;
+        if (std.mem.eql(u8, x.path, "a__g[1]__out.cm")) cm[1] = x.slot;
+    }
+    try std.testing.expect(cm[0].? != cm[1].?);
+    const p = &lowered.program;
+    var seen = [2]bool{ false, false };
+    for (p.drivers) |d| {
+        if (d.source != .gate) continue;
+        const lane = d.source.gate.lane.?;
+        try std.testing.expectEqual(cm[lane].?, p.nets[d.net].slot);
+        try std.testing.expectEqual(@as(?u32, null), d.source.gate.out_bit);
+        seen[lane] = true;
+    }
+    try std.testing.expect(seen[0] and seen[1]);
+}

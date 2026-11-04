@@ -3,9 +3,11 @@
 //! with exact or Cody-Waite argument reduction, so its error (~2^-100
 //! relative) is far below the half ulp of `f64` the libraries promise.
 //! Zig's own `f128` builtins (`@exp`, `@sin`, ...) are `f64` arithmetic
-//! widened, so none is used. Null where the reference does not claim its
-//! accuracy (a sin/cos argument past 2^50, where the reduction's pi runs
-//! out) or the function has no real value.
+//! widened, so none is used. A sin/cos/tan argument past 2^50 is reduced
+//! by Payne-Hanek against 2/pi to `frac_bits` bits, computed once from
+//! Machin's formula in big integers (`twoOverPi`), so the reduction is
+//! exact to ~2^-270 for every finite double. Null where the function has
+//! no real value.
 //! Cites: C99 F.10 (the special cases are not judged here: a special both
 //! libraries disagree on is read by eye from the run's log).
 //!
@@ -27,6 +29,12 @@ const pio2 = [4]f128{
     -0x60ce2ff7d10567.0p-225,
 };
 
+/// Fraction bits of `twoOverPi`: a double's exponent is at most 971 past
+/// its 53-bit integer mantissa, so 1300 leave ~270 bits below the point.
+const frac_bits = 1300;
+// ponytail: computed once and never freed (smp_allocator): the run's lifetime.
+var two_over_pi_cache: ?std.math.big.int.Managed = null;
+
 /// The reference value of `name` (a `math` function's name) at `x` (and
 /// `y` for `pow`, `atan2`), or null.
 pub fn of(comptime name: []const u8, x: f64, y: f64) ?f128 {
@@ -38,9 +46,9 @@ pub fn of(comptime name: []const u8, x: f64, y: f64) ?f128 {
         .log => if (x > 0) logQ(q) else null,
         .log10 => if (x > 0) logQ(q) / ln10 else null,
         .pow => powQ(x, y),
-        .sin => if (@abs(x) < 0x1p50) sinCosQ(q, false) else null,
-        .cos => if (@abs(x) < 0x1p50) sinCosQ(q, true) else null,
-        .tan => if (@abs(x) < 0x1p50) sinCosQ(q, false) / sinCosQ(q, true) else null,
+        .sin => if (@abs(x) < 0x1p50) sinCosQ(q, false) else hugeSinCos(x, false),
+        .cos => if (@abs(x) < 0x1p50) sinCosQ(q, true) else hugeSinCos(x, true),
+        .tan => if (@abs(x) < 0x1p50) sinCosQ(q, false) / sinCosQ(q, true) else hugeSinCos(x, false).? / hugeSinCos(x, true).?,
         .sinh => sinhQ(q),
         .cosh => (expQ(@abs(q)) + expQ(-@abs(q))) / 2,
         .tanh => if (@abs(x) > 40) std.math.copysign(@as(f128, 1), q) else sinhQ(q) / ((expQ(@abs(q)) + expQ(-@abs(q))) / 2),
@@ -168,6 +176,87 @@ fn sinCosQ(x: f128, comptime want_cos: bool) f128 {
     return v;
 }
 
+/// floor(2^frac_bits * 2/pi), from pi = 16 atan(1/5) - 4 atan(1/239) at
+/// 64 guard bits, computed on first use.
+fn twoOverPi() *const std.math.big.int.Managed {
+    if (two_over_pi_cache) |*t| return t;
+    const Big = std.math.big.int.Managed;
+    const gpa = std.heap.smp_allocator;
+    const p = frac_bits + 64;
+    var pi = Big.initSet(gpa, 0) catch @panic("OOM");
+    for ([_]struct { u32, i32 }{ .{ 5, 16 }, .{ 239, -4 } }) |nc| {
+        var one = Big.initSet(gpa, 1) catch @panic("OOM");
+        one.shiftLeft(&one, p) catch @panic("OOM");
+        var pow = Big.initSet(gpa, nc[0]) catch @panic("OOM");
+        const nn = Big.initSet(gpa, @as(u64, nc[0]) * nc[0]) catch @panic("OOM");
+        var term = Big.init(gpa) catch @panic("OOM");
+        var rem = Big.init(gpa) catch @panic("OOM");
+        var den = Big.init(gpa) catch @panic("OOM");
+        var sum = Big.initSet(gpa, 0) catch @panic("OOM");
+        // atan(1/n) * 2^p = sum (-1)^k 2^p / ((2k+1) n^(2k+1)); each term
+        // floored, so the sum is off by at most its term count (< 2^10).
+        var k: u32 = 0;
+        while (k < 4 * p) : (k += 1) {
+            const odd = Big.initSet(gpa, 2 * k + 1) catch @panic("OOM");
+            den.mul(&pow, &odd) catch @panic("OOM");
+            term.divFloor(&rem, &one, &den) catch @panic("OOM");
+            if (term.eqlZero()) break;
+            if (k % 2 == 0) sum.add(&sum, &term) catch @panic("OOM") else sum.sub(&sum, &term) catch @panic("OOM");
+            pow.mul(&pow, &nn) catch @panic("OOM");
+        }
+        const c = Big.initSet(gpa, nc[1]) catch @panic("OOM");
+        sum.mul(&sum, &c) catch @panic("OOM");
+        pi.add(&pi, &sum) catch @panic("OOM");
+    }
+    var num = Big.initSet(gpa, 1) catch @panic("OOM");
+    num.shiftLeft(&num, frac_bits + 1 + p) catch @panic("OOM");
+    var t = Big.init(gpa) catch @panic("OOM");
+    var rem = Big.init(gpa) catch @panic("OOM");
+    t.divFloor(&rem, &num, &pi) catch @panic("OOM");
+    two_over_pi_cache = t;
+    return &two_over_pi_cache.?;
+}
+
+/// sin(x) or cos(x) for a finite |x| >= 1 (`of` uses it past 2^50): x = m * 2^e exactly, x * 2/pi
+/// = m * T / 2^(frac_bits - e); its integer part's low two bits are the
+/// quadrant and its fraction, read to 128 bits, the reduced argument.
+fn hugeSinCos(x: f64, comptime want_cos: bool) ?f128 {
+    if (std.math.isNan(x) or std.math.isInf(x)) return null;
+    assert(@abs(x) >= 1); // `of` calls it past 2^50; the test below from 1
+    const Big = std.math.big.int.Managed;
+    const gpa = std.heap.smp_allocator;
+    const bits: u64 = @bitCast(@abs(x));
+    const m: u64 = (bits & ((1 << 52) - 1)) | (1 << 52);
+    const e: i32 = @as(i32, @intCast(bits >> 52)) - 1075;
+    assert(e >= -52 and e < frac_bits - 200);
+    const fb: usize = @intCast(frac_bits - e);
+    var y = Big.initSet(gpa, m) catch @panic("OOM");
+    defer y.deinit();
+    y.mul(&y, twoOverPi()) catch @panic("OOM");
+    var top = Big.init(gpa) catch @panic("OOM");
+    defer top.deinit();
+    top.shiftRight(&y, fb - 128) catch @panic("OOM");
+    var low = Big.init(gpa) catch @panic("OOM");
+    defer low.deinit();
+    low.truncate(&top, .unsigned, 130) catch @panic("OOM");
+    const w = low.toInt(u130) catch unreachable; // truncated to 130 bits
+    var quad: u2 = @truncate(w >> 128);
+    var f: f128 = @as(f128, @floatFromInt(@as(u128, @truncate(w)))) * 0x1p-128;
+    if (f >= 0.5) {
+        f -= 1;
+        quad +%= 1;
+    }
+    const r = f * (pio2[0] + pio2[1] + pio2[2]);
+    const q: u2 = if (want_cos) quad +% 1 else quad;
+    const v = switch (q) {
+        0 => sinSeries(r),
+        1 => cosSeries(r),
+        2 => -sinSeries(r),
+        3 => -cosSeries(r),
+    };
+    return if (!want_cos and x < 0) -v else v;
+}
+
 fn sinSeries(r: f128) f128 {
     var term = r;
     var sum = r;
@@ -214,4 +303,27 @@ fn atan2Q(y: f64, x: f64) ?f128 {
     const a = atanQ(@as(f128, y) / @as(f128, x));
     if (x > 0) return a;
     return if (y > 0) a + pi else a - pi;
+}
+
+test "the big-integer reduction agrees with the four-part pi/2 one below 2^50" {
+    // Two independent reductions (Machin's pi in big integers, the 224-bit
+    // pio2 constant) must give the same f128 to far below an f64 ulp.
+    var prng = std.Random.DefaultPrng.init(0x2f9);
+    const r = prng.random();
+    for (0..2000) |i| {
+        const mag = std.math.ldexp(@as(f64, 1) + r.float(f64), @intCast(i % 49));
+        const x = if (r.boolean()) mag else -mag;
+        inline for (.{ false, true }) |want_cos| {
+            const a = sinCosQ(x, want_cos);
+            const b = hugeSinCos(x, want_cos).?;
+            try std.testing.expect(@abs(a - b) <= 0x1p-100);
+        }
+    }
+    // sin^2 + cos^2 = 1 past 2^50, where only the big-integer one reaches.
+    for (0..200) |i| {
+        const x = std.math.ldexp(@as(f64, 1) + r.float(f64), @intCast(50 + i * 4));
+        const s = hugeSinCos(x, false).?;
+        const c = hugeSinCos(x, true).?;
+        try std.testing.expect(@abs(s * s + c * c - 1) <= 0x1p-100);
+    }
 }

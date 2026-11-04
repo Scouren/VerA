@@ -23,6 +23,7 @@ const Zcu = @import("../Zcu.zig");
 const eval = @import("eval.zig");
 const walk = @import("walk.zig");
 const defparam = @import("defparam.zig");
+const dist = @import("dist.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Env = eval.Env;
@@ -76,7 +77,7 @@ pub fn resolve(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, target: InternPool
         const start: u32 = @intCast(list.items.len);
         for (vir.body(decl.body)) |i| if (vir.instructions.items(.tag)[@backingInt(i)] == .ps_override) {
             const o = payloadOf(vir, Inst.Override, i);
-            const v = if (try env.body(o.value)) |c| try env.intern(c) else InternPool.Index.undef;
+            const v = try dist.fold(s, &env, ps.file, o.value) orelse if (try env.body(o.value)) |c| try env.intern(c) else InternPool.Index.undef;
             try list.append(s.arena, .{ .name = try zcu.intern_pool.getString(s.gpa, vir.string(o.name)), .value = v });
         };
         run = .{ .start = start, .len = @intCast(list.items.len - start) };

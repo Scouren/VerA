@@ -413,8 +413,6 @@ verilog-a/ch09_system_tasks/display_formats.va tables row 4: old `held text`, ne
 verilog-a/ch09_system_tasks/display_library_binding.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/display_radix_of_integer_is_32_bits.va codes: old {}, new E0321 (E0321: a string is not a number; §3.3 Table 3-3 gives it no arithmetic)
 verilog-a/ch09_system_tasks/distribution_arity_rejected.va codes: old {}, new E0506 (E0506: `$rdist_uniform` takes 3 to 4, given 2)
-verilog-a/ch09_system_tasks/dist_type_string_inside_paramset.va tables row 3: old `param u.ka integer local = -2146999808`, new `param u.ka integer local = ?`
-verilog-a/ch09_system_tasks/dist_type_string_misspelled_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/fatal_finish_number_3_rejected.va codes: old E0824, new {}
 verilog-a/ch09_system_tasks/fclose_two_descriptors_rejected.va codes: old E0887, new {}
 verilog-a/ch09_system_tasks/fd_channels_past_30.va tables row 16: old `held name`, new `limit_slots 0`
@@ -515,8 +513,6 @@ verilog-a/ch09_system_tasks/reserved_system_function_name_rejected.va codes: old
 verilog-a/ch09_system_tasks/rewind.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/rng_count_range_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/rng_fractional_count_rejected.va the old side refused, the new side lowered
-verilog-a/ch09_system_tasks/rng_paramset_fractional_rejected.va the old side refused, the new side lowered
-verilog-a/ch09_system_tasks/rng_paramset_nonfinite_integer_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/rng_skipped_arity_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/rng_skipped_seed_rejected.va the old side refused, the new side lowered
 verilog-a/ch09_system_tasks/rng_skipped_type_string_rejected.va the old side refused, the new side lowered

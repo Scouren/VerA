@@ -29,13 +29,15 @@ const Graph = common.Graph;
 const byName = common.byName;
 const pathFromRoot = common.pathFromRoot;
 const testRun = common.testRun;
+/// `vera-next`, `diff-comp` and `conformance-next` (docs/rewrite/comp.md).
+const comp = @import("rewrite_comp.zig");
 
 pub fn add(g: Graph) void {
     const b = g.b;
     const mods = g.mods;
     // One description for every new module: each oracle names itself in its row below.
     const all = b.step("rewrite", "The rewrite's modules' tests (test-<module>) and every diff-* oracle below");
-    for ([_][]const u8{ "vams", "intern_pool", "air", "link", "std_sim", "sema", "std_kernels", "codegen" }) |name| {
+    for ([_][]const u8{ "vams", "intern_pool", "air", "link", "std_sim", "sema", "std_kernels", "codegen", "comp" }) |name| {
         all.dependOn(&b.top_level_steps.get(b.fmt("test-{s}", .{name})).?.step);
     }
     const o = b.addOptions();
@@ -132,6 +134,7 @@ pub fn add(g: Graph) void {
     kd.dependOn(kt);
     all.dependOn(kd);
     g.test_step.dependOn(kd);
+    comp.add(g, all);
 }
 
 // ---- private ----

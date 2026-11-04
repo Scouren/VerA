@@ -1,0 +1,502 @@
+//! `vera-next --lsp`: a Language Server Protocol 3.17 session on stdin/stdout
+//! -> the compiler's diagnostics as `textDocument/publishDiagnostics`, and
+//! its fix-its as `quickfix` code actions. The old `src/cli/lsp.zig`'s
+//! session, its lint now `Compilation.update` with the `lint` target (the
+//! analysis up to Sema and the float verdict) and the editor's text as an
+//! overlay on the compilation's one reader (`Config.overlays`), so an
+//! `include is read from disk and the open document from the editor.
+//!
+//! Every open Verilog-A document is linted on open and on every change.
+//! Diagnostics inside an included file are published on that file's URI.
+//! The flags are this command line's, then the workspace root's
+//! `.vera-flags` (whitespace-separated `vera` flags, `-I` relative to the
+//! root), read once at `initialize`. Positions are UTF-8 when the client
+//! offers it (`positionEncoding`), else UTF-16. A `.v` document gets no
+//! diagnostics yet.
+//!
+//! Cites: none of the LRM's; the protocol is LSP 3.17's.
+//!
+//! Contents:
+//! - `pub const max_message_bytes: usize`, `pub const header_lines_max: u32`
+//! - `pub const ServeError = Allocator.Error || Io.Writer.Error || Compilation.UpdateError`
+//! - `pub fn serve(gpa: Allocator, io: Io, cli: *args.Options, in: *Io.Reader, out: *Io.Writer, err: *Io.Writer) ServeError!u8`
+
+const std = @import("std");
+const assert = std.debug.assert;
+const Allocator = std.mem.Allocator;
+const Io = std.Io;
+const Compilation = @import("comp");
+const args = @import("cli/args.zig");
+const lspd = @import("lsp_diagnostics.zig");
+const Range = lspd.Range;
+const Fix = lspd.Fix;
+const Diagnostic = lspd.Diagnostic;
+const uriToPath = lspd.uriToPath;
+const pathToUri = lspd.pathToUri;
+
+/// The largest message body read. A `didOpen` carries the whole document, and
+/// the compiler takes no source past 4 GiB (u32 offsets); a body
+/// past this is refused and the session ends (the stream cannot be resynced).
+pub const max_message_bytes: usize = 1 << 28;
+/// The most header fields one message may carry before its blank line; a
+/// client sends one or two.
+pub const header_lines_max: u32 = 64;
+
+/// Every way `serve` fails rather than ends the session: memory, or a
+/// stream that cannot take the answer.
+pub const ServeError = Allocator.Error || Io.Writer.Error || Compilation.UpdateError;
+
+const Doc = struct {
+    /// gpa-owned.
+    text: []u8,
+    /// Other URIs (included files) the last lint published on; gpa-owned.
+    /// Cleared when a later lint does not publish on them again.
+    extra: std.ArrayList([]u8) = .empty,
+
+    fn deinit(d: *Doc, gpa: Allocator) void {
+        gpa.free(d.text);
+        for (d.extra.items) |u| gpa.free(u);
+        d.extra.deinit(gpa);
+    }
+};
+
+const Server = struct {
+    gpa: Allocator,
+    io: Io,
+    out: *Io.Writer,
+    cli: *args.Options,
+    utf16: bool = true,
+    shutdown: bool = false,
+    /// `initialize` answered: a second one reads no `.vera-flags`, whose
+    /// flags `cli` already holds and whose bytes it borrows.
+    initialized: bool = false,
+    /// URI (gpa-owned key) -> document.
+    docs: std.StringHashMapUnmanaged(Doc) = .empty,
+    /// `.vera-flags`' bytes, which `cli` borrows; gpa-owned.
+    flags_text: []u8 = &.{},
+    /// Absolute `-I` dirs made from relative ones; `cli` borrows them.
+    abs_dirs: std.ArrayList([]u8) = .empty,
+
+    fn deinit(s: *Server) void {
+        var it = s.docs.iterator();
+        while (it.next()) |e| {
+            s.gpa.free(e.key_ptr.*);
+            e.value_ptr.deinit(s.gpa);
+        }
+        s.docs.deinit(s.gpa);
+        s.gpa.free(s.flags_text);
+        for (s.abs_dirs.items) |d| s.gpa.free(d);
+        s.abs_dirs.deinit(s.gpa);
+    }
+
+    fn send(s: *Server, arena: Allocator, msg: anytype) !void {
+        var aw: Io.Writer.Allocating = .init(arena);
+        // An allocating writer fails only when its allocator does.
+        std.json.Stringify.value(msg, .{ .emit_null_optional_fields = false }, &aw.writer) catch return error.OutOfMemory;
+        assert(aw.written().len != 0);
+        assert(aw.written()[0] == '{'); // Every LSP message is a JSON object.
+        try s.out.print("Content-Length: {d}\r\n\r\n", .{aw.written().len});
+        try s.out.writeAll(aw.written());
+        try s.out.flush();
+    }
+
+    fn reply(s: *Server, arena: Allocator, id: std.json.Value, result: anytype) !void {
+        try s.send(arena, .{ .jsonrpc = "2.0", .id = id, .result = result });
+    }
+
+    fn showMessage(s: *Server, arena: Allocator, text: []const u8) !void {
+        try s.send(arena, .{ .jsonrpc = "2.0", .method = "window/showMessage", .params = .{ .type = 1, .message = text } });
+    }
+};
+
+/// The incoming envelope: a request has an `id` and a `method`, a
+/// notification only a `method`; a response (to a server request, which this
+/// server never makes) is ignored.
+const Message = struct {
+    id: ?std.json.Value = null,
+    method: ?[]const u8 = null,
+    params: ?std.json.Value = null,
+};
+
+const parse_opts: std.json.ParseOptions = .{ .ignore_unknown_fields = true };
+
+comptime {
+    _ = ams_session;
+}
+
+const ams_session = struct {
+    test "a session: initialize, a missing `;` diagnosed with its fix, the fix as a code action, shutdown" {
+        const gpa = std.testing.allocator;
+        var arena_state: std.heap.ArenaAllocator = .init(gpa);
+        defer arena_state.deinit();
+        const arena = arena_state.allocator();
+
+        // E0207 at `endmodule`, with "insert `;`" after the `1` of line 2:
+        // `  analog /*é*/ x = 1` is 21 bytes (the `é` in the comment is 2), so the
+        // insertion is at character 21 in UTF-8.
+        const src = "module m;\\n  real x;\\n  analog /*é*/ x = 1\\nendmodule\\n";
+        var input: std.ArrayList(u8) = .empty;
+        for ([_][]const u8{
+            \\{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{"general":{"positionEncodings":["utf-8","utf-16"]}}}}
+            ,
+            \\{"jsonrpc":"2.0","method":"initialized","params":{}}
+            ,
+            "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":{\"textDocument\":{\"uri\":\"file:///nonexistent/m.va\",\"languageId\":\"verilogams\",\"version\":1,\"text\":\"" ++ src ++ "\"}}}",
+            \\{"jsonrpc":"2.0","id":2,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///nonexistent/m.va"},"range":{"start":{"line":3,"character":0},"end":{"line":3,"character":0}},"context":{"diagnostics":[{"range":{"start":{"line":3,"character":0},"end":{"line":3,"character":9}},"message":"x","data":{"fixes":[{"title":"insert `;`","uri":"file:///nonexistent/m.va","range":{"start":{"line":2,"character":21},"end":{"line":2,"character":21}},"newText":";"}]}}]}}}
+            ,
+            \\{"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{}}
+            ,
+            \\{"jsonrpc":"2.0","id":4,"method":"shutdown"}
+            ,
+            \\{"jsonrpc":"2.0","method":"exit"}
+        }) |m| try input.appendSlice(arena, try frame(arena, m));
+
+        var in: Io.Reader = .fixed(input.items);
+        var out: Io.Writer.Allocating = .init(arena);
+        var err: Io.Writer.Allocating = .init(arena);
+        var cli: args.Options = .{};
+        defer cli.deinit(gpa);
+        try std.testing.expectEqual(@as(u8, 0), try serve(gpa, std.testing.io, &cli, &in, &out.writer, &err.writer));
+        try std.testing.expectEqualStrings("", err.written());
+
+        const got = out.written();
+        const has = struct {
+            fn f(hay: []const u8, needle: []const u8) !void {
+                if (std.mem.find(u8, hay, needle) == null) {
+                    std.debug.print("missing {s}\nin {s}\n", .{ needle, hay });
+                    return error.TestUnexpectedResult;
+                }
+            }
+        }.f;
+        try has(got, "\"positionEncoding\":\"utf-8\"");
+        try has(got, "\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":\"file:///nonexistent/m.va\"");
+        // The parse refusal at `endmodule` (line 3, UTF-8 character 0); its
+        // text is the parse stage's (comp.xfail names the gap).
+        try has(got, "{\"range\":{\"start\":{\"line\":3,\"character\":0}");
+        try has(got, "\"code\":\"E0207\",\"source\":\"vera\"");
+        try has(got, "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":[{\"title\":\"insert `;`\",\"kind\":\"quickfix\",\"edit\":{\"changes\":{\"file:///nonexistent/m.va\":[{\"range\":{\"start\":{\"line\":2,\"character\":21},\"end\":{\"line\":2,\"character\":21}},\"newText\":\";\"}]}}}]}");
+        try has(got, "{\"jsonrpc\":\"2.0\",\"id\":3,\"error\":{\"code\":-32601");
+        try has(got, "{\"jsonrpc\":\"2.0\",\"id\":4,\"result\":null}");
+    }
+};
+
+/// Runs one session: reads framed messages from `in` until `exit`, answering
+/// on `out`. `cli` holds the command line's flags; `.vera-flags` is parsed
+/// into it at `initialize`, so it must outlive the call; the strings that
+/// file added to `cli` are freed when the call returns. Returns the process
+/// exit status: 0 after `shutdown` then `exit`, 1 for an `exit` without a
+/// `shutdown`, a closed input, or a malformed frame (reason on `err`).
+pub fn serve(gpa: Allocator, io: Io, cli: *args.Options, in: *Io.Reader, out: *Io.Writer, err: *Io.Writer) ServeError!u8 {
+    assert(!cli.lint_flag);
+    assert(cli.paths.items.len == 0);
+    var s: Server = .{ .gpa = gpa, .io = io, .out = out, .cli = cli };
+    defer s.deinit();
+    var arena_state: std.heap.ArenaAllocator = .init(gpa);
+    defer arena_state.deinit();
+
+    while (true) {
+        // Not `.retain_capacity`: that would pin the largest `didOpen` (up to
+        // `max_message_bytes`) for the session, and its regrow swallows an
+        // allocation failure. One chunk per message is noise beside a lint.
+        _ = arena_state.reset(.free_all);
+        const arena = arena_state.allocator();
+
+        // Header: `Content-Length: N\r\n`, maybe other fields, then `\r\n`.
+        var len: ?usize = null;
+        var fields: u32 = 0;
+        while (true) : (fields += 1) {
+            if (fields == header_lines_max) {
+                try err.print("error: --lsp: a message header of more than {d} lines\n", .{header_lines_max});
+                return 1;
+            }
+            const line = in.takeDelimiterInclusive('\n') catch |e| switch (e) {
+                error.EndOfStream => return 1,
+                else => {
+                    try err.print("error: --lsp: reading a header failed: {t}\n", .{e});
+                    return 1;
+                },
+            };
+            const field = std.mem.trimEnd(u8, line, "\r\n");
+            if (field.len == 0) break;
+            const key = "content-length:";
+            if (field.len > key.len and std.ascii.eqlIgnoreCase(field[0..key.len], key))
+                len = std.fmt.parseInt(usize, std.mem.trim(u8, field[key.len..], " \t"), 10) catch null;
+        }
+        const n = len orelse {
+            try err.writeAll("error: --lsp: a message without a valid Content-Length\n");
+            return 1;
+        };
+        if (n > max_message_bytes) {
+            try err.print("error: --lsp: a {d}-byte message is past the {d}-byte limit\n", .{ n, max_message_bytes });
+            return 1;
+        }
+        const body = in.readAllocAll(arena, n) catch |e| switch (e) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => {
+                try err.print("error: --lsp: reading a {d}-byte message failed: {t}\n", .{ n, e });
+                return 1;
+            },
+        };
+
+        const msg = std.json.parseFromSliceLeaky(Message, arena, body, parse_opts) catch |e| {
+            if (e == error.OutOfMemory) return error.OutOfMemory;
+            try s.send(arena, .{ .jsonrpc = "2.0", .id = null, .@"error" = .{ .code = -32700, .message = "parse error" } });
+            continue;
+        };
+        const method = msg.method orelse continue;
+        const params = msg.params orelse .null;
+        if (std.mem.eql(u8, method, "exit")) return if (s.shutdown) 0 else 1;
+        // A params shape the server cannot read is the client's bug: answer
+        // a request with InvalidParams, drop a notification.
+        // The session loop ends only at `exit` or a broken stream.
+        dispatch(&s, arena, method, msg.id, params) catch |e| switch (e) {
+            error.OutOfMemory, error.WriteFailed => |x| return x,
+            else => if (msg.id) |id| try s.send(arena, .{ .jsonrpc = "2.0", .id = id, .@"error" = .{ .code = -32602, .message = @errorName(e) } }),
+        };
+    }
+}
+
+// ---- private ----
+
+fn dispatch(s: *Server, arena: Allocator, method: []const u8, id: ?std.json.Value, params: std.json.Value) !void {
+    assert(!std.mem.eql(u8, method, "exit")); // `serve` ends the session itself.
+    const eql = std.mem.eql;
+    if (eql(u8, method, "initialize")) {
+        const p = try std.json.parseFromValueLeaky(struct {
+            rootUri: ?[]const u8 = null,
+            capabilities: struct {
+                general: struct { positionEncodings: []const []const u8 = &.{} } = .{},
+            } = .{},
+        }, arena, params, parse_opts);
+        for (p.capabilities.general.positionEncodings) |e| {
+            if (eql(u8, e, "utf-8")) s.utf16 = false;
+        }
+        if (!s.initialized) if (p.rootUri) |u| if (try uriToPath(arena, u)) |root| try readFlags(s, arena, root);
+        s.initialized = true;
+        try s.reply(arena, id orelse return, .{
+            .capabilities = .{
+                .positionEncoding = if (s.utf16) "utf-16" else "utf-8",
+                // Full text on every change (1); `save` is not asked for.
+                .textDocumentSync = .{ .openClose = true, .change = 1 },
+                .codeActionProvider = .{ .codeActionKinds = &[_][]const u8{"quickfix"} },
+            },
+            .serverInfo = .{ .name = "vera" },
+        });
+    } else if (eql(u8, method, "shutdown")) {
+        s.shutdown = true;
+        try s.reply(arena, id orelse return, null);
+    } else if (eql(u8, method, "textDocument/didOpen")) {
+        const p = try std.json.parseFromValueLeaky(struct {
+            textDocument: struct { uri: []const u8, text: []const u8 },
+        }, arena, params, parse_opts);
+        try setText(s, arena, p.textDocument.uri, p.textDocument.text);
+    } else if (eql(u8, method, "textDocument/didChange")) {
+        const p = try std.json.parseFromValueLeaky(struct {
+            textDocument: struct { uri: []const u8 },
+            contentChanges: []const struct { text: []const u8 },
+        }, arena, params, parse_opts);
+        // Full sync: the last change is the whole document.
+        if (p.contentChanges.len == 0) return;
+        try setText(s, arena, p.textDocument.uri, p.contentChanges[p.contentChanges.len - 1].text);
+    } else if (eql(u8, method, "textDocument/didClose")) {
+        const p = try std.json.parseFromValueLeaky(struct {
+            textDocument: struct { uri: []const u8 },
+        }, arena, params, parse_opts);
+        const kv = s.docs.fetchRemove(p.textDocument.uri) orelse return;
+        var doc = kv.value;
+        defer {
+            s.gpa.free(kv.key);
+            doc.deinit(s.gpa);
+        }
+        try publish(s, arena, kv.key, &.{});
+        for (doc.extra.items) |u| try publish(s, arena, u, &.{});
+    } else if (eql(u8, method, "textDocument/codeAction")) {
+        const p = try std.json.parseFromValueLeaky(struct {
+            context: struct { diagnostics: []const struct { data: struct { fixes: []const Fix = &.{} } = .{} } },
+        }, arena, params, parse_opts);
+        const Edit = struct { range: Range, newText: []const u8 };
+        const Action = struct {
+            title: []const u8,
+            kind: []const u8 = "quickfix",
+            edit: struct { changes: std.json.ArrayHashMap([]const Edit) },
+        };
+        var actions: std.ArrayList(Action) = .empty;
+        for (p.context.diagnostics) |d| for (d.data.fixes) |f| {
+            var changes: std.json.ArrayHashMap([]const Edit) = .{};
+            try changes.map.put(arena, f.uri, try arena.dupe(Edit, &.{.{ .range = f.range, .newText = f.newText }}));
+            try actions.append(arena, .{ .title = f.title, .edit = .{ .changes = changes } });
+        };
+        try s.reply(arena, id orelse return, actions.items);
+    } else if (id) |rid| {
+        try s.send(arena, .{ .jsonrpc = "2.0", .id = rid, .@"error" = .{ .code = -32601, .message = "method not found" } });
+    }
+    // Any other notification (`initialized`, `$/cancelRequest`, `didSave`, ...) needs nothing.
+}
+
+/// `.vera-flags` at `root`, after this command line's flags; a relative `-I`
+/// is made relative to `root`. A flag `vera` refuses is shown to the user,
+/// and the flags before it stay.
+fn readFlags(s: *Server, arena: Allocator, root: []const u8) !void {
+    assert(!s.initialized); // Read once: `cli` borrows the bytes.
+    assert(s.flags_text.len == 0);
+    const path = try std.fs.path.join(arena, &.{ root, ".vera-flags" });
+    s.flags_text = Io.Dir.cwd().readFileAlloc(s.io, path, s.gpa, .limited(max_message_bytes)) catch |e| switch (e) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => return, // no `.vera-flags`: the command line's flags alone
+    };
+    var iter = std.mem.tokenizeAny(u8, s.flags_text, " \t\r\n");
+    const dirs_before = s.cli.include_dirs.items.len;
+    var discard: Io.Writer.Discarding = .init(&.{});
+    var why: Io.Writer.Allocating = .init(arena);
+    if (try args.parse(s.cli, s.gpa, &iter, &discard.writer, &why.writer) != null)
+        try s.showMessage(arena, try arena.print("vera: {s}: {s}", .{ path, std.mem.trimEnd(u8, why.written(), "\n") }));
+    for (s.cli.include_dirs.items[dirs_before..]) |*d| if (!std.fs.path.isAbsolute(d.*)) {
+        try s.abs_dirs.ensureUnusedCapacity(s.gpa, 1);
+        const abs = try std.fs.path.join(s.gpa, &.{ root, d.* });
+        s.abs_dirs.appendAssumeCapacity(abs);
+        d.* = abs;
+    };
+}
+
+fn setText(s: *Server, arena: Allocator, uri: []const u8, text: []const u8) !void {
+    // Every allocation first: a failure leaves the old document whole.
+    const owned = try s.gpa.dupe(u8, text);
+    const gop = s.docs.getOrPut(s.gpa, uri) catch |e| {
+        s.gpa.free(owned);
+        return e;
+    };
+    if (gop.found_existing) {
+        s.gpa.free(gop.value_ptr.text);
+    } else {
+        gop.key_ptr.* = s.gpa.dupe(u8, uri) catch |e| {
+            s.docs.removeByPtr(gop.key_ptr);
+            s.gpa.free(owned);
+            return e;
+        };
+        gop.value_ptr.* = .{ .text = &.{} };
+    }
+    gop.value_ptr.text = owned;
+    assert(std.mem.eql(u8, gop.value_ptr.text, text));
+    try lintAndPublish(s, arena, gop.key_ptr.*, gop.value_ptr);
+}
+
+// ponytail: a full lint per keystroke, no debounce or cancellation; add a
+// frontend-only pass on change when a large model makes typing lag.
+fn lintAndPublish(s: *Server, arena: Allocator, uri: []const u8, doc: *Doc) !void {
+    assert(s.docs.getPtr(uri) == doc);
+    const path = (try uriToPath(arena, uri)) orelse "<untitled>";
+    const is_va = !std.mem.eql(u8, std.fs.path.extension(path), ".v");
+    var bundle: @import("vams").Diag = .empty;
+    defer bundle.deinit(s.gpa);
+    var sources: []const @import("vams").Diag.Source = &.{};
+    var comp: ?*Compilation = null;
+    defer if (comp) |c| c.destroy();
+    if (is_va and s.cli.sim != .verilog) {
+        // `resolve` refused every codegen flag beside `--lsp`: a lint.
+        var config = args.config(s.cli, &.{path}, 1);
+        assert(config.target == .lint);
+        config.overlays = &.{.{ .path = path, .bytes = doc.text }};
+        const c = try Compilation.create(s.gpa, s.io, config);
+        comp = c;
+        try c.update();
+        bundle = try c.getAllErrors();
+        sources = try c.sources();
+    }
+    const by_uri = try lspd.diagnostics(arena, bundle, sources, @fromBackingInt(0), uri, s.utf16);
+    assert(by_uri.count() != 0); // The document's own URI is always the first key.
+
+    // Clear the included files this lint no longer reports on.
+    for (doc.extra.items) |u| if (!by_uri.contains(u)) try publish(s, arena, u, &.{});
+    for (doc.extra.items) |u| s.gpa.free(u);
+    doc.extra.clearRetainingCapacity();
+    var it = by_uri.iterator();
+    while (it.next()) |e| {
+        try publish(s, arena, e.key_ptr.*, e.value_ptr.items);
+        if (!std.mem.eql(u8, e.key_ptr.*, uri)) try doc.extra.append(s.gpa, try s.gpa.dupe(u8, e.key_ptr.*));
+    }
+    assert(doc.extra.items.len + 1 == by_uri.count()); // Every URI but the document's own.
+}
+
+fn publish(s: *Server, arena: Allocator, uri: []const u8, ds: []const Diagnostic) !void {
+    for (ds) |d| assert(d.severity >= 1 and d.severity <= 3);
+    try s.send(arena, .{
+        .jsonrpc = "2.0",
+        .method = "textDocument/publishDiagnostics",
+        .params = .{ .uri = uri, .diagnostics = ds },
+    });
+}
+
+fn frame(arena: Allocator, json: []const u8) ![]const u8 {
+    return arena.print("Content-Length: {d}\r\n\r\n{s}", .{ json.len, json });
+}
+
+/// A session over a `.v` document (never linted) under `root`, whose
+/// `.vera-flags` holds `-I inc`: initialize twice, open, change with no
+/// change, change, close, close again, shutdown, exit.
+fn vSession(gpa: Allocator, root_uri: []const u8) !void {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    const init_msg = try arena.print("{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{{\"rootUri\":\"{s}\"}}}}", .{root_uri});
+    var input: std.ArrayList(u8) = .empty;
+    for ([_][]const u8{
+        init_msg,
+        init_msg,
+        \\{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///x/top.v","text":"module top; endmodule\n"}}}
+        ,
+        \\{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///x/top.v"},"contentChanges":[]}}
+        ,
+        \\{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///x/top.v"},"contentChanges":[{"text":"a"},{"text":"module top2; endmodule\n"}]}}
+        ,
+        \\{"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":"file:///x/top.v"}}}
+        ,
+        \\{"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":"file:///x/top.v"}}}
+        ,
+        \\{"jsonrpc":"2.0","id":2,"method":"shutdown"}
+        ,
+        \\{"jsonrpc":"2.0","method":"exit"}
+    }) |m| try input.appendSlice(arena, try frame(arena, m));
+    var in: Io.Reader = .fixed(input.items);
+    var out: Io.Writer.Allocating = .init(arena);
+    var err: Io.Writer.Allocating = .init(arena);
+    var cli: args.Options = .{};
+    defer cli.deinit(gpa);
+    try std.testing.expectEqual(@as(u8, 0), try serve(gpa, std.testing.io, &cli, &in, &out.writer, &err.writer));
+    try std.testing.expectEqualStrings("", err.written());
+    // `.vera-flags` is read once. (Its strings died with the session.)
+    try std.testing.expectEqual(@as(usize, 1), cli.include_dirs.items.len);
+    // Opened, changed once (the empty change is no edit), closed once: three
+    // publishes, each empty for a `.v` document.
+    try std.testing.expectEqual(@as(usize, 3), std.mem.count(u8, out.written(), "\"diagnostics\":[]"));
+}
+
+test "exit without shutdown, and a closed input, are status 1" {
+    const gpa = std.testing.allocator;
+    var cli: args.Options = .{};
+    defer cli.deinit(gpa);
+    var out: Io.Writer.Allocating = .init(gpa);
+    defer out.deinit();
+    var err: Io.Writer.Allocating = .init(gpa);
+    defer err.deinit();
+    var exit: Io.Reader = .fixed("Content-Length: 33\r\n\r\n{\"jsonrpc\":\"2.0\",\"method\":\"exit\"}");
+    try std.testing.expectEqual(@as(u8, 1), try serve(gpa, std.testing.io, &cli, &exit, &out.writer, &err.writer));
+    var closed: Io.Reader = .fixed("");
+    try std.testing.expectEqual(@as(u8, 1), try serve(gpa, std.testing.io, &cli, &closed, &out.writer, &err.writer));
+    var bad: Io.Reader = .fixed("Content-Type: x\r\n\r\n{}");
+    try std.testing.expectEqual(@as(u8, 1), try serve(gpa, std.testing.io, &cli, &bad, &out.writer, &err.writer));
+    try std.testing.expectEqualStrings("error: --lsp: a message without a valid Content-Length\n", err.written());
+    // The header's name is case-insensitive; the body's size is bounded.
+    var big: Io.Reader = .fixed("content-length: 268435457\r\n\r\n");
+    try std.testing.expectEqual(@as(u8, 1), try serve(gpa, std.testing.io, &cli, &big, &out.writer, &err.writer));
+    try std.testing.expect(std.mem.endsWith(u8, err.written(), "error: --lsp: a 268435457-byte message is past the 268435456-byte limit\n"));
+}
+
+test "a session over a .v document: `.vera-flags` read once, leak-free under every allocation failure" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(std.testing.io, .{ .sub_path = ".vera-flags", .data = "-I inc\n" });
+    var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena.deinit();
+    const root = try tmp.dir.realPathFileAlloc(std.testing.io, ".", arena.allocator());
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, vSession, .{try pathToUri(arena.allocator(), root)});
+}

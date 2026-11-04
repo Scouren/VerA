@@ -23,6 +23,7 @@ const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const InternPool = @import("intern_pool");
 const Air = @import("../Air.zig");
+const tan_q = @import("tan.zig");
 const Inst = Air.Inst;
 
 /// A value of a §3.2 `integer` or `real`, or a §3.2.2 array version.
@@ -296,17 +297,21 @@ pub fn unary(tag: Inst.Tag, a: Value) Error!Value {
         .real = switch (tag) {
             .fneg => -x,
             .sqrt => @sqrt(x),
-            .exp => @exp(x),
+            // exp, log10 and tan in f128, rounded once: the f64 builtins
+            // are within 1 ulp only, and diff-air's f128 reference found
+            // the old fold closer on 6,979 exp and 9,398 tan operand sets
+            // (`@log10` was off by 1e-10 relative on a subnormal).
+            .exp => @floatCast(@exp(@as(f128, x))),
             .expm1 => math.expm1(x),
             .ln => @log(x),
             .ln1p => math.log1p(x),
-            .log10 => log10(x),
+            .log10 => @floatCast(@log10(@as(f128, x))),
             .floor => @floor(x),
             .ceil => @ceil(x),
             .fabs => @abs(x),
             .sin => @sin(x),
             .cos => @cos(x),
-            .tan => @tan(x),
+            .tan => tan_q.tan(x),
             .asin => math.asin(x),
             .acos => math.acos(x),
             .atan => math.atan(x),
@@ -416,14 +421,6 @@ fn pow(x: f64, y: f64) f64 {
     const mag: f64 = @floatCast(@exp(@as(f128, y) * @log(@as(f128, @abs(x)))));
     const odd = int_y and @abs(y) < 0x1p53 and @mod(y, 2) != 0;
     return if (x < 0 and odd) -mag else mag;
-}
-
-/// log10(x). `@log10` is off by up to 1e-10 relative on a subnormal
-/// (diff-air found it against `contract.gm.log10` and Python's
-/// `math.log10`), so a subnormal is scaled into the normal range first.
-fn log10(x: f64) f64 {
-    if (x > 0 and x < math.floatMin(f64)) return @log10(x * 0x1p54) - 16.25561976585498454154190031512262316; // 54·log10(2)
-    return @log10(x);
 }
 
 /// §3.2: the low 32 bits, sign-extended.

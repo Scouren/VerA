@@ -15,6 +15,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const vams = @import("vams");
 const std_sim = @import("std_sim");
+const kernels = @import("kernels");
 const digital = @import("../digital.zig");
 const expr = @import("expr.zig");
 const place = @import("place.zig");
@@ -160,9 +161,31 @@ fn argumentForms(l: *Lower, i: Inst.Index, f: SysFn, args: []const Inst.Ref) Err
             if (args.len != want or args[0] == .none) return l.reject(l.frame, at, "$test$plusargs takes (string) and $value$plusargs (format, variable)");
             // §17.10.1 "either a string or a nonreal variable".
             if ((try expr.typeValue(l, args[0])).real) return l.rejectArg(l.frame, i, 0, "§17.10: the plusarg string is a string or a nonreal variable");
+            // §17.10.2: "%d %o %h %b %e %f %g %s" (either case, a leading 0 allowed) are "the only valid ones".
+            if (f == .value_plusargs) if (literal(l, args[0])) |text| {
+                var k: usize = 0;
+                while (std.mem.findScalarPos(u8, text, k, '%')) |pct| {
+                    k = pct + 1;
+                    while (k < text.len and text[k] == '0') k += 1;
+                    if (k == text.len or std.mem.findScalar(u8, "dohbefgsDOHBEFGS", text[k]) == null)
+                        return l.rejectArgFmt(l.frame, i, 0, "§17.10.2: a $value$plusargs format is one of %d %o %h %b %e %f %g %s, not `%{s}`", .{text[@min(k, text.len)..@min(k + 1, text.len)]});
+                }
+            };
         },
+        // §17.2.1 "The type is a character string ... of one of the forms in Table 17-7".
+        .fopen => if (args.len == 2) if (literal(l, args[1])) |ty| if (!kernels.fopen_types.has(ty))
+            return l.rejectArg(l.frame, i, 1, "§17.2.1: an $fopen type is one of Table 17-7's r, w, a, r+, w+, a+ (with b)"),
         else => {}, // else: checked where lowered
     }
+}
+
+/// The text of string literal `r`, or null when `r` is no literal.
+fn literal(l: *Lower, r: Inst.Ref) ?[]const u8 {
+    const vir = l.virOf(l.frame);
+    const i = r.toIndex() orelse return null;
+    if (Lower.tag(vir, i) != .str) return null;
+    const sd = vir.instructions.items(.data)[@backingInt(i)].str;
+    return vir.string_bytes[@backingInt(sd.start)..][0..sd.len];
 }
 
 /// §17.9 a `$random` or `$dist_*` call: its seed (an inout variable written

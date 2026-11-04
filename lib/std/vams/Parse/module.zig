@@ -157,7 +157,7 @@ fn parsePorts(p: *Parse) Error!Node.SubRange {
         const tok = p.tok_i;
         switch (p.tokenTag(tok)) {
             .keyword_input, .keyword_output, .keyword_inout => {
-                if (plain) try p.warn(.invalid_port_declaration);
+                if (plain) try p.warnSite(.invalid_port_declaration, .port_after_list, p.tok_i, 0);
                 ansi = true;
                 try p.push(try decl.parsePortDecl(p, .header));
             },

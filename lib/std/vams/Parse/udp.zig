@@ -112,10 +112,10 @@ pub fn parseUdpInst(p: *Parse) Error!Node.Index {
         _ = try p.expect(.l_paren);
         const terms_top = p.scratch.items.len;
         const out = try expr.parseExpr(p);
-        if (!prim.isNetLvalue(p, out)) return p.failAt(.invalid_gate_terminals, inst);
+        if (!prim.isNetLvalue(p, out)) return p.failSite(.invalid_gate_terminals, .gate_output, p.nodes.items(.main_token)[@backingInt(out)], 0);
         try p.push(out);
         while (p.eat(.comma) != null) try p.push(try expr.parseExpr(p));
-        if (!named and p.scratch.items.len - terms_top < 2) return p.failAt(.invalid_gate_terminals, name_tok);
+        if (!named and p.scratch.items.len - terms_top < 2) return p.failSite(.invalid_gate_terminals, .instance_unnamed, name_tok, @intCast(p.scratch.items.len - terms_top));
         _ = try p.expect(.r_paren);
         const terms = try p.spanFrom(terms_top);
         try p.push(try p.addNode(.gate_instance, inst, .{ .extra = try p.addExtra(Node.GateInstance{ .range = range, .terms_start = terms.start, .terms_end = terms.end }) }));

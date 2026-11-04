@@ -381,6 +381,10 @@ fn child(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunF
         // A stopping device is expected here: no core dump (each one took
         // seconds and a share of the machine's coredump store).
         _ = linux.prctl(@backingInt(linux.PR.SET_DUMPABLE), 0, 0, 0, 0);
+        // Nor a stack trace: the oracle's handler symbolizes its own debug
+        // information at each stop, most of a second per child.
+        const dfl: std.posix.Sigaction = .{ .handler = .{ .handler = std.posix.SIG.DFL }, .mask = std.posix.sigemptyset(), .flags = 0 };
+        std.debug.updateSegfaultHandler(&dfl);
         var counts: Counts = .{ 0, 0, 0, 0, 0 };
         const why = compare(arena, r, old_fn, new_fn, ver_fn, fds[1], &counts, stops, start, probe) catch "the oracle ran out of memory";
         const tail = [_]u32{done} ++ counts;

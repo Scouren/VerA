@@ -352,6 +352,12 @@ pub fn sink(l: *Lower, r: Inst.Ref) Error!Sink {
             if (first < 0 or first + s.count > w) return l.refuse("§12.3.9.2 a select outside its net");
             return .{ .net = at, .lo = @intCast(first), .width = s.count };
         },
+        // A.8.5 a one-operand concatenation is its operand (`tran ({a}, b)`).
+        .concat => {
+            const ops = vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i));
+            if (ops.len != 1) return l.refuse("a continuous assignment to an expression");
+            return sink(l, ops[0]);
+        },
         else => return l.refuse("a continuous assignment to an expression"),
     }
 }

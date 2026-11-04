@@ -508,3 +508,32 @@ test "§7.2.2 a mixed design's string parameter is the analog block's (supply_se
         \\
     );
 }
+
+test "A.8.5 a one-operand concatenation as a switch, pull or MOS terminal is its operand (concatenation_as_switch_terminal.va)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    // The same text with each `{x}` written ` x `: every offset equal.
+    const braced = try lowerSource(a, prelude ++
+        \\module mx(p); inout p; electrical p;
+        \\  reg d, en; wire a, b, u, q;
+        \\  assign a = 1'b1;
+        \\  tran ({a}, b); pullup ({u}); nmos ({q}, d, en);
+        \\  initial begin d = 1'b0; en = 1'b1; end
+        \\  analog I(p) <+ V(p);
+        \\endmodule
+        \\
+    , true);
+    const plain = try lowerSource(a, prelude ++
+        \\module mx(p); inout p; electrical p;
+        \\  reg d, en; wire a, b, u, q;
+        \\  assign a = 1'b1;
+        \\  tran ( a , b); pullup ( u ); nmos ( q , d, en);
+        \\  initial begin d = 1'b0; en = 1'b1; end
+        \\  analog I(p) <+ V(p);
+        \\endmodule
+        \\
+    , true);
+    try expectEqualPrograms(&plain.program, &braced.program);
+    try std.testing.expectEqual(@as(usize, 1), braced.program.trans.len);
+}

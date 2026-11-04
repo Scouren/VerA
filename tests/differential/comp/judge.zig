@@ -97,8 +97,8 @@ pub fn compare(arena: Allocator, old: Run, new: Run, digital: bool) !?[]const u8
     return null;
 }
 
-/// The agent and stage a disagreement belongs to: the first diagnostic
-/// code one stream has and the other lacks decides; with the same codes,
+/// The agent and stage a disagreement belongs to: of the diagnostic codes
+/// one stream has and the other lacks, the earliest stage's decides; with the same codes,
 /// the driver's own text (a location, a plain line) is the spine's, and a
 /// different transcript or status the lowering's.
 pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool) ![]const u8 {
@@ -144,16 +144,20 @@ fn stageOf(code: []const u8) stages.Owner {
     return stages.owner(c);
 }
 
-/// The stage that owns `code` (`E0405`), and its agent.
+/// The stage that owns `code` (`E0405`) by `stages.owner`, and its agent:
+/// the front end is rw-comp's, Sema's lowering rw-lower's or rw-dlower's.
 fn ownerOf(code: []const u8, digital: bool) []const u8 {
     assert(code.len == 5);
-    return switch (stageOf(code)) {
-        .preprocess => "rw-zero (preprocess)",
-        .parse, .astgen => "rw-zero (parse/astgen)",
-        .elab => "rw-zero (elab)",
+    const c = std.meta.stringToEnum(Code, code) orelse return "rw-comp (driver)";
+    return switch (stages.owner(c)) {
+        .preprocess => "rw-comp (preprocess)",
+        .parse => "rw-comp (parse)",
+        .astgen => "rw-comp (astgen)",
+        .elab => "rw-comp (elab)",
+        .sema => if (digital) "rw-dlower (digital lowering)" else "rw-lower (analog lowering)",
         .proof => "rw-zero (air passes)",
-        .codegen => if (std.mem.eql(u8, code[1..3], "12")) "rtlil backend" else if (digital) "rw-dlower (digital lowering)" else "rw-codegen (codegen)",
-        .sema, .run => if (digital) "rw-dlower (digital lowering)" else "rw-lower (analog lowering)",
+        .codegen => "rw-codegen (codegen)",
+        .run => if (digital) "rw-dlower (run)" else "rw-codegen (run)",
     };
 }
 

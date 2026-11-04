@@ -19,6 +19,7 @@
 //! - `pub fn prevOf(scope: *const Scope, name: Vir.String, inst: Inst.Index) Inst.Ref`
 //! - `pub fn delayExprs(ag: *AstGen, scope: *Scope, node: Node.Index) Error!Inst.Exprs`
 //! - `pub fn strengthString(ag: *AstGen, lp: ?Ast.TokenIndex) Error!Vir.String`
+//! - `pub fn prefixAttrs(ag: *AstGen, scope: *Scope, tok: Ast.TokenIndex) Error!Vir.List(Inst.Attr)`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -47,6 +48,15 @@ pub const TypeWords = struct {
     strength: ?Ast.TokenIndex = null,
 };
 
+/// `partitionPoint`'s predicate: an attribute node starting before `tok`.
+const MainBelow = struct {
+    tree: *const Ast,
+    tok: Ast.TokenIndex,
+    fn below(c: MainBelow, n: Node.Index) bool {
+        return c.tree.nodeMainToken(n) < c.tok;
+    }
+};
+
 /// Reads the type words starting at `first`, up to a range, a delay or the
 /// first name.
 pub fn typeWords(tree: *const Ast, first: Ast.TokenIndex) TypeWords {
@@ -59,7 +69,10 @@ pub fn typeWords(tree: *const Ast, first: Ast.TokenIndex) TypeWords {
             // list_of_net_identifiers`); an out-of-context name may open
             // with `$root` (Annex F.2.1).
             const next = tree.tokenTag(rangeEnd(tree, i + 1));
-            if (t.discipline != null or !(AstGen.isName(next) or next == .system_identifier)) return t;
+            // A keyword the §10.6 set frees is a name here too (`electrical
+            // sin;` under 1364-2005): the parser took it as one.
+            const freed = next.isKeyword() and !isTypeWord(next);
+            if (t.discipline != null or !(AstGen.isName(next) or next == .system_identifier or freed)) return t;
             t.discipline = i;
         },
         .keyword_wire => t.net = .wire,
@@ -146,6 +159,7 @@ pub fn lower(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
                     .range = try exprBody(ag, scope, d.range),
                     .dims = try rangeBody(ag, scope, declaratorDims(tree, x)),
                     .init = try exprBody(ag, scope, tree.nodeData(x).extra_and_opt_node[1]),
+                    .attrs = try prefixAttrs(ag, scope, d.main_token),
                 });
             }
         },
@@ -244,7 +258,53 @@ pub fn strengthString(ag: *AstGen, lp: ?Ast.TokenIndex) Error!Vir.String {
     return ag.string(buf.items);
 }
 
+/// The §2.9 attribute specs of the instances that prefix the construct
+/// starting at token `tok` (`(* a *) (* b = 1 *) real x;`), their values
+/// lowered in `scope`. The attribute nodes are found by binary search over
+/// one source-ordered list, so a declaration costs a lookup.
+pub fn prefixAttrs(ag: *AstGen, scope: *Scope, tok: Ast.TokenIndex) Error!Vir.List(Inst.Attr) {
+    const tree = ag.tree;
+    if (tok == 0 or tree.tokenTag(tok - 1) != .asterisk_r_paren) return .empty;
+    // Back over the run of instances to the first `(*`.
+    var first = tok;
+    while (first > 0 and tree.tokenTag(first - 1) == .asterisk_r_paren) {
+        var k = first - 1;
+        while (k > 0 and tree.tokenTag(k) != .l_paren_asterisk) k -= 1;
+        first = k;
+    }
+    const nodes = ag.attr_nodes orelse blk: {
+        var list: std.ArrayList(Node.Index) = .empty;
+        for (tree.nodes.items(.tag), 0..) |tag, n| if (tag == .attribute) try list.append(ag.arena, @fromBackingInt(@as(u32, @intCast(n))));
+        std.mem.sort(Node.Index, list.items, tree, struct {
+            fn lt(t: *const Ast, a: Node.Index, b: Node.Index) bool {
+                return t.nodeMainToken(a) < t.nodeMainToken(b);
+            }
+        }.lt);
+        ag.attr_nodes = list.items;
+        break :blk list.items;
+    };
+    const lo = std.sort.partitionPoint(Node.Index, nodes, MainBelow{ .tree = tree, .tok = first }, MainBelow.below);
+    var out: std.ArrayList(Inst.Attr) = .empty;
+    for (nodes[lo..]) |n| {
+        if (tree.nodeMainToken(n) >= tok) break;
+        for (tree.extraDataSlice(tree.nodeData(n).extra_range, Node.Index)) |sp| try out.append(ag.arena, .{
+            .name = try ag.identString(tree.nodeMainToken(sp)),
+            .value = try exprBody(ag, scope, tree.nodeData(sp).opt_node),
+        });
+    }
+    return ag.addList(Inst.Attr, out.items);
+}
+
 // ---- private ----
+
+/// Whether `tag` is a keyword `typeWords` reads as part of a declaration's
+/// type (so never a freed name).
+fn isTypeWord(tag: Token.Tag) bool {
+    return switch (tag) {
+        .keyword_wire, .keyword_tri, .keyword_tri0, .keyword_tri1, .keyword_wand, .keyword_triand, .keyword_wor, .keyword_trior, .keyword_trireg, .keyword_uwire, .keyword_supply0, .keyword_supply1, .keyword_wreal, .keyword_ground, .keyword_signed, .keyword_vectored, .keyword_scalared, .keyword_reg, .keyword_integer, .keyword_real, .keyword_realtime, .keyword_time, .keyword_string, .keyword_input, .keyword_output, .keyword_inout, .keyword_parameter, .keyword_localparam, .keyword_specparam, .keyword_automatic => true,
+        else => false, // else: every other keyword names no type
+    };
+}
 
 /// The token after a bracketed range that opens at `i`, or `i` itself when
 /// none does. Brackets nest; the scan stops at the end of the text.
@@ -308,6 +368,7 @@ fn lowerParams(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
             .dims = try rangeBody(ag, scope, tree.extraDataSlice(.{ .start = pa.dims_start, .end = pa.dims_end }, Node.Index)),
             .value = try exprBody(ag, scope, pa.value.toOptional()),
             .ranges = try ag.addList(Inst.ValueRange, ranges),
+            .attrs = try prefixAttrs(ag, scope, d.main_token),
         });
     }
 }
@@ -353,6 +414,7 @@ fn lowerIos(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
             .dims = try rangeBody(ag, scope, declaratorDims(tree, x)),
             .init = try exprBody(ag, scope, tree.nodeData(x).extra_and_opt_node[1]),
             .defaults = defaults,
+            .attrs = try prefixAttrs(ag, scope, d.main_token),
         });
     }
 }
@@ -381,6 +443,7 @@ fn lowerNets(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
             .delay = delay,
             .init = try exprBody(ag, scope, tree.nodeData(d).extra_and_opt_node[1]),
             .defaults = defaults,
+            .attrs = try prefixAttrs(ag, scope, main),
         });
     }
 }

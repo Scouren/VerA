@@ -423,11 +423,11 @@ test "Annex E.3.2.1 port_discipline on a shipped primitive names a continuous di
     , .{}, &.{.E0355});
 }
 
-test "§2.6.2 a scale factor in a UDP's delay is E0247; IEEE 1364-2005 §12.8.1 a defparam of its own parameter that reads it is E0907" {
+test "§2.6.2 a scale factor in a UDP's delay is E0247 (each UDP instance's W0252 beside it); IEEE 1364-2005 §12.8.1 a defparam of its own parameter that reads it is E0907" {
     try expectCodes(
         \\primitive buf1(q, a); output q; input a; table 0 : 0; 1 : 1; endtable endprimitive
         \\module top; wire q; buf1 #(0 ? 2u : 0.25) g(q, 1'b0); buf1 #(1) h(q, 1'b0); endmodule
-    , .{}, &.{.E0247});
+    , .{}, &.{ .E0247, .W0252, .W0252 });
     try expectCodes(
         \\module w; parameter real x = 1.0; parameter real y = x; defparam w.x = y; endmodule
         \\module top; w w(); endmodule

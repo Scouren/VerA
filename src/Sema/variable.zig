@@ -19,6 +19,7 @@ const InternPool = @import("intern_pool");
 const Air = @import("air");
 const Sema = @import("../Sema.zig");
 const decl = @import("decl.zig");
+const attr = @import("attr.zig");
 const Inst = vams.Vir.Inst;
 const Unit = Sema.Unit;
 const Block = Sema.Block;
@@ -47,6 +48,23 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
         const ty = decl.tyOf(v.flags.storage);
         if (v.dims.len != 0) try decl.declareArray(s, unit, first, v.dims, ty) else try unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = try decl.addAlloc(s, ty), .ty = ty } });
         const bind = unit.binds.get(first) orelse continue;
+        // VerA's `vera_scratch` (§2.9): no held slot, every evaluation starts
+        // over; not for a value an `analog initial` or event body leaves
+        // for a later read (E0536), nor a digital process's (E0537).
+        var mode = try attr.scratch(s, unit, v.attrs, i.toRef());
+        if (mode != .off and unit.carried.contains(first)) {
+            try s.fail(.E0536, unit.file, i.toRef(), "`{s}`", .{vir.string(v.name)});
+            mode = .off;
+        }
+        if (mode == .uninit and v.init.len != 0) {
+            try s.fail(.E0539, unit.file, i.toRef(), "`{s}`", .{vir.string(v.name)});
+            mode = .zero;
+        }
+        if (mode != .off and std.mem.findScalar(Inst.Index, unit.discrete.items, first) != null) try s.fail(.E0537, unit.file, i.toRef(), "`{s}`", .{vir.string(v.name)});
+        if (mode != .off) {
+            _ = unit.held.remove(first);
+            if (mode == .zero and v.init.len == 0 and bind == .slot) try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(bind.slot.alloc), .rhs = .fromIntern(if (ty == .real) .zero_real else .zero) } } }));
+        }
         if (unit.held.contains(first)) {
             const init: InternPool.Index = if (v.init.len == 0) .undef else if (try decl.foldBody(s, unit, v.init)) |k| try decl.intern(s, k) else .undef;
             try addHeld(s, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, vir.string(v.name) }), bind, init);

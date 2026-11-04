@@ -26,7 +26,10 @@
 //! the old preprocessed text; in a fixture, the new `byte_start` is the
 //! offset of the old line and column in the original file. A fixture that
 //! may differ is a line of `diag.xfail` (`<path> <reason>`); a listed
-//! fixture that agrees, or is not in the corpus, fails the run.
+//! fixture that agrees, or is not in the corpus, fails the run. A fixture
+//! where the LRM sides with the new bundle is a line of `diag.rulings`
+//! (`settle.zig`), whose expected result is the new bundle's rows in order,
+//! each `CODE@line:col` in the original file.
 //!
 //! Cites no LRM clause: the catalogue rows cite their own.
 //!
@@ -40,6 +43,7 @@ const diag = @import("diag");
 const vera = @import("vera");
 const frontend = @import("frontend");
 const rewrite_options = @import("rewrite_options");
+const settle = @import("settle.zig");
 const Diag = vams.Diag;
 
 /// The scripts' files: name, original text, and where the old preprocessed
@@ -100,6 +104,10 @@ const Offsets = union(enum) {
     /// in the original text of the named source.
     fixture: []const Diag.Source,
 };
+
+/// What `compareFixture` found: what differs first, or null; the new
+/// bundle's rows as a ruling reads them; and the fixture's `//! lrm` clauses.
+const FixtureVerdict = struct { why: ?[]const u8, rows: []const u8 = "", cited: []const []const u8 = &.{} };
 
 // ---- private ----
 
@@ -389,7 +397,7 @@ fn copyLoc(bag: *const diag.Bag, span: diag.Span, file: diag.FileId) Diag.Loc {
 
 /// Runs the old `analyze` on fixture `rel`, copies its rows into a `Wip`,
 /// and returns null when every rendering agrees, else what differs first.
-fn compareFixture(a: Allocator, io: std.Io, root: []const u8, rel: []const u8, tally: *Tally) !?[]const u8 {
+fn compareFixture(a: Allocator, io: std.Io, root: []const u8, rel: []const u8, tally: *Tally) !FixtureVerdict {
     const gpa = std.heap.smp_allocator;
     const path = try std.fs.path.join(a, &.{ root, rel });
     const text = try frontend.preprocessor.readText(io, .cwd(), path, a);
@@ -407,7 +415,7 @@ fn compareFixture(a: Allocator, io: std.Io, root: []const u8, rel: []const u8, t
         error.OutOfMemory => return e,
         error.CompileFailed, error.NoModule, error.NothingToElaborate => {},
     }
-    if (bag.isEmpty()) return null;
+    if (bag.isEmpty()) return .{ .why = null };
     bag.sort();
 
     var wip: Diag.Wip = .init(a);
@@ -436,7 +444,25 @@ fn compareFixture(a: Allocator, io: std.Io, root: []const u8, rel: []const u8, t
         const t = bag.sourceText(id);
         s.* = .{ .name = bag.fileName(id), .text = t, .line_starts = try Diag.lineStarts(a, t) };
     }
-    return compareRendered(a, &bag, d, sources, .{ .fixture = sources }, .{}, tally);
+    const why = try compareRendered(a, &bag, d, sources, .{ .fixture = sources }, .{}, tally) orelse return .{ .why = null };
+    return .{ .why = why, .rows = try rowsText(a, d, sources), .cited = try settle.clauses(a, text) };
+}
+
+/// The bundle's rows in order, `CODE@line:col` (1-based, in the original
+/// text of the row's file), space-separated: what a ruling expects.
+fn rowsText(a: Allocator, d: Diag, sources: []const Diag.Source) ![]const u8 {
+    var out: std.Io.Writer.Allocating = .init(a);
+    for (d.messages(), 0..) |i, k| {
+        const m = d.message(i);
+        if (k != 0) try out.writer.writeByte(' ');
+        try out.writer.print("{t}", .{m.tag.code});
+        if (m.loc.isNone()) continue;
+        const starts = sources[@backingInt(m.loc.file)].line_starts;
+        var line: usize = 0;
+        while (line + 1 < starts.len and starts[line + 1] <= m.loc.start) line += 1;
+        try out.writer.print("@{d}:{d}", .{ line + 1, m.loc.start - starts[line] + 1 });
+    }
+    return out.written();
 }
 
 /// The first differing byte and the text around it on each side.
@@ -520,26 +546,37 @@ test "diff-diag: the old compiler's diagnostics on the reject and warn fixtures 
     const root = rewrite_options.fixture_root;
     const fixtures = try collect(ra, io, root);
     const xfail = try readXfail(ra, io, try std.fs.path.join(ra, &.{ rewrite_options.repo_root, "tests/differential/diag.xfail" }));
+    var rulings = try settle.Rulings.read(ra, io, rewrite_options.repo_root, "diag");
 
     var fixture_arena: std.heap.ArenaAllocator = .init(gpa);
     defer fixture_arena.deinit();
     var tally: Tally = .{};
     var agreed: usize = 0;
+    var ruled: usize = 0;
     var listed: usize = 0;
     var bad: usize = 0;
     var seen: std.StringHashMapUnmanaged(void) = .empty;
     for (fixtures) |rel| {
         _ = fixture_arena.reset(.retain_capacity);
         try seen.put(ra, rel, {});
-        const why = try compareFixture(fixture_arena.allocator(), io, root, rel, &tally);
+        const v = try compareFixture(fixture_arena.allocator(), io, root, rel, &tally);
         const reason = xfail.get(rel);
-        if (why) |w| {
+        if (v.why) |w| {
             if (reason != null) {
                 listed += 1;
                 continue;
             }
+            if (rulings.get(rel) != null) {
+                const no = try rulings.settle(fixture_arena.allocator(), rel, v.cited, v.rows) orelse {
+                    ruled += 1;
+                    continue;
+                };
+                bad += 1;
+                std.debug.print("diff-diag: MISMATCH {s}: {s}; {s}\n", .{ rel, w, no });
+                continue;
+            }
             bad += 1;
-            std.debug.print("diff-diag: MISMATCH {s}: {s}\n", .{ rel, w });
+            std.debug.print("diff-diag: MISMATCH {s}: {s}\n  new rows: {s}\n", .{ rel, w, v.rows });
         } else if (reason) |rsn| {
             bad += 1;
             std.debug.print("diff-diag: XPASS {s} agrees; remove its diag.xfail line ({s})\n", .{ rel, rsn });
@@ -550,8 +587,11 @@ test "diff-diag: the old compiler's diagnostics on the reject and warn fixtures 
         bad += 1;
         std.debug.print("diff-diag: STALE {s} is in diag.xfail but not in the corpus\n", .{k.*});
     };
-    std.debug.print("diff-diag: fixtures: {d} compared, {d} agreed ({d} with diagnostics: {d} rows, {d} text bytes, {d} JSON lines byte-equal, {d} by relation), {d} listed in diag.xfail, {d} failed\n", .{
-        fixtures.len, agreed, tally.bundles, tally.rows, tally.text_bytes, tally.json_exact, tally.json_relation, listed, bad,
+    var ruling_text: std.Io.Writer.Allocating = .init(ra);
+    bad += try rulings.finish(&ruling_text.writer);
+    std.debug.print("{s}", .{ruling_text.written()});
+    std.debug.print("diff-diag: fixtures: {d} compared, {d} agreed ({d} by a ruling; {d} with diagnostics: {d} rows, {d} text bytes, {d} JSON lines byte-equal, {d} by relation), {d} listed in diag.xfail, {d} failed\n", .{
+        fixtures.len, agreed + ruled, ruled, tally.bundles, tally.rows, tally.text_bytes, tally.json_exact, tally.json_relation, listed, bad,
     });
     try std.testing.expect(fixtures.len > 900);
     try std.testing.expect(tally.rows > 1000);

@@ -181,6 +181,8 @@ pub const Lower = struct {
     why_code: vams.Diag.Code = .E1100,
     /// VAMS §7.3.5 a mixed design's analog events (`Program.monitors`).
     monitors: std.ArrayList(Program.A2d) = .empty,
+    /// VAMS §7.8 each bridge's segment net, by its `Zcu.instances` row.
+    segment_of: std.AutoHashMapUnmanaged(u32, Name) = .empty,
     names: std.ArrayList(Name) = .empty,
     frames: std.ArrayList(Frame) = .empty,
     scopes: std.ArrayList(ScopeInfo) = .empty,

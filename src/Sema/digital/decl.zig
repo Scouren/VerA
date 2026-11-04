@@ -64,10 +64,8 @@ const Walk = struct {
     groups: std.ArrayList(ports.Group) = .empty,
     /// Its module's list of ports.
     list: Vir.Body = .empty,
-    /// A mixed design's module variables by domain (`domain.of`), and its
-    /// continuous nets a bridge makes digital segments (`domain.segments`).
+    /// A mixed design's module variables by domain (`domain.of`).
     domain: domain_mod.Domain = .{},
-    segments: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty,
 };
 
 /// Walks every instance in `Zcu.instances` order: its scope, its frame, its
@@ -215,12 +213,21 @@ fn instance(w: *Walk, k: u32) Error!void {
     // connects one external port at a time instead.
     const rows = zcu.instances.items(.ports)[k];
     const formals = vir.body(m.ports);
+    // VAMS §7.8 a connection through a bridge to a continuous net is that
+    // bridge's segment: a bridged port's, and the bridge's own ports'.
+    const own_segment = if (bridge) |b| try domain_mod.skipped(l, w.placed[k].frame, b.actual) else false;
+    const segmented = if (l.options.mixed and parent != .none and bridge == null) try domain_mod.segmented(l, w.placed[k].frame, k) else std.AutoHashMapUnmanaged(Inst.Index, u32).empty;
     const grouped = ports.expressionPorts(vir, formals);
     for (formals, 0..) |formal, at| {
         // A bridge's every port takes the bridged port's connection: its
         // continuous one is skipped (`analogNet`), its discrete one joins it.
         const actual: Inst.Ref = if (bridge) |b| b.actual else if (rows.len == 0) .none else zcu.ports.items(.actual)[rows.start + at];
-        const conn: ports.Conn = .{ .actual = actual, .frame = if (actual == .none) none else w.placed[k].frame, .lane = w.placed[k].lane };
+        const conn: ports.Conn = .{
+            .actual = actual,
+            .frame = if (actual == .none) none else w.placed[k].frame,
+            .lane = w.placed[k].lane,
+            .bridge = if (own_segment) k else segmented.get(formal) orelse none,
+        };
         const inner: Inst.Index = switch (Lower.tag(vir, formal)) {
             .io => formal,
             .port => blk: {
@@ -267,10 +274,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
     }
     for (later.values()) |decls| try redecl.check(l, f, decls.items, .module, w.list);
     const top = l.frames.items[f].parent == none;
-    if (top and l.options.mixed) {
-        w.domain = try domain_mod.of(l.a, vir, body, w.index == 0);
-        w.segments = try domain_mod.segments(l, w.index);
-    }
+    if (top and l.options.mixed) w.domain = try domain_mod.of(l.a, vir, body, w.index == 0);
     w.deferred.clearRetainingCapacity();
     for (later.keys(), later.values()) |first, decls| try signal(w, f, first, decls.items, if (top) w.conns.get(first) else null);
     if (top) for (w.groups.items) |g| try ports.group(l, f, g, &w.deferred);
@@ -489,7 +493,7 @@ fn analogNet(l: *Lower, vir: *const Vir, decls: []const Inst.Index) Error!bool {
 fn signal(w: *Walk, f: u32, first: Inst.Index, decls: []const Inst.Index, conn: ?ports.Conn) Error!void {
     const l = w.l;
     const vir = l.virOf(f);
-    if (l.options.mixed and !w.segments.contains(first) and try analogNet(l, vir, decls)) return;
+    if (l.options.mixed and try analogNet(l, vir, decls)) return;
     if (w.domain.analog.contains(first)) return; // VAMS §7.2.2 the analog block's
     var storage: Inst.Storage = .none;
     var dir: Inst.Direction = .none;

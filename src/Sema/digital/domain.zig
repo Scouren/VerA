@@ -18,7 +18,8 @@
 //! - `pub fn probe(l: *Lower, i: Inst.Index) Error!u32`
 //! - `pub fn monitor(l: *Lower, i: Inst.Index) Error!?u32`
 //! - `pub const Bridge = struct`, `pub fn bridgeOf(l: *Lower, k: u32) Error!?Bridge`
-//! - `pub fn segments(l: *Lower, k: u32) Error!std.AutoHashMapUnmanaged(Inst.Index, void)`
+//! - `pub fn segmented(l: *Lower, w_placed_frame: u32, k: u32) Error!std.AutoHashMapUnmanaged(Inst.Index, u32)`
+//! - `pub fn skipped(l: *Lower, f: u32, actual: Inst.Ref) Error!bool`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -175,25 +176,29 @@ pub fn bridgeOf(l: *Lower, k: u32) Error!?Bridge {
     return null;
 }
 
-/// VAMS §7.8 the continuous nets of instance `k`'s module that a bridge
-/// joins to a discrete port below: each the digital segment between that
-/// port and its bridge (lib/sim/digital mints one there), so the digital
-/// half declares it, a plain wire. By first declaration.
-pub fn segments(l: *Lower, k: u32) Error!std.AutoHashMapUnmanaged(Inst.Index, void) {
+/// VAMS §7.8 the bridge (an `Zcu.instances` row) each formal of instance
+/// `k`'s module meets a continuous net of its parent through, by formal:
+/// those connections are the bridge's segment. A bridge's own formals take
+/// its own row when the port it bridges meets one.
+pub fn segmented(l: *Lower, w_placed_frame: u32, k: u32) Error!std.AutoHashMapUnmanaged(Inst.Index, u32) {
     const zcu = l.zcu;
-    const parents = zcu.instances.items(.parent);
-    var out: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
+    var out: std.AutoHashMapUnmanaged(Inst.Index, u32) = .empty;
     for (zcu.inserts.items(.bridge), zcu.inserts.items(.instance), zcu.inserts.items(.port)) |b, at, port| {
-        if (parents[@backingInt(b)] != @as(@TypeOf(parents[0]), @fromBackingInt(k))) continue;
-        const child: u32 = @backingInt(at);
-        if (parents[child] != parents[@backingInt(b)]) continue; // a primitive's terminal: `bridgeOf` refuses it
-        const actual = try actualOf(l, child, port);
-        const i = actual.toIndex() orelse continue;
-        const pv = zcu.fileVir(zcu.instances.items(.module)[k].file);
-        if (Lower.tag(pv, i) != .decl_ref) continue; // a select or concatenation: the net is not one name
-        try out.put(l.a, decl.canonical(pv, pv.instructions.items(.data)[@backingInt(i)].decl_tok.decl), {});
+        if (@backingInt(at) != k) continue;
+        if (zcu.instances.items(.parent)[k] != zcu.instances.items(.parent)[@backingInt(b)]) continue; // a primitive's terminal
+        if (try skipped(l, w_placed_frame, try actualOf(l, k, port))) try out.put(l.a, port, @backingInt(b));
     }
     return out;
+}
+
+/// Whether connection `actual` (in frame `f`) names a net the digital half
+/// skipped: a continuous one, the analog solver's.
+pub fn skipped(l: *Lower, f: u32, actual: Inst.Ref) Error!bool {
+    const i = actual.toIndex() orelse return false;
+    const vir = l.virOf(f);
+    if (Lower.tag(vir, i) != .decl_ref) return false;
+    const d = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl);
+    return l.lookup(f, d) == null;
 }
 
 // ---- private ----

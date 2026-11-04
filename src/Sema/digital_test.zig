@@ -106,6 +106,16 @@ fn expectEqualPrograms(want: *const Program, got: *const Program) !void {
     }
 }
 
+/// Whether slot `src` drives the net whose slot is `net_slot` through a
+/// port (a `.bridge` driver, §12.3.9.2).
+fn drives(p: *const Program, src: u32, net_slot: u32) bool {
+    for (p.drivers) |d| {
+        if (p.nets[d.net].slot != net_slot) continue;
+        if (d.source == .bridge and d.source.bridge.src == src) return true;
+    }
+    return false;
+}
+
 fn isMultiArrayList(comptime T: type) bool {
     return @typeInfo(T) == .@"struct" and @hasDecl(T, "Field") and @hasDecl(T, "Slice");
 }
@@ -283,12 +293,7 @@ test "§7.8 an inserted connect module's discrete port joins the digital net it 
         if (std.mem.endsWith(u8, x.path, ".cm")) cm_slot = x.slot;
         try std.testing.expect(!std.mem.endsWith(u8, x.path, ".el") and !std.mem.eql(u8, x.path, "u1.p"));
     }
-    const p = &lowered.program;
-    const drives = for (p.drivers) |d| {
-        if (p.nets[d.net].slot != n_slot.?) continue;
-        if (d.source == .bridge and d.source.bridge.src == cm_slot.?) break true;
-    } else false;
-    try std.testing.expect(drives);
+    try std.testing.expect(drives(&lowered.program, cm_slot.?, n_slot.?));
 }
 
 test "§7.2.2 a process naming fewer instructions than the names read before it (regression: specify_paths_design_runs.va crashed)" {
@@ -304,7 +309,7 @@ test "§7.2.2 a process naming fewer instructions than the names read before it 
     );
 }
 
-test "§7.8 a digital port meeting a continuous net: the net is the digital segment between the port and its bridge (both_halves_of_the_bridge_execute.va)" {
+test "§7.8 a digital port meeting a continuous net: the bridge's segment joins them, the net stays analog (both_halves_of_the_bridge_execute.va)" {
     var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
     defer arena_state.deinit();
     const lowered = try lowerSource(arena_state.allocator(), prelude ++
@@ -323,22 +328,51 @@ test "§7.8 a digital port meeting a continuous net: the net is the digital segm
         \\connectrules rules; connect d2a; endconnectrules
         \\
     , true);
-    // `u1.q` (an output reg) drives `y1` through its port (§12.3.9.2), and
-    // the bridge's input net `cm`, joined to the whole of `y1`, is `y1`.
-    var y1: ?u32 = null;
+    // `y1` is continuous: not the digital half's. The bridge's input net
+    // `cm` is its segment, which `u1.q` (an output reg) drives (§12.3.9.2).
     var q: ?u32 = null;
     var cm: ?u32 = null;
     for (lowered.names) |x| {
-        if (std.mem.eql(u8, x.path, "y1")) y1 = x.slot;
+        try std.testing.expect(!std.mem.eql(u8, x.path, "y1"));
         if (std.mem.eql(u8, x.path, "u1.q")) q = x.slot;
         if (std.mem.endsWith(u8, x.path, ".cm")) cm = x.slot;
     }
-    try std.testing.expect(y1 != null and q != null);
-    try std.testing.expectEqual(y1, cm);
+    try std.testing.expect(drives(&lowered.program, q.?, cm.?));
+}
+
+test "§7.8.3.2 split: each port's own bridge and segment, so one port's driver reaches only its bridge (split_one_instance_per_port.va)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const lowered = try lowerSource(arena_state.allocator(), prelude ++
+        \\connectmodule d2a(cm, el);
+        \\  input cm; output el; ddiscrete cm; electrical el;
+        \\  reg lvl; always @(cm) lvl = cm;
+        \\  analog I(el) <+ 0.0;
+        \\endmodule
+        \\module src(q); output q; ddiscrete q; reg q; initial q = 1'b0; endmodule
+        \\module top;
+        \\  electrical a;
+        \\  src u1(a);
+        \\  src u2(a);
+        \\  analog I(a) <+ V(a) / 1000.0;
+        \\endmodule
+        \\connectrules rules; connect d2a split; endconnectrules
+        \\
+    , true);
+    // §7.8.3.2 "one connect module per port": `a__u1__q` and `a__u2__q`
+    // (§7.8.5's split names), each `cm` the segment its own port drives.
+    var q1: ?u32 = null;
+    var q2: ?u32 = null;
+    var cm1: ?u32 = null;
+    var cm2: ?u32 = null;
+    for (lowered.names) |x| {
+        if (std.mem.eql(u8, x.path, "u1.q")) q1 = x.slot;
+        if (std.mem.eql(u8, x.path, "u2.q")) q2 = x.slot;
+        if (std.mem.eql(u8, x.path, "a__u1__q.cm")) cm1 = x.slot;
+        if (std.mem.eql(u8, x.path, "a__u2__q.cm")) cm2 = x.slot;
+    }
+    try std.testing.expect(cm1.? != cm2.?);
     const p = &lowered.program;
-    const drives = for (p.drivers) |d| {
-        if (p.nets[d.net].slot != y1.?) continue;
-        if (d.source == .bridge and d.source.bridge.src == q.?) break true;
-    } else false;
-    try std.testing.expect(drives);
+    try std.testing.expect(drives(p, q1.?, cm1.?) and drives(p, q2.?, cm2.?));
+    try std.testing.expect(!drives(p, q1.?, cm2.?) and !drives(p, q2.?, cm1.?));
 }

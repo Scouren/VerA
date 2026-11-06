@@ -1,0 +1,3 @@
+# Allowed differences between link and the old zigbuild
+# (tests/differential/link.zig, `zig build diff-link`).
+# One line: <case id> <reason>. A listed case that agrees fails the run.

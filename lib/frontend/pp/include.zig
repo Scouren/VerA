@@ -152,9 +152,9 @@ fn includerDir(pp: *const Pp) ?[]const u8 {
 
 fn readAt(pp: *Pp, base: []const u8, path: []const u8, span: diag.Span) Error!?Included {
     assert(path.len > 0);
-    const io = std.Io.Threaded.global_single_threaded.io();
+    const files = pp.opts.files orelse return null; // no disk: the built-ins only
     const full = try std.fs.path.join(pp.arena, &.{ base, path });
-    if (preprocessor.readText(io, .cwd(), full, pp.arena)) |bytes| {
+    if (files.read(full, preprocessor.max_text_bytes)) |bytes| {
         return .{ .text = bytes, .path = full };
     } else |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,

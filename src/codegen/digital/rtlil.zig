@@ -63,11 +63,13 @@ pub fn emit(arena: Allocator, source: []const u8, opts: digital.Options, bag: *d
 // ---- private ----
 
 fn emitDeep(arena: Allocator, source: []const u8, opts: digital.Options, bag: *diag.Bag) Error![]const u8 {
+    // ponytail: the process's io until step 7 builds RTLIL from the shared `Program`.
+    var files: Front.Files = .init(std.Io.Threaded.global_single_threaded.io(), arena);
     const pp = Front.preprocessor.process(arena, source, .{ .file_name = opts.file_name, .include_dirs = opts.include_dirs, .defines = opts.defines, .std_defs = false, .more = more: {
         const more = try arena.alloc(Front.preprocessor.File, opts.more.len);
         for (opts.more, more) |u, *f| f.* = .{ .name = u.name, .text = u.text };
         break :more more;
-    }, .bag = bag }) catch |e| return switch (e) {
+    }, .bag = bag, .files = &files }) catch |e| return switch (e) {
         error.OutOfMemory => error.OutOfMemory,
         error.PreprocessFailed => error.DigitalFailed,
     };

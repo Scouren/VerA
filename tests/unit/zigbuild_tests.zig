@@ -223,12 +223,49 @@ test "a split build that fails returns one report and leaks the others' none" {
         \\}
         \\
     );
-    const o: Options = .{ .work_dir = work, .name = "faildev", .optimize = .fast, .backend = .llvm, .modules = &mods, .split = .parts };
     const dev = "pub fn eval() callconv(.c) void { @compileError(\"boom\"); }\n";
-    var r = try buildLibrary(gpa, io, o, .{ .text = dev }, 1);
-    defer r.deinit(gpa);
-    try std.testing.expect(r == .failed);
-    try std.testing.expect(r.failed.errorMessageCount() > 0);
+    // One child at a time, then all at once: a report from a later batch is
+    // dropped as cleanly as one from the same batch.
+    for ([_]?u32{ 1, null }) |jobs| {
+        const o: Options = .{ .work_dir = work, .name = "faildev", .optimize = .fast, .backend = .llvm, .modules = &mods, .split = .parts, .jobs = jobs };
+        var r = try buildLibrary(gpa, io, o, .{ .text = dev }, 1);
+        defer r.deinit(gpa);
+        try std.testing.expect(r == .failed);
+        try std.testing.expect(r.failed.errorMessageCount() > 0);
+    }
+}
+
+test "a split build gives the same library bytes from 1 job and from every job at once" {
+    // AGENTS.md: determinism is a test, 1 job and N jobs give the same bytes.
+    // Oracle: the library built one child at a time.
+    const gpa = std.testing.allocator;
+    const io = std.testing.io;
+    var arena: std.heap.ArenaAllocator = .init(gpa);
+    defer arena.deinit();
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const mods = try standIns(arena.allocator(), tmp, "mods", "pub const k: f64 = 2.0;\n",
+        \\pub fn exportDevice(comptime D: type, comptime name: []const u8) void {
+        \\    _ = name;
+        \\    @export(&D.eval, .{ .name = "arp_eval" });
+        \\}
+        \\pub fn exportDevicePart(comptime D: type, comptime name: []const u8, comptime part: @TypeOf(.setup)) void {
+        \\    _ = name;
+        \\    if (part == .eval) @export(&D.eval, .{ .name = "arp_eval" });
+        \\}
+        \\
+    );
+    const dev = "pub fn eval(x: f64) callconv(.c) f64 { return x * @import(\"contract\").k; }\n";
+    var bytes: [2][]u8 = undefined;
+    for ([_]?u32{ 1, std.enums.values(@import("contract").DevicePart).len }, &bytes, 0..) |jobs, *out, i| {
+        const work = try arena.allocator().print(".zig-cache/tmp/{s}/w{d}", .{ tmp.sub_path, i });
+        const o: Options = .{ .work_dir = work, .name = "jobsdev", .optimize = .fast, .backend = .llvm, .modules = &mods, .split = .parts, .jobs = jobs };
+        var r = try buildLibrary(gpa, io, o, .{ .text = dev }, 1);
+        defer r.deinit(gpa);
+        out.* = try Io.Dir.cwd().readFileAlloc(io, try expectOk(io, r), arena.allocator(), .unlimited);
+    }
+    try std.testing.expect(bytes[0].len > 0);
+    try std.testing.expectEqualSlices(u8, bytes[0], bytes[1]);
 }
 
 test "artifact_cache: a second work directory reuses the first's library, and a changed device misses" {

@@ -7,7 +7,7 @@
 //! Cites: IEEE 1364-2005 §17.10 (plusargs); VAMS §7, §8 (the mixed runner).
 //!
 //! Contents:
-//! - `pub fn build(gpa: Allocator, io: Io, arena: Allocator, req: Request, x: Request.Exe, spec: *const exe.Spec, result: *const Result, device: []const u8, bag: *diag.Bag, err: *Io.Writer, o: *Outcome) request.CompileError!void`
+//! - `pub fn build(gpa: Allocator, io: Io, arena: Allocator, req: Config, x: Config.Exe, spec: *const exe.Spec, result: *const Result, device: []const u8, bag: *diag.Bag, err: *Io.Writer, o: *Outcome) request.CompileError!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -18,7 +18,7 @@ const exe = @import("exe");
 const ir = @import("ir");
 const zigbuild = @import("zigbuild");
 const request = @import("request.zig");
-const Request = request.Request;
+const Config = @import("Config.zig");
 const Outcome = request.Outcome;
 const Result = @import("Result.zig");
 
@@ -35,8 +35,8 @@ pub fn build(
     gpa: Allocator,
     io: Io,
     arena: Allocator,
-    req: Request,
-    x: Request.Exe,
+    req: Config,
+    x: Config.Exe,
     spec: *const exe.Spec,
     result: *const Result,
     device: []const u8,
@@ -47,7 +47,7 @@ pub fn build(
     assert(req.build.contract != null);
     assert(device.len != 0);
     const b = req.build;
-    const in_path = req.options.file_name;
+    const in_path = req.file_name;
     var facts = try exe.compileFacts(arena, result.lowered, result.mir);
     facts.validate_contract = x.validate_contract;
     try exe.warnGridEvents(bag, result.lowered, result.mir);

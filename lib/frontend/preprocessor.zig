@@ -20,6 +20,7 @@
 //! - `pub const predefined_macros: [3][]const u8`
 //! - `pub fn process(arena: Allocator, source: []const u8, opts: Options) Error!Output`
 //! - `pub fn readText(io: std.Io, dir: std.Io.Dir, path: []const u8, gpa: Allocator) ReadError![]u8`
+//! - `pub fn readTextLimited(io: std.Io, dir: std.Io.Dir, path: []const u8, gpa: Allocator, max: usize) ReadError![]u8`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -29,6 +30,7 @@ const spice_cards = @import("spice_cards.zig");
 const Pp = @import("pp/Pp.zig");
 const protect = @import("pp/protect.zig");
 const Directives = @import("pp/events.zig").Directives;
+const Files = @import("Files.zig");
 
 /// Inputs to `process`. Every slice is borrowed for the call.
 pub const Options = struct {
@@ -69,6 +71,10 @@ pub const Options = struct {
     more: []const File = &.{},
     /// Receives diagnostics, the file table and the source map.
     bag: *diag.Bag,
+    /// Reads every file the text names: an `include, a netlist's
+    /// `.INCLUDE`, `.LIB` and `.HDL`; the compilation passes its own. Null:
+    /// the text may name no file on disk, only the built-in annex files.
+    files: ?*Files = null,
     /// E0150's bound on the preprocessed text. Only tests lower it, to reach
     /// the diagnostic without 4 GiB of text.
     text_limit: usize = max_text_bytes,
@@ -191,7 +197,7 @@ pub fn process(arena: Allocator, source: []const u8, opts: Options) Error!Output
         if (opts.std_defs) try pp.replayStdDefs() else try pp.runSpicePrimitives();
         // Annex E.2 after Table E.1: a `.MODEL` wrapper instantiates the
         // primitive its type names, so the primitive has to be declared first.
-        const cards = try spice_cards.synthesize(arena, opts.spice_netlist, opts.spice_path);
+        const cards = try spice_cards.synthesize(arena, opts.spice_netlist, opts.spice_path, opts.files);
         if (cards.refused.len != 0) {
             // E.1.2: a card inside a definition outside VerA's claimed SPICE
             // subset is refused, not skipped (see `spice_cards`).
@@ -242,8 +248,8 @@ pub fn process(arena: Allocator, source: []const u8, opts: Options) Error!Output
     // the command line (IEEE 1364-2005 §13.4.1), so its modules are the
     // user's and E.3.3 selects them by name.
     for (hdl) |path| {
-        const io = std.Io.Threaded.global_single_threaded.io();
-        const text = readText(io, .cwd(), path, arena) catch |e| switch (e) {
+        const read = if (opts.files) |f| f.read(path, max_text_bytes) else error.FileNotFound;
+        const text = read catch |e| switch (e) {
             error.OutOfMemory => return error.OutOfMemory,
             else => {
                 var b = opts.bag.build(.preprocess, .E0126, .{ .start = 0, .end = 0 });
@@ -298,17 +304,23 @@ pub fn process(arena: Allocator, source: []const u8, opts: Options) Error!Output
 /// is read until it passes the bound. An empty `path` (user-typed: `vera ""`,
 /// `--spice=`) is `error.FileNotFound`, the error the OS gave before.
 pub fn readText(io: std.Io, dir: std.Io.Dir, path: []const u8, gpa: Allocator) ReadError![]u8 {
+    return readTextLimited(io, dir, path, gpa, max_text_bytes);
+}
+
+/// `readText` bounded by `max` bytes instead of `max_text_bytes`: a data
+/// file no lexer addresses (`Files.read`).
+pub fn readTextLimited(io: std.Io, dir: std.Io.Dir, path: []const u8, gpa: Allocator, max: usize) ReadError![]u8 {
     if (path.len == 0) return error.FileNotFound;
     var file = try dir.openFile(io, path, .{});
     defer file.close(io);
     const st = try file.stat(io);
-    if (st.kind == .file and st.size > max_text_bytes) return error.StreamTooLong;
+    if (st.kind == .file and st.size > max) return error.StreamTooLong;
     var r = file.reader(io, &.{});
-    const text = r.interface.allocRemaining(gpa, .limited(max_text_bytes)) catch |e| switch (e) {
+    const text = r.interface.allocRemaining(gpa, .limited(max)) catch |e| switch (e) {
         error.ReadFailed => return r.err.?,
         else => |other| return other,
     };
-    assert(text.len <= max_text_bytes);
+    assert(text.len <= max);
     return text;
 }
 

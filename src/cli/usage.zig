@@ -89,6 +89,7 @@ pub const usage_text =
     \\  --zig PATH              zig executable to drive (default: zig)
     \\  --optimize=MODE         Debug|ReleaseSafe|ReleaseFast|ReleaseSmall (default: exe Debug, so ReleaseFast)
     \\  --zig-backend=auto|llvm|native   auto: native for Debug on x86_64, else llvm
+    \\  --jobs=N                most zig processes a build runs at once (default: the CPU count)
     \\  --debug-info            keep DWARF in a ReleaseFast/ReleaseSmall --emit-so or
     \\                          --emit-exe artifact (default: stripped; same machine
     \\                          code, about half the LLVM time of a large device)

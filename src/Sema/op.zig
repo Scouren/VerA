@@ -82,6 +82,10 @@ pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
     switch (tag) {
         .ddt => return .{ .ref = try ddt(s, b, vals.items[0]), .ty = .real },
         .idt => return .{ .ref = try idt(s, b, vals.items), .ty = .real },
+        .transition => {
+            try defaultTransition(s, b, &vals);
+            return .{ .ref = try expr.call(s, b, @backingInt(tag), .real, vals.items), .ty = .real };
+        },
         else => return .{ .ref = try expr.call(s, b, @backingInt(tag), .real, vals.items), .ty = .real },
     }
 }
@@ -319,6 +323,29 @@ fn idt(s: *Sema, b: *Block, vals: []const Ref) Allocator.Error!Ref {
 fn select(s: *Sema, b: *Block, c: Ref, x: Ref, y: Ref) Allocator.Error!Ref {
     const at = try s.air.addExtra(s.gpa, Air.Bin{ .lhs = x, .rhs = y });
     return s.addInst(b, .{ .tag = .select, .data = .{ .pl_op = .{ .operand = c, .payload = at } } });
+}
+
+/// §10.3 `default_transition` "shall be used for the rise_time and
+/// fall_time ... of transition filters which do not have them specified":
+/// under the directive in force at the module (`Module.stamp`), an absent
+/// or zero rise time is the directive's value, and an absent or zero fall
+/// time the rise time (§4.5.8 "If only a positive rise_time value is
+/// specified, the simulator uses it for both"); a time known only at run
+/// time is tested where it runs (the old device's `transitionTimes`).
+/// Without the directive the call keeps what the source wrote.
+fn defaultTransition(s: *Sema, b: *Block, vals: *std.ArrayList(Ref)) Allocator.Error!void {
+    const stamp = b.unit.module.stamp;
+    if (!stamp.flags.has_transition) return;
+    const dflt: Ref = .fromIntern(try decl.intern(s, .{ .real = stamp.transition.get() }));
+    while (vals.items.len < 4) try vals.append(s.arena, .fromIntern(.zero_real));
+    vals.items[2] = try orWhenZero(s, b, vals.items[2], dflt);
+    vals.items[3] = try orWhenZero(s, b, vals.items[3], vals.items[2]);
+}
+
+/// `x`, or `y` where `x` is zero.
+fn orWhenZero(s: *Sema, b: *Block, x: Ref, y: Ref) Allocator.Error!Ref {
+    if (expr.constOf(s, x)) |c| return if (c.asReal() == 0) y else x;
+    return select(s, b, try expr.binOp(s, b, .fne, x, .fromIntern(.zero_real)), x, y);
 }
 
 /// A §4.5.2 operator unknown, `<op>$<k>`.

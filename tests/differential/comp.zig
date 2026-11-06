@@ -13,8 +13,8 @@
 //! agrees, or that is not in the corpus, fails the run until its line goes.
 //! Determinism: `-Dcomp-j1=N` fixtures' new side runs again at `--jobs=1`
 //! and must write the same bytes as at the CPU count.
-//! `-Dcomp-filter=` runs a subset; `-Dcomp-rebaseline` writes every
-//! disagreement to `zig-out/<list>.xfail.new` instead of failing.
+//! `-Dcomp-filter=` runs a subset (`|` between alternatives); `-Dcomp-rebaseline`
+//! writes every disagreement to `zig-out/<list>.xfail.new` instead of failing.
 //! The `.v` backends' runs (`v_options`: diff-digital-exe, diff-rtlil,
 //! diff-digital-device) take every `.v` fixture through `--emit-exe` (then
 //! the binary it built), `--emit-rtlil` or `--check` in place of `--run`,
@@ -76,12 +76,18 @@ fn runAll() !void {
     const arena = arena_state.allocator();
     const all = try fixture.collect(arena, io, options.fixture_root);
     var picked: std.ArrayList(Fixture) = .empty;
-    for (all) |f| if (options.filter.len == 0 or std.mem.find(u8, f.rel, options.filter) != null) {
-        if (v_run.flag.len == 0 or f.lang == .verilog) try picked.append(arena, f);
-    };
+    for (all) |f| {
+        if (v_run.flag.len != 0 and f.lang != .verilog) continue;
+        var alts = std.mem.splitScalar(u8, options.filter, '|');
+        const hit = while (alts.next()) |alt| {
+            if (std.mem.find(u8, f.rel, alt) != null) break true;
+        } else false;
+        if (hit) try picked.append(arena, f);
+    }
     const env = try arena.create(std.process.Environ.Map);
     env.* = try std.testing.environ.createMap(arena);
-    const work = try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", "comp-work" });
+    // One directory per run: the four runs go in parallel under `rewrite`.
+    const work = try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", "comp-work-" ++ v_run.name });
     try env.put("ZIG_LOCAL_CACHE_DIR", try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", "comp-zig-cache" }));
     const outcomes = try arena.alloc(Outcome, picked.items.len);
     @memset(outcomes, .pending);

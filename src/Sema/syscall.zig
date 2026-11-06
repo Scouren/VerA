@@ -157,7 +157,9 @@ pub fn task(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error
         _ = try expr.call(s, b, @backingInt(tag), null, try lowerArgs(s, b, args));
         return;
     }
-    if (info.family == .simctl) {
+    // §9.5.1/§9.5.2 `$fclose`/`$fflush`: a row (the old `systask` gives
+    // every file_out task one) over the plain call, no format.
+    if (info.family == .simctl or tag == .@"$fclose" or tag == .@"$fflush") {
         const r = try expr.call(s, b, @backingInt(tag), null, try lowerArgs(s, b, args));
         try s.device.displays.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .call = r.toIndex().? });
         return;

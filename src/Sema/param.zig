@@ -71,6 +71,7 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
         const row = try addRow(s, unit, vir.string(p.name), p, ty, elems[at]);
         try unit.binds.put(s.arena, decl.canonical(vir, i), .{ .param = row });
         try checkRange(s, unit, i, p, elems[at]);
+        try checkType(s, unit, i, p);
         if (try stateRead(s, unit, p.value)) |what| try s.fail(.E0363, unit.file, i.toRef(), "`{s}` reads `{s}`", .{ vir.string(p.name), what });
         if (unit.prefix.len == 0) try derived.append(s.arena, .{ row, p.value });
     };
@@ -79,6 +80,25 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
 }
 
 // ---- private ----
+
+/// §3.4.1 "the type of a string parameter ... is mandatory" (E0346), and
+/// "it shall be an error to assign a numeric value to a parameter declared
+/// as string or to assign a string value to a real parameter" (E0345).
+fn checkType(s: *Sema, unit: *Unit, i: Inst.Index, p: Inst.Param) Allocator.Error!void {
+    const vir = unit.vir;
+    // The default as written: the instance's value is already converted.
+    const c = (try decl.foldBody(s, unit, p.value)) orelse return;
+    const is_str = c == .str;
+    // §4.2.1.1 a real with no integer value cannot become an integer.
+    if (p.flags.storage == .integer and c == .real and !std.math.isFinite(c.real))
+        try s.fail(.E0368, unit.file, i.toRef(), "`{s}` = {d}", .{ vir.string(p.name), c.real });
+    if (p.flags.storage == .none and p.range.len == 0) {
+        if (is_str) try s.fail(.E0346, unit.file, i.toRef(), "`{s}` is initialized with a string; write `parameter string`", .{vir.string(p.name)});
+        return;
+    }
+    if ((p.flags.storage == .string) == is_str) return;
+    try s.fail(.E0345, unit.file, i.toRef(), "`{s}` is declared {t} and initialized with a {s} value", .{ vir.string(p.name), p.flags.storage, if (is_str) "string" else "numeric" });
+}
 
 /// §3.4.7/§9.18 `aliasparam m = $mfactor;` on the root: the first alias of
 /// a hierarchical system parameter is a card row of Table 9-29's top-level
@@ -316,11 +336,23 @@ fn asType(s: *Sema, ty: Device.Param.Type, v: InternPool.Index, zero: bool) Allo
 }
 
 /// §3.4.2 a parameter's value inside its `from` ranges and outside its
-/// `exclude` ones (E0361); a bound folds over every parameter.
+/// `exclude` ones (E0361); a bound folds over every parameter. A range
+/// whose first bound is not below its second is E0347 ("The first
+/// expression in the range shall be numerically smaller than the second"),
+/// and the value is then not judged.
 fn checkRange(s: *Sema, unit: *Unit, i: Inst.Index, p: Inst.Param, value: InternPool.Index) Allocator.Error!void {
     const vir = unit.vir;
     const ip = &s.zcu.intern_pool;
     const name = vir.string(p.name);
+    const before = s.zcu.failed.len;
+    for (vir.list(Inst.ValueRange, p.ranges)) |r| {
+        if (r.flags.set or !r.flags.interval) continue;
+        const lo = (try decl.foldBody(s, unit, r.lo)) orelse continue;
+        const hi = (try decl.foldBody(s, unit, r.hi)) orelse continue;
+        if (lo == .str or hi == .str or lo.asReal() < hi.asReal()) continue;
+        try s.fail(.E0347, unit.file, i.toRef(), "`{s}` {s} bounds {d} and {d} are not in increasing order", .{ name, if (r.flags.exclude) "exclude" else "from", lo.asReal(), hi.asReal() });
+    }
+    if (s.zcu.failed.len != before) return;
     var has_from = false;
     var in_from = false;
     switch (ip.indexToKey(value)) {

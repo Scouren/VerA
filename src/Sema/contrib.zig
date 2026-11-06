@@ -92,6 +92,7 @@ pub fn access(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src
     if (try @import("timepoint.zig").refuse(s, b, src, "a probe (§4.4)")) return expr.poison;
     if (args.len == 1) if (try portOf(s, b, args[0], src)) |p| return portFlow(s, b, name, p, src);
     const t = (try target(s, b, name, args, src)) orelse return expr.poison;
+    try s.branch_reads.append(s.arena, .{ .access = t.access, .hi = t.hi, .lo = t.lo, .file = b.unit.file, .src = src });
     switch (t.access) {
         .potential => {
             const hi = try probe(s, t.hi);
@@ -142,6 +143,10 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
     // the module drives in.
     for (vir.list(Inst.Ref, c.args)) |a| if (isPortBranch(b.unit, a)) return s.fail(.E0407, file, src, "a contribution to a port access", .{});
     const t = (try target(s, b, name, vir.list(Inst.Ref, c.args), src)) orelse return;
+    // §1.3.4.1/§1.3.4.2 no contribution to a signal-flow `input` port.
+    for ([_]Node.Index{ t.hi, t.lo }) |n| if (@import("net.zig").inputPortOf(s, n)) |port|
+        if (try @import("net.zig").isSignalFlow(s, s.device.nodes.items(.discipline)[@backingInt(n)]))
+            return s.fail(.E0425, file, src, "`{s}` is an `input` port of a signal-flow discipline", .{port});
     // §5.6.7.2 "Once a value is indirectly assigned to a branch, it cannot
     // be contributed to using the branch contribution operator <+."
     if (indirectOn(s, t.hi, t.lo)) return s.fail(.E0409, file, src, "`({s},{s})`", .{ nodeName(s, t.hi), nodeName(s, t.lo) });

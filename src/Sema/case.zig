@@ -31,6 +31,9 @@ pub fn lower(s: *Sema, b: *Block, x: Inst.Case) Allocator.Error!void {
     const arms = vir.list(Inst.Arm, x.arms);
     var default: ?Inst.Arm = null;
     for (arms) |a| if (a.flags.default) {
+        // §5.8.3 "use of multiple default statements in one case statement
+        // shall be illegal".
+        if (default != null) try s.fail(.E0427, b.unit.file, .none, "", .{});
         default = a;
     };
     try caseFrom(s, b, subject, arms, default, 0, x.flags.kind);

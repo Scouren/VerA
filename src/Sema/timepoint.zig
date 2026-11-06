@@ -29,6 +29,8 @@ pub fn enter(s: *Sema, b: *Block, attrs: Vir.List(Inst.Attr)) Allocator.Error!vo
     const vir = b.unit.vir;
     for (vir.list(Inst.Attr, attrs)) |a| if (std.mem.eql(u8, vir.string(a.name), "vera_timepoint")) {
         if (a.value.len != 0) {
+            // It picks the code the device is built with: no card value.
+            if (@import("attr.zig").readsParam(vir, a.value)) return s.fail(.E0529, b.unit.file, .none, "the value reads a parameter", .{});
             const c = (try decl.foldBody(s, b.unit, a.value)) orelse return s.fail(.E0529, b.unit.file, .none, "", .{});
             if (!c.isTrue()) return;
         }

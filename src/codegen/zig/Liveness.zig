@@ -20,7 +20,7 @@
 //! Contents:
 //! - fields `masks`, `used`, `assigned`, `targeted`
 //! - `pub const Mask = u64`, `pub const unknowns_max: u32`
-//! - `pub fn init(arena: Allocator, air: Air, n_u: u32) error{ OutOfMemory, TooManyUnknowns }!Liveness`
+//! - `pub fn init(arena: Allocator, air: Air, n_u: u32, roots: ?[]const bool) error{ OutOfMemory, TooManyUnknowns }!Liveness`
 //! - `pub fn maskOf(l: Liveness, ref: Air.Inst.Ref) Mask`
 //! - `pub fn effect(air: Air, tag: Air.Inst.Tag, data: Air.Inst.Data) bool`
 //! - `pub const Operands = struct` (`collect`, `slice`)
@@ -104,8 +104,9 @@ pub const Operands = struct {
 const Liveness = @This();
 
 /// Computes the three columns of `air`, whose probes read `n_u` unknowns,
-/// into `arena`. Fails with `error.TooManyUnknowns` past `unknowns_max`.
-pub fn init(arena: Allocator, air: Air, n_u: u32) error{ OutOfMemory, TooManyUnknowns }!Liveness {
+/// into `arena`; `roots`, per instruction, adds effects (the display tasks
+/// `say` records). Fails with `error.TooManyUnknowns` past `unknowns_max`.
+pub fn init(arena: Allocator, air: Air, n_u: u32, roots: ?[]const bool) error{ OutOfMemory, TooManyUnknowns }!Liveness {
     if (n_u > unknowns_max) return error.TooManyUnknowns;
     const n = air.instructions.len;
     const l: Liveness = .{
@@ -134,7 +135,7 @@ pub fn init(arena: Allocator, air: Air, n_u: u32) error{ OutOfMemory, TooManyUnk
     // residual. Operands mostly precede their readers, so a reverse sweep
     // settles in a pass or two; each pass that changes marks a new value.
     var sweep: usize = 0;
-    while (l.markUsed(air, reach)) : (sweep += 1) assert(sweep <= n);
+    while (l.markUsed(air, reach, roots)) : (sweep += 1) assert(sweep <= n);
     // Each pass only ORs bits in, so it stops: at most one pass per bit of
     // every slot and block, plus the pass that sees nothing change.
     const passes_max = n * unknowns_max + 2;
@@ -177,7 +178,7 @@ pub fn effect(air: Air, tag: Inst.Tag, data: Inst.Data) bool {
 /// One reverse pass: every operand of a live instruction (an effect, or a
 /// value some live instruction reads) is used. Returns whether any mark
 /// was new.
-fn markUsed(l: Liveness, air: Air, reach: []const bool) bool {
+fn markUsed(l: Liveness, air: Air, reach: []const bool, roots: ?[]const bool) bool {
     const tags = air.instructions.items(.tag);
     const datas = air.instructions.items(.data);
     var grew = false;
@@ -185,7 +186,8 @@ fn markUsed(l: Liveness, air: Air, reach: []const bool) bool {
     while (i > 0) {
         i -= 1;
         if (!reach[i]) continue;
-        if (!l.used[i] and !effect(air, tags[i], datas[i])) continue;
+        const root = if (roots) |r| r[i] else false;
+        if (!l.used[i] and !root and !effect(air, tags[i], datas[i])) continue;
         var ops: Operands = .{};
         ops.collect(air, tags[i], datas[i]);
         for (ops.slice()) |r| if (r.toIndex()) |o| {
@@ -296,12 +298,12 @@ test "Liveness: a slot joins every value assigned to it; a constant has no lanes
     defer air.deinit(gpa);
     var arena: std.heap.ArenaAllocator = .init(gpa);
     defer arena.deinit();
-    const l = try init(arena.allocator(), air, 2);
+    const l = try init(arena.allocator(), air, 2, null);
     try std.testing.expectEqual(@as(Mask, 0b11), l.masks[@backingInt(ld)]);
     try std.testing.expectEqual(@as(Mask, 0b11), l.masks[@backingInt(mul)]);
     try std.testing.expect(l.assigned[@backingInt(s)]);
     try std.testing.expect(l.used[@backingInt(mul)]);
     try std.testing.expect(!l.used[@backingInt(ret)]);
     try std.testing.expectEqual(@as(Mask, 0), l.maskOf(.fromIntern(InternPool.Index.two_real)));
-    try std.testing.expectError(error.TooManyUnknowns, init(arena.allocator(), air, 65));
+    try std.testing.expectError(error.TooManyUnknowns, init(arena.allocator(), air, 65, null));
 }

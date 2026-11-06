@@ -29,6 +29,7 @@ const DeclGen = @import("DeclGen.zig");
 const Liveness = @import("Liveness.zig");
 const Ident = @import("Ident.zig");
 const calls = @import("calls.zig");
+const say = @import("say.zig");
 const Inst = Air.Inst;
 const Ref = Inst.Ref;
 const Error = DeclGen.Error;
@@ -38,6 +39,10 @@ w: *std.Io.Writer,
 uses: Uses = .{},
 /// Statement nesting, for indentation.
 indent: u32 = 1,
+/// Which body: `core`'s, or `say`'s (prints recorded, `say.zig`).
+phase: Phase = .core,
+
+pub const Phase = enum { core, say };
 
 /// Which of `core`'s parameters the body read.
 pub const Uses = struct { x: bool = false, model: bool = false, inst: bool = false, sim: bool = false };
@@ -568,10 +573,16 @@ fn genCall(f: *Function, inst: Inst.Index, data: Inst.Data) Error!void {
     switch (info.family) {
         // §9.4/§9.7 a print or a simulation control task is not part of a
         // residual: the device's display phase runs it.
-        .display, .simctl => return if (used) f.dg.fail("the value of `{s}`", .{@tagName(tag)}),
+        .display, .simctl => {
+            if (used) return f.dg.fail("the value of `{s}`", .{@tagName(tag)});
+            if (f.phase == .say) try say.record(f, inst);
+            return;
+        },
         else => {}, // else: a value, by tag below
     }
     if (!used and !Liveness.effect(air.*, .call, data)) return;
+    // A task with no value (a §9.5 file task) has no spelling here yet.
+    if (air.typeOfIndex(f.dg.ip, inst) == .none) return f.dg.fail("the task `{s}`", .{@tagName(tag)});
     try f.line();
     try f.print("const v{d} = ", .{@backingInt(inst)});
     try calls.gen(f, inst, tag, args);
@@ -580,7 +591,7 @@ fn genCall(f: *Function, inst: Inst.Index, data: Inst.Data) Error!void {
 
 /// Writes `M.<name>` over one scalar type at mask `m` (`F.zL(S, m)`), each
 /// operand widened to it.
-fn kernel(f: *Function, m: Liveness.Mask, name: []const u8, ops: []const Ref) Error!void {
+pub fn kernel(f: *Function, m: Liveness.Mask, name: []const u8, ops: []const Ref) Error!void {
     assert(ops.len == 1 or ops.len == 2);
     try f.print("F.zLu(S, 0x{x}, M.{s}(F.zL(S, 0x{x})", .{ m, name, m });
     for (ops) |o| {

@@ -30,6 +30,7 @@ const vams = @import("vams");
 const InternPool = @import("intern_pool");
 const Air = @import("air");
 const Zcu = @import("Zcu.zig");
+const netlist = @import("Sema/netlist.zig");
 const walk = @import("Sema/walk.zig");
 const paramset = @import("Sema/paramset.zig");
 const checks = @import("Sema/checks.zig");
@@ -120,6 +121,9 @@ inlining: std.ArrayList(Inst.Index) = .empty,
 /// §3.4.7 the card row an `aliasparam` of each hierarchical system
 /// parameter made on the root (param.zig); the root's reads read it.
 sys_alias: std.EnumArray(Zcu.SystemParam, ?Air.Device.Param.Index) = .initFill(null),
+/// §1.3.1 every access read: its quantity and node pair, in order
+/// (contrib.zig's `checkProbes`).
+branch_reads: std.ArrayList(struct { access: Air.Device.Access, hi: Air.Device.Node.Index, lo: Air.Device.Node.Index, file: Zcu.File.Index, src: Inst.Ref }) = .empty,
 /// The contribution rows a reactive term was added to (contrib.zig).
 react_written: std.AutoHashMapUnmanaged(Air.Device.Contribution.Index, void) = .empty,
 /// §6.4.3 each paramset instance's output variables by flat name, and the
@@ -333,6 +337,7 @@ pub fn elaborate(zcu: *Zcu, config: Config) Allocator.Error!void {
     var arena_state: std.heap.ArenaAllocator = .init(zcu.gpa);
     defer arena_state.deinit();
     var s: Sema = .{ .zcu = zcu, .gpa = zcu.gpa, .arena = arena_state.allocator(), .config = config };
+    try netlist.shadows(&s);
     try namespace(&s);
     try checks.run(&s);
     const roots = try pickRoots(&s);

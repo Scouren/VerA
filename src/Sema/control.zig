@@ -304,7 +304,7 @@ fn block(s: *Sema, b: *Block, x: Inst.Block) Allocator.Error!void {
     for (b.unit.vir.list(Inst.Attr, x.attrs)) |a| if (std.mem.eql(u8, b.unit.vir.string(a.name), "vera_nodiff")) {
         if (a.value.len == 0) {
             b.nodiff = true;
-        } else if (try decl.foldBody(s, b.unit, a.value)) |c| {
+        } else if (if (@import("attr.zig").readsParam(b.unit.vir, a.value)) null else try decl.foldBody(s, b.unit, a.value)) |c| {
             b.nodiff = c.isTrue();
         } else try s.fail(.E0525, b.unit.file, .none, "", .{});
     };

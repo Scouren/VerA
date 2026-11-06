@@ -11,6 +11,7 @@
 //!
 //! Contents:
 //! - `pub fn call(s: *Sema, b: *Block, f: Inst.Index, pre: []const Value, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value`
+//! - `pub fn checkRecursion(s: *Sema, unit: *const Sema.Unit) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -86,7 +87,67 @@ pub fn call(s: *Sema, b: *Block, f: Inst.Index, pre: []const Value, args: []cons
     return .{ .ref = result, .ty = ret_ty };
 }
 
+/// §4.7.3 "recursive functions are not permitted" of an analog function
+/// (E0510), judged on the declarations: an uncalled recursive function is
+/// still illegal (the old `checkFuncRecursion`). One reachability walk per
+/// function over the module's call graph.
+pub fn checkRecursion(s: *Sema, unit: *const Sema.Unit) Allocator.Error!void {
+    const vir = unit.vir;
+    var fns: std.ArrayList(Inst.Index) = .empty;
+    for (vir.body(unit.module.body)) |i| if (vir.instructions.items(.tag)[@backingInt(i)] == .function and decl.canonical(vir, i) == i) try fns.append(s.arena, i);
+    if (fns.items.len == 0) return;
+    const edges = try s.arena.alloc(std.ArrayList(Inst.Index), fns.items.len);
+    for (fns.items, edges) |f, *out| {
+        out.* = .empty;
+        try callees(s, vir, decl.payloadOf(vir, Inst.Function, f).body, out, 0);
+    }
+    var seen: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
+    var stack: std.ArrayList(Inst.Index) = .empty;
+    for (fns.items) |f| {
+        const fd = decl.payloadOf(vir, Inst.Function, f);
+        if (!fd.flags.analog) continue;
+        seen.clearRetainingCapacity();
+        stack.clearRetainingCapacity();
+        try stack.append(s.arena, f);
+        walk: while (stack.pop()) |g| {
+            const k = std.mem.findScalar(Inst.Index, fns.items, g) orelse continue;
+            for (edges[k].items) |h| {
+                if (h == f) {
+                    try s.fail(.E0510, unit.file, f.toRef(), "`{s}` calls itself", .{vir.string(fd.name)});
+                    break :walk;
+                }
+                if ((try seen.getOrPut(s.arena, h)).found_existing) continue;
+                try stack.append(s.arena, h);
+            }
+        }
+    }
+}
+
 // ---- private ----
+
+/// Appends every function body `b` calls (through nested bodies too).
+fn callees(s: *Sema, vir: *const Vir, b: Vir.Body, out: *std.ArrayList(Inst.Index), depth: u32) Allocator.Error!void {
+    if (depth > 1 << 10) return;
+    for (vir.body(b)) |i| {
+        const data = vir.instructions.items(.data)[@backingInt(i)];
+        switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+            .call => if (decl.payloadOf(vir, Inst.Call, i).callee.toIndex()) |c| if (vir.instructions.items(.tag)[@backingInt(c)] == .decl_ref) {
+                const g = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(c)].decl_tok.decl);
+                if (vir.instructions.items(.tag)[@backingInt(g)] == .function) try out.append(s.arena, g);
+            },
+            .case => for (vir.list(Inst.Arm, decl.payloadOf(vir, Inst.Case, i).arms)) |arm| try callees(s, vir, arm.body, out, depth + 1),
+            inline else => |t| if (comptime Inst.dataKind(t) == .pl_node) {
+                const P = Inst.Payload(t);
+                if (P != void) {
+                    const p = vir.extraData(P, data.pl_node.payload_index);
+                    inline for (@typeInfo(P).@"struct".field_names) |name| {
+                        if (@FieldType(P, name) == Vir.Body) try callees(s, vir, @field(p, name), out, depth + 1);
+                    }
+                }
+            },
+        }
+    }
+}
 
 /// A formal's type: its own declaration's, or a variable of its name in the
 /// body (`input x; real x;`); real when none says.

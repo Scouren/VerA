@@ -14,6 +14,9 @@
 //! - `pub fn bindChildPorts(s: *Sema, unit: *Unit) Allocator.Error!void`
 //! - `pub fn bindBridges(s: *Sema) Allocator.Error!void`
 //! - `pub fn pullDrives(s: *Sema) Allocator.Error!void`
+//! - `pub fn signalFlowPorts(s: *Sema) Allocator.Error!void`
+//! - `pub fn isSignalFlow(s: *Sema, disc: InternPool.String) Allocator.Error!bool`
+//! - `pub fn inputPortOf(s: *Sema, n: Node.Index) ?[]const u8`
 //! - `pub fn netDiscipline(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.Error!InternPool.String`
 
 const std = @import("std");
@@ -157,6 +160,57 @@ pub fn netDiscipline(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.E
     return .empty;
 }
 
+/// §1.3.4 a signal-flow port (its discipline binds one nature) has the
+/// direction of its one quantity, so the root's `inout` one is E0360.
+pub fn signalFlowPorts(s: *Sema) Allocator.Error!void {
+    const unit = &s.units.items[0];
+    const vir = unit.vir;
+    for (vir.body(unit.module.ports)) |p| {
+        const first = portDecl(vir, p) orelse continue;
+        if (dirOf(unit, first) != .inout) continue;
+        const bind = unit.binds.get(first) orelse continue;
+        const n: Node.Index = switch (bind) {
+            .node => |x| x,
+            .vector => |v| unit.vec_rows.items[v.first],
+            else => continue,
+        };
+        if (n == .ground) continue;
+        const disc = s.device.nodes.items(.discipline)[@backingInt(n)];
+        if (!try isSignalFlow(s, disc)) continue;
+        try s.fail(.E0360, unit.file, first.toRef(), "`{s}` is an `inout` port of discipline `{s}`, which binds one nature only", .{ vir.string(nameOf(vir, first)), s.zcu.intern_pool.stringToSlice(disc) });
+    }
+}
+
+/// §1.3.4 whether discipline `disc` binds exactly one of potential and flow.
+pub fn isSignalFlow(s: *Sema, disc: InternPool.String) Allocator.Error!bool {
+    if (disc == .empty) return false;
+    const zcu = s.zcu;
+    const d = zcu.disciplines.get(disc) orelse return false;
+    const dvir = zcu.fileVir(d.file);
+    var potential = false;
+    var flow = false;
+    for (dvir.list(Inst.DisciplineItem, payloadOf(dvir, Inst.Discipline, zcu.declRow(d).inst).items)) |it| switch (it.kind) {
+        .potential => potential = true,
+        .flow => flow = true,
+        .domain, .potential_attr, .flow_attr, .attr => {},
+    };
+    return potential != flow;
+}
+
+/// The name of the root's `input` port whose node is `n`, or null.
+pub fn inputPortOf(s: *Sema, n: Node.Index) ?[]const u8 {
+    if (n == .ground or @backingInt(n) >= s.device.num_ports) return null;
+    const unit = &s.units.items[0];
+    const vir = unit.vir;
+    for (vir.body(unit.module.ports)) |p| {
+        const first = portDecl(vir, p) orelse continue;
+        const bind = unit.binds.get(first) orelse continue;
+        if (bind != .node or bind.node != n) continue;
+        if (dirOf(unit, first) == .input) return vir.string(nameOf(vir, first));
+    }
+    return null;
+}
+
 /// IEEE 1364-2005 §19.9 `unconnected_drive`: each child's `input` port its
 /// instance leaves unconnected is held at potential 0 (`pull0`) or 1
 /// (`pull1`) by a potential source, when its discipline binds a potential
@@ -195,12 +249,18 @@ pub fn pullDrives(s: *Sema) Allocator.Error!void {
 
 /// Whether any declaration of `first`'s name is an `input`.
 fn isInput(unit: *const Unit, first: Inst.Index) bool {
+    return dirOf(unit, first) == .input;
+}
+
+/// The direction a declaration of `first`'s name gives, or `.none`.
+fn dirOf(unit: *const Unit, first: Inst.Index) Inst.Direction {
     const vir = unit.vir;
     for ([_]Vir.Body{ unit.module.ports, unit.module.body }) |body| for (vir.body(body)) |i| {
         if (vir.instructions.items(.tag)[@backingInt(i)] != .io or canonical(vir, i) != first) continue;
-        if (payloadOf(vir, Inst.Io, i).flags.dir == .input) return true;
+        const d = payloadOf(vir, Inst.Io, i).flags.dir;
+        if (d != .none) return d;
     };
-    return false;
+    return .none;
 }
 
 /// §7.8.4 the lower side of each connect module inserted in `parent`,

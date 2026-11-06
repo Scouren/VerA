@@ -30,6 +30,7 @@ const SysFn = @import("vams").SysFn;
 const stamps = @import("stamps.zig");
 const state = @import("state.zig");
 const calls = @import("calls.zig");
+const say = @import("say.zig");
 const Device = Air.Device;
 const Real = Function.Real;
 
@@ -57,6 +58,12 @@ branch_u: []u32 = &.{},
 host_params: u8 = 0,
 /// Per instruction: an `alloc`'s `Instance` field when §5.10 holds it.
 held_field: []?[]const u8 = &.{},
+/// §9.4 the display tasks `say` records (`say.plan`), and the liveness
+/// of its body.
+say_sites: []const say.Site = &.{},
+say_live: Liveness = undefined,
+/// §4.5.14 the lanes a `ddx` reads (`calls.zig`), in `core` or `say`.
+ddx_reads: Liveness.Mask = 0,
 /// Per §9.21.1 snapshot site (a `$table_model` call's `site - 1`): its
 /// sample count, the length of `Instance.table_<k>` (`state.plan`).
 table_len: []u32 = &.{},
@@ -117,8 +124,6 @@ const DeclGen = @This();
 
 /// Writes the whole device to `w`.
 pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
-    const d = dg.device;
-    if (d.limit_slots.len != 0) return dg.fail("a §9.17.3 `$limit`", .{});
     try stamps.unknowns(dg);
     const p = try stamps.plan(dg);
     try dg.givenBits();
@@ -128,6 +133,9 @@ pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     var body: std.Io.Writer.Allocating = .init(dg.arena);
     var f: Function = .{ .dg = dg, .w = &body.writer };
     try f.genBody(dg.air.mainBody());
+    try say.plan(dg);
+    // `say`'s body before the tables: its `ddx` lanes join `deriv_reads`.
+    const say_text = try say.genBody(dg);
 
     try dg.print(w, "{s}", .{header});
     try dg.genUnknowns(w);
@@ -136,6 +144,7 @@ pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     try dg.genCore(w, f.uses, body.written());
     try dg.genEntries(w, p);
     try state.genEntries(dg, w);
+    try say.genEntries(dg, w, say_text);
     try dg.print(w, "\ncomptime {{\n    contract.validate(Self);\n}}\n", .{});
 }
 
@@ -143,10 +152,12 @@ pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
 /// charge site's charge, read from their slots.
 pub fn genReturn(dg: *DeclGen, f: *Function) Error!void {
     const d = dg.device;
+    if (f.phase == .say) return dg.print(f.w, "return;", .{});
     try dg.print(f.w, "return .{{", .{});
     for (d.contributions.items(.resist), 0..) |slot, k| if (dg.live.assigned[@backingInt(slot)]) try dg.print(f.w, " .r{d} = s{d},", .{ k, @backingInt(slot) });
     for (d.charge_sites.items(.slot), 0..) |slot, k| try dg.print(f.w, " .c{d} = s{d},", .{ k, @backingInt(slot) });
     for (dg.held_field, 0..) |h, i| if (h != null) try dg.print(f.w, " .h{d} = s{d},", .{ i, i });
+    for (d.limit_slots.items(.slot), 0..) |slot, k| try dg.print(f.w, " .l{d} = s{d},", .{ k, @backingInt(slot) });
     try dg.print(f.w, " }};", .{});
 }
 
@@ -320,7 +331,8 @@ fn genTables(dg: *DeclGen, w: *std.Io.Writer, p: stamps.Plan) Error!void {
     var all: Liveness.Mask = 0;
     for (p.pattern) |m| all |= m;
     for (d.charge_sites.items(.slot)) |slot| all |= dg.live.masks[@backingInt(slot)];
-    try dg.print(w, "\n/// The unknowns whose derivative lane the device reads.\npub const deriv_reads: u64 = 0x{x};\n/// No §4.5.14 `ddx` reads a lane.\npub const ddx_reads: u64 = 0;\n", .{all});
+    all |= dg.ddx_reads;
+    try dg.print(w, "\n/// The unknowns whose derivative lane the device reads.\npub const deriv_reads: u64 = 0x{x};\n/// The lanes a §4.5.14 `ddx` reads.\npub const ddx_reads: u64 = 0x{x};\n", .{ all, dg.ddx_reads });
     try dg.print(w, "/// §5.6 bit `c` of row `r`: d eval[r] / d x[c] may be nonzero.\npub const jac_pattern = [n_u]u64{{", .{});
     for (p.pattern) |m| try dg.print(w, " 0x{x},", .{m});
     try dg.print(w, " }};\n", .{});
@@ -343,12 +355,14 @@ fn genCore(dg: *DeclGen, w: *std.Io.Writer, uses: Function.Uses, body: []const u
     var reals = d.charge_sites.len;
     for (dg.held_field, 0..) |h, i| reals += @intFromBool(h != null and dg.air.instructions.items(.data)[i].ty == InternPool.Index.real_type);
     for (d.contributions.items(.resist)) |slot| reals += @intFromBool(dg.live.assigned[@backingInt(slot)]);
+    reals += d.limit_slots.len;
     try dg.print(w, "\nfn Core(comptime S: type) type {{\n    {s}return struct {{", .{if (reals == 0) "_ = S;\n    " else ""});
     for (d.contributions.items(.resist), 0..) |slot, k| if (dg.live.assigned[@backingInt(slot)]) try dg.print(w, " r{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
     for (d.charge_sites.items(.slot), 0..) |slot, k| try dg.print(w, " c{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
     for (dg.held_field, 0..) |h, i| if (h != null) {
         if (dg.air.instructions.items(.data)[i].ty == InternPool.Index.real_type) try dg.print(w, " h{d}: F.zOf(S, 0x{x}),", .{ i, dg.live.masks[i] }) else try dg.print(w, " h{d}: i64,", .{i});
     };
+    for (d.limit_slots.items(.slot), 0..) |slot, k| try dg.print(w, " l{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
     try dg.print(w, " }};\n}}\n", .{});
     // §9.21.1 every evaluation starts from the snapshots an accepted point kept.
     const tables = dg.table_len.len != 0;
@@ -448,7 +462,7 @@ fn nodeName(dg: *const DeclGen, r: u32) []const u8 {
     return dg.u_names[r];
 }
 
-fn print(dg: *DeclGen, w: *std.Io.Writer, comptime fmt: []const u8, args: anytype) Error!void {
+pub fn print(dg: *DeclGen, w: *std.Io.Writer, comptime fmt: []const u8, args: anytype) Error!void {
     _ = dg;
     w.print(fmt, args) catch return error.OutOfMemory;
 }

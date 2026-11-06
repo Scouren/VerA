@@ -93,6 +93,12 @@ const Watch = struct {
 // ---- private ----
 
 fn lower(comptime body: []const u8) !Out {
+    return lowerWith(body, .{});
+}
+
+/// `lower` under the directive events `directives` (offsets into the
+/// prelude and `body`).
+fn lowerWith(comptime body: []const u8, directives: vams.Preprocessor.events.Directives) !Out {
     const gpa = std.testing.allocator;
     const src: [:0]const u8 = prelude ++ body;
     var out: Out = .{ .arena = .init(gpa), .tables = "", .codes = &.{}, .analysis = null, .zcu = undefined, .vir = undefined };
@@ -102,7 +108,7 @@ fn lower(comptime body: []const u8) !Out {
     defer ast.deinit(gpa);
     try std.testing.expectEqual(@as(usize, 0), ast.errors.len);
     out.vir = try gpa.create(vams.Vir);
-    out.vir.* = try vams.AstGen.generate(gpa, &ast, .{});
+    out.vir.* = try vams.AstGen.generate(gpa, &ast, .{ .directives = directives });
     out.zcu = try gpa.create(Zcu);
     out.zcu.* = try .init(gpa);
     _ = try out.zcu.addFile("test.va", out.vir.*, 0);
@@ -298,6 +304,33 @@ test "§4.2.9 an unsigned operand makes the comparison unsigned, each extended f
     // 40'hFF_FFFF_FFFF: 40'h00_FFFF_FFFF is not it, 0; against the same 32
     // bits, 1. So 2 + 8 = 10 times V(p) = 1.
     try std.testing.expectEqual(@as(f64, 10.0), try o.value(0, 0, &.{1.0}));
+}
+
+test "§10.3 `default_transition` fills a transition's absent rise and fall times" {
+    var o = try lowerWith(
+        \\module m(p);
+        \\  inout p; electrical p;
+        \\  analog V(p) <+ transition(V(p), 0, 0);
+        \\endmodule
+    , .{ .transitions = &.{.{ .at = 0, .value = 2e-9 }} });
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{}, o.codes);
+    // Hand-derived: the rise time written is 0, so it is the directive's
+    // 2 ns; no fall time is written, so it is the rise time, 2 ns.
+    var rise: ?f64 = null;
+    var fall: ?f64 = null;
+    const a = &o.analysis.?;
+    for (a.air.instructions.items(.tag), a.air.instructions.items(.data)) |t, d| {
+        if (t != .call) continue;
+        const x = a.air.extraData(Air.Call, d.ty_pl.payload);
+        if (x.data.callee != @backingInt(vams.SysFn.Tag.transition)) continue;
+        const args: []const Air.Inst.Ref = @ptrCast(a.air.extra[x.end..][0..x.data.args_len]);
+        if (args.len < 4) continue;
+        rise = if (args[2].toInterned()) |r| o.zcu.intern_pool.indexToKey(r).float else null;
+        fall = if (args[3].toInterned()) |f| o.zcu.intern_pool.indexToKey(f).float else null;
+    }
+    try std.testing.expectEqual(@as(?f64, 2e-9), rise);
+    try std.testing.expectEqual(@as(?f64, 2e-9), fall);
 }
 
 test "§4.7.1 an analog function with no type returns real" {

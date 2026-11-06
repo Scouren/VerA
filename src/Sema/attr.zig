@@ -10,6 +10,7 @@
 //! Contents:
 //! - `pub const Scratch = enum`
 //! - `pub fn check(s: *Sema, unit: *Unit) Allocator.Error!void`
+//! - `pub fn readsParam(vir: *const Vir, b: Vir.Body) bool`
 //! - `pub fn scratch(s: *Sema, unit: *Unit, attrs: Vir.List(Inst.Attr), src: Inst.Ref) Allocator.Error!Scratch`
 
 const std = @import("std");
@@ -48,6 +49,17 @@ pub fn check(s: *Sema, unit: *Unit) Allocator.Error!void {
     };
 }
 
+/// Whether body `b` reads a parameter: a VerA attribute that picks the code
+/// the device is built with folds without the model card, so one that reads
+/// a parameter is refused (E0525, E0529, E0534).
+pub fn readsParam(vir: *const Vir, b: Vir.Body) bool {
+    for (vir.body(b)) |i| if (vir.instructions.items(.tag)[@backingInt(i)] == .decl_ref) {
+        const d = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl);
+        if (vir.instructions.items(.tag)[@backingInt(d)] == .param) return true;
+    };
+    return false;
+}
+
 /// The `vera_scratch` mode `attrs` (a variable's) gives: the last spec
 /// wins; §2.9's default 1 when it has no value.
 pub fn scratch(s: *Sema, unit: *Unit, attrs: Vir.List(Inst.Attr), src: Inst.Ref) Allocator.Error!Scratch {
@@ -58,7 +70,7 @@ pub fn scratch(s: *Sema, unit: *Unit, attrs: Vir.List(Inst.Attr), src: Inst.Ref)
     };
     const a = spec orelse return .off;
     if (a.value.len == 0) return .zero;
-    const c = (try decl.foldBody(s, unit, a.value)) orelse {
+    const c = (if (readsParam(vir, a.value)) null else try decl.foldBody(s, unit, a.value)) orelse {
         try s.fail(.E0534, unit.file, src, "", .{});
         return .off;
     };

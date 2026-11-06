@@ -352,7 +352,8 @@ pub const table = std.EnumArray(Tag, Info).init(.{
     .timer = .{ .ty = .int, .args = .{ .min = 1, .max = 4 }, .family = .event, .context = .analog },
     .initial_step = .{ .ty = .int, .family = .event, .context = .analog },
     .final_step = .{ .ty = .int, .family = .event, .context = .analog },
-    .analysis = .{ .ty = .int, .args = .{ .min = 1 }, .family = .query, .context = .analog },
+    // §4.6.1 the old callee table types the result real (a 1.0 or 0.0).
+    .analysis = .{ .ty = .real, .args = .{ .min = 1 }, .family = .query, .context = .analog },
     .ac_stim = op(.{ .max = 3 }),
     .white_noise = op(.{ .min = 1, .max = 2 }),
     .flicker_noise = op(.{ .min = 2, .max = 3 }),

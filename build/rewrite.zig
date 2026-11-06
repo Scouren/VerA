@@ -103,7 +103,10 @@ pub fn add(g: Graph) void {
         r.has_side_effects = true;
         const step = b.step(d.step, d.what);
         step.dependOn(&r.step);
-        if (std.mem.eql(u8, d.step, "diff-codegen")) codegenHosts(g, step);
+        if (std.mem.eql(u8, d.step, "diff-codegen")) {
+            codegenHosts(g, step);
+            benchFast(g);
+        }
         all.dependOn(&r.step);
         g.test_step.dependOn(&r.step);
     }
@@ -128,7 +131,7 @@ pub fn add(g: Graph) void {
         .{ .name = "air", .module = byName(mods, "air") },
     });
     const kr = testRun(b, "diff-kernels", kmod, g.runner, g.results_dir);
-    const kt = b.step("kernels-targets", "std_kernels built for x86_64, aarch64, NVPTX and AMDGCN, its f64 math held to no fused multiply-add on each");
+    const kt = b.step("kernels-targets", "std_kernels built for x86_64, aarch64, NVPTX and AMDGCN, its f64 math and the strict family's kernels held to no optional contraction on each, the Fast family's to the fast flags");
     kernelTargets(b, kt);
     const kd = b.step("diff-kernels", "std_kernels against lib/kernels and the old kernel text, bit for bit; Gompute against gm and an f128 reference; kernels-targets");
     kd.dependOn(&kr.step);
@@ -174,6 +177,45 @@ fn codegenHosts(g: Graph, step: *Build.Step) void {
     }
 }
 
+/// `bench-fast`: `tests/bench_fast.zig` over the new devices of
+/// `tests/bench/*.va`, ReleaseFast as a device is: strict against fast-math
+/// evaluation time (AGENTS.md: a speed claim cites a benchmark).
+fn benchFast(g: Graph) void {
+    const b = g.b;
+    const names = [_][]const u8{ "sema", "air", "intern_pool", "vams", "codegen", "frontend", "diag", "vera" };
+    var imports: [names.len]Build.Module.Import = undefined;
+    for (&imports, names) |*i, n| i.* = .{ .name = n, .module = byName(g.mods, n) };
+    const gen = b.addExecutable(.{ .name = "bench-device", .root_module = g.m.make("tests/differential/codegen/device_gen.zig", &imports) });
+    const contract = b.createModule(.{ .root_source_file = b.path("lib/contract.zig"), .target = g.m.target, .optimize = .ReleaseFast });
+    const kernels = b.createModule(.{ .root_source_file = b.path("lib/std/kernels.zig"), .target = g.m.target, .optimize = .ReleaseFast, .imports = &.{
+        .{ .name = "contract", .module = contract },
+        .{ .name = "gompute_math", .module = b.dependency("gompute", .{ .optimize = .ReleaseFast }).module("math") },
+    } });
+    const root = b.createModule(.{ .root_source_file = b.path("tests/bench_fast.zig"), .target = g.m.target, .optimize = .ReleaseFast, .imports = &.{
+        .{ .name = "contract", .module = contract },
+        .{ .name = "std_kernels", .module = kernels },
+    } });
+    for ([_][]const u8{ "diode", "mosfet", "abs", "tanh_amp", "mos_exp" }) |name| for ([_][]const u8{ "", "_v" }) |side| {
+        const run = b.addRunArtifact(gen);
+        run.addFileArg(b.path(b.fmt("tests/bench/{s}.va", .{name})));
+        run.addArg(pathFromRoot(b, "tests/conformance/tests/include"));
+        const out = run.addOutputFileArg("device.zig");
+        if (side.len != 0) run.addArg("versioned");
+        root.addImport(b.fmt("{s}{s}", .{ name, side }), b.createModule(.{
+            .root_source_file = out,
+            .target = g.m.target,
+            .optimize = .ReleaseFast,
+            .imports = &.{
+                .{ .name = "contract", .module = contract },
+                .{ .name = "std_kernels", .module = kernels },
+            },
+        }));
+    };
+    const exe = b.addExecutable(.{ .name = "bench-fast", .root_module = root });
+    const step = b.step("bench-fast", "Strict against fast-math device evaluation time held to no device slower versioned than strict (tests/bench/*.va, ReleaseFast, median and least of 101 runs)");
+    step.dependOn(&b.addRunArtifact(exe).step);
+}
+
 /// diff-codegen's scratch-array device (`codegen.examples.stack`, the
 /// bsource.va stack of lib/TODO.md §11.10), written by a generator so the
 /// oracle compiles it and holds it to `Air.interp`.
@@ -215,11 +257,15 @@ fn kernelTargets(b: *Build, step: *Build.Step) void {
             .{ .name = "contract", .module = contract },
             .{ .name = "gompute_math", .module = gompute_math },
         } });
-        const Part = enum { all, math, control };
-        for ([_]Part{ .all, .math, .control }) |part| {
+        // `family`: the generic kernels over the strict reference family;
+        // `fast`: over its `Fast` twin, which must carry the fast flags.
+        const Part = enum { all, math, family, fast, control };
+        for ([_]Part{ .all, .math, .family, .fast, .control }) |part| {
             const o = b.addOptions();
             o.addOption(bool, "math_only", part == .math);
             o.addOption(bool, "control", part == .control);
+            o.addOption(bool, "family_only", part == .family or part == .fast);
+            o.addOption(bool, "fast", part == .fast);
             const root = b.createModule(.{ .root_source_file = b.path("tests/differential/kernels_targets.zig"), .target = t, .optimize = .ReleaseFast, .imports = &.{
                 .{ .name = "std_kernels", .module = kernels },
                 .{ .name = "contract", .module = contract },
@@ -236,7 +282,7 @@ fn kernelTargets(b: *Build, step: *Build.Step) void {
             // and is allowed (lib/TODO.md §11.8).
             const ir = b.addSystemCommand(&.{ "grep", "-Eq", "fmuladd|(fadd|fsub|fmul|fdiv|fneg)[a-z ]* (contract|fast)" });
             ir.addFileArg(obj.getEmittedLlvmIr());
-            ir.expectExitCode(if (part == .control) 0 else 1);
+            ir.expectExitCode(if (part == .control or part == .fast) 0 else 1);
             step.dependOn(&ir.step);
         }
     }

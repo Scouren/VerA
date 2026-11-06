@@ -1,0 +1,32 @@
+// The fast-math benchmark's MOSFET-like model (`zig build bench-fast`): a
+// level-1 square law with body effect and channel-length modulation, cutoff,
+// triode and saturation selected by §5.8 conditionals.
+`include "disciplines.vams"
+module bench_mos(d, g, s, b);
+  inout d, g, s, b;
+  electrical d, g, s, b;
+  parameter real vto = 0.7 from [-5:5];
+  parameter real kp = 2e-5 from (0:1e-2];
+  parameter real w = 10e-6 from [1e-8:1e-2];
+  parameter real l = 1e-6 from [1e-8:1e-2];
+  parameter real lambda = 0.02 from [0:1];
+  parameter real gamma = 0.4 from [0:3];
+  parameter real phi = 0.65 from [0.1:2];
+  real vgs, vds, vbs, vth, vov, beta, ids, sq;
+  analog begin
+    vgs = V(g, s);
+    vds = V(d, s);
+    vbs = V(b, s);
+    beta = kp * w / l;
+    sq = sqrt(phi - (vbs < 0 ? vbs : 0) + 1e-3);
+    vth = vto + gamma * (sq - sqrt(phi));
+    vov = vgs - vth;
+    if (vov <= 0)
+      ids = 0;
+    else if (vds < vov)
+      ids = beta * (vov - 0.5 * vds) * vds * (1 + lambda * vds);
+    else
+      ids = 0.5 * beta * vov * vov * (1 + lambda * vds);
+    I(d, s) <+ ids + 1e-12 * vds;
+  end
+endmodule

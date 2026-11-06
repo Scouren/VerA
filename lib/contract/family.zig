@@ -13,7 +13,7 @@
 //! - `pub const RefOptions = struct { collapse_applied: bool, math: type }`
 //! - `pub fn checkFamily(comptime S: type) void`
 //! - `pub fn RefFamily(comptime L: type, comptime lane: anytype, comptime opts: RefOptions) type`,
-//!   whose decls are `collapse_applied`, `V`, `con`, `probe`, `sel` and `Of(m)`,
+//!   whose decls are `collapse_applied`, `V`, `Fast`, `fromFast`, `con`, `probe`, `sel` and `Of(m)`,
 //!   a value with `mask` and the primitives `to`, `val`, `ddxAt`, `add`, `sub`,
 //!   `neg`, `mul`, `div`, `scale`, `addC`, `exp`, `log`, `expm1`, `log1p`,
 //!   `sqrt`, `sin`, `cos`, `tanh`, `sinh`, `cosh`, `atan`, `pow`, `lt`, `le`, `eq`
@@ -70,6 +70,12 @@ const testing = std.testing;
 /// Optional trait: `collapse_applied: bool = true` promises the host applied
 /// the device's `collapse()` aliases to its gather and scatter maps; the
 /// device then omits the collapsed branches' cancelling stamps.
+///
+/// Optional trait: `Fast`, a family with the same `V` and masks computing
+/// every primitive under `@setFloatMode(.optimized)`, with `fromFast(a)`
+/// returning `Fast` value `a` as this family's `Of(mask)`, value and lanes
+/// unchanged. A versioned unit (lib/TODO.md §11.9) runs its fast body on
+/// `Fast` inside its guard box; without the trait it runs on `S` itself.
 pub const family_fns = [_][]const u8{ "Of", "V", "con", "probe", "sel" };
 
 /// The methods every `Of(m)` value carries, with the numerics pinned in the
@@ -129,6 +135,8 @@ pub fn checkFamily(comptime S: type) void {
     if (!build_config.validating) return;
     if (@hasDecl(S, "collapse_applied") and @TypeOf(S.collapse_applied) != bool)
         @compileError(@typeName(S) ++ ": family collapse_applied must be bool");
+    if (@hasDecl(S, "Fast") and !@hasDecl(S, "fromFast"))
+        @compileError(@typeName(S) ++ ": family declares Fast without fromFast");
     inline for (family_fns) |f| {
         if (!@hasDecl(S, f)) @compileError(@typeName(S) ++ ": family is missing `" ++ f ++ "`");
     }
@@ -151,7 +159,7 @@ pub fn checkFamily(comptime S: type) void {
 /// AMDGCN too.
 pub fn RefFamily(comptime L: type, comptime lane: anytype, comptime opts: RefOptions) type {
     comptime assert(@typeInfo(L) == .float);
-    return RefSparse(L, comptime laneTable(lane), opts.collapse_applied, opts.math);
+    return RefSparse(L, comptime laneTable(lane), opts.collapse_applied, opts.math, .strict);
 }
 
 /// Value `a` of a `RefFamily` family as one column per unknown, `n` of them:
@@ -229,13 +237,21 @@ fn sqrtSlope(s: f64) f64 {
     return slope;
 }
 
-fn RefSparse(comptime L: type, comptime lane: []const u32, comptime collapsed: bool, comptime Lib: type) type {
+fn RefSparse(comptime L: type, comptime lane: []const u32, comptime collapsed: bool, comptime Lib: type, comptime mode: std.builtin.FloatMode) type {
     const M = MaskOf(lane.len);
     return struct {
         /// The family's `collapse_applied` trait (`RefOptions`).
         pub const collapse_applied = collapsed;
         /// One unknown's value: one operating point.
         pub const V = f64;
+        /// The optional `Fast` trait: this family with every primitive
+        /// computed under `@setFloatMode(.optimized)`.
+        pub const Fast = if (mode == .strict) RefSparse(L, lane, collapsed, Lib, .optimized) else @This();
+
+        /// `Fast` value `a` as this family's: the same value and lanes.
+        pub fn fromFast(a: anytype) Of(@TypeOf(a).mask) {
+            return .{ .v = a.v, .d = a.d };
+        }
 
         /// The constant `c`, with no lanes.
         pub fn con(c: f64) Of(0) {
@@ -247,6 +263,7 @@ fn RefSparse(comptime L: type, comptime lane: []const u32, comptime collapsed: b
         }
         /// `c ≠ 0 ? a : b` (a NaN `c` picks `a`), the winner widened to both masks.
         pub fn sel(c: anytype, a: anytype, b: anytype) Of(@TypeOf(a).mask | @TypeOf(b).mask) {
+            @setFloatMode(mode);
             const r = @TypeOf(a).mask | @TypeOf(b).mask;
             return if (c.v != 0.0) a.to(r) else b.to(r);
         }
@@ -285,6 +302,7 @@ fn RefSparse(comptime L: type, comptime lane: []const u32, comptime collapsed: b
                     return @splat(@as(L, @floatCast(c)));
                 }
                 fn map(a: T, v: f64, c: f64) T {
+                    @setFloatMode(mode);
                     return .{ .v = v, .d = a.d * k(c) };
                 }
                 fn Join(comptime B: type) type {
@@ -331,20 +349,24 @@ fn RefSparse(comptime L: type, comptime lane: []const u32, comptime collapsed: b
 
                 /// a + b; each operand's lanes on its own unknowns.
                 pub fn add(a: T, b: anytype) Join(@TypeOf(b)) {
+                    @setFloatMode(mode);
                     const r = m | @TypeOf(b).mask;
                     return .{ .v = a.v + b.v, .d = a.spread(r) + b.spread(r) };
                 }
                 /// a − b; `b`'s lanes negated.
                 pub fn sub(a: T, b: anytype) Join(@TypeOf(b)) {
+                    @setFloatMode(mode);
                     const r = m | @TypeOf(b).mask;
                     return .{ .v = a.v - b.v, .d = a.spread(r) - b.spread(r) };
                 }
                 /// −a, every lane negated.
                 pub fn neg(a: T) T {
+                    @setFloatMode(mode);
                     return .{ .v = -a.v, .d = -a.d };
                 }
                 /// a·b; lanes mulAdd(b.d, a.v, a.d·b.v), one product for a one-sided operand.
                 pub fn mul(a: T, b: anytype) Join(@TypeOf(b)) {
+                    @setFloatMode(mode);
                     const B = @TypeOf(b);
                     const r = m | B.mask;
                     if (B.mask == 0) return .{ .v = a.v * b.v, .d = a.spread(r) * kj(B, b.v) };
@@ -353,6 +375,7 @@ fn RefSparse(comptime L: type, comptime lane: []const u32, comptime collapsed: b
                 }
                 /// a/b; lanes mulAdd(b.d, −q, a.d)·(1/b.v), a.d·(1/b.v) for an `Of(0)` divisor.
                 pub fn div(a: T, b: anytype) Join(@TypeOf(b)) {
+                    @setFloatMode(mode);
                     const B = @TypeOf(b);
                     const r = m | B.mask;
                     const inv = 1.0 / b.v;
@@ -362,74 +385,91 @@ fn RefSparse(comptime L: type, comptime lane: []const u32, comptime collapsed: b
                 }
                 /// a·c; lanes a.d·c.
                 pub fn scale(a: T, c: f64) T {
+                    @setFloatMode(mode);
                     return map(a, a.v * c, c);
                 }
                 /// a + c; lanes unchanged.
                 pub fn addC(a: T, c: f64) T {
+                    @setFloatMode(mode);
                     return .{ .v = a.v + c, .d = a.d };
                 }
                 /// Lib.exp; lanes d·e.
                 pub fn exp(a: T) T {
+                    @setFloatMode(mode);
                     const e = Lib.exp(a.v);
                     return map(a, e, e);
                 }
                 /// Lib.log; lanes d·(1/v).
                 pub fn log(a: T) T {
+                    @setFloatMode(mode);
                     return map(a, Lib.log(a.v), 1.0 / a.v);
                 }
                 /// Lib.expm1; lanes d·exp(v).
                 pub fn expm1(a: T) T {
+                    @setFloatMode(mode);
                     return map(a, Lib.expm1(a.v), Lib.exp(a.v));
                 }
                 /// Lib.log1p; lanes d·(1/(1+v)).
                 pub fn log1p(a: T) T {
+                    @setFloatMode(mode);
                     return map(a, Lib.log1p(a.v), 1.0 / (1.0 + a.v));
                 }
                 /// √a; lanes d·(0.5/s), 0 unless s > 0.
                 pub fn sqrt(a: T) T {
+                    @setFloatMode(mode);
                     const s = @sqrt(a.v);
                     return map(a, s, sqrtSlope(s));
                 }
                 /// Lib.sin; lanes d·cos.
                 pub fn sin(a: T) T {
+                    @setFloatMode(mode);
                     return map(a, Lib.sin(a.v), Lib.cos(a.v));
                 }
                 /// Lib.cos; lanes d·(−sin).
                 pub fn cos(a: T) T {
+                    @setFloatMode(mode);
                     return map(a, Lib.cos(a.v), -Lib.sin(a.v));
                 }
                 /// Lib.tanh; lanes d·(1−th²).
                 pub fn tanh(a: T) T {
+                    @setFloatMode(mode);
                     const th = Lib.tanh(a.v);
                     return map(a, th, 1.0 - th * th);
                 }
                 /// Lib.sinh; lanes d·cosh.
                 pub fn sinh(a: T) T {
+                    @setFloatMode(mode);
                     return map(a, Lib.sinh(a.v), Lib.cosh(a.v));
                 }
                 /// Lib.cosh; lanes d·sinh.
                 pub fn cosh(a: T) T {
+                    @setFloatMode(mode);
                     return map(a, Lib.cosh(a.v), Lib.sinh(a.v));
                 }
                 /// Lib.atan; lanes d·(1/(1+v²)).
                 pub fn atan(a: T) T {
+                    @setFloatMode(mode);
                     return map(a, Lib.atan(a.v), 1.0 / (1.0 + a.v * a.v));
                 }
                 /// Lib.pow(a, c); lanes d·(c·p/x), d·(c·pow(0, c−1)) at x = 0, 0 for a non-finite slope.
                 pub fn pow(a: T, c: f64) T {
+                    @setFloatMode(mode);
                     const p = Lib.pow(a.v, c);
                     return map(a, p, powSlope(Lib, a.v, c, p));
                 }
                 /// 1.0 when a < b, else 0.0 (NaN gives 0); no lanes.
                 pub fn lt(a: T, b: anytype) Of(0) {
+                    @setFloatMode(mode);
                     return con(@floatFromInt(@intFromBool(a.v < b.v)));
                 }
                 /// 1.0 when a <= b, else 0.0 (NaN gives 0); no lanes.
                 pub fn le(a: T, b: anytype) Of(0) {
+                    @setFloatMode(mode);
                     return con(@floatFromInt(@intFromBool(a.v <= b.v)));
                 }
                 /// 1.0 when a == b, else 0.0 (NaN gives 0); no lanes.
                 pub fn eq(a: T, b: anytype) Of(0) {
+                    @setFloatMode(mode);
                     return con(@floatFromInt(@intFromBool(a.v == b.v)));
                 }
             };
@@ -446,6 +486,17 @@ test "denseRow: each lane at its unknown's column, +0 elsewhere, past 64 too" {
     var nz: usize = 0;
     for (d) |e| nz += @intFromBool(e != 0.0);
     try testing.expectEqual(@as(usize, 2), nz);
+}
+
+test "RefFamily Fast: the same numbers off contraction, back through fromFast" {
+    const S = RefFamily(f64, &.{ 0, 1 }, .{});
+    const a = S.Fast.probe(0, 3.0).mul(S.Fast.probe(1, 0.5)).addC(1.0);
+    const b = S.fromFast(a);
+    try testing.expect(@TypeOf(b) == S.Of(0b11));
+    try testing.expectEqual(@as(f64, 2.5), b.val());
+    try testing.expectEqual(@as(f64, 0.5), b.ddxAt(0));
+    try testing.expectEqual(@as(f64, 3.0), b.ddxAt(1));
+    try testing.expect(S.Fast.Fast == S.Fast);
 }
 
 test "RefFamily sparse: Of(m) carries exactly m's lanes, joins on binary ops" {

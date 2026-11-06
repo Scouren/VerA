@@ -8,8 +8,10 @@
 //!   the NEW device: Sema's `Air` + `Air.Device`, `Air.Float` over
 //!   `codegen.floatRoots`, `codegen.generate` strict, and again versioned
 //!   (§11.9) when a root is `.optimized`: the VERSIONED device, held to the
-//!   old one bit for bit outside its box, within `fast_ulps` inside it, and
-//!   red when no point lands inside; a side that refuses the source is
+//!   old one bit for bit outside its box, within `fast_ulps` or `fast_rel` inside it,
+//!   every value finite there (the box's promise), and red when no point
+//!   lands inside; the most ulps a fixture's fast body moved a value and a
+//!   lane is printed per fixture that moved; a side that refuses the source is
 //!   skipped and counted; codegen failing on the new side is a disagreement;
 //! - both devices are built by `link` (ReleaseFast, LLVM), each side's
 //!   devices of a batch to one library, under `codegen/dyn.zig` (which holds
@@ -40,6 +42,7 @@ const link = @import("link");
 const DynLib = @import("dynlib").DynLib;
 const options = @import("rewrite_options");
 const sides = @import("codegen/sides.zig");
+const ulps = @import("codegen/ulps.zig");
 
 /// Seeded points per fixture.
 const points = 1000;
@@ -50,14 +53,19 @@ const jobs = 2;
 
 /// What a child counted: points compared, values within the libm bound,
 /// points inside a versioned unit's box, points outside it, and the most
-/// ulps a value inside moved.
+/// ulps a value inside moved: a row or charge, then a derivative lane.
 const Counts = [counts_len]u32;
-const counts_len = 5;
+const counts_len = 6;
 
 /// How far a value the fast-math body computed may move from the strict
 /// one: reassociation and contraction under `@setFloatMode(.optimized)`.
-/// The measured maximum is reported; a lowering bug is far past it.
-const fast_ulps: u64 = 1 << 20;
+/// Mixed: `fast_ulps` away from zero, or `fast_rel` of its row's scale (the
+/// largest magnitude of the row's value and lanes), where a lane cancels
+/// to near zero and an ulp count means nothing (bench-fast: a tanh lane
+/// 347022 ulps apart). The measured maximum is reported; a lowering bug is
+/// far past both.
+const fast_ulps: u64 = 1 << 12;
+const fast_rel: f64 = 1e-13;
 
 /// `compareIsolated`'s end-of-run record.
 const done: u32 = std.math.maxInt(u32);
@@ -84,6 +92,8 @@ const Tally = struct {
     inside: u64 = 0,
     outside: u64 = 0,
     fast_ulps: u32 = 0,
+    /// Per fixture with a versioned device: its most ulps, values then lanes.
+    ulps: std.ArrayList(Ulps) = .empty,
     /// Points where every side stopped alike (`compareIsolated`).
     stops: u32 = 0,
     agreed: u32 = 0,
@@ -96,6 +106,9 @@ const Tally = struct {
     optimized: u32 = 0,
     roots: u32 = 0,
 };
+
+/// One versioned fixture's measured fast-math bound.
+const Ulps = struct { rel: []const u8, value: u32, lane: u32 };
 
 /// A fixture both sides wrote a device for.
 const Ready = struct { rel: []const u8, old: []const u8, new: []const u8, ver: ?[]const u8, card: sides.Card };
@@ -189,6 +202,8 @@ fn runAll() !void {
         try out.writer.print("{s} {s}: {s}\n", .{ if (agreed) "XPASS" else "STALE", rel, if (agreed) "agrees now; delete its codegen.xfail line" else "codegen.xfail names a fixture that was not compared" });
     }
     tally.agreed = tally.compared - countCompared(&whys, ready.items);
+    // The measured fast-math bound per versioned fixture that moved.
+    for (tally.ulps.items) |u| if (u.value != 0 or u.lane != 0) try out.writer.print("ulps {d} values, {d} lanes: {s}\n", .{ u.value, u.lane, u.rel });
     std.debug.print("{s}diff-codegen: {d} fixtures ({d} named in lower.xfail, {d} the old side refused, {d} the new side refused), {d} built and compared at {d} points ({d} evaluations bit for bit, {d} values within the libm ulp bound), {d} agree, {d} in codegen.xfail, {d} failures; device text old {d} B, new {d} B (median per device old {d} B, new {d} B); build old {d} ms, new {d} ms; roots .optimized {d}/{d}; versioned units: {d} points inside the box (at most {d} ulps apart), {d} outside (bit for bit); {d} points where every side stopped alike\n", .{
         out.written(),   tally.fixtures,  tally.lower_listed,                   tally.old_refused,                    tally.new_refused,                 tally.compared,                    points,          tally.points, tally.values_libm, tally.agreed,    tally.xfailed, tally.failed,
         tally.old_bytes, tally.new_bytes, try median(arena, ready.items, .old), try median(arena, ready.items, .new), tally.old_ns / std.time.ns_per_ms, tally.new_ns / std.time.ns_per_ms, tally.optimized, tally.roots,  tally.inside,      tally.fast_ulps, tally.outside, tally.stops,
@@ -349,7 +364,8 @@ fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver
                 tally.values_libm += d.counts[1];
                 tally.inside += d.counts[2];
                 tally.outside += d.counts[3];
-                tally.fast_ulps = @max(tally.fast_ulps, d.counts[4]);
+                tally.fast_ulps = @max(tally.fast_ulps, d.counts[4], d.counts[5]);
+                if (ver_fn != null) try tally.ulps.append(arena, .{ .rel = r.rel, .value = d.counts[4], .lane = d.counts[5] });
                 tally.stops += @intCast(stops.items.len);
                 return d.why;
             },
@@ -397,7 +413,7 @@ fn child(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunF
         // information at each stop, most of a second per child.
         const dfl: std.posix.Sigaction = .{ .handler = .{ .handler = std.posix.SIG.DFL }, .mask = std.posix.sigemptyset(), .flags = 0 };
         std.debug.updateSegfaultHandler(&dfl);
-        var counts: Counts = .{ 0, 0, 0, 0, 0 };
+        var counts: Counts = @splat(0);
         const why = compare(arena, r, old_fn, new_fn, ver_fn, fds[1], &counts, stops, start, probe) catch "the oracle ran out of memory";
         const tail = [_]u32{done} ++ counts;
         _ = linux.write(fds[1], @ptrCast(&tail), @sizeOf(@TypeOf(tail)));
@@ -501,18 +517,24 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?Ru
             const rc = f.?(names.ptr, vals.ptr, @intCast(vals.len), x.ptr, n, t, @intCast(p), out.ptr, @intCast(len), says[s].ptr, say_cap, &say_lens[s]);
             if (rc != 0) return try arena.print("the {s} device's entry returned {d} (card: {s})", .{ side, rc, try std.mem.join(arena, ",", @ptrCast(r.card.names)) });
         }
+        // §11.9 the box promises no inf or NaN on the fast body's slice.
+        if (sides_n == 3 and inside) for (outs[2], 0..) |b, i| {
+            if (!std.math.isFinite(b)) return try arena.print("point {d}: versioned value {d} is {e} inside the box", .{ p, i, b });
+        };
         for (1..sides_n) |s| for (outs[0], outs[s], 0..) |a, b, i| {
-            if (sameBits(a, b)) continue;
-            const apart = ulpsApart(a, b);
+            if (ulps.sameBits(a, b)) continue;
+            const apart = ulps.apart(a, b);
             if (libm and apart <= libm_ulps) {
                 counts[1] += 1;
                 continue;
             }
+            const part, const at = if (i < n) .{ "row", i } else if (i < n + n * n) .{ "d row", i - n } else if (i < 2 * n + n * n) .{ "q row", i - n - n * n } else .{ "d q row", i - 2 * n - n * n };
             if (s == 2 and inside and apart <= fast_ulps) {
-                counts[4] = @max(counts[4], @as(u32, @intCast(apart)));
+                const k: usize = if (part[0] == 'd') 5 else 4;
+                counts[k] = @max(counts[k], @as(u32, @intCast(apart)));
                 continue;
             }
-            const part, const at = if (i < n) .{ "row", i } else if (i < n + n * n) .{ "d row", i - n } else if (i < 2 * n + n * n) .{ "q row", i - n - n * n } else .{ "d q row", i - 2 * n - n * n };
+            if (s == 2 and inside and @abs(a - b) <= fast_rel * ulps.rowScale(outs[0], n, i)) continue;
             return try arena.print("point {d}: {s} {d}: old {e}, {s} {e}{s}", .{ p, part, at, a, if (s == 1) "new" else "versioned", b, if (s == 2 and !inside) " (outside the box: the strict body ran)" else "" });
         };
         // §9.4 the point's display records: bit for bit, save the rows'
@@ -528,8 +550,8 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?Ru
                 break;
             }
             for (a, b, 0..) |va, vb, i| {
-                if (sameBits(va, vb)) continue;
-                const apart = ulpsApart(va, vb);
+                if (ulps.sameBits(va, vb)) continue;
+                const apart = ulps.apart(va, vb);
                 if (libm and apart <= libm_ulps) continue;
                 if (s == 2 and inside and apart <= fast_ulps) continue;
                 say_why = try arena.print("point {d}: display record value {d}: old {e}, {s} {e}", .{ p, i, va, if (s == 1) "new" else "versioned", vb });
@@ -566,21 +588,6 @@ fn admitted(box: []const @import("air").Float.Guard, x: []const f64, args: []con
         .arg => args[g.index],
     })) return false;
     return true;
-}
-
-/// How many representable doubles lie between `a` and `b`; max for a NaN
-/// against a number or a sign change.
-fn ulpsApart(a: f64, b: f64) u64 {
-    if (std.math.isNan(a) or std.math.isNan(b)) return std.math.maxInt(u64);
-    if ((a < 0) != (b < 0)) return if (a == 0 and b == 0) 0 else std.math.maxInt(u64);
-    const x: i64 = @bitCast(@abs(a));
-    const y: i64 = @bitCast(@abs(b));
-    return @abs(x - y);
-}
-
-fn sameBits(a: f64, b: f64) bool {
-    if (std.math.isNan(a) and std.math.isNan(b)) return true;
-    return @as(u64, @bitCast(a)) == @as(u64, @bitCast(b));
 }
 
 /// A value near `def` inside every `from` range, outside every `exclude`

@@ -1,0 +1,16 @@
+// The fast-math benchmark's fourth model (`zig build bench-fast`): a
+// transconductance amplifier with a tanh limiter and output conductance, the
+// macromodel stage of an op-amp, §4.3 tanh and §4.2 arithmetic.
+`include "disciplines.vams"
+module bench_ota(inp, inn, out);
+  inout inp, inn, out;
+  electrical inp, inn, out;
+  parameter real gm = 1e-3 from (0:1];
+  parameter real vlim = 0.2 from [1e-3:10];
+  parameter real go = 1e-6 from [0:1];
+  real vid;
+  analog begin
+    vid = V(inp, inn);
+    I(out) <+ -gm * vlim * tanh(vid / vlim) + go * V(out);
+  end
+endmodule

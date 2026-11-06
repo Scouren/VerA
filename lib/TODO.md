@@ -450,6 +450,21 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
    cross-target determinism) wait for the LLVM backend. A deliberate behaviour change: devices
    re-baselined with §11.3's. The old pipeline keeps the unsound rule until the switch-over.
    Spec: `docs/rewrite/float-guard.md`.
+   **Measured (2026-11-06, `zig build bench-fast`).** `@setFloatMode` reaches only its own
+   function's operators, and a device's arithmetic is the host family's methods, so the fast
+   body runs on the family's optional `Fast` twin (`lib/contract/family.zig`); a family without
+   it runs the body as before. The fast body won on transcendental devices (a diode's exp
+   +24%, a tanh OTA's +6%) and lost to its per-point entry check on polynomial ones (a
+   square-law MOSFET -9%, abs -17%), so codegen versions only a body that computes a
+   transcendental (`DeclGen.transcendental`), and bench-fast fails a device slower versioned.
+   **Future contract change, for ESPice (not built):** dispatch per batch, not per point. A
+   batch family (`batch_ok`, a vector `V`) already reduces the entry check over its lanes
+   (`zIn`), so one check covers the batch; but the Zig backend emits no `batch_ok` device and
+   ESPice evaluates per point. With a batch entry (`evalBatch(S, xs, ...)`, the host's
+   instances of one model in one call), the check runs once per batch, the fast or strict
+   body runs the whole batch, and polynomial devices could be versioned again. Mask-then-patch
+   (fast everywhere, strict where the mask fails) is unsound: the fast body branches on values
+   `nnan`/`ninf` make poison outside the box.
 10. **Scratch arrays: a written-element mask, not a memset, in the rewrite's codegen only**
     (2026-11-03, from ESPice's bsource.va: the per-eval zeroing of a 1152 B stack was 3.5% of a
     benchmark's cycles). VAMS §3.2 makes an unwritten element read 0, and a stack indexed by a

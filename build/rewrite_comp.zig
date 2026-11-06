@@ -59,7 +59,9 @@ pub fn add(g: Graph, all: *Build.Step) void {
         const r = testRun(b, run_row.step, mod, g.runner, g.results_dir);
         r.has_side_effects = true; // Reads the fixture tree and runs both drivers.
         b.step(run_row.step, run_row.what).dependOn(&r.step);
-        all.dependOn(&r.step);
+        // diff-rtlil's tiebreaker needs Yosys (`nix develop .#external`):
+        // it runs in the README's external gate line, not in `rewrite`.
+        if (!std.mem.eql(u8, run_row.list, "rtlil")) all.dependOn(&r.step);
     }
 
     // rtlil-equiv: diff-rtlil's Yosys tiebreaker on its canary and on tests/rtlil.
@@ -68,7 +70,7 @@ pub fn add(g: Graph, all: *Build.Step) void {
     const eq = testRun(b, "rtlil-equiv", eq_mod, g.runner, g.results_dir);
     eq.has_side_effects = true; // Runs both drivers and Yosys.
     b.step("rtlil-equiv", "tests/rtlil through vera and vera-next --emit-rtlil, held equivalent by Yosys (required: `nix develop .#external`), and a planted fault caught").dependOn(&eq.step);
-    // ponytail: joins `rewrite` once the emitter holds it green (rw-rtlil, next commit).
+    // Needs Yosys: the README's external gate line runs it, not `rewrite`.
 
     // §12: concurrent --check runs of one model in one directory.
     const race_mod = g.m.make("tests/differential/comp_check.zig", &.{});

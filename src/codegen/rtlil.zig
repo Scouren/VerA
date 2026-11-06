@@ -6,7 +6,7 @@
 //! Contents:
 //! - `pub const Refusal = struct`
 //! - `pub fn refusal(arena: Allocator, s: *const Sites) Allocator.Error!?Refusal`
-//! - `pub const emit = @import("rtlil/emit.zig").emit`
+//! - `pub const emit = @import("rtlil/emit.zig").emit`, `pub const In`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -17,8 +17,10 @@ const Sites = sites.Sites;
 const Code = vams.Diag.Code;
 const Allocator = std.mem.Allocator;
 
-/// The text of a design inside the subset (`rtlil/emit.zig`).
+/// The text of a design inside the subset (`rtlil/emit.zig`), and what it reads.
 pub const emit = @import("rtlil/emit.zig").emit;
+/// `emit`'s input: the lowered design and the instances' parents and names.
+pub const In = @import("rtlil/emit.zig").In;
 
 /// The construct the old emitter refuses first: its code, the offset of
 /// its token in the preprocessed text, and the message's detail ("" for

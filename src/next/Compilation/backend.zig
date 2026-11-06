@@ -336,18 +336,24 @@ fn rtlilRefused(comp: *Compilation, out: vams.Preprocessor.Output) !bool {
     return true;
 }
 
-/// `--emit-rtlil`'s text (`codegen.rtlil.emit`) to `-o`, else on stdout.
+/// `--emit-rtlil`'s text (`codegen.rtlil.emit`, over the lowered design and
+/// `Zcu.instances`' parents and names) to `-o`, else on stdout.
 fn rtlilText(comp: *Compilation) !?Job {
-    var text: Io.Writer.Allocating = .init(comp.arena());
-    try codegen_mod.rtlil.emit(&text.writer, comp.arena(), &comp.lowered.?);
-    const p = comp.config.out_path orelse {
-        try comp.outputs.out.appendSlice(comp.arena(), text.written());
-        return null;
+    const a = comp.arena();
+    const zi = comp.zcu.instances.slice();
+    const parent = try a.alloc(u32, zi.len);
+    const name = try a.alloc([]const u8, zi.len);
+    for (parent, name, zi.items(.parent), zi.items(.name)) |*p, *n, zp, zn| {
+        p.* = @backingInt(zp);
+        n.* = comp.zcu.intern_pool.stringToSlice(zn);
+    }
+    var text: Io.Writer.Allocating = .init(a);
+    codegen_mod.rtlil.emit(&text.writer, a, .{ .lowered = &comp.lowered.?, .parent = parent, .name = name }) catch |e| switch (e) {
+        error.Unsupported => return notBuilt(comp, .rtlil, "the RTLIL text of a shape outside the subset"),
+        error.OutOfMemory, error.WriteFailed => |x| return x,
     };
-    Io.Dir.cwd().writeFile(comp.io, .{ .sub_path = p, .data = text.written() }) catch |e| {
-        try comp.outputs.err.print(comp.arena(), "error: cannot write `{s}`: {t}\n", .{ p, e });
-        comp.outputs.status = 1;
-    };
+    comp.device = .{ .text = try comp.gpa.dupe(u8, text.written()) };
+    try writeText(comp);
     return null;
 }
 

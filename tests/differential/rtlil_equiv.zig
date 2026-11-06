@@ -27,6 +27,16 @@ fn emit(arena: std.mem.Allocator, io: Io, exe: []const u8, src: []const u8) ![]c
     return error.EmitFailed;
 }
 
+/// `text` with counter.v's `case (q[1:0])` labels 0 and 1 traded: the
+/// arms' bodies swapped. Asserts both labels were there.
+fn swapArms(arena: std.mem.Allocator, text: []const u8) ![]const u8 {
+    const a = try std.mem.replaceOwned(u8, arena, text, "case 2'00\n", "case 2'@@\n");
+    const b = try std.mem.replaceOwned(u8, arena, a, "case 2'01\n", "case 2'00\n");
+    const c = try std.mem.replaceOwned(u8, arena, b, "case 2'@@\n", "case 2'01\n");
+    try std.testing.expect(!std.mem.eql(u8, a, text) and !std.mem.eql(u8, b, a));
+    return c;
+}
+
 test "rtlil-equiv: vera-next's RTLIL of tests/rtlil is Yosys-equivalent to vera's, and a planted fault is not" {
     var arena_state: std.heap.ArenaAllocator = .init(std.heap.smp_allocator);
     defer arena_state.deinit();
@@ -49,6 +59,12 @@ test "rtlil-equiv: vera-next's RTLIL of tests/rtlil is Yosys-equivalent to vera'
             const fault = try std.mem.replaceOwned(u8, a, old, "cell $reduce_and $vera$c2", "cell $reduce_or $vera$c2");
             try std.testing.expect(!std.mem.eql(u8, fault, old));
             try std.testing.expect(try yosys.equivalent(a, io, options.yosys, work, old, fault) != null);
+            // The structural canary: the case's two arms swapped (the
+            // shape vera-next rebuilds from pcs), and new's text the same way.
+            for ([_][]const u8{ old, new }) |text| {
+                const swapped = try swapArms(a, text);
+                try std.testing.expect(try yosys.equivalent(a, io, options.yosys, work, old, swapped) != null);
+            }
         }
     }
     try std.testing.expectEqual(@as(u32, 0), failed);

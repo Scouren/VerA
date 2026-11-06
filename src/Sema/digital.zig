@@ -653,6 +653,7 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Low
 // ---- private ----
 
 fn spine(l: *Lower) Error!void {
+    try gates.checkUdps(l);
     if (l.zcu.instances.len == 0) {
         l.why = "digital execution found no top-level module";
         l.why_at = moduleAt(l, firstModule(l) orelse return error.Rejected);

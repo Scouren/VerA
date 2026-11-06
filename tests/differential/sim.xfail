@@ -17,10 +17,6 @@ verilog/04_data_types/type_uwire_multiple_drivers_rejected.v old run failed (E11
 verilog/05_expressions/constant_time_rejected.v old run failed (E1100: a constant expression is required here), new run completed
 verilog/05_expressions/native_wide_index_bound_limit.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
 verilog/07_gate_switch_level/split_array_rejected.v old run failed (E1100: §7.1.5: `t_nand` names two instances; one instance identifier has one range), new run completed
-verilog/08_udp/combinational_reg_rejected.v old run failed (E1100: §8.1.2: a combinational UDP cannot contain a reg declaration), new run completed
-verilog/08_udp/initial_to_input_rejected.v old run failed (E1100: §8.1.3: a UDP initial statement assigns the output), new run completed
-verilog/08_udp/multibit_initial_rejected.v old run failed (E1100: §8.1.3: a UDP initial value is a single-bit literal), new run completed
-verilog/08_udp/sequential_without_reg_rejected.v old run failed (E1100: §8.1.2: a sequential UDP's output needs a reg declaration), new run completed
 verilog/10_tasks_functions/constant_function_hierarchical_rejected.v old run failed (E1100: §10.4.5: a function called during elaboration is a constant function, and it contains a hierarchical reference), new run completed
 verilog/12_hierarchy/connections_to_portless_module_rejected.v old E1100 at byte 143: more port connections than the module has ports; new E1100 at byte 141: elaboration refuses it (E0906)
 verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v old run failed (E1100: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element it is in), new run completed

@@ -171,6 +171,9 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
                 _ = try l.b.inst(.trigger_elem, try place.elemRow(l, s), 0, scope);
                 return;
             };
+            // §9.7.3 an undeclared name is no named event.
+            if (r.toIndex()) |ri| if (Lower.tag(vir, ri) == .str_ref and l.implicit.get(.{ .frame = l.rootFrame(l.frame), .name = vir.instructions.items(.data)[@backingInt(ri)].str_tok.start }) == null)
+                return l.reject(l.frame, i.toRef(), "undeclared named event");
             const n = (try expr.nameOf(l, r)) orelse return l.reject(l.frame, r, "§9.7.3: an event array takes an index, not a part-select");
             if (n.kind != .event) return l.refuse("§5.10.4 `->` of a variable or net");
             _ = try l.b.inst(.trigger, n.slot, 0, scope);

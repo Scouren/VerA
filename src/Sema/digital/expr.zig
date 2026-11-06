@@ -430,7 +430,7 @@ pub fn leafName(l: *Lower, i: Inst.Index) Error!Name {
     if (Lower.tag(vir, i) == .decl_ref) return declName(l, data.decl_tok.decl);
     if (Lower.tag(vir, i) == .field) return hier.field(l, i);
     assert(Lower.tag(vir, i) == .str_ref);
-    const n = l.implicit.get(.{ .frame = l.rootFrame(l.frame), .name = data.str_tok.start }) orelse return l.refuse("a hierarchical name");
+    const n = l.implicit.get(.{ .frame = l.rootFrame(l.frame), .name = data.str_tok.start }) orelse return l.reject(l.frame, i.toRef(), "undeclared digital variable");
     return l.names.items[n];
 }
 

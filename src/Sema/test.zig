@@ -359,7 +359,7 @@ test "§7.8.5.1 a gate terminal on a continuous vector net gets no bridge (E0929
     , "dd", &.{.E0929});
 }
 
-test "§7.4.4 a net's second discipline declaration in one scope is E0902; §3.11 a branch or access joining incompatible disciplines is E0355" {
+test "§7.4.4 a net's second discipline declaration in one scope is E0902; §3.11 a branch or access joining incompatible disciplines is E0355; §3.7 a port joining a wreal to a wand is E0919" {
     const prelude =
         \\nature V; units = "V"; access = V; endnature
         \\nature R; units = "rad"; access = R; endnature
@@ -372,6 +372,31 @@ test "§7.4.4 a net's second discipline declaration in one scope is E0902; §3.1
     try expectCodes(prelude ++ "module top(p); inout p; ea p; endmodule", .{}, &.{});
     try expectCodes(prelude ++ "module top; ea a; rot b; branch (a, b) br; endmodule", .{}, &.{.E0355});
     try expectCodes(prelude ++ "module top; ea a; eb b; branch (a, b) br; endmodule", .{}, &.{});
+    // §3.7 a wreal joins only a wire, tri or wreal (E0919).
+    const kid = "module kid(o); output o; wreal o; endmodule\n";
+    try expectCodes(kid ++ "module top; wand n; kid u(.o(n)); endmodule", .{}, &.{.E0919});
+    try expectCodes(kid ++ "module top; wire n; kid u(n); endmodule", .{}, &.{});
+    // IEEE 1364-2005 §12.3.10 Table 12-1: a wand port on a wor net warns
+    // (W1160), whole or through a select; a wire port does not.
+    const wand = "module m(y); output y; wand y; endmodule\n";
+    try expectCodes(wand ++ "module top; wor w; m u(w); endmodule", .{ .ieee1364 = true }, &.{.W1160});
+    try expectCodes(wand ++ "module top; wor [1:0] w; m u(w[0]); endmodule", .{ .ieee1364 = true }, &.{.W1160});
+    try expectCodes("module m(y); output y; endmodule module top; wor w; m u(w); endmodule", .{ .ieee1364 = true }, &.{});
+}
+
+test "IEEE 1364-2005 §12.2.1 a one-name defparam naming nothing is E0901, one reaching out of its array element E1100; §12.8.2 one that resolves differently once the hierarchy is complete E1100" {
+    const v: Sema.Config = .{ .ieee1364 = true };
+    try expectCodes("module t; parameter foo = 1; endmodule module top; t u(); defparam foo = 3; endmodule", v, &.{.E0901});
+    try expectCodes("module leaf; parameter p = 1; endmodule module blk; leaf x(); defparam u[1].x.p = 5; endmodule module top; blk u[0:1](); endmodule", v, &.{ .E1100, .E1100 });
+    try expectCodes(
+        \\module m; m1 n(); endmodule
+        \\module m1; parameter p = 2; defparam m.n.p = 1;
+        \\  generate if (p == 1) begin : m m2 n(); end endgenerate
+        \\endmodule
+        \\module m2; parameter p = 3; endmodule
+    , v, &.{.E1100});
+    // The neighbour: an upward name that resolves the same either way.
+    try expectCodes("module m; m1 n(); endmodule module m1; parameter p = 2; defparam m.n.p = 1; endmodule", v, &.{});
 }
 
 test "Annex F.2.1 step 3 an out-of-context declaration overrides a net's discipline: twice for one segment is E0902, an incompatible override E0375" {

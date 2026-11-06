@@ -85,7 +85,7 @@ pub fn resolve(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, target: InternPool
         for (vir.body(decl.body)) |i| if (vir.instructions.items(.tag)[@backingInt(i)] == .ps_override) {
             const o = payloadOf(vir, Inst.Override, i);
             const v = try dist.fold(s, &env, ps.file, o.value) orelse if (try env.body(o.value)) |c| try env.intern(c) else InternPool.Index.undef;
-            try list.append(s.arena, .{ .name = try zcu.intern_pool.getString(s.gpa, vir.string(o.name)), .value = v });
+            try list.append(s.arena, .{ .name = try zcu.intern_pool.getString(s.gpa, vir.string(o.name)), .value = v, .stmt = i.toRef(), .stmt_file = ps.file });
         };
         run = .{ .start = start, .len = @intCast(list.items.len - start) };
         name = try zcu.intern_pool.getString(s.gpa, vir.string(decl.module));

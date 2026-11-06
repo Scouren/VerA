@@ -14,6 +14,7 @@
 //! - `pub fn roots(s: *Sema, configs: []const ConfigRef, root: u32, out: *std.ArrayList(Zcu.Decl)) Allocator.Error!void`
 //! - `pub fn rootTarget(s: *Sema, d: Zcu.Decl, name: InternPool.String) Allocator.Error!InternPool.String`
 //! - `pub fn bind(s: *Sema, parent: Zcu.Instance.Index, name: InternPool.String, target: InternPool.String) Allocator.Error!InternPool.String`
+//! - `pub fn rootConfig(s: *Sema, configs: []const ConfigRef) Allocator.Error!?u32`
 //! - `pub fn ruleWords(s: *Sema, text: []const u8) Allocator.Error![]const []const u8`
 //! - `pub fn cellOf(text: []const u8) []const u8`
 
@@ -147,6 +148,47 @@ pub fn bind(s: *Sema, parent: Zcu.Instance.Index, name: InternPool.String, targe
     return key(s, lib, ucell);
 }
 
+/// IEEE 1364-2005 §13.4.4 the root configuration, the one no `use
+/// ...:config` clause names: its index in `configs`, or null after E0243
+/// for none or two. Then §13.3.2 E0243 for an instance clause that names an
+/// instance inside a hierarchy another config specifies.
+/// ponytail: §13.3.2 is judged on each config's own rules, statically.
+pub fn rootConfig(s: *Sema, configs: []const ConfigRef) Allocator.Error!?u32 {
+    assert(configs.len != 0);
+    var root: ?u32 = null;
+    for (configs, 0..) |cfg, k| {
+        if (try referenced(s, configs, cfg.vir.string(cfg.c.name))) continue;
+        if (root) |r| {
+            const why = try std.fmt.allocPrint(s.arena, "configurations `{s}` and `{s}` are both unreferenced, so neither is the design's (IEEE 1364-2005 §13.4.4)", .{ configs[r].vir.string(configs[r].c.name), cfg.vir.string(cfg.c.name) });
+            try s.failRule(.{ .rule = .config, .name = why }, .E0243, cfg.decl.file, cfg.vir.decls()[@backingInt(cfg.decl.index)].inst.toRef(), "{s}", .{why});
+            return null;
+        }
+        root = @intCast(k);
+    }
+    if (root == null) {
+        const why = "every configuration is named by another's `use` clause, so none is the design's (IEEE 1364-2005 §13.4.4)";
+        try s.failRule(.{ .rule = .config, .name = why }, .E0243, configs[0].decl.file, configs[0].vir.decls()[@backingInt(configs[0].decl.index)].inst.toRef(), "{s}", .{why});
+        return null;
+    }
+    for (configs) |cfg| {
+        const rules = cfg.vir.list(Vir.String, cfg.c.rules);
+        for (rules) |r| {
+            const w = try ruleWords(s, cfg.vir.string(r));
+            if (w.len != 4 or !std.mem.eql(u8, w[0], "instance") or !std.mem.eql(u8, w[2], "use") or !std.mem.endsWith(u8, w[3], ":config")) continue;
+            for (rules, 0..) |o, k| {
+                const ow = try ruleWords(s, cfg.vir.string(o));
+                if (ow.len < 2 or !std.mem.eql(u8, ow[0], "instance")) continue;
+                const p = ow[1];
+                if (p.len <= w[1].len or !std.mem.startsWith(u8, p, w[1]) or p[w[1].len] != '.') continue;
+                const why = try std.fmt.allocPrint(s.arena, "instance clause `{s}` names an instance inside `{s}`, whose hierarchy another config (`{s}`) specifies (IEEE 1364-2005 §13.3.2)", .{ p, w[1], cellOf(w[3]) });
+                try s.failRule(.{ .rule = .config, .name = why, .part = .{ .rule = @intCast(k) } }, .E0243, cfg.decl.file, cfg.vir.decls()[@backingInt(cfg.decl.index)].inst.toRef(), "{s}", .{why});
+                return null;
+            }
+        }
+    }
+    return root;
+}
+
 /// A rule's words: its tokens (AstGen joins them with spaces) with `.` and
 /// `:` glued to their neighbours, so `top . u use work . gate` is `top.u`,
 /// `use`, `work.gate`.
@@ -175,6 +217,15 @@ pub fn cellOf(text: []const u8) []const u8 {
 }
 
 // ---- private ----
+
+/// Whether a `use ...:config` clause of any of `configs` names `name`.
+fn referenced(s: *Sema, configs: []const ConfigRef, name: []const u8) Allocator.Error!bool {
+    for (configs) |other| for (other.vir.list(Vir.String, other.c.rules)) |r| {
+        const w = try ruleWords(s, other.vir.string(r));
+        if (w.len == 4 and std.mem.eql(u8, w[2], "use") and std.mem.endsWith(u8, w[3], ":config") and std.mem.eql(u8, cellOf(w[3]), name)) return true;
+    };
+    return false;
+}
 
 /// The `Zcu.modules` key of cell `cell` in library `lib`.
 // ponytail: `lib.cell` cannot be a simple identifier; an escaped one

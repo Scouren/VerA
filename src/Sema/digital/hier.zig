@@ -75,15 +75,16 @@ fn part(l: *Lower, vir: *const Vir, r: Inst.Ref, index: ?i64, depth: u32) Error!
             const b = Lower.payload(vir, Inst.Bin, i);
             return part(l, vir, b.lhs, try l.intOf(l.frame, b.rhs), depth + 1);
         },
-        .str_ref => return head(l, vir.string(data.str_tok.start), index),
-        .decl_ref => return head(l, declName(vir, data.decl_tok.decl), index),
+        .str_ref => return head(l, r, vir.string(data.str_tok.start), index),
+        .decl_ref => return head(l, r, declName(vir, data.decl_tok.decl), index),
         else => return l.refuse("a hierarchical name part that is no name"),
     }
 }
 
-/// §12.5 the first part `name` (and `index`): from the current scope
-/// outward, a child of that name or the instance itself, then a root.
-fn head(l: *Lower, name: []const u8, index: ?i64) Error!u32 {
+/// §12.5 the first part `name` (and `index`), written at `r`: from the
+/// current scope outward, a child of that name or the instance itself,
+/// then a root; else lib/sim/digital's refusal.
+fn head(l: *Lower, r: Inst.Ref, name: []const u8, index: ?i64) Error!u32 {
     if (name.len == 0) return l.refuse("a hierarchical name of an unnamed scope");
     var s = l.frames.items[l.frame].scope;
     var steps: usize = 0;
@@ -95,7 +96,8 @@ fn head(l: *Lower, name: []const u8, index: ?i64) Error!u32 {
         s = parent;
     }
     for (l.roots.items) |root| if (index == null and instanceNamed(l, root, name)) return root;
-    return l.refuse("a hierarchical name whose first part names no scope");
+    if (index) |k| return l.rejectFmt(l.frame, r, "§12.5: `{s}[{d}]`: an instance select out of range, or of no array", .{ name, k });
+    return l.reject(l.frame, r, "undeclared instance in a hierarchical reference");
 }
 
 /// The child scope of `s` named `name` with index `index`, or null.

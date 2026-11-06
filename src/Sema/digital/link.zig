@@ -67,7 +67,7 @@ pub fn resolveDisables(l: *Lower) Error!void {
             const vir = l.virOf(s.outer);
             if (std.mem.eql(u8, vir.string(Lower.payload(vir, Inst.Function, s.decl).name), d.name)) break k;
         } else return l.refuseFmt("a disable of `{s}`, which names no block or task the lowering finds", .{d.name});
-        if (l.subs.items[row].function) return l.refuse("§10.3 a disable of a function");
+        if (l.subs.items[row].function) return l.reject(d.frame, d.inst.toRef(), "§10.3: `disable` cannot name a function, only a named block within one");
         l.b.setInst(d.pc, .disable_task, @intCast(row), 0);
     }
 }

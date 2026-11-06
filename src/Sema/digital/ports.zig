@@ -84,6 +84,8 @@ pub fn expressionPorts(vir: *const Vir, formals: []const Inst.Index) bool {
 /// the connected nets, and an inout one is joined to them bit by bit, as a
 /// `tran` joins two nets (§7.6).
 pub fn group(l: *Lower, f: u32, g: Group, deferred: *std.ArrayList(nets.Wire)) Error!void {
+    l.sink_use = .port;
+    defer l.sink_use = .assign;
     const c = g.conn;
     if (c.actual == .none) return;
     if (c.lane != null) return l.refuse("an instance array of a module with port expressions");
@@ -418,6 +420,8 @@ fn wholeNet(l: *Lower, c: Conn) Error!?Name {
 /// §12.3.9.2 a port (`src`, `width` bits) driving the nets its connection
 /// names: a bridge per operand, the rightmost operand the port's low bits.
 fn send(l: *Lower, f: u32, c: Conn, src: u32, width: u32, signed: bool, deferred: *std.ArrayList(nets.Wire)) Error!void {
+    l.sink_use = .port;
+    defer l.sink_use = .assign;
     const saved = l.frame;
     defer l.frame = saved;
     l.frame = c.frame;
@@ -448,6 +452,8 @@ fn send(l: *Lower, f: u32, c: Conn, src: u32, width: u32, signed: bool, deferred
 /// driving bits [lo, lo + width) of the connection's operands, the
 /// rightmost operand its low bits: a bridge per operand it overlaps.
 fn sendLane(l: *Lower, f: u32, c: Conn, src: u32, width: u32, lo: u32, deferred: *std.ArrayList(nets.Wire)) Error!void {
+    l.sink_use = .port;
+    defer l.sink_use = .assign;
     const saved = l.frame;
     defer l.frame = saved;
     l.frame = c.frame;
@@ -469,6 +475,8 @@ fn sendLane(l: *Lower, f: u32, c: Conn, src: u32, width: u32, lo: u32, deferred:
 /// connection names, rightmost operand first: the bits both sides have,
 /// one `tran` each; the rest of either side connects nothing.
 fn joinPort(l: *Lower, at: u32, width: u32, c: Conn) Error!void {
+    l.sink_use = .port;
+    defer l.sink_use = .assign;
     const saved = l.frame;
     defer l.frame = saved;
     l.frame = c.frame;

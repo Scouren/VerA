@@ -94,7 +94,7 @@ pub fn declare(l: *Lower, f: u32, scope: u32, i: Inst.Index) Error!void {
 /// §10.4.1 the type of function call `i`: its result's.
 pub fn resultType(l: *Lower, i: Inst.Index) Error!Type {
     const row = try callee(l, i);
-    if (!l.subs.items[row].function) return l.refuse("§10.4 a task called as a function");
+    if (!l.subs.items[row].function) return l.reject(l.frame, i.toRef(), "§10.2: a task is enabled as a statement, not called in an expression");
     return l.subs.items[row].result_ty;
 }
 
@@ -111,6 +111,7 @@ pub fn callRow(l: *Lower, i: Inst.Index) Error!u32 {
         o.* = .{ .in = none, .place = none, .ty = ty };
         if (dir != .output) o.in = try expr.evalFor(l, a, typeOfTy(ty));
         if (dir != .input) {
+            if (!place.isLvalue(l, a)) return l.rejectArg(l.frame, i, k, "§10.2.2: a task output actual must be a procedural lvalue");
             o.place = try place.place(l, a);
             o.ty = try l.tyOf(try place.targetType(l, a));
         }
@@ -128,7 +129,7 @@ pub fn callRow(l: *Lower, i: Inst.Index) Error!u32 {
 pub fn enable(l: *Lower, i: Inst.Index, depth: u32) Error!void {
     const row = try callee(l, i);
     const scope = l.frames.items[l.frame].scope;
-    if (l.subs.items[row].function) return l.refuse("§10.4 a function enabled as a task");
+    if (l.subs.items[row].function) return l.reject(l.frame, i.toRef(), "§10.4: a function is called in an expression, not enabled");
     if (!try timed(l, row)) {
         _ = try l.b.inst(.call, try callRow(l, i), 0, scope);
         return;
@@ -275,7 +276,7 @@ fn storage(l: *Lower, outer: u32, scope: u32, i: Inst.Index) Error!Storage {
             .io => Lower.payload(vir, Inst.Io, d).prev,
             .variable => blk: {
                 const v = Lower.payload(vir, Inst.Variable, d);
-                if (v.init.len != 0) return l.refuse("an initialized subroutine variable");
+                if (v.init.len != 0) return l.reject(outer, d.toRef(), "an initialized task or function variable is not implemented");
                 break :blk v.prev;
             },
             else => continue, // else: declared below, or a statement
@@ -374,8 +375,11 @@ fn callee(l: *Lower, i: Inst.Index) Error!u32 {
 fn argsOf(l: *Lower, i: Inst.Index, r: Row) Error![]const Inst.Ref {
     const vir = l.virOf(l.frame);
     const args = vir.list(Inst.Ref, Lower.payload(vir, Inst.Call, i).args);
-    if (args.len != r.own.ports.len) return l.refuse("§10.2.2 a call with one argument per formal not given");
-    for (args) |a| if (a == .none) return l.refuse("§10.2.2 an omitted argument");
+    if (args.len != r.own.ports.len) {
+        const dv = l.virOf(r.outer);
+        return l.rejectFmt(l.frame, i.toRef(), "`{s}` takes {d} arguments, not {d}", .{ dv.string(Lower.payload(dv, Inst.Function, r.decl).name), r.own.ports.len, args.len });
+    }
+    for (args) |a| if (a == .none) return l.reject(l.frame, i.toRef(), "§10.2.2: null task arguments are not permitted");
     return args;
 }
 

@@ -171,7 +171,10 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
                 _ = try l.b.inst(.trigger_elem, try place.elemRow(l, s), 0, scope);
                 return;
             };
-            const n = (try expr.nameOf(l, r)) orelse return l.refuse("a trigger of no named event");
+            // §9.7.3 an undeclared name is no named event.
+            if (r.toIndex()) |ri| if (Lower.tag(vir, ri) == .str_ref and l.implicit.get(.{ .frame = l.rootFrame(l.frame), .name = vir.instructions.items(.data)[@backingInt(ri)].str_tok.start }) == null)
+                return l.reject(l.frame, i.toRef(), "undeclared named event");
+            const n = (try expr.nameOf(l, r)) orelse return l.reject(l.frame, r, "§9.7.3: an event array takes an index, not a part-select");
             if (n.kind != .event) return l.refuse("§5.10.4 `->` of a variable or net");
             _ = try l.b.inst(.trigger, n.slot, 0, scope);
         },
@@ -197,7 +200,7 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
                 else => return l.refuse("a disable of a hierarchical name"),
             };
             const at = try l.b.inst(.disable_block, 0, 0, scope);
-            try l.disables.append(l.a, .{ .pc = at, .frame = l.frame, .name = name });
+            try l.disables.append(l.a, .{ .pc = at, .frame = l.frame, .name = name, .inst = i });
         },
         .ret, .brk, .cont => return l.refuse("return, break or continue"),
         .variable, .param, .event => {},
@@ -339,7 +342,7 @@ fn caseStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
     const scope = l.frames.items[l.frame].scope;
     const c = Lower.payload(vir, Inst.Case, i);
     const arms = vir.list(Inst.Arm, c.arms);
-    if (arms.len == 0) return l.refuse("§9.5 a case statement with no item");
+    if (arms.len == 0) return l.reject(l.frame, i.toRef(), "a case statement requires at least one item");
     var ty = try expr.typeValue(l, c.operand);
     for (arms) |arm| for (vir.list(Inst.Ref, arm.values)) |v| {
         ty = expr.common(ty, try expr.typeValue(l, v));
@@ -401,7 +404,7 @@ fn process(l: *Lower, p: Proc) Error!u32 {
                 else => unreachable, // else: `declare.items` records these two
             };
             const n = l.names.items[l.lookup(p.frame, prev.toIndex() orelse p.inst) orelse return l.refuse("an initialized declaration with no slot")];
-            if (n.dims.len != 0) return l.refuse("an initialized array");
+            if (n.dims.len != 0) return l.reject(p.frame, p.inst.toRef(), "an unpacked array declaration takes no initializer");
             if (n.kind != .variable) return l.refuse("an initialized net port");
             const init = vir.body(init_body);
             _ = try l.b.inst(.init_var, n.slot, try expr.evalFor(l, init[init.len - 1].toRef(), n.ty), scope);

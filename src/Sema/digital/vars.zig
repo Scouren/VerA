@@ -91,7 +91,11 @@ pub fn variable(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Index)
     }
     if (range.len != 0) {
         if (n.ty.real) return l.refuse("a real with a range");
-        const r = try rangeOf(l, f, range);
+        // A bound that is no constant is reported at the declaration.
+        const r = rangeOf(l, f, range) catch |e| {
+            if (e == error.Rejected) l.why_at = l.srcOffset(f, first);
+            return e;
+        };
         n.msb = r.msb;
         n.lsb = r.lsb;
         n.ty.width = r.width;

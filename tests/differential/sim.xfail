@@ -4,18 +4,12 @@
 # (`lowering: ...`), a stage before it that refuses the fixture, or the first
 # transcript difference. A listed fixture that agrees fails the run until its
 # line goes.
-verilog-ams/digital/driver_count_in_an_ordinary_module_rejected.v lowering: the system function `$driver_count`
 verilog-ams/digital/reject_wreal_connected_to_wand.v old run failed (E0919: `n` is a wand and port `o` is a wreal), new run completed
 verilog-ams/digital/vams_digital_temperature_refused.v lowering: the system function `$temperature`
 verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v old run failed (E1100: §3.8: an attribute value must be a constant expression), new run completed
 verilog/03_lexical_conventions/escaped_system_task_rejected.v lowering: a hierarchical task or function name
 verilog/03_lexical_conventions/forward_reference_reg_rejected.v old run failed (E1100: a name is used before its declaration), new run completed
-verilog/04_data_types/array_row_write_rejected.v lowering: a select of a whole array dimension
-verilog/04_data_types/array_slice_write_rejected.v lowering: a select of a whole array dimension
-verilog/04_data_types/continuous_assign_to_reg_rejected.v lowering: a continuous assignment to a variable
-verilog/04_data_types/memory_as_vector_rejected.v lowering: an assignment to a whole unpacked array
 verilog/04_data_types/native_real_edge_rejected.v old run failed (E1100: §4.8.1: posedge and negedge do not apply to a real variable), new run completed
-verilog/04_data_types/native_real_select_rejected.v lowering: a select of a real
 verilog/04_data_types/nonconstant_declaration_assignment_rejected.v old run failed (E1100: §6.2.1: a constant expression is required here), new run completed
 verilog/04_data_types/parameter_assigned_specify_block_specparam_rejected.v lowering: a name declared by `param` that has no slot
 verilog/04_data_types/parameter_assigned_specparam_rejected.v old run failed (E1100: §4.10.3: a module parameter cannot be assigned an expression that includes a specify parameter), new run completed
@@ -23,89 +17,32 @@ verilog/04_data_types/parameter_from_variable_rejected.v old run failed (E1100: 
 verilog/04_data_types/parameter_redeclares_net_rejected.v old run failed (E1100: duplicate digital variable), new run completed
 verilog/04_data_types/port_list_body_parameter_override_rejected.v old run failed (E1100: §12.2: `Q` is a local parameter, which a defparam cannot override), new run completed
 verilog/04_data_types/posedge_real_rejected.v old run failed (E1100: §4.8.1: posedge and negedge do not apply to a real variable), new run completed
-verilog/04_data_types/real_index_rejected.v lowering: a real index
 verilog/04_data_types/real_range_bound_rejected.v old run failed (E1100: §4.3.1: a bound is a constant integer expression, not a real), new run completed
 verilog/04_data_types/specparam_before_declaration_rejected.v old run failed (E1100: §4.10.3: a specify parameter is declared before it is referenced), new run completed
 verilog/04_data_types/task_named_like_variable_rejected.v old run failed (E1100: §10.4.2: duplicate declaration of `t`, a task or function name in this scope), new run completed
-verilog/04_data_types/type_net_array_whole_assign_rejected.v lowering: a continuous assignment to a whole net array
 verilog/04_data_types/type_uwire_multiple_drivers_rejected.v old run failed (E1100: a uwire net accepts a single driver per bit), new run completed
-verilog/04_data_types/undeclared_procedural_target_rejected.v lowering: a hierarchical name
-verilog/04_data_types/variable_range_bound_rejected.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
-verilog/04_data_types/whole_memory_write_rejected.v lowering: an assignment to a whole unpacked array
 verilog/05_expressions/constant_time_rejected.v old run failed (E1100: a constant expression is required here), new run completed
-verilog/05_expressions/expr_concat_unsized_rejected.v lowering: an unsized concatenation operand
-verilog/05_expressions/expr_zero_replication_alone_rejected.v lowering: a zero replication outside a concatenation
-verilog/05_expressions/native_select_variable_width_rejected.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
-verilog/05_expressions/native_select_zero_width_rejected.v lowering: §5.2.1 an indexed part-select width that is not a positive constant
 verilog/05_expressions/native_wide_index_bound_limit.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
-verilog/05_expressions/partial_address_rejected.v lowering: a select of a whole array dimension
-verilog/05_expressions/real_bit_select_rejected.v lowering: a select of a real
-verilog/05_expressions/real_case_equality_rejected.v lowering: === of a real
-verilog/05_expressions/real_modulus_rejected.v lowering: a real operand of %, a bitwise or a shift operator
-verilog/05_expressions/real_operand_diagnostic_clause_rejected.v lowering: ~ of a real
-verilog/05_expressions/reversed_part_select_rejected.v lowering: §5.2.1 a part-select reversed against its declaration
-verilog/05_expressions/scalar_bit_select_rejected.v lowering: §5.2.1 a select of a scalar
-verilog/05_expressions/scalar_element_part_select_rejected.v lowering: a select of a whole array dimension
-verilog/05_expressions/variable_part_select_rejected.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
-verilog/06_assignments/array_declaration_assignment_rejected.v lowering: an initialized array
-verilog/06_assignments/continuous_assign_to_integer_rejected.v lowering: a continuous assignment to a variable
-verilog/06_assignments/real_array_initializer_rejected.v lowering: an initialized array
-verilog/06_assignments/task_variable_initializer_rejected.v lowering: an initialized subroutine variable
 verilog/07_gate_switch_level/split_array_rejected.v old run failed (E1100: §7.1.5: `t_nand` names two instances; one instance identifier has one range), new run completed
-verilog/07_gate_switch_level/switch_three_delays_rejected.v lowering: §7.6 a pass switch with three delays
 verilog/08_udp/combinational_reg_rejected.v old run failed (E1100: §8.1.2: a combinational UDP cannot contain a reg declaration), new run completed
 verilog/08_udp/initial_to_input_rejected.v old run failed (E1100: §8.1.3: a UDP initial statement assigns the output), new run completed
 verilog/08_udp/multibit_initial_rejected.v old run failed (E1100: §8.1.3: a UDP initial value is a single-bit literal), new run completed
 verilog/08_udp/sequential_without_reg_rejected.v old run failed (E1100: §8.1.2: a sequential UDP's output needs a reg declaration), new run completed
-verilog/08_udp/udp_named_terminal_rejected.v lowering: a primitive terminal connected by name
-verilog/08_udp/udp_null_terminal_rejected.v lowering: an unconnected primitive terminal
-verilog/09_behavioral_modeling/assign_bit_select_rejected.v lowering: §9.3.2 a procedural continuous assignment of a select that is no select of a net
-verilog/09_behavioral_modeling/assign_memory_word_rejected.v lowering: §9.3.2 a procedural continuous assignment of a select that is no select of a net
-verilog/09_behavioral_modeling/assign_to_net_rejected.v lowering: §9.3.1 assign/deassign of a net
-verilog/09_behavioral_modeling/assign_to_reg_select_rejected.v lowering: §9.3.2 a procedural continuous assignment of a select that is no select of a net
-verilog/09_behavioral_modeling/event_array_assign_rejected.v lowering: an assignment to a named event, task, function or scope
-verilog/09_behavioral_modeling/event_array_part_select_rejected.v lowering: a trigger of no named event
 verilog/09_behavioral_modeling/event_array_posedge_rejected.v old run failed (E1100: §9.7.3: a named event has no value for a posedge or negedge), new run completed
-verilog/09_behavioral_modeling/event_array_rank_rejected.v lowering: a select of a whole array dimension
-verilog/09_behavioral_modeling/event_array_value_rejected.v lowering: a named event element read as a value
-verilog/09_behavioral_modeling/event_holds_no_data_rejected.v lowering: an assignment to a named event, task, function or scope
 verilog/09_behavioral_modeling/event_used_before_declaration_rejected.v old run failed (E1100: §9.7.3: a named event is declared before it is used), new run completed
-verilog/09_behavioral_modeling/force_variable_bit_select_rejected.v lowering: §9.3.2 a procedural continuous assignment of a select that is no select of a net
 verilog/09_behavioral_modeling/multiple_default_rejected.v old run failed (E1100: a case statement cannot have multiple default items), new run completed
-verilog/09_behavioral_modeling/native_wide_event_real_index_rejected.v lowering: a real index
-verilog/09_behavioral_modeling/undeclared_event_rejected.v lowering: a hierarchical name
 verilog/10_tasks_functions/constant_function_hierarchical_rejected.v old run failed (E1100: §10.4.5: a function called during elaboration is a constant function, and it contains a hierarchical reference), new run completed
-verilog/10_tasks_functions/disable_function_rejected.v lowering: §10.3 a disable of a function
-verilog/10_tasks_functions/function_call_statement_rejected.v lowering: §10.4 a function enabled as a task
 verilog/10_tasks_functions/function_event_trigger_rejected.v old run failed (E1100: §10.4.4: a function body cannot contain an event trigger), new run completed
 verilog/10_tasks_functions/function_scope_object_named_as_function_rejected.v old run failed (E1100: duplicate digital variable), new run completed
 verilog/10_tasks_functions/module_object_named_as_function_rejected.v lowering: a task or function its walk did not declare
-verilog/10_tasks_functions/subroutine_parameter_assignment_rejected.v lowering: an assignment to a parameter
-verilog/10_tasks_functions/task_as_operand_rejected.v lowering: §10.4 a task called as a function
-verilog/10_tasks_functions/task_null_argument_rejected.v lowering: §10.2.2 an omitted argument
-verilog/10_tasks_functions/task_output_expression_rejected.v lowering: an lvalue form
-verilog/11_scheduling/primitive_output_to_reg_rejected.v lowering: a continuous assignment to a variable
 verilog/12_hierarchy/assign_before_net_declaration_rejected.v old run failed (E1100: duplicate digital variable), new run completed
 verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v old run failed (E1100: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element it is in), new run completed
 verilog/12_hierarchy/defparam_across_generate_instances_rejected.v old run failed (E1100: §12.2.1: a defparam inside `somename[0]` cannot change a parameter outside the generate block instance or array element it is in), new run completed
 verilog/12_hierarchy/defparam_nonconstant_rejected.v old run failed (E1100: a constant expression is required here), new run completed
 verilog/12_hierarchy/duplicate_port_name_rejected.v old run failed (E1100: §12.3.2: a port defined twice in the list of ports: `p`), new run completed
-verilog/12_hierarchy/function_port_range_scope_rejected.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
-verilog/12_hierarchy/generate_loop_repeated_genvar_rejected.v lowering: §12.4.1 a loop generate scheme repeating a genvar value
-verilog/12_hierarchy/generate_nonterminating_rejected.v lowering: §12.4.1 a loop generate scheme repeating a genvar value
-verilog/12_hierarchy/hierarchy_simple_name_stops_at_module_rejected.v lowering: a hierarchical name
-verilog/12_hierarchy/input_declared_reg_rejected.v lowering: §12.3.3 an input or inout port declared as a variable
-verilog/12_hierarchy/instance_select_out_of_range_rejected.v lowering: a hierarchical name whose first part names no scope
 verilog/12_hierarchy/localparam_override_rejected.v old run failed (E1100: §12.2: `LP` is a local parameter, which a defparam cannot override), new run completed
-verilog/12_hierarchy/module_instance_delay_rejected.v lowering: a UDP instance of no primitive
-verilog/12_hierarchy/no_top_level_module_rejected.v lowering: a design with no instance
-verilog/12_hierarchy/non_ancestor_module_name_rejected.v lowering: a hierarchical name whose first part names no scope
-verilog/12_hierarchy/nonconstant_generate_scheme_rejected.v lowering: a generate condition Sema/eval.zig does not fold
-verilog/12_hierarchy/output_to_expression_rejected.v lowering: a continuous assignment to an expression
-verilog/12_hierarchy/output_to_variable_rejected.v lowering: a continuous assignment to a variable
 verilog/12_hierarchy/port_width_mismatch_vams_rejected.v old run failed (E1100: §6.5.7.1: the sizes of the port and the net connected to it shall match), new run completed
 verilog/12_hierarchy/real_connected_to_port_rejected.v old run failed (E1100: §12.3.7: a real cannot be connected to a port), new run completed
-verilog/12_hierarchy/self_instantiation_rejected.v lowering: a design with no instance
 verilog/12_hierarchy/unnamed_block_referenced_rejected.v old run failed (E1100: undeclared instance in a hierarchical reference), new run completed
 verilog/13_configuration/cell_not_in_its_library_rejected.v old run failed (E1100: undeclared module in instantiation: library `gateLib` holds no cell `top`), new run completed
 verilog/13_configuration/config_in_map_rejected.v a `//@` line the cli refuses
@@ -118,30 +55,8 @@ verilog/13_configuration/source_text_in_map_rejected.v a `//@` line the cli refu
 verilog/13_configuration/two_libraries_match_rejected.v a `//@` line the cli refuses
 verilog/13_configuration/two_unreferenced_configs_rejected.v old run failed (E0243: configurations `cfg_a` and `cfg_b` are both unreferenced, so neither is the design's (IEEE 1364-2005 §13.4.4)), new run completed
 verilog/13_configuration/undeclared_library_rejected.v old run failed (E1100: undeclared module in instantiation: no library of the search order (nosuch) holds cell `adder`), new run completed
-verilog/15_timing_checks/notifier_net_rejected.v lowering: §15.5.2 a notifier that is no reg
-verilog/15_timing_checks/recrem_signal_limit_rejected.v lowering: a timing check limit Sema/eval.zig does not fold
-verilog/15_timing_checks/setuphold_signal_limit_rejected.v lowering: a timing check limit Sema/eval.zig does not fold
-verilog/17_system_tasks/dist_seed_constant_rejected.v lowering: an lvalue form
-verilog/17_system_tasks/fclose_two_descriptors_rejected.v lowering: $fclose without one argument
-verilog/17_system_tasks/fread_multidim_rejected.v lowering: §17.2.4.4 $fread into a memory of more than one dimension
-verilog/17_system_tasks/fwrite_no_descriptor_rejected.v lowering: a file task with no descriptor
-verilog/17_system_tasks/math_arguments_rejected.v lowering: a math function with the wrong argument count
-verilog/17_system_tasks/printtimescale_unknown_scope_rejected.v lowering: a hierarchical name whose first part names no scope
-verilog/17_system_tasks/random_seed_constant_rejected.v lowering: an lvalue form
-verilog/18_vcd/dumplimit_without_size_rejected.v lowering: $dumplimit without one argument
 verilog/18_vcd/dumpports_duplicate_scope_rejected.v old run failed (E1100: §18.3.1: each $dumpports scope shall be unique), new run completed
 verilog/18_vcd/dumpports_variable_scope_rejected.v old run failed (E1100: §18.3.1: a $dumpports scope is a module instance: only modules are allowed, not variables), new run completed
-verilog/18_vcd/dumpvars_memory_word_rejected.v lowering: a $dumpvars argument that names no scope or variable
-verilog/18_vcd/dumpvars_unknown_scope_rejected.v lowering: a $dumpvars argument naming no root module
-verilog/18_vcd/part_select_rejected.v lowering: a $dumpvars argument that names no scope or variable
-verilog/19_compiler_directives/mixed_timescale_rejected.v lowering: §19.8 some modules with a `timescale and some without
-verilog/19_compiler_directives/none_implicit_net_rejected.v lowering: a hierarchical name
-verilog/19_compiler_directives/some_modules_without_rejected.v lowering: §19.8 some modules with a `timescale and some without
 verilog/19_compiler_directives/timescale_inside_module_rejected.v old run failed (E1100: §19.8: a `timescale directive is written outside a module definition, not inside one), new run completed
 verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v a `//@` line the cli refuses
 verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v a `//@` line the cli refuses
-verilog/A_formal_syntax/b_A_2_2_1_dimension_and_initializer_rejected.v lowering: an initialized array
-verilog/A_formal_syntax/b_A_6_9_empty_task_argument_rejected.v lowering: §10.2.2 an omitted argument
-verilog/A_formal_syntax/b_A_8_2_empty_function_call_rejected.v lowering: §10.2.2 a call with one argument per formal not given
-verilog/A_formal_syntax/b_A_8_4_select_after_range_rejected.v lowering: a select of an expression
-verilog/A_formal_syntax/grammar_empty_case_rejected.v lowering: §9.5 a case statement with no item

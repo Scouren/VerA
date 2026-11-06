@@ -40,6 +40,7 @@ const Allocator = std.mem.Allocator;
 const Program = @import("Program.zig");
 const logic = @import("logic.zig");
 const eval = @import("eval.zig");
+const driver_access = @import("driver_access.zig");
 const resolve = @import("resolve.zig");
 const hold = @import("holds.zig");
 const tchk = @import("tchk.zig");
@@ -399,6 +400,8 @@ pub fn store(s: *State, slot: u32, value: Literal) Error!void {
         @memcpy(v, value.values());
         @memcpy(x, value.unknowns());
     }
+    // VAMS §9.22.5 an update need not change the value.
+    if (s.p.driver_updates.len != 0) try driver_access.stored(s, slot, changed);
     if (!changed) return;
     if (s.p.path_source.len != 0 and s.p.path_source[slot]) {
         s.path_edge[slot] = .{ .time = s.scheduler.now, .before = before_words, .after = .{ v[0], x[0] } };
@@ -424,6 +427,7 @@ pub fn trigger(s: *State, slot: u32) Error!void {
 pub fn scheduleWrite(s: *State, slot: u32, sel: ?eval.Sel, value: Literal, delay: ?u64) Error!void {
     assert(slot < s.p.slots.len);
     _ = try s.enqueueBuf(.{ .write = .{ .slot = slot, .sel = sel, .width = value.width, .signed = value.signed } }, value.planes, delay, true);
+    if (s.p.driver_updates.len != 0) try driver_access.scheduled(s, slot);
 }
 
 /// Queues a plain write of `value` into `slot`, `delay` ticks later, in

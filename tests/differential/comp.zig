@@ -14,7 +14,11 @@
 //! Determinism: `-Dcomp-j1=N` fixtures' new side runs again at `--jobs=1`
 //! and must write the same bytes as at the CPU count.
 //! `-Dcomp-filter=` runs a subset; `-Dcomp-rebaseline` writes every
-//! disagreement to `zig-out/comp.xfail.new` instead of failing.
+//! disagreement to `zig-out/<list>.xfail.new` instead of failing.
+//! The `.v` backends' runs (`v_options`: diff-digital-exe, diff-rtlil,
+//! diff-digital-device) take every `.v` fixture through `--emit-exe` (then
+//! the binary it built), `--emit-rtlil` or `--check` in place of `--run`,
+//! each against its own list (`tests/differential/<name>.xfail`).
 //! No LRM clause: this checks VerA's rewrite against VerA.
 //!
 //! Contents: tests only.
@@ -23,6 +27,9 @@ const std = @import("std");
 const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const options = @import("comp_options");
+/// Which run this is: `flag` replaces a `.v` fixture's `--run`/`--elab`
+/// ("" for diff-comp itself) and `name` is its xfail list's.
+const v_run = @import("v_options");
 const fixture = @import("comp/fixture.zig");
 const judge = @import("comp/judge.zig");
 const Fixture = fixture.Fixture;
@@ -69,7 +76,9 @@ fn runAll() !void {
     const arena = arena_state.allocator();
     const all = try fixture.collect(arena, io, options.fixture_root);
     var picked: std.ArrayList(Fixture) = .empty;
-    for (all) |f| if (options.filter.len == 0 or std.mem.find(u8, f.rel, options.filter) != null) try picked.append(arena, f);
+    for (all) |f| if (options.filter.len == 0 or std.mem.find(u8, f.rel, options.filter) != null) {
+        if (v_run.flag.len == 0 or f.lang == .verilog) try picked.append(arena, f);
+    };
     const env = try arena.create(std.process.Environ.Map);
     env.* = try std.testing.environ.createMap(arena);
     const work = try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", "comp-work" });
@@ -85,8 +94,8 @@ fn runAll() !void {
         // Absolute: each child runs in a directory of its own.
         .exe_old = try Io.Dir.cwd().realPathFileAlloc(io, options.vera, arena),
         .exe_new = try Io.Dir.cwd().realPathFileAlloc(io, options.vera_next, arena),
-        .rulings = try readRulings(arena, io),
-        .j1_every = if (options.j1_sample == 0) std.math.maxInt(u32) else @max(1, @as(u32, @intCast(picked.items.len)) / options.j1_sample),
+        .rulings = if (v_run.flag.len == 0) try readRulings(arena, io) else .empty,
+        .j1_every = if (options.j1_sample == 0 or v_run.flag.len != 0) std.math.maxInt(u32) else @max(1, @as(u32, @intCast(picked.items.len)) / options.j1_sample),
     };
     const t0 = Io.Clock.awake.now(io);
     const threads = try arena.alloc(std.Thread, @max(1, options.jobs));
@@ -129,17 +138,19 @@ fn worker(s: *Shared) void {
 fn one(arena: Allocator, s: *Shared, k: u32) !Outcome {
     const f = s.fixtures[k];
     if (f.lang == .vpi) return .{ .not_built = "vpi" };
-    const args = try fixture.argv(arena, f, options.fixture_root);
+    const args = try arena.dupe([]const u8, try fixture.argv(arena, f, options.fixture_root));
+    if (v_run.flag.len != 0) args[0] = v_run.flag;
+    const exec = std.mem.eql(u8, v_run.flag, "--emit-exe");
     const w_new = try std.fmt.allocPrint(arena, "{s}/{d}-n", .{ s.work, k });
-    var new = try judge.run(arena, s.io, s.exe_new, args, w_new, s.env);
+    var new = try judge.run(arena, s.io, s.exe_new, args, w_new, s.env, exec);
     if (judge.notBuilt(new)) |b| return .{ .not_built = b };
     if (k % s.j1_every == 0) {
         const one_job = try std.mem.concat(arena, []const u8, &.{ &.{"--jobs=1"}, args });
-        const again = try judge.run(arena, s.io, s.exe_new, one_job, w_new, s.env);
+        const again = try judge.run(arena, s.io, s.exe_new, one_job, w_new, s.env, exec);
         if (try judge.compare(arena, new, again, f.lang == .verilog)) |why| return .{ .nondeterministic = why };
     }
     const w_old = try std.fmt.allocPrint(arena, "{s}/{d}-o", .{ s.work, k });
-    var old = try judge.run(arena, s.io, s.exe_old, args, w_old, s.env);
+    var old = try judge.run(arena, s.io, s.exe_old, args, w_old, s.env, exec);
     // Paths under the fixture root read the same on both sides; the
     // reasons `comp.xfail` keeps name them relative, whatever checkout ran.
     const root = options.fixture_root ++ "/";
@@ -156,7 +167,7 @@ fn one(arena: Allocator, s: *Shared, k: u32) !Outcome {
 /// Holds the outcomes to `comp.xfail` and `comp.rulings`, prints the
 /// tally, and fails on an unlisted difference or a stale line.
 fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const Outcome, secs: u32) !void {
-    const xfail = try readList(arena, io, "tests/differential/comp.xfail");
+    const xfail = try readList(arena, io, "tests/differential/" ++ v_run.name ++ ".xfail");
     var out: Io.Writer.Allocating = .init(arena);
     var new_list: Io.Writer.Allocating = .init(arena);
     var t: struct { ruled: u32 = 0, agree: u32 = 0, not_built: u32 = 0, differ: u32 = 0, listed: u32 = 0, failed: u32 = 0 } = .{};
@@ -183,7 +194,7 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
         const l = line orelse {
             if (xfail.contains(f.rel)) {
                 t.failed += 1;
-                try out.writer.print("XPASS {s}: agrees now; delete its comp.xfail line\n", .{f.rel});
+                try out.writer.print("XPASS {s}: agrees now; delete its " ++ v_run.name ++ ".xfail line\n", .{f.rel});
             }
             continue;
         };
@@ -199,7 +210,7 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
             t.listed += 1;
         } else if (!options.rebaseline or o == .nondeterministic) {
             t.failed += 1;
-            try out.writer.print("FAIL {s} {s}{s}\n", .{ f.rel, flat, if (xfail.contains(f.rel)) " (its comp.xfail line names another owner)" else "" });
+            try out.writer.print("FAIL {s} {s}{s}\n", .{ f.rel, flat, if (xfail.contains(f.rel)) " (its " ++ v_run.name ++ ".xfail line names another owner)" else "" });
         }
     }
     if (options.filter.len == 0) {
@@ -210,13 +221,13 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
             } else false;
             if (known) continue;
             t.failed += 1;
-            try out.writer.print("STALE {s}: comp.xfail names a fixture that is not in the corpus\n", .{rel.*});
+            try out.writer.print("STALE {s}: " ++ v_run.name ++ ".xfail names a fixture that is not in the corpus\n", .{rel.*});
         }
     }
-    if (options.rebaseline) try Io.Dir.cwd().writeFile(io, .{ .sub_path = try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", "comp.xfail.new" }), .data = new_list.written() });
+    if (options.rebaseline) try Io.Dir.cwd().writeFile(io, .{ .sub_path = try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", v_run.name ++ ".xfail.new" }), .data = new_list.written() });
     var owners: Io.Writer.Allocating = .init(arena);
     for (by_owner.keys(), by_owner.values()) |k, v| try owners.writer.print("  {d} {s}\n", .{ v, k });
-    std.debug.print("{s}diff-comp: {d} fixtures in {d} s: {d} agree, {d} ruled (old-side bugs), {d} need a backend vera-next has not got, {d} differ; {d} in comp.xfail, {d} failures. By owner:\n{s}", .{ out.written(), fixtures.len, secs, t.agree, t.ruled, t.not_built, t.differ, t.listed, t.failed, owners.written() });
+    std.debug.print("{s}" ++ v_run.name ++ ": {d} fixtures in {d} s: {d} agree, {d} ruled (old-side bugs), {d} need a backend vera-next has not got, {d} differ; {d} in " ++ v_run.name ++ ".xfail, {d} failures. By owner:\n{s}", .{ out.written(), fixtures.len, secs, t.agree, t.ruled, t.not_built, t.differ, t.listed, t.failed, owners.written() });
     if (t.failed != 0 and !options.rebaseline) return error.DiffCompFailed;
 }
 

@@ -38,13 +38,27 @@ pub fn add(g: Graph, all: *Build.Step) void {
     o.addOption(u32, "jobs", b.option(u32, "comp-jobs", "diff-comp: fixtures compared at once (default 4; the machine is shared)") orelse 4);
     o.addOption(u32, "j1_sample", b.option(u32, "comp-j1", "diff-comp: also run this many fixtures' new side at -j1 and compare the bytes with -jN (default 200)") orelse 200);
     o.addOption(bool, "rebaseline", b.option(bool, "comp-rebaseline", "diff-comp: write every disagreement to zig-out/comp.xfail.new instead of failing on it") orelse false);
-    const mod = g.m.make("tests/differential/comp.zig", &.{.{ .name = "vams", .module = byName(g.mods, "vams") }});
-    mod.addOptions("comp_options", o);
-    const r = testRun(b, "diff-comp", mod, g.runner, g.results_dir);
-    r.has_side_effects = true; // Reads the fixture tree and runs both drivers.
-    const step = b.step("diff-comp", "vera-next against vera on every fixture's harness command line: exit code, diagnostics, stdout, emitted files");
-    step.dependOn(&r.step);
-    all.dependOn(&r.step);
+    // diff-comp itself, then the `.v` backends' runs (docs/rewrite/digital.md):
+    // the same fixtures with `--run` swapped for the backend's flag, each
+    // against its own xfail list.
+    const runs = [_]struct { step: []const u8, flag: []const u8, list: []const u8, what: []const u8 }{
+        .{ .step = "diff-comp", .flag = "", .list = "comp", .what = "vera-next against vera on every fixture's harness command line: exit code, diagnostics, stdout, emitted files" },
+        .{ .step = "diff-digital-exe", .flag = "--emit-exe", .list = "digital_exe", .what = "every .v fixture through --emit-exe and the binary it built, vera-next against vera" },
+        .{ .step = "diff-rtlil", .flag = "--emit-rtlil", .list = "rtlil", .what = "every .v fixture through --emit-rtlil, vera-next against vera" },
+        .{ .step = "diff-digital-device", .flag = "--check", .list = "digital_device", .what = "every .v fixture through --check (a .v top as a contract device), vera-next against vera" },
+    };
+    for (runs) |run_row| {
+        const vo = b.addOptions();
+        vo.addOption([]const u8, "flag", run_row.flag);
+        vo.addOption([]const u8, "name", run_row.list);
+        const mod = g.m.make("tests/differential/comp.zig", &.{.{ .name = "vams", .module = byName(g.mods, "vams") }});
+        mod.addOptions("comp_options", o);
+        mod.addOptions("v_options", vo);
+        const r = testRun(b, run_row.step, mod, g.runner, g.results_dir);
+        r.has_side_effects = true; // Reads the fixture tree and runs both drivers.
+        b.step(run_row.step, run_row.what).dependOn(&r.step);
+        all.dependOn(&r.step);
+    }
 
     // §12: concurrent --check runs of one model in one directory.
     const race_mod = g.m.make("tests/differential/comp_check.zig", &.{});
@@ -61,6 +75,14 @@ pub fn add(g: Graph, all: *Build.Step) void {
     bench.has_side_effects = true; // Spawns vera-next, which spawns zig.
     b.step("bench-run", "vera-next --run on a swept and re-carded resistor: every transcript line against Ohm's law").dependOn(&bench.step);
     all.dependOn(&bench.step);
+
+    // exe-run: a `.v --emit-exe` binary against vera-next's own `--run`.
+    const exe_mod = g.m.make("tests/differential/exe_run.zig", &.{});
+    exe_mod.addOptions("comp_options", o);
+    const exe_run = testRun(b, "exe-run", exe_mod, g.runner, g.results_dir);
+    exe_run.has_side_effects = true; // Spawns vera-next, which spawns zig.
+    b.step("exe-run", "A .v --emit-exe binary prints what vera-next --run prints, byte for byte").dependOn(&exe_run.step);
+    all.dependOn(&exe_run.step);
 
     // conformance-next: the suite's harness with vera-next as the tool.
     const conform = b.addExecutable(.{ .name = "conform", .root_module = b.createModule(.{ .target = g.m.target, .optimize = .ReleaseSafe, .link_libc = true }) });

@@ -127,8 +127,9 @@ pub fn codegen(comp: *Compilation, b: Compilation.Backend) !?Job {
         .osdi => return notBuilt(comp, b, "the OSDI backend (--emit-osdi)"),
         .rtlil => return notBuilt(comp, b, "the RTLIL backend (--emit-rtlil)"),
         .digital_device => return notBuilt(comp, b, "the digital device backend (a .v --emit-zig, --check, --emit-so)"),
-        .digital_exe => return notBuilt(comp, b, "the native digital executable (a .v --emit-exe)"),
+        .digital_exe => return digitalExe(comp),
         .libmap => unreachable, // Refused before preprocessing.
+        .digital_lowering => unreachable, // A stage, not a backend: `semaDigital` names it.
     }
     const an = &comp.analysis.?;
     // §8: the mixed runner needs the digital half Sema lowers beside it.
@@ -258,23 +259,9 @@ pub fn runDigital(comp: *Compilation) !?Job {
     };
     s.budget = comp.config.event_budget;
     s.io = comp.io;
-    var result: std_sim.State.Error!void = {};
-    const t = try std.Thread.spawn(.{ .stack_size = 1 << 30 }, struct {
-        fn go(st: *std_sim.State, r: *std_sim.State.Error!void) void {
-            r.* = std_sim.Interp.run(st);
-        }
-    }.go, .{ &s, &result });
-    t.join();
-    std_sim.files.closeAll(&s);
+    const result = std_sim.exe.run(&s);
     try comp.outputs.out.appendSlice(comp.arena(), out.written());
-    const pp = comp.pp.output();
-    for (s.checks, l.check_sites) |ch, site| if (ch.count != 0) {
-        try comp.wip.add(.run, .W1199, errors.relocate(pp, site, site), "a timing check reported a violation", .{});
-    };
-    result catch |e| switch (e) {
-        error.SimFailed => try comp.wip.add(.run, .E1100, .none, "{s}", .{s.failure.?}),
-        error.OutOfMemory, error.WriteFailed => |x| return x,
-    };
+    try std_sim.exe.report(&s, result, &comp.wip, try checkSites(comp));
     return null;
 }
 
@@ -293,6 +280,57 @@ pub fn scratchDir(comp: *Compilation) ![]const u8 {
 }
 
 // ---- private ----
+
+/// `.v --emit-exe`: an executable that runs the lowered Program through
+/// `std_sim.exe`, as `--run` does (`codegen.digital_next.writeExe`), built
+/// through `link` under `--work-dir` (default `.zig-cache/vera-tb`), named
+/// for the input's stem; `main` prints its path.
+fn digitalExe(comp: *Compilation) !?Job {
+    const c = comp.config;
+    const a = comp.arena();
+    const all = try comp.sources();
+    const sources = try a.alloc(std_sim.exe.Source, all.len);
+    for (sources, all) |*s, d| s.* = .{ .name = d.name, .text = d.text };
+    var root: Io.Writer.Allocating = .init(a);
+    try codegen_mod.digital_next.writeExe(&root.writer, a, &comp.lowered.?.program, sources, try checkSites(comp), c.event_budget);
+    const slots = try a.alloc(link_mod.Server, c.thread_limit);
+    var q: link_mod.Queue = .init(slots);
+    const tree = std.fs.path.dirname(std.fs.path.dirname(c.contract.?) orelse ".") orelse ".";
+    const mods = [_]link_mod.Module{
+        .{ .name = "std_sim", .root = try std.fs.path.join(a, &.{ tree, "lib", "std", "sim.zig" }), .deps = &.{ "kernels", "contract", "vams" } },
+        .{ .name = "kernels", .root = try std.fs.path.join(a, &.{ tree, "lib", "kernels", "root.zig" }), .deps = &.{"contract"} },
+        .{ .name = "contract", .root = c.contract.? },
+        .{ .name = "vams", .root = try std.fs.path.join(a, &.{ tree, "lib", "std", "vams.zig" }) },
+    };
+    const f: link_mod.File = .{ .kind = .exe, .work_dir = c.work_dir orelse ".zig-cache/vera-tb", .name = std.fs.path.stem(c.paths[0]), .optimize = c.optimize, .modules = &mods, .zig_exe = c.zig_exe, .debug_info = c.debug_info, .out_path = c.out_path };
+    var built = link_mod.buildExe(f, comp.gpa, comp.io, &q, null, root.written()) catch |e| {
+        try comp.outputs.err.print(a, "error: {s}: building the executable failed: {t}\n", .{ c.paths[0], e });
+        comp.outputs.status = 1;
+        return null;
+    };
+    defer built.deinit(comp.gpa);
+    switch (built) {
+        .ok => |p| comp.outputs.exe = try a.dupe(u8, p),
+        .failed => |bundle| {
+            try comp.outputs.err.print(a, "error: {s}: the generated executable does not compile — this is an engine bug, not a problem with the design:\n", .{c.paths[0]});
+            var w: Io.Writer.Allocating = .init(a);
+            try bundle.renderToWriter(.{}, &w.writer);
+            try comp.outputs.err.appendSlice(a, w.written());
+            comp.outputs.status = 1;
+        },
+    }
+    return null;
+}
+
+/// Each timing check's W1199 site (`Lowered.check_sites`), relocated to
+/// the file the user wrote.
+fn checkSites(comp: *Compilation) ![]const vams.Diag.Loc {
+    const l = &comp.lowered.?;
+    const pp = comp.pp.output();
+    const out = try comp.arena().alloc(vams.Diag.Loc, l.check_sites.len);
+    for (out, l.check_sites) |*o, site| o.* = errors.relocate(pp, site, site);
+    return out;
+}
 
 /// The modules a device compiles against, from the tree its `contract`
 /// root sits in (`<tree>/lib/contract.zig`, `main`'s written tree):
@@ -415,7 +453,7 @@ fn notBuilt(comp: *Compilation, b: Compilation.Backend, what: []const u8) !?Job 
 
 fn notBuiltFmt(comp: *Compilation, stage: []const u8, why: []const u8) !?Job {
     const what = try comp.arena().print("{s} of {s}", .{ stage, why });
-    try frontend.notBuilt(comp, .digital_device, what);
+    try frontend.notBuilt(comp, .digital_lowering, what);
     return null;
 }
 

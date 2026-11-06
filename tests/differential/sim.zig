@@ -3,7 +3,9 @@
 //! fixture `vera --run` judges against a golden (the `suite -- devices` and
 //! `ieee1364` sets) in, a verdict per fixture out. The new side compiles the
 //! fixture from source (vams Preprocessor, Parse, AstGen, Sema's
-//! elaboration, then `sema.digital.lower`) and runs the `Program` in
+//! elaboration, then `sema.digital.lower`), parsed and generated as
+//! vera-next does a `.v` (`discrete`, `ieee1364`: else a rule the lowering
+//! owns is refused at the parser and agrees by accident), and runs the `Program` in
 //! `std_sim`; the oracle is lib/sim/digital's own run, the product until the
 //! rewrite replaces it. A fixture agrees when both transcripts are
 //! byte-equal, both runs end the same way (completed, or a runtime error),
@@ -203,9 +205,9 @@ fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, op
     if (out.failed) return .{ .earlier = try a.print("the vams preprocessor refuses it ({s})", .{out.diagnostics[out.diagnostics.len - 1].code}) };
     const text = try a.dupeSentinel(u8, out.text, 0);
     const tree = try a.create(vams.Ast);
-    tree.* = try vams.Ast.parse(a, text, .{ .keywords = std.meta.stringToEnum(vams.Ast.KeywordSet, @tagName(opts.language)).? });
+    tree.* = try vams.Ast.parse(a, text, .{ .keywords = std.meta.stringToEnum(vams.Ast.KeywordSet, @tagName(opts.language)).?, .discrete = true });
     if (tree.errors.len != 0) return .{ .earlier = try a.print("the vams parser refuses it ({t})", .{tree.errors[0].tag}) };
-    const vir = try vams.AstGen.generate(a, tree, .{ .directives = out.directives });
+    const vir = try vams.AstGen.generate(a, tree, .{ .directives = out.directives, .ieee1364 = true });
     // `SIM_DUMP=1` with `SIM_ONLY`: the fixture's Vir on stderr.
     if (std.process.Environ.getPosix(std.testing.environ, "SIM_DUMP") != null) {
         var dump: std.Io.Writer.Allocating = .init(a);

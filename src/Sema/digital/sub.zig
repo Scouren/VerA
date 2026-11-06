@@ -82,6 +82,13 @@ pub fn declare(l: *Lower, f: u32, scope: u32, i: Inst.Index) Error!void {
     const s = Lower.payload(vir, Inst.Function, i);
     // VAMS §4.7 an analog function is the analog block's to call.
     if (s.flags.analog) return if (l.options.mixed) {} else l.refuse("an analog function");
+    // §10.4.4 c) and d): every argument an input, and at least one.
+    if (!s.flags.task) {
+        const formals = vir.body(s.formals);
+        for (formals) |p| if (Lower.payload(vir, Inst.Io, p).flags.dir != .input)
+            return l.reject(f, p.toRef(), "§10.4.4: a function argument is an input, not an output or inout");
+        if (formals.len == 0) return l.reject(f, i.toRef(), "§10.4.1: a function shall have at least one input declared");
+    }
     const sc = try decl.newScope(l, scope, vir.string(s.name), null, l.b.times.items[scope], l.srcOffset(f, i), false);
     const own = try storage(l, f, sc, i);
     const row: u32 = @intCast(l.subs.items.len);

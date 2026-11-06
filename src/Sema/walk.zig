@@ -49,7 +49,9 @@ const Dp = defparams.Dp;
 /// A value an instance gives one of its target's parameters: named, or the
 /// next in order (`name` empty); `value` is none for an empty `.name()`,
 /// which keeps the default.
-pub const Given = struct { name: InternPool.String, value: InternPool.Index };
+/// `stmt`: the §6.4.1 paramset statement that gave it (in `stmt_file`),
+/// where its reports point; none for an instance's own value.
+pub const Given = struct { name: InternPool.String, value: InternPool.Index, stmt: Inst.Ref = .none, stmt_file: Zcu.File.Index = undefined };
 
 /// A run of `Walk.givens`.
 pub const Run = struct { start: u32, len: u32 };
@@ -73,6 +75,9 @@ pub const Walk = struct {
     s: *Sema,
     zcu: *Zcu,
     late: *std.StringArrayHashMapUnmanaged(std.ArrayList(defparams.Late)),
+    /// The defparams (by source) an earlier pass resolved upward past a
+    /// generate block not instantiated then (IEEE 1364-2005 §12.8.2).
+    went_up: *std.AutoHashMapUnmanaged(defparams.Source, void),
     pending: std.ArrayList(Pending) = .empty,
     givens: std.ArrayList(Given) = .empty,
     rows: std.ArrayList(defparams.Row) = .empty,
@@ -99,6 +104,7 @@ pub fn run(s: *Sema, roots: []const Zcu.Decl) Allocator.Error!defparams.Waiting 
     assert(zcu.instances.len == 0);
     const failed_before = zcu.failed.len;
     var late: std.StringArrayHashMapUnmanaged(std.ArrayList(defparams.Late)) = .empty;
+    var went_up: std.AutoHashMapUnmanaged(defparams.Source, void) = .empty;
     var pass: u32 = 0;
     while (true) : (pass += 1) {
         zcu.instances.shrinkRetainingCapacity(0);
@@ -107,7 +113,7 @@ pub fn run(s: *Sema, roots: []const Zcu.Decl) Allocator.Error!defparams.Waiting 
         zcu.defparams.clearRetainingCapacity();
         zcu.defparam_sources.clearRetainingCapacity();
         zcu.failed.shrinkRetainingCapacity(failed_before);
-        var w: Walk = .{ .s = s, .zcu = zcu, .late = &late };
+        var w: Walk = .{ .s = s, .zcu = zcu, .late = &late, .went_up = &went_up };
         var k = roots.len;
         while (k > 0) {
             k -= 1;
@@ -210,27 +216,32 @@ pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const G
     assert(env.positions.count() == env.values.items.len);
     if (base) |b| assert(b.get(.mfactor) != .none);
     const zcu = s.zcu;
-    var specified: std.EnumArray(Zcu.SystemParam, ?struct { value: InternPool.Index, spelling: []const u8 }) = .initFill(null);
-    for (givens) |g| {
+    const Where = struct { file: Zcu.File.Index, src: Inst.Ref, part: Zcu.Part };
+    var specified: std.EnumArray(Zcu.SystemParam, ?struct { value: InternPool.Index, spelling: []const u8, at: Where }) = .initFill(null);
+    for (givens, 0..) |g, n| {
         if (g.name == .empty or g.value == .none) continue;
         const name = zcu.intern_pool.stringToSlice(g.name);
         const k = env.systemNamed(name) orelse continue;
         if (specified.get(k)) |before| if (!std.mem.eql(u8, before.spelling, name))
             try s.fail(.E0908, file, src, "`${s}` is given more than one value", .{@tagName(k)});
-        specified.set(k, .{ .value = g.value, .spelling = try s.arena.dupe(u8, name) });
+        const at: Where = if (g.stmt != .none) .{ .file = g.stmt_file, .src = g.stmt, .part = .whole } else .{ .file = file, .src = src, .part = .{ .value = @intCast(n) } };
+        specified.set(k, .{ .value = g.value, .spelling = try s.arena.dupe(u8, name), .at = at });
     }
     for (dps) |dp| {
         const k = env.systemNamed(dp.name) orelse continue;
         if (specified.get(k)) |before| if (!std.mem.eql(u8, before.spelling, dp.name))
             try s.failRule(.{ .part = .target }, .E0908, dp.file, dp.src, "`${s}` and its alias are both given a value", .{@tagName(k)});
-        specified.set(k, .{ .value = dp.value, .spelling = dp.name });
+        specified.set(k, .{ .value = dp.value, .spelling = dp.name, .at = .{ .file = dp.file, .src = dp.src, .part = .rhs } });
     }
     var out: Zcu.Hier = undefined;
     for (std.enums.values(Zcu.SystemParam)) |k| {
         const up: ?f64 = if (base) |b| if (env.toConst(b.get(k))) |c| c.asReal() else null else k.initial();
         const own: ?f64 = if (specified.get(k)) |sp| if (env.toConst(sp.value)) |c| c.asReal() else null else k.initial();
-        if (specified.get(k) != null) if (own) |v| if (!k.allows(v))
-            try s.fail(.E0890, file, src, "`${s}` is {d}, and Table 9-29 allows only {s}", .{ @tagName(k), v, k.domain() });
+        if (specified.get(k)) |sp| if (own) |v| if (!k.allows(v)) {
+            const why = "`${s}` is {d}, and Table 9-29 allows only {s}";
+            const args = .{ @tagName(k), v, k.domain() };
+            if (sp.at.part == .whole) try s.fail(.E0890, sp.at.file, sp.at.src, why, args) else try s.failRule(.{ .part = sp.at.part }, .E0890, sp.at.file, sp.at.src, why, args);
+        };
         const v: ?f64 = if (own == null or up == null) null else switch (k) {
             .xposition, .yposition => up.? + own.?,
             .angle => @rem(up.? + own.?, 360.0),

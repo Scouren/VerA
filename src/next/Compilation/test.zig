@@ -141,6 +141,26 @@ test "a §4.3.2 error from the air passes is located at the operator the user wr
     try std.testing.expectEqualStrings("%", src[m.loc.start..m.loc.end]);
 }
 
+test "a .v design with no top-level module is refused, never a silent success" {
+    // Oracle: IEEE 1364-2005 §12.1.1 (a top is a module no other instantiates)
+    // and the fixture verilog/12_hierarchy/self_instantiation_rejected.v's
+    // //! reject: the old engine's E1100 at the first token.
+    const gpa = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var paths: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer paths.deinit();
+    const src = "// a comment\nmodule m;\n  m u();\nendmodule\n";
+    const comp = try compileText(paths.allocator(), &tmp, "self.v", src, .{ .target = .elab });
+    defer comp.destroy();
+    var errors = try comp.getAllErrors();
+    defer errors.deinit(gpa);
+    try std.testing.expect(errors.failed());
+    const m = errors.message(errors.messages()[0]);
+    try std.testing.expectEqual(vams.Diag.Code.E1100, m.tag.code);
+    try std.testing.expectEqualStrings("module", src[m.loc.start..][0.."module".len]);
+}
+
 test "a backend that is not built is named, with not_built_status" {
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();

@@ -12,10 +12,10 @@
 //! Cites: IEEE 1364-2005 §9.9, §11.4, §12.4, §12.5, §19.8.
 //!
 //! Contents:
-//! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Named = struct`, `pub const SegmentRef = struct`, `pub const Why = struct`
+//! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Port = struct`, `pub const Named = struct`, `pub const SegmentRef = struct`, `pub const Why = struct`, `pub const Spec = struct`, `pub const ProcSite = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
-//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `reject`, `rejectFmt`, `rejectOperand`, `rejectArg`, `rejectArgFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
+//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `Declared`, `refuse`, `refuseFmt`, `reject`, `rejectFmt`, `rejectOperand`, `rejectArg`, `rejectArgFmt`, `lookup`, `readsSignal`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
 //! - `pub const none: u32`
 //! - `pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Lowered`
 
@@ -28,6 +28,7 @@ const InternPool = @import("intern_pool");
 const Zcu = @import("../Zcu.zig");
 const eval = @import("eval.zig");
 const decl = @import("digital/decl.zig");
+const decl_mod = @import("decl.zig");
 const stmt = @import("digital/stmt.zig");
 const nets = @import("digital/nets.zig");
 const time0 = @import("digital/time0.zig");
@@ -64,6 +65,76 @@ pub const Lowered = struct {
     program: Program,
     check_sites: []const u32 = &.{},
     names: []const Named = &.{},
+    /// The root instance's ports, in its list of ports' order (`Port`).
+    ports: []const Port = &.{},
+    /// The source offset of the root module's `module` keyword, in
+    /// `check_sites`' offset space.
+    top_at: u32 = 0,
+    /// The distinct (module, parameter values) pairs instantiated, in
+    /// first-instance order (`Spec`).
+    specs: []const Spec = &.{},
+    /// Per `Program.scopes` row, the `specs` row of the instance whose
+    /// module its code is in (a named or generate block's is its
+    /// instance's), or `none` for a scope no frame binds in.
+    scope_spec: []const u32 = &.{},
+    /// Per `Program.slots` row, the name of the first declaration bound to
+    /// it ("" for a cell no declaration names: a hold, a temporary), and
+    /// that declaration's source offset (`none` for an implicit net or a
+    /// cell), in `check_sites`' offset space.
+    slot_names: []const []const u8 = &.{},
+    slot_at: []const u32 = &.{},
+    /// Per compiled process (an `initial`, an `always`, a §6.2.1
+    /// declaration assignment, a continuous driver), its first pc and
+    /// source offset (`none` for a driver Vir holds no position of).
+    proc_sites: []const ProcSite = &.{},
+    /// Per `Program.slots` row, the `Program.scopes` row of the frame its
+    /// declaration (or implicit net) was bound in, `none` for a cell; and
+    /// its declared `[msb:lsb]` as written (reversed or negative kept),
+    /// `width - 1 : 0` without one.
+    slot_scope: []const u32 = &.{},
+    slot_msb: []const i64 = &.{},
+    slot_lsb: []const i64 = &.{},
+    /// Per `Program.scopes` row, the `Zcu.instances` row whose frame owns
+    /// it, or `none`.
+    scope_instance: []const u32 = &.{},
+    /// Per `Zcu.instances` row, its ports (`top.ports`, its own slots) and
+    /// its `specs` row.
+    instance_ports: []const []const Port = &.{},
+    instance_spec: []const u32 = &.{},
+};
+
+/// One module specialization: its name, its `Zcu` key (the module and its
+/// folded parameters, an interned `aggregate`), its first instance (a
+/// `Zcu.instances` row) and that instance's ports (`Port`, slots its own).
+pub const Spec = struct {
+    module: []const u8,
+    key: Zcu.Instance.Key,
+    instance: u32,
+    ports: []const Port,
+    /// No override reached the spec (no `#(...)`, defparam or paramset
+    /// at some instance of it): its values are the module's defaults.
+    defaults: bool,
+};
+
+/// A process's first pc (`Program.insts` row) and source offset.
+pub const ProcSite = struct { pc: u32, at: u32 };
+
+/// One port of the root instance as a device host drives it: its name,
+/// direction, the `Program.slots` row behind it (`maxInt` when none: a
+/// continuous port of a mixed design), its type and declared `[msb:lsb]`,
+/// `scalar` when declared without a range, `integer` for an `integer` or
+/// `time` variable.
+pub const Port = struct {
+    name: []const u8,
+    /// 1-based, in the module's list of ports, null ports counted (A.1.3).
+    position: u32,
+    dir: enum { input, output, inout },
+    slot: u32,
+    ty: Program.Ty,
+    msb: i64,
+    lsb: i64,
+    scalar: bool,
+    integer: bool,
 };
 
 /// VAMS §7.3 one variable or net a mixed host reads (D2A) or writes (A2D):
@@ -275,6 +346,18 @@ pub const Lower = struct {
     subs: std.ArrayList(sub.Row) = .empty,
     /// §4.5 the implicit nets, by their instance frame and name.
     implicit: std.AutoHashMapUnmanaged(Implicit, u32) = .empty,
+    /// Every declaration bound to slots, in bind order (`Lowered.slot_names`).
+    declared: std.ArrayList(Declared) = .empty,
+    proc_sites: std.ArrayList(ProcSite) = .empty,
+    /// Where lib/sim/digital bound each declaration of a frame (its first,
+    /// `redecl.bindOrder`): a use before it in compiled code is an error.
+    bound_at: std.AutoHashMapUnmanaged(struct { frame: u32, decl: Inst.Index }, u32) = .empty,
+    /// Processes and drivers are being compiled (lib/sim/digital's pass
+    /// two), where a name is visible only from its binding on.
+    compiling: bool = false,
+
+    /// Declaration `decl` of frame `frame`, bound to `count` slots from `slot`.
+    pub const Declared = struct { frame: u32, decl: Inst.Index, slot: u32, count: u32, msb: i64, lsb: i64 };
 
     /// A.6.5 a `disable` at pc `pc` of the name `name`, written in frame `frame`.
     pub const Disable = struct { pc: u32, frame: u32, name: []const u8, inst: Inst.Index };
@@ -407,6 +490,7 @@ pub const Lower = struct {
     pub fn bind(l: *Lower, f: u32, d: Inst.Index, n: Name) Error!u32 {
         assert(f < l.frames.items.len);
         const at: u32 = @intCast(l.names.items.len);
+        if (n.kind != .sub and n.kind != .scope) try l.declared.append(l.a, .{ .frame = f, .decl = d, .slot = n.slot, .count = n.count, .msb = n.msb, .lsb = n.lsb });
         try l.names.append(l.a, n);
         try l.frames.items[f].names.put(l.a, d, at);
         return at;
@@ -444,6 +528,38 @@ pub const Lower = struct {
         return env;
     }
 
+    /// Whether expression `r` of frame `f` reads a variable, a net or a
+    /// named event: no constant expression (§5.2: "a constant expression
+    /// … shall consist of constant numbers and parameters").
+    pub fn readsSignal(l: *Lower, f: u32, r: Inst.Ref) Error!bool {
+        const vir = l.virOf(f);
+        var stack: std.ArrayList(Inst.Index) = .empty;
+        var ops: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
+        try stack.append(l.a, r.toIndex() orelse return false);
+        var steps: usize = 0;
+        while (stack.pop()) |i| : (steps += 1) {
+            assert(steps <= vir.instructions.len * 4);
+            if (tag(vir, i) == .decl_ref) {
+                const d = decl_mod.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl);
+                // Not bound yet (a port whose own range names it): by its form.
+                const at = l.lookup(f, d) orelse switch (tag(vir, d)) {
+                    .variable, .net, .io, .event => return true,
+                    else => continue, // else: a parameter, a genvar, a subroutine
+                };
+                switch (l.names.items[at].kind) {
+                    .variable, .net, .event => return true,
+                    .param, .genvar, .sub, .scope => {},
+                }
+                continue;
+            }
+            ops.clearRetainingCapacity();
+            try @import("control.zig").operands(l.a, vir, i, &ops);
+            var it = ops.keyIterator();
+            while (it.next()) |o| try stack.append(l.a, o.*);
+        }
+        return false;
+    }
+
     /// The folded value of `r` in frame `f`, or null when it has none at
     /// elaboration.
     pub fn constOf(l: *Lower, f: u32, r: Inst.Ref) Error!?eval.Const {
@@ -456,7 +572,10 @@ pub const Lower = struct {
         // The IEEE 1364 mode first: §5.5's widths (a 64-bit parameter's
         // arithmetic), x/z bits, selects, constant functions.
         if (try eval.v1364.int(try l.envAt(f), r)) |v| return v;
-        const c = (try l.constOf(f, r)) orelse return l.refuse("a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)");
+        const c = (try l.constOf(f, r)) orelse return if (try l.readsSignal(f, r))
+            l.reject(f, r, "a constant expression is required here")
+        else
+            l.refuse("a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)");
         return switch (c) {
             .int => |v| v,
             .real => |v| if (std.math.isFinite(v)) @intFromFloat(@round(v)) else l.refuse("a non-finite real where an integer constant is required"),
@@ -526,12 +645,40 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Low
         why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
         return e;
     } else &.{};
-    return .{ .program = program, .check_sites = l.check_sites.items, .names = named };
+    const top = @import("digital/top.zig");
+    const root_ports = top.ports(&l, 0) catch |e| {
+        why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
+        return e;
+    };
+    const specs = top.specs(&l) catch |e| {
+        why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
+        return e;
+    };
+    const slots = try top.slotNames(&l, program.slots.items(.ty));
+    return .{
+        .program = program,
+        .check_sites = l.check_sites.items,
+        .names = named,
+        .ports = root_ports,
+        .top_at = top.topAt(&l),
+        .specs = specs.rows,
+        .scope_spec = specs.of_scope,
+        .slot_names = slots.names,
+        .slot_at = slots.at,
+        .proc_sites = l.proc_sites.items,
+        .slot_scope = slots.scope,
+        .slot_msb = slots.msb,
+        .slot_lsb = slots.lsb,
+        .scope_instance = specs.scope_instance,
+        .instance_ports = specs.instance_ports,
+        .instance_spec = specs.of_instance,
+    };
 }
 
 // ---- private ----
 
 fn spine(l: *Lower) Error!void {
+    try gates.checkUdps(l);
     if (l.zcu.instances.len == 0) {
         l.why = "digital execution found no top-level module";
         l.why_at = moduleAt(l, firstModule(l) orelse return error.Rejected);

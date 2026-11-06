@@ -2,17 +2,23 @@
 //! them: one name's declarations (`decls`, the first first: a port
 //! direction and the net or variable completing it) in; nothing, or the
 //! E1100 rejection of the one that redeclares it or whose range differs.
-//! Cites: IEEE 1364-2005 §4.2, §10.2.1, §12.3.3.
+//! And a scope's names across kinds (`bindOrder`): bound in lib/sim/digital's
+//! order, a second binding of one name refused, each first's binding offset
+//! kept for compiled code (`Lower.bound_at`).
+//! Cites: IEEE 1364-2005 §4.2, §4.5, §10.2.1, §10.4.2, §12.3.3.
 //!
 //! Contents:
 //! - `pub const Scope = enum`
 //! - `pub fn check(l: *Lower, f: u32, decls: []const Inst.Index, scope: Scope, ports: Vir.Body) Error!void`
+//! - `pub fn bindOrder(l: *Lower, f: u32, all: []const Inst.Index) Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
 const vams = @import("vams");
 const digital = @import("../digital.zig");
 const vars = @import("vars.zig");
+const canonical = @import("../decl.zig").canonical;
+const nameOf = @import("../decl.zig").nameOf;
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Vir = vams.Vir;
@@ -64,6 +70,78 @@ pub fn check(l: *Lower, f: u32, decls: []const Inst.Index, scope: Scope, ports: 
         if (declared) return l.reject(f, d.toRef(), "duplicate digital variable");
         declared = true;
     }
+}
+
+/// The items `all` of frame `f`'s scope bound as lib/sim/digital's
+/// `declareHead`/`declareBody` bind them: parameters, events, variables,
+/// nets, then ports (one name's port, net and variable are one binding, at
+/// its variable, else its port, else its net). A name bound twice is
+/// "duplicate digital variable" at the second (§4.2); a task or function
+/// named like a bound name is §10.4.2's error at it; a net declared after a
+/// continuous assignment names it was §4.5's implicit net there, so it
+/// declares the name twice.
+pub fn bindOrder(l: *Lower, f: u32, all: []const Inst.Index) Error!void {
+    const vir = l.virOf(f);
+    const Entry = struct { stage: u8, at: u32, decl: Inst.Index, first: Inst.Index };
+    var entries: std.ArrayList(Entry) = .empty;
+    var groups: std.AutoArrayHashMapUnmanaged(Inst.Index, Entry) = .empty;
+    for (all) |i| {
+        const stage: u8 = switch (Lower.tag(vir, i)) {
+            .param => if (Lower.payload(vir, Inst.Param, i).flags.kind == .specparam) continue else 0,
+            .event => 1,
+            .variable => 2,
+            .net => blk: {
+                const n = Lower.payload(vir, Inst.Net, i);
+                // A VAMS discipline declaration declares no second net.
+                if (n.flags.net == .none and n.discipline != .empty) continue;
+                break :blk 3;
+            },
+            .io => 4,
+            else => continue, // else: binds no name of this table
+        };
+        const e: Entry = .{ .stage = stage, .at = l.srcOffset(f, i), .decl = i, .first = canonical(vir, i) };
+        if (stage <= 1) {
+            try entries.append(l.a, e);
+            continue;
+        }
+        // A port's net is folded into the port: it binds at the port.
+        const gop = try groups.getOrPut(l.a, e.first);
+        if (!gop.found_existing) {
+            gop.value_ptr.* = e;
+        } else if (stage == 2 and gop.value_ptr.stage != 2 or stage == 4 and gop.value_ptr.stage == 3) {
+            gop.value_ptr.* = e;
+        }
+    }
+    try entries.appendSlice(l.a, groups.values());
+    std.mem.sort(Entry, entries.items, {}, struct {
+        fn lt(_: void, x: Entry, y: Entry) bool {
+            return x.stage < y.stage or x.stage == y.stage and x.at < y.at;
+        }
+    }.lt);
+    var bound: std.AutoHashMapUnmanaged(Vir.String, Entry) = .empty;
+    for (entries.items) |e| {
+        const gop = try bound.getOrPut(l.a, nameOf(vir, e.decl));
+        if (gop.found_existing) return l.reject(f, e.decl.toRef(), "duplicate digital variable");
+        gop.value_ptr.* = e;
+        try l.bound_at.put(l.a, .{ .frame = f, .decl = e.first }, e.at);
+    }
+    for (all) |i| switch (Lower.tag(vir, i)) {
+        .function => {
+            const s = Lower.payload(vir, Inst.Function, i);
+            if (s.flags.analog or !bound.contains(s.name)) continue;
+            return l.rejectFmt(f, i.toRef(), "§10.4.2: duplicate declaration of `{s}`, a task or function name in this scope", .{vir.string(s.name)});
+        },
+        .assign => {
+            const lhs = vir.body(Lower.payload(vir, Inst.Assign, i).lhs);
+            // ponytail: a bare name only, not a concatenation's or a terminal's.
+            if (lhs.len != 1 or Lower.tag(vir, lhs[0]) != .decl_ref) continue;
+            const d = vir.instructions.items(.data)[@backingInt(lhs[0])].decl_tok.decl;
+            if (Lower.tag(vir, d) != .net) continue;
+            const e = bound.get(nameOf(vir, d)) orelse continue;
+            if (e.stage == 3 and e.at > l.srcOffset(f, lhs[0])) return l.reject(f, e.decl.toRef(), "duplicate digital variable");
+        },
+        else => {}, // else: no rule of this table reads it
+    };
 }
 
 // ---- private ----

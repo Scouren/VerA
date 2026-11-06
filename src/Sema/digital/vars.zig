@@ -91,7 +91,11 @@ pub fn variable(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Index)
     }
     if (range.len != 0) {
         if (n.ty.real) return l.refuse("a real with a range");
-        const r = try rangeOf(l, f, range);
+        // A bound that is no constant is reported at the declaration.
+        const r = rangeOf(l, f, range) catch |e| {
+            if (e == error.Rejected) l.why_at = l.srcOffset(f, first);
+            return e;
+        };
         n.msb = r.msb;
         n.lsb = r.lsb;
         n.ty.width = r.width;
@@ -114,6 +118,7 @@ pub fn param(l: *Lower, f: u32, i: Inst.Index) Error!u32 {
     // analog block's (lib/sim/digital's mixed elaboration skips them).
     if (l.options.mixed and (p.dims.len != 0 or p.flags.storage == .string)) return none;
     if (p.dims.len != 0) return l.refuse("a parameter array");
+    try paramValueRules(l, f, i, p);
     const env = try l.envAt(f);
     const value = (try env.param(i)) orelse return lateParam(l, f, i);
     var n: Name = .{ .kind = .param };
@@ -192,6 +197,9 @@ pub fn rangeOf(l: *Lower, f: u32, range: Vir.Body) Error!struct { msb: i64, lsb:
     const vir = l.virOf(f);
     const r = vir.body(range);
     const bin = Lower.payload(vir, Inst.Bin, r[r.len - 1]);
+    // §4.3.1 "msb_constant_expression … integer".
+    for ([2]Inst.Ref{ bin.lhs, bin.rhs }) |b| if (try l.constOf(f, b)) |c| if (c == .real)
+        return l.reject(f, b, "§4.3.1: a bound is a constant integer expression, not a real");
     const msb = try l.intOf(f, bin.lhs);
     const lsb = try l.intOf(f, bin.rhs);
     const width = std.math.cast(u32, @abs(@as(i128, msb) - lsb) + 1) orelse return l.refuse("a range past 2^32 bits");
@@ -256,6 +264,52 @@ pub fn finishParams(l: *Lower, p: *Program) Error!void {
 }
 
 // ---- private ----
+
+/// lib/sim/digital's rules on the value parameter `i` takes: a defparam's
+/// is constant and reaches no local parameter (§12.2); its own default
+/// names only parameters declared before it (§4.10.1), and is constant.
+/// ponytail: a `#()` override's value is elaboration's to judge.
+fn paramValueRules(l: *Lower, f: u32, i: Inst.Index, p: Inst.Param) Error!void {
+    const zcu = l.zcu;
+    const vir = l.virOf(f);
+    const k = l.frames.items[f].instance;
+    const name = vir.string(p.name);
+    const constness = @import("constness.zig");
+    for (zcu.defparam_sources.keys(), zcu.defparam_sources.values()) |dp, src| {
+        if (dp.instance != k or !std.mem.eql(u8, zcu.intern_pool.stringToSlice(dp.name), name)) continue;
+        const dvir = zcu.fileVir(src.file);
+        const di = src.src.toIndex() orelse return;
+        if (p.flags.kind == .localparam or p.flags.local) {
+            // At the defparam, as lib/sim/digital reports it.
+            l.why = try std.fmt.allocPrint(l.a, "§12.2: `{s}` is a local parameter, which a defparam cannot override", .{name});
+            const tree = l.options.sources[@backingInt(src.file)].tree;
+            // Its target's first token: back from the `=` past the path.
+            var t = tree.nodeMainToken(dvir.instructions.items(.data)[@backingInt(di)].pl_node.src_node);
+            while (t > 0 and tree.tokenTag(t - 1) != .keyword_defparam and tree.tokenTag(t - 1) != .comma) t -= 1;
+            l.why_at = tree.tokenStart(t);
+            return error.Rejected;
+        }
+        const rhs = dvir.body(Lower.payload(dvir, Inst.Assign, di).rhs);
+        if (rhs.len != 0 and try constness.offender(l, dvir, rhs[rhs.len - 1].toRef(), true) != null) return l.reject(f, i.toRef(), "a constant expression is required here");
+        return;
+    }
+    const parent = zcu.instances.items(.parent)[@backingInt(k)];
+    if (parent != .none) if (zcu.instances.items(.src)[@backingInt(k)].toIndex()) |src| {
+        const pvir = zcu.fileVir(zcu.instances.items(.module)[@backingInt(parent)].file);
+        if (Lower.tag(pvir, src) == .instance and Lower.payload(pvir, Inst.Instance, src).params.len != 0) return;
+    };
+    const b = vir.body(p.value);
+    if (b.len == 0) return;
+    const value = b[b.len - 1].toRef();
+    if (try constness.offender(l, vir, value, true)) |o| {
+        if (o.kind == .name) return l.reject(f, o.inst.toRef(), "§4.10.1: a parameter's value is a constant expression of numbers and previously defined parameters, and this name is neither");
+        return l.reject(f, i.toRef(), "a constant expression is required here");
+    }
+    // §4.10.3 "module parameters shall not be assigned a constant expression
+    // that includes any specify parameters".
+    if (p.flags.kind != .specparam and try constness.readsSpecparam(l, vir, value))
+        return l.reject(f, value, "§4.10.3: a module parameter cannot be assigned an expression that includes a specify parameter");
+}
 
 /// §12.2 the self-determined type of the expression that gave untyped
 /// parameter `i` of frame `f` its final value (`finalValue`).

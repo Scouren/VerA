@@ -52,6 +52,8 @@ pub fn compileAll(l: *Lower) Error!void {
     var early: std.ArrayList(u32) = .empty;
     var queued: std.ArrayList(u32) = .empty;
     try vars.compileParams(l);
+    // lib/sim/digital's pass two: a name is visible from its binding on.
+    l.compiling = true;
     try nets.compileDrivers(l);
     try gates.compileTrans(l);
     try sub.compileBodies(l);
@@ -90,6 +92,17 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
     const vir = l.virOf(l.frame);
     const scope = l.frames.items[l.frame].scope;
     const tg = Lower.tag(vir, i);
+    // §10.4.4: "Functions shall not contain any time-controlled statements"
+    // nor "any nonblocking assignments", nor enable tasks.
+    // An assignment is reported at its target, as lib/sim/digital does.
+    if (l.in_function) switch (tg) {
+        .store_nb => return l.reject(l.frame, Lower.payload(vir, Inst.Bin, i).lhs, "§10.4.4: a function body cannot contain a nonblocking assignment"),
+        .store_nb_timed => return l.reject(l.frame, Lower.payload(vir, Inst.Timed, i).lhs, "§10.4.4: a function body cannot contain a nonblocking assignment"),
+        .store_timed => return l.reject(l.frame, Lower.payload(vir, Inst.Timed, i).lhs, "§10.4.4: a function body cannot contain a time control"),
+        .delay, .event_wait, .wait => return l.reject(l.frame, i.toRef(), "§10.4.4: a function body cannot contain a time control"),
+        .call => return l.reject(l.frame, i.toRef(), "§10.4.4: a function cannot enable a task"),
+        else => {}, // else: a statement a function may hold
+    };
     switch (tg) {
         .block => try block(l, i, depth),
         .condbr => {
@@ -163,6 +176,7 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
             _ = try l.b.inst(if (tg == .store) .assign else .assign_nb, try place.place(l, s.lhs), try expr.evalFor(l, s.rhs, target), scope);
         },
         .trigger => {
+            if (l.in_function) return l.reject(l.frame, i.toRef(), "§10.4.4: a function body cannot contain an event trigger");
             const r = vir.instructions.items(.data)[@backingInt(i)].un_node.operand;
             // §9.7.3 an element of an event array, chosen when it runs.
             if (r.toIndex()) |ri| if (Lower.tag(vir, ri) == .elem) {
@@ -171,6 +185,9 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
                 _ = try l.b.inst(.trigger_elem, try place.elemRow(l, s), 0, scope);
                 return;
             };
+            // §9.7.3 an undeclared name is no named event.
+            if (r.toIndex()) |ri| if (Lower.tag(vir, ri) == .str_ref and l.implicit.get(.{ .frame = l.rootFrame(l.frame), .name = vir.instructions.items(.data)[@backingInt(ri)].str_tok.start }) == null)
+                return l.reject(l.frame, i.toRef(), "undeclared named event");
             const n = (try expr.nameOf(l, r)) orelse return l.reject(l.frame, r, "§9.7.3: an event array takes an index, not a part-select");
             if (n.kind != .event) return l.refuse("§5.10.4 `->` of a variable or net");
             _ = try l.b.inst(.trigger, n.slot, 0, scope);
@@ -340,6 +357,9 @@ fn caseStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
     const c = Lower.payload(vir, Inst.Case, i);
     const arms = vir.list(Inst.Arm, c.arms);
     if (arms.len == 0) return l.reject(l.frame, i.toRef(), "a case statement requires at least one item");
+    var defaults: u32 = 0;
+    for (arms) |arm| defaults += @intFromBool(arm.flags.default);
+    if (defaults > 1) return l.reject(l.frame, i.toRef(), "a case statement cannot have multiple default items");
     var ty = try expr.typeValue(l, c.operand);
     for (arms) |arm| for (vir.list(Inst.Ref, arm.values)) |v| {
         ty = expr.common(ty, try expr.typeValue(l, v));
@@ -392,6 +412,7 @@ fn process(l: *Lower, p: Proc) Error!u32 {
     const vir = l.virOf(p.frame);
     const scope = l.frames.items[p.frame].scope;
     const start = pc(l);
+    try l.proc_sites.append(l.a, .{ .pc = start, .at = l.srcOffset(p.frame, p.inst) });
     switch (p.kind) {
         .init_var => {
             // The name is bound to its first declaration (`output q; reg q = 1;`).
@@ -404,6 +425,9 @@ fn process(l: *Lower, p: Proc) Error!u32 {
             if (n.dims.len != 0) return l.reject(p.frame, p.inst.toRef(), "an unpacked array declaration takes no initializer");
             if (n.kind != .variable) return l.refuse("an initialized net port");
             const init = vir.body(init_body);
+            // §6.2.1: "The assignment shall be to a constant expression."
+            if (try @import("constness.zig").offender(l, vir, init[init.len - 1].toRef(), false) != null)
+                return l.reject(p.frame, init[init.len - 1].toRef(), "§6.2.1: a constant expression is required here");
             _ = try l.b.inst(.init_var, n.slot, try expr.evalFor(l, init[init.len - 1].toRef(), n.ty), scope);
             _ = try l.b.inst(.stop, 0, 0, scope);
         },

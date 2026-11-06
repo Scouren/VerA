@@ -163,6 +163,13 @@ fn rejection(a: std.mem.Allocator, src: []const u8) !digital.Why {
     return error.TestExpectedError;
 }
 
+/// The slot `name` (its first) declares in `lowered`, or a test failure.
+fn slotNamed(lowered: *const digital.Lowered, name: []const u8) !u32 {
+    for (lowered.slot_names, 0..) |n, k| if (std.mem.eql(u8, n, name)) return @intCast(k);
+    std.debug.print("no slot named `{s}`\n", .{name});
+    return error.TestUnexpectedResult;
+}
+
 fn isMultiArrayList(comptime T: type) bool {
     return @typeInfo(T) == .@"struct" and @hasDecl(T, "Field") and @hasDecl(T, "Slice");
 }
@@ -695,4 +702,151 @@ test "§9.22.5 driver_update fires on every assignment of a port's reg, a change
     // still 2 (§9.22 ¶3, its driver is no ordinary one). t=60 `o <= #5 0`
     // is queued: 3, and landing at 65 is no second update: still 3.
     try std.testing.expectEqualStrings("1\n2\n2\n3\n", try transcript(a, &lowered.program));
+}
+
+test "§12.3.2/§12.3.3 the root's ports for a device host: list-of-ports order, direction, slot, type, range and kind; top_at at `module`" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    // No directive: the preprocessed text is the source, offset for offset.
+    const src =
+        \\module top(a, b, c, n);
+        \\  input [3:0] a; output b; reg b; inout c; output n; integer n;
+        \\endmodule
+        \\
+    ;
+    const lowered = try lowerSource(arena_state.allocator(), src, false);
+    const p = lowered.ports;
+    try std.testing.expectEqual(@as(usize, 4), p.len);
+    // `a`: an input vector [3:0]; `b`: a scalar output reg; `c`: a scalar
+    // inout net; `n`: an `integer` output, 32 bits signed, [31:0].
+    try std.testing.expectEqualStrings("a", p[0].name);
+    try std.testing.expect(p[0].dir == .input and p[0].msb == 3 and p[0].lsb == 0 and !p[0].scalar and !p[0].integer);
+    try std.testing.expectEqual(Program.Ty.int(4, false), p[0].ty);
+    try std.testing.expectEqualStrings("b", p[1].name);
+    try std.testing.expect(p[1].dir == .output and p[1].scalar and !p[1].integer);
+    try std.testing.expectEqualStrings("c", p[2].name);
+    try std.testing.expect(p[2].dir == .inout and p[2].scalar);
+    try std.testing.expectEqualStrings("n", p[3].name);
+    try std.testing.expect(p[3].dir == .output and p[3].integer and !p[3].scalar and p[3].msb == 31 and p[3].lsb == 0);
+    try std.testing.expectEqual(Program.Ty.int(32, true), p[3].ty);
+    for (p, 0..) |x, k| for (p[0..k]) |y| try std.testing.expect(x.slot != y.slot);
+    try std.testing.expectEqualStrings("module top", src[lowered.top_at..][0.."module top".len]);
+}
+
+test "§12.2 the backends' tables: one spec per (module, parameters), each scope's spec, each slot's declared name and offset, each process's offset" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const src =
+        \\module top; wire w; reg r;
+        \\  sub #(.P(1)) a(.x(w)); sub #(.P(1)) b(.x(w)); sub #(.P(2)) c(.x(w));
+        \\  initial r = 0; assign w = r;
+        \\endmodule
+        \\module sub(x); parameter P = 0; input x; reg [P:0] q; always @(x) q = x; endmodule
+        \\
+    ;
+    const lowered = try lowerSource(arena_state.allocator(), src, false);
+    const p = &lowered.program;
+    // Three specs, by hand: top; sub with P = 1 (a and b share it); sub with P = 2.
+    const s = lowered.specs;
+    try std.testing.expectEqual(@as(usize, 3), s.len);
+    try std.testing.expectEqualStrings("top", s[0].module);
+    try std.testing.expectEqual(@as(usize, 0), s[0].ports.len);
+    for (s[1..]) |x| {
+        try std.testing.expectEqualStrings("sub", x.module);
+        try std.testing.expectEqual(@as(usize, 1), x.ports.len);
+        try std.testing.expectEqualStrings("x", x.ports[0].name);
+        try std.testing.expect(x.ports[0].dir == .input);
+    }
+    try std.testing.expect(s[1].key.params != s[2].key.params);
+    try std.testing.expectEqual(p.scopes.len, lowered.scope_spec.len);
+    const want = [_]struct { []const u8, u32 }{ .{ "top", 0 }, .{ "a", 1 }, .{ "b", 1 }, .{ "c", 2 } };
+    for (want) |w| {
+        var found = false;
+        for (p.scopes, lowered.scope_spec) |sc, spec| if (std.mem.eql(u8, p.str(sc.name), w[0])) {
+            try std.testing.expectEqual(w[1], spec);
+            found = true;
+        };
+        try std.testing.expect(found);
+    }
+    // Every declared slot carries its name and its declaration's offset:
+    // `r` once, `q` once per instance.
+    try std.testing.expectEqual(p.slots.len, lowered.slot_names.len);
+    var qs: u32 = 0;
+    var rs: u32 = 0;
+    for (lowered.slot_names, lowered.slot_at) |nm, at| {
+        if (std.mem.eql(u8, nm, "q")) qs += 1;
+        if (std.mem.eql(u8, nm, "r")) rs += 1;
+        if (nm.len != 0 and at != digital.none) try std.testing.expectEqualStrings(nm, src[at..][0..nm.len]);
+    }
+    try std.testing.expectEqual(@as(u32, 3), qs);
+    try std.testing.expectEqual(@as(u32, 1), rs);
+    // Processes: one `initial`, three `always` (one per instance), one
+    // continuous driver, at its value `r`.
+    var initials: u32 = 0;
+    var always: u32 = 0;
+    var drivers: u32 = 0;
+    for (lowered.proc_sites) |ps| {
+        try std.testing.expect(ps.pc < p.insts.len);
+        if (std.mem.startsWith(u8, src[ps.at..], "initial")) initials += 1;
+        if (std.mem.startsWith(u8, src[ps.at..], "always")) always += 1;
+        if (std.mem.startsWith(u8, src[ps.at..], "r;")) drivers += 1;
+    }
+    try std.testing.expectEqual(@as(u32, 1), initials);
+    try std.testing.expectEqual(@as(u32, 3), always);
+    try std.testing.expectEqual(@as(u32, 1), drivers);
+}
+
+test "§12.2/A.1.3/§5.5 the netlist tables: each slot's scope and declared range, each scope's instance, each instance's ports and spec, a port's header position, a spec's defaults" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    // By hand: `leaf(a, , , y)` puts y at position 4; `d` has no override,
+    // `e` a `#(2)` and `f` a defparam; `NIB - 4'd4` is 4 bits wide (§5.5:
+    // self-determined, max(4, 4)), so 3 - 4 is 4'hf and `u` is [15:0].
+    const src =
+        \\module top; wire i, o1, o2, o3; wire [-2:5] asc; wire [4:-3] desc;
+        \\  localparam NIB = 4'd3; wire [NIB - 4'd4 : 0] u;
+        \\  leaf d(i, , , o1); leaf #(2) e(i, , , o2); leaf f(i, , , o3);
+        \\  defparam f.P = 3;
+        \\endmodule
+        \\module leaf(a, , , y); parameter P = 1; input a; output y; reg [P:0] r; assign y = a; endmodule
+        \\
+    ;
+    const lowered = try lowerSource(arena_state.allocator(), src, false);
+    const p = &lowered.program;
+    try std.testing.expectEqual(p.slots.len, lowered.slot_scope.len);
+    try std.testing.expectEqual(p.slots.len, lowered.slot_msb.len);
+    try std.testing.expectEqual(p.slots.len, lowered.slot_lsb.len);
+    try std.testing.expectEqual(p.scopes.len, lowered.scope_instance.len);
+    // Ranges as declared, reversed and negative ones kept.
+    const asc = try slotNamed(&lowered, "asc");
+    try std.testing.expect(lowered.slot_msb[asc] == -2 and lowered.slot_lsb[asc] == 5);
+    const desc = try slotNamed(&lowered, "desc");
+    try std.testing.expect(lowered.slot_msb[desc] == 4 and lowered.slot_lsb[desc] == -3);
+    const u = try slotNamed(&lowered, "u");
+    try std.testing.expect(lowered.slot_msb[u] == 15 and lowered.slot_lsb[u] == 0);
+    try std.testing.expectEqual(Program.Ty.int(16, false), p.slots.items(.ty)[u]);
+    // `top`'s slots are in the root scope, row 0 of instance 0.
+    try std.testing.expectEqual(@as(u32, 0), lowered.slot_scope[asc]);
+    try std.testing.expectEqual(@as(u32, 0), lowered.scope_instance[0]);
+    // Instances in `Zcu.instances` order: top, d, e, f.
+    try std.testing.expectEqual(@as(usize, 4), lowered.instance_ports.len);
+    try std.testing.expectEqual(@as(usize, 4), lowered.instance_spec.len);
+    for (lowered.instance_ports[1..]) |ports| {
+        try std.testing.expectEqual(@as(usize, 2), ports.len);
+        try std.testing.expectEqual(@as(u32, 1), ports[0].position);
+        try std.testing.expectEqualStrings("y", ports[1].name);
+        try std.testing.expectEqual(@as(u32, 4), ports[1].position);
+    }
+    // Each leaf's `r` sits in its own instance's scope.
+    for (p.slots.items(.ty), 0..) |_, k| if (std.mem.eql(u8, lowered.slot_names[k], "r")) {
+        const inst = lowered.scope_instance[lowered.slot_scope[k]];
+        try std.testing.expect(inst >= 1 and inst <= 3);
+    };
+    // Specs: top, leaf P=1 (d: defaults), leaf P=2 (e), leaf P=3 (f).
+    const spec = lowered.specs;
+    try std.testing.expectEqual(@as(usize, 4), spec.len);
+    try std.testing.expect(spec[lowered.instance_spec[0]].defaults);
+    try std.testing.expect(spec[lowered.instance_spec[1]].defaults);
+    try std.testing.expect(!spec[lowered.instance_spec[2]].defaults);
+    try std.testing.expect(!spec[lowered.instance_spec[3]].defaults);
 }

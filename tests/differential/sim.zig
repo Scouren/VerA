@@ -3,7 +3,9 @@
 //! fixture `vera --run` judges against a golden (the `suite -- devices` and
 //! `ieee1364` sets) in, a verdict per fixture out. The new side compiles the
 //! fixture from source (vams Preprocessor, Parse, AstGen, Sema's
-//! elaboration, then `sema.digital.lower`) and runs the `Program` in
+//! elaboration, then `sema.digital.lower`), parsed and generated as
+//! vera-next does a `.v` (`discrete`, `ieee1364`: else a rule the lowering
+//! owns is refused at the parser and agrees by accident), and runs the `Program` in
 //! `std_sim`; the oracle is lib/sim/digital's own run, the product until the
 //! rewrite replaces it. A fixture agrees when both transcripts are
 //! byte-equal, both runs end the same way (completed, or a runtime error),
@@ -11,8 +13,8 @@
 //! the same files. Each fixture is compared in a child process of its
 //! own (Linux), so one that crashes either side is a difference of its
 //! own and its memory is not this test's. A `//! reject` fixture agrees when both sides refuse
-//! it: the new side at a stage before the lowering (that stage's oracle
-//! owns its codes), or the lowering raising lib/sim/digital's code with
+//! it: the new side at a stage before the lowering with the old run's first
+//! error code (as vera-next words it) at its byte, or the lowering raising lib/sim/digital's code with
 //! its message at its byte, or the run failing as the old run does; a crash,
 //! or a lowering that refuses it as unsupported, is a difference. A known difference is a line of `sim.xfail` (`<path
 //! under the fixture root> <reason>`); a listed fixture that agrees, or
@@ -44,10 +46,15 @@ const Side = struct { out: []const u8, failed: bool, why: []const u8 = "", sites
 
 /// The new side's compile, from source: the `Program` and its check sites,
 /// or why it stopped.
-/// `earlier`: a stage before the lowering raised an error; `refused`: the
+/// `earlier`: a stage before the lowering raised an error (`Early`); `refused`: the
 /// lowering does not express the design yet (or the harness cannot run
 /// it); `rejected`: the lowering raised an error (`Why.code`).
-const Compiled = union(enum) { lowered: sema.digital.Lowered, refused: []const u8, earlier: []const u8, rejected: sema.digital.Why };
+const Compiled = union(enum) { lowered: sema.digital.Lowered, refused: []const u8, earlier: Early, rejected: sema.digital.Why };
+
+/// A refusal before the lowering: which stage and why, and the first
+/// error's code (as vera-next reports it) and byte, which the old run's
+/// first error must match.
+const Early = struct { why: []const u8, code: []const u8, at: u32 };
 
 // ---- private ----
 
@@ -200,12 +207,19 @@ fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, op
     };
     const out = try a.create(vams.Preprocessor.Output);
     out.* = pp.output();
-    if (out.failed) return .{ .earlier = try a.print("the vams preprocessor refuses it ({s})", .{out.diagnostics[out.diagnostics.len - 1].code}) };
+    if (out.failed) for (out.diagnostics) |d| if (d.code[0] == 'E')
+        return .{ .earlier = .{ .why = try a.print("the vams preprocessor refuses it ({s})", .{d.code}), .code = d.code, .at = d.start } };
     const text = try a.dupeSentinel(u8, out.text, 0);
     const tree = try a.create(vams.Ast);
-    tree.* = try vams.Ast.parse(a, text, .{ .keywords = std.meta.stringToEnum(vams.Ast.KeywordSet, @tagName(opts.language)).? });
-    if (tree.errors.len != 0) return .{ .earlier = try a.print("the vams parser refuses it ({t})", .{tree.errors[0].tag}) };
-    const vir = try vams.AstGen.generate(a, tree, .{ .directives = out.directives });
+    tree.* = try vams.Ast.parse(a, text, .{ .keywords = std.meta.stringToEnum(vams.Ast.KeywordSet, @tagName(opts.language)).?, .discrete = true });
+    if (tree.errors.len != 0) {
+        var w: vams.Diag.Wip = .init(a);
+        try vams.Ast.parse_errors.report(tree, &w);
+        const d = try w.toOwnedBundle();
+        const m = d.message(d.messages()[0]);
+        return .{ .earlier = .{ .why = try a.print("the vams parser refuses it ({t})", .{tree.errors[0].tag}), .code = @tagName(m.tag.code), .at = m.loc.start } };
+    }
+    const vir = try vams.AstGen.generate(a, tree, .{ .directives = out.directives, .ieee1364 = true });
     // `SIM_DUMP=1` with `SIM_ONLY`: the fixture's Vir on stderr.
     if (std.process.Environ.getPosix(std.testing.environ, "SIM_DUMP") != null) {
         var dump: std.Io.Writer.Allocating = .init(a);
@@ -214,14 +228,27 @@ fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, op
     }
     for (vir.diag.messages()) |m| {
         const code = vir.diag.message(m).tag.code;
-        if (@tagName(code)[0] == 'E') return .{ .earlier = try a.print("AstGen refuses it ({t})", .{code}) };
+        // vera-next's IEEE 1364 route words E0376 as lib/sim/digital's E1100.
+        if (@tagName(code)[0] == 'E') return .{ .earlier = .{ .why = try a.print("AstGen refuses it ({t})", .{code}), .code = if (code == .E0376) "E1100" else @tagName(code), .at = vir.diag.message(m).loc.start } };
     }
     var zcu: Zcu = try .init(a);
     const file = try zcu.addFile(path, vir, 0);
     if (std.mem.find(u8, source, "//@ libmap") != null or std.mem.find(u8, source, "//@ liblist") != null)
         try libraries(a, &zcu, file, tree, out.unit_starts, opts);
     try sema.Sema.elaborate(&zcu, .{ .roots = .all, .ieee1364 = true });
-    for (zcu.failed.items(.code)) |code| if (@tagName(code)[0] == 'E') return .{ .earlier = try a.print("elaboration refuses it ({t})", .{code}) };
+    const zf = zcu.failed.slice();
+    for (zf.items(.code), zf.items(.src), zf.items(.rule), zf.items(.part)) |code, src, rule, part| if (@tagName(code)[0] == 'E') {
+        // vera-next's IEEE 1364 route reports a `Rule` under lib/sim/digital's
+        // code (src/next/Compilation/legacy.zig's `rule`, mirrored).
+        const as: []const u8 = switch (rule) {
+            .none => @tagName(code),
+            .defparam_unknown => "E0907",
+            .config => "E0243",
+            .defparam_nothing => "E0901",
+            else => "E1100", // else: legacy.zig's catch-all
+        };
+        return .{ .earlier = .{ .why = try a.print("elaboration refuses it ({t})", .{code}), .code = as, .at = if (sema.locate.part(tree, &vir, src, part)) |span| span.bytes(tree).start else 0 } };
+    };
     var why: sema.digital.Why = .{};
     const lowered = sema.digital.lower(a, &zcu, .{ .sources = &.{.{ .tree = tree, .pp = out }} }, &why) catch |e| switch (e) {
         error.Unsupported => return .{ .refused = try a.print("lowering: {s}", .{why.text}) },
@@ -284,7 +311,7 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
     const reject = negative(source);
     switch (compiled) {
         .refused => |why| return why,
-        .earlier => |why| if (!reject) return why,
+        .earlier => |e| if (!reject) return e.why,
         .rejected, .lowered => {},
     }
 
@@ -317,7 +344,14 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
     };
     const lowered = switch (compiled) {
         .lowered => |l| l,
-        .earlier => |why| return if (old.failed) "" else std.fmt.allocPrint(a, "old run completed, new {s}", .{why}),
+        // An earlier stage's refusal agrees only with the old run's first
+        // error: its code at its byte.
+        .earlier => |e| {
+            const f = first orelse return std.fmt.allocPrint(a, "old run completed, new {s}", .{e.why});
+            if (!std.mem.eql(u8, @tagName(f.code), e.code) or f.at != e.at)
+                return std.fmt.allocPrint(a, "old {t} at byte {d}: {s}; new {s} at byte {d}: {s}", .{ f.code, f.at, f.message, e.code, e.at, e.why });
+            return "";
+        },
         .rejected => |why| {
             const f = first orelse return std.fmt.allocPrint(a, "old run completed, the new lowering raised {t} at byte {d}: {s}", .{ why.code, why.at, why.text });
             // Two code enums (lib/diag's and vams'), one catalogue: compared by name.

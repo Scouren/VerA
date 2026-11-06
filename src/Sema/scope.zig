@@ -6,8 +6,11 @@
 //! access function's two arguments are E0355 (§3.11: "It shall be an error
 //! to connect two ports or nets of the same domain with incompatible
 //! disciplines"). A net with no declared discipline, or ground, is not
-//! judged here.
-//! Cites: VAMS-2023 §3.6.5, §3.11, §3.11.1, §3.12, §7.4.4.
+//! judged here. A port joining a `wreal` to a net type other than wire,
+//! tri or wreal is E0919 (§3.7: "A wreal ... can only be connected to
+//! ... wire, tri and wreal"). On the IEEE 1364 route a port joined to a
+//! net of a type Table 12-1 marks "warn" is W1160 (§12.3.10).
+//! Cites: VAMS-2023 §3.6.5, §3.7, §3.11, §3.11.1, §3.12, §7.4.4.
 //!
 //! Contents:
 //! - `pub fn run(s: *Sema, file: Zcu.File.Index) Allocator.Error!void`
@@ -23,13 +26,16 @@ const discipline = @import("discipline.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const payloadOf = walk.payloadOf;
+const resolve = @import("resolve.zig");
+const NetKind = Inst.NetKind;
 
 /// A net of one module: the module's declaration row and the net's name.
 const Key = struct { module: u32, name: Vir.String };
 
 /// Checks every user module of `file`: E0902 for each second discipline
 /// declaration, module by module in source order, then E0355 for each
-/// branch and access call, in instruction order.
+/// branch and access call, in instruction order, then E0919 for each
+/// module's instances in source order.
 pub fn run(s: *Sema, file: Zcu.File.Index) Allocator.Error!void {
     const before = s.zcu.failed.len;
     defer assert(s.zcu.failed.len >= before);
@@ -70,6 +76,7 @@ pub fn run(s: *Sema, file: Zcu.File.Index) Allocator.Error!void {
             try s.failRule(.{ .note = note }, .E0902, file, i.toRef(), "`{s}` is already of discipline `{s}`", .{ vir.string(name), vir.string(gop.value_ptr.*) });
         };
     }
+    try wrealPorts(s, file);
     if (discs.count() < 2) return;
     const tags = vir.instructions.items(.tag);
     for (tags, 0..) |tag, k| {
@@ -110,6 +117,122 @@ pub fn run(s: *Sema, file: Zcu.File.Index) Allocator.Error!void {
 }
 
 // ---- private ----
+
+/// §3.7 E0919 for each connection of each user module's instances in
+/// `file` that joins a wreal to a net of a type other than wire or tri.
+/// A name the parent never declared is a variable or an implicit wire.
+fn wrealPorts(s: *Sema, file: Zcu.File.Index) Allocator.Error!void {
+    const zcu = s.zcu;
+    const vir = zcu.fileVir(file);
+    for (vir.decls(), 0..) |row, k| {
+        if (row.kind != .module and row.kind != .macromodule and row.kind != .connectmodule) continue;
+        if (zcu.isBuiltin(.{ .file = file, .index = @fromBackingInt(@intCast(k)) })) continue;
+        const m = payloadOf(vir, Inst.Module, row.inst);
+        for (vir.body(m.body)) |i| {
+            if (vir.instructions.items(.tag)[@backingInt(i)] != .instance) continue;
+            const ins = payloadOf(vir, Inst.Instance, i);
+            const child = zcu.modules.get(try zcu.intern_pool.getString(s.gpa, vir.string(ins.target))) orelse continue;
+            if (zcu.declRow(child).kind == .primitive) continue;
+            const cvir = zcu.fileVir(child.file);
+            const cm = payloadOf(cvir, Inst.Module, zcu.declRow(child).inst);
+            const header = cvir.body(cm.ports);
+            const conns = vir.list(Inst.Arg, ins.conns);
+            for (conns, 0..) |c, n| {
+                const value = vir.body(c.value);
+                if (value.len == 0) continue;
+                // §12.3.10 a select of one net still joins the port to it.
+                const whole, const ref = switch (vir.instructions.items(.tag)[@backingInt(value[value.len - 1])]) {
+                    .decl_ref => .{ true, value[value.len - 1] },
+                    .elem, .slice, .slice_up, .slice_down => |t| sel: {
+                        const sel_at = value[value.len - 1];
+                        const base = if (t == .elem) payloadOf(vir, Inst.Bin, sel_at).lhs else payloadOf(vir, Inst.Triple, sel_at).a;
+                        const at = base.toIndex() orelse continue;
+                        if (vir.instructions.items(.tag)[@backingInt(at)] != .decl_ref) continue;
+                        break :sel .{ false, at };
+                    },
+                    else => continue, // else: only a net or a select of one joins a port to a net
+                };
+                const outer_decl = vir.instructions.items(.data)[@backingInt(ref)].decl_tok.decl;
+                const outer_name = declName(vir, outer_decl) orelse continue;
+                const outer = kindOf(vir, m, vir.string(outer_name)) orelse continue;
+                const formal = if (c.name == .empty) (if (n < header.len) header[n] else continue) else for (header) |h| {
+                    if (std.mem.eql(u8, resolve.portName(cvir, h), vir.string(c.name))) break h;
+                } else continue;
+                const port_name = resolve.portName(cvir, formal);
+                const inner = kindOf(cvir, cm, resolve.internalName(cvir, formal)) orelse .wire;
+                if (s.config.ieee1364 and warnCell(inner, outer))
+                    try s.fail(.W1160, child.file, formal.toRef(), "§12.3.10: a `{t}` port joined to a `{t}` net is a Table 12-1 warn cell of the net type table", .{ inner, outer });
+                if (!whole or (outer == .wreal) == (inner == .wreal)) continue;
+                const other = if (outer == .wreal) inner else outer;
+                if (other == .wire or other == .tri) continue;
+                try s.failRule(.{ .part = .{ .conn = @intCast(n) } }, .E0919, file, i.toRef(), "`{s}` is a {t} and port `{s}` is a {t}", .{ vir.string(outer_name), outer, port_name, inner });
+            }
+        }
+    }
+}
+
+/// IEEE 1364-2005 §12.3.10 Table 12-1: whether a port of net type
+/// `internal` joined to a net of type `external` is a "warn" cell.
+fn warnCell(internal: NetKind, external: NetKind) bool {
+    const Col = enum { wire, wand, wor, trireg, tri0, tri1, uwire, supply0, supply1, other };
+    const col = struct {
+        fn of(k: NetKind) Col {
+            return switch (k) {
+                .wire, .tri, .none, .ground => .wire,
+                .wand, .triand => .wand,
+                .wor, .trior => .wor,
+                .trireg => .trireg,
+                .tri0 => .tri0,
+                .tri1 => .tri1,
+                .uwire => .uwire,
+                .supply0 => .supply0,
+                .supply1 => .supply1,
+                .wreal => .other,
+            };
+        }
+    }.of;
+    const warns: []const Col = switch (col(internal)) {
+        .wire, .other => &.{},
+        .wand => &.{ .wor, .trireg, .tri0, .tri1, .uwire },
+        .wor => &.{ .wand, .trireg, .tri0, .tri1, .uwire },
+        .trireg => &.{ .wand, .wor, .uwire },
+        .tri0 => &.{ .wand, .wor, .tri1, .uwire },
+        .tri1 => &.{ .wand, .wor, .tri0, .uwire },
+        .uwire => &.{ .wand, .wor, .trireg, .tri0, .tri1 },
+        .supply0 => &.{.supply1},
+        .supply1 => &.{.supply0},
+    };
+    // Table 12-1's diagonal never warns.
+    assert(std.mem.findScalar(Col, warns, col(internal)) == null);
+    return std.mem.findScalar(Col, warns, col(external)) != null;
+}
+
+/// The name a net or port declaration declares, or null for another
+/// instruction.
+fn declName(vir: *const Vir, i: Inst.Index) ?Vir.String {
+    return switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .io => payloadOf(vir, Inst.Io, i).name,
+        .net => payloadOf(vir, Inst.Net, i).name,
+        else => null, // else: only these declare a net
+    };
+}
+
+/// The net type module `m` declares `name` with (a port declaration
+/// without one is a wire), or null when it declares no net of the name.
+fn kindOf(vir: *const Vir, m: Inst.Module, name: []const u8) ?NetKind {
+    var found: ?NetKind = null;
+    for ([_]Vir.Body{ m.ports, m.body }) |b| for (vir.body(b)) |i| {
+        const n, const kind = switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+            .io => .{ payloadOf(vir, Inst.Io, i).name, payloadOf(vir, Inst.Io, i).flags.net },
+            .net => .{ payloadOf(vir, Inst.Net, i).name, payloadOf(vir, Inst.Net, i).flags.net },
+            else => continue, // else: only these declare a net
+        };
+        if (!std.mem.eql(u8, vir.string(n), name)) continue;
+        if (kind != .none) return if (kind == .ground) .wire else kind;
+        found = .wire;
+    };
+    return found;
+}
 
 /// The value a body ends in, or none for an empty body.
 fn last(vir: *const Vir, b: Vir.Body) Inst.Ref {

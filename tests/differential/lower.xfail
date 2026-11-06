@@ -463,7 +463,6 @@ verilog-ams/annex_a_syntax/specify_paths_design_runs.va tables row 8: old `param
 verilog-ams/annex_a_syntax/specparam_declaration_unsupported.va tables row 2: old `param tdr real local = 1.5e0`, new `contrib flow direct br0 p n`
 verilog-ams/annex_a_syntax/specparam_module_item_value.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
 verilog-ams/annex_a_syntax/specparam_range_and_select.va tables row 1: old `param code integer local = 10`, new `param b1 integer = 0`
-verilog-ams/annex_a_syntax/task_declaration_enabled_from_initial.va tables row 1: old `param level integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/annex_a_syntax/timing_checks_design_runs.va tables row 4: old `param u.tSU integer local = 10`, new `node 4 u.clk net`
 verilog-ams/annex_c_analog_subset/casex_accepted.va codes: old {}, new E0512 (E0512: `casex`/`casez` in an analog body)
 verilog-ams/annex_c_analog_subset/casez_accepted.va codes: old {}, new E0512 (E0512: `casex`/`casez` in an analog body)

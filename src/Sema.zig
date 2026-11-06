@@ -428,17 +428,8 @@ fn configRoots(s: *Sema, roots: *std.ArrayList(Zcu.Decl)) Allocator.Error!bool {
         for (vir.decls(), 0..) |d, k| if (d.kind == .config)
             try configs.append(s.arena, .{ .vir = vir, .c = vir.extraData(Inst.Config, vir.instructions.items(.data)[@backingInt(d.inst)].pl_node.payload_index), .decl = .{ .file = file, .index = @fromBackingInt(@intCast(k)) } });
     }
-    const root_at = for (configs.items, 0..) |cfg, k| {
-        const name = cfg.vir.string(cfg.c.name);
-        const named = named: {
-            for (configs.items) |other| for (other.vir.list(Vir.String, other.c.rules)) |r| {
-                const w = try ruleWords(s, other.vir.string(r));
-                if (w.len == 4 and std.mem.eql(u8, w[2], "use") and std.mem.endsWith(u8, w[3], ":config") and std.mem.eql(u8, cellOf(w[3]), name)) break :named true;
-            };
-            break :named false;
-        };
-        if (!named) break k;
-    } else return false;
+    if (configs.items.len == 0) return false;
+    const root_at = (try library.rootConfig(s, configs.items)) orelse return false;
     const root = configs.items[root_at];
     if (zcu.decl_lib.count() != 0) {
         try library.roots(s, configs.items, @intCast(root_at), roots);

@@ -9,7 +9,7 @@
 //! Cites: VAMS-2023 §6.3.1, §7.8.5; IEEE 1364-2005 §12.2.1, §12.5, §12.8.1.
 //!
 //! Contents:
-//! - `pub const Dp`, `pub const Waiting`, `pub const Row`, `pub const Origin`, `pub const Late`
+//! - `pub const Dp`, `pub const Source`, `pub const Waiting`, `pub const Row`, `pub const Origin`, `pub const Late`
 //! - `pub fn reportUnused(s: *Sema, waiting: Waiting) Allocator.Error!void`
 //! - `pub fn waitingFor(s: *Sema, waiting: Waiting, parent: Instance.Index, name: []const u8) Allocator.Error![]const Dp`
 //! - `pub fn applyDefparams(s: *Sema, env: *Env, dps: []const Dp, module: Vir.String) Allocator.Error!void`
@@ -45,6 +45,9 @@ pub const Waiting = struct { rows: []const Row, origins: []Origin };
 
 /// A defparam waiting for its target below `anchor`, `rel` the path to it.
 pub const Row = struct { anchor: Instance.Index, rel: []const u8, param: []const u8, value: InternPool.Index, origin: u32 };
+
+/// A defparam's place in the source, which names it across passes.
+pub const Source = struct { file: Zcu.File.Index, src: Inst.Ref };
 
 /// A defparam as written, for E0907 when it never reaches a parameter.
 pub const Origin = struct { file: Zcu.File.Index, src: Inst.Ref, text: []const u8, writer: []const u8, used: bool = false };
@@ -163,12 +166,41 @@ pub fn collect(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index,
     const param = if (dot) |d| text.items[d + 1 ..] else text.items;
     var rel = if (dot) |d| text.items[0..d] else "";
     var anchor = index;
-    if (upward and std.mem.startsWith(u8, rel, "$root.")) rel = rel["$root.".len..];
+    const key: Source = .{ .file = file, .src = i.toRef() };
+    var up = upward;
+    if (s.config.ieee1364 and !up and rel.len != 0) if (headBlock(vir, lhs[lhs.len - 1].toRef())) |b| {
+        const head = rel[0 .. std.mem.findAny(u8, rel, ".[") orelse rel.len];
+        // IEEE 1364-2005 §12.8.2: a head that names a generate block not
+        // instantiated now resolves as an upward name; once the block is,
+        // the name resolves differently, which is an error.
+        if (!w.prefixes.contains(b)) {
+            if (upwardAnchor(w, index, head) != null) {
+                up = true;
+                try w.went_up.put(s.arena, key, {});
+            }
+        } else if (w.went_up.contains(key)) {
+            w.origins.items[origin].used = true;
+            return s.failRule(.{ .rule = .defparam_early, .part = .target }, .E1100, file, i.toRef(), "this defparam's hierarchical name was resolved before the hierarchy was complete and would resolve differently once it is (IEEE 1364-2005 12.8.2)", .{});
+        }
+    };
+    if (s.config.ieee1364 and up and rel.len == 0 and env.named(param) == null and env.systemNamed(param) == null) {
+        // §12.2.1 a one-name defparam that no declaration here names.
+        w.origins.items[origin].used = true;
+        return s.failRule(.{ .rule = .defparam_nothing, .name = text.items, .part = .target }, .E0901, file, i.toRef(), "§12.2.1: this defparam's hierarchical name `{s}` names nothing in the design", .{text.items});
+    }
+    if (s.config.ieee1364 and up and rel.len != 0) if (outsideElement(w, index, rel)) |element| {
+        // §12.2.1 "a defparam statement in a hierarchy in or under ... an
+        // array of instances ... shall not change a parameter value outside
+        // that hierarchy".
+        w.origins.items[origin].used = true;
+        return s.failRule(.{ .rule = .defparam_outside, .name = element, .part = .target }, .E1100, file, i.toRef(), "a defparam inside `{s}` cannot change a parameter outside the array element it is in (IEEE 1364-2005 12.2.1)", .{element});
+    };
+    if (up and std.mem.startsWith(u8, rel, "$root.")) rel = rel["$root.".len..];
     // A head that names no ancestor names a child this module does not
     // declare: a §7.8.5 connect module insertion makes (`a__cm__d.p`).
-    if (upward) if (upwardAnchor(w, index, rel[0 .. std.mem.findAny(u8, rel, ".[") orelse rel.len])) |up| {
+    if (up) if (upwardAnchor(w, index, rel[0 .. std.mem.findAny(u8, rel, ".[") orelse rel.len])) |at| {
         const head_end = std.mem.findAny(u8, rel, ".[") orelse rel.len;
-        anchor = up;
+        anchor = at;
         rel = if (head_end < rel.len and rel[head_end] == '.') rel[head_end + 1 ..] else rel[head_end..];
     };
     // IEEE 1364-2005 §12.8.1: a defparam of its own instance's parameter
@@ -300,6 +332,43 @@ fn render(w: *Walk, env: *Env, r: Inst.Ref, out: *std.ArrayList(u8)) Allocator.E
         },
         else => return null, // else: no other expression is a hierarchical name
     }
+}
+
+/// The generate block a defparam target's head names (`blk` of
+/// `blk.u.p`), or null when it names something else.
+fn headBlock(vir: *const Vir, r: Inst.Ref) ?Inst.Index {
+    var at = r;
+    // Bounded by the target's depth: each turn moves to an operand.
+    for (0..1 << 12) |_| {
+        const i = at.toIndex() orelse return null;
+        switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+            .field => at = payloadOf(vir, Inst.Field, i).operand,
+            .elem => at = payloadOf(vir, Inst.Bin, i).lhs,
+            .decl_ref => {
+                const d = vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl;
+                return if (vir.instructions.items(.tag)[@backingInt(d)] == .gen_block) d else null;
+            },
+            else => return null, // else: no other expression is a hierarchical name
+        }
+    }
+    return null;
+}
+
+/// The array element, `from` or an ancestor (`u[0]`), whose array an
+/// upward path `rel` with a selected head (`u[1].x`) names: the element the
+/// defparam may not reach out of; null otherwise.
+fn outsideElement(w: *Walk, from: Instance.Index, rel: []const u8) ?[]const u8 {
+    const head_end = std.mem.findAny(u8, rel, ".[") orelse return null;
+    if (rel[head_end] != '[') return null;
+    const head = rel[0..head_end];
+    const zcu = w.zcu;
+    var it = from;
+    while (it != .none) : (it = zcu.instances.items(.parent)[@backingInt(it)]) {
+        const n = zcu.intern_pool.stringToSlice(zcu.instances.items(.name)[@backingInt(it)]);
+        const last = if (std.mem.findScalarLast(u8, n, '.')) |d| n[d + 1 ..] else n;
+        if (last.len > head.len and std.mem.startsWith(u8, last, head) and last[head.len] == '[') return last;
+    }
+    return null;
 }
 
 fn moduleName(zcu: *const Zcu, i: Instance.Index) []const u8 {

@@ -46,13 +46,19 @@ pub fn inst(tree: *const Ast, vir: *const Vir, src: Inst.Ref) ?Span {
 
 /// Where part `p` of instance `src` was written, as the old elaborators
 /// located it: the first token of its k-th connection or parameter value
-/// (a named one's `.`; `value` its expression), a defparam's target name,
+/// (a named one's `.`; `value` its expression), a defparam's target name
+/// or value,
 /// an attribute spec's name; the instruction itself for `.whole`, or when
 /// the part cannot be found.
 pub fn part(tree: *const Ast, vir: *const Vir, src: Inst.Ref, p: Zcu.Part) ?Span {
     const k: u32, const list_open: ?Token = switch (p) {
         .whole => return inst(tree, vir, src),
         .target => return .{ .token = target(tree, vir, src) orelse return inst(tree, vir, src) },
+        .rule => |k| return .{ .token = rule(tree, vir, src, k) orelse return inst(tree, vir, src), .point = true },
+        .rhs => {
+            const eq = instToken(tree, vir, src) orelse return null;
+            return if (tree.tokenTag(eq) == .equal) .{ .token = eq + 1 } else inst(tree, vir, src);
+        },
         .attr => |k| return .{ .token = attr(tree, vir, src, k) orelse return inst(tree, vir, src) },
         .conn => |k| .{ k, connOpen(tree, vir, src) },
         .param, .value => |k| .{ k, paramOpen(tree, vir, src) },
@@ -127,6 +133,20 @@ fn attr(tree: *const Ast, vir: *const Vir, src: Inst.Ref, k: u32) ?Token {
         },
         else => {},
     };
+    return null;
+}
+
+/// The first token of configuration `src`'s k-th rule: the statement after
+/// its `config name;` and its `design` statement; null past `endconfig`.
+fn rule(tree: *const Ast, vir: *const Vir, src: Inst.Ref, k: u32) ?Token {
+    var t = instToken(tree, vir, src) orelse return null;
+    var semis: u32 = 0;
+    // Bounded by the token count: each turn moves one token on.
+    while (tree.tokenTag(t) != .eof and tree.tokenTag(t) != .keyword_endconfig) : (t += 1) {
+        if (tree.tokenTag(t) != .semicolon) continue;
+        semis += 1;
+        if (semis == k + 2) return t + 1;
+    }
     return null;
 }
 

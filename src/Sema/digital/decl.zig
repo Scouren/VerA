@@ -221,6 +221,13 @@ fn instance(w: *Walk, k: u32) Error!void {
     // connects one external port at a time instead.
     const rows = zcu.instances.items(.ports)[k];
     const formals = vir.body(m.ports);
+    // §12.3.2 each external port name once in the list of ports.
+    for (formals, 0..) |p, at| if (externalName(vir, p)) |nm| {
+        for (formals[0..at]) |q| if (externalName(vir, q) == nm) {
+            const v = vir.body(Lower.payload(vir, Inst.Port, p).value);
+            return l.rejectFmt(f, if (v.len != 0) v[v.len - 1].toRef() else p.toRef(), "§12.3.2: a port defined twice in the list of ports: `{s}`", .{vir.string(nm)});
+        };
+    };
     // VAMS §7.8 a connection through a bridge to a continuous net is that
     // bridge's segment: a bridged port's, and the bridge's own ports'.
     // A primitive terminal's upper net is always continuous (connect.zig).
@@ -259,6 +266,31 @@ fn instance(w: *Walk, k: u32) Error!void {
     try items(w, f, scope, if (m.flags.ansi) m.ports else .empty, m.body, "");
 }
 
+/// The external name list-of-ports entry `p` gives explicitly (§12.3.2):
+/// `.name(…)`; null for an implicit port (`a`, `a[7:4]`), which may repeat.
+fn externalName(vir: *const Vir, p: Inst.Index) ?Vir.String {
+    if (Lower.tag(vir, p) != .port) return null;
+    const port = Lower.payload(vir, Inst.Port, p);
+    if (port.name == .empty) return null;
+    const v = vir.body(port.value);
+    if (v.len == 0) return port.name;
+    var x = v[v.len - 1];
+    var steps: usize = 0;
+    while (steps < vir.instructions.len) : (steps += 1) switch (Lower.tag(vir, x)) {
+        // A port whose expression's base is its own name is implicit
+        // (`a`, `a[7:4]`): listing a net twice that way is legal. ponytail:
+        // `.a(a)` written twice reads as implicit, as Vir keeps no `.`.
+        .decl_ref => {
+            const base = vir.string(Lower.payload(vir, Inst.Name, vir.instructions.items(.data)[@backingInt(x)].decl_tok.decl).name);
+            return if (std.mem.eql(u8, base, vir.string(port.name))) null else port.name;
+        },
+        .elem => x = Lower.payload(vir, Inst.Bin, x).lhs.toIndex() orelse return port.name,
+        .slice, .slice_up, .slice_down => x = Lower.payload(vir, Inst.Triple, x).a.toIndex() orelse return port.name,
+        else => return port.name, // else: an explicit `.name(expression)`
+    };
+    return port.name;
+}
+
 /// One scope's items: header ports (ANSI) and declarations first, so a
 /// later item can name any of them, then processes, generate blocks and
 /// child instances in source order.
@@ -281,6 +313,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
         if (!gop.found_existing) gop.value_ptr.* = .empty;
         try gop.value_ptr.append(l.a, i);
     }
+    try redecl.bindOrder(l, f, all);
     for (later.values()) |decls| try redecl.check(l, f, decls.items, .module, w.list);
     const top = l.frames.items[f].parent == none;
     if (top and l.options.mixed) w.domain = try domain_mod.of(l.a, vir, body, w.index == 0);

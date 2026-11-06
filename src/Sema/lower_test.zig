@@ -444,3 +444,18 @@ test "§5.2.1 an analog initial body runs under the host's first-evaluation flag
     try std.testing.expectEqual(@as(usize, 1), countTag(&o, .cond_br));
     try std.testing.expectEqual(@as(f64, 0), try o.value(0, 0, &.{1.0}));
 }
+
+test "§7.3.1/A.2.7 a variable only a task writes is digital-owned: a card row the host writes, not an analog zero" {
+    // The old side's discrete_input.zig: a task is enabled only from the
+    // discrete context, so its body's writes are the digital half's.
+    var o = try lower(
+        \\module m(p); inout p; electrical p; integer level;
+        \\  task set_twice; input integer k; level = 2 * k; endtask
+        \\  initial set_twice(5);
+        \\  analog I(p) <+ V(p) * level;
+        \\endmodule
+    );
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{}, o.codes);
+    try std.testing.expect(std.mem.find(u8, o.tables, "param level\n") != null);
+}

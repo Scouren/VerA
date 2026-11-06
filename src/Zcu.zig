@@ -22,7 +22,7 @@
 //! (the last cell of a name).
 //!
 //! Contents:
-//! - fields `gpa`, `intern_pool`, `files`, `modules`, `paramsets`, `disciplines`, `natures`, `instances`, `instance_map`, `ports`, `defparams`, `defparam_sources`, `net_discipline`, `inserts`, `failed`
+//! - fields `gpa`, `intern_pool`, `files`, `modules`, `paramsets`, `disciplines`, `natures`, `instances`, `instance_map`, `ports`, `defparams`, `defparam_sources`, `net_discipline`, `inserts`, `failed`, `netlist_modules`, `netlist_unsupported`
 //! - `pub const File` (`File.Index`), `pub const Decl` (`none`), `pub const Instance` (`Index`, `Key`), `pub const Port`, `pub const Defparam`, `pub const DefparamSource`, `pub const NetKey`, `pub const Insert`, `pub const Failure`, `pub const Rule`, `pub const Part`
 //! - `pub const SystemParam` (`fromName`, `initial`, `allows`, `domain`), `pub const Hier`, `pub const PathFormatter`
 //! - `pub const instances_max: u32`
@@ -98,6 +98,13 @@ shape_params: std.AutoArrayHashMapUnmanaged(InternPool.String, void) = .empty,
 decl_lib: std.AutoHashMapUnmanaged(Decl, InternPool.String) = .empty,
 /// §13.5.1/§13.7.1 the library search order under a map (borrowed).
 lib_order: []const InternPool.String = &.{},
+/// Annex E.2 the modules the SPICE netlist stands for (borrowed): an
+/// instance names one regardless of case (E.2.1, SPICE is case-insensitive)
+/// when no declaration matches it exactly.
+netlist_modules: []const Decl = &.{},
+/// E.1.2 the netlist's `.MODEL`s of an unsupported type, `name type` each
+/// (borrowed): an instance of one is E0952, not E0904.
+netlist_unsupported: []const []const u8 = &.{},
 
 /// One source file's analysis: its path and its Vir, which the caller
 /// owns and keeps alive as long as the `Zcu`.

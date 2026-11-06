@@ -49,6 +49,34 @@ const timeout_s = 300;
 /// Most files a run may write that are compared.
 const files_max: u32 = 1 << 12;
 
+/// The diagnostics of a rendered stream: each from its headline to the
+/// next headline or the end.
+const Blocks = struct {
+    text: []const u8,
+    at: usize = 0,
+
+    fn next(it: *Blocks) ?[]const u8 {
+        const start = headline(it.text, it.at) orelse return null;
+        const end = headline(it.text, start + 1) orelse it.text.len;
+        it.at = end;
+        // A rendered diagnostic ends at its blank line; a summary may follow.
+        const blank = std.mem.find(u8, it.text[start..end], "\n\n") orelse end - start;
+        return it.text[start..][0..blank];
+    }
+
+    /// The offset of the first `error[`/`warning[` line at or after `from`.
+    fn headline(text: []const u8, from: usize) ?usize {
+        var k = from;
+        // Bounded by the text's length: each turn moves one line on.
+        while (k < text.len) {
+            const line_start = k == 0 or text[k - 1] == '\n';
+            if (line_start and (std.mem.startsWith(u8, text[k..], "error[") or std.mem.startsWith(u8, text[k..], "warning["))) return k;
+            k = (std.mem.findScalarPos(u8, text, k, '\n') orelse return null) + 1;
+        }
+        return null;
+    }
+};
+
 /// Runs `exe args` in `work` (created fresh, removed after) and returns
 /// what it printed and wrote, in `arena`.
 pub fn run(arena: Allocator, io: Io, exe: []const u8, args: []const []const u8, work: []const u8, env: *const std.process.Environ.Map) !Run {
@@ -110,7 +138,7 @@ pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool) ![]const u8 {
     // the device's §9.4 display phase (`$strobe`), which the Zig device
     // backend has not got yet.
     if (!digital and old.status == new.status and dropped(old.stderr, new.stderr)) return "rw-codegen (display phase)";
-    if (a.len != 0 and !std.mem.eql(u8, old.stderr, new.stderr)) return try std.fmt.allocPrint(arena, "{s} {s}", .{ ownerOf(a[0], digital), part(old.stderr, new.stderr) });
+    if (a.len != 0 and !std.mem.eql(u8, old.stderr, new.stderr)) return try std.fmt.allocPrint(arena, "{s} {s}", .{ ownerOf(firstChanged(old.stderr, new.stderr) orelse a[0], digital), part(old.stderr, new.stderr) });
     return if (digital) "rw-dlower (digital lowering)" else "rw-lower (analog lowering)";
 }
 
@@ -193,6 +221,37 @@ fn part(a: []const u8, b: []const u8) []const u8 {
         return "location";
     }
     return "notes";
+}
+
+/// The code of the first diagnostic of `a` whose rendering differs from
+/// the same code's same occurrence in `b` (the stage that changed it),
+/// or null when every one matches and only their order differs.
+fn firstChanged(a: []const u8, b: []const u8) ?[]const u8 {
+    var blocks = Blocks{ .text = a };
+    // Bounded by `a`'s length: each turn takes one diagnostic.
+    while (blocks.next()) |x| {
+        if (codeOf(x).len == 0) continue;
+        var seen: u32 = 0;
+        var mine = Blocks{ .text = a };
+        while (mine.next()) |m| {
+            if (m.ptr == x.ptr) break;
+            if (std.mem.eql(u8, codeOf(m), codeOf(x))) seen += 1;
+        }
+        var theirs = Blocks{ .text = b };
+        const y = while (theirs.next()) |t| {
+            if (!std.mem.eql(u8, codeOf(t), codeOf(x))) continue;
+            if (seen == 0) break t;
+            seen -= 1;
+        } else return codeOf(x);
+        if (!std.mem.eql(u8, x, y)) return codeOf(x);
+    }
+    return null;
+}
+
+/// A diagnostic block's code (`E0405`), or empty.
+fn codeOf(block: []const u8) []const u8 {
+    const open = std.mem.findScalar(u8, block, '[') orelse return "";
+    return if (block.len >= open + 7 and block[open + 6] == ']') block[open + 1 .. open + 6] else "";
 }
 
 /// The codes of a rendered stream's headlines (`error[E0405]:`), in order.

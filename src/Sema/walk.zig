@@ -34,6 +34,7 @@ const InternPool = @import("intern_pool");
 const Sema = @import("../Sema.zig");
 const Zcu = @import("../Zcu.zig");
 const cycle = @import("cycle.zig");
+const netlist = @import("netlist.zig");
 const eval = @import("eval.zig");
 const paramset = @import("paramset.zig");
 const discipline = @import("discipline.zig");
@@ -266,6 +267,7 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     const m = vir.extraData(Inst.Module, vir.instructions.items(.data)[@backingInt(row.inst)].pl_node.payload_index);
     var env: Env = try .init(s.gpa, s.arena, &zcu.intern_pool, vir, &.{ m.params, m.body });
     defer env.deinit();
+    if (netlist.inNetlist(zcu, p.parent)) try netlist.respell(s, &env, w.givens.items[picked.givens.start..][0..picked.givens.len]);
     try applyGivens(s, &env, p.file, p.src, w.givens.items[picked.givens.start..][0..picked.givens.len], p.quiet, row.name);
     // A paramset instance's defparams name the paramset's parameters.
     if (std.meta.eql(picked.paramset, Zcu.Decl.none)) try defparams.applyDefparams(s, &env, dps, row.name);

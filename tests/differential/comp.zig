@@ -18,7 +18,9 @@
 //! The `.v` backends' runs (`v_options`: diff-digital-exe, diff-rtlil,
 //! diff-digital-device) take every `.v` fixture through `--emit-exe` (then
 //! the binary it built), `--emit-rtlil` or `--check` in place of `--run`,
-//! each against its own list (`tests/differential/<name>.xfail`).
+//! each against its own list (`tests/differential/<name>.xfail`) and
+//! rulings (`<name>.rulings`); a `--check` ruling's tiebreaker runs the
+//! device the new side builds (`comp/device.zig`).
 //! No LRM clause: this checks VerA's rewrite against VerA.
 //!
 //! Contents: tests only.
@@ -32,6 +34,7 @@ const options = @import("comp_options");
 const v_run = @import("v_options");
 const fixture = @import("comp/fixture.zig");
 const judge = @import("comp/judge.zig");
+const device = @import("comp/device.zig");
 const Fixture = fixture.Fixture;
 
 /// One fixture's outcome.
@@ -100,7 +103,7 @@ fn runAll() !void {
         // Absolute: each child runs in a directory of its own.
         .exe_old = try Io.Dir.cwd().realPathFileAlloc(io, options.vera, arena),
         .exe_new = try Io.Dir.cwd().realPathFileAlloc(io, options.vera_next, arena),
-        .rulings = if (v_run.flag.len == 0) try readRulings(arena, io) else .empty,
+        .rulings = try readRulings(arena, io),
         .j1_every = if (options.j1_sample == 0 or v_run.flag.len != 0) std.math.maxInt(u32) else @max(1, @as(u32, @intCast(picked.items.len)) / options.j1_sample),
     };
     const t0 = Io.Clock.awake.now(io);
@@ -164,8 +167,11 @@ fn one(arena: Allocator, s: *Shared, k: u32) !Outcome {
     new.stderr = try std.mem.replaceOwned(u8, arena, new.stderr, root, "");
     const why = (try judge.compare(arena, old, new, f.lang == .verilog)) orelse return .agree;
     if (s.rulings.get(f.rel)) |clause| {
-        if (try tiebreak(arena, s.io, f, new)) return .{ .ruled = clause };
-        return .{ .differ = .{ .owner = "comp.rulings", .why = try std.fmt.allocPrint(arena, "the ruling ({s}) does not hold: the new side misses the fixture's own verdict; {s}", .{ clause, why }) } };
+        const miss: ?[]const u8 = if (std.mem.eql(u8, v_run.flag, "--check"))
+            try deviceTiebreak(arena, s, f, new, args, try std.fmt.allocPrint(arena, "{s}/{d}-d", .{ s.work, k }))
+        else if (try tiebreak(arena, s.io, f, new)) null else "the new side misses the fixture's own verdict";
+        if (miss == null) return .{ .ruled = clause };
+        return .{ .differ = .{ .owner = v_run.name ++ ".rulings", .why = try std.fmt.allocPrint(arena, "the ruling ({s}) does not hold: {s}; {s}", .{ clause, miss.?, why }) } };
     }
     return .{ .differ = .{ .owner = try judge.owner(arena, old, new, f.lang == .verilog), .why = why } };
 }
@@ -251,9 +257,19 @@ fn tiebreak(arena: Allocator, io: Io, f: Fixture, new: judge.Run) !bool {
     return std.mem.eql(u8, gold, new.stdout);
 }
 
-/// `comp.rulings`: `<path> <clause and reason>` lines, `#` comments.
+/// diff-digital-device's tiebreaker: the old side failed the design, and
+/// the new side's device builds and runs it as `--run` does
+/// (`comp/device.zig`); a `//! reject` fixture's `--run` must fail too.
+/// Null when it holds, else why not.
+fn deviceTiebreak(arena: Allocator, s: *Shared, f: Fixture, new: judge.Run, args: []const []const u8, work: []const u8) !?[]const u8 {
+    if (new.status != 0) return "the new side builds no device";
+    return device.agrees(arena, s.io, s.env, s.exe_new, options.repo_root, args, work, f.reject);
+}
+
+/// The run's rulings (`<name>.rulings`): `<path> <clause and reason>`
+/// lines, `#` comments.
 fn readRulings(arena: Allocator, io: Io) !std.StringHashMapUnmanaged([]const u8) {
-    const path = try std.fs.path.join(arena, &.{ options.repo_root, "tests/differential/comp.rulings" });
+    const path = try std.fs.path.join(arena, &.{ options.repo_root, "tests/differential/" ++ v_run.name ++ ".rulings" });
     const text = Io.Dir.cwd().readFileAlloc(io, path, arena, .limited(1 << 22)) catch |e| switch (e) {
         error.FileNotFound => return .empty,
         else => return e,

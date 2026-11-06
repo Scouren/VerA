@@ -84,6 +84,45 @@ pub fn add(g: Graph, all: *Build.Step) void {
     b.step("exe-run", "A .v --emit-exe binary prints what vera-next --run prints, byte for byte").dependOn(&exe_run.step);
     all.dependOn(&exe_run.step);
 
+    // vdev-next: tests/host/vdev_host.zig's hand-derived host oracles over
+    // the `.v` devices vera-next writes (`std_sim.Device`), as `devices`
+    // runs them over the old ones (build/devices.zig).
+    const vdev = g.m.make("tests/host/vdev_host.zig", &.{.{ .name = "contract", .module = byName(g.mods, "contract") }});
+    for ([_][]const u8{ "v_inv", "v_buf", "v_count", "v_a2d", "v_edge", "v_any", "v_wide", "v_huge", "v_say" }) |name| {
+        const gen = b.addRunArtifact(next);
+        gen.addArg("--emit-zig");
+        gen.addFileArg(b.path(b.fmt("tests/conformance/tests/verilog-ams/ch07_mixed_signal/{s}.v", .{name})));
+        gen.addArg("-o");
+        vdev.addImport(name, b.createModule(.{
+            .root_source_file = gen.addOutputFileArg2(b.fmt("{s}.zig", .{name}), .{}),
+            .target = g.m.target,
+            .optimize = g.m.optimize,
+            .imports = &.{ .{ .name = "contract", .module = byName(g.mods, "contract") }, .{ .name = "std_sim", .module = byName(g.mods, "std_sim") } },
+        }));
+    }
+    const vdev_run = testRun(b, "vdev-next", vdev, g.runner, g.results_dir);
+    const vdev_step = b.step("vdev-next", "tests/host/vdev_host.zig over the .v devices vera-next writes (std_sim.Device), and the old device's refusals");
+    vdev_step.dependOn(&vdev_run.step);
+    all.dependOn(&vdev_run.step);
+    // The old device's refusals, byte for byte (build/devices.zig's rows).
+    for ([_]struct { []const u8, u8, []const u8 }{
+        .{ "v_inout", 1, "error[E1103]: design cannot be a contract device: module `v_inout`: an inout port" },
+        .{ "v_integer", 1, "error[E1103]: design cannot be a contract device: module `v_integer`: an integer or time port" },
+        .{ "v_pins", 1, "error[E1103]: design cannot be a contract device: module `v_pins`: more than 65535 pins" },
+        .{ "v_tran", 1, "error[E1103]: design cannot be a contract device: module `v_tran`: a §7.6 pass switch" },
+        .{ "v_seconds", 0, "warning[W1155]: device digital tick is 1 s" },
+    }) |r| {
+        const run = b.addRunArtifact(next);
+        run.addArg("--emit-zig");
+        run.addFileArg(b.path(b.fmt("tests/conformance/tests/verilog-ams/ch07_mixed_signal/{s}.v", .{r[0]})));
+        run.addArg("-o");
+        _ = run.addOutputFileArg2("device.zig", .{});
+        run.expectExitCode(r[1]);
+        run.addCheck(.{ .expect_stderr_match = r[2] });
+        vdev_step.dependOn(&run.step);
+        all.dependOn(&run.step);
+    }
+
     // conformance-next: the suite's harness with vera-next as the tool.
     const conform = b.addExecutable(.{ .name = "conform", .root_module = b.createModule(.{ .target = g.m.target, .optimize = .ReleaseSafe, .link_libc = true }) });
     conform.root_module.addCSourceFile(.{ .file = b.path("tests/conformance/harness/conform.c"), .flags = &.{ "-std=gnu11", "-D_GNU_SOURCE" } });

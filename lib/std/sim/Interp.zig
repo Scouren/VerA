@@ -19,6 +19,7 @@ const Allocator = std.mem.Allocator;
 const Program = @import("Program.zig");
 const State = @import("State.zig");
 const eval = @import("eval.zig");
+const small = @import("small.zig");
 const logic = @import("logic.zig");
 const display = @import("display.zig");
 const resolve = @import("resolve.zig");
@@ -42,6 +43,12 @@ const Literal = logic.Literal;
 /// region 3b) or an explicit D2A term occurred (§8.5.3.6 region 1b).
 pub const Stop = enum { idle, analog, explicit_d2a };
 
+/// Steps (instructions or events) between two resets of a scratch arena.
+/// Nothing a step allocates outlives it. A reset costs about as much as a
+/// short step, so it runs once per this many (on an LFSR, resetting every
+/// step was 8% of the run).
+const tidy_every = 64;
+
 /// Whether a process goes on after an instruction.
 const Flow = enum { next, ended };
 
@@ -56,8 +63,9 @@ pub fn run(s: *State) Error!void {
 /// Dispatches every event at a time <= `limit`, then returns with only later
 /// work queued; a later call resumes.
 pub fn runUntil(s: *State, limit: u64) Error!Stop {
+    var since: u32 = 0;
     while (s.scheduler.nextUntil(limit)) |event| {
-        _ = s.scratch.reset(.retain_capacity);
+        since = tidy(&s.scratch, since);
         if (event.time != s.budget_time) {
             s.budget_time = event.time;
             s.budget_used = 0;
@@ -79,8 +87,9 @@ pub fn runUntil(s: *State, limit: u64) Error!Stop {
             },
             .write => |w| {
                 const n = Program.words(w.width);
-                const planes = try a.dupe(u64, row.buf[0 .. 2 * n]);
-                try eval.write(s, a, w.slot, w.sel, .{ .width = w.width, .signed = w.signed, .sized = true, .planes = planes });
+                // The row is not free until this dispatch ends: its buffer
+                // stays put while the write wakes and queues.
+                try eval.write(s, a, w.slot, w.sel, .{ .width = w.width, .signed = w.signed, .sized = true, .planes = row.buf[0 .. 2 * n] });
             },
             .strobe => |show| try display.show(s, a, show, 0),
             .fstrobe => |at| try files.fshow(s, a, at),
@@ -151,11 +160,12 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
     const datas = p.insts.items(.data);
     var pc = start;
     var restarted = false;
+    var since: u32 = 0;
     while (true) {
         assert(pc < p.insts.len);
         // §10.3 a disabled subroutine's activations return at once.
         if (s.unwind != null) return;
-        _ = scratch.reset(.retain_capacity);
+        since = tidy(scratch, since);
         const a = scratch.allocator();
         const d = datas[pc];
         switch (tags[pc]) {
@@ -165,7 +175,11 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
                 pc += 1;
             },
             .assign, .assign_nb => {
-                try eval.put(s, a, d.a, try eval.eval(s, a, d.b), tags[pc] == .assign_nb, null);
+                // A value of at most 64 bits lives here: every landing copies it.
+                var planes: [2]u64 = undefined;
+                const ty = p.exprs.items(.ty)[d.b];
+                const value = if (small.fits(ty)) small.literal(&planes, try small.value(s, a, d.b), ty) else try eval.eval(s, a, d.b);
+                try eval.put(s, a, d.a, value, tags[pc] == .assign_nb, null);
                 pc += 1;
             },
             .delay => {
@@ -352,6 +366,14 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
 }
 
 // ---- private ----
+
+/// Counts one step on `scratch`, resetting it every `tidy_every`.
+fn tidy(scratch: *std.heap.ArenaAllocator, since: u32) u32 {
+    assert(since <= tidy_every);
+    if (since < tidy_every) return since + 1;
+    _ = scratch.reset(.retain_capacity);
+    return 1;
+}
 
 /// One pass back to the top of an untimed loop counts against the step's
 /// budget, so `initial forever x = 1;` is refused by name.

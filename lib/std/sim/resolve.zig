@@ -69,6 +69,26 @@ const Switches = struct {
 /// A transition's delay and §14.6.1 reject and error limits.
 const Timed = struct { ticks: u64, reject: u64, err: u64 };
 
+/// Per bit of one word, which values `foldUniform`'s drivers assert.
+const Seen = struct {
+    zero: u64 = 0,
+    one: u64 = 0,
+    x: u64 = 0,
+
+    fn add(seen: *Seen, v: u64, x: u64) void {
+        seen.zero |= ~v & ~x;
+        seen.one |= v & ~x;
+        seen.x |= v & x;
+    }
+
+    /// The resolved (value, unknown) planes of the `live` bits.
+    fn word(seen: Seen, live: u64) [2]u64 {
+        const unknown = seen.x | (seen.zero & seen.one);
+        const none = ~(seen.zero | seen.one | seen.x);
+        return .{ (seen.one | unknown) & live, (unknown | none) & live };
+    }
+};
+
 /// Driver `at`'s turn at pc `pc` (`.continuous`): its value now, published
 /// at once or after its delay, and the driver armed again.
 pub fn continuous(s: *State, a: Allocator, at: u32, pc: u32) Error!void {
@@ -185,7 +205,13 @@ pub fn resolve(s: *State, a: Allocator, net: u32) Error!void {
     // §7.10/§7.11: a MOS switch passes its data's strength, so a change of
     // strength alone on a net one reads re-evaluates that switch.
     var moved = false;
-    for (0..width) |i| {
+    const plain = !n.strength_read and switch (n.kind) {
+        .wire, .tri, .uwire => true,
+        // A pull, a wired table, a trireg's charge or a wreal's own rule.
+        .tri0, .tri1, .supply0, .supply1, .wand, .wor, .triand, .trior, .trireg, .wreal => false,
+    } and uniform(s, drivers, width);
+    if (plain) foldUniform(s, drivers, resolved);
+    for (0..if (plain) 0 else width) |i| {
         const at: u32 = @intCast(i);
         var acc: Signal = .{};
         for (drivers) |d| {
@@ -567,4 +593,60 @@ fn chargeState(s: *State, net: u32, floating: bool) Error!void {
     const after = s.p.nets[net].decay;
     if (after == Program.Net.no_decay) return;
     s.decay_event[net] = try s.enqueue(.{ .decay = net }, after, false);
+}
+
+/// Whether `drivers` (of a net `width` bits wide) resolve word by word:
+/// each full width, none an H/L, none at highz, and one driver or all at
+/// one strength on both sides. Then Table 7-14's `combine` of a bit is the
+/// value they agree on, x where two disagree or one is x, z where all are.
+fn uniform(s: *const State, drivers: []const u32, width: u32) bool {
+    assert(drivers.len < std.math.maxInt(u32));
+    if (drivers.len == 0) return false;
+    const first = drivers[0];
+    for (drivers) |d| {
+        if (s.drv_or_z[d] or s.p.drivers[d].width != width) return false;
+        if (s.drv_s0[d] == .highz or s.drv_s1[d] == .highz) return false;
+        if (drivers.len == 1) break;
+        if (s.drv_s0[d] != s.drv_s1[d] or s.drv_s0[d] != s.drv_s0[first]) return false;
+    }
+    return true;
+}
+
+/// `resolve`'s per-bit fold over `uniform` drivers, a word at a time.
+fn foldUniform(s: *const State, drivers: []const u32, resolved: Literal) void {
+    const n = Program.words(resolved.width);
+    for (resolved.values(), resolved.unknowns(), 0..) |*v, *x, w| {
+        var acc: Seen = .{};
+        for (drivers) |d| {
+            const c = current(s, d);
+            acc.add(c.values()[w], c.unknowns()[w]);
+        }
+        const live = logic.wordMask(resolved.width, w);
+        v.*, x.* = acc.word(live);
+    }
+    assert(resolved.values().len == n);
+}
+
+test Seen {
+    // Oracle: `Signal.combine` folded bit by bit and collapsed, as
+    // `resolve` does, over 1 to 4 strong drivers of random four-state words.
+    var prng: std.Random.DefaultPrng = .init(7);
+    const r = prng.random();
+    for (0..500) |_| {
+        const k = r.intRangeAtMost(usize, 1, 4);
+        var vs: [4]u64 = undefined;
+        var xs: [4]u64 = undefined;
+        var seen: Seen = .{};
+        for (vs[0..k], xs[0..k]) |*v, *x| {
+            v.* = r.int(u64);
+            x.* = r.int(u64);
+            seen.add(v.*, x.*);
+        }
+        const got = seen.word(std.math.maxInt(u64));
+        for (0..64) |i| {
+            var acc: Signal = .{};
+            for (vs[0..k], xs[0..k]) |v, x| acc = acc.combine(.of(logic.planeBit(v >> @intCast(i), x >> @intCast(i)), .strong, .strong));
+            try std.testing.expectEqual(acc.collapse(), logic.planeBit(got[0] >> @intCast(i), got[1] >> @intCast(i)));
+        }
+    }
 }

@@ -125,7 +125,15 @@ pub fn bindOrder(l: *Lower, f: u32, all: []const Inst.Index) Error!void {
         gop.value_ptr.* = e;
         try l.bound_at.put(l.a, .{ .frame = f, .decl = e.first }, e.at);
     }
+    var gates: std.AutoHashMapUnmanaged(Vir.String, void) = .empty;
     for (all) |i| switch (Lower.tag(vir, i)) {
+        // §7.1.5 one instance identifier, one range: a gate array named twice.
+        .instance => {
+            const in = Lower.payload(vir, Inst.Instance, i);
+            if (in.flags.kind != .gate or in.name == .empty) continue;
+            if ((try gates.getOrPut(l.a, in.name)).found_existing)
+                return l.rejectFmt(f, i.toRef(), "§7.1.5: `{s}` names two instances; one instance identifier has one range", .{vir.string(in.name)});
+        },
         .function => {
             const s = Lower.payload(vir, Inst.Function, i);
             if (s.flags.analog or !bound.contains(s.name)) continue;

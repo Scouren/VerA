@@ -320,6 +320,7 @@ pub fn compileDrivers(l: *Lower) Error!void {
     @memset(runs, .empty);
     for (l.wires.items, 0..) |w, k| try runs[w.net].append(l.a, @intCast(k));
     for (l.nets.items, runs) |*n, run| n.drivers = try l.b.listOf(run.items);
+    for (l.nets.items, runs) |n, run| if (n.kind == .uwire) try uwireDrivers(l, n, run.items);
 }
 
 /// The net bits lvalue operand `r` names: a whole net (or net array
@@ -403,6 +404,30 @@ pub fn delayOf(l: *Lower, d: Delay3, rows: *[3]u32) Error!net.Delay {
 }
 
 // ---- private ----
+
+/// §4.6.6 "a uwire net accepts a single driver per bit": two drivers of
+/// net `n` writing one bit, reported at its declaration as lib/sim/digital
+/// does. A port window drives its bits; any other driver the whole net.
+fn uwireDrivers(l: *Lower, n: NetRow, run: []const u32) Error!void {
+    for (run, 0..) |a, k| for (run[k + 1 ..]) |b| {
+        const x = driverBits(l.wires.items[a], n.width);
+        const y = driverBits(l.wires.items[b], n.width);
+        if (!(x[0] < y[1] and y[0] < x[1])) continue;
+        for (l.declared.items) |d| if (d.slot == n.slot) {
+            l.why_at = l.srcOffset(d.frame, d.decl);
+            break;
+        };
+        l.why = "a uwire net accepts a single driver per bit";
+        return error.Rejected;
+    };
+}
+
+fn driverBits(w: Wire, width: u32) [2]u32 {
+    return switch (w.source) {
+        .bridge => |b| .{ b.dst_lo, b.dst_lo + b.width },
+        else => .{ 0, width }, // else: a driver of the whole net
+    };
+}
 /// lib/sim/digital's refusal of lvalue `r`, a variable, as `sink_use` drives it.
 fn notNet(l: *Lower, r: Inst.Ref) Error {
     return switch (l.sink_use) {

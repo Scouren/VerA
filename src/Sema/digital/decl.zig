@@ -238,6 +238,18 @@ fn instance(w: *Walk, k: u32) Error!void {
         // A bridge's every port takes the bridged port's connection: its
         // continuous one is skipped (`analogNet`), its discrete one joins it.
         const actual: Inst.Ref = if (bridge) |b| b.actual else if (rows.len == 0) .none else zcu.ports.items(.actual)[rows.start + at];
+        // §12.3.7: "The real data type shall not be directly connected to a port."
+        if (bridge == null and !l.options.mixed) if (actual.toIndex()) |ai| {
+            const pf = w.placed[k].frame;
+            const pvir = l.virOf(pf);
+            if (Lower.tag(pvir, ai) == .decl_ref) {
+                const rd = canonical(pvir, pvir.instructions.items(.data)[@backingInt(ai)].decl_tok.decl);
+                if (Lower.tag(pvir, rd) == .variable) switch (Lower.payload(pvir, Inst.Variable, rd).flags.storage) {
+                    .real, .realtime => return l.reject(pf, actual, "§12.3.7: a real cannot be connected to a port"),
+                    else => {}, // else: an integral variable
+                };
+            }
+        };
         const conn: ports.Conn = .{
             .actual = actual,
             .frame = if (actual == .none) none else w.placed[k].frame,

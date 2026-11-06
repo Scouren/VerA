@@ -6,14 +6,11 @@
 # line goes.
 verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v old run failed (E1100: §3.8: an attribute value must be a constant expression), new run completed
 verilog/03_lexical_conventions/escaped_system_task_rejected.v lowering: a hierarchical task or function name
-verilog/04_data_types/type_uwire_multiple_drivers_rejected.v old run failed (E1100: a uwire net accepts a single driver per bit), new run completed
 verilog/05_expressions/native_wide_index_bound_limit.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
-verilog/07_gate_switch_level/split_array_rejected.v old run failed (E1100: §7.1.5: `t_nand` names two instances; one instance identifier has one range), new run completed
 verilog/10_tasks_functions/constant_function_hierarchical_rejected.v old run failed (E1100: §10.4.5: a function called during elaboration is a constant function, and it contains a hierarchical reference), new run completed
 verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v old run failed (E1100: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element it is in), new run completed
 verilog/12_hierarchy/defparam_across_generate_instances_rejected.v old run failed (E1100: §12.2.1: a defparam inside `somename[0]` cannot change a parameter outside the generate block instance or array element it is in), new run completed
 verilog/12_hierarchy/port_width_mismatch_vams_rejected.v old run failed (E1100: §6.5.7.1: the sizes of the port and the net connected to it shall match), new run completed
-verilog/12_hierarchy/real_connected_to_port_rejected.v old run failed (E1100: §12.3.7: a real cannot be connected to a port), new run completed
 verilog/12_hierarchy/unnamed_block_referenced_rejected.v old run failed (E1100: undeclared instance in a hierarchical reference), new run completed
 verilog/13_configuration/cell_not_in_its_library_rejected.v old run failed (E1100: undeclared module in instantiation: library `gateLib` holds no cell `top`), new run completed
 verilog/13_configuration/config_in_map_rejected.v a `//@` line the cli refuses

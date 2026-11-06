@@ -399,6 +399,7 @@ fn process(l: *Lower, p: Proc) Error!u32 {
     const vir = l.virOf(p.frame);
     const scope = l.frames.items[p.frame].scope;
     const start = pc(l);
+    try l.proc_sites.append(l.a, .{ .pc = start, .at = l.srcOffset(p.frame, p.inst) });
     switch (p.kind) {
         .init_var => {
             // The name is bound to its first declaration (`output q; reg q = 1;`).

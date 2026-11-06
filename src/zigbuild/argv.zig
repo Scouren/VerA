@@ -127,6 +127,12 @@ pub const Options = struct {
     /// libc. Null builds for the detected native target, which inside a Nix
     /// sandbox is musl.
     target: ?[]const u8 = null,
+    /// Most `zig` children alive at once in a split build; null is the CPU
+    /// count. Each child holds the whole device's analysis in memory, so a
+    /// split of 3 parts and 64 setup chunks spawned at once could exhaust a
+    /// machine's RAM. Not in the artifact key: it decides no byte of the
+    /// library.
+    jobs: ?u32 = null,
 };
 
 /// `-lc` for every library VerA builds on a dynamic-linking host: a host

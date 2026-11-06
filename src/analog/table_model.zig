@@ -279,20 +279,21 @@ fn readTableFile(
     missing: ?*bool,
 ) Oom!?TableFile {
     assert(e == .none or self.exprValid(e));
-    const io = std.Io.Threaded.global_single_threaded.io();
-    const dir: std.Io.Dir = .cwd();
+    const no_bound = std.math.maxInt(usize);
     const text = blk: {
         for (self.opts.include_dirs) |base| {
             const full = try std.fs.path.join(self.arena, &.{ base, name });
             // No size bound but memory: a data file is numbers, not text the
             // lexer addresses (§9.21.1 bounds nothing about it).
-            const r = dir.readFileAlloc(io, full, self.arena, .unlimited) catch |e2| {
+            const read = if (self.opts.files) |f| f.read(full, no_bound) else error.FileNotFound;
+            const r = read catch |e2| {
                 if (e2 == error.OutOfMemory) return error.OutOfMemory;
                 continue; // try the next dir, exactly as `readInclude` does
             };
             break :blk r;
         }
-        const r = dir.readFileAlloc(io, name, self.arena, .unlimited) catch |e2| {
+        const read = if (self.opts.files) |f| f.read(name, no_bound) else error.FileNotFound;
+        const r = read catch |e2| {
             if (e2 == error.OutOfMemory) return error.OutOfMemory;
             if (missing) |m| {
                 m.* = true;

@@ -28,7 +28,7 @@
 //! - `pub const Synthesized = struct`
 //! - `pub const File = struct`
 //! - `pub const Refusal = struct`
-//! - `pub fn synthesize(arena: Allocator, netlist: []const u8, path: []const u8) Allocator.Error!Synthesized`
+//! - `pub fn synthesize(arena: Allocator, netlist: []const u8, path: []const u8, disk: ?*Files) Allocator.Error!Synthesized`
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -41,6 +41,7 @@ const spice_expr = @import("spice/expr.zig");
 const spice_model = @import("spice/model.zig");
 const spice_names = @import("spice/names.zig");
 const spice_reader = @import("spice/reader.zig");
+const Files = @import("Files.zig");
 const Card = spice_card.Card;
 const Refusals = spice_card.Refusals;
 const model_types = spice_card.model_types;
@@ -141,12 +142,14 @@ const fuzz_words = [_][]const u8{ ".subckt", ".ends", ".model", ".param", ".endl
 /// Returns Verilog-AMS module text for every `.MODEL` and `.SUBCKT` card in
 /// `netlist`, the text of the file `path` names ("" when it names none:
 /// relative `.INCLUDE`/`.LIB`/`.HDL` names then resolve against the working
-/// directory). The text, the refusals and the files are allocated from
+/// directory). Every file a card names is read through `disk` (null: none
+/// is, and each is a refusal). The text,
+/// the refusals and the files are allocated from
 /// `arena`; the working copies (the lowered lines, the joined cards, per-card
 /// strings) live on a scratch arena freed on return. Never fails on malformed
 /// input: a line outside a definition this does not understand contributes
 /// nothing, and one inside a definition is a `Refusal`.
-pub fn synthesize(arena: Allocator, netlist: []const u8, path: []const u8) Allocator.Error!Synthesized {
+pub fn synthesize(arena: Allocator, netlist: []const u8, path: []const u8, disk: ?*Files) Allocator.Error!Synthesized {
     if (netlist.len == 0) return .{};
     var scratch_state: std.heap.ArenaAllocator = .init(std.heap.page_allocator);
     defer scratch_state.deinit();
@@ -154,7 +157,7 @@ pub fn synthesize(arena: Allocator, netlist: []const u8, path: []const u8) Alloc
     var refusals: Refusals = .{ .arena = arena };
 
     // Every line of every file, `.INCLUDE`/`.LIB` expanded in place.
-    var r: Reader = .{ .arena = arena, .scratch = scratch, .refusals = &refusals };
+    var r: Reader = .{ .arena = arena, .scratch = scratch, .refusals = &refusals, .disk = disk };
     try r.files.append(arena, .{ .name = if (path.len == 0) "<spice netlist>" else path, .text = netlist });
     try r.read(0, null);
     assert(r.reading.items.len == 0); // every `read` pops what it pushed
@@ -284,7 +287,7 @@ fn expectRefusals(refused: []const Refusal, wants: []const []const u8) !void {
 fn synthesizeAll(gpa: Allocator, netlist: []const u8) !void {
     var arena_state: std.heap.ArenaAllocator = .init(gpa);
     defer arena_state.deinit();
-    _ = try synthesize(arena_state.allocator(), netlist, "");
+    _ = try synthesize(arena_state.allocator(), netlist, "", null);
 }
 
 fn synthesizeOne(_: void, s: *std.testing.Smith) anyerror!void {
@@ -296,7 +299,7 @@ fn synthesizeOne(_: void, s: *std.testing.Smith) anyerror!void {
     }
     var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena_state.deinit();
-    const out = try synthesize(arena_state.allocator(), w.buffered(), "");
+    const out = try synthesize(arena_state.allocator(), w.buffered(), "", null);
     // Every refusal points inside the file it names, and a module count
     // comes with module text.
     for (out.refused) |r| {
@@ -348,7 +351,7 @@ test "a .MODEL card becomes a module with the primitive's ports, a .SUBCKT with 
         \\R1 B1 GND 10K
         \\.ENDS ECPOSC
         \\.TRAN 1N 100N $ skipped, not diagnosed
-    , "");
+    , "", null);
     try std.testing.expectEqual(@as(u32, 2), s.modules);
     try std.testing.expectEqual(@as(usize, 0), s.refused.len);
     // E.2.2.1: ports AND parameters from the bjt primitive, in Table E.1's
@@ -383,7 +386,7 @@ test "a .SUBCKT's device cards are its body, and an unreadable one is refused" {
         \\R3 A B RMOD
         \\.ENDS RDIV
         \\R9 X Y 1K
-    , "");
+    , "", null);
     try std.testing.expectEqual(@as(u32, 1), s.modules);
     try std.testing.expect(std.mem.find(u8, s.text, "resistor #(.r(1000)) r1(in, out);") != null);
     try std.testing.expect(std.mem.find(u8, s.text, "resistor #(.r(3000)) r2(out, gnd);") != null);
@@ -407,7 +410,7 @@ test "a .SUBCKT's device cards are its body, and an unreadable one is refused" {
         \\.SUBCKT PAD A B
         \\R1 A B 9K
         \\.ENDS
-    , "");
+    , "", null);
     try std.testing.expectEqual(@as(u32, 1), dup.modules);
     try std.testing.expect(std.mem.find(u8, dup.text, "9000") == null);
 }
@@ -420,7 +423,7 @@ test "a .MODEL card's value reaches the Table E.1 parameter of the same name" {
     const s = try synthesize(arena,
         \\.MODEL RMOD R R=10K TC1=1E-3
         \\.MODEL CM C C=1P IC=2.5
-    , "");
+    , "", null);
     try std.testing.expectEqual(@as(u32, 2), s.modules);
     // §2.6.2 Table 2-1 by way of E.2.2.3's `resistor #(.r(10k))`: `10K` is 10000.
     // §3.4.2's `from` range survives the substitution: it belongs to the
@@ -472,7 +475,7 @@ test "a card naming a keyword is declared as a §2.8.1 escaped identifier" {
         \\.SUBCKT AMP (INPUT OUTPUT)
         \\.ENDS AMP
         \\.MODEL WIRE NPN BF=80
-    , "");
+    , "", null);
     try std.testing.expectEqual(@as(u32, 2), s.modules);
     // The terminator is the point: `\input,` would scan the comma into the
     // name (§2.8.1 ends at white space, and `,` is printable ASCII).
@@ -480,7 +483,7 @@ test "a card naming a keyword is declared as a §2.8.1 escaped identifier" {
     try std.testing.expect(std.mem.find(u8, s.text, "electrical \\input , \\output ;") != null);
     try std.testing.expect(std.mem.find(u8, s.text, "module \\wire (c, b, e, s);") != null);
     // A name that is not a keyword is not escaped.
-    const plain = try synthesize(arena, ".SUBCKT PAD IN OUT\n.ENDS\n", "");
+    const plain = try synthesize(arena, ".SUBCKT PAD IN OUT\n.ENDS\n", "", null);
     try std.testing.expect(std.mem.find(u8, plain.text, "module pad(in, out);") != null);
 }
 
@@ -493,7 +496,7 @@ test "a digit-leading name and a numeric node are spelled §2.8.1, not dropped" 
         \\.MODEL 2N2222 NPN BF=200
         \\.SUBCKT FLT A 1 B
         \\.ENDS FLT
-    , "");
+    , "", null);
     try std.testing.expectEqual(@as(u32, 2), s.modules);
     // E.2 treats the model as a module definition even though `2N2222` fails
     // §2.7's identifier shape.
@@ -504,7 +507,7 @@ test "a digit-leading name and a numeric node are spelled §2.8.1, not dropped" 
     try std.testing.expect(std.mem.find(u8, s.text, "electrical a, \\1 , b;") != null);
     // A parameter assignment ends the port list: it is a module parameter
     // (HSPICE's PARAMS:, VD-012), not a port.
-    const p = try synthesize(arena, ".SUBCKT X N1 N2 PARAMS: W=2\n.ENDS\n", "");
+    const p = try synthesize(arena, ".SUBCKT X N1 N2 PARAMS: W=2\n.ENDS\n", "", null);
     try std.testing.expectEqual(@as(u32, 1), p.modules);
     try std.testing.expectEqual(@as(usize, 0), p.refused.len);
     try std.testing.expect(std.mem.find(u8, p.text, "module x(n1, n2);") != null);
@@ -516,17 +519,17 @@ test "an unrecognised model type, a repeat and an empty netlist all contribute n
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    try std.testing.expectEqual(@as(u32, 0), (try synthesize(arena, "", "")).modules);
-    const sw = try synthesize(arena, ".MODEL SW1 SW RON=1\n", "");
+    try std.testing.expectEqual(@as(u32, 0), (try synthesize(arena, "", "", null)).modules);
+    const sw = try synthesize(arena, ".MODEL SW1 SW RON=1\n", "", null);
     try std.testing.expectEqual(@as(u32, 0), sw.modules);
     // E.1.2: kept by name and type, so its instance is refused as such.
     try std.testing.expectEqual(@as(usize, 1), sw.unsupported.len);
     try std.testing.expectEqualStrings("sw1 sw", sw.unsupported[0]);
-    try std.testing.expectEqual(@as(u32, 0), (try synthesize(arena, "R1 a b 1k\n.TRAN 1n 1u\n", "")).modules);
-    const dup = try synthesize(arena, ".MODEL M1 NPN\n.MODEL M1 PNP\n", "");
+    try std.testing.expectEqual(@as(u32, 0), (try synthesize(arena, "R1 a b 1k\n.TRAN 1n 1u\n", "", null)).modules);
+    const dup = try synthesize(arena, ".MODEL M1 NPN\n.MODEL M1 PNP\n", "", null);
     try std.testing.expectEqual(@as(u32, 1), dup.modules);
     // A portless .SUBCKT is A.1.2's `module identifier ;`, not `electrical ;`.
-    const bare = try synthesize(arena, ".SUBCKT PAD\n.ENDS\n", "");
+    const bare = try synthesize(arena, ".SUBCKT PAD\n.ENDS\n", "", null);
     try std.testing.expectEqual(@as(u32, 1), bare.modules);
     try std.testing.expect(std.mem.find(u8, bare.text, "electrical") == null);
 }
@@ -545,7 +548,7 @@ test "E.3.1 the four controlled sources inside a .SUBCKT, and the V card an F or
         \\H1 B C VS 5
         \\F2 D 0 VNONE 6
         \\.ENDS
-    , "");
+    , "", null);
     for ([_][]const u8{
         "branch (a, x) vs;",
         "V(vs) <+ $simparam(\"sourceScaleFactor\") * 0;",
@@ -574,7 +577,7 @@ test "E.1.2 nested .SUBCKT, {expr} values and trailing fields in a body are refu
         \\.ENDS
         \\R9 X Y RMOD
         \\.TRAN 1N 1U
-    , "");
+    , "", null);
     try std.testing.expectEqual(@as(usize, 3), s.refused.len);
     try std.testing.expect(std.mem.find(u8, s.refused[0].why, "nested") != null);
     try std.testing.expect(std.mem.find(u8, s.refused[1].why, "{rval}") != null);
@@ -597,7 +600,7 @@ test "E.2 an M/Q/J/D card instantiates its model's module, card parameters under
         \\.MODEL NCH BSIMCMG TYPE=1 L=20N NSD=2E+26
         \\.MODEL QMOD MYBJT BF=80
         \\.MODEL DIO DIODE_VA IS=1E-14
-    , "");
+    , "", null);
     try std.testing.expectEqual(@as(usize, 0), s.refused.len);
     for ([_][]const u8{
         // The model card first (its `l` replaced by the instance's 50n, in
@@ -634,7 +637,7 @@ test "E.2 a card whose model is a Table E.1 semiconductor is E0953; a binned mod
         \\MX Y A VDD VDD BSIM4 L={LEN}
         \\MY Y A VDD VDD BSIM4 OFF
         \\.ENDS
-    , "");
+    , "", null);
     try std.testing.expectEqual(@as(usize, 4), s.refused.len);
     try std.testing.expect(s.refused[0].code == .E0953);
     try std.testing.expect(std.mem.find(u8, s.refused[0].why, "Table E.1's `mosfet`") != null);
@@ -659,7 +662,7 @@ test "PARAMS: on a .SUBCKT, {expr} values over them, and X cards instantiating a
         \\X1 A MID 0 RDIV PARAMS: RTOP=2K
         \\X2 MID B 0 RDIV M=2
         \\.ENDS
-    , "");
+    , "", null);
     try std.testing.expectEqual(@as(usize, 0), s.refused.len);
     try std.testing.expectEqual(@as(u32, 2), s.modules);
     for ([_][]const u8{
@@ -681,7 +684,7 @@ test "PARAMS: on a .SUBCKT, {expr} values over them, and X cards instantiating a
         }
     }
     // A name that is not a parameter before it is refused at the card.
-    const bad = try synthesize(arena, ".SUBCKT R A B PARAMS: X={Y}\n.ENDS\n", "");
+    const bad = try synthesize(arena, ".SUBCKT R A B PARAMS: X={Y}\n.ENDS\n", "", null);
     try std.testing.expectEqual(@as(usize, 1), bad.refused.len);
     try std.testing.expect(std.mem.find(u8, bad.refused[0].why, "reads `y`") != null);
 }
@@ -718,7 +721,7 @@ test "E.4.2 a card naming a binned model instantiates the bin that holds its L a
         \\M3 D G S B NCH W=2 L=3
         \\M4 D G S B NCH L=1
         \\.ENDS
-    , "");
+    , "", null);
     // lmin <= L < lmax: 0.5 is the second bin's, 0.25 the first's; the
     // bounds select and are not forwarded.
     for ([_][]const u8{
@@ -875,7 +878,7 @@ test "cards: `+` continues the card above, a leading `+` is dropped, and an unte
         \\.MODEL NOTYPE
         \\.SUBCKT OPEN A B
         \\R1 A B 1K
-    , "");
+    , "", null);
     try expectRefusals(s.refused, &.{});
     try std.testing.expectEqual(@as(u32, 2), s.modules);
     try expectHas(s.text, &.{
@@ -912,7 +915,7 @@ test "E.2 a .SUBCKT header and body refuse what they cannot read, and name it" {
         \\R2 A B W=
         \\R3 A B {W
         \\.ENDS
-    , "");
+    , "", null);
     try expectRefusals(s.refused, &.{
         "`.subckt` names no definition",
         "`a=1` is not a name for a definition",
@@ -946,7 +949,7 @@ test "E.2 Q's substrate is read as SPICE3 reads it, by which field a .MODEL card
         \\Q2 C B E 2N2222 3
         \\Q3 C B E QM SUB
         \\.ENDS
-    , "");
+    , "", null);
     try expectHas(s.text, &.{
         "   mybjt #(.bf(100)) q1(c, b, e, s);",
         "   mybjt #(.bf(100), .area(3)) q2(c, b, e);",
@@ -969,7 +972,7 @@ test "E.3.1 a controlled source in its POLY, VALUE, TABLE or LAPLACE form is ref
         \\F1 A B POLY(1) VS 0 2
         \\E3 A B C D 2
         \\.ENDS
-    , "");
+    , "", null);
     try expectRefusals(s.refused, &.{ "`poly`", "`value`", "`table`", "`laplace`", "`poly`" });
     try expectHas(s.text, &.{"V(a, b) <+ 2 * V(c, d);"});
     try std.testing.expect(std.mem.find(u8, s.text, "poly") == null);
@@ -989,7 +992,7 @@ test "a top-level .LIB block is a library entry, read only when called" {
         \\.LIB OPEN
         \\.SUBCKT LOST A B
         \\.ENDS
-    , "");
+    , "", null);
     try std.testing.expectEqual(@as(u32, 1), s.modules);
     try expectHas(s.text, &.{"module seen(a, b);"});
     try std.testing.expect(std.mem.find(u8, s.text, "hidden") == null);
@@ -1034,7 +1037,8 @@ test "Reader: .INCLUDE, .LIB entries and .HDL beside the netlist, and the refusa
     try tmp.dir.writeFile(io, .{ .sub_path = "open.sp", .data = ".LIB TT\n.SUBCKT T2 A B\n.ENDS\n" });
     try tmp.dir.writeFile(io, .{ .sub_path = "top.sp", .data = test_top });
     const top: []const u8 = try tmp.dir.realPathFileAlloc(io, "top.sp", arena);
-    const s = try synthesize(arena, test_top, top);
+    var disk: Files = .init(io, arena);
+    const s = try synthesize(arena, test_top, top, &disk);
     // inc.sp twice (the second module is a repeat), lib.sp's `tt` entry and
     // open.sp's unterminated one.
     try std.testing.expectEqual(@as(u32, 3), s.modules);
@@ -1064,7 +1068,8 @@ test "Reader: an .INCLUDE cycle is one refusal naming it; finite nesting has no 
     const arena = arena_state.allocator();
     try tmp.dir.writeFile(io, .{ .sub_path = "self.sp", .data = ".include self.sp\n" });
     const path: []const u8 = try tmp.dir.realPathFileAlloc(io, "self.sp", arena);
-    const s = try synthesize(arena, ".include self.sp\n", path);
+    var disk: Files = .init(io, arena);
+    const s = try synthesize(arena, ".include self.sp\n", path, &disk);
     try expectRefusals(s.refused, &.{"`.include` cycle:"});
     // The netlist, and self.sp opened once more before the cycle is seen.
     try std.testing.expectEqual(@as(usize, 2), s.files.len);
@@ -1078,7 +1083,7 @@ test "Reader: an .INCLUDE cycle is one refusal naming it; finite nesting has no 
     }
     try tmp.dir.writeFile(io, .{ .sub_path = "two.sp", .data = ".LIB a\n.LIB two.sp b\n.ENDL\n.LIB b\n.SUBCKT FROMB A B\nR1 A B 1K\n.ENDS\n.ENDL\n" });
     const top = ".include c0.sp\n.lib two.sp a\n";
-    const deep = try synthesize(arena, top, try tmp.dir.realPathFileAlloc(io, "self.sp", arena));
+    const deep = try synthesize(arena, top, try tmp.dir.realPathFileAlloc(io, "self.sp", arena), &disk);
     try std.testing.expectEqual(@as(usize, 0), deep.refused.len);
     try expectHas(deep.text, &.{ "module deep(a, b);", "module fromb(a, b);" });
 }

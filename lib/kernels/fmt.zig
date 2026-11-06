@@ -31,7 +31,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const testing = std.testing;
 const Int = @import("integer.zig");
-const str_k = @import("str_real.zig");
+const str_k = @import("contract").str_real;
 
 /// §9.4.3 Table 9-22's four conversions. The value is the base, so a digit is
 /// `@ctz(base)` bits wide for the three power-of-two members and decimal is the

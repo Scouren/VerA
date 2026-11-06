@@ -1,6 +1,8 @@
 //! A C-style format and its numeric arguments in, the text C prints out:
 //! the renderer behind `formatSay` and `formatStatus`, the §9.4 display
-//! tasks a device records and a host prints.
+//! tasks a device records and a host prints. A real conversion is
+//! `str_real.zCReal`'s, the one the device prints through, so a host and a
+//! device print one text (`tests/printf_reference.zig` holds both to C).
 //! Cites: VAMS-2023 §9.4.3 Table 9-23 (the conversions, `%r`'s engineering
 //! notation and the `%10.3g` example), §2.6.2 Table 2-1 (the scale letters),
 //! §4.2.1.1 (a real rounds to an integer); C11 7.21.6.1 (flags, width,
@@ -10,20 +12,18 @@
 //! - `pub fn formatC(fmt: []const u8, args: []const f64, name: []const u8, w: *std.Io.Writer) std.Io.Writer.Error!void`
 
 const std = @import("std");
+const str_real = @import("str_real.zig");
 const assert = std.debug.assert;
 const Writer = std.Io.Writer;
 
 /// The longest precision a conversion keeps; more is cut to it.
 const precision_max = 64;
-/// Bytes one conversion renders into: the longest `%f` of a double at
-/// `precision_max` (309 integer digits, the point, 64 fraction digits) fits
-/// below `scratch_at`, and the scientific rendering `cReal` reads above it.
+/// Bytes one real conversion renders into: the longest is a sign, 309
+/// integer digits, the point and `precision_max` fraction digits of `%f`.
 const buf_len = 512;
-const scratch_at = 256;
 
 comptime {
-    assert(309 + 1 + precision_max < buf_len);
-    assert(scratch_at + 64 + precision_max < buf_len);
+    assert(1 + 309 + 1 + precision_max < buf_len);
 }
 
 /// A §9.4.3 conversion's flags, width and precision.
@@ -155,25 +155,27 @@ fn writeInteger(w: *Writer, conv: u8, v: f64, f: Flags) Writer.Error!void {
     try writePadded(w, if (signed) signOf(n < 0, f) else "", digits, f, .number);
 }
 
-/// `v` in real conversion `conv`: `nan`/`inf` (upper case for an upper-case
-/// conversion) when not finite, else `cReal`'s body after the sign.
+/// `v` in real conversion `conv` (`%t` is `%g`): `str_real.zCReal`'s
+/// sign and body, in the field `writePadded` lays out, which zero-fills
+/// only a finite value (C: the '0' flag is ignored for inf and nan).
 fn writeReal(w: *Writer, conv: u8, v: f64, f: Flags) Writer.Error!void {
     assert(classOf(conv) == .real);
-    if (!std.math.isFinite(v)) {
-        const up = std.ascii.isUpper(conv);
-        const t: []const u8 = if (std.math.isNan(v)) (if (up) "NAN" else "nan") else if (up) "INF" else "inf";
-        return writePadded(w, signOf(v < 0, f), t, f, .text);
-    }
-    // SAFETY: `cReal` returns only bytes it wrote (or a literal).
+    const c: u8 = switch (conv) {
+        't' => 'g',
+        'T' => 'G',
+        else => conv,
+    };
+    const flags: u8 = (if (f.plus) str_real.zc_plus else 0) |
+        (if (f.space) str_real.zc_space else 0) |
+        (if (f.alt) str_real.zc_alt else 0);
+    const prec: i64 = if (f.prec) |p| @intCast(p) else -1;
+    // SAFETY: `zCReal` returns only bytes it wrote.
     var buf: [buf_len]u8 = undefined;
-    const body = cReal(&buf, @abs(v), std.ascii.toLower(conv), f.prec, f.alt);
-    // `%E`/`%G` spell the exponent marker upper case; `%R`'s scale letters
-    // keep their case (`m` is milli, `M` mega).
-    // SAFETY: `upperString` writes the `body.len` bytes it returns.
-    var upper: [buf_len]u8 = undefined;
-    const text = if (conv == 'E' or conv == 'G') std.ascii.upperString(&upper, body) else body;
-    assert(text.len == body.len);
-    try writePadded(w, signOf(std.math.signbit(v), f), text, f, .number);
+    const text = str_real.zCReal(&buf, v, c, flags, 0, prec);
+    assert(text.len < buf.len);
+    const signed = text.len != 0 and (text[0] == '-' or text[0] == '+' or text[0] == ' ');
+    const sign = if (signed) text[0..1] else "";
+    try writePadded(w, sign, text[sign.len..], f, if (std.math.isFinite(v)) .number else .text);
 }
 
 fn signOf(neg: bool, f: Flags) []const u8 {
@@ -201,177 +203,6 @@ fn writePadded(w: *Writer, sign: []const u8, body: []const u8, f: Flags, fill_ki
     }
 }
 
-/// `v` (finite, not negative) as C's `%e`, `%f` or `%g` at precision `p`, or
-/// §9.4.3's `%r`: a mantissa in [1, 1000) over a §2.6.2 scale factor (`T G M
-/// K k m u n p f a`; `k` for 1e3, Table 2-1's spelling). `alt` is C's '#'
-/// on `%e`/`%f`/`%g` (`withPoint`, and `%g` keeps its zeros); lowering
-/// refuses it on `%r` (E0825).
-fn cReal(buf: *[buf_len]u8, v: f64, conv: u8, prec: ?usize, alt: bool) []const u8 {
-    assert(std.math.isFinite(v));
-    assert(!std.math.signbit(v));
-    const float = std.fmt.float;
-    const p = prec orelse 6;
-    switch (conv) {
-        'f' => return withPoint(alt, buf, float.render(buf, v, .{ .mode = .decimal, .precision = p }) catch "?"),
-        'e' => return withPoint(alt, buf, cExp(buf, float.render(buf[scratch_at..], v, .{ .mode = .scientific, .precision = p }) catch return "?")),
-        'r' => return cEng(buf, v, prec),
-        else => {
-            // An explicit %g precision counts FRACTIONAL digits, as the
-            // device's `str_real.zCReal` prints it: §9.4.3's own example
-            // reads "%10.3g" as "three (3) fractional digits", where C11
-            // counts significant ones, and VerA follows the example (#44).
-            // So `%.3g` of 1234.5678 is `1234.568`, the `%.3f` text.
-            if (prec != null) return cReal(buf, v, 'f', prec, alt);
-            // C11 7.21.6.1 %g: P significant digits; X the exponent %e would
-            // print; %f with P - 1 - X decimals when P > X >= -4, else %e.
-            const sig = @max(p, 1);
-            const sci = float.render(buf[scratch_at..], v, .{ .mode = .scientific, .precision = sig - 1 }) catch return "?";
-            const x = std.fmt.parseInt(i32, sci[std.mem.findScalar(u8, sci, 'e').? + 1 ..], 10) catch 0;
-            const out = if (x < -4 or x >= @as(i32, @intCast(sig)))
-                cExp(buf, sci)
-            else
-                float.render(buf, v, .{ .mode = .decimal, .precision = @intCast(@as(i32, @intCast(sig)) - 1 - x) }) catch return "?";
-            if (alt) return withPoint(true, buf, out);
-            return trimZeros(buf, out);
-        },
-    }
-}
-
-/// C11 `%g` without `#`: the fraction's trailing zeros go, then a bare
-/// point, and the exponent part moves down behind what is left. `out` is a
-/// body `cReal` wrote at the start of `buf`.
-fn trimZeros(buf: *[buf_len]u8, out: []const u8) []const u8 {
-    assert(out.len <= buf.len);
-    const e_at = std.mem.findScalar(u8, out, 'e') orelse out.len;
-    if (std.mem.findScalar(u8, out[0..e_at], '.') == null) return out;
-    var end = e_at;
-    while (out[end - 1] == '0') end -= 1;
-    if (out[end - 1] == '.') end -= 1;
-    const exp_part = out[e_at..];
-    std.mem.copyForwards(u8, buf[end..], exp_part);
-    assert(end + exp_part.len <= out.len);
-    return buf[0 .. end + exp_part.len];
-}
-
-/// C11 7.21.6.1p6 '#' on a real conversion: "the result ... always contains
-/// a decimal-point character, even if no digits follow it". `out` is a body
-/// `cReal` wrote at the start of `buf`; one with no point gets it before its
-/// exponent, or at its end (`%#.0f` of 2 is `2.`, `%#.0e` of 1 is `1.e+00`).
-fn withPoint(alt: bool, buf: *[buf_len]u8, out: []const u8) []const u8 {
-    if (!alt or @intFromPtr(out.ptr) != @intFromPtr(buf) or std.mem.findScalar(u8, out, '.') != null) return out;
-    assert(out.len < buf.len);
-    const at = std.mem.findScalar(u8, out, 'e') orelse out.len;
-    @memmove(buf[at + 1 .. out.len + 1], buf[at..out.len]);
-    buf[at] = '.';
-    return buf[0 .. out.len + 1];
-}
-
-// `cReal`'s `%r`, as `str_real.zCReal` prints it: the value's shortest
-// round-trip digits with the point moved to the multiple-of-three exponent
-// Table 2-1 has a letter for (clamped to a..T, the mantissa absorbing the
-// rest), rounded to `prec` fractional digits, ties to the even digit, when a
-// precision is given. Decimal digits, never a division, so 4.7e-9 is 4.7n
-// and not 4.699999999999999n. A carry out of the mantissa is not
-// renormalized: 999.996 at %.2r is 1000.00, as in the kernel. Writes at most
-// 1 + 1 + 322 + 1 bytes (a subnormal, unclamped digits) into `buf`.
-fn cEng(buf: *[buf_len]u8, v: f64, prec: ?usize) []const u8 {
-    assert(!std.math.signbit(v));
-    // SAFETY: `n` counts the digits written; only ds[0..n] is read.
-    var ds: [24]u8 = undefined;
-    ds[0] = '0';
-    var n: usize = 1;
-    var x: i32 = 0;
-    if (v != 0) {
-        const sci = std.fmt.float.render(buf[scratch_at..], v, .{ .mode = .scientific }) catch return "?";
-        const e = std.mem.findScalar(u8, sci, 'e') orelse return "?";
-        n = 0;
-        for (sci[0..e]) |c| if (c != '.') {
-            ds[n] = c;
-            n += 1;
-        };
-        x = std.fmt.parseInt(i32, sci[e + 1 ..], 10) catch return "?";
-    }
-    const g = std.math.clamp(@divFloor(x, 3) * 3, -18, 12);
-    // Digits before the point; 0 or fewer below the `a` clamp.
-    var int_len: i32 = x - g + 1;
-    if (prec) |p| {
-        const keep = int_len + @as(i32, @intCast(p));
-        if (keep < 0) {
-            n = 0;
-        } else if (keep < @as(i32, @intCast(n))) {
-            const k: usize = @intCast(keep);
-            var up = ds[k] > '5';
-            if (ds[k] == '5') {
-                const rest = for (ds[k + 1 .. n]) |c| {
-                    if (c != '0') break true;
-                } else false;
-                up = rest or (k > 0 and (ds[k - 1] - '0') % 2 == 1);
-            }
-            n = k;
-            if (up) {
-                var i = k;
-                while (i > 0) {
-                    i -= 1;
-                    if (ds[i] != '9') {
-                        ds[i] += 1;
-                        break;
-                    }
-                    ds[i] = '0';
-                } else {
-                    // Every kept digit was a 9, or none was kept: one more
-                    // integer digit, a leading 1.
-                    std.mem.copyBackwards(u8, ds[1 .. n + 1], ds[0..n]);
-                    ds[0] = '1';
-                    n += 1;
-                    int_len += 1;
-                }
-            }
-        }
-    }
-    const frac: usize = prec orelse @intCast(@max(@as(i32, @intCast(n)) - int_len, 0));
-    var o: usize = 0;
-    if (int_len <= 0) {
-        buf[o] = '0';
-        o += 1;
-    } else for (0..@intCast(int_len)) |i| {
-        buf[o] = if (i < n) ds[i] else '0';
-        o += 1;
-    }
-    if (frac != 0) {
-        buf[o] = '.';
-        o += 1;
-        for (0..frac) |j| {
-            const at = int_len + @as(i32, @intCast(j));
-            buf[o] = if (at >= 0 and at < @as(i32, @intCast(n))) ds[@intCast(at)] else '0';
-            o += 1;
-        }
-    }
-    const letter = "afpnum kMGT"[@intCast(@divExact(g, 3) + 6)];
-    if (letter != ' ') {
-        buf[o] = letter;
-        o += 1;
-    }
-    assert(o < buf_len);
-    return buf[0..o];
-}
-
-/// Zig's `1.5e-7` as C's `1.5e-07`: a signed exponent of at least two
-/// digits, copied to the front of `buf`. `sci` lies above `scratch_at`.
-fn cExp(buf: *[buf_len]u8, sci: []const u8) []const u8 {
-    assert(@intFromPtr(sci.ptr) >= @intFromPtr(buf) + scratch_at);
-    const e = std.mem.findScalar(u8, sci, 'e').?;
-    var exp = sci[e + 1 ..];
-    const neg = exp.len != 0 and exp[0] == '-';
-    if (neg) exp = exp[1..];
-    // A mantissa at `precision_max` and a three-digit exponent.
-    // SAFETY: `print` writes the bytes it returns.
-    var tmp: [2 + precision_max + 6]u8 = undefined;
-    const t = std.mem.print(&tmp, "{s}e{c}{s}{s}", .{ sci[0..e], @as(u8, if (neg) '-' else '+'), if (exp.len < 2) "0" else "", exp }) catch unreachable;
-    assert(t.len < scratch_at);
-    @memcpy(buf[0..t.len], t);
-    return buf[0..t.len];
-}
-
 test "formatC: §9.4.3's conversions as C11 7.21.6.1 prints them" {
     const cases = [_]struct { fmt: []const u8, v: f64, want: []const u8 }{
         .{ .fmt = "%g", .v = 0.1, .want = "0.1" },
@@ -391,7 +222,7 @@ test "formatC: §9.4.3's conversions as C11 7.21.6.1 prints them" {
         .{ .fmt = "%b", .v = 5, .want = "101" },
         .{ .fmt = "%c", .v = 65, .want = "A" },
         .{ .fmt = "%r", .v = 4.7e-9, .want = "4.7n" },
-        .{ .fmt = "%r", .v = 2200, .want = "2.2k" },
+        .{ .fmt = "%r", .v = 2200, .want = "2.2K" }, // Table 2-1 has K and k; the device prints K
         .{ .fmt = "%g", .v = std.math.inf(f64), .want = "inf" },
         .{ .fmt = "%m: %g", .v = 1, .want = "top.x1: 1" },
     };
@@ -474,7 +305,7 @@ test "formatC %r: §2.6.2 engineering notation, as the display kernels print it"
     // digits, ties to even.
     const cases = [_]struct { fmt: []const u8, v: f64, want: []const u8 }{
         .{ .fmt = "%r", .v = 4.7e-9, .want = "4.7n" },
-        .{ .fmt = "%r", .v = 2200, .want = "2.2k" },
+        .{ .fmt = "%r", .v = 2200, .want = "2.2K" }, // Table 2-1 has K and k; the device prints K
         .{ .fmt = "%r", .v = 1234567, .want = "1.234567M" }, // every digit, not %g's six
         .{ .fmt = "%r", .v = 999.9999999, .want = "999.9999999" }, // not rounded up to 1000
         .{ .fmt = "%r", .v = 0.999, .want = "999m" },
@@ -488,11 +319,11 @@ test "formatC %r: §2.6.2 engineering notation, as the display kernels print it"
         .{ .fmt = "%r", .v = 1.5e-20, .want = "0.015a" },
         // A precision is the mantissa's fractional digits, never %g's
         // significant ones (which printed `1.2e+02k` here).
-        .{ .fmt = "%.2r", .v = 123456, .want = "123.46k" },
+        .{ .fmt = "%.2r", .v = 123456, .want = "123.46K" },
         .{ .fmt = "%.1r", .v = 4.75e-9, .want = "4.8n" }, // 4.75: a tie, to even
         .{ .fmt = "%.1r", .v = 4.25e-9, .want = "4.2n" },
-        .{ .fmt = "%.2r", .v = 999.996, .want = "1000.00" }, // the carry is not renormalized
-        .{ .fmt = "%8.1r|", .v = 1500, .want = "    1.5k|" },
+        .{ .fmt = "%.2r", .v = 999.996, .want = "1.00K" }, // the carry takes the next letter, as the device prints it
+        .{ .fmt = "%8.1r|", .v = 1500, .want = "    1.5K|" },
     };
     for (cases) |c| {
         var buf: [128]u8 = undefined;

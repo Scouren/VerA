@@ -10,6 +10,7 @@
 //! - `pub const lexer = @import("lexer.zig")`
 //! - `pub const token_value = @import("token_value.zig")`
 //! - `pub const preprocessor = @import("preprocessor.zig")`
+//! - `pub const Files = @import("Files.zig")`
 //! - `pub const directive_events = @import("pp/events.zig")`
 //! - `pub const prelude = @import("pp/prelude.zig")`
 //! - `pub const protect = @import("pp/protect.zig")`
@@ -46,6 +47,9 @@ pub const token_value = @import("token_value.zig");
 
 /// Clause 10 directives and comment stripping: source files in, one text out.
 pub const preprocessor = @import("preprocessor.zig");
+/// The one reader of the files a source names (`include, netlist cards,
+/// `$table_model` data); the compilation owns it.
+pub const Files = @import("Files.zig");
 
 /// The positional directive events `preprocessor.Output.directives` holds.
 pub const directive_events = @import("pp/events.zig");

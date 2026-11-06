@@ -1,0 +1,55 @@
+# diff-sim's known differences (tests/differential/sim.zig): one fixture per
+# line, its path under tests/conformance/tests and why it does not agree yet:
+# a construct Sema's digital lowering (src/Sema/digital*) does not lower yet
+# (`lowering: ...`), a stage before it that refuses the fixture, or the first
+# transcript difference. A listed fixture that agrees fails the run until its
+# line goes.
+verilog-ams/digital/reject_wreal_connected_to_wand.v old run failed (E0919: `n` is a wand and port `o` is a wreal), new run completed
+verilog-ams/digital/vams_digital_temperature_refused.v lowering: the system function `$temperature`
+verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v old run failed (E1100: §3.8: an attribute value must be a constant expression), new run completed
+verilog/03_lexical_conventions/escaped_system_task_rejected.v lowering: a hierarchical task or function name
+verilog/03_lexical_conventions/forward_reference_reg_rejected.v old run failed (E1100: a name is used before its declaration), new run completed
+verilog/04_data_types/nonconstant_declaration_assignment_rejected.v old run failed (E1100: §6.2.1: a constant expression is required here), new run completed
+verilog/04_data_types/parameter_assigned_specify_block_specparam_rejected.v lowering: a name declared by `param` that has no slot
+verilog/04_data_types/parameter_assigned_specparam_rejected.v old run failed (E1100: §4.10.3: a module parameter cannot be assigned an expression that includes a specify parameter), new run completed
+verilog/04_data_types/parameter_from_variable_rejected.v old run failed (E1100: §4.10.1: a parameter's value is a constant expression of numbers and previously defined parameters, and this name is neither), new run completed
+verilog/04_data_types/parameter_redeclares_net_rejected.v old run failed (E1100: duplicate digital variable), new run completed
+verilog/04_data_types/port_list_body_parameter_override_rejected.v old run failed (E1100: §12.2: `Q` is a local parameter, which a defparam cannot override), new run completed
+verilog/04_data_types/specparam_before_declaration_rejected.v old run failed (E1100: §4.10.3: a specify parameter is declared before it is referenced), new run completed
+verilog/04_data_types/task_named_like_variable_rejected.v old run failed (E1100: §10.4.2: duplicate declaration of `t`, a task or function name in this scope), new run completed
+verilog/04_data_types/type_uwire_multiple_drivers_rejected.v old run failed (E1100: a uwire net accepts a single driver per bit), new run completed
+verilog/05_expressions/constant_time_rejected.v old run failed (E1100: a constant expression is required here), new run completed
+verilog/05_expressions/native_wide_index_bound_limit.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
+verilog/07_gate_switch_level/split_array_rejected.v old run failed (E1100: §7.1.5: `t_nand` names two instances; one instance identifier has one range), new run completed
+verilog/08_udp/combinational_reg_rejected.v old run failed (E1100: §8.1.2: a combinational UDP cannot contain a reg declaration), new run completed
+verilog/08_udp/initial_to_input_rejected.v old run failed (E1100: §8.1.3: a UDP initial statement assigns the output), new run completed
+verilog/08_udp/multibit_initial_rejected.v old run failed (E1100: §8.1.3: a UDP initial value is a single-bit literal), new run completed
+verilog/08_udp/sequential_without_reg_rejected.v old run failed (E1100: §8.1.2: a sequential UDP's output needs a reg declaration), new run completed
+verilog/09_behavioral_modeling/event_used_before_declaration_rejected.v old run failed (E1100: §9.7.3: a named event is declared before it is used), new run completed
+verilog/10_tasks_functions/constant_function_hierarchical_rejected.v old run failed (E1100: §10.4.5: a function called during elaboration is a constant function, and it contains a hierarchical reference), new run completed
+verilog/10_tasks_functions/function_scope_object_named_as_function_rejected.v old run failed (E1100: duplicate digital variable), new run completed
+verilog/10_tasks_functions/module_object_named_as_function_rejected.v lowering: a task or function its walk did not declare
+verilog/12_hierarchy/assign_before_net_declaration_rejected.v old run failed (E1100: duplicate digital variable), new run completed
+verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v old run failed (E1100: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element it is in), new run completed
+verilog/12_hierarchy/defparam_across_generate_instances_rejected.v old run failed (E1100: §12.2.1: a defparam inside `somename[0]` cannot change a parameter outside the generate block instance or array element it is in), new run completed
+verilog/12_hierarchy/defparam_nonconstant_rejected.v old run failed (E1100: a constant expression is required here), new run completed
+verilog/12_hierarchy/localparam_override_rejected.v old run failed (E1100: §12.2: `LP` is a local parameter, which a defparam cannot override), new run completed
+verilog/12_hierarchy/port_width_mismatch_vams_rejected.v old run failed (E1100: §6.5.7.1: the sizes of the port and the net connected to it shall match), new run completed
+verilog/12_hierarchy/real_connected_to_port_rejected.v old run failed (E1100: §12.3.7: a real cannot be connected to a port), new run completed
+verilog/12_hierarchy/unnamed_block_referenced_rejected.v old run failed (E1100: undeclared instance in a hierarchical reference), new run completed
+verilog/13_configuration/cell_not_in_its_library_rejected.v old run failed (E1100: undeclared module in instantiation: library `gateLib` holds no cell `top`), new run completed
+verilog/13_configuration/config_in_map_rejected.v a `//@` line the cli refuses
+verilog/13_configuration/design_cell_missing_rejected.v old run failed (E1100: undeclared module in instantiation: library `work` holds no cell `missing`), new run completed
+verilog/13_configuration/design_names_config_rejected.v old run failed (E1100: undeclared module in instantiation: library `work` holds no cell `cfg`), new run completed
+verilog/13_configuration/every_config_referenced_rejected.v old run failed (E0243: every configuration is named by another's `use` clause, so none is the design's (IEEE 1364-2005 §13.4.4)), new run completed
+verilog/13_configuration/library_without_path_rejected.v a `//@` line the cli refuses
+verilog/13_configuration/rule_inside_other_config_rejected.v old run failed (E0243: instance clause `top.bot.a1` names an instance inside `top.bot`, whose hierarchy another config (`bot`) specifies (IEEE 1364-2005 §13.3.2)), new run completed
+verilog/13_configuration/source_text_in_map_rejected.v a `//@` line the cli refuses
+verilog/13_configuration/two_libraries_match_rejected.v a `//@` line the cli refuses
+verilog/13_configuration/two_unreferenced_configs_rejected.v old run failed (E0243: configurations `cfg_a` and `cfg_b` are both unreferenced, so neither is the design's (IEEE 1364-2005 §13.4.4)), new run completed
+verilog/13_configuration/undeclared_library_rejected.v old run failed (E1100: undeclared module in instantiation: no library of the search order (nosuch) holds cell `adder`), new run completed
+verilog/18_vcd/dumpports_duplicate_scope_rejected.v old run failed (E1100: §18.3.1: each $dumpports scope shall be unique), new run completed
+verilog/18_vcd/dumpports_variable_scope_rejected.v old run failed (E1100: §18.3.1: a $dumpports scope is a module instance: only modules are allowed, not variables), new run completed
+verilog/19_compiler_directives/timescale_inside_module_rejected.v old run failed (E1100: §19.8: a `timescale directive is written outside a module definition, not inside one), new run completed
+verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v a `//@` line the cli refuses
+verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v a `//@` line the cli refuses

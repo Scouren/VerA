@@ -114,9 +114,11 @@ pub fn add(g: Graph, ams: bool) Added {
             .target = target,
             .optimize = .ReleaseSafe,
             .link_libc = true,
-            .imports = &.{.{ .name = "kernels", .module = kernels }},
+            .imports = &.{ .{ .name = "kernels", .module = kernels }, .{ .name = "contract", .module = contract } },
         });
-        test_step.dependOn(&testRun(b, "printf_reference", printf_ref, runner, results_dir).step);
+        const printf_run = testRun(b, "printf_reference", printf_ref, runner, results_dir);
+        test_step.dependOn(&printf_run.step);
+        b.step("test-printf", "Hold zCReal and the contract's formatC to glibc's snprintf (tests/printf_reference.zig) only").dependOn(&printf_run.step);
     }
 
     const o = b.addOptions();

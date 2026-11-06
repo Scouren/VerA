@@ -1,5 +1,5 @@
 //! `vera` over a `.va`: the settled command line and the source -> a
-//! `vera.Request`, the `vera.compile` spine, and what its `Outcome` says to
+//! `vera.Config`, the `vera.compile` spine, and what its `Outcome` says to
 //! print: paths and text on stdout, the refusal and the diagnostics on
 //! stderr, the status as the exit code. `--run` then runs the testbench it
 //! built with the source's plusargs, and its exit status is `vera`'s.
@@ -48,20 +48,18 @@ pub fn run(
     var o: vera.Outcome = .{};
     defer o.deinit(gpa);
     vera.compile(gpa, io, arena, source, .{
-        .options = .{
-            .file_name = in_path,
-            .include_dirs = cli.include_dirs.items,
-            .defines = cli.defines.items,
-            .std_defs = cli.std_defs,
-            .require_std_includes = true, // the source includes the annex D files it uses
-            .language = cli.language,
-            .sim = cli.sim,
-            .lint = cli.levels,
-            .proof = .{ .unknown_bound = cli.unknown_bound },
-            .discipline_resolution = cli.discipline_resolution,
-            .display = cli.display,
-            .param_overrides = cli.overrides.items,
-        },
+        .file_name = in_path,
+        .include_dirs = cli.include_dirs.items,
+        .defines = cli.defines.items,
+        .std_defs = cli.std_defs,
+        .require_std_includes = true, // the source includes the annex D files it uses
+        .language = cli.language,
+        .sim = cli.sim,
+        .lint = cli.levels,
+        .proof = .{ .unknown_bound = cli.unknown_bound },
+        .discipline_resolution = cli.discipline_resolution,
+        .display = cli.display,
+        .param_overrides = cli.overrides.items,
         .codegen = .{ .jac_f32 = cli.jac_f32, .jac_f32_host = cli.jac_f32_host },
         .spice_path = cli.spice_path,
         .verilog = if (cli.emit_verilog) .{ .digital_pins = cli.digital_pins, .power_pins = cli.power_pins, .vdd = cli.vdd } else null,
@@ -82,6 +80,7 @@ pub fn run(
             .debug_info = cli.debug_info,
             // A finished `.osdi` is reused across work directories.
             .artifact_cache = if (cli.emit_osdi) try globalCache(arena, env, "vera-osdi") else null,
+            .jobs = cli.jobs,
         },
     }, &bag, &o) catch |e| {
         // Past the `--param` check the bag is final, and an error leaves

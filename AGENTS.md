@@ -118,8 +118,11 @@ Binding on every change, in every project.
 - Nothing collects a cache. Keep a byte budget per cache and delete old
   entries only while no build runs (the `long-term-garbage-collection`
   skill); a warm cache is kept, never wiped by routine.
-- Gate on the exit code: `cmd | tail` swallows it, so use
-  `exit "${PIPESTATUS[0]}"`.
+- Gate on the command's own exit code: `cmd > log 2>&1; echo $?`, then read
+  the log. A pipe reports its last stage (`cmd | tail` is `tail`'s 0), and
+  `${PIPESTATUS[0]}` recovers it in bash only: zsh spells it
+  `${pipestatus[1]}` and leaves the bash name empty, so `exit
+  "${PIPESTATUS[0]}"` exits 0 there.
 
 ### Maintaining
 
@@ -158,7 +161,7 @@ Binding on every change, in every project.
   oracle's own accuracy (ngspice at `reltol=1e-3` is not a `1e-6` oracle).
 - Nondeterminism is fixed at its order, never in the test: two runs of the
   same command write the same bytes.
-- Gate on the exit code. `zig build test 2>&1 | tail` swallows it.
+- Gate on the exit code, as the method's Builds rule says: `zig build test 2>&1 | tail` swallows it.
 
 ## Maintaining
 
@@ -183,7 +186,8 @@ Binding on every change, in every project.
 - Edit loop: keep `zig build check --watch -fincremental` running. `check` type-checks every root without emitting or running anything, so an edit is re-checked in under a second. `zig build test-<module> --watch -fincremental` also works, but each rerun costs the tests' run time.
 - After cloning, run `git submodule update --init tests/conformance`: every fixture lives in that submodule. `--recursive` adds the suite's external suites, which only `zig build conformance` runs.
 - `zig build -Dtarget=wasm32-wasi` builds `vera.wasm`. The front end and every `--emit-*` that only writes text run there; anything that spawns `zig` cannot. Size budgets are asserted with `<=` so they hold on 32-bit targets.
-- VerA does not depend on ESPice; ESPice depends on VerA. `zig build test-spice -Despice=PATH` runs the `.sp` decks on an espice it is handed (an ESPice release, a nix profile or a local build) and grades each against its oracle. That espice compiles the decks' devices with its own VerA, so the step checks compatibility with that release, not this tree; `.github/workflows/spice.yaml` imports a pinned ESPice release and runs it (disabled, by hand only, until ESPice publishes one). Without `-Despice` the step fails. No `zig build` fetches anything.
+- VerA does not depend on ESPice; ESPice depends on VerA. `zig build test-spice -Despice=PATH` runs the `.sp` decks on an espice it is handed (an ESPice release, a nix profile or a local build) and grades each against its oracle. That espice compiles the decks' devices with its own VerA, so the step checks compatibility with that release, not this tree; `.github/workflows/spice.yaml` imports a pinned ESPice release and runs it (disabled, by hand only, until ESPice publishes one). Without `-Despice` the step fails.
+- One dependency is fetched: Gompute (the device math), pinned in `build.zig.zon` by commit and content hash. A first `zig build` in a fresh clone fetches it once into the global cache; `nix build` gets it through `fetchFromGitHub` with the same pin and stays offline in the sandbox. Nothing else is fetched. Bump it by tag (`zig fetch --save git+https://github.com/OmarSiwy/Gompute?ref=vX.Y.Z`) together with `flake.nix`'s hash.
 
 ## Worktrees
 

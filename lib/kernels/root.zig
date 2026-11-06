@@ -44,7 +44,8 @@ pub const vera_version = @import("contract").vera_version;
 pub const str_scan = @import("str_scan.zig");
 /// §9.4.3 Table 9-23 real conversions (`zCReal`, the `zc_*` flags); also the
 /// digital engine's `%e/%f/%g`.
-pub const str_real = @import("str_real.zig");
+/// §9.4.3's real conversions; the contract owns them (`formatC` prints through them too).
+pub const str_real = @import("contract").str_real;
 /// §9.5.3 a run-time format string (`zSFormatRt`).
 pub const str_format = @import("str_format.zig");
 /// §3.3 string storage: per-site rows, held strings, concatenation,
@@ -104,8 +105,9 @@ pub const fopen_types = std.StaticStringMap(void).initComptime(.{
 pub const text = struct {
     pub const str = deviceText(
         "zstd",
+        // ponytail: `str_real.zig` is lib/contract/'s now; the provenance line keeps the old name so device text stays byte-identical until step 9 drops the splice.
         &.{ "str_store.zig", "str_real.zig", "str_format.zig", "str_scan.zig" },
-        &.{ @embedFile("str_store.zig"), @embedFile("str_real.zig"), @embedFile("str_format.zig"), @embedFile("str_scan.zig") },
+        &.{ @embedFile("str_store.zig"), @import("contract").str_real_source, @embedFile("str_format.zig"), @embedFile("str_scan.zig") },
     );
     pub const table = deviceText("ztstd", &.{"table_kernels.zig"}, &.{@embedFile("table_kernels.zig")});
     pub const rng = deviceText("zrstd", &.{"rng_kernels.zig"}, &.{@embedFile("rng_kernels.zig")});

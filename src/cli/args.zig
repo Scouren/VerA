@@ -141,6 +141,7 @@ const Valued = enum {
     sim,
     discipline_resolution,
     unknown_bound,
+    jobs,
 };
 
 const valued = std.StaticStringMap(Valued).initComptime(.{
@@ -150,6 +151,7 @@ const valued = std.StaticStringMap(Valued).initComptime(.{
     .{ "--zig-backend=", .zig_backend },                     .{ "--expect-module=", .expect_module },
     .{ "--std=", .std },                                     .{ "--sim=", .sim },
     .{ "--discipline-resolution=", .discipline_resolution }, .{ "--unknown-bound=", .unknown_bound },
+    .{ "--jobs=", .jobs },
 });
 
 /// `--optimize=` names. Zig 0.17 renamed `std.lang.Optimize`'s tags
@@ -532,12 +534,13 @@ fn takeValued(cli: *Cli, v: Valued, arg: []const u8, value: []const u8, err: *Io
             try err.print("error: `{s}`: not static|fifo\n", .{arg});
             return 2;
         },
-        .event_budget => {
-            cli.event_budget = std.fmt.parseInt(u64, value, 10) catch 0;
-            if (cli.event_budget == 0) {
+        .event_budget, .jobs => {
+            const n = std.fmt.parseInt(u64, value, 10) catch 0;
+            if (n == 0 or (v == .jobs and n > std.math.maxInt(u32))) {
                 try err.print("error: `{s}`: not a positive integer\n", .{arg});
                 return 2;
             }
+            if (v == .jobs) cli.jobs = @intCast(n) else cli.event_budget = n;
         },
         .zig_backend => cli.zig_backend = if (std.mem.eql(u8, value, "auto")) null else if (std.mem.eql(u8, value, "llvm")) .llvm else if (std.mem.eql(u8, value, "native")) .self_hosted else {
             try err.print("error: `{s}`: not auto|llvm|native\n", .{arg});
@@ -859,6 +862,18 @@ test "parse: --event-budget is a positive u64" {
     defer l.deinit();
     _ = try l.read(&.{"--event-budget=18446744073709551615"});
     try std.testing.expectEqual(@as(u64, std.math.maxInt(u64)), l.cli.event_budget);
+}
+
+test "parse: --jobs is a positive u32" {
+    for ([_][]const u8{ "--jobs=0", "--jobs=-1", "--jobs=x", "--jobs=4294967296" }) |flag| {
+        var buf: [96]u8 = undefined;
+        try fixtures.expectRefused(&.{flag}, try std.mem.print(&buf, "error: `{s}`: not a positive integer\n", .{flag}));
+    }
+    var l: fixtures.Line = .init();
+    defer l.deinit();
+    try std.testing.expectEqual(@as(?u32, null), l.cli.jobs);
+    _ = try l.read(&.{"--jobs=3"});
+    try std.testing.expectEqual(@as(?u32, 3), l.cli.jobs);
 }
 
 test "parse: the language, library and reporting flags" {

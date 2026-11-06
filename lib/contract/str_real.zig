@@ -1,9 +1,11 @@
 //! §9.4.3 Table 9-23's real conversions: one f64, its conversion letter,
 //! flags, width and precision in, the C11 7.21.6.1 text (or §2.6.2's
-//! engineering `%r`) out, in the caller's buffer. Device text (`text.str`),
-//! and host Zig for the digital engine's `%e/%f/%g` (`fmt.zig`, `sim`), so
-//! both engines print a real one way; `tests/printf_reference.zig` holds it
-//! to glibc's `snprintf`.
+//! engineering `%r`) out, in the caller's buffer. Device text
+//! (`kernels.text.str`), host Zig for the digital engine's `%e/%f/%g`
+//! (`kernels/fmt.zig`, `sim`) and for a host's `formatC`, so every engine
+//! and every host print a real one way; `tests/printf_reference.zig` holds
+//! it, and `formatC` through it, to glibc's `snprintf`. It lives in the
+//! contract, the one module both `kernels` and an installed host reach.
 //! Cites: VAMS §2.6.2 (Table 2-1), §9.4.3 (Table 9-23); C11 7.21.6.1;
 //! IEEE 754 roundTiesToEven; docs/specification/Vague_Decisions.md §6.
 //!

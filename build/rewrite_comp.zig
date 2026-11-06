@@ -34,7 +34,7 @@ pub fn add(g: Graph, all: *Build.Step) void {
     o.addOption([]const u8, "repo_root", pathFromRoot(b, "."));
     o.addOptionPath("vera", g.exe.getEmittedBin());
     o.addOptionPath("vera_next", next.getEmittedBin());
-    o.addOption([]const u8, "filter", b.option([]const u8, "comp-filter", "diff-comp: only the fixtures whose path holds this") orelse "");
+    o.addOption([]const u8, "filter", b.option([]const u8, "comp-filter", "diff-comp: only the fixtures whose path holds this (`|` between alternatives)") orelse "");
     o.addOption(u32, "jobs", b.option(u32, "comp-jobs", "diff-comp: fixtures compared at once (default 4; the machine is shared)") orelse 4);
     o.addOption(u32, "j1_sample", b.option(u32, "comp-j1", "diff-comp: also run this many fixtures' new side at -j1 and compare the bytes with -jN (default 200)") orelse 200);
     // diff-rtlil's tiebreaker (tests/differential/comp/yosys.zig): required, never skipped.

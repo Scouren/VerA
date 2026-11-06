@@ -8,124 +8,900 @@
 # interpreted executable has none (a behaviour change the lead decides on).
 # A listed fixture that agrees fails the run until its line goes. Refresh:
 # -Dcomp-rebaseline writes zig-out/digital_device.xfail.new.
-verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/03_lexical_conventions/ams_lexical_escaped_ascii.v not built: backend digital_device
+verilog/03_lexical_conventions/ams_lexical_escaped_hierarchy.v not built: backend digital_device
+verilog/03_lexical_conventions/ams_lexical_escaped_length_identity.v not built: backend digital_device
+verilog/03_lexical_conventions/ams_lexical_escaped_terminators.v not built: backend digital_device
+verilog/03_lexical_conventions/ams_lexical_long_distinct.v not built: backend digital_device
+verilog/03_lexical_conventions/ams_lexical_punctuation_identity.v not built: backend digital_device
+verilog/03_lexical_conventions/attribute_positions.v not built: backend digital_device
+verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v not built: backend digital_device
+verilog/03_lexical_conventions/block_comment_no_nest.v not built: backend digital_device
+verilog/03_lexical_conventions/block_statement_attribute.v not built: backend digital_device
+verilog/03_lexical_conventions/case_item_statement_attribute.v not built: backend digital_device
+verilog/03_lexical_conventions/comment_forms.v not built: backend digital_device
+verilog/03_lexical_conventions/delay_then_unsized_constant.v not built: backend digital_device
+verilog/03_lexical_conventions/directive_takes_effect_when_read.v not built: backend digital_device
+verilog/03_lexical_conventions/escaped_keyword.v not built: backend digital_device
 verilog/03_lexical_conventions/escaped_system_task_rejected.v not built: backend digital_lowering
-verilog/03_lexical_conventions/forward_reference_reg_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/named_localparam_override_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.2: `L` is a local parameter, which a parameter value assignment cannot override`, new `error[E0907]: override names no parameter of the module: `L` is not a parameter of `b_4_10_2_leaf``
-verilog/04_data_types/native_real_edge_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/nonconstant_declaration_assignment_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/03_lexical_conventions/examples.v not built: backend digital_device
+verilog/03_lexical_conventions/forward_reference_reg_rejected.v not built: backend digital_device
+verilog/03_lexical_conventions/free_format_layout.v not built: backend digital_device
+verilog/03_lexical_conventions/identifier_examples.v not built: backend digital_device
+verilog/03_lexical_conventions/lexical_decimal_unknown.v not built: backend digital_device
+verilog/03_lexical_conventions/lexical_four_state_constants.v not built: backend digital_device
+verilog/03_lexical_conventions/lexical_packed_strings.v not built: backend digital_device
+verilog/03_lexical_conventions/lexical_unsized_context_fill.v not built: backend digital_device
+verilog/03_lexical_conventions/literal_size_65536.v not built: backend digital_device
+verilog/03_lexical_conventions/literal_size_over_2_24.v not built: backend digital_device
+verilog/03_lexical_conventions/number_forms.v not built: backend digital_device
+verilog/03_lexical_conventions/operator_positions.v not built: backend digital_device
+verilog/03_lexical_conventions/real_constants.v not built: backend digital_device
+verilog/03_lexical_conventions/real_to_integer_rounding.v not built: backend digital_device
+verilog/03_lexical_conventions/subroutine_statement_attribute.v not built: backend digital_device
+verilog/03_lexical_conventions/system_task_forms.v not built: backend digital_device
+verilog/03_lexical_conventions/unsized_based_constant_digit_width.v not built: backend digital_device
+verilog/03_lexical_conventions/unsized_signed_32bit_constant.v not built: backend digital_device
+verilog/03_lexical_conventions/unsized_wide_constant.v not built: backend digital_device
+verilog/03_lexical_conventions/white_space.v not built: backend digital_device
+verilog/04_data_types/array_17_dimensions.v not built: backend digital_device
+verilog/04_data_types/array_declarations.v not built: backend digital_device
+verilog/04_data_types/array_index_out_of_range.v not built: backend digital_device
+verilog/04_data_types/capacitive_network_figure_4_2.v not built: backend digital_device
+verilog/04_data_types/charge_strength_declaration.v not built: backend digital_device
+verilog/04_data_types/generate_block_name_space.v not built: backend digital_device
+verilog/04_data_types/implicit_nets.v not built: backend digital_device
+verilog/04_data_types/integer_time_real.v not built: backend digital_device
+verilog/04_data_types/localparam_from_parameter.v not built: backend digital_device
+verilog/04_data_types/name_spaces.v not built: backend digital_device
+verilog/04_data_types/native_real_arrays.v not built: backend digital_device
+verilog/04_data_types/native_real_edge_rejected.v not built: backend digital_device
+verilog/04_data_types/net_declaration_drive_strength.v not built: backend digital_device
+verilog/04_data_types/net_takes_driver_value.v not built: backend digital_device
+verilog/04_data_types/net_types.v not built: backend digital_device
+verilog/04_data_types/net_x_before_delayed_driver.v not built: backend digital_device
+verilog/04_data_types/nonconstant_declaration_assignment_rejected.v not built: backend digital_device
 verilog/04_data_types/parameter_assigned_specify_block_specparam_rejected.v not built: backend digital_lowering
-verilog/04_data_types/parameter_assigned_specparam_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/parameter_from_variable_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/parameter_redeclares_net_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/port_list_body_parameter_override_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/posedge_real_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/real_range_bound_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/specparam_before_declaration_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/task_named_like_variable_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/type_uwire_multiple_drivers_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/05_expressions/constant_time_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/04_data_types/parameter_assigned_specparam_rejected.v not built: backend digital_device
+verilog/04_data_types/parameter_from_variable_rejected.v not built: backend digital_device
+verilog/04_data_types/parameter_range_selects.v not built: backend digital_device
+verilog/04_data_types/parameter_redeclares_net_rejected.v not built: backend digital_device
+verilog/04_data_types/parameter_types_and_ranges.v not built: backend digital_device
+verilog/04_data_types/parameter_width.v not built: backend digital_device
+verilog/04_data_types/parameter_widths.v not built: backend digital_device
+verilog/04_data_types/port_list_body_parameter_override_rejected.v not built: backend digital_device
+verilog/04_data_types/port_list_parameter_defparam.v not built: backend digital_device
+verilog/04_data_types/posedge_real_rejected.v not built: backend digital_device
+verilog/04_data_types/real_integer_conversion.v not built: backend digital_device
+verilog/04_data_types/real_integer_conversion_widths.v not built: backend digital_device
+verilog/04_data_types/real_range_bound_rejected.v not built: backend digital_device
+verilog/04_data_types/reg_holds_between_assignments.v not built: backend digital_device
+verilog/04_data_types/scalar_and_vector.v not built: backend digital_device
+verilog/04_data_types/scalared_vectored.v not built: backend digital_device
+verilog/04_data_types/signed_ranged_parameter.v not built: backend digital_device
+verilog/04_data_types/specparam_before_declaration_rejected.v not built: backend digital_device
+verilog/04_data_types/specparam_module_body_delay.v not built: backend digital_device
+verilog/04_data_types/task_named_like_variable_rejected.v not built: backend digital_device
+verilog/04_data_types/time_parameter_is_unsigned_64.v not built: backend digital_device
+verilog/04_data_types/type_multidimensional_array.v not built: backend digital_device
+verilog/04_data_types/type_negative_vector_bounds.v not built: backend digital_device
+verilog/04_data_types/type_net_array.v not built: backend digital_device
+verilog/04_data_types/type_net_resolution_tables.v not built: backend digital_device
+verilog/04_data_types/type_uwire_multiple_drivers_rejected.v not built: backend digital_device
+verilog/04_data_types/type_uwire_single_driver.v not built: backend digital_device
+verilog/04_data_types/undeclared_procedural_target_rejected.v not built: backend digital_lowering
+verilog/04_data_types/unknown_bits_to_real.v not built: backend digital_device
+verilog/04_data_types/unsized_unknown_literal_to_real.v not built: backend digital_device
+verilog/04_data_types/untyped_parameter_width.v not built: backend digital_device
+verilog/04_data_types/uwire_per_bit_drivers.v not built: backend digital_device
+verilog/04_data_types/value_set.v not built: backend digital_device
+verilog/04_data_types/variable_arrays.v not built: backend digital_device
+verilog/04_data_types/variable_initial_values.v not built: backend digital_device
+verilog/04_data_types/variable_range_bound_rejected.v not built: backend digital_lowering
+verilog/04_data_types/vector_and_memory.v not built: backend digital_device
+verilog/04_data_types/vector_ranges.v not built: backend digital_device
+verilog/05_expressions/assignment_extension.v not built: backend digital_device
+verilog/05_expressions/bit_part_select_addressing.v not built: backend digital_device
+verilog/05_expressions/bitlength_example.v not built: backend digital_device
+verilog/05_expressions/bitwise_tables.v not built: backend digital_device
+verilog/05_expressions/concatenation.v not built: backend digital_device
+verilog/05_expressions/conditional_ambiguous.v not built: backend digital_device
+verilog/05_expressions/conditional_real_x.v not built: backend digital_device
+verilog/05_expressions/conditional_z_select.v not built: backend digital_device
+verilog/05_expressions/constant_operands.v not built: backend digital_device
+verilog/05_expressions/constant_select_and_function.v not built: backend digital_device
+verilog/05_expressions/constant_time_rejected.v not built: backend digital_device
+verilog/05_expressions/copy_concatenate_compare.v not built: backend digital_device
+verilog/05_expressions/division_modulus_power.v not built: backend digital_device
+verilog/05_expressions/element_selects.v not built: backend digital_device
+verilog/05_expressions/equality_extension_and_unknowns.v not built: backend digital_device
+verilog/05_expressions/every_operator.v not built: backend digital_device
+verilog/05_expressions/expr_arithmetic_unknowns.v not built: backend digital_device
+verilog/05_expressions/expr_cast_width.v not built: backend digital_device
+verilog/05_expressions/expr_concat_zero_neighbor.v not built: backend digital_device
+verilog/05_expressions/expr_logical_unknowns.v not built: backend digital_device
+verilog/05_expressions/expr_memory_address_unknown.v not built: backend digital_device
+verilog/05_expressions/expr_mintypmax_context.v not built: backend digital_device
+verilog/05_expressions/expr_signed_boundaries.v not built: backend digital_device
+verilog/05_expressions/expr_string_numeric_padding.v not built: backend digital_device
+verilog/05_expressions/expr_truncation_direction.v not built: backend digital_device
+verilog/05_expressions/expr_unknown_extension.v not built: backend digital_device
+verilog/05_expressions/expr_unsized_unknown_extension.v not built: backend digital_device
+verilog/05_expressions/expression_deeper_than_256.v not built: backend digital_device
+verilog/05_expressions/expression_type_rules.v not built: backend digital_device
+verilog/05_expressions/expressions.v not built: backend digital_device
+verilog/05_expressions/indexed_part_select.v not built: backend digital_device
+verilog/05_expressions/integer_number_signedness.v not built: backend digital_device
+verilog/05_expressions/logical_connectives.v not built: backend digital_device
+verilog/05_expressions/memory_index_out_of_range_x.v not built: backend digital_device
+verilog/05_expressions/memory_indirection.v not built: backend digital_device
+verilog/05_expressions/native_array_selects.v not built: backend digital_device
+verilog/05_expressions/native_indexed_selects.v not built: backend digital_device
+verilog/05_expressions/native_real_conditionals.v not built: backend digital_device
+verilog/05_expressions/native_select_boundaries.v not built: backend digital_device
+verilog/05_expressions/native_select_variable_width_rejected.v not built: backend digital_lowering
 verilog/05_expressions/native_wide_index_bound_limit.v not built: backend digital_lowering
-verilog/07_gate_switch_level/split_array_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/07_gate_switch_level/unknown_gate_keyword_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: undeclared module in instantiation: no library of the search order (work) holds cell `AND``, new `error[E0904]: instance names no module: `AND``
-verilog/08_udp/combinational_reg_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/05_expressions/native_wide_index_edges.v not built: backend digital_device
+verilog/05_expressions/native_wide_index_values.v not built: backend digital_device
+verilog/05_expressions/null_string.v not built: backend digital_device
+verilog/05_expressions/operand_forms.v not built: backend digital_device
+verilog/05_expressions/padding_breaks_compare.v not built: backend digital_device
+verilog/05_expressions/precedence.v not built: backend digital_device
+verilog/05_expressions/real_and_relational_operands.v not built: backend digital_device
+verilog/05_expressions/real_operand_results.v not built: backend digital_device
+verilog/05_expressions/reduction_steps.v not built: backend digital_device
+verilog/05_expressions/reg_integer_interpretation.v not built: backend digital_device
+verilog/05_expressions/relational_extension.v not built: backend digital_device
+verilog/05_expressions/self_determined_example.v not built: backend digital_device
+verilog/05_expressions/shift_fill_and_sign.v not built: backend digital_device
+verilog/05_expressions/signed_unknown_bits.v not built: backend digital_device
+verilog/05_expressions/signed_unknown_bitwise.v not built: backend digital_device
+verilog/05_expressions/signed_unsigned_functions.v not built: backend digital_device
+verilog/05_expressions/string_test.v not built: backend digital_device
+verilog/05_expressions/sum_width_from_lhs.v not built: backend digital_device
+verilog/05_expressions/table_5_22_widths.v not built: backend digital_device
+verilog/05_expressions/truncation_examples.v not built: backend digital_device
+verilog/05_expressions/variable_part_select_rejected.v not built: backend digital_lowering
+verilog/06_assignments/adder_concatenation_lhs.v not built: backend digital_device
+verilog/06_assignments/assign_delay_inertial.v not built: backend digital_device
+verilog/06_assignments/assign_delay_rise_fall.v not built: backend digital_device
+verilog/06_assignments/assign_delay_single.v not built: backend digital_device
+verilog/06_assignments/assign_delay_turnoff.v not built: backend digital_device
+verilog/06_assignments/assign_drive_strength.v not built: backend digital_device
+verilog/06_assignments/assign_variable_delay.v not built: backend digital_device
+verilog/06_assignments/assign_variable_rise_fall_delay.v not built: backend digital_device
+verilog/06_assignments/assignment_pending_same_value.v not built: backend digital_device
+verilog/06_assignments/assignment_select_operand.v not built: backend digital_device
+verilog/06_assignments/assignment_variable_initializer.v not built: backend digital_device
+verilog/06_assignments/assignment_vector_delay.v not built: backend digital_device
+verilog/06_assignments/assignment_vector_delay_unknown.v not built: backend digital_device
+verilog/06_assignments/cont_assign_reeval.v not built: backend digital_device
+verilog/06_assignments/continuous_drive.v not built: backend digital_device
+verilog/06_assignments/decl_assign_delay_is_one_drivers.v not built: backend digital_device
+verilog/06_assignments/declaration_forms.v not built: backend digital_device
+verilog/06_assignments/examples.v not built: backend digital_device
+verilog/06_assignments/hier_delay.v not built: backend digital_device
+verilog/06_assignments/indexed_part_select_lhs.v not built: backend digital_device
+verilog/06_assignments/native_select_assignment_effects.v not built: backend digital_device
+verilog/06_assignments/net_array_element_selects.v not built: backend digital_device
+verilog/06_assignments/net_decl_assign_delay.v not built: backend digital_device
+verilog/06_assignments/net_delay.v not built: backend digital_device
+verilog/06_assignments/net_variable_delay.v not built: backend digital_device
+verilog/06_assignments/one_bit_range_delay.v not built: backend digital_device
+verilog/06_assignments/part_select_drive_strengths.v not built: backend digital_device
+verilog/06_assignments/select_bus.v not built: backend digital_device
+verilog/06_assignments/table_6_1_left_hand_forms.v not built: backend digital_device
+verilog/06_assignments/table_6_1_select_and_concatenation_lhs.v not built: backend digital_device
+verilog/06_assignments/variable_holds_value.v not built: backend digital_device
+verilog/06_assignments/vector_net_delay.v not built: backend digital_device
+verilog/07_gate_switch_level/ambiguous_strength_range.v not built: backend digital_device
+verilog/07_gate_switch_level/bidirectional.v not built: backend digital_device
+verilog/07_gate_switch_level/charge_strength_sharing.v not built: backend digital_device
+verilog/07_gate_switch_level/drive_strength_dominance.v not built: backend digital_device
+verilog/07_gate_switch_level/every_primitive.v not built: backend digital_device
+verilog/07_gate_switch_level/figure_combinations.v not built: backend digital_device
+verilog/07_gate_switch_level/gate_delays.v not built: backend digital_device
+verilog/07_gate_switch_level/gate_identifier_delay.v not built: backend digital_device
+verilog/07_gate_switch_level/gate_multibit_input_lsb.v not built: backend digital_device
+verilog/07_gate_switch_level/gate_variable_delay.v not built: backend digital_device
+verilog/07_gate_switch_level/gates_enable.v not built: backend digital_device
+verilog/07_gate_switch_level/gates_ninput.v not built: backend digital_device
+verilog/07_gate_switch_level/gates_noutput.v not built: backend digital_device
+verilog/07_gate_switch_level/gates_one_input.v not built: backend digital_device
+verilog/07_gate_switch_level/highz_half_strength.v not built: backend digital_device
+verilog/07_gate_switch_level/instance_list_shared_spec.v not built: backend digital_device
+verilog/07_gate_switch_level/mos_data_undriven_supply.v not built: backend digital_device
+verilog/07_gate_switch_level/mos_instance_array.v not built: backend digital_device
+verilog/07_gate_switch_level/optional_instance_name.v not built: backend digital_device
+verilog/07_gate_switch_level/primitive_ambiguous_same_polarity.v not built: backend digital_device
+verilog/07_gate_switch_level/primitive_array_broadcast.v not built: backend digital_device
+verilog/07_gate_switch_level/primitive_pull_ignored_polarity.v not built: backend digital_device
+verilog/07_gate_switch_level/primitive_three_delay_unknown.v not built: backend digital_device
+verilog/07_gate_switch_level/primitive_tran_both_directions.v not built: backend digital_device
+verilog/07_gate_switch_level/pull_gate_bit_select.v not built: backend digital_device
+verilog/07_gate_switch_level/pull_gate_instance_array.v not built: backend digital_device
+verilog/07_gate_switch_level/resistive_reduction_table.v not built: backend digital_device
+verilog/07_gate_switch_level/split_array_rejected.v not built: backend digital_device
+verilog/07_gate_switch_level/strength_levels.v not built: backend digital_device
+verilog/07_gate_switch_level/strength_reduction.v not built: backend digital_device
+verilog/07_gate_switch_level/supply_net_strength.v not built: backend digital_device
+verilog/07_gate_switch_level/supply_reduced_to_strong.v not built: backend digital_device
+verilog/07_gate_switch_level/switch_bits_strength_delay.v not built: backend digital_device
+verilog/07_gate_switch_level/switch_cmos.v not built: backend digital_device
+verilog/07_gate_switch_level/switch_mos.v not built: backend digital_device
+verilog/07_gate_switch_level/switch_strength_change.v not built: backend digital_device
+verilog/07_gate_switch_level/switch_supply_zero.v not built: backend digital_device
+verilog/07_gate_switch_level/three_drivers_strength_removal.v not built: backend digital_device
+verilog/07_gate_switch_level/tran_from_supply_undriven.v not built: backend digital_device
+verilog/07_gate_switch_level/tran_instance_array.v not built: backend digital_device
+verilog/07_gate_switch_level/tran_strength_display.v not built: backend digital_device
+verilog/07_gate_switch_level/tranif0_rtranif0_weak_reduction.v not built: backend digital_device
+verilog/07_gate_switch_level/tri0_tri1_pull_strength.v not built: backend digital_device
+verilog/07_gate_switch_level/trireg_capacitive_hold.v not built: backend digital_device
+verilog/07_gate_switch_level/trireg_charge_decay.v not built: backend digital_device
+verilog/07_gate_switch_level/two_named_arrays.v not built: backend digital_device
+verilog/07_gate_switch_level/unordered_delay_triples.v not built: backend digital_device
+verilog/07_gate_switch_level/wired_ambiguous_strength.v not built: backend digital_device
+verilog/07_gate_switch_level/wired_equal_strength_table.v not built: backend digital_device
+verilog/07_gate_switch_level/wired_logic_under_strength.v not built: backend digital_device
+verilog/07_gate_switch_level/wired_unequal_strength.v not built: backend digital_device
+verilog/08_udp/combinational_reg_rejected.v not built: backend digital_device
 verilog/08_udp/definition_inside_module_rejected.v rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `q``, new `error[E0205]: unsupported module item: found table`
-verilog/08_udp/initial_to_input_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/08_udp/multibit_initial_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/08_udp/output_not_first_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §8.1.1: the output port shall be the first port of a UDP`, new `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port, and it is the first port`
-verilog/08_udp/sequential_without_reg_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/08_udp/three_delays_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §8.6: a UDP instance takes at most two delays`, new `error[E0239]: a UDP instance's delay is more than a delay2: `inv #(…) g`: 3 value(s)`
-verilog/08_udp/two_outputs_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port`, new `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port, and it is the first port`
+verilog/08_udp/definition_placement.v not built: backend digital_device
+verilog/08_udp/header_forms.v not built: backend digital_device
+verilog/08_udp/initial_to_input_rejected.v not built: backend digital_device
+verilog/08_udp/initial_values.v not built: backend digital_device
+verilog/08_udp/input_minimums.v not built: backend digital_device
+verilog/08_udp/instance_array.v not built: backend digital_device
+verilog/08_udp/instances.v not built: backend digital_device
+verilog/08_udp/jk_edge_ff.v not built: backend digital_device
+verilog/08_udp/multibit_initial_rejected.v not built: backend digital_device
+verilog/08_udp/multiplexer.v not built: backend digital_device
+verilog/08_udp/output_bit_select.v not built: backend digital_device
+verilog/08_udp/output_reg_initializer.v not built: backend digital_device
+verilog/08_udp/overlapping_entries_agree.v not built: backend digital_device
+verilog/08_udp/sequential_64_inputs.v not built: backend digital_device
+verilog/08_udp/sequential_hold_agrees.v not built: backend digital_device
+verilog/08_udp/sequential_without_reg_rejected.v not built: backend digital_device
+verilog/08_udp/table_symbols.v not built: backend digital_device
+verilog/08_udp/two_delays.v not built: backend digital_device
+verilog/08_udp/udp_65_inputs.v not built: backend digital_device
+verilog/08_udp/udp_comb.v not built: backend digital_device
+verilog/08_udp/udp_comb_level.v not built: backend digital_device
+verilog/08_udp/udp_dff.v not built: backend digital_device
+verilog/08_udp/udp_header_order.v not built: backend digital_device
+verilog/08_udp/udp_initial_instance_delay.v not built: backend digital_device
+verilog/08_udp/udp_input_x.v not built: backend digital_device
+verilog/08_udp/udp_latch.v not built: backend digital_device
 verilog/08_udp/udp_named_terminal_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1100]: digital source execution failed: §8: a UDP instance connects its terminals by position, none left open`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `triage_pass` primitive`
 verilog/08_udp/udp_null_terminal_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1100]: digital source execution failed: §8: a UDP instance connects its terminals by position, none left open`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `mux` primitive`
-verilog/09_behavioral_modeling/event_array_posedge_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/09_behavioral_modeling/event_array_selector_trigger_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/09_behavioral_modeling/event_used_before_declaration_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/09_behavioral_modeling/multiple_default_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/08_udp/udp_one_edge.v not built: backend digital_device
+verilog/08_udp/udp_potential_edges_dominance.v not built: backend digital_device
+verilog/09_behavioral_modeling/always_without_timing_control.v not built: backend digital_device
+verilog/09_behavioral_modeling/assignment_assign_deassign.v not built: backend digital_device
+verilog/09_behavioral_modeling/assignment_force_release.v not built: backend digital_device
+verilog/09_behavioral_modeling/block_name_reference.v not built: backend digital_device
+verilog/09_behavioral_modeling/block_parameter_and_event.v not built: backend digital_device
+verilog/09_behavioral_modeling/blocking_order_and_target.v not built: backend digital_device
+verilog/09_behavioral_modeling/case_linear_search.v not built: backend digital_device
+verilog/09_behavioral_modeling/concatenation_lvalue.v not built: backend digital_device
+verilog/09_behavioral_modeling/concatenation_targets.v not built: backend digital_device
+verilog/09_behavioral_modeling/constant_case_expression.v not built: backend digital_device
+verilog/09_behavioral_modeling/control.v not built: backend digital_device
+verilog/09_behavioral_modeling/delay_values.v not built: backend digital_device
+verilog/09_behavioral_modeling/dont_care_examples.v not built: backend digital_device
+verilog/09_behavioral_modeling/edge_detection.v not built: backend digital_device
+verilog/09_behavioral_modeling/event_array.v not built: backend digital_device
+verilog/09_behavioral_modeling/event_array_automatic.v not built: backend digital_device
+verilog/09_behavioral_modeling/event_array_native_automatic.v not built: backend digital_device
+verilog/09_behavioral_modeling/event_array_native_effects.v not built: backend digital_device
+verilog/09_behavioral_modeling/event_array_native_selection.v not built: backend digital_device
+verilog/09_behavioral_modeling/event_array_posedge_rejected.v not built: backend digital_device
+verilog/09_behavioral_modeling/event_array_selector_trigger_rejected.v not built: backend digital_device
+verilog/09_behavioral_modeling/event_arrays.v not built: backend digital_device
+verilog/09_behavioral_modeling/event_or.v not built: backend digital_device
+verilog/09_behavioral_modeling/event_used_before_declaration_rejected.v not built: backend digital_device
+verilog/09_behavioral_modeling/expression_event.v not built: backend digital_device
+verilog/09_behavioral_modeling/force_immediate.v not built: backend digital_device
+verilog/09_behavioral_modeling/force_net_selects.v not built: backend digital_device
+verilog/09_behavioral_modeling/force_wire_array_element.v not built: backend digital_device
+verilog/09_behavioral_modeling/forever_without_timing_rejected.v not built: backend digital_device
+verilog/09_behavioral_modeling/fork_join_is_concurrent.v not built: backend digital_device
+verilog/09_behavioral_modeling/if_else_if_chain.v not built: backend digital_device
+verilog/09_behavioral_modeling/if_truth_and_else_binding.v not built: backend digital_device
+verilog/09_behavioral_modeling/implicit_sensitivity_cascade.v not built: backend digital_device
+verilog/09_behavioral_modeling/implicit_sensitivity_paren_star.v not built: backend digital_device
+verilog/09_behavioral_modeling/implicit_sensitivity_star.v not built: backend digital_device
+verilog/09_behavioral_modeling/initial_and_always.v not built: backend digital_device
+verilog/09_behavioral_modeling/intra_assign_delay.v not built: backend digital_device
+verilog/09_behavioral_modeling/intra_assignment_delay_blocking.v not built: backend digital_device
+verilog/09_behavioral_modeling/intra_assignment_delay_nonblocking.v not built: backend digital_device
+verilog/09_behavioral_modeling/intra_assignment_event_blocking.v not built: backend digital_device
+verilog/09_behavioral_modeling/loop_rules.v not built: backend digital_device
+verilog/09_behavioral_modeling/lvalue_forms.v not built: backend digital_device
+verilog/09_behavioral_modeling/multiple_default_rejected.v not built: backend digital_device
+verilog/09_behavioral_modeling/named_block_reg.v not built: backend digital_device
+verilog/09_behavioral_modeling/named_block_variables.v not built: backend digital_device
+verilog/09_behavioral_modeling/named_event_digital.v not built: backend digital_device
+verilog/09_behavioral_modeling/named_event_has_no_memory.v not built: backend digital_device
+verilog/09_behavioral_modeling/named_event_silent_always.v not built: backend digital_device
+verilog/09_behavioral_modeling/named_fork_declarations.v not built: backend digital_device
+verilog/09_behavioral_modeling/native_concat_targets.v not built: backend digital_device
+verilog/09_behavioral_modeling/native_force_many_selects_of_one_net.v not built: backend digital_device
+verilog/09_behavioral_modeling/native_force_net_selects.v not built: backend digital_device
+verilog/09_behavioral_modeling/native_real_events.v not built: backend digital_device
+verilog/09_behavioral_modeling/native_real_scalar_nba.v not built: backend digital_device
+verilog/09_behavioral_modeling/native_select_events.v not built: backend digital_device
+verilog/09_behavioral_modeling/native_select_timing.v not built: backend digital_device
+verilog/09_behavioral_modeling/native_wide_event_indices.v not built: backend digital_device
+verilog/09_behavioral_modeling/nba_event_control_region.v not built: backend digital_device
+verilog/09_behavioral_modeling/nba_event_control_update_region.v not built: backend digital_device
+verilog/09_behavioral_modeling/nba_index_snapshot.v not built: backend digital_device
+verilog/09_behavioral_modeling/nba_pending_updates.v not built: backend digital_device
+verilog/09_behavioral_modeling/nba_same_time_updates.v not built: backend digital_device
+verilog/09_behavioral_modeling/negative_signed_delay.v not built: backend digital_device
+verilog/09_behavioral_modeling/nonblocking_event_control.v not built: backend digital_device
+verilog/09_behavioral_modeling/nonblocking_scheduling.v not built: backend digital_device
+verilog/09_behavioral_modeling/parallel_block_timing.v not built: backend digital_device
+verilog/09_behavioral_modeling/real_negative_zero.v not built: backend digital_device
+verilog/09_behavioral_modeling/real_parameter_delay.v not built: backend digital_device
+verilog/09_behavioral_modeling/repeat_count_any_width.v not built: backend digital_device
+verilog/09_behavioral_modeling/repeat_event_control.v not built: backend digital_device
+verilog/09_behavioral_modeling/repeat_unsigned_64bit_count.v not built: backend digital_device
+verilog/09_behavioral_modeling/sched_implicit_event_exclusion.v not built: backend digital_device
+verilog/09_behavioral_modeling/sched_implicit_lhs_index.v not built: backend digital_device
+verilog/09_behavioral_modeling/sched_implicit_reads_nothing.v not built: backend digital_device
+verilog/09_behavioral_modeling/sched_implicit_write_only.v not built: backend digital_device
+verilog/09_behavioral_modeling/sched_wait_constant.v not built: backend digital_device
+verilog/09_behavioral_modeling/sched_wait_expression.v not built: backend digital_device
+verilog/09_behavioral_modeling/select_edge.v not built: backend digital_device
+verilog/09_behavioral_modeling/select_edge_glitch.v not built: backend digital_device
+verilog/09_behavioral_modeling/sequential_block.v not built: backend digital_device
+verilog/09_behavioral_modeling/specify_block_specparam.v not built: backend digital_device
+verilog/09_behavioral_modeling/undeclared_event_rejected.v not built: backend digital_lowering
 verilog/09_behavioral_modeling/unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
 verilog/09_behavioral_modeling/unnamed_fork_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
-verilog/10_tasks_functions/constant_function_hierarchical_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/10_tasks_functions/function_enables_task_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function cannot enable a task`, new `error[E0214]: expected '<+' or '=': found `;``
-verilog/10_tasks_functions/function_event_trigger_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/10_tasks_functions/function_nonblocking_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function body cannot contain a nonblocking assignment`, new `error[E0214]: expected '<+' or '=': found `;``
-verilog/10_tasks_functions/function_output_argument_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function argument is an input, not an output or inout`, new `error[E0207]: unexpected token: found `output`: A.2.6 gives a function `input` formals only; an `analog function` or a task takes `output``
-verilog/10_tasks_functions/function_scope_object_named_as_function_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/10_tasks_functions/function_time_control_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function body cannot contain a time control`, new `error[E0254]: a delay control in an analog block`
-verilog/10_tasks_functions/function_without_input_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.1: a function shall have at least one input declared`, new `error[E0224]: an analog function declares no formal argument: `f` has an empty formal list`
+verilog/09_behavioral_modeling/untimed_loop_under_budget.v not built: backend digital_device
+verilog/09_behavioral_modeling/wait_is_level_sensitive.v not built: backend digital_device
+verilog/09_behavioral_modeling/zero_delay_always_rejected.v not built: backend digital_device
+verilog/10_tasks_functions/automatic_activation_events.v not built: backend digital_device
+verilog/10_tasks_functions/automatic_subroutine_parameters.v not built: backend digital_device
+verilog/10_tasks_functions/constant_function_clogb2.v not built: backend digital_device
+verilog/10_tasks_functions/constant_function_generate_condition.v not built: backend digital_device
+verilog/10_tasks_functions/constant_function_hierarchical_rejected.v not built: backend digital_device
+verilog/10_tasks_functions/constant_function_named_block.v not built: backend digital_device
+verilog/10_tasks_functions/constant_function_parameters.v not built: backend digital_device
+verilog/10_tasks_functions/constant_function_system_task_ignored.v not built: backend digital_device
+verilog/10_tasks_functions/disable_ancestor_block.v not built: backend digital_device
+verilog/10_tasks_functions/disable_ancestor_task.v not built: backend digital_device
+verilog/10_tasks_functions/disable_block_in_function.v not built: backend digital_device
+verilog/10_tasks_functions/disable_named_block.v not built: backend digital_device
+verilog/10_tasks_functions/disable_recursive_task.v not built: backend digital_device
+verilog/10_tasks_functions/disable_self_block.v not built: backend digital_device
+verilog/10_tasks_functions/disable_sibling_block.v not built: backend digital_device
+verilog/10_tasks_functions/disable_sibling_task.v not built: backend digital_device
+verilog/10_tasks_functions/factorial.v not built: backend digital_device
+verilog/10_tasks_functions/function_automatic_recursion.v not built: backend digital_device
+verilog/10_tasks_functions/function_call_operand.v not built: backend digital_device
+verilog/10_tasks_functions/function_declaration_forms.v not built: backend digital_device
+verilog/10_tasks_functions/function_enables_task_rejected.v not built: backend digital_device
+verilog/10_tasks_functions/function_event_trigger_rejected.v not built: backend digital_device
+verilog/10_tasks_functions/function_nonblocking_rejected.v not built: backend digital_device
+verilog/10_tasks_functions/function_output_argument_rejected.v not built: backend digital_device
+verilog/10_tasks_functions/function_return_variable.v not built: backend digital_device
+verilog/10_tasks_functions/function_return_width_is_the_boundary.v not built: backend digital_device
+verilog/10_tasks_functions/function_scope_object_named_as_function_rejected.v not built: backend digital_device
+verilog/10_tasks_functions/function_time_control_rejected.v not built: backend digital_device
+verilog/10_tasks_functions/function_without_input_rejected.v not built: backend digital_device
 verilog/10_tasks_functions/module_object_named_as_function_rejected.v not built: backend digital_lowering
-verilog/12_hierarchy/assign_before_net_declaration_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/connections_to_portless_module_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: more port connections than the module has ports`, new `error[E0906]: port connections do not match the module's ports: `noports` declares 0 ports, and this instance connects 1`
-verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/defparam_across_generate_instances_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/defparam_early_resolution_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.8.2: this defparam's hierarchical name was resolved before the hierarchy was complete and would resolve diff`, new `error[E0907]: override names no parameter of the module: `m.n.p` names no parameter of the elab
-verilog/12_hierarchy/defparam_names_no_parameter_rejected.v rw-comp (elab) message: stderr: line 1: old `error[E0907]: override names no parameter of the module: §12.2.1: this defparam names `Z`, which is no parameter of its module`, new `error[E0907]: override names no parameter of the module: `Z` is not a parameter of `inner``
-verilog/12_hierarchy/defparam_names_nothing_rejected.v rw-comp (elab): stderr: line 1: old `error[E0901]: hierarchical name names nothing in the elaborated design: §12.2.1: this defparam's hierarchical name `foo` names nothing in the design`, new `error[E0907]: override names no parameter of the module: `foo` is not a parameter of `triage_defparam_name
-verilog/12_hierarchy/defparam_nonconstant_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element`, new `error[E0907]: override names no parameter of the module: `u[1].x.p` names no parameter of the e
-verilog/12_hierarchy/duplicate_port_name_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/extra_ordered_connection_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: more port connections than the module has ports`, new `error[E0906]: port connections do not match the module's ports: `m` declares 2 ports, and this instance connects 3`
-verilog/12_hierarchy/extra_ordered_parameter_value_ignored.v rw-comp (elab): stderr: line 1: old `warning[W1155]: device digital tick is 1 s: module `triage_extra_ordered_parameter_value_ignored`: no `timescale sets a finer precision`, new `error[E0907]: override names no parameter of the module: `sub` declares 0 overridable parameters, and this instance over
-verilog/12_hierarchy/extra_ordered_value_ignored.v rw-comp (elab): stderr: line 1: old `warning[W1155]: device digital tick is 1 s: module `b_12_2_2_1_extra_ordered_value_ignored`: no `timescale sets a finer precision`, new `error[E0907]: override names no parameter of the module: `my_mem` declares 2 overridable parameters, and this instance overrid
-verilog/12_hierarchy/listed_port_undeclared_rejected.v rw-comp (astgen): stderr: line 1: old `error[E1100]: digital source execution failed: §12.3.3: port `b` has no direction declaration`, new `error[E0376]: port has no direction declaration: port `b` of module `m` is not declared `input`, `output` or `inout``
-verilog/12_hierarchy/localparam_override_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/mixed_ordered_named_ports_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.3.6: an instance mixes ordered and named port connections`, new `error[E0906]: port connections do not match the module's ports: an ordered connection in a list of named connections`
-verilog/12_hierarchy/named_connection_to_concatenation_port_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: the instantiated module has no such port`, new `error[E0906]: port connections do not match the module's ports: `c` is not a port of `complex_ports``
+verilog/10_tasks_functions/native_real_subroutines.v not built: backend digital_device
+verilog/10_tasks_functions/nested_task_completion.v not built: backend digital_device
+verilog/10_tasks_functions/nonansi_function_port_typed_later.v not built: backend digital_device
+verilog/10_tasks_functions/nonansi_task_output_reg_port.v not built: backend digital_device
+verilog/10_tasks_functions/nonansi_task_port_completion.v not built: backend digital_device
+verilog/10_tasks_functions/nonansi_task_real_port.v not built: backend digital_device
+verilog/10_tasks_functions/real_function_return.v not built: backend digital_device
+verilog/10_tasks_functions/recursion_past_1024.v not built: backend digital_device
+verilog/10_tasks_functions/recursion_without_end_rejected.v not built: backend digital_device
+verilog/10_tasks_functions/recursive_task_copyback.v not built: backend digital_device
+verilog/10_tasks_functions/recursive_task_fork_join.v not built: backend digital_device
+verilog/10_tasks_functions/static_task_item_hierarchical.v not built: backend digital_device
+verilog/10_tasks_functions/task_argument_passing.v not built: backend digital_device
+verilog/10_tasks_functions/task_concurrent_storage.v not built: backend digital_device
+verilog/10_tasks_functions/task_copy_timing.v not built: backend digital_device
+verilog/10_tasks_functions/task_declaration_forms.v not built: backend digital_device
+verilog/10_tasks_functions/task_function_distinctions.v not built: backend digital_device
+verilog/10_tasks_functions/task_output_lifetime.v not built: backend digital_device
+verilog/10_tasks_functions/task_recursive_timed_automatic.v not built: backend digital_device
+verilog/10_tasks_functions/task_static_lifetime.v not built: backend digital_device
+verilog/10_tasks_functions/task_storage_per_instance.v not built: backend digital_device
+verilog/10_tasks_functions/timed_subroutine_parameters.v not built: backend digital_device
+verilog/11_scheduling/auto_state_never_written.v not built: backend digital_device
+verilog/11_scheduling/auto_state_rerun.v not built: backend digital_device
+verilog/11_scheduling/auto_state_two.v not built: backend digital_device
+verilog/11_scheduling/procedural_continuous_tracks_sources.v not built: backend digital_device
+verilog/11_scheduling/region_order.v not built: backend digital_device
+verilog/11_scheduling/sched_allowed_active_race.v not built: backend digital_device
+verilog/11_scheduling/sched_blocking_target_return.v not built: backend digital_device
+verilog/11_scheduling/sched_constant_ports.v not built: backend digital_device
+verilog/11_scheduling/sched_fork_arm_chain_order.v not built: backend digital_device
+verilog/11_scheduling/sched_fork_arm_wake_order.v not built: backend digital_device
+verilog/11_scheduling/sched_node_wake_order.v not built: backend digital_device
+verilog/11_scheduling/sched_task_copy_timing.v not built: backend digital_device
+verilog/11_scheduling/scheduling.v not built: backend digital_device
+verilog/11_scheduling/switch_x_gate.v not built: backend digital_device
+verilog/11_scheduling/terminal_and_port_connections.v not built: backend digital_device
+verilog/11_scheduling/update_events.v not built: backend digital_device
+verilog/11_scheduling/zero_delay_loop_rejected.v not built: backend digital_device
+verilog/12_hierarchy/assign_before_net_declaration_rejected.v not built: backend digital_device
+verilog/12_hierarchy/defparam_absolute_inside_array_element.v not built: backend digital_device
+verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v not built: backend digital_device
+verilog/12_hierarchy/defparam_across_generate_instances_rejected.v not built: backend digital_device
+verilog/12_hierarchy/defparam_before_generate.v not built: backend digital_device
+verilog/12_hierarchy/defparam_early_resolution_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.8.2: this defparam's hierarchical name was resolved before the hierarchy was complete and would resolve diff`, new `error[E0907]: override names no parameter of the module: `n.m.n.p` names no parameter of the el
+verilog/12_hierarchy/defparam_inside_generate_block.v not built: backend digital_device
+verilog/12_hierarchy/defparam_last_wins.v not built: backend digital_device
+verilog/12_hierarchy/defparam_names_nothing_rejected.v rw-comp (elab): stderr: line 1: old `error[E0901]: hierarchical name names nothing in the elaborated design: §12.2.1: this defparam's hierarchical name `foo` names nothing in the design`, new `error[E0907]: override names no parameter of the module: §12.2.1: this defparam names `foo`, which is no 
+verilog/12_hierarchy/defparam_nonconstant_rejected.v not built: backend digital_device
+verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element`, new `error[E0907]: override names no parameter of the module: `u[0].u[1].x.p` names no parameter of 
+verilog/12_hierarchy/defparam_upward_and_indexed_paths.v not built: backend digital_device
+verilog/12_hierarchy/direct_nesting_and_recursion.v not built: backend digital_device
+verilog/12_hierarchy/duplicate_module_later_wins.v not built: backend digital_device
+verilog/12_hierarchy/duplicate_port_name_rejected.v not built: backend digital_device
+verilog/12_hierarchy/explicit_port_names.v not built: backend digital_device
+verilog/12_hierarchy/external_type_cells.v not built: backend digital_device
+verilog/12_hierarchy/extra_ordered_parameter_value_ignored.v not built: backend digital_device
+verilog/12_hierarchy/extra_ordered_value_ignored.v not built: backend digital_device
+verilog/12_hierarchy/ffnand_instances.v not built: backend digital_device
+verilog/12_hierarchy/function_in_generate_block.v not built: backend digital_device
+verilog/12_hierarchy/function_port_range_scope_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/generate_block_continuous_assign.v not built: backend digital_device
+verilog/12_hierarchy/generate_block_variables.v not built: backend digital_device
+verilog/12_hierarchy/generate_localparam_visible.v not built: backend digital_device
+verilog/12_hierarchy/generate_loop_and_case.v not built: backend digital_device
+verilog/12_hierarchy/generate_past_65536_iterations.v not built: backend digital_device
+verilog/12_hierarchy/generate_region_optional.v not built: backend digital_device
+verilog/12_hierarchy/generate_scopes_in_names.v not built: backend digital_device
+verilog/12_hierarchy/generate_select_per_iteration.v not built: backend digital_device
+verilog/12_hierarchy/genvar_hierarchical_index.v not built: backend digital_device
+verilog/12_hierarchy/gray2bin_continuous_assign.v not built: backend digital_device
+verilog/12_hierarchy/hierarchical_path_names.v not built: backend digital_device
+verilog/12_hierarchy/hierarchical_task_call_suspends.v not built: backend digital_device
+verilog/12_hierarchy/hierarchy_deeper_than_64.v not built: backend digital_device
+verilog/12_hierarchy/hierarchy_explicit_port_concat.v not built: backend digital_device
+verilog/12_hierarchy/hierarchy_port_signedness.v not built: backend digital_device
+verilog/12_hierarchy/hierarchy_simple_name_stops_at_module_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/hierarchy_unselected_instance_not_top.v not built: backend digital_device
+verilog/12_hierarchy/hierarchy_upward_reference.v not built: backend digital_device
+verilog/12_hierarchy/implicit_net_in_instance_expression.v not built: backend digital_device
+verilog/12_hierarchy/inout_net_expressions.v not built: backend digital_device
+verilog/12_hierarchy/instance_array_concat_port.v not built: backend digital_device
+verilog/12_hierarchy/instance_array_constant_port.v not built: backend digital_device
+verilog/12_hierarchy/instance_array_width_product.v not built: backend digital_device
+verilog/12_hierarchy/instance_select.v not built: backend digital_device
+verilog/12_hierarchy/instance_select_out_of_range_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/internal_type_cells.v not built: backend digital_device
+verilog/12_hierarchy/localparam_override_rejected.v not built: backend digital_device
+verilog/12_hierarchy/module_header_forms.v not built: backend digital_device
+verilog/12_hierarchy/module_without_process.v not built: backend digital_device
+verilog/12_hierarchy/named_block_items.v not built: backend digital_device
+verilog/12_hierarchy/net_type_warning.v not built: backend digital_device
 verilog/12_hierarchy/no_top_level_module_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/null_port_extra_connection_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: more port connections than the module has ports`, new `error[E0906]: port connections do not match the module's ports: `null_leaf` declares 4 ports, and this instance connects 5`
-verilog/12_hierarchy/parameter_assigned_twice_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.2.2: parameter `size` is assigned twice`, new `error[E0908]: a parameter is overridden more than once: `size` is given more than one value`
-verilog/12_hierarchy/port_connected_twice_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.3.6: port `a` is connected twice`, new `error[E0906]: port connections do not match the module's ports: `a` is connected twice`
-verilog/12_hierarchy/port_input_width_extends.v rw-codegen (codegen) message: exit status old 1, new 0
-verilog/12_hierarchy/port_output_width_truncates.v rw-codegen (codegen) message: exit status old 1, new 0
-verilog/12_hierarchy/port_width_mismatch_vams_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/real_connected_to_port_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/12_hierarchy/non_ancestor_module_name_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/null_port_combinations.v not built: backend digital_device
+verilog/12_hierarchy/output_reg_inherits_port_sign.v not built: backend digital_device
+verilog/12_hierarchy/override_type_and_range.v not built: backend digital_device
+verilog/12_hierarchy/param_width_per_instance.v not built: backend digital_device
+verilog/12_hierarchy/parameter_assignment_forms.v not built: backend digital_device
+verilog/12_hierarchy/parameter_dependence.v not built: backend digital_device
+verilog/12_hierarchy/port_ansi_output_reg.v not built: backend digital_device
+verilog/12_hierarchy/port_concat_matching_width.v not built: backend digital_device
+verilog/12_hierarchy/port_driver_resolution.v not built: backend digital_device
+verilog/12_hierarchy/port_input_width_extends.v not built: backend digital_device
+verilog/12_hierarchy/port_output_width_truncates.v not built: backend digital_device
+verilog/12_hierarchy/port_signed_inheritance.v not built: backend digital_device
+verilog/12_hierarchy/port_width_mismatch_vams_rejected.v not built: backend digital_device
+verilog/12_hierarchy/real_and_signed_overrides.v not built: backend digital_device
+verilog/12_hierarchy/real_connected_to_port_rejected.v not built: backend digital_device
+verilog/12_hierarchy/real_through_bits.v not built: backend digital_device
+verilog/12_hierarchy/scope_implicit_net_lhs.v not built: backend digital_device
+verilog/12_hierarchy/scope_lexical_shadow.v not built: backend digital_device
+verilog/12_hierarchy/select_and_concatenation_ports.v not built: backend digital_device
+verilog/12_hierarchy/select_sinks.v not built: backend digital_device
+verilog/12_hierarchy/select_warning.v not built: backend digital_device
 verilog/12_hierarchy/self_instantiation_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/unknown_parameter_name_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.2.2: the module has no such parameter: `width``, new `error[E0907]: override names no parameter of the module: `width` is not a parameter of `vdff``
-verilog/12_hierarchy/unknown_port_name_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: the instantiated module has no such port`, new `error[E0906]: port connections do not match the module's ports: `zz` is not a port of `m``
-verilog/12_hierarchy/unnamed_block_referenced_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/12_hierarchy/structural_sinks_and_expression_sources.v not built: backend digital_device
+verilog/12_hierarchy/two_top_level_modules.v not built: backend digital_device
+verilog/12_hierarchy/unnamed_block_referenced_rejected.v not built: backend digital_device
+verilog/12_hierarchy/uwire_port.v not built: backend digital_device
+verilog/12_hierarchy/variable_port_select_sinks.v not built: backend digital_device
 verilog/13_configuration/cell_not_in_its_library_rejected.v not built: backend libmap
+verilog/13_configuration/cell_use_binds_named_cell.v not built: backend digital_device
 verilog/13_configuration/cfg1_default_liblist.v not built: backend libmap
 verilog/13_configuration/cfg2_gate_first.v not built: backend libmap
 verilog/13_configuration/cfg3_cell_use.v not built: backend libmap
 verilog/13_configuration/cfg4_instance_liblist.v not built: backend libmap
 verilog/13_configuration/cfg6_hierarchical.v not built: backend libmap
 verilog/13_configuration/command_line_search_order.v not built: backend libmap
+verilog/13_configuration/config_binding_display.v not built: backend digital_device
+verilog/13_configuration/config_cell_liblist.v not built: backend digital_device
+verilog/13_configuration/config_default_liblist.v not built: backend digital_device
+verilog/13_configuration/config_design_select.v not built: backend digital_device
 verilog/13_configuration/config_in_map_rejected.v not built: backend libmap
+verilog/13_configuration/config_named_like_module.v not built: backend digital_device
 verilog/13_configuration/config_overrides_command_line.v not built: backend libmap
 verilog/13_configuration/default_search_order.v not built: backend libmap
-verilog/13_configuration/design_cell_missing_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/13_configuration/design_names_config_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/13_configuration/every_config_referenced_rejected.v rw-comp (elab): exit status old 1, new 0
+verilog/13_configuration/design_cell_missing_rejected.v not built: backend digital_device
+verilog/13_configuration/design_names_config_rejected.v not built: backend digital_device
+verilog/13_configuration/empty_liblist_parent_library.v not built: backend digital_device
+verilog/13_configuration/every_config_referenced_rejected.v not built: backend digital_device
+verilog/13_configuration/every_instance_bound.v not built: backend digital_device
+verilog/13_configuration/every_rule_form.v not built: backend digital_device
+verilog/13_configuration/hierarchical_config.v not built: backend digital_device
 verilog/13_configuration/include_map.v not built: backend libmap
+verilog/13_configuration/instance_use_binds_named_cell.v not built: backend digital_device
 verilog/13_configuration/library_without_path_rejected.v not built: backend libmap
+verilog/13_configuration/multiple_top_cells.v not built: backend digital_device
 verilog/13_configuration/parent_library_by_map.v not built: backend libmap
 verilog/13_configuration/resolution_order.v not built: backend libmap
-verilog/13_configuration/rule_inside_other_config_rejected.v rw-comp (elab): exit status old 1, new 0
+verilog/13_configuration/rule_inside_other_config_rejected.v not built: backend digital_device
+verilog/13_configuration/same_name_cell_last_wins.v not built: backend digital_device
 verilog/13_configuration/source_text_in_map_rejected.v not built: backend libmap
 verilog/13_configuration/two_libraries_match_rejected.v not built: backend libmap
-verilog/13_configuration/two_unreferenced_configs_rejected.v rw-comp (elab): exit status old 1, new 0
-verilog/13_configuration/unbound_instance_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: undeclared module in instantiation: no library of the search order (work) holds cell `absent``, new `error[E0904]: instance names no module: `absent``
+verilog/13_configuration/two_unreferenced_configs_rejected.v not built: backend digital_device
 verilog/13_configuration/undeclared_library_rejected.v not built: backend libmap
-verilog/18_vcd/dumpports_duplicate_scope_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/18_vcd/dumpports_same_file_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/18_vcd/dumpports_variable_scope_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/19_compiler_directives/ams_keywords_instance_names.v rw-codegen (codegen) message: exit status old 1, new 0
+verilog/14_specify_blocks/delay_selection.v not built: backend digital_device
+verilog/14_specify_blocks/edge_sensitive_paths.v not built: backend digital_device
+verilog/14_specify_blocks/edge_state_dependent_paths.v not built: backend digital_device
+verilog/14_specify_blocks/full_parallel_paths.v not built: backend digital_device
+verilog/14_specify_blocks/ifnone.v not built: backend digital_device
+verilog/14_specify_blocks/mintypmax_path_delays.v not built: backend digital_device
+verilog/14_specify_blocks/module_paths.v not built: backend digital_device
+verilog/14_specify_blocks/negative_pulse_showcancelled.v not built: backend digital_device
+verilog/14_specify_blocks/path_and_distributed_delays.v not built: backend digital_device
+verilog/14_specify_blocks/path_delay_values.v not built: backend digital_device
+verilog/14_specify_blocks/polarity.v not built: backend digital_device
+verilog/14_specify_blocks/pulse_default_limits.v not built: backend digital_device
+verilog/14_specify_blocks/pulse_error_window_styles.v not built: backend digital_device
+verilog/14_specify_blocks/pulse_path_specific_limits.v not built: backend digital_device
+verilog/14_specify_blocks/sdf_pulse_limits_override_specparam.v not built: backend digital_device
+verilog/14_specify_blocks/specify_path_bit_drivers.v not built: backend digital_device
+verilog/14_specify_blocks/specify_path_delay_one.v not built: backend digital_device
+verilog/14_specify_blocks/specify_timing_checks_named_by_w0251.v not built: backend digital_device
+verilog/14_specify_blocks/state_dependent_paths.v not built: backend digital_device
+verilog/14_specify_blocks/x_transition_delays.v not built: backend digital_device
+verilog/15_timing_checks/conditions.v not built: backend digital_device
+verilog/15_timing_checks/fullskew_checks_both_orders.v not built: backend digital_device
+verilog/15_timing_checks/hold.v not built: backend digital_device
+verilog/15_timing_checks/negative_timing_disabled_copies_signals.v not built: backend digital_device
+verilog/15_timing_checks/nochange_high_window.v not built: backend digital_device
+verilog/15_timing_checks/notifier.v not built: backend digital_device
+verilog/15_timing_checks/period.v not built: backend digital_device
+verilog/15_timing_checks/recovery.v not built: backend digital_device
+verilog/15_timing_checks/recrem.v not built: backend digital_device
+verilog/15_timing_checks/removal.v not built: backend digital_device
+verilog/15_timing_checks/setup.v not built: backend digital_device
+verilog/15_timing_checks/setuphold.v not built: backend digital_device
+verilog/15_timing_checks/setuphold_delayed_args.v not built: backend digital_device
+verilog/15_timing_checks/setuphold_timecheck_condition.v not built: backend digital_device
+verilog/15_timing_checks/setuphold_timestamp_condition.v not built: backend digital_device
+verilog/15_timing_checks/skew_late_data_notifies.v not built: backend digital_device
+verilog/15_timing_checks/skew_waits_for_data_event.v not built: backend digital_device
+verilog/15_timing_checks/timeskew_missing_event_and_rearm.v not built: backend digital_device
+verilog/15_timing_checks/timeskew_remain_active.v not built: backend digital_device
+verilog/15_timing_checks/timing_check_forms.v not built: backend digital_device
+verilog/15_timing_checks/vector.v not built: backend digital_device
+verilog/15_timing_checks/width.v not built: backend digital_device
+verilog/16_sdf/sdf_absolute_path_delay.v not built: backend digital_device
+verilog/16_sdf/sdf_interconnect_delay.v not built: backend digital_device
+verilog/16_sdf/sdf_label_reevaluates_path.v not built: backend digital_device
+verilog/16_sdf/sdf_min_typ_max_selection.v not built: backend digital_device
+verilog/16_sdf/sdf_multiple_files_scoped.v not built: backend digital_device
+verilog/16_sdf/sdf_ordered_increment.v not built: backend digital_device
+verilog/16_sdf/sdf_timing_check_limit.v not built: backend digital_device
+verilog/17_system_tasks/append_writes_at_end.v not built: backend digital_device
+verilog/17_system_tasks/clog2.v not built: backend digital_device
+verilog/17_system_tasks/closed_channel_not_written.v not built: backend digital_device
+verilog/17_system_tasks/conversions.v not built: backend digital_device
+verilog/17_system_tasks/decimal_field_width_zero_flag.v not built: backend digital_device
+verilog/17_system_tasks/decimal_of_real_width.v not built: backend digital_device
+verilog/17_system_tasks/decimal_over_64_bits.v not built: backend digital_device
+verilog/17_system_tasks/display_decimal_states.v not built: backend digital_device
+verilog/17_system_tasks/display_named_scope.v not built: backend digital_device
+verilog/17_system_tasks/display_packed_ascii.v not built: backend digital_device
+verilog/17_system_tasks/display_radix.v not built: backend digital_device
+verilog/17_system_tasks/display_unknown_radix.v not built: backend digital_device
+verilog/17_system_tasks/display_write_runs.v not built: backend digital_device
+verilog/17_system_tasks/dist_nonpositive_warning.v not built: backend digital_device
+verilog/17_system_tasks/dist_reference.v not built: backend digital_device
+verilog/17_system_tasks/escape_sequences.v not built: backend digital_device
+verilog/17_system_tasks/ferror.v not built: backend digital_device
+verilog/17_system_tasks/fflush.v not built: backend digital_device
+verilog/17_system_tasks/fgets.v not built: backend digital_device
+verilog/17_system_tasks/field_width_past_4096.v not built: backend digital_device
+verilog/17_system_tasks/file_read_position.v not built: backend digital_device
+verilog/17_system_tasks/finish_exits.v not built: backend digital_device
+verilog/17_system_tasks/finish_expression_zero.v not built: backend digital_device
+verilog/17_system_tasks/fmonitor.v not built: backend digital_device
+verilog/17_system_tasks/fopen_write_append_mcd.v not built: backend digital_device
+verilog/17_system_tasks/fread.v not built: backend digital_device
+verilog/17_system_tasks/fscanf.v not built: backend digital_device
+verilog/17_system_tasks/fscanf_unformatted_u.v not built: backend digital_device
+verilog/17_system_tasks/fstrobe.v not built: backend digital_device
+verilog/17_system_tasks/ieee_math_clog2_unsigned.v not built: backend digital_device
+verilog/17_system_tasks/ieee_math_clog2_wide.v not built: backend digital_device
+verilog/17_system_tasks/ieee_math_constant_expression.v not built: backend digital_device
+verilog/17_system_tasks/ieee_math_real_result.v not built: backend digital_device
+verilog/17_system_tasks/itor_real_argument_converts.v not built: backend digital_device
+verilog/17_system_tasks/logic_planes.v not built: backend digital_device
+verilog/17_system_tasks/monitor.v not built: backend digital_device
+verilog/17_system_tasks/monitor_bit_argument.v not built: backend digital_device
+verilog/17_system_tasks/monitor_change_at_finish_printed.v not built: backend digital_device
+verilog/17_system_tasks/monitor_install_settled.v not built: backend digital_device
+verilog/17_system_tasks/monitor_return_to_previous.v not built: backend digital_device
+verilog/17_system_tasks/monitor_time_exception.v not built: backend digital_device
+verilog/17_system_tasks/monitoron_already_enabled.v not built: backend digital_device
+verilog/17_system_tasks/native_binary_file_targets.v not built: backend digital_device
+verilog/17_system_tasks/native_file_input_targets.v not built: backend digital_device
+verilog/17_system_tasks/native_file_scan_targets.v not built: backend digital_device
+verilog/17_system_tasks/native_nested_scan_destinations.v not built: backend digital_device
+verilog/17_system_tasks/native_sformat_dynamic.v not built: backend digital_device
+verilog/17_system_tasks/percent_x_alias.v not built: backend digital_device
+verilog/17_system_tasks/pla_async_personality.v not built: backend digital_device
+verilog/17_system_tasks/pla_plane_ignore.v not built: backend digital_device
+verilog/17_system_tasks/pla_plane_x_worst_case.v not built: backend digital_device
+verilog/17_system_tasks/pla_sync_array_logic.v not built: backend digital_device
+verilog/17_system_tasks/plane_example.v not built: backend digital_device
+verilog/17_system_tasks/plusargs_variable_query.v not built: backend digital_device
+verilog/17_system_tasks/printtimescale_current_scope.v not built: backend digital_device
+verilog/17_system_tasks/printtimescale_named_module.v not built: backend digital_device
+verilog/17_system_tasks/printtimescale_names_parameter.v not built: backend digital_device
+verilog/17_system_tasks/printtimescale_prints_argument.v not built: backend digital_device
+verilog/17_system_tasks/printtimescale_unknown_scope_rejected.v not built: backend digital_lowering
+verilog/17_system_tasks/q_exam.v not built: backend digital_device
+verilog/17_system_tasks/q_exam_code_runtime.v not built: backend digital_device
+verilog/17_system_tasks/q_exam_means.v not built: backend digital_device
+verilog/17_system_tasks/q_exam_peak_length.v not built: backend digital_device
+verilog/17_system_tasks/q_full.v not built: backend digital_device
+verilog/17_system_tasks/queue_capacity_stats.v not built: backend digital_device
+verilog/17_system_tasks/queue_order_payload.v not built: backend digital_device
+verilog/17_system_tasks/queue_status_boundaries.v not built: backend digital_device
+verilog/17_system_tasks/random_seed_reference.v not built: backend digital_device
+verilog/17_system_tasks/read_needs_read_type.v not built: backend digital_device
+verilog/17_system_tasks/readmem_address_outside_memory.v not built: backend digital_device
+verilog/17_system_tasks/readmem_address_outside_task_range.v not built: backend digital_device
+verilog/17_system_tasks/readmem_address_range_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_address_restart.v not built: backend digital_device
+verilog/17_system_tasks/readmem_address_underscore.v not built: backend digital_device
+verilog/17_system_tasks/readmem_address_x_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_address_zero_padding.v not built: backend digital_device
+verilog/17_system_tasks/readmem_binary_file_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_count_warning.v not built: backend digital_device
+verilog/17_system_tasks/readmem_edge_address_bad_digit_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_edge_address_gap_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_edge_address_overflow_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_edge_after_range_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_edge_underscore_leading_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_edge_underscore_only_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_excess_legal_neighbor.v not built: backend digital_device
+verilog/17_system_tasks/readmem_file_name_variable.v not built: backend digital_device
+verilog/17_system_tasks/readmem_file_past_4mib.v not built: backend digital_device
+verilog/17_system_tasks/readmem_invalid_high_binary_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_invalid_high_hex_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_lowest_descending.v not built: backend digital_device
+verilog/17_system_tasks/readmem_malformed_base_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_malformed_base_wide_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_malformed_binary_digit_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_malformed_hex_digit_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_malformed_legal_neighbors.v not built: backend digital_device
+verilog/17_system_tasks/readmem_malformed_punctuation_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_malformed_width_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_malformed_width_wide_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_overflow_rejected.v not built: backend digital_device
+verilog/17_system_tasks/readmem_oversized_legal.v not built: backend digital_device
+verilog/17_system_tasks/readmem_question_z.v not built: backend digital_device
+verilog/17_system_tasks/readmem_start_address_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_start_formfeed.v not built: backend digital_device
+verilog/17_system_tasks/readmem_underscore_legal.v not built: backend digital_device
+verilog/17_system_tasks/readmem_unknown_bound_load_terminated.v not built: backend digital_device
+verilog/17_system_tasks/readmem_variable_bounds.v not built: backend digital_device
+verilog/17_system_tasks/readmem_warn_binary_excess_start.v not built: backend digital_device
+verilog/17_system_tasks/readmem_warn_binary_short_start.v not built: backend digital_device
+verilog/17_system_tasks/readmem_warn_empty.v not built: backend digital_device
+verilog/17_system_tasks/readmem_warn_hex_excess_down.v not built: backend digital_device
+verilog/17_system_tasks/readmem_warn_hex_excess_up.v not built: backend digital_device
+verilog/17_system_tasks/readmem_warn_hex_short_down.v not built: backend digital_device
+verilog/17_system_tasks/readmem_warn_hex_short_up.v not built: backend digital_device
+verilog/17_system_tasks/readmemb_range.v not built: backend digital_device
+verilog/17_system_tasks/readmemh.v not built: backend digital_device
+verilog/17_system_tasks/real_c_flags.v not built: backend digital_device
+verilog/17_system_tasks/real_conversions.v not built: backend digital_device
+verilog/17_system_tasks/real_precision_100.v not built: backend digital_device
+verilog/17_system_tasks/realtime_stored_operand.v not built: backend digital_device
+verilog/17_system_tasks/same_seed_same_value.v not built: backend digital_device
+verilog/17_system_tasks/scope_name_past_64_levels.v not built: backend digital_device
+verilog/17_system_tasks/scope_unnamed_loop_generate.v not built: backend digital_device
+verilog/17_system_tasks/sdf_annotate_rejected.v not built: backend digital_device
+verilog/17_system_tasks/seedless_random_starts_at_seed_0.v not built: backend digital_device
+verilog/17_system_tasks/seek_gap_and_origin.v not built: backend digital_device
+verilog/17_system_tasks/sformat_excess_argument_warning.v not built: backend digital_device
+verilog/17_system_tasks/sformat_variable_format.v not built: backend digital_device
+verilog/17_system_tasks/sscanf_conversions.v not built: backend digital_device
+verilog/17_system_tasks/sscanf_field_rules.v not built: backend digital_device
+verilog/17_system_tasks/sscanf_time_scaled.v not built: backend digital_device
+verilog/17_system_tasks/sscanf_unformatted_z.v not built: backend digital_device
+verilog/17_system_tasks/sscanf_unknown_input.v not built: backend digital_device
+verilog/17_system_tasks/stop_suspends.v not built: backend digital_device
+verilog/17_system_tasks/strength_format.v not built: backend digital_device
+verilog/17_system_tasks/strength_scalar.v not built: backend digital_device
+verilog/17_system_tasks/string_leading_nul_as_space.v not built: backend digital_device
+verilog/17_system_tasks/string_output.v not built: backend digital_device
+verilog/17_system_tasks/string_parameter_prints_decimal.v not built: backend digital_device
+verilog/17_system_tasks/strobe_end_of_step.v not built: backend digital_device
+verilog/17_system_tasks/strobe_expression_args.v not built: backend digital_device
+verilog/17_system_tasks/strobe_scheduling.v not built: backend digital_device
+verilog/17_system_tasks/test_plusargs_absent.v not built: backend digital_device
+verilog/17_system_tasks/time_format_realtime.v not built: backend digital_device
+verilog/17_system_tasks/time_queries.v not built: backend digital_device
+verilog/17_system_tasks/time_rounding.v not built: backend digital_device
+verilog/17_system_tasks/time_stime_wrap.v not built: backend digital_device
+verilog/17_system_tasks/timeformat.v not built: backend digital_device
+verilog/17_system_tasks/timeformat_default_call.v not built: backend digital_device
+verilog/17_system_tasks/timeformat_real_operand.v not built: backend digital_device
+verilog/17_system_tasks/timeformat_runtime_arguments.v not built: backend digital_device
+verilog/17_system_tasks/ungetc_pushback_limit.v not built: backend digital_device
+verilog/17_system_tasks/ungetc_read_routines.v not built: backend digital_device
+verilog/17_system_tasks/unknown_digits.v not built: backend digital_device
+verilog/17_system_tasks/value_plusargs_absent.v not built: backend digital_device
+verilog/17_system_tasks/wide_operand_prints_every_digit.v not built: backend digital_device
+verilog/17_system_tasks/zero_width_format.v not built: backend digital_device
+verilog/17_system_tasks/zero_width_time.v not built: backend digital_device
+verilog/18_vcd/dumpfile_default_name.v not built: backend digital_device
+verilog/18_vcd/dumpfile_variable_name.v not built: backend digital_device
+verilog/18_vcd/dumplimit_stops_with_comment.v not built: backend digital_device
+verilog/18_vcd/dumpports_control_tasks.v not built: backend digital_device
+verilog/18_vcd/dumpports_duplicate_scope_rejected.v not built: backend digital_device
+verilog/18_vcd/dumpports_node_information.v not built: backend digital_device
+verilog/18_vcd/dumpports_same_file_rejected.v not built: backend digital_device
+verilog/18_vcd/dumpports_variable_scope_rejected.v not built: backend digital_device
+verilog/18_vcd/dumpportslimit_stops_with_comment.v not built: backend digital_device
+verilog/18_vcd/dumpvars_later_time_rejected.v not built: backend digital_device
+verilog/18_vcd/event_marker.v not built: backend digital_device
+verilog/18_vcd/example_value_changes.v not built: backend digital_device
+verilog/18_vcd/port_value_changes.v not built: backend digital_device
+verilog/18_vcd/real_value_format.v not built: backend digital_device
+verilog/18_vcd/table_18_2_shortening.v not built: backend digital_device
+verilog/18_vcd/task_function_scopes.v not built: backend digital_device
+verilog/18_vcd/var_sections.v not built: backend digital_device
+verilog/18_vcd/vcd_dumpoff_on.v not built: backend digital_device
+verilog/18_vcd/vcd_dumpvars.v not built: backend digital_device
+verilog/18_vcd/vcd_dumpvars_levels.v not built: backend digital_device
+verilog/18_vcd/version_names_dumpfile_literal.v not built: backend digital_device
+verilog/18_vcd/version_names_dumpfile_variable.v not built: backend digital_device
+verilog/19_compiler_directives/ams_keywords_are_identifiers.v not built: backend digital_device
+verilog/19_compiler_directives/ams_keywords_instance_names.v not built: backend digital_device
+verilog/19_compiler_directives/begin_keywords_2001_noconfig.v not built: backend digital_device
+verilog/19_compiler_directives/celldefine.v not built: backend digital_device
+verilog/19_compiler_directives/conditional_compilation.v not built: backend digital_device
 verilog/19_compiler_directives/default_nettype_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^`
-verilog/19_compiler_directives/timescale_inside_module_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/19_compiler_directives/default_nettype_operand_next_line.v not built: backend digital_device
+verilog/19_compiler_directives/default_nettype_trireg.v not built: backend digital_device
+verilog/19_compiler_directives/default_nettype_uwire.v not built: backend digital_device
+verilog/19_compiler_directives/implicit_net_types.v not built: backend digital_device
+verilog/19_compiler_directives/include_inserts_contents.v not built: backend digital_device
+verilog/19_compiler_directives/include_relative_file.v not built: backend digital_device
+verilog/19_compiler_directives/keyword_versions.v not built: backend digital_device
+verilog/19_compiler_directives/line_directive.v not built: backend digital_device
+verilog/19_compiler_directives/macro_comment_backslash_newline.v not built: backend digital_device
+verilog/19_compiler_directives/macro_string_literal_not_substituted.v not built: backend digital_device
+verilog/19_compiler_directives/macro_text_1800_forms_warn.v not built: backend digital_device
+verilog/19_compiler_directives/no_timescale_is_1s_1s.v not built: backend digital_device
+verilog/19_compiler_directives/noconfig.v not built: backend digital_device
+verilog/19_compiler_directives/none_all_declared.v not built: backend digital_device
+verilog/19_compiler_directives/none_implicit_net_rejected.v not built: backend digital_lowering
+verilog/19_compiler_directives/parameter_example.v not built: backend digital_device
+verilog/19_compiler_directives/pragma_unrecognized_no_effect.v not built: backend digital_device
+verilog/19_compiler_directives/resetall_keeps_begin_keywords.v not built: backend digital_device
+verilog/19_compiler_directives/resetall_restores_defaults.v not built: backend digital_device
+verilog/19_compiler_directives/standard_pragmas.v not built: backend digital_device
+verilog/19_compiler_directives/text_macros.v not built: backend digital_device
+verilog/19_compiler_directives/timescale_delay_round_each.v not built: backend digital_device
+verilog/19_compiler_directives/timescale_inside_module_rejected.v not built: backend digital_device
+verilog/19_compiler_directives/unconnected_drive.v not built: backend digital_device
 verilog/19_compiler_directives/unconnected_drive_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^^^^`
-verilog/28_protected_envelopes/protected_des_base64.v rw-codegen (codegen) message: exit status old 1, new 0
-verilog/28_protected_envelopes/protected_des_uuencode.v rw-codegen (codegen) message: exit status old 1, new 0
-verilog/28_protected_envelopes/protected_eight_nested_envelopes.v rw-codegen (codegen) message: exit status old 1, new 0
-verilog/28_protected_envelopes/protected_md5_digest.v rw-codegen (codegen) message: exit status old 1, new 0
-verilog/28_protected_envelopes/protected_session_key_block.v rw-codegen (codegen) message: exit status old 1, new 0
-verilog/28_protected_envelopes/protected_sha1_digest.v rw-codegen (codegen) message: exit status old 1, new 0
+verilog/19_compiler_directives/unconnected_drive_operand_next_line.v not built: backend digital_device
+verilog/19_compiler_directives/unconnected_drive_pull_meets_the_strength_model.v not built: backend digital_device
+verilog/19_compiler_directives/undef.v not built: backend digital_device
+verilog/19_compiler_directives/units_and_precision.v not built: backend digital_device
+verilog/28_protected_envelopes/protect_author_info_metadata.v not built: backend digital_device
+verilog/28_protected_envelopes/protect_author_metadata.v not built: backend digital_device
+verilog/28_protected_envelopes/protect_comment_metadata.v not built: backend digital_device
+verilog/28_protected_envelopes/protect_encrypt_agent_info_metadata.v not built: backend digital_device
+verilog/28_protected_envelopes/protect_encrypt_agent_metadata.v not built: backend digital_device
+verilog/28_protected_envelopes/protected_des_base64.v not built: backend digital_device
+verilog/28_protected_envelopes/protected_des_uuencode.v not built: backend digital_device
+verilog/28_protected_envelopes/protected_eight_nested_envelopes.v not built: backend digital_device
+verilog/28_protected_envelopes/protected_md5_digest.v not built: backend digital_device
+verilog/28_protected_envelopes/protected_session_key_block.v not built: backend digital_device
+verilog/28_protected_envelopes/protected_sha1_digest.v not built: backend digital_device
 verilog/A_formal_syntax/b_A_1_1_incdir.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_library_text.v not built: backend libmap
-verilog/A_formal_syntax/b_A_2_6_function_output_port_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function argument is an input, not an output or inout`, new `error[E0207]: unexpected token: found `output`: A.2.6 gives a function `input` formals only; an `analog function` or a task takes `output``
+verilog/A_formal_syntax/b_A_1_3_concat_port.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_1_3_null_port.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_1_3_part_select_port.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_1_3_ports.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_1_4_module_items.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_1_5_configuration.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_1_1_parameter_declarations.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_1_1_real_parameters.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_1_2_port_declarations.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_1_3_range_then_delay.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_1_3_type_declarations.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_2_1_net_and_variable_types.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_2_2_strengths.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_2_3_delays.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_2_3_mintypmax_delay.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_3_declaration_lists.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_4_declaration_assignments.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_4_pathpulse_error_limit.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_4_pathpulse_mintypmax.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_5_ranges.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_6_function_declarations.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_6_function_output_port_rejected.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_6_real_functions.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_7_task_declarations.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_8_block_item_declarations.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_2_8_event_and_parameter_items.v not built: backend digital_device
 verilog/A_formal_syntax/b_A_2_8_net_block_item_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found `;``, new `error: could not compile due to 1 previous error(s)`
-verilog/A_formal_syntax/b_A_4_1_mixed_port_connections_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.3.6: an instance mixes ordered and named port connections`, new `error[E0906]: port connections do not match the module's ports: a named connection in a list of ordered connections`
-verilog/A_formal_syntax/b_A_5_2_two_outputs_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port`, new `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port, and it is the first port`
-verilog/A_formal_syntax/b_A_5_4_udp_delay3_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §8.6: a UDP instance takes at most two delays`, new `error[E0239]: a UDP instance's delay is more than a delay2: `b_A_5_4_buf #(…) u`: 3 value(s)`
+verilog/A_formal_syntax/b_A_3_1_gate_instantiations.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_3_1_pass_enable_delay.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_3_2_primitive_strengths.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_3_3_bit_select_terminals.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_3_3_primitive_terminals.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_3_4_gate_and_switch_types.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_4_1_instance_array.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_4_1_module_instantiation.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_4_2_case_generate.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_4_2_generate_constructs.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_5_1_udp_declarations.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_5_3_udp_body.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_5_4_udp_instance_array.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_5_4_udp_instances.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_6_1_continuous_assignments.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_6_2_procedural_assignments.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_6_2_repeat_intra_assignment.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_6_3_named_block_declarations.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_6_3_named_block_reg.v not built: backend digital_device
 verilog/A_formal_syntax/b_A_6_3_unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found k`, new `error: could not compile due to 1 previous error(s)`
-verilog/B_keywords/b_B_keywords.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/A_formal_syntax/b_A_6_4_statements.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_6_5_mintypmax_delay_control.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_6_5_timing_controls.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_6_8_looping_statements.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_6_9_hierarchical_task_enable.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_6_9_task_enables.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_7_1_specify_block.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_7_2_path_declarations.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_7_3_specify_terminals.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_7_4_mintypmax_path_delay.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_7_4_path_delays.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_7_5_system_timing_checks.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_8_1_concatenations.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_8_2_function_calls.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_8_3_expressions.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_8_4_primaries.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_8_5_concatenated_lvalues.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_8_5_lvalues.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_8_6_operators.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_8_7_numbers.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_8_8_strings.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_9_1_attributes.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_9_2_comments.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_9_3_indexed_hierarchical_name.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_9_4_white_space.v not built: backend digital_device
+verilog/A_formal_syntax/b_A_source_text.v not built: backend digital_device
+verilog/A_formal_syntax/grammar_escaped_system_name.v not built: backend digital_device
+verilog/A_formal_syntax/grammar_nullable_statement.v not built: backend digital_device
+verilog/A_formal_syntax/grammar_parameter_header.v not built: backend digital_device
+verilog/B_keywords/b_B_keywords.v not built: backend digital_device

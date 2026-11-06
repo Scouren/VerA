@@ -19,6 +19,7 @@ const SysFn = @import("vams").SysFn;
 const DeclGen = @import("DeclGen.zig");
 const Function = @import("Function.zig");
 const state = @import("state.zig");
+const Liveness = @import("Liveness.zig");
 const Real = Function.Real;
 const Ref = Air.Inst.Ref;
 const Error = DeclGen.Error;
@@ -141,13 +142,45 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Ref
                 try f.print(")", .{});
             } else try f.print(", 32)", .{});
         },
+        // §4.5.14 the partial derivative along unknown `u`'s lane, which
+        // `ddx_reads` (and so `deriv_reads`) then carries.
+        .ddx => {
+            const u = state.intConst(f.dg, args[1]) orelse return f.dg.fail("a `ddx` along no constant unknown", .{});
+            if (u >= Liveness.unknowns_max) return f.dg.fail("a `ddx` past unknown {d}", .{Liveness.unknowns_max});
+            f.dg.ddx_reads |= @as(Liveness.Mask, 1) << @intCast(u);
+            try f.print("S.con((", .{});
+            try f.real(args[0]);
+            try f.print(").ddxAt({d}))", .{u});
+        },
+        // §9.17.3 a user-function `$limit`: Sema inlined the function and
+        // kept its value in the row's slot; the result carries the access
+        // function's derivative (`M.zLimitUf`).
+        .@"limit$uf" => {
+            if (args.len != 2) return f.dg.fail("a malformed `limit$uf` call", .{});
+            try f.kernel(f.dg.live.masks[@backingInt(inst)], "zLimitUf", args);
+        },
+        // The slot's value at the end of the previous iterate
+        // (`advanceIteration`, `state.zig`).
+        .@"limit$old" => {
+            const k = state.intConst(f.dg, args[0]) orelse return f.dg.fail("a malformed `limit$old` call", .{});
+            f.uses.inst = true;
+            try f.print("M.zInst(S, inst, \"limiter_previous__{d}\")", .{k});
+        },
+        // A port access keys no state, so §4.5.15 lets the request be
+        // declined: the access function's value.
+        .@"$limit" => {
+            if (args.len != 1) return f.dg.fail("a §9.17.3 `$limit` string form (the host's `limit` hook)", .{});
+            try f.real(args[0]);
+        },
         // §9.21 a table lookup (`K.table.zTable`), the old `emitTable`.
         .@"$table_model" => try table(f, inst, args),
         else => {
-            // rw-lower's `display$phase` guards a print's operands: a solver
-            // device drops prints, so it answers 0. By name, so this spells
-            // it before and after the tag lands.
-            if (std.mem.eql(u8, @tagName(tag), "display$phase")) return f.print("@as(i64, 0)", .{});
+            // rw-lower's `display$phase` guards a print's operands: `core`
+            // drops prints, so it answers 0, and `say` 1. By name, so this
+            // spells it before and after the tag lands.
+            if (std.mem.eql(u8, @tagName(tag), "display$phase")) return f.print("@as(i64, {d})", .{@intFromBool(f.phase == .say)});
+            // §9.4 a print operand's width marker (`say.zig`): its value.
+            if (std.mem.eql(u8, @tagName(tag), "display$width") and args.len >= 2) return if (int) f.int(args[0]) else f.real(args[0]);
             return f.dg.fail("a call of `{s}`", .{@tagName(tag)}); // not yet spelled by this backend
         },
     }

@@ -7,6 +7,7 @@
 //! - `pub const Sema`
 //! - `pub const digital`
 //! - `pub const fold`
+//! - `pub const locate`
 
 /// The compilation unit's tables.
 pub const Zcu = @import("Zcu.zig");
@@ -17,6 +18,8 @@ pub const digital = @import("Sema/digital.zig");
 /// Emit-time constant folding of Air value tags (diff-kernels holds it to
 /// the device's kernels).
 pub const fold = @import("Sema/fold.zig");
+/// Where an instruction or a part of one was written, as a token.
+pub const locate = @import("Sema/locate.zig");
 
 test {
     _ = Zcu;

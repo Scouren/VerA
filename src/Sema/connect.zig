@@ -110,8 +110,8 @@ fn collectRules(s: *Sema) Allocator.Error![]const Rule {
                 if (ov[1] == .empty) continue;
                 const name = vir.string(ov[1]);
                 const side = if (try discipline.domainOf(s, name) == .continuous) &r.cont else &r.disc;
-                if (!try discipline.compatible(s, side.discipline, name)) {
-                    try s.fail(.E0915, file, i.toRef(), "`{s}` cannot stand for `{s}`'s `{s}` (§3.11.1)", .{ name, mvir.string(zcu.declRow(m).name), zcu.intern_pool.stringToSlice(side.port) });
+                if (try discipline.conflict(s, side.discipline, name)) |why| {
+                    try s.fail(.E0915, file, i.toRef(), "`{s}` cannot stand for `{s}`'s `{s}` ({s})", .{ name, mvir.string(zcu.declRow(m).name), side.discipline, why });
                     break false;
                 }
                 side.discipline = name;
@@ -157,8 +157,8 @@ fn mixedPorts(s: *Sema, rules: []const Rule, p: Instance.Index, c: Instance.Inde
             // discipline (F.2), and a shipped primitive's ports take the
             // net's (E.3.2.2).
             const declared = if (pdecls.get(sig)) |n| n.discipline.len != 0 else false;
-            if (declared and !zcu.isBuiltin(cmod) and !try discipline.compatible(s, up, low))
-                try s.fail(.E0355, pmod.file, zcu.instances.items(.src)[@backingInt(c)], "port `{s}` is `{s}` and its net `{s}` is `{s}`: incompatible disciplines (§3.11.1)", .{ resolve.portName(cvir, formal), low, zcu.intern_pool.stringToSlice(sig), up });
+            if (declared and !zcu.isBuiltin(cmod)) if (try discipline.conflict(s, up, low)) |why|
+                try s.fail(.E0355, pmod.file, actual, "port `{f}.{s}` is of discipline `{s}` and is connected to `{s}`, of discipline `{s}` ({s})", .{ zcu.fmtPathBelowRoot(c), resolve.portName(cvir, formal), low, zcu.intern_pool.stringToSlice(sig), up, why });
             continue;
         }
         const dir = if (cdecls.get(inner)) |n| n.dir else Inst.Direction.none;
@@ -357,12 +357,32 @@ fn analogActual(s: *Sema, file: Zcu.File.Index, vir: *const Vir, c: Instance.Ind
     if (try discipline.domainOf(s, zcu.intern_pool.stringToSlice(low)) != .continuous) return;
     switch (vir.instructions.items(.tag)[@backingInt(i)]) {
         .elem, .slice, .slice_up, .slice_down, .concat, .decl_ref => {},
-        else => return s.fail(.E0906, file, zcu.instances.items(.src)[@backingInt(c)], "port `{s}` is continuous and its connection is an expression, not a net", .{resolve.portName(cvir, formal)}), // else: every other instruction is an expression
+        else => { // else: every other instruction is an expression
+            const src = zcu.instances.items(.src)[@backingInt(c)];
+            const k = connIndex(vir, src, actual) orelse return s.fail(.E0906, file, src, "a port connection must be a net reference", .{});
+            return s.failRule(.{ .part = .{ .conn = k } }, .E0906, file, src, "a port connection must be a net reference", .{});
+        },
     }
     if (vir.instructions.items(.tag)[@backingInt(i)] != .decl_ref) return;
     const d = vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl;
-    if (vir.instructions.items(.tag)[@backingInt(d)] == .variable)
-        try s.fail(.E0906, file, zcu.instances.items(.src)[@backingInt(c)], "port `{s}` is continuous and its connection is a variable: it joins only a net", .{resolve.portName(cvir, formal)});
+    if (vir.instructions.items(.tag)[@backingInt(d)] == .variable) {
+        const cmod = zcu.instances.items(.module)[@backingInt(c)];
+        const name = vir.string(payloadOf(vir, Inst.Variable, d).name);
+        try s.fail(.E0906, file, actual, "`{s}` is a variable, and port `{s}` of `{s}` has the continuous discipline `{s}`: it joins only a net", .{ name, resolve.portName(cvir, formal), cvir.string(zcu.declRow(cmod).name), zcu.intern_pool.stringToSlice(low) });
+    }
+}
+
+/// The position of the connection of instance `src` whose value is
+/// `actual`, or null.
+fn connIndex(vir: *const Vir, src: Inst.Ref, actual: Inst.Ref) ?u32 {
+    assert(actual != .none);
+    const i = src.toIndex() orelse return null;
+    if (vir.instructions.items(.tag)[@backingInt(i)] != .instance) return null;
+    for (vir.list(Inst.Arg, payloadOf(vir, Inst.Instance, i).conns), 0..) |a, k| {
+        const v = vir.body(a.value);
+        if (v.len != 0 and v[v.len - 1].toRef() == actual) return @intCast(k);
+    }
+    return null;
 }
 
 /// Table 7-2 and §7.7.1: statement `r` bridges a port of direction `dir`

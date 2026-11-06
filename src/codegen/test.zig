@@ -112,9 +112,10 @@ test "a construct the backend does not spell yet fails with its name, never writ
     try std.testing.expect(std.mem.find(u8, r.fail, "$random") != null);
 }
 
-test "a print's operands are dead in the residual: no unused local, no call" {
+test "a print's operands are dead in the residual and live in `say`" {
     // §9.4 a `$strobe` runs in the display phase, so the value only it
-    // reads is not emitted (Zig refuses an unused local).
+    // reads is not emitted in `core` (Zig refuses an unused local), and
+    // `say` records it (`say.zig`).
     const gpa = std.testing.allocator;
     var r = try emit(gpa,
         \\module d(a, c);
@@ -128,7 +129,11 @@ test "a print's operands are dead in the residual: no unused local, no call" {
     );
     defer r.deinit(gpa);
     try expectParses(gpa, r.ok.text);
-    try std.testing.expect(std.mem.find(u8, r.ok.text, ".exp()") == null);
+    const at = std.mem.find(u8, r.ok.text, "pub fn say(").?;
+    try std.testing.expect(std.mem.find(u8, r.ok.text[0..at], ".exp()") == null);
+    try std.testing.expect(std.mem.find(u8, r.ok.text[at..], ".exp()") != null);
+    try std.testing.expect(std.mem.find(u8, r.ok.text[at..], "out.put(0, &.{") != null);
+    try std.testing.expect(std.mem.find(u8, r.ok.text, ".fmt = \"%g\\n\"") != null);
 }
 
 test "§11.10 the bsource stack: no memset, a one-word reset, every read behind its written bit" {

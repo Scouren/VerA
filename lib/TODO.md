@@ -1478,3 +1478,36 @@ src/
   "    d res" lines. The runner matches the old transcript. The scare led to a
   bench-run test that checks a lane-derived Jacobian against sign(v); it goes red
   on zeroed lanes. It also surfaced the fast-body finding above.
+
+- **Paused (user, 2026-11-04).** All five agents and the lead's gate were stopped. Branches
+  and worktrees are kept under `.claude/worktrees/agent-*`.
+  - `refactor` is at `fae3345b`. That is the merge of rw-dlower's 79b003f9: its own
+    merge of the green `0930e59c`, gated on its branch. The lead's full gate and the
+    comp.xfail rebaseline for that merge were stopped mid-run.
+  - **On resume:**
+    1. `nix develop -c zig build check test-unit rewrite test-comp test-vera-next bench-run -Dcomp-rebaseline=true -j6`.
+    2. Install `zig-out/comp.xfail.new` after the path-set regression check.
+    3. Resume the agents by name, each from its branch head:
+       - rw-codegen: the display phase, then the real fast body;
+       - rw-lower: re-merge refactor, then lower.xfail;
+       - rw-dlower: sim.xfail, then the 88 digital_lowering lines;
+       - rw-zero: the .v backends and the `-Dcomp-v-flag` oracle;
+       - rw-comp: its Sema.zig conflict, then astgen/elab/parse, W1199 and conformance-next.
+  - **State at pause:**
+
+    | Oracle | Status |
+    |---|---|
+    | parse, astgen, elab, pp, diag, air, kernels, spice, link | 0 lines |
+    | diff-sim | 1161/1281 |
+    | diff-lower | 1974/2628 |
+    | codegen.xfail | 435 lines |
+    | diff-comp | 1330 agree |
+    | not built | VPI 114, libmap 21 |
+- **Morning item: `.v --emit-exe` build remarks.** The old native digital codegen prints
+  `note:` remarks on how it built a design ("4-state: nothing delays", ...). The new
+  `.v` exe (step 1: the embedded Program run by std_sim's interpreter) has none.
+  701 fixtures differ only in those notes; `digital_exe.xfail` lists them as
+  "digital_exe (build remarks)".
+  - If step 2 (native codegen, kept only if its benchmark wins) ships, it can print
+    the remarks that are still true, and the lines go away.
+  - If step 2 doesn't ship, dropping the remarks is the user's call.

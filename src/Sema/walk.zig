@@ -121,7 +121,7 @@ pub fn run(s: *Sema, roots: []const Zcu.Decl) Allocator.Error!defparams.Waiting 
         // Each pass adds a late value or changes one; the values a cycle of
         // defparams feeds itself stop changing or the passes run out.
         if (w.rerun and pass > late.count() + 1) for (w.origins.items) |o| if (o.used)
-            try s.fail(.E0907, o.file, o.src, "`{s}` keeps changing the value it reads (IEEE 1364-2005 §12.8.1)", .{o.text});
+            try s.failRule(.{ .part = .target }, .E0907, o.file, o.src, "`{s}` keeps changing the value it reads (IEEE 1364-2005 §12.8.1)", .{o.text});
         if (!w.rerun or pass > late.count() + 1) {
             // Every root is a module, so each made an instance.
             assert(zcu.instances.len >= roots.len);
@@ -142,7 +142,8 @@ pub fn applyGivens(s: *Sema, env: *Env, file: Zcu.File.Index, src: Inst.Ref, giv
     var ordered: u32 = 0;
     var overridable: u32 = 0;
     for (env.positions.keys()) |p| overridable += @intFromBool(isOverridable(vir, p));
-    for (givens) |g| {
+    for (givens, 0..) |g, k| {
+        const at: Zcu.Part = .{ .param = @intCast(k) };
         const p = if (g.name == .empty) ordered: {
             defer ordered += 1;
             var n: u32 = 0;
@@ -152,8 +153,8 @@ pub fn applyGivens(s: *Sema, env: *Env, file: Zcu.File.Index, src: Inst.Ref, giv
             };
             if (ordered == overridable) {
                 if (s.config.ieee1364) {
-                    try s.fail(.W1161, file, src, "§12.2.2.1: `{s}` declares {d} overridable parameters, and this instance gives more values; the extra ones are ignored", .{ vir.string(module), overridable });
-                } else try s.fail(.E0907, file, src, "`{s}` declares {d} overridable parameters, and this instance overrides more", .{ vir.string(module), overridable });
+                    try s.failRule(.{ .rule = .param_extra, .nums = .{ @intCast(givens.len - k), overridable }, .part = at }, .W1161, file, src, "§12.2.2.1: `{s}` declares {d} overridable parameters, and this instance gives more values; the extra ones are ignored", .{ vir.string(module), overridable });
+                } else try s.failRule(.{ .part = at }, .E0907, file, src, "`{s}` declares {d} overridable parameters, and this instance overrides more", .{ vir.string(module), overridable });
             }
             continue;
         } else named: {
@@ -161,12 +162,14 @@ pub fn applyGivens(s: *Sema, env: *Env, file: Zcu.File.Index, src: Inst.Ref, giv
             // §9.18's hierarchical system parameters bind on any instance.
             if (env.systemNamed(name) != null) continue;
             if (env.named(name)) |q| if (isOverridable(vir, q)) break :named q;
-            if (!quiet) try s.fail(.E0907, file, src, "`{s}` is not a parameter of `{s}`", .{ name, vir.string(module) });
+            const rule: Zcu.Rule = if (env.named(name) != null) .param_local else .param_unknown;
+            // §3.4.5 a localparam is not overridable: said so by name.
+            if (!quiet) try s.failRule(.{ .rule = rule, .name = name, .part = at }, .E0907, file, src, "`{s}` is {s} of `{s}`", .{ name, if (rule == .param_local) "a localparam" else "not a parameter", vir.string(module) });
             continue;
         };
         if (g.value == .none) continue;
         const gop = try env.given.getOrPut(s.gpa, p);
-        if (gop.found_existing) try s.fail(.E0908, file, src, "`{s}` is given more than one value", .{vir.string(payloadOf(vir, Inst.Param, p).name)});
+        if (gop.found_existing) try s.failRule(.{ .rule = .param_twice, .name = vir.string(payloadOf(vir, Inst.Param, p).name), .part = at }, .E0908, file, src, "`{s}` and its alias are both given a value", .{vir.string(payloadOf(vir, Inst.Param, p).name)});
         gop.value_ptr.* = g.value;
         try env.spelling.put(s.gpa, p, if (g.name == .empty) vir.string(payloadOf(vir, Inst.Param, p).name) else ip.stringToSlice(g.name));
     }
@@ -214,13 +217,13 @@ pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const G
         const name = zcu.intern_pool.stringToSlice(g.name);
         const k = env.systemNamed(name) orelse continue;
         if (specified.get(k)) |before| if (!std.mem.eql(u8, before.spelling, name))
-            try s.fail(.E0908, file, src, "`{s}` and its alias are both given a value", .{@tagName(k)});
+            try s.fail(.E0908, file, src, "`${s}` is given more than one value", .{@tagName(k)});
         specified.set(k, .{ .value = g.value, .spelling = try s.arena.dupe(u8, name) });
     }
     for (dps) |dp| {
         const k = env.systemNamed(dp.name) orelse continue;
         if (specified.get(k)) |before| if (!std.mem.eql(u8, before.spelling, dp.name))
-            try s.fail(.E0908, dp.file, dp.src, "`{s}` and its alias are both given a value", .{@tagName(k)});
+            try s.failRule(.{ .part = .target }, .E0908, dp.file, dp.src, "`${s}` and its alias are both given a value", .{@tagName(k)});
         specified.set(k, .{ .value = dp.value, .spelling = dp.name });
     }
     var out: Zcu.Hier = undefined;
@@ -338,19 +341,20 @@ fn portDisciplineAttrs(s: *Sema, p: Pending) Allocator.Error!void {
     assert(vir.instructions.items(.tag)[@backingInt(i)] == .instance);
     var env: Env = try .init(s.gpa, s.arena, &s.zcu.intern_pool, vir, &.{});
     defer env.deinit();
-    for (vir.list(Inst.Attr, payloadOf(vir, Inst.Instance, i).attrs)) |a| {
+    for (vir.list(Inst.Attr, payloadOf(vir, Inst.Instance, i).attrs), 0..) |a, k| {
         if (!std.mem.eql(u8, vir.string(a.name), "port_discipline")) continue;
+        const at: Sema.Why = .{ .part = .{ .attr = @intCast(k) } };
         const c: eval.Const = if (a.value.len == 0) .{ .int = 1 } else (try env.body(a.value)) orelse continue;
         if (c != .str) {
-            try s.fail(.E0358, p.file, p.src, "E.3.2.1: port_discipline requires a string naming a continuous discipline", .{});
+            try s.failRule(at, .E0358, p.file, p.src, "E.3.2.1: port_discipline requires a string naming a continuous discipline", .{});
             continue;
         }
         if (!s.zcu.disciplines.contains(try s.zcu.intern_pool.getString(s.gpa, c.str))) {
-            try s.fail(.E0358, p.file, p.src, "E.3.2.1: port_discipline names an undeclared discipline `{s}`", .{c.str});
+            try s.failRule(at, .E0358, p.file, p.src, "E.3.2.1: port_discipline names an undeclared discipline `{s}`", .{c.str});
             continue;
         }
         if (try discipline.domainOf(s, c.str) != .continuous)
-            try s.fail(.E0358, p.file, p.src, "E.3.2.1: port_discipline requires a continuous discipline; `{s}` is not one", .{c.str});
+            try s.failRule(at, .E0358, p.file, p.src, "E.3.2.1: port_discipline requires a continuous discipline; `{s}` is not one", .{c.str});
     }
 }
 
@@ -370,20 +374,20 @@ fn bindPorts(s: *Sema, p: Pending, vir: *const Vir, m: Inst.Module, module: Vir.
     const formals = vir.body(m.ports);
     const named = conns.len != 0 and conns[0].name != .empty;
     if (!named and conns.len > formals.len)
-        try s.fail(.E0906, p.file, p.src, "`{s}` declares {d} ports, and this instance connects {d}", .{ vir.string(module), formals.len, conns.len });
+        try s.failRule(.{ .rule = .port_count, .part = .{ .conn = @intCast(formals.len) } }, .E0906, p.file, p.src, "`{s}` declares {d} ports, and this instance connects {d}", .{ vir.string(module), formals.len, conns.len });
     for (conns, 0..) |c, k| {
         if (named != (c.name != .empty)) {
-            try s.fail(.E0906, p.file, p.src, "a{s} connection in a list of {s} connections", .{ if (named) "n ordered" else " named", if (named) "named" else "ordered" });
+            try s.failRule(.{ .rule = .port_mixed, .part = .{ .conn = @intCast(k) } }, .E0906, p.file, p.src, "a{s} connection in a list of {s} connections", .{ if (named) "n ordered" else " named", if (named) "named" else "ordered" });
             continue;
         }
         if (!named) continue;
         const n = pvir.string(c.name);
         if (portNamed(vir, formals, n) == null) {
-            try s.fail(.E0906, p.file, p.src, "`{s}` is not a port of `{s}`", .{ n, vir.string(module) });
+            try s.failRule(.{ .rule = .port_unknown, .name = n, .part = .{ .conn = @intCast(k) } }, .E0906, p.file, p.src, "`{s}` is not a port of `{s}`", .{ n, vir.string(module) });
             continue;
         }
         for (conns[0..k]) |prev| if (prev.name != .empty and std.mem.eql(u8, pvir.string(prev.name), n)) {
-            try s.fail(.E0906, p.file, p.src, "`{s}` is connected twice", .{n});
+            try s.failRule(.{ .rule = .port_twice, .name = n, .part = .{ .conn = @intCast(k) } }, .E0906, p.file, p.src, "`{s}` is connected twice", .{n});
             break;
         };
     }
@@ -483,7 +487,7 @@ fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i:
         // is no real.
         if (in.flags.scaled) try s.fail(.E0247, file, i.toRef(), "a scaled literal in `{s}`'s UDP delay", .{vir.string(in.target)});
         if (params.len > 2 or (params.len != 0 and params[0].name != .empty))
-            try s.fail(.E0239, file, i.toRef(), "`{s} #(…) {s}`: {d} value(s)", .{ vir.string(in.target), vir.string(in.name), params.len })
+            try s.failRule(.{ .rule = .udp_delay }, .E0239, file, i.toRef(), "`{s} #(…) {s}`: {d} value(s)", .{ vir.string(in.target), vir.string(in.name), params.len })
         else
             // The instance computes nothing in an analog device (a notice
             // stage 5 owns, tests/differential/stages.zig).

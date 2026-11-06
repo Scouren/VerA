@@ -53,13 +53,16 @@ pub fn resolve(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, target: InternPool
     var first: Zcu.Decl = .none;
     var own: InternPool.Index = .none;
     var base: ?Zcu.Hier = null;
+    var prev: Zcu.Decl = .none;
     for (0..zcu.paramsets.items.len + 1) |_| {
         // Annex E: a user paramset shadows a shipped primitive of its name.
         if (zcu.modules.get(name)) |d| if (!zcu.isBuiltin(d) or !try hasParamset(s, name))
             return .{ .module = d, .paramset = first, .givens = run, .base = base, .own = own };
         const level_dps = if (std.meta.eql(first, Zcu.Decl.none)) dps else &.{};
-        const ps = (try select(s, file, src, name, list.items[run.start..][0..run.len], level_dps)) orelse return null;
+        const link: ?Zcu.Decl = if (std.meta.eql(first, Zcu.Decl.none)) null else prev;
+        const ps = (try select(s, file, src, name, list.items[run.start..][0..run.len], level_dps, link)) orelse return null;
         if (std.meta.eql(first, Zcu.Decl.none)) first = ps;
+        prev = ps;
         const vir = zcu.fileVir(ps.file);
         const decl = payloadOf(vir, Inst.Paramset, zcu.declRow(ps).inst);
         var env: Env = try .init(s.gpa, s.arena, &zcu.intern_pool, vir, &.{decl.body});
@@ -113,8 +116,9 @@ pub fn chainEnds(s: *Sema, name: InternPool.String, out: *std.AutoHashMapUnmanag
 // ---- private ----
 
 /// §6.4.2 the one paramset named `name` that admits `givens`, after the
-/// tie-breaking rules; null after E0904, E0911 or E0914.
-fn select(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, name: InternPool.String, givens: []const walk.Given, dps: []const defparam.Dp) Allocator.Error!?Zcu.Decl {
+/// tie-breaking rules; null after E0904, E0911 or E0914. `link`: the
+/// paramset whose target `name` is, past a chain's first level.
+fn select(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, name: InternPool.String, givens: []const walk.Given, dps: []const defparam.Dp, link: ?Zcu.Decl) Allocator.Error!?Zcu.Decl {
     assert(name != .empty);
     var candidates: u32 = 0;
     var live: std.ArrayList(Zcu.Decl) = .empty;
@@ -125,18 +129,23 @@ fn select(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, name: InternPool.String
     }
     const shown = s.zcu.intern_pool.stringToSlice(name);
     if (candidates == 0) {
-        try s.fail(.E0904, file, src, "`{s}`", .{shown});
+        // A chain's link names neither: reported at that paramset.
+        if (link) |l| {
+            try s.fail(.E0904, l.file, s.zcu.declRow(l).inst.toRef(), "`{s}`, the module this paramset specializes", .{shown});
+            return null;
+        }
+        try s.failRule(.{ .rule = .cell_unbound, .name = shown }, .E0904, file, src, "`{s}`", .{shown});
         return null;
     }
     // "applied in order until a unique paramset has been selected".
     for ([_]TieRule{ .un_overridden, .ranged_locals, .unconnected_ports }) |rule|
         if (live.items.len > 1) try tieBreak(s, file, src, givens, &live, rule);
     if (live.items.len == 0) {
-        try s.fail(.E0911, file, src, "no paramset named `{s}` admits these parameter values", .{shown});
+        try s.fail(.E0911, file, src, "`{s}`: no paramset named `{s}` admits these parameter values", .{ instanceName(s.zcu, file, src), shown });
         return null;
     }
     if (live.items.len > 1) {
-        try s.fail(.E0914, file, src, "{d} paramsets named `{s}` are still applicable after §6.4.2's tie-breaking rules", .{ live.items.len, shown });
+        try s.fail(.E0914, file, src, "`{s}`: {d} paramsets named `{s}` are still applicable after §6.4.2's tie-breaking rules", .{ instanceName(s.zcu, file, src), live.items.len, shown });
         return null;
     }
     assert(live.items.len == 1);
@@ -326,6 +335,14 @@ fn tieBreak(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, givens: []const walk.
 
 /// The connections of the instance instruction `src` of `file`, with the
 /// Vir they are in, or null for a root.
+/// The name of instance `src` as written; "" for none.
+fn instanceName(zcu: *const Zcu, file: Zcu.File.Index, src: Inst.Ref) []const u8 {
+    const i = src.toIndex() orelse return "";
+    const vir = zcu.fileVir(file);
+    if (vir.instructions.items(.tag)[@backingInt(i)] != .instance) return "";
+    return vir.string(payloadOf(vir, Inst.Instance, i).name);
+}
+
 fn instanceConns(zcu: *const Zcu, file: Zcu.File.Index, src: Inst.Ref) ?struct { vir: *const Vir, list: []const Inst.Arg } {
     assert(@backingInt(file) < zcu.files.len);
     const i = src.toIndex() orelse return null;

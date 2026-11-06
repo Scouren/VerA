@@ -96,9 +96,11 @@ pub const Job = union(enum) {
     run_digital,
 };
 
-/// Every backend `codegen`'s dispatch names. Only `zig` is merged; the
-/// others' prongs report "not built" (`not_built_status`).
-pub const Backend = enum { zig, exe, verilog, osdi, rtlil, digital_device, digital_exe, libmap };
+/// Every backend `codegen`'s dispatch names; a prong not merged reports
+/// "not built" (`not_built_status`). `digital_lowering` is no backend: it
+/// names a `.v` construct Sema's digital lowering does not express yet,
+/// so its fixtures' lines say whose debt they are.
+pub const Backend = enum { zig, exe, verilog, osdi, rtlil, digital_device, digital_exe, libmap, digital_lowering };
 
 /// The exit status of an input that needs a backend not built yet: above
 /// 125, which the conformance harness reads as "the tool could not run

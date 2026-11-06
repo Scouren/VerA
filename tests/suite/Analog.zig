@@ -348,7 +348,7 @@ fn runAndCheck(
         if (std.mem.eql(u8, p, "W0650")) break;
     } else try levels.set(.W0650, .allow);
 
-    var opts: vera.Settings = .{
+    var opts: vera.Config = .{
         .file_name = f.path,
         .include_dirs = &.{ f.dir(), harness.include_dir },
         .require_std_includes = true,

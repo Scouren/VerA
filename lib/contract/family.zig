@@ -10,7 +10,7 @@
 //! - `pub const family_fns: [5][]const u8`
 //! - `pub const family_primitives: [25][]const u8`
 //! - `pub const no_lane: u8`
-//! - `pub const RefOptions = struct { collapse_applied: bool }`
+//! - `pub const RefOptions = struct { collapse_applied: bool, math: type }`
 //! - `pub fn checkFamily(comptime S: type) void`
 //! - `pub fn RefFamily(comptime L: type, comptime lane: anytype, comptime opts: RefOptions) type`,
 //!   whose decls are `collapse_applied`, `V`, `con`, `probe`, `sel` and `Of(m)`,
@@ -98,6 +98,12 @@ pub const no_lane: u8 = std.math.maxInt(u8);
 pub const RefOptions = struct {
     /// The family's `collapse_applied` trait (see `family_fns`).
     collapse_applied: bool = false,
+    /// The transcendentals' values: a namespace with `exp`, `log`,
+    /// `expm1`, `log1p`, `sin`, `cos`, `tanh`, `sinh`, `cosh`, `atan` and
+    /// `pow` over `f64`. `gm` for the old pipeline's hosts; the rewrite's
+    /// pass `std_kernels.math` (Gompute), so a device's family primitives
+    /// are the values its folds give (diff-kernels' fold-equals-device).
+    math: type = gm,
 };
 
 /// `RefFamily`'s internal "not carried": `lane` normalized by `laneTable`.
@@ -141,10 +147,11 @@ pub fn checkFamily(comptime S: type) void {
 /// the element's maximum is "not carried". A lane-free family (no entry
 /// carried) runs every entry point on plain values. A host that indexes a
 /// row at run time reads it through `denseRow`. Transcendentals go through
-/// `gm`, so the family compiles for NVPTX and AMDGCN too.
+/// `opts.math` (`gm`, or Gompute), so the family compiles for NVPTX and
+/// AMDGCN too.
 pub fn RefFamily(comptime L: type, comptime lane: anytype, comptime opts: RefOptions) type {
     comptime assert(@typeInfo(L) == .float);
-    return RefSparse(L, comptime laneTable(lane), opts.collapse_applied);
+    return RefSparse(L, comptime laneTable(lane), opts.collapse_applied, opts.math);
 }
 
 /// Value `a` of a `RefFamily` family as one column per unknown, `n` of them:
@@ -208,8 +215,8 @@ inline fn laneFma(comptime T: type, a: T, b: T, c: T) T {
 
 /// `pow`'s lane coefficient (§7[2]): c·p/x off zero, c·pow(0, c−1) at it, 0
 /// when that is not finite.
-fn powSlope(x: f64, c: f64, p: f64) f64 {
-    const s = if (x != 0.0) c * p / x else c * gm.pow(x, c - 1.0);
+fn powSlope(comptime Lib: type, x: f64, c: f64, p: f64) f64 {
+    const s = if (x != 0.0) c * p / x else c * Lib.pow(x, c - 1.0);
     const slope = if (std.math.isFinite(s)) s else 0.0;
     assert(std.math.isFinite(slope));
     return slope;
@@ -222,7 +229,7 @@ fn sqrtSlope(s: f64) f64 {
     return slope;
 }
 
-fn RefSparse(comptime L: type, comptime lane: []const u32, comptime collapsed: bool) type {
+fn RefSparse(comptime L: type, comptime lane: []const u32, comptime collapsed: bool, comptime Lib: type) type {
     const M = MaskOf(lane.len);
     return struct {
         /// The family's `collapse_applied` trait (`RefOptions`).
@@ -361,57 +368,57 @@ fn RefSparse(comptime L: type, comptime lane: []const u32, comptime collapsed: b
                 pub fn addC(a: T, c: f64) T {
                     return .{ .v = a.v + c, .d = a.d };
                 }
-                /// gm.exp; lanes d·e.
+                /// Lib.exp; lanes d·e.
                 pub fn exp(a: T) T {
-                    const e = gm.exp(a.v);
+                    const e = Lib.exp(a.v);
                     return map(a, e, e);
                 }
-                /// gm.log; lanes d·(1/v).
+                /// Lib.log; lanes d·(1/v).
                 pub fn log(a: T) T {
-                    return map(a, gm.log(a.v), 1.0 / a.v);
+                    return map(a, Lib.log(a.v), 1.0 / a.v);
                 }
-                /// gm.expm1; lanes d·exp(v).
+                /// Lib.expm1; lanes d·exp(v).
                 pub fn expm1(a: T) T {
-                    return map(a, gm.expm1(a.v), gm.exp(a.v));
+                    return map(a, Lib.expm1(a.v), Lib.exp(a.v));
                 }
-                /// gm.log1p; lanes d·(1/(1+v)).
+                /// Lib.log1p; lanes d·(1/(1+v)).
                 pub fn log1p(a: T) T {
-                    return map(a, gm.log1p(a.v), 1.0 / (1.0 + a.v));
+                    return map(a, Lib.log1p(a.v), 1.0 / (1.0 + a.v));
                 }
                 /// √a; lanes d·(0.5/s), 0 unless s > 0.
                 pub fn sqrt(a: T) T {
                     const s = @sqrt(a.v);
                     return map(a, s, sqrtSlope(s));
                 }
-                /// gm.sin; lanes d·cos.
+                /// Lib.sin; lanes d·cos.
                 pub fn sin(a: T) T {
-                    return map(a, gm.sin(a.v), gm.cos(a.v));
+                    return map(a, Lib.sin(a.v), Lib.cos(a.v));
                 }
-                /// gm.cos; lanes d·(−sin).
+                /// Lib.cos; lanes d·(−sin).
                 pub fn cos(a: T) T {
-                    return map(a, gm.cos(a.v), -gm.sin(a.v));
+                    return map(a, Lib.cos(a.v), -Lib.sin(a.v));
                 }
-                /// gm.tanh; lanes d·(1−th²).
+                /// Lib.tanh; lanes d·(1−th²).
                 pub fn tanh(a: T) T {
-                    const th = gm.tanh(a.v);
+                    const th = Lib.tanh(a.v);
                     return map(a, th, 1.0 - th * th);
                 }
-                /// gm.sinh; lanes d·cosh.
+                /// Lib.sinh; lanes d·cosh.
                 pub fn sinh(a: T) T {
-                    return map(a, gm.sinh(a.v), gm.cosh(a.v));
+                    return map(a, Lib.sinh(a.v), Lib.cosh(a.v));
                 }
-                /// gm.cosh; lanes d·sinh.
+                /// Lib.cosh; lanes d·sinh.
                 pub fn cosh(a: T) T {
-                    return map(a, gm.cosh(a.v), gm.sinh(a.v));
+                    return map(a, Lib.cosh(a.v), Lib.sinh(a.v));
                 }
-                /// gm.atan; lanes d·(1/(1+v²)).
+                /// Lib.atan; lanes d·(1/(1+v²)).
                 pub fn atan(a: T) T {
-                    return map(a, gm.atan(a.v), 1.0 / (1.0 + a.v * a.v));
+                    return map(a, Lib.atan(a.v), 1.0 / (1.0 + a.v * a.v));
                 }
-                /// gm.pow(a, c); lanes d·(c·p/x), d·(c·pow(0, c−1)) at x = 0, 0 for a non-finite slope.
+                /// Lib.pow(a, c); lanes d·(c·p/x), d·(c·pow(0, c−1)) at x = 0, 0 for a non-finite slope.
                 pub fn pow(a: T, c: f64) T {
-                    const p = gm.pow(a.v, c);
-                    return map(a, p, powSlope(a.v, c, p));
+                    const p = Lib.pow(a.v, c);
+                    return map(a, p, powSlope(Lib, a.v, c, p));
                 }
                 /// 1.0 when a < b, else 0.0 (NaN gives 0); no lanes.
                 pub fn lt(a: T, b: anytype) Of(0) {
@@ -463,11 +470,11 @@ test "RefFamily sparse: Of(m) carries exactly m's lanes, joins on binary ops" {
 }
 
 test "pow and sqrt lane coefficients at the edges the numerics table pins" {
-    try testing.expectEqual(@as(f64, 12), powSlope(2, 3, 8)); // c·p/x
-    try testing.expectEqual(@as(f64, 1), powSlope(0, 1, 0)); // c·pow(0, 0)
-    try testing.expectEqual(@as(f64, 0), powSlope(0, 2, 0)); // c·pow(0, 1)
-    try testing.expectEqual(@as(f64, 0), powSlope(0, 0.5, 0)); // 0.5·pow(0, -0.5) = inf
-    try testing.expectEqual(@as(f64, 0), powSlope(std.math.nan(f64), 2, std.math.nan(f64)));
+    try testing.expectEqual(@as(f64, 12), powSlope(gm, 2, 3, 8)); // c·p/x
+    try testing.expectEqual(@as(f64, 1), powSlope(gm, 0, 1, 0)); // c·pow(0, 0)
+    try testing.expectEqual(@as(f64, 0), powSlope(gm, 0, 2, 0)); // c·pow(0, 1)
+    try testing.expectEqual(@as(f64, 0), powSlope(gm, 0, 0.5, 0)); // 0.5·pow(0, -0.5) = inf
+    try testing.expectEqual(@as(f64, 0), powSlope(gm, std.math.nan(f64), 2, std.math.nan(f64)));
     try testing.expectEqual(@as(f64, 0.125), sqrtSlope(4)); // 0.5/4
     try testing.expectEqual(@as(f64, 0), sqrtSlope(0));
     try testing.expectEqual(@as(f64, 0), sqrtSlope(std.math.nan(f64)));

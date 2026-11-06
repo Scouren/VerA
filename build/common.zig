@@ -34,10 +34,25 @@ pub const module_specs = [_]struct {
     c: ?[]const u8 = null,
 }{
     .{ .name = "contract", .path = "lib/contract.zig" },
+    // The device kernels shipped once (docs/rewrite/kernels.md). `gompute_math`
+    // is the pinned Gompute dependency's `math` module (build.zig.zon), not a row.
+    .{ .name = "std_kernels", .path = "lib/std/kernels.zig", .imports = &.{ "contract", "gompute_math" } },
+    // The rewrite's modules (docs/rewrite/README.md): each builds and tests
+    // alone (`zig build test-<name>`), importing only std or the rows above.
+    .{ .name = "vams", .path = "lib/std/vams.zig" },
+    .{ .name = "intern_pool", .path = "src/InternPool.zig" },
+    .{ .name = "air", .path = "src/Air.zig", .imports = &.{ "intern_pool", "vams", "std_kernels" } },
     .{ .name = "base", .path = "lib/base/root.zig" },
     .{ .name = "kernels", .path = "lib/kernels/root.zig", .imports = &.{"contract"} },
+    .{ .name = "std_sim", .path = "lib/std/sim.zig", .imports = &.{ "kernels", "contract" } },
+    .{ .name = "sema", .path = "src/sema.zig", .imports = &.{ "vams", "intern_pool", "air", "kernels", "std_sim", "std_kernels" } },
     .{ .name = "diag", .path = "lib/diag/root.zig" },
     .{ .name = "dynlib", .path = "src/dynlib.zig" },
+    .{ .name = "link", .path = "src/link.zig", .imports = &.{ "contract", "dynlib" } },
+    // The Zig device backend (docs/rewrite/codegen.md): Air + Air.Device in, device text out.
+    .{ .name = "codegen", .path = "src/codegen.zig", .imports = &.{ "air", "intern_pool", "vams", "sema", "std_kernels", "contract", "link" } },
+    // The rewrite's spine (docs/rewrite/comp.md): `vera-next`'s Compilation.
+    .{ .name = "comp", .path = "src/next/Compilation.zig", .imports = &.{ "vams", "intern_pool", "air", "sema", "std_sim", "codegen", "link" } },
     .{ .name = "frontend", .path = "lib/frontend/root.zig", .imports = &.{ "base", "diag", "kernels" } },
     .{ .name = "elab", .path = "src/elab/root.zig", .imports = &.{ "base", "diag", "frontend", "kernels" } },
     .{ .name = "ir", .path = "src/ir/root.zig", .imports = &.{ "base", "diag", "kernels" } },
@@ -77,17 +92,16 @@ pub const Graph = struct {
 };
 
 /// `module_specs` as modules, exported with `addModule` when `exported`.
+/// The import `gompute_math` is the pinned Gompute's `math` module, which
+/// takes its target from the module importing it.
 pub fn defineModules(b: *Build, target: Build.ResolvedTarget, exported: bool) []const Import {
     var created: std.ArrayList(Import) = .empty;
+    const gompute_math = b.dependency("gompute", .{}).module("math");
     for (module_specs) |spec| {
         const deps = b.allocator.alloc(Import, spec.imports.len) catch @panic("OOM");
-        for (deps, spec.imports) |*d, name| d.* = .{ .name = name, .module = byName(created.items, name) };
+        for (deps, spec.imports) |*d, name| d.* = .{ .name = name, .module = if (std.mem.eql(u8, name, "gompute_math")) gompute_math else byName(created.items, name) };
         const opts: Module.CreateOptions = .{ .root_source_file = b.path(spec.path), .target = target, .imports = deps };
         const mod = if (exported) b.addModule(spec.name, opts) else b.createModule(opts);
-        if (std.mem.eql(u8, spec.name, "elab")) {
-            mod.addAnonymousImport("resolution_unknown_fixture", .{ .root_source_file = b.path("tests/conformance/tests/verilog-ams/annex_f_resolution/detail_resolution_unknown_after_bottom_up.va") });
-            mod.addAnonymousImport("resolution_digital_parent_fixture", .{ .root_source_file = b.path("tests/conformance/tests/verilog-ams/annex_f_resolution/detail_resolution_digital_parent.va") });
-        }
         if (spec.c) |c| {
             mod.addCSourceFile(.{ .file = b.path(c), .flags = &.{ "-std=c99", "-Wall", "-Werror" } });
             mod.addIncludePath(b.path(std.fs.path.dirname(c).?));
@@ -127,18 +141,27 @@ pub fn simSources(b: *Build) *Module {
     return b.createModule(.{ .root_source_file = wf.add("sim_sources.zig", root.written()) });
 }
 
-/// The root a module's tests compile from: the module, or on Linux, when its
-/// tests load a library (it is `dynlib` or imports it), a twin with the same
-/// file and imports that links glibc, so `std.DynLib` is `dlopen`
-/// (src/dynlib.zig refuses std's ElfDynLib, which applies no relocations).
-/// A twin, not the module: `vera` shares the module and links no libc.
+/// The root a module's tests compile from: the module, or a twin with the
+/// same file and imports when its tests need more than the module ships.
+/// On Linux, a module whose tests load a library (it is `dynlib` or imports
+/// it) links glibc in the twin, so `std.DynLib` is `dlopen` (src/dynlib.zig
+/// refuses std's ElfDynLib, which applies no relocations); `vera` shares the
+/// module and links no libc. `elab`'s twin gets the two Annex F conformance
+/// fixtures its `segment.zig` tests embed, so the exported module never
+/// names a file of the test submodule.
 pub fn testRoot(b: *Build, mod: Import) *Module {
     const m = mod.module;
-    if (m.resolved_target.?.result.os.tag != .linux) return m;
-    if (!std.mem.eql(u8, mod.name, "dynlib") and m.import_table.get("dynlib") == null) return m;
-    const twin = b.createModule(.{ .root_source_file = m.root_source_file, .target = m.resolved_target, .optimize = m.optimize, .link_libc = true });
+    const elab = std.mem.eql(u8, mod.name, "elab");
+    const dl = m.resolved_target.?.result.os.tag == .linux and
+        (std.mem.eql(u8, mod.name, "dynlib") or m.import_table.get("dynlib") != null);
+    if (!elab and !dl) return m;
+    const twin = b.createModule(.{ .root_source_file = m.root_source_file, .target = m.resolved_target, .optimize = m.optimize, .link_libc = dl });
     var it = m.import_table.iterator();
     while (it.next()) |e| twin.addImport(e.key_ptr.*, e.value_ptr.*);
+    if (elab) {
+        twin.addAnonymousImport("resolution_unknown_fixture", .{ .root_source_file = b.path("tests/conformance/tests/verilog-ams/annex_f_resolution/detail_resolution_unknown_after_bottom_up.va") });
+        twin.addAnonymousImport("resolution_digital_parent_fixture", .{ .root_source_file = b.path("tests/conformance/tests/verilog-ams/annex_f_resolution/detail_resolution_digital_parent.va") });
+    }
     return twin;
 }
 

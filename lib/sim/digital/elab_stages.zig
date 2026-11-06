@@ -65,6 +65,8 @@ pub const Top = struct { m: *const Ast.ModuleDecl, tops: []const u32 };
 /// `wreal` rule reads them; any error in `bag` then fails.
 pub fn parse(arena: std.mem.Allocator, source: []const u8, opts: Options, bag: *diag.Bag) Error!Parsed {
     assert(source.len < std.math.maxInt(u32)); // Byte offsets are u32.
+    // ponytail: the process's io until step 7 moves this elaboration into `Compilation`.
+    var files: Front.Files = .init(std.Io.Threaded.global_single_threaded.io(), arena);
     const pp: Front.preprocessor.Output = if (opts.mixed) |mx| .{
         .text = source,
         .directives = .{ .timescales = try steps.mixedTimescales(arena, mx.timescales) },
@@ -72,7 +74,7 @@ pub fn parse(arena: std.mem.Allocator, source: []const u8, opts: Options, bag: *
         const more = try arena.alloc(Front.preprocessor.File, opts.more.len);
         for (opts.more, more) |u, *f| f.* = .{ .name = u.name, .text = u.text };
         break :more more;
-    }, .bag = bag, .std_1364 = @backingInt(opts.language) < @backingInt(Front.keyword.KeywordSet.vams_2_3), .protect_keys = opts.protect_keys }) catch |e| return switch (e) {
+    }, .bag = bag, .files = &files, .std_1364 = @backingInt(opts.language) < @backingInt(Front.keyword.KeywordSet.vams_2_3), .protect_keys = opts.protect_keys }) catch |e| return switch (e) {
         error.OutOfMemory => error.OutOfMemory,
         error.PreprocessFailed => error.DigitalFailed,
     };

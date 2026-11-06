@@ -8,7 +8,7 @@
 //! Cites: none of the LRM's; OSDI 0.4 (`lib/osdi_dyn.zig`).
 //!
 //! Contents:
-//! - `pub fn build(gpa: Allocator, io: Io, arena: Allocator, req: Request, result: *const Result, device: Output, err: *Io.Writer, o: *Outcome) request.CompileError!void`
+//! - `pub fn build(gpa: Allocator, io: Io, arena: Allocator, req: Config, result: *const Result, device: Output, err: *Io.Writer, o: *Outcome) request.CompileError!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -17,7 +17,7 @@ const Io = std.Io;
 const zigbuild = @import("zigbuild");
 const Output = @import("device").Output;
 const request = @import("request.zig");
-const Request = request.Request;
+const Config = @import("Config.zig");
 const Outcome = request.Outcome;
 const Result = @import("Result.zig");
 
@@ -29,7 +29,7 @@ pub fn build(
     gpa: Allocator,
     io: Io,
     arena: Allocator,
-    req: Request,
+    req: Config,
     result: *const Result,
     device: Output,
     err: *Io.Writer,
@@ -38,7 +38,7 @@ pub fn build(
     assert(req.so);
     assert(o.status == 0);
     const b = req.build;
-    const in_path = req.options.file_name;
+    const in_path = req.file_name;
     const wd = b.work_dir orelse if (req.osdi) ".zig-cache/vera-tb" else {
         try err.writeAll("error: --emit-so needs --work-dir DIR\n");
         return o.done(2);
@@ -63,6 +63,7 @@ pub fn build(
         // `osdi_dyn` keeps every per-iterate callback in `.eval`.
         .cold_self_hosted = req.osdi,
         .artifact_cache = if (req.osdi) b.artifact_cache else null,
+        .jobs = b.jobs,
     }, device, 1) catch |e| {
         try err.print("error: {s}: building the device failed: {t}\n", .{ in_path, e });
         return o.done(1);

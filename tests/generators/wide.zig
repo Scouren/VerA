@@ -63,7 +63,7 @@ const Row = struct {
         switch (r.pass) {
             .lint, .emit_zig, .emit_so_tree, .emit_verilog => {
                 const source = try analog(arena, r.shape);
-                var req: vera.Request = .{ .options = .{ .file_name = "m.va" } };
+                var req: vera.Config = .{ .file_name = "m.va" };
                 switch (r.pass) {
                     .lint => {},
                     .emit_zig, .emit_so_tree => req.zig = true,

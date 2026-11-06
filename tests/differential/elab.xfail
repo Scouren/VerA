@@ -1,0 +1,4 @@
+# diff-elab known differences: `<path under the fixture root> <reason>`, one per line.
+# A listed fixture that agrees, or is not compared, fails the run. A later stage's codes
+# are compared one way (stages.zig), and a difference the LRM settles for the
+# new side is a line of elab.rulings, not of this file.

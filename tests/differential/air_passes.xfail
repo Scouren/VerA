@@ -1,0 +1,6 @@
+# Allowed failures of the Air passes' oracles
+# (tests/differential/air_passes.zig, `zig build diff-air-passes`).
+# One line: <oracle> <kind> <reason>. Oracles and kinds: float (interval,
+# finite, slice, violation), legalize (bits), setup (invariant), held (pruned).
+# A line whose oracle never fails in that kind fails the run (an unexpected
+# pass); a failure no line names fails it too. Empty: every oracle is clean.

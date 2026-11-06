@@ -1,0 +1,11 @@
+# diff-kernels' known differences: `<name> <max ulps | any> <reason>`.
+# A name is a std_kernels function (or a gm function, for the math swap)
+# whose answer differs from the old one; `any` is a difference that is not
+# a number of ulps (NaN against a number, a sign, a text). A line whose name
+# agrees fails the run: remove it.
+#
+# Not here: the gm -> Gompute 2.0 swap's differences (cosh, sinh, log10 and
+# the kernels, folds and Ac family over them). The f128 reference judges each
+# (kernels/reference.zig): Gompute stays within its documented bound on every
+# input and its worst case is no farther than gm's, so diff-kernels prints
+# them as old-side bugs instead.

@@ -1,0 +1,172 @@
+# diff-parse known differences: `<path under the fixture root> <reason>`, one per line.
+# A listed fixture that agrees, or is not compared, fails the run. An old refusal by a
+# later stage's codes alone (stages.zig) is set aside, not listed.
+spice/reject_spice_fet_card_model_has_no_behaviour.va the report differs: old E0205 `found cell`, new E0240 `found cell`
+spice/reject_spice_lib_entry_missing.va the report differs: old E0205 `found cell`, new E0240 `found cell`
+verilog-a/annex_a_syntax/delay_control_in_analog_rejected.va the report differs: old E0254 ``, new E0249 `digital_statement_in_analog`
+verilog-a/annex_a_syntax/force_in_analog_rejected.va the report differs: old E0258 ``, new E0249 `digital_statement_in_analog`
+verilog-a/annex_a_syntax/forever_in_analog_rejected.va the report differs: old E0256 ``, new E0249 `digital_statement_in_analog`
+verilog-a/annex_a_syntax/library_declaration_in_design_rejected.va the report differs: old E0232 ``, new E0232 `library_text_in_source`
+verilog-a/annex_a_syntax/library_source_text.va the report differs: old E0232 ``, new E0232 `library_text_in_source`
+verilog-a/annex_a_syntax/reject_A_10_1001_function_named_block.va the report differs: old E0226 ``, new E0226 `invalid_function`
+verilog-a/annex_a_syntax/reject_A_1_5_config_without_design_statement.va the report differs: old E0207 `found `, new E0243 `invalid_config_rule`
+verilog-a/annex_a_syntax/reject_A_2_6_function_output_formal.va the report differs: old E0207 `found `, new E0207 `invalid_port_declaration`
+verilog-a/annex_a_syntax/reject_A_2_6_null_item_in_analog_function.va the report differs: old E0219 ``, new E0219 `null_statement`
+verilog-a/annex_a_syntax/reject_A_4_1_module_instance_without_name.va the report differs: old E0293 ``, new E0207 `invalid_gate_terminals`
+verilog-a/annex_a_syntax/reject_A_6_3_declaration_in_unnamed_block.va the report differs: old E0290 `found `, new E0207 `decl_in_unnamed_block`
+verilog-a/annex_a_syntax/reject_A_8_2_empty_function_argument.va the report differs: old E0289 `argument 1 of `, new E0207 `empty_argument`
+verilog-a/annex_a_syntax/reject_A_8_5_literal_assignment_target.va the report differs: old E0207 `found 2.0: an A.8.5 assignment target is a variable, never a literal`, new E0207 `literal_assignment_target`
+verilog-a/annex_a_syntax/wait_in_analog_rejected.va the report differs: old E0255 ``, new E0249 `digital_statement_in_analog`
+verilog-a/annex_b_keywords/escaped_keyword_is_not_the_keyword.va the report differs: old E0240 `found analog`, new E0240 `found \analog`
+verilog-a/annex_g_change_history/final_step_empty_parens_rejected.va the report differs: old E0220 `after `, new E0220 `empty_step_event_list`
+verilog-a/annex_g_change_history/null_statement_unconditional_rejected.va the report differs: old E0219 ``, new E0219 `null_statement`
+verilog-a/annex_g_change_history/obsolete_forever.va the report differs: old E0256 ``, new E0249 `digital_statement_in_analog`
+verilog-a/ch02_lexical/attribute_keyword_name_rejected.va the report differs: old E0208 `found keyword `, new E0208 `found `
+verilog-a/ch02_lexical/base_apostrophe_whitespace_rejected.va the report differs: old E0131 ``, new E0207 `found invalid token`
+verilog-a/ch02_lexical/binary_digit_f_rejected.va the report differs: old E0133 ``, new E0207 `found f`
+verilog-a/ch02_lexical/hex_without_base_rejected.va the report differs: old E0133 ``, new E0207 `found af`
+verilog-a/ch02_lexical/illegal_base_letter_rejected.va the report differs: old E0131 ``, new E0207 `found invalid token`
+verilog-a/ch02_lexical/nested_attribute_rejected.va the report differs: old E0357 `the value contains an attribute instance`, new E0207 `nested_attribute`
+verilog-a/ch02_lexical/octal_escape_above_377_rejected.va the report differs: old E0148 ``, new E0148 `invalid_string_escape`
+verilog-a/ch02_lexical/reject_2_6_space_between_apostrophe_and_base.va the report differs: old E0131 ``, new E0207 `found invalid token`
+verilog-a/ch03_data_types/discipline_domain_is_continuous_or_discrete_rejected.va the report differs: old E0212 `found `, new E0208 `found `
+verilog-a/ch03_data_types/discipline_item_needs_a_binding_keyword_rejected.va the report differs: old E0213 `found Voltage`, new E0240 `found Voltage`
+verilog-a/ch03_data_types/from_range_without_bracket.va the report differs: old E0207 `found 5`, new E0209 `found 5`
+verilog-a/ch03_data_types/nature_parent_access_must_be_potential_or_flow_rejected.va the report differs: old E0211 `found voltage`, new E0208 `found voltage`
+verilog-a/ch03_data_types/reject_A_2_1_3_net_list_mixes_assignment.va the report differs: old E0292 ``, new E0207 `invalid_net_declaration`
+verilog-a/ch04_expressions/function_bare_return_rejected.va the report differs: old E0227 ``, new E0226 `invalid_function`
+verilog-a/ch04_expressions/function_named_block_ban.va the report differs: old E0226 ``, new E0226 `invalid_function`
+verilog-a/ch04_expressions/function_no_arguments.va the report differs: old E0224 ``, new E0226 `invalid_function`
+verilog-a/ch04_expressions/function_undirected_argument.va the report differs: old E0224 ``, new E0226 `invalid_function`
+verilog-a/ch05_analog_behavior/delay_control_in_analog_rejected.va the report differs: old E0254 ``, new E0249 `digital_statement_in_analog`
+verilog-a/ch05_analog_behavior/final_step_empty_parens_rejected.va the report differs: old E0220 `after `, new E0220 `empty_step_event_list`
+verilog-a/ch05_analog_behavior/wait_statement_in_analog_rejected.va the report differs: old E0255 ``, new E0249 `digital_statement_in_analog`
+verilog-a/ch06_hierarchy/generate_nested_region_rejected.va the report differs: old E0228 ``, new E0228 `not_a_generate_item`
+verilog-a/ch06_hierarchy/generate_parameter_declaration_rejected.va the report differs: old E0229 ``, new E0228 `not_a_generate_item`
+verilog-a/ch06_hierarchy/generate_region.va the report differs: old E0221 `found `, new E0221 `begin_at_module_scope`
+verilog-a/ch06_hierarchy/parameter_list_empty_header_rejected.va the report differs: old E0246 `an empty module parameter header has no parameter declaration`, new E0246 `invalid_parameter_list`
+verilog-a/ch06_hierarchy/parameter_list_empty_override_rejected.va the report differs: old E0246 `an empty parameter value assignment has no expression or named assignm`, new E0246 `invalid_parameter_list`
+verilog-a/ch06_hierarchy/parameter_list_local_header_rejected.va the report differs: old E0246 `a module parameter header requires `, new E0246 `invalid_parameter_list`
+verilog-a/ch06_hierarchy/parameter_list_mixed_override_rejected.va the report differs: old E0246 `instance mixes ordered and named parameter assignments`, new E0246 `invalid_parameter_list`
+verilog-a/ch06_hierarchy/parameter_list_mixed_reverse_rejected.va the report differs: old E0246 `instance mixes ordered and named parameter assignments`, new E0246 `invalid_parameter_list`
+verilog-a/ch06_hierarchy/paramset_event_control_rejected.va the report differs: old E0237 `an event control: found `, new E0207 `invalid_paramset`
+verilog-a/ch06_hierarchy/paramset_misspelled_item_rejected.va the report differs: old E0205 `found paramter in a paramset body`, new E0207 `invalid_paramset`
+verilog-a/ch06_hierarchy/paramset_without_item_declaration_rejected.va the report differs: old E0297 `paramset `, new E0207 `invalid_paramset`
+verilog-a/ch06_hierarchy/reject_6_4_1_paramset_named_block.va the report differs: old E0237 `a named block: found `, new E0207 `invalid_paramset`
+verilog-a/ch10_directives/begin_keywords_bad_specifier.va the report differs: old E0135 ``, new E0135 `unknown_keyword_set`
+verilog-a/ch10_directives/begin_keywords_inside_a_paramset.va the report differs: old E0202 ``, new E0202 ``
+verilog-a/ch10_directives/end_keywords_unmatched.va the report differs: old E0136 ``, new E0136 `unmatched_end_keywords`
+verilog-a/ch10_directives/warning_macro_semicolon_rejected.va the report differs: old E0219 ``, new E0219 `null_statement`
+verilog-ams/annex_a_syntax/fork_in_analog_rejected.va the report differs: old E0249 ``, new E0249 `digital_statement_in_analog`
+verilog-ams/annex_a_syntax/period_requires_event_control.va the report differs: old E0207 ``, new E0245 `invalid_specify_item`
+verilog-ams/annex_a_syntax/reject_A_2_1_3_two_net_types.va the report differs: old E0207 `found `, new E0207 `invalid_net_declaration`
+verilog-ams/annex_a_syntax/reject_A_2_2_2_drive_strength_two_zero_sides.va the report differs: old E0207 `a drive strength pairs one 0-side with one 1-side strength`, new E0207 `expected_strength`
+verilog-ams/annex_a_syntax/reject_A_2_2_3_net_with_four_delays.va the report differs: old E0210 `found `, new E0207 `found `
+verilog-ams/annex_a_syntax/reject_A_2_6_typed_analog_function_input.va the report differs: old E0291 ``, new E0207 `invalid_port_declaration`
+verilog-ams/annex_a_syntax/reject_A_3_1_buf_with_one_terminal.va the report differs: old E0209 `a buf/not gate needs at least one output and one input`, new E0207 `invalid_gate_terminals`
+verilog-ams/annex_a_syntax/reject_A_3_2_pullup_with_zero_strength.va the report differs: old E0207 `a single-strength bracket on this gate is A.3.2's `, new E0207 `expected_strength`
+verilog-ams/annex_a_syntax/reject_A_3_3_constant_output_terminal.va the report differs: old E0207 `found 1'b0: a gate's output terminal is a net_lvalue (A.3.3), a net th`, new E0207 `invalid_gate_terminals`
+verilog-ams/annex_a_syntax/reject_A_3_4_gate_type_fixes_the_terminal_count.va the report differs: old E0209 `an enable gate takes an output, a data input and an enable`, new E0207 `invalid_gate_terminals`
+verilog-ams/annex_a_syntax/reject_A_5_1_udp_without_table.va the report differs: old E0207 `found endprimitive: a udp_body is a `, new E0233 `invalid_udp`
+verilog-ams/annex_a_syntax/reject_A_5_2_udp_inout_port.va the report differs: old E0207 `found `, new E0233 `invalid_udp`
+verilog-ams/annex_a_syntax/reject_A_5_3_udp_combinational_edge.va the report differs: old E0234 `an edge indicator `, new E0233 `invalid_udp`
+verilog-ams/annex_a_syntax/reject_A_6_8_forever_null_body.va the report differs: old E0296 ``, new E0207 `forever_needs_statement`
+verilog-ams/annex_a_syntax/reject_A_7_1_gate_inside_specify.va the report differs: old E0207 `found `, new E0245 `invalid_specify_item`
+verilog-ams/annex_a_syntax/reject_A_7_1_pulsestyle_parenthesized.va the report differs: old E0207 `found `, new E0245 `invalid_specify_item`
+verilog-ams/annex_a_syntax/reject_A_7_2_parallel_path_with_two_sources.va the report differs: old E0207 `a parallel path (`, new E0245 `invalid_specify_item`
+verilog-ams/annex_a_syntax/reject_A_7_3_expression_as_path_terminal.va the report differs: old E0207 `found b: a path description connects its terminals with `, new E0245 `invalid_specify_item`
+verilog-ams/annex_a_syntax/reject_A_7_4_four_path_delays.va the report differs: old E0207 `a path delay lists 1, 2, 3, 6 or 12 values (A.7.4 list_of_path_delay_e`, new E0245 `invalid_specify_item`
+verilog-ams/annex_a_syntax/reject_A_7_5_2_numeric_notifier.va the report differs: old E0207 `found 5: the notifier argument of `, new E0245 `invalid_specify_item`
+verilog-ams/annex_a_syntax/width_requires_event_control.va the report differs: old E0207 ``, new E0245 `invalid_specify_item`
+verilog-ams/annex_c_analog_subset/digital_procedural_rejected.va the report differs: old E0255 ``, new E0249 `digital_statement_in_analog`
+verilog-ams/ch07_mixed_signal/connect_mode_not_merged_or_split_rejected.va the report differs: old E0207 `found segmented: a connect_mode is `, new E0208 `found segmented`
+verilog-ams/ch09_system_tasks/driver_update_in_analog_event_rejected.va the report differs: old E0209 `found `, new E0207 `driver_update_outside_connect_module`
+verilog-ams/ch09_system_tasks/driver_update_in_ordinary_module_rejected.va the report differs: old E0818 ``, new E0207 `driver_update_outside_connect_module`
+verilog-ams/digital/std_1364_analog_block_rejected.v the report differs: old E0242 ``, new E0207 `vams_construct_under_1364`
+verilog/03_lexical_conventions/nested_attribute_rejected.v the report differs: old E0357 `the value contains an attribute instance`, new E0207 `nested_attribute`
+verilog/04_data_types/drive_strength_without_assignment_rejected.v the report differs: old E0207 `§4.4: a drive strength is only legal on a net declaration assignment`, new E0207 `invalid_net_declaration`
+verilog/04_data_types/reject_charge_strength_on_wire.v the report differs: old E0257 `a charge strength is only legal on a trireg`, new E0207 `invalid_net_declaration`
+verilog/04_data_types/scalared_without_range_rejected.v the report differs: old E0207 `§4.3.2: scalared and vectored are only legal on a vector net, which de`, new E0207 `invalid_net_declaration`
+verilog/06_assignments/assignment_highz_pair_rejected.v the report differs: old E0207 `§6.1.4: both drive strengths cannot be high impedance`, new E0207 `expected_strength`
+verilog/06_assignments/reject_delay4.v the report differs: old E0210 `found `, new E0207 `found `
+verilog/07_gate_switch_level/and_gate_three_delays_rejected.v the report differs: old E0210 `found `, new E0207 `found `
+verilog/07_gate_switch_level/buf_gate_three_delays_rejected.v the report differs: old E0210 `found `, new E0207 `found `
+verilog/07_gate_switch_level/enable_gate_missing_control_rejected.v the report differs: old E0209 `an enable gate takes an output, a data input and an enable`, new E0207 `invalid_gate_terminals`
+verilog/07_gate_switch_level/four_net_delays_rejected.v the report differs: old E0210 `found `, new E0207 `found `
+verilog/07_gate_switch_level/gate_highz_pair_rejected.v the report differs: old E0207 `§6.1.4: both drive strengths cannot be high impedance`, new E0207 `expected_strength`
+verilog/07_gate_switch_level/gates_no_input_rejected.v the report differs: old E0209 `an n-input gate takes an output and at least one input`, new E0207 `invalid_gate_terminals`
+verilog/07_gate_switch_level/missing_pcontrol_rejected.v the report differs: old E0209 `a cmos switch (A.3.4 cmos_switchtype) takes an output, an input, an nc`, new E0207 `invalid_gate_terminals`
+verilog/07_gate_switch_level/mos_drive_strength_rejected.v the report differs: old E0208 `found strong1`, new E0209 `found strong1`
+verilog/07_gate_switch_level/mos_switch_missing_control_rejected.v the report differs: old E0209 `a mos switch (A.3.4 mos_switchtype) takes an output, an input and an e`, new E0207 `invalid_gate_terminals`
+verilog/07_gate_switch_level/no_output_rejected.v the report differs: old E0209 `a buf/not gate needs at least one output and one input`, new E0207 `invalid_gate_terminals`
+verilog/07_gate_switch_level/non_charge_strength_rejected.v the report differs: old E0207 `found strong, which is not a charge strength`, new E0207 `expected_strength`
+verilog/07_gate_switch_level/pull_gate_two_terminals_rejected.v the report differs: old E0207 `found `, new E0207 `invalid_gate_terminals`
+verilog/07_gate_switch_level/reject_same_polarity_drive_strength.v the report differs: old E0207 `a drive strength pairs one 0-side with one 1-side strength`, new E0207 `expected_strength`
+verilog/08_udp/definition_inside_module_rejected.v the report differs: old E0205 `found primitive`, new E0240 `found primitive`
+verilog/08_udp/inout_port_rejected.v the report differs: old E0207 `found `, new E0233 `invalid_udp`
+verilog/08_udp/no_change_in_combinational_rejected.v the report differs: old E0233 ``, new E0233 `invalid_udp`
+verilog/08_udp/question_in_output_rejected.v the report differs: old E0233 ``, new E0233 `invalid_udp`
+verilog/08_udp/reject_udp_comb_edge.v the report differs: old E0234 `an edge indicator `, new E0233 `invalid_udp`
+verilog/08_udp/reject_udp_z_output.v the report differs: old E0233 ``, new E0233 `invalid_udp`
+verilog/08_udp/udp_input_z_rejected.v the report differs: old E0233 ``, new E0233 `invalid_udp`
+verilog/08_udp/udp_two_edges_rejected.v the report differs: old E0234 `a sequential UDP table entry permits at most one input transition desc`, new E0233 `invalid_udp`
+verilog/09_behavioral_modeling/always_without_statement_rejected.v the report differs: old E0209 `found `, new E0219 `null_statement`
+verilog/09_behavioral_modeling/delay_sized_constant_rejected.v the report differs: old E0207 `found 64'd2147483648`, new E0207 `invalid_delay_value`
+verilog/09_behavioral_modeling/initial_without_statement_rejected.v the report differs: old E0209 `found `, new E0219 `null_statement`
+verilog/09_behavioral_modeling/unnamed_block_declaration_rejected.v the report differs: old E0290 `found `, new E0207 `decl_in_unnamed_block`
+verilog/09_behavioral_modeling/unnamed_fork_declaration_rejected.v the report differs: old E0290 `found `, new E0207 `decl_in_unnamed_block`
+verilog/10_tasks_functions/task_port_item_needs_direction_rejected.v the report differs: old E0207 `found a: a task or function port list opens with input, output or inou`, new E0207 `invalid_port_declaration`
+verilog/11_scheduling/primitive_output_to_expression_rejected.v the report differs: old E0207 `found `, new E0207 `invalid_gate_terminals`
+verilog/12_hierarchy/mixed_ordered_named_parameters_rejected.v the report differs: old E0246 `instance mixes ordered and named parameter assignments`, new E0246 `invalid_parameter_list`
+verilog/12_hierarchy/nested_generate_region_rejected.v the report differs: old E0228 ``, new E0228 `not_a_generate_item`
+verilog/12_hierarchy/parameter_in_generate_block_rejected.v the report differs: old E0229 ``, new E0228 `not_a_generate_item`
+verilog/12_hierarchy/port_ansi_input_reg_rejected.v the report differs: old E0207 `found `, new E0207 `invalid_port_declaration`
+verilog/12_hierarchy/standalone_generate_block_rejected.v the report differs: old E0221 `found `, new E0221 `begin_at_module_scope`
+verilog/13_configuration/cell_without_expansion_rejected.v the report differs: old E0207 `found `, new E0243 `invalid_config_rule`
+verilog/13_configuration/config_default_use_rejected.v the report differs: old E0207 `found use: a default pairs with `, new E0243 `invalid_config_rule`
+verilog/13_configuration/design_after_rule_rejected.v the report differs: old E0207 `found `, new E0243 `invalid_config_rule`
+verilog/13_configuration/include_statement_rejected.v the report differs: old E0232 ``, new E0232 `library_text_in_source`
+verilog/13_configuration/instance_without_expansion_rejected.v the report differs: old E0207 `found `, new E0243 `invalid_config_rule`
+verilog/13_configuration/library_declaration_rejected.v the report differs: old E0232 ``, new E0232 `library_text_in_source`
+verilog/13_configuration/library_with_liblist_rejected.v the report differs: old E0243 `a cell clause with a library name takes `, new E0243 `invalid_config_rule`
+verilog/13_configuration/missing_endconfig_rejected.v the report differs: old E0207 `found end of file: no `, new E0243 `invalid_config_rule`
+verilog/13_configuration/two_default_liblists_rejected.v the report differs: old E0243 `more than one default clause specifies a liblist (IEEE 1364-2005 §13.3`, new E0243 `invalid_config_rule`
+verilog/13_configuration/two_design_statements_rejected.v the report differs: old E0207 `found design, which begins no A.1.5 config_rule_statement`, new E0243 `invalid_config_rule`
+verilog/13_configuration/use_suffix_not_config_rejected.v the report differs: old E0207 `found `, new E0207 `found `
+verilog/14_specify_blocks/condition_operator_rejected.v the report differs: old E0245 `a state-dependent path's condition uses only Table 14-1's operators (§`, new E0245 `invalid_specify_item`
+verilog/14_specify_blocks/edge_path_polarity_placement_rejected.v the report differs: old E0245 `an edge-sensitive path writes its polarity after the destination (Synt`, new E0245 `invalid_specify_item`
+verilog/14_specify_blocks/four_delay_values_rejected.v the report differs: old E0207 `a path delay lists 1, 2, 3, 6 or 12 values (A.7.4 list_of_path_delay_e`, new E0245 `invalid_specify_item`
+verilog/14_specify_blocks/ifnone_edge_sensitive_rejected.v the report differs: old E0245 `ifnone takes a simple path (Syntax 14-5), not an edge-sensitive one`, new E0245 `invalid_specify_item`
+verilog/14_specify_blocks/multiple_paths_parallel_rejected.v the report differs: old E0207 `a parallel path (`, new E0245 `invalid_specify_item`
+verilog/14_specify_blocks/parallel_path_list_rejected.v the report differs: old E0207 `a parallel path (`, new E0245 `invalid_specify_item`
+verilog/14_specify_blocks/parallel_path_two_inputs_rejected.v the report differs: old E0207 `a parallel path (`, new E0245 `invalid_specify_item`
+verilog/14_specify_blocks/polarity_operator_rejected.v the report differs: old E0207 `found `, new E0245 `invalid_specify_item`
+verilog/14_specify_blocks/specify_outside_module_rejected.v the report differs: old E0245 `a specify block outside a module (§14.1)`, new E0245 `specify_outside_module`
+verilog/15_timing_checks/edge_descriptor_rejected.v the report differs: old E0207 `found 00, not an A.7.5.3 edge descriptor (01, 10, or 0 or 1 paired wit`, new E0245 `invalid_specify_item`
+verilog/15_timing_checks/period_without_edge_rejected.v the report differs: old E0207 ``, new E0245 `invalid_specify_item`
+verilog/15_timing_checks/system_task_in_specify_rejected.v the report differs: old E0207 `found $display: A.7.1 admits only A.7.5.1's twelve timing checks insid`, new E0245 `invalid_specify_item`
+verilog/15_timing_checks/timing_check_in_procedure_rejected.v the report differs: old E0207 ``, new E0214 `found $setup`
+verilog/15_timing_checks/width_null_threshold_rejected.v the report differs: old E0207 `found `, new E0245 `invalid_specify_item`
+verilog/19_compiler_directives/unknown_version_rejected.v the report differs: old E0135 ``, new E0135 `unknown_keyword_set`
+verilog/A_formal_syntax/b_A_1_3_empty_parameter_header_rejected.v the report differs: old E0246 `an empty module parameter header has no parameter declaration`, new E0246 `invalid_parameter_list`
+verilog/A_formal_syntax/b_A_1_3_localparam_header_rejected.v the report differs: old E0246 `a module parameter header requires `, new E0246 `invalid_parameter_list`
+verilog/A_formal_syntax/b_A_1_3_port_mixed_forms_rejected.v the report differs: old E0207 `found `, new E0207 `invalid_port_declaration`
+verilog/A_formal_syntax/b_A_1_5_missing_design_rejected.v the report differs: old E0207 `found `, new E0243 `invalid_config_rule`
+verilog/A_formal_syntax/b_A_2_1_2_input_reg_rejected.v the report differs: old E0207 `found `, new E0207 `invalid_port_declaration`
+verilog/A_formal_syntax/b_A_2_1_3_delay_before_range_rejected.v the report differs: old E0207 `A.2.1.3: a net's range comes before its delay (`, new E0207 `invalid_net_declaration`
+verilog/A_formal_syntax/b_A_2_1_3_strength_without_assignment_rejected.v the report differs: old E0207 `§4.4: a drive strength is only legal on a net declaration assignment`, new E0207 `invalid_net_declaration`
+verilog/A_formal_syntax/b_A_3_1_missing_input_terminal_rejected.v the report differs: old E0209 `an n-input gate takes an output and at least one input`, new E0207 `invalid_gate_terminals`
+verilog/A_formal_syntax/b_A_3_2_pullup_strength0_only_rejected.v the report differs: old E0207 `a single-strength bracket on this gate is A.3.2's `, new E0207 `expected_strength`
+verilog/A_formal_syntax/b_A_3_3_expression_output_terminal_rejected.v the report differs: old E0207 `found `, new E0207 `invalid_gate_terminals`
+verilog/A_formal_syntax/b_A_3_4_enable_gate_two_outputs_rejected.v the report differs: old E0209 `an enable gate takes an output, a data input and an enable`, new E0207 `invalid_gate_terminals`
+verilog/A_formal_syntax/b_A_4_1_empty_parameter_assignment_rejected.v the report differs: old E0246 `an empty parameter value assignment has no expression or named assignm`, new E0246 `invalid_parameter_list`
+verilog/A_formal_syntax/b_A_4_2_nested_generate_region_rejected.v the report differs: old E0228 ``, new E0228 `not_a_generate_item`
+verilog/A_formal_syntax/b_A_5_1_missing_udp_body_rejected.v the report differs: old E0207 `found endprimitive: a udp_body is a `, new E0233 `invalid_udp`
+verilog/A_formal_syntax/b_A_6_3_unnamed_block_declaration_rejected.v the report differs: old E0290 `found `, new E0207 `decl_in_unnamed_block`
+verilog/A_formal_syntax/b_A_6_4_null_initial_statement_rejected.v the report differs: old E0209 `found `, new E0219 `null_statement`
+verilog/A_formal_syntax/b_A_7_1_statement_in_specify_rejected.v the report differs: old E0207 `found `, new E0245 `invalid_specify_item`
+verilog/A_formal_syntax/b_A_7_2_parallel_path_two_inputs_rejected.v the report differs: old E0207 `a parallel path (`, new E0245 `invalid_specify_item`
+verilog/A_formal_syntax/b_A_7_4_four_path_delays_rejected.v the report differs: old E0207 `a path delay lists 1, 2, 3, 6 or 12 values (A.7.4 list_of_path_delay_e`, new E0245 `invalid_specify_item`
+verilog/A_formal_syntax/b_A_7_5_1_setup_without_limit_rejected.v the report differs: old E0207 ``, new E0245 `invalid_specify_item`
+verilog/A_formal_syntax/b_A_7_5_2_expression_notifier_rejected.v the report differs: old E0207 `found ntfr: the notifier argument of `, new E0245 `invalid_specify_item`
+verilog/A_formal_syntax/b_A_7_5_3_edge_descriptor_11_rejected.v the report differs: old E0207 `found 11, not an A.7.5.3 edge descriptor (01, 10, or 0 or 1 paired wit`, new E0245 `invalid_specify_item`

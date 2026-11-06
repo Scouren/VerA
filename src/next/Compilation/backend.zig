@@ -125,7 +125,7 @@ pub fn codegen(comp: *Compilation, b: Compilation.Backend) !?Job {
         .zig, .exe => {},
         .verilog => return notBuilt(comp, b, "the behavioural Verilog backend (--emit-verilog)"),
         .osdi => return notBuilt(comp, b, "the OSDI backend (--emit-osdi)"),
-        .rtlil => return notBuilt(comp, b, "the RTLIL backend (--emit-rtlil)"),
+        .rtlil => return rtlilText(comp),
         .digital_device => return digitalDevice(comp),
         .digital_exe => return digitalExe(comp),
         .libmap => unreachable, // Refused before preprocessing.
@@ -227,6 +227,7 @@ pub fn semaDigital(comp: *Compilation) !?Job {
     const out = try comp.arena().create(vams.Preprocessor.Output);
     out.* = comp.pp.output();
     for (sources, comp.units.items) |*s, *u| s.* = .{ .tree = &u.tree, .pp = out };
+    if (comp.config.target == .rtlil and try rtlilRefused(comp, out.*)) return null;
     var why: sema.digital.Why = .{};
     comp.lowered = sema.digital.lower(comp.arena(), &comp.zcu, .{ .sources = sources }, &why) catch |e| switch (e) {
         error.Unsupported => return notBuiltFmt(comp, "the digital lowering", why.text),
@@ -319,6 +320,40 @@ fn digitalExe(comp: *Compilation) !?Job {
             comp.outputs.status = 1;
         },
     }
+    return null;
+}
+
+/// `--emit-rtlil`'s refusal (`codegen.rtlil.refusal`), read from the
+/// files' Vir before the lowering as the old emitter read its own parse:
+/// reported, and true, when the design is outside the subset.
+fn rtlilRefused(comp: *Compilation, out: vams.Preprocessor.Output) !bool {
+    const a = comp.arena();
+    const trees = try a.alloc(*const vams.Ast, comp.units.items.len);
+    for (trees, comp.units.items) |*t, *u| t.* = &u.tree;
+    const s = try sema.digital.sites.collect(a, &comp.zcu, trees);
+    const r = (try codegen_mod.rtlil.refusal(a, &s)) orelse return false;
+    try comp.wip.add(.codegen, r.code, errors.relocate(out, r.at, r.at), "{s}", .{r.detail});
+    return true;
+}
+
+/// `--emit-rtlil`'s text (`codegen.rtlil.emit`, over the lowered design and
+/// `Zcu.instances`' parents and names) to `-o`, else on stdout.
+fn rtlilText(comp: *Compilation) !?Job {
+    const a = comp.arena();
+    const zi = comp.zcu.instances.slice();
+    const parent = try a.alloc(u32, zi.len);
+    const name = try a.alloc([]const u8, zi.len);
+    for (parent, name, zi.items(.parent), zi.items(.name)) |*p, *n, zp, zn| {
+        p.* = @backingInt(zp);
+        n.* = comp.zcu.intern_pool.stringToSlice(zn);
+    }
+    var text: Io.Writer.Allocating = .init(a);
+    codegen_mod.rtlil.emit(&text.writer, a, .{ .lowered = &comp.lowered.?, .parent = parent, .name = name }) catch |e| switch (e) {
+        error.Unsupported => return notBuilt(comp, .rtlil, "the RTLIL text of a shape outside the subset"),
+        error.OutOfMemory, error.WriteFailed => |x| return x,
+    };
+    comp.device = .{ .text = try comp.gpa.dupe(u8, text.written()) };
+    try writeText(comp);
     return null;
 }
 

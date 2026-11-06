@@ -61,6 +61,8 @@ pub fn bundle(comp: *Compilation) Allocator.Error!Diag {
     for (zf.items(.code), zf.items(.file), zf.items(.src), zf.items(.message), zf.items(.rule), zf.items(.name), zf.items(.nums), zf.items(.part), zf.items(.note), zf.items(.help)) |code, file, src, message, rule, name, nums, part, note, help| {
         const u = &comp.units.items[@backingInt(file)];
         const is_error = @tagName(code)[0] == 'E';
+        // The old `--emit-rtlil` parsed and never elaborated: no warning of elaboration's.
+        if (comp.config.target == .rtlil and !is_error) continue;
         if (comp.config.digital() and is_error) {
             if (refused) continue;
             refused = true;

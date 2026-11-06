@@ -12,7 +12,7 @@
 //! Cites: IEEE 1364-2005 §9.9, §11.4, §12.4, §12.5, §19.8.
 //!
 //! Contents:
-//! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Port = struct`, `pub const Named = struct`, `pub const SegmentRef = struct`, `pub const Why = struct`, `pub const Spec = struct`, `pub const ProcSite = struct`
+//! - `pub const sites`, `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Port = struct`, `pub const Named = struct`, `pub const SegmentRef = struct`, `pub const Why = struct`, `pub const Spec = struct`, `pub const ProcSite = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
 //! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `Declared`, `refuse`, `refuseFmt`, `reject`, `rejectFmt`, `rejectOperand`, `rejectArg`, `rejectArgFmt`, `lookup`, `readsSignal`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
@@ -39,6 +39,10 @@ const Program = std_sim.Program;
 const Builder = std_sim.Builder;
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
+
+/// Where `--emit-rtlil` refuses the design (`digital/sites.zig`), read
+/// from the Vir alone, before any lowering.
+pub const sites = @import("digital/sites.zig");
 
 /// Where one `Zcu` file came from: its tree (token offsets) and the
 /// preprocessor's output (source locations of `$finish` and timing checks).

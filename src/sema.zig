@@ -47,4 +47,5 @@ test {
     _ = @import("Sema/array.zig");
     _ = @import("Sema/lower_test.zig");
     _ = @import("Sema/digital_test.zig");
+    _ = @import("Sema/digital/sites_test.zig");
 }

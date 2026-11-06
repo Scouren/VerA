@@ -35,6 +35,7 @@ const v_run = @import("v_options");
 const fixture = @import("comp/fixture.zig");
 const judge = @import("comp/judge.zig");
 const device = @import("comp/device.zig");
+const yosys = @import("comp/yosys.zig");
 const Fixture = fixture.Fixture;
 
 /// One fixture's outcome.
@@ -49,6 +50,9 @@ const Outcome = union(enum) {
     /// A `comp.rulings` line settled the difference: the old side is wrong
     /// and the new one meets the fixture's own verdict.
     ruled: []const u8,
+    /// diff-rtlil: both built, and Yosys proves the two RTLIL texts
+    /// equivalent (`comp/yosys.zig`).
+    equivalent,
 };
 
 /// The shared state of one run, read by every worker.
@@ -68,6 +72,12 @@ const Shared = struct {
     /// `comp.rulings`: fixture to the clause that settles it.
     rulings: std.StringHashMapUnmanaged([]const u8),
 };
+
+/// A diff-rtlil ruling whose clause starts with this: old `--emit-rtlil`
+/// preprocessed the design with front-end options of its own (no
+/// `--protect-keys`, no IEEE 1364 macro-text warning), and the new side
+/// follows the front end `--run` uses.
+const front_end_ruling = "front end:";
 
 // ---- private ----
 
@@ -133,7 +143,7 @@ fn worker(s: *Shared) void {
         s.lock.lockUncancelable(s.io);
         defer s.lock.unlock(s.io);
         s.outcomes[k] = switch (out) {
-            .pending, .agree => out,
+            .pending, .agree, .equivalent => out,
             .not_built => |b| .{ .not_built = std.heap.smp_allocator.dupe(u8, b) catch "?" },
             .differ => |d| .{ .differ = .{ .owner = std.heap.smp_allocator.dupe(u8, d.owner) catch "?", .why = std.heap.smp_allocator.dupe(u8, d.why) catch "?" } },
             .nondeterministic => |w| .{ .nondeterministic = std.heap.smp_allocator.dupe(u8, w) catch "?" },
@@ -166,9 +176,16 @@ fn one(arena: Allocator, s: *Shared, k: u32) !Outcome {
     old.stderr = try std.mem.replaceOwned(u8, arena, old.stderr, root, "");
     new.stderr = try std.mem.replaceOwned(u8, arena, new.stderr, root, "");
     const why = (try judge.compare(arena, old, new, f.lang == .verilog)) orelse return .agree;
+    // Two RTLIL texts of one circuit agree: Yosys is the judge.
+    if (std.mem.eql(u8, v_run.flag, "--emit-rtlil") and old.status == 0 and new.status == 0 and old.stdout.len != 0 and new.stdout.len != 0 and std.mem.eql(u8, old.stderr, new.stderr)) {
+        const miss = try yosys.equivalent(arena, s.io, options.yosys, try std.fmt.allocPrint(arena, "{s}/{d}-y", .{ s.work, k }), old.stdout, new.stdout);
+        if (miss == null) return .equivalent;
+    }
     if (s.rulings.get(f.rel)) |clause| {
         const miss: ?[]const u8 = if (std.mem.eql(u8, v_run.flag, "--check"))
             try deviceTiebreak(arena, s, f, new, args, try std.fmt.allocPrint(arena, "{s}/{d}-d", .{ s.work, k }))
+        else if (std.mem.startsWith(u8, clause, front_end_ruling))
+            try frontEndTiebreak(arena, s, f, new, try std.fmt.allocPrint(arena, "{s}/{d}-r", .{ s.work, k }))
         else if (try tiebreak(arena, s.io, f, new)) null else "the new side misses the fixture's own verdict";
         if (miss == null) return .{ .ruled = clause };
         return .{ .differ = .{ .owner = v_run.name ++ ".rulings", .why = try std.fmt.allocPrint(arena, "the ruling ({s}) does not hold: {s}; {s}", .{ clause, miss.?, why }) } };
@@ -182,7 +199,7 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
     const xfail = try readList(arena, io, "tests/differential/" ++ v_run.name ++ ".xfail");
     var out: Io.Writer.Allocating = .init(arena);
     var new_list: Io.Writer.Allocating = .init(arena);
-    var t: struct { ruled: u32 = 0, agree: u32 = 0, not_built: u32 = 0, differ: u32 = 0, listed: u32 = 0, failed: u32 = 0 } = .{};
+    var t: struct { equivalent: u32 = 0, ruled: u32 = 0, agree: u32 = 0, not_built: u32 = 0, differ: u32 = 0, listed: u32 = 0, failed: u32 = 0 } = .{};
     var by_owner: std.StringArrayHashMapUnmanaged(u32) = .empty;
     for (fixtures, outcomes) |f, o| {
         if (o == .ruled) {
@@ -192,7 +209,7 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
         }
         const line: ?[]const u8 = switch (o) {
             .pending => unreachable, // Every worker finished its fixtures.
-            .agree => null,
+            .agree, .equivalent => null,
             .not_built => |b| try std.fmt.allocPrint(arena, "not built: backend {s}", .{b}),
             .differ => |d| try std.fmt.allocPrint(arena, "{s}: {s}", .{ d.owner, d.why }),
             .nondeterministic => |w| try std.fmt.allocPrint(arena, "rw-comp (determinism): -j1 and -jN differ: {s}", .{w}),
@@ -200,6 +217,10 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
         };
         switch (o) {
             .agree => t.agree += 1,
+            .equivalent => {
+                t.agree += 1;
+                t.equivalent += 1;
+            },
             .not_built => t.not_built += 1,
             else => t.differ += 1,
         }
@@ -239,7 +260,7 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
     if (options.rebaseline) try Io.Dir.cwd().writeFile(io, .{ .sub_path = try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", v_run.name ++ ".xfail.new" }), .data = new_list.written() });
     var owners: Io.Writer.Allocating = .init(arena);
     for (by_owner.keys(), by_owner.values()) |k, v| try owners.writer.print("  {d} {s}\n", .{ v, k });
-    std.debug.print("{s}" ++ v_run.name ++ ": {d} fixtures in {d} s: {d} agree, {d} ruled (old-side bugs), {d} need a backend vera-next has not got, {d} differ; {d} in " ++ v_run.name ++ ".xfail, {d} failures. By owner:\n{s}", .{ out.written(), fixtures.len, secs, t.agree, t.ruled, t.not_built, t.differ, t.listed, t.failed, owners.written() });
+    std.debug.print("{s}" ++ v_run.name ++ ": {d} fixtures in {d} s: {d} agree ({d} by Yosys equivalence), {d} ruled (old-side bugs), {d} need a backend vera-next has not got, {d} differ; {d} in " ++ v_run.name ++ ".xfail, {d} failures. By owner:\n{s}", .{ out.written(), fixtures.len, secs, t.agree, t.equivalent, t.ruled, t.not_built, t.differ, t.listed, t.failed, owners.written() });
     if (t.failed != 0 and !options.rebaseline) return error.DiffCompFailed;
 }
 
@@ -264,6 +285,32 @@ fn tiebreak(arena: Allocator, io: Io, f: Fixture, new: judge.Run) !bool {
 fn deviceTiebreak(arena: Allocator, s: *Shared, f: Fixture, new: judge.Run, args: []const []const u8, work: []const u8) !?[]const u8 {
     if (new.status != 0) return "the new side builds no device";
     return device.agrees(arena, s.io, s.env, s.exe_new, options.repo_root, args, work, f.reject);
+}
+
+/// The tiebreaker of a `front_end_ruling`: old `vera` on the fixture's own
+/// `--run` line reports the preprocessor's diagnostics (codes E01xx/W01xx)
+/// the new side does, in order. Null when it holds, else why not.
+fn frontEndTiebreak(arena: Allocator, s: *Shared, f: Fixture, new: judge.Run, work: []const u8) !?[]const u8 {
+    const run_args = try fixture.argv(arena, f, options.fixture_root);
+    const ref = try judge.run(arena, s.io, s.exe_old, run_args, work, s.env, false);
+    const want = try preprocessCodes(arena, ref.stderr);
+    const got = try preprocessCodes(arena, new.stderr);
+    if (std.mem.eql(u8, want, got)) return null;
+    return try std.fmt.allocPrint(arena, "old --run's preprocessor reports `{s}`, the new side `{s}`", .{ want, got });
+}
+
+/// The `[E01xx]`/`[W01xx]` codes of `stderr`'s headlines, in order.
+fn preprocessCodes(arena: Allocator, stderr: []const u8) ![]const u8 {
+    var out: Io.Writer.Allocating = .init(arena);
+    var lines = std.mem.splitScalar(u8, stderr, '\n');
+    while (lines.next()) |line| {
+        const at = std.mem.find(u8, line, "[") orelse continue;
+        if (at + 7 > line.len or line[at + 6] != ']') continue;
+        if (!std.mem.startsWith(u8, line, "error[") and !std.mem.startsWith(u8, line, "warning[")) continue;
+        const code = line[at + 1 .. at + 6];
+        if (std.mem.startsWith(u8, code[1..], "01")) try out.writer.print("{s} ", .{code});
+    }
+    return out.written();
 }
 
 /// The run's rulings (`<name>.rulings`): `<path> <clause and reason>`

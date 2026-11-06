@@ -16,7 +16,7 @@
 //! Cites: VAMS-2023 §5.6 and §5.6.1.3 (a contribution is a float unit).
 //!
 //! Contents:
-//! - `pub const zig`: the Zig backend; `pub const bench`: the analog testbench backend; `pub const digital_next`: the `.v` backends; `pub const examples`: hand-built devices (test support)
+//! - `pub const zig`: the Zig backend; `pub const bench`: the analog testbench backend; `pub const digital_next`: the `.v` backends; `pub const rtlil`: the RTLIL backend; `pub const examples`: hand-built devices (test support)
 //! - `pub const Backend = enum { zig }`
 //! - `pub const Input = struct`, `pub const Options = struct`
 //! - `pub const Result = union(enum) { ok: link.Output, fail: []u8 }`, `Result.deinit`
@@ -35,6 +35,8 @@ pub const zig = @import("codegen/zig.zig");
 pub const examples = @import("codegen/examples.zig");
 /// The analog testbench backend (`--run`, `--emit-exe`).
 pub const bench = @import("codegen/bench.zig");
+/// The `--emit-rtlil` backend: its refusals and its text.
+pub const rtlil = @import("codegen/rtlil.zig");
 /// The `.v` backends over `std_sim.Program` (`--emit-exe` today).
 pub const digital_next = @import("codegen/digital_next.zig");
 

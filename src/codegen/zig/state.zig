@@ -51,6 +51,7 @@ pub fn plan(dg: *DeclGen) DeclGen.Error!void {
 /// then the §9.21.1 snapshots: each site's samples, `table_ready` (captured
 /// this evaluation) and `table_kept` (captured at an accepted point).
 pub fn genInstanceFields(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
+    for (0..dg.device.limit_slots.len) |k| w.print("    limiter_previous__{d}: f64 = 0.0,\n", .{k}) catch return error.OutOfMemory;
     for (dg.table_len, 0..) |n, k| w.print("    table_{d}: [{d}]f64 = @splat(0.0),\n", .{ k, n }) catch return error.OutOfMemory;
     if (dg.table_len.len != 0) w.print("    table_ready: [{0d}]bool = @splat(false),\n    table_kept: [{0d}]bool = @splat(false),\n", .{dg.table_len.len}) catch return error.OutOfMemory;
     for (dg.held_field, 0..) |field, i| if (field) |f| {
@@ -61,12 +62,14 @@ pub fn genInstanceFields(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
 }
 
 /// `State`, `initState`, `updateState`, `stateCtl` and `state_class` when
-/// the device holds a variable or snapshots a table (then `mutable_eval`).
+/// the device holds a variable, snapshots a table (then `mutable_eval`) or
+/// keeps a §9.17.3 `$limit` slot (then `advanceIteration`).
 pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
     var held = false;
     for (dg.held_field) |f| held = held or f != null;
     const tables = dg.table_len.len != 0;
-    if (!held and !tables) return;
+    const limits = dg.device.limit_slots.len;
+    if (!held and !tables and limits == 0) return;
     const p = struct {
         fn f(out: *std.Io.Writer, comptime fmt: []const u8, args: anytype) DeclGen.Error!void {
             out.print(fmt, args) catch return error.OutOfMemory;
@@ -76,6 +79,7 @@ pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
     if (tables) try p(w, "\npub const mutable_eval = true;\n", .{});
     try p(w, "\n/// §5.10 the held values as last committed (`stateCtl`).\npub const State = struct {{\n", .{});
     if (tables) try p(w, "    table_kept: [{d}]bool = @splat(false),\n", .{dg.table_len.len});
+    for (0..limits) |k| try p(w, "    limiter_previous__{d}: f64 = 0.0,\n", .{k});
     for (dg.held_field, 0..) |field, i| if (field) |f| {
         try p(w, "    {s}: {s} = ", .{ f, typeName(dg, i) });
         try writeInit(dg, w, i);
@@ -98,10 +102,18 @@ pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
     try p(w, "    return .ok;\n}}\n\n/// `commit` keeps the instance's held values; `revert` restores them.\npub fn stateCtl(_: *const Model, inst: *Instance, state: *State, op: contract.StateCtlOp) bool {{\n    switch (op) {{\n        .query => {{}},\n        .commit => {{\n", .{});
     if (tables) try p(w, "            state.table_kept = inst.table_kept;\n            inst.table_ready = inst.table_kept;\n", .{});
     for (dg.held_field) |field| if (field) |f| try p(w, "            state.{s} = inst.{s};\n", .{ f, f });
+    for (0..limits) |k| try p(w, "            state.limiter_previous__{0d} = inst.limiter_previous__{0d};\n", .{k});
     try p(w, "        }},\n        .revert => {{\n", .{});
     if (tables) try p(w, "            inst.table_kept = state.table_kept;\n            inst.table_ready = inst.table_kept;\n", .{});
     for (dg.held_field) |field| if (field) |f| try p(w, "            inst.{s} = state.{s};\n", .{ f, f });
+    for (0..limits) |k| try p(w, "            inst.limiter_previous__{0d} = state.limiter_previous__{0d};\n", .{k});
     try p(w, "        }},\n    }}\n    return false;\n}}\n\npub const state_class: contract.StateClass = .history;\n", .{});
+    if (limits == 0) return;
+    // §9.17.3 after each Newton iterate, each `$limit` slot's value is the
+    // next iterate's previous one (`limit$old`).
+    try p(w, "\n/// §9.17.3 an iterate's limited values become the next one's previous ones.\npub fn advanceIteration(comptime S: type, model: *const Model, inst: *Instance, x: [n_u]f64, sim: contract.SimState) void {{\n    const m = run(S, &x, D.zProbe(S, &x), model, inst, sim);\n", .{});
+    for (0..limits) |k| try p(w, "    inst.limiter_previous__{0d} = m.l{0d}.val();\n", .{k});
+    try p(w, "}}\n", .{});
 }
 
 // ---- private ----

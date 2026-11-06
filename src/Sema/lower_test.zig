@@ -326,6 +326,30 @@ test "§5.8.1 an analog operator under a condition that moves is E0514; a static
     try std.testing.expectEqualSlices(Diag.Code, &.{}, o.codes);
 }
 
+test "§7.2.2/§6.6 a digital process a generate scheme brings in is judged; one it leaves out is not" {
+    // §4.5.15 an analog operator "can not be used inside an initial or
+    // always block": the old checker saw the flattened design, every
+    // active generate scope's process included (E0422).
+    try expectCode(
+        \\module m(p); inout p; electrical p; real x;
+        \\  generate if (1) begin : g
+        \\    always x = ddt(V(p));
+        \\  end endgenerate
+        \\  analog I(p) <+ V(p);
+        \\endmodule
+    , .E0422);
+    var o = try lower(
+        \\module m(p); inout p; electrical p; real x;
+        \\  generate if (0) begin : g
+        \\    always x = ddt(V(p));
+        \\  end endgenerate
+        \\  analog I(p) <+ V(p);
+        \\endmodule
+    );
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{}, o.codes);
+}
+
 test "§4.4 a net is no value (E0315); §9.2 a digital-only task is refused in analog (E0806)" {
     try expectCode(
         \\module m(p); inout p; electrical p; real x;

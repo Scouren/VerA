@@ -183,7 +183,7 @@ pub fn semaTop(comp: *Compilation) !bool {
         else
             try ip.get(comp.gpa, .{ .float = typed.value }),
     };
-    try sema.Sema.elaborate(&comp.zcu, .{ .roots = if (comp.config.digital()) .all else .first, .overrides = overrides });
+    try sema.Sema.elaborate(&comp.zcu, .{ .roots = if (comp.config.digital()) .all else .first, .overrides = overrides, .ieee1364 = comp.config.digital() });
     for (comp.zcu.failed.items(.code)) |code| if (severity(comp, code) == .err) return false;
     return comp.zcu.instances.len != 0;
 }
@@ -202,10 +202,10 @@ pub fn notBuilt(comp: *Compilation, b: Compilation.Backend, what: []const u8) !v
 fn astgenUnit(comp: *Compilation, unit: u32) Allocator.Error!?void {
     const gpa = comp.gpa;
     const u = &comp.units.items[unit];
-    u.tree = try vams.Ast.parse(gpa, u.text, .{ .keywords = comp.config.language });
+    u.tree = try vams.Ast.parse(gpa, u.text, .{ .keywords = comp.config.language, .discrete = comp.config.digital() });
     u.vir = .{ .instructions = .empty, .extra = &.{}, .string_bytes = &.{}, .diag = .empty };
     if (u.tree.errors.len != 0) return null;
-    u.vir = try vams.AstGen.generate(gpa, &u.tree, .{ .directives = comp.pp.output().directives, .language = comp.config.language });
+    u.vir = try vams.AstGen.generate(gpa, &u.tree, .{ .directives = comp.pp.output().directives, .ieee1364 = comp.config.digital() });
     u.builtins = builtinModules(comp, u);
 }
 

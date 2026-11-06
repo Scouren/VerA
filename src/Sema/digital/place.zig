@@ -250,6 +250,17 @@ pub fn terms(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
         else => .any, // else: a name or an expression
     };
     const watched = if (edge == .any) r else vir.instructions.items(.data)[@backingInt(i)].un_node.operand;
+    if (edge != .any) {
+        const n: ?Name = if (watched.toIndex()) |wi| switch (Lower.tag(vir, wi)) {
+            .decl_ref, .str_ref, .field => try expr.leafName(l, wi),
+            .elem => (try selectOf(l, wi)).name,
+            else => null, // else: an expression's value has an edge
+        } else null;
+        if (n) |x| {
+            if (x.kind == .event) return l.reject(l.frame, r, "§9.7.3: a named event has no value for a posedge or negedge");
+            if (x.ty.real) return l.reject(l.frame, r, "§4.8.1: posedge and negedge do not apply to a real variable");
+        }
+    }
     const w = watched.toIndex() orelse return l.refuse("an omitted event expression");
     if (try @import("domain.zig").monitor(l, w)) |event| {
         if (edge != .any) return l.refuse("an edge of an analog event");

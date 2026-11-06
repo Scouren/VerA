@@ -105,7 +105,7 @@ pub fn run(gpa: Allocator, source: [:0]const u8, tokens: Ast.TokenList.Slice, op
         .gen_depth = 0,
         .attr_depth = 0,
         .in_paramset = false,
-        .discrete = @backingInt(options.keywords) < @backingInt(KeywordSet.vams_2_3),
+        .discrete = options.discrete or @backingInt(options.keywords) < @backingInt(KeywordSet.vams_2_3),
         .connect_module = false,
     };
     defer p.errors.deinit(gpa);

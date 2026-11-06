@@ -310,6 +310,8 @@ pub fn compileDrivers(l: *Lower) Error!void {
         };
         const pc = try l.b.inst(.continuous, @intCast(k), 0, scope);
         try l.driver_pcs.append(l.a, pc);
+        const value: ?Inst.Index = if (w.source == .expr) w.source.expr.value.toIndex() else null;
+        try l.proc_sites.append(l.a, .{ .pc = pc, .at = if (value) |i| l.srcOffset(w.frame, i) else none });
     }
     l.b.p.drivers = out;
     l.b.p.udp_bits = udp_bits.items;

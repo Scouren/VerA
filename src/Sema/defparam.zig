@@ -55,8 +55,11 @@ pub const Late = struct { param: []const u8, value: InternPool.Index, file: Zcu.
 /// E0907 for every defparam that reached no instance.
 pub fn reportUnused(s: *Sema, waiting: Waiting) Allocator.Error!void {
     for (waiting.rows) |r| assert(r.origin < waiting.origins.len);
-    for (waiting.origins) |o| if (!o.used)
-        try s.fail(.E0907, o.file, o.src, "`{s}` names no parameter of the elaborated design", .{o.text});
+    for (waiting.origins) |o| if (!o.used) {
+        // Named from the root's scope: the writer's path below the root.
+        const below = if (std.mem.findScalar(u8, o.writer, '.')) |d| o.writer[d + 1 ..] else "";
+        try s.failRule(.{ .part = .target }, .E0907, o.file, o.src, "`{s}{s}{s}` names no parameter of the elaborated design", .{ below, if (below.len == 0) "" else ".", o.text });
+    };
 }
 
 /// The waiting defparams that name a new child `name` of `parent` (a
@@ -83,12 +86,12 @@ pub fn applyDefparams(s: *Sema, env: *Env, dps: []const Dp, module: Vir.String) 
     for (dps) |dp| {
         if (env.systemNamed(dp.name) != null) continue;
         const q = env.named(dp.name) orelse {
-            try s.fail(.E0907, dp.file, dp.src, "`{s}` is not a parameter of `{s}`", .{ dp.name, env.vir.string(module) });
+            try s.failRule(.{ .rule = .defparam_unknown, .name = dp.name, .part = .target }, .E0907, dp.file, dp.src, "`{s}` is not a parameter of `{s}`", .{ dp.name, env.vir.string(module) });
             continue;
         };
         // §3.4.7: a parameter and its alias are not both given a value.
         if (env.spelling.get(q)) |before| if (!std.mem.eql(u8, before, dp.name))
-            try s.fail(.E0908, dp.file, dp.src, "`{s}` and its alias are both given a value", .{env.vir.string(payloadOf(env.vir, Inst.Param, q).name)});
+            try s.failRule(.{ .part = .target }, .E0908, dp.file, dp.src, "`{s}` and its alias are both given a value", .{env.vir.string(payloadOf(env.vir, Inst.Param, q).name)});
         try env.given.put(s.gpa, q, dp.value);
     }
 }
@@ -169,7 +172,7 @@ pub fn collect(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index,
     // whose value reads that parameter has no value to be in force first.
     if (anchor == index and rel.len == 0) if (env.named(param)) |target| if (try env.dependsOn(a.rhs, target)) {
         w.origins.items[origin].used = true;
-        return s.fail(.E0907, file, i.toRef(), "`{s}` is applied before its instance's parameters take their values, and its value reads `{s}` itself (IEEE 1364-2005 12.8.1)", .{ text.items, param });
+        return s.failRule(.{ .part = .target }, .E0907, file, i.toRef(), "`{s}` is applied before its instance's parameters take their values, and its value reads `{s}` itself (IEEE 1364-2005 12.8.1)", .{ text.items, param });
     };
     try place(w, anchor, rel, param, value, origin);
 }

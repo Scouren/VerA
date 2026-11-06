@@ -196,6 +196,9 @@ pub fn rangeOf(l: *Lower, f: u32, range: Vir.Body) Error!struct { msb: i64, lsb:
     const vir = l.virOf(f);
     const r = vir.body(range);
     const bin = Lower.payload(vir, Inst.Bin, r[r.len - 1]);
+    // §4.3.1 "msb_constant_expression … integer".
+    for ([2]Inst.Ref{ bin.lhs, bin.rhs }) |b| if (try l.constOf(f, b)) |c| if (c == .real)
+        return l.reject(f, b, "§4.3.1: a bound is a constant integer expression, not a real");
     const msb = try l.intOf(f, bin.lhs);
     const lsb = try l.intOf(f, bin.rhs);
     const width = std.math.cast(u32, @abs(@as(i128, msb) - lsb) + 1) orelse return l.refuse("a range past 2^32 bits");

@@ -725,3 +725,66 @@ test "§12.3.2/§12.3.3 the root's ports for a device host: list-of-ports order,
     for (p, 0..) |x, k| for (p[0..k]) |y| try std.testing.expect(x.slot != y.slot);
     try std.testing.expectEqualStrings("module top", src[lowered.top_at..][0.."module top".len]);
 }
+
+test "§12.2 the backends' tables: one spec per (module, parameters), each scope's spec, each slot's declared name and offset, each process's offset" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const src =
+        \\module top; wire w; reg r;
+        \\  sub #(.P(1)) a(.x(w)); sub #(.P(1)) b(.x(w)); sub #(.P(2)) c(.x(w));
+        \\  initial r = 0; assign w = r;
+        \\endmodule
+        \\module sub(x); parameter P = 0; input x; reg [P:0] q; always @(x) q = x; endmodule
+        \\
+    ;
+    const lowered = try lowerSource(arena_state.allocator(), src, false);
+    const p = &lowered.program;
+    // Three specs, by hand: top; sub with P = 1 (a and b share it); sub with P = 2.
+    const s = lowered.specs;
+    try std.testing.expectEqual(@as(usize, 3), s.len);
+    try std.testing.expectEqualStrings("top", s[0].module);
+    try std.testing.expectEqual(@as(usize, 0), s[0].ports.len);
+    for (s[1..]) |x| {
+        try std.testing.expectEqualStrings("sub", x.module);
+        try std.testing.expectEqual(@as(usize, 1), x.ports.len);
+        try std.testing.expectEqualStrings("x", x.ports[0].name);
+        try std.testing.expect(x.ports[0].dir == .input);
+    }
+    try std.testing.expect(s[1].key.params != s[2].key.params);
+    try std.testing.expectEqual(p.scopes.len, lowered.scope_spec.len);
+    const want = [_]struct { []const u8, u32 }{ .{ "top", 0 }, .{ "a", 1 }, .{ "b", 1 }, .{ "c", 2 } };
+    for (want) |w| {
+        var found = false;
+        for (p.scopes, lowered.scope_spec) |sc, spec| if (std.mem.eql(u8, p.str(sc.name), w[0])) {
+            try std.testing.expectEqual(w[1], spec);
+            found = true;
+        };
+        try std.testing.expect(found);
+    }
+    // Every declared slot carries its name and its declaration's offset:
+    // `r` once, `q` once per instance.
+    try std.testing.expectEqual(p.slots.len, lowered.slot_names.len);
+    var qs: u32 = 0;
+    var rs: u32 = 0;
+    for (lowered.slot_names, lowered.slot_at) |nm, at| {
+        if (std.mem.eql(u8, nm, "q")) qs += 1;
+        if (std.mem.eql(u8, nm, "r")) rs += 1;
+        if (nm.len != 0 and at != digital.none) try std.testing.expectEqualStrings(nm, src[at..][0..nm.len]);
+    }
+    try std.testing.expectEqual(@as(u32, 3), qs);
+    try std.testing.expectEqual(@as(u32, 1), rs);
+    // Processes: one `initial`, three `always` (one per instance), one
+    // continuous driver, at its value `r`.
+    var initials: u32 = 0;
+    var always: u32 = 0;
+    var drivers: u32 = 0;
+    for (lowered.proc_sites) |ps| {
+        try std.testing.expect(ps.pc < p.insts.len);
+        if (std.mem.startsWith(u8, src[ps.at..], "initial")) initials += 1;
+        if (std.mem.startsWith(u8, src[ps.at..], "always")) always += 1;
+        if (std.mem.startsWith(u8, src[ps.at..], "r;")) drivers += 1;
+    }
+    try std.testing.expectEqual(@as(u32, 1), initials);
+    try std.testing.expectEqual(@as(u32, 3), always);
+    try std.testing.expectEqual(@as(u32, 1), drivers);
+}

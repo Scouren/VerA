@@ -76,6 +76,14 @@ pub fn add(g: Graph, all: *Build.Step) void {
     b.step("bench-run", "vera-next --run on a swept and re-carded resistor: every transcript line against Ohm's law").dependOn(&bench.step);
     all.dependOn(&bench.step);
 
+    // exe-run: a `.v --emit-exe` binary against vera-next's own `--run`.
+    const exe_mod = g.m.make("tests/differential/exe_run.zig", &.{});
+    exe_mod.addOptions("comp_options", o);
+    const exe_run = testRun(b, "exe-run", exe_mod, g.runner, g.results_dir);
+    exe_run.has_side_effects = true; // Spawns vera-next, which spawns zig.
+    b.step("exe-run", "A .v --emit-exe binary prints what vera-next --run prints, byte for byte").dependOn(&exe_run.step);
+    all.dependOn(&exe_run.step);
+
     // conformance-next: the suite's harness with vera-next as the tool.
     const conform = b.addExecutable(.{ .name = "conform", .root_module = b.createModule(.{ .target = g.m.target, .optimize = .ReleaseSafe, .link_libc = true }) });
     conform.root_module.addCSourceFile(.{ .file = b.path("tests/conformance/harness/conform.c"), .flags = &.{ "-std=gnu11", "-D_GNU_SOURCE" } });

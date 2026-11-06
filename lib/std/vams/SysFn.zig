@@ -227,6 +227,9 @@ pub const Tag = enum(u8) {
     // first operand) that read it: a number, or a string.
     @"scan$item",
     @"scan$str",
+    // §9.4.3 a print operand's IEEE 1364 width (and sign) for the
+    // formatter: (value, bits[, signed]), the value itself.
+    @"display$width",
 
     /// The tag `spelling` names, or null for a user system function.
     pub fn fromName(spelling: []const u8) ?Tag {
@@ -504,6 +507,7 @@ pub const table = std.EnumArray(Tag, Info).init(.{
     .@"str$repeat" = .{ .ty = .str, .args = .exactly(2), .family = .string },
     .@"scan$item" = .{ .ty = .real, .args = .exactly(2), .family = .string },
     .@"scan$str" = .{ .ty = .str, .args = .exactly(2), .family = .string },
+    .@"display$width" = .{ .ty = .int, .args = .{ .min = 2, .max = 3 }, .family = .convert },
 });
 
 const display: Info = .{ .ty = .none, .family = .display };

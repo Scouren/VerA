@@ -200,6 +200,8 @@ fn hostCall(ctx: *anyopaque, callee: u32, args: []const Air.interp.Value) Air.in
         // A reader's destinations: the old interpreter refuses the reader.
         .@"scan$item" => return .{ .real = 0 },
         .@"scan$str" => return .{ .str = "" },
+        // A print operand's width record: the operand.
+        .@"display$width" => return args[0],
         // §3.3 Table 3-3 over strings, as the old `$str$cat`/`$str$repeat`
         // and string comparison compute them.
         .@"str$cmp" => return if (args[0] != .str or args[1] != .str) error.Unsupported else .{ .int = switch (std.mem.order(u8, args[0].str, args[1].str)) {

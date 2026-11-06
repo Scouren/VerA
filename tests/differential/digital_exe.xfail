@@ -89,7 +89,6 @@ verilog/04_data_types/type_net_array.v digital_exe (build remarks): stderr: line
 verilog/04_data_types/type_net_resolution_tables.v digital_exe (build remarks): stderr: line 1: old `note: verilog/04_data_types/type_net_resolution_tables.v: 4-state: a §7.9 net resolved from strengths or several drivers, or a three-state, switch, UDP, port-w`, new ``
 verilog/04_data_types/type_uwire_multiple_drivers_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/04_data_types/type_uwire_single_driver.v digital_exe (build remarks): stderr: line 1: old `note: verilog/04_data_types/type_uwire_single_driver.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
-verilog/04_data_types/undeclared_procedural_target_rejected.v not built: backend digital_lowering
 verilog/04_data_types/unknown_bits_to_real.v digital_exe (build remarks): stderr: line 1: old `note: verilog/04_data_types/unknown_bits_to_real.v: 4-state: a constant with an x or z bit (verilog/04_data_types/unknown_bits_to_real.v:15)`, new ``
 verilog/04_data_types/unsized_unknown_literal_to_real.v digital_exe (build remarks): stderr: line 1: old `note: verilog/04_data_types/unsized_unknown_literal_to_real.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
 verilog/04_data_types/untyped_parameter_width.v digital_exe (build remarks): stderr: line 1: old `note: verilog/04_data_types/untyped_parameter_width.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
@@ -97,7 +96,6 @@ verilog/04_data_types/uwire_per_bit_drivers.v digital_exe (build remarks): stder
 verilog/04_data_types/value_set.v digital_exe (build remarks): stderr: line 1: old `note: verilog/04_data_types/value_set.v: 4-state: a §7.9 net resolved from strengths or several drivers, or a three-state, switch, UDP, port-window or pull dri`, new ``
 verilog/04_data_types/variable_arrays.v digital_exe (build remarks): stderr: line 1: old `note: verilog/04_data_types/variable_arrays.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
 verilog/04_data_types/variable_initial_values.v digital_exe (build remarks): stderr: line 1: old `note: verilog/04_data_types/variable_initial_values.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
-verilog/04_data_types/variable_range_bound_rejected.v not built: backend digital_lowering
 verilog/04_data_types/vector_and_memory.v digital_exe (build remarks): stderr: line 1: old `note: verilog/04_data_types/vector_and_memory.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
 verilog/04_data_types/vector_ranges.v digital_exe (build remarks): stderr: line 1: old `note: verilog/04_data_types/vector_ranges.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
 verilog/05_expressions/assignment_extension.v digital_exe (build remarks): stderr: line 1: old `note: verilog/05_expressions/assignment_extension.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
@@ -139,7 +137,6 @@ verilog/05_expressions/native_array_selects.v digital_exe (build remarks): stder
 verilog/05_expressions/native_indexed_selects.v digital_exe (build remarks): stderr: line 1: old `note: verilog/05_expressions/native_indexed_selects.v: 4-state: a constant with an x or z bit (verilog/05_expressions/native_indexed_selects.v:42)`, new ``
 verilog/05_expressions/native_real_conditionals.v digital_exe (build remarks): stderr: line 1: old `note: verilog/05_expressions/native_real_conditionals.v: 4-state: a constant with an x or z bit (verilog/05_expressions/native_real_conditionals.v:23)`, new ``
 verilog/05_expressions/native_select_boundaries.v digital_exe (build remarks): stderr: line 1: old `note: verilog/05_expressions/native_select_boundaries.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
-verilog/05_expressions/native_select_variable_width_rejected.v not built: backend digital_lowering
 verilog/05_expressions/native_wide_index_bound_limit.v not built: backend digital_lowering
 verilog/05_expressions/native_wide_index_edges.v digital_exe (build remarks): stderr: line 1: old `note: verilog/05_expressions/native_wide_index_edges.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
 verilog/05_expressions/native_wide_index_values.v digital_exe (build remarks): stderr: line 1: old `note: verilog/05_expressions/native_wide_index_values.v: 4-state: a constant with an x or z bit (verilog/05_expressions/native_wide_index_values.v:37)`, new ``
@@ -161,7 +158,6 @@ verilog/05_expressions/string_test.v digital_exe (build remarks): stderr: line 1
 verilog/05_expressions/sum_width_from_lhs.v digital_exe (build remarks): stderr: line 1: old `note: verilog/05_expressions/sum_width_from_lhs.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
 verilog/05_expressions/table_5_22_widths.v digital_exe (build remarks): stderr: line 1: old `note: verilog/05_expressions/table_5_22_widths.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
 verilog/05_expressions/truncation_examples.v digital_exe (build remarks): stderr: line 1: old `note: verilog/05_expressions/truncation_examples.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
-verilog/05_expressions/variable_part_select_rejected.v not built: backend digital_lowering
 verilog/06_assignments/adder_concatenation_lhs.v digital_exe (build remarks): stderr: line 1: old `note: verilog/06_assignments/adder_concatenation_lhs.v: 4-state: a §7.9 net resolved from strengths or several drivers, or a three-state, switch, UDP, port-win`, new ``
 verilog/06_assignments/assign_delay_inertial.v digital_exe (build remarks): stderr: line 1: old `note: verilog/06_assignments/assign_delay_inertial.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
 verilog/06_assignments/assign_delay_rise_fall.v digital_exe (build remarks): stderr: line 1: old `note: verilog/06_assignments/assign_delay_rise_fall.v: 4-state: a `delay3` whose rise, fall and turn-off differ, chosen by an x or z`, new ``
@@ -358,7 +354,6 @@ verilog/09_behavioral_modeling/select_edge.v digital_exe (build remarks): stderr
 verilog/09_behavioral_modeling/select_edge_glitch.v digital_exe (build remarks): stderr: line 1: old `note: verilog/09_behavioral_modeling/select_edge_glitch.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
 verilog/09_behavioral_modeling/sequential_block.v digital_exe (build remarks): stderr: line 1: old `note: verilog/09_behavioral_modeling/sequential_block.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
 verilog/09_behavioral_modeling/specify_block_specparam.v digital_exe (build remarks): stderr: line 1: old `note: verilog/09_behavioral_modeling/specify_block_specparam.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
-verilog/09_behavioral_modeling/undeclared_event_rejected.v not built: backend digital_lowering
 verilog/09_behavioral_modeling/unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
 verilog/09_behavioral_modeling/unnamed_fork_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
 verilog/09_behavioral_modeling/untimed_loop_under_budget.v digital_exe (build remarks): stderr: line 1: old `note: verilog/09_behavioral_modeling/untimed_loop_under_budget.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
@@ -454,7 +449,6 @@ verilog/12_hierarchy/extra_ordered_parameter_value_ignored.v digital_exe (build 
 verilog/12_hierarchy/extra_ordered_value_ignored.v digital_exe (build remarks): stderr: line 11: old `note: verilog/12_hierarchy/extra_ordered_value_ignored.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
 verilog/12_hierarchy/ffnand_instances.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/ffnand_instances.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
 verilog/12_hierarchy/function_in_generate_block.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/function_in_generate_block.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
-verilog/12_hierarchy/function_port_range_scope_rejected.v not built: backend digital_lowering
 verilog/12_hierarchy/generate_block_continuous_assign.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/generate_block_continuous_assign.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
 verilog/12_hierarchy/generate_block_variables.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/generate_block_variables.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
 verilog/12_hierarchy/generate_localparam_visible.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/generate_localparam_visible.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
@@ -470,7 +464,6 @@ verilog/12_hierarchy/hierarchical_task_call_suspends.v digital_exe (build remark
 verilog/12_hierarchy/hierarchy_deeper_than_64.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/hierarchy_deeper_than_64.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
 verilog/12_hierarchy/hierarchy_explicit_port_concat.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/hierarchy_explicit_port_concat.v: 4-state: a §7.9 net resolved from strengths or several drivers, or a three-state, switch, UDP, por`, new ``
 verilog/12_hierarchy/hierarchy_port_signedness.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/hierarchy_port_signedness.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
-verilog/12_hierarchy/hierarchy_simple_name_stops_at_module_rejected.v not built: backend digital_lowering
 verilog/12_hierarchy/hierarchy_unselected_instance_not_top.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/hierarchy_unselected_instance_not_top.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
 verilog/12_hierarchy/hierarchy_upward_reference.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/hierarchy_upward_reference.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
 verilog/12_hierarchy/implicit_net_in_instance_expression.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/implicit_net_in_instance_expression.v: 4-state: `===` or `!==` against an x or z, which asks whether a value is unknown (verilog/12_h`, new ``
@@ -479,7 +472,6 @@ verilog/12_hierarchy/instance_array_concat_port.v digital_exe (build remarks): s
 verilog/12_hierarchy/instance_array_constant_port.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/instance_array_constant_port.v: 4-state: a §7.9 net resolved from strengths or several drivers, or a three-state, switch, UDP, port-`, new ``
 verilog/12_hierarchy/instance_array_width_product.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/instance_array_width_product.v: 4-state: a §7.9 net resolved from strengths or several drivers, or a three-state, switch, UDP, port-`, new ``
 verilog/12_hierarchy/instance_select.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/instance_select.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
-verilog/12_hierarchy/instance_select_out_of_range_rejected.v not built: backend digital_lowering
 verilog/12_hierarchy/internal_type_cells.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/internal_type_cells.v: 4-state: a §7.9 net resolved from strengths or several drivers, or a three-state, switch, UDP, port-window or`, new ``
 verilog/12_hierarchy/localparam_override_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/module_header_forms.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/module_header_forms.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
@@ -487,7 +479,6 @@ verilog/12_hierarchy/module_without_process.v digital_exe (build remarks): stder
 verilog/12_hierarchy/named_block_items.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/named_block_items.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
 verilog/12_hierarchy/net_type_warning.v rw-comp (elab): stderr: line 1: old `warning[W1160]: dissimilar net types joined through a port: §12.3.10: a `wand` port joined to a `wor` net is a Table 12-1 warn cell of the net type table`, new ``
 verilog/12_hierarchy/no_top_level_module_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/non_ancestor_module_name_rejected.v not built: backend digital_lowering
 verilog/12_hierarchy/null_port_combinations.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/null_port_combinations.v: 4-state: a §7.9 net resolved from strengths or several drivers, or a three-state, switch, UDP, port-window`, new ``
 verilog/12_hierarchy/output_reg_inherits_port_sign.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/output_reg_inherits_port_sign.v: 4-state: a §7.9 net resolved from strengths or several drivers, or a three-state, switch, UDP, port`, new ``
 verilog/12_hierarchy/override_type_and_range.v digital_exe (build remarks): stderr: line 1: old `note: verilog/12_hierarchy/override_type_and_range.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
@@ -657,7 +648,6 @@ verilog/17_system_tasks/printtimescale_current_scope.v digital_exe (build remark
 verilog/17_system_tasks/printtimescale_named_module.v digital_exe (build remarks): stderr: line 1: old `note: verilog/17_system_tasks/printtimescale_named_module.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
 verilog/17_system_tasks/printtimescale_names_parameter.v digital_exe (build remarks): stderr: line 1: old `note: verilog/17_system_tasks/printtimescale_names_parameter.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
 verilog/17_system_tasks/printtimescale_prints_argument.v digital_exe (build remarks): stderr: line 1: old `note: verilog/17_system_tasks/printtimescale_prints_argument.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
-verilog/17_system_tasks/printtimescale_unknown_scope_rejected.v not built: backend digital_lowering
 verilog/17_system_tasks/q_exam.v digital_exe (build remarks): stderr: line 1: old `note: verilog/17_system_tasks/q_exam.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
 verilog/17_system_tasks/q_exam_code_runtime.v digital_exe (build remarks): stderr: line 1: old `note: verilog/17_system_tasks/q_exam_code_runtime.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
 verilog/17_system_tasks/q_exam_means.v digital_exe (build remarks): stderr: line 1: old `note: verilog/17_system_tasks/q_exam_means.v: 4-state: a constant with an x or z bit (verilog/17_system_tasks/q_exam_means.v:28)`, new ``
@@ -798,7 +788,6 @@ verilog/19_compiler_directives/macro_text_1800_forms_warn.v rw-comp (preprocess)
 verilog/19_compiler_directives/no_timescale_is_1s_1s.v digital_exe (build remarks): stderr: line 1: old `note: verilog/19_compiler_directives/no_timescale_is_1s_1s.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
 verilog/19_compiler_directives/noconfig.v digital_exe (build remarks): stderr: line 1: old `note: verilog/19_compiler_directives/noconfig.v: 4-state: nothing delays, so the run never leaves time 0`, new ``
 verilog/19_compiler_directives/none_all_declared.v digital_exe (build remarks): stderr: line 1: old `note: verilog/19_compiler_directives/none_all_declared.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
-verilog/19_compiler_directives/none_implicit_net_rejected.v not built: backend digital_lowering
 verilog/19_compiler_directives/parameter_example.v digital_exe (build remarks): stderr: line 1: old `note: verilog/19_compiler_directives/parameter_example.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
 verilog/19_compiler_directives/pragma_unrecognized_no_effect.v digital_exe (build remarks): stderr: line 1: old `note: verilog/19_compiler_directives/pragma_unrecognized_no_effect.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``
 verilog/19_compiler_directives/resetall_keeps_begin_keywords.v digital_exe (build remarks): stderr: line 1: old `note: verilog/19_compiler_directives/resetall_keeps_begin_keywords.v: 2-state once a time step begins with no live x or z; 4-state until then`, new ``

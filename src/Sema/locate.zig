@@ -46,13 +46,18 @@ pub fn inst(tree: *const Ast, vir: *const Vir, src: Inst.Ref) ?Span {
 
 /// Where part `p` of instance `src` was written, as the old elaborators
 /// located it: the first token of its k-th connection or parameter value
-/// (a named one's `.`; `value` its expression), a defparam's target name,
+/// (a named one's `.`; `value` its expression), a defparam's target name
+/// or value,
 /// an attribute spec's name; the instruction itself for `.whole`, or when
 /// the part cannot be found.
 pub fn part(tree: *const Ast, vir: *const Vir, src: Inst.Ref, p: Zcu.Part) ?Span {
     const k: u32, const list_open: ?Token = switch (p) {
         .whole => return inst(tree, vir, src),
         .target => return .{ .token = target(tree, vir, src) orelse return inst(tree, vir, src) },
+        .rhs => {
+            const eq = instToken(tree, vir, src) orelse return null;
+            return if (tree.tokenTag(eq) == .equal) .{ .token = eq + 1 } else inst(tree, vir, src);
+        },
         .attr => |k| return .{ .token = attr(tree, vir, src, k) orelse return inst(tree, vir, src) },
         .conn => |k| .{ k, connOpen(tree, vir, src) },
         .param, .value => |k| .{ k, paramOpen(tree, vir, src) },

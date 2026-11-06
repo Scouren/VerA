@@ -177,6 +177,13 @@ pub fn semaTop(comp: *Compilation) !bool {
         for (u.vir.decls()[0..u.builtins], 0..) |d, k| if (d.kind == .module and std.mem.eql(u8, declSource(comp, u, d), netlist_unit))
             try netlist.append(comp.arena(), .{ .file = file, .index = @fromBackingInt(@intCast(k)) });
     }
+    // §6.2: a build needs a module to elaborate (a connect module is placed by
+    // §7.6 insertion, never a root); a check or a lint of none builds nothing.
+    const c = &comp.config;
+    if (!c.digital() and c.target != .lint and c.target != .check and !hasModule(comp)) {
+        try comp.wip.add(.lower, .E1001, .none, "", .{});
+        return false;
+    }
     comp.zcu.netlist_modules = netlist.items;
     if (comp.netlist) |*n| comp.zcu.netlist_unsupported = n.output().unsupported;
     const overrides = try comp.arena().alloc(sema.Sema.Config.Override, comp.config.overrides.len);
@@ -212,6 +219,15 @@ fn astgenUnit(comp: *Compilation, unit: u32) Allocator.Error!?void {
     if (u.tree.errors.len != 0) return null;
     u.vir = try vams.AstGen.generate(gpa, &u.tree, .{ .directives = comp.pp.output().directives, .ieee1364 = comp.config.digital() });
     u.builtins = builtinModules(comp, u);
+}
+
+/// Whether a unit declares a module or macromodule of its own (not
+/// shipped text).
+fn hasModule(comp: *const Compilation) bool {
+    for (comp.units.items) |*u| for (u.vir.decls()[u.builtins..]) |d| {
+        if (d.kind == .module or d.kind == .macromodule) return true;
+    };
+    return false;
 }
 
 /// The leading modules of `u` that come from shipped text: Table E.1's

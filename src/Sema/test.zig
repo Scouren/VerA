@@ -359,7 +359,7 @@ test "§7.8.5.1 a gate terminal on a continuous vector net gets no bridge (E0929
     , "dd", &.{.E0929});
 }
 
-test "§7.4.4 a net's second discipline declaration in one scope is E0902; §3.11 a branch or access joining incompatible disciplines is E0355" {
+test "§7.4.4 a net's second discipline declaration in one scope is E0902; §3.11 a branch or access joining incompatible disciplines is E0355; §3.7 a port joining a wreal to a wand is E0919" {
     const prelude =
         \\nature V; units = "V"; access = V; endnature
         \\nature R; units = "rad"; access = R; endnature
@@ -372,6 +372,10 @@ test "§7.4.4 a net's second discipline declaration in one scope is E0902; §3.1
     try expectCodes(prelude ++ "module top(p); inout p; ea p; endmodule", .{}, &.{});
     try expectCodes(prelude ++ "module top; ea a; rot b; branch (a, b) br; endmodule", .{}, &.{.E0355});
     try expectCodes(prelude ++ "module top; ea a; eb b; branch (a, b) br; endmodule", .{}, &.{});
+    // §3.7 a wreal joins only a wire, tri or wreal (E0919).
+    const kid = "module kid(o); output o; wreal o; endmodule\n";
+    try expectCodes(kid ++ "module top; wand n; kid u(.o(n)); endmodule", .{}, &.{.E0919});
+    try expectCodes(kid ++ "module top; wire n; kid u(n); endmodule", .{}, &.{});
 }
 
 test "Annex F.2.1 step 3 an out-of-context declaration overrides a net's discipline: twice for one segment is E0902, an incompatible override E0375" {

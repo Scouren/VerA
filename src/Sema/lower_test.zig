@@ -281,6 +281,25 @@ test "A.6.2 a constant `initial` assignment is the variable's start value" {
     try std.testing.expectEqual(@as(f64, 20.0), try o.value(0, 0, &.{2.0}));
 }
 
+test "§4.2.9 an unsigned operand makes the comparison unsigned, each extended from its own width" {
+    var o = try lower(
+        \\module m(p);
+        \\  inout p; electrical p;
+        \\  integer a;
+        \\  analog begin
+        \\    a = -1;
+        \\    I(p) <+ V(p) * ((a < 32'd1) + 2 * (a < 1) + 4 * (a == 40'hFF_FFFF_FFFF) + 8 * (a == 32'hFFFF_FFFF));
+        \\  end
+        \\endmodule
+    );
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{}, o.codes);
+    // a < 32'd1: 4294967295 < 1 is 0; a < 1 (both signed) is 1; a against
+    // 40'hFF_FFFF_FFFF: 40'h00_FFFF_FFFF is not it, 0; against the same 32
+    // bits, 1. So 2 + 8 = 10 times V(p) = 1.
+    try std.testing.expectEqual(@as(f64, 10.0), try o.value(0, 0, &.{1.0}));
+}
+
 test "§4.7.1 an analog function with no type returns real" {
     var o = try lower(
         \\module m(p);

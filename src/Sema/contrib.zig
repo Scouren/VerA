@@ -88,6 +88,8 @@ pub fn access(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src
         try s.fail(.E0421, b.unit.file, src, "not allowed in {s}", .{ctx});
         return expr.poison;
     }
+    // VerA's `vera_timepoint` (§2.9): a probe is the iterate.
+    if (try @import("timepoint.zig").refuse(s, b, src, "a probe (§4.4)")) return expr.poison;
     if (args.len == 1) if (try portOf(s, b, args[0], src)) |p| return portFlow(s, b, name, p, src);
     const t = (try target(s, b, name, args, src)) orelse return expr.poison;
     switch (t.access) {
@@ -401,6 +403,13 @@ fn terminalBind(s: *Sema, b: *Block, r: Inst.Ref, src: Inst.Ref) Allocator.Error
                 return null;
             };
             return .{ hit.bind.bind, hit.bind.unit };
+        },
+        // §6.5.4 an implicit net an instance connection made (net.zig).
+        .str_ref => {
+            const flat = try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, vir.string(vir.instructions.items(.data)[@backingInt(i)].str_tok.start) });
+            if (s.node_rows.get(try s.zcu.intern_pool.getString(s.gpa, flat))) |n| return .{ .{ .node = n }, unit };
+            try s.fail(.E0512, unit.file, src, "an access of a name with no node", .{});
+            return null;
         },
         else => {
             try s.fail(.E0512, unit.file, src, "an access of a select or a hierarchical name is not lowered by Sema yet", .{});

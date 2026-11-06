@@ -168,7 +168,12 @@ fn inst(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!Value {
         },
         .field => hierRead(s, b, src),
         .concat, .replicate => @import("string.zig").concat(s, b, i, src),
-        .str_ref, .slice, .slice_up, .slice_down, .pattern, .pattern_repl, .port_branch, .event_or, .posedge, .negedge, .driver_update, .step_event, .range, .pulse_limits => refuse(s, b, src, @tagName(tag)),
+        // §6.8 a name no declaration in scope gives.
+        .str_ref => blk: {
+            try s.fail(.E0314, b.unit.file, src, "`{s}` is not declared here", .{vir.string(data.str_tok.start)});
+            break :blk poison;
+        },
+        .slice, .slice_up, .slice_down, .pattern, .pattern_repl, .port_branch, .event_or, .posedge, .negedge, .driver_update, .step_event, .range, .pulse_limits => refuse(s, b, src, @tagName(tag)),
         .paramset_output => @import("simprobe.zig").dotted(s, b, vir.string(data.str_tok.start), src),
         .module, .nature, .discipline, .paramset, .primitive, .connectrules, .config, .port, .io, .net, .variable, .param, .aliasparam, .genvar, .event, .branch, .instance, .assign, .defparam, .analog, .analog_initial, .initial, .always, .function, .gen_for, .gen_if, .gen_case, .gen_block, .specify, .path, .timing_check, .pulse_style, .timing_event, .ps_override, .connect_resolve, .connect_insert, .block, .condbr, .case, .loop, .repeat, .wait, .delay, .event_wait, .store, .store_nb, .contrib, .proc_assign, .force, .store_timed, .store_nb_timed, .contrib_indirect, .deassign, .release, .trigger, .disable, .ret, .brk, .cont, .delay_ctl, .event_ctl, .repeat_ctl => unreachable, // AstGen: an operand is an expression
     };
@@ -333,8 +338,10 @@ fn binary(s: *Sema, b: *Block, tag: Inst.Tag, bin: Inst.Bin, src: Inst.Ref) Allo
                 .eq, .case_eq => if (real) .feq else .ieq,
                 else => if (real) .fne else .ine, // else: `!=` and `!==`
             };
-            const ty: Sema.Ty = if (real) .real else .integer;
-            return .{ .ref = try binOp(s, b, t, try coerce(s, b, x, ty), try coerce(s, b, y, ty)), .ty = .integer };
+            if (real) return .{ .ref = try binOp(s, b, t, try coerce(s, b, x, .real), try coerce(s, b, y, .real)), .ty = .integer };
+            // §4.2.9 an unsigned operand makes the comparison unsigned.
+            const xy = try @import("sign.zig").compareOperands(s, b, b.unit.vir, bin.lhs, bin.rhs, x.ref, y.ref);
+            return .{ .ref = try binOp(s, b, t, xy[0], xy[1]), .ty = .integer };
         },
         .bit_and, .bit_or, .bit_xor, .bit_xnor, .shl, .shr => {
             if (x.ty != .integer or y.ty != .integer) {

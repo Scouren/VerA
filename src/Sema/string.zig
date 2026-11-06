@@ -62,6 +62,8 @@ pub fn compare(s: *Sema, b: *Block, tag: Inst.Tag, x: Value, y: Value) Allocator
 /// and `str$repeat`. A sized-integer operand is not lowered yet.
 pub fn concat(s: *Sema, b: *Block, i: Inst.Index, src: Inst.Ref) Allocator.Error!Value {
     const vir = b.unit.vir;
+    // §4.2.13 the integer form: sized literals, folded.
+    if (try @import("bits.zig").fold(s, b, i, src)) |v| return v;
     const repl = vir.instructions.items(.tag)[@backingInt(i)] == .replicate;
     var copies: i64 = 1;
     var count: ?Ref = null;
@@ -169,6 +171,7 @@ pub fn read(s: *Sema, b: *Block, tag: SysFn.Tag, first: usize, args: []const Ins
         try ops.append(s.arena, v.ref);
     }
     const r = try expr.call(s, b, @backingInt(tag), .integer, ops.items);
+    try @import("syscall.zig").fileRow(s, tag, r);
     for (args, 0..) |a, k| {
         if (!(k == first or (many and k > first)) or a == .none) continue;
         const ty = slotType(b, a) orelse .real;

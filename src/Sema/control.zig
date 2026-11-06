@@ -40,9 +40,22 @@ pub fn body(s: *Sema, b: *Block, vb: Vir.Body) Allocator.Error!void {
     const insts = vir.body(vb);
     var used: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
     for (insts) |i| try operands(s.arena, vir, i, &used);
-    for (insts) |i| {
+    var skip = false;
+    for (insts, 0..) |i, k| {
         if (b.dead) return;
+        if (skip) {
+            skip = false;
+            continue;
+        }
         const tag = vir.instructions.items(.tag)[@backingInt(i)];
+        // §6.6.1 an analog `for` over a genvar: its initialization, then
+        // the `loop`, unrolled.
+        if (@import("genfor.zig").genvarStore(vir, i) != null) {
+            const next: ?Inst.Index = if (k + 1 < insts.len and vir.instructions.items(.tag)[@backingInt(insts[k + 1])] == .loop) insts[k + 1] else null;
+            try @import("genfor.zig").unroll(s, b, i, next);
+            skip = next != null;
+            continue;
+        }
         if ((tag == .call or tag == .call_sys) and !used.contains(i)) {
             try task(s, b, i);
             continue;
@@ -101,6 +114,19 @@ pub fn operands(a: Allocator, vir: *const Vir, i: Inst.Index, out: *std.AutoHash
 pub fn assignTo(s: *Sema, b: *Block, lhs_ref: Inst.Ref, v: Sema.Value, src: Inst.Ref) Allocator.Error!void {
     const vir = b.unit.vir;
     const lhs = lhs_ref.toIndex() orelse return;
+    // §5.7 a `reg` (or a bit or part of one) is the discrete domain's: no
+    // analog procedural assignment target.
+    if (@import("discrete.zig").base(vir, lhs_ref)) |d| if (vir.instructions.items(.tag)[@backingInt(d)] == .variable and decl.payloadOf(vir, Inst.Variable, d).flags.storage == .reg)
+        return s.fail(.E0316, b.unit.file, src, "`{s}` is a reg: an analog procedural assignment targets an integer, real or string (§5.7)", .{vir.string(decl.nameOf(vir, d))});
+    switch (vir.instructions.items(.tag)[@backingInt(lhs)]) {
+        .decl_ref, .elem => {},
+        // §5.7 "Hierarchical assignment of a variable from another
+        // scope/module is not allowed."
+        .field => return s.fail(.E0316, b.unit.file, src, "a hierarchical name is not an assignment target", .{}),
+        // A.6.3 a concatenation target is not in the analog subset.
+        .concat => return s.fail(.E0317, b.unit.file, src, "", .{}),
+        else => return s.fail(.E0316, b.unit.file, src, "only `x` and `x[<constant>]` can be assigned to", .{}), // else: not an lvalue
+    }
     if (vir.instructions.items(.tag)[@backingInt(lhs)] == .elem) {
         const array = @import("array.zig");
         const e = (try array.element(s, b, lhs_ref, src)) orelse return;
@@ -108,11 +134,10 @@ pub fn assignTo(s: *Sema, b: *Block, lhs_ref: Inst.Ref, v: Sema.Value, src: Inst
         if (b.nodiff and e.ty == .real) r = try expr.unOp(s, b, .dstop, r);
         return array.store(s, b, e, r);
     }
-    if (vir.instructions.items(.tag)[@backingInt(lhs)] != .decl_ref)
-        return s.fail(.E0512, b.unit.file, src, "an assignment to a select is not lowered by Sema yet", .{});
     const first = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(lhs)].decl_tok.decl);
     const bind = b.unit.binds.get(first) orelse return s.fail(.E0512, b.unit.file, src, "an assignment to a name with no slot", .{});
     if (bind != .slot) return s.fail(.E0313, b.unit.file, src, "an assignment to a name that is not a variable", .{});
+    if (try notIntegral(s, b, v, bind.slot.ty, src)) return;
     var r = try expr.coerce(s, b, v, bind.slot.ty);
     if (b.nodiff and bind.slot.ty == .real) r = try expr.unOp(s, b, .dstop, r);
     if (op.isStatic(s, r, 0)) try s.static_slots.put(s.arena, bind.slot.alloc, {}) else _ = s.static_slots.remove(bind.slot.alloc);
@@ -182,14 +207,30 @@ pub fn eventArgs(s: *Sema, unit: *Sema.Unit, tag: vams.SysFn.Tag, args: []const 
 
 // ---- private ----
 
+/// §3.3 "A string cannot be assigned to an integral type", only a string
+/// literal can (E0354). True when raised.
+fn notIntegral(s: *Sema, b: *Block, v: Sema.Value, ty: Sema.Ty, src: Inst.Ref) Allocator.Error!bool {
+    if (v.ty != .string or ty == .string or expr.constOf(s, v.ref) != null) return false;
+    try s.fail(.E0354, b.unit.file, src, "a string value assigned to a {t}; only a string literal converts (§3.3)", .{ty});
+    return true;
+}
+
 fn stmt(s: *Sema, b: *Block, i: Inst.Index, tag: Inst.Tag) Allocator.Error!void {
     const unit = b.unit;
     const vir = unit.vir;
     const src = i.toRef();
+    // A cached statement holds no contribution or event (§2.9).
+    const banned: ?[]const u8 = switch (tag) {
+        .contrib, .contrib_indirect => "a contribution (§5.6)",
+        .event_wait => "an event control (§5.10)",
+        .trigger, .disable => "an event statement (§5.10)",
+        else => null, // else: allowed in a cached statement
+    };
+    if (banned) |what| if (try @import("timepoint.zig").refuse(s, b, src, what)) return;
     switch (tag) {
         .block => try block(s, b, decl.payloadOf(vir, Inst.Block, i)),
         .condbr => try condbr(s, b, decl.payloadOf(vir, Inst.CondBr, i)),
-        .case => try case(s, b, decl.payloadOf(vir, Inst.Case, i)),
+        .case => try @import("case.zig").lower(s, b, decl.payloadOf(vir, Inst.Case, i)),
         .loop => try loop(s, b, decl.payloadOf(vir, Inst.Loop, i)),
         .repeat => try repeat(s, b, decl.payloadOf(vir, Inst.Repeat, i)),
         .store => {
@@ -199,12 +240,21 @@ fn stmt(s: *Sema, b: *Block, i: Inst.Index, tag: Inst.Tag) Allocator.Error!void 
         .ret => {
             const target = b.function orelse return s.fail(.E0512, unit.file, src, "`return` outside a function", .{});
             const r = vir.instructions.items(.data)[@backingInt(i)].un_node.operand;
-            if (r != .none) try s.fail(.E0512, unit.file, src, "`return` with a value is not lowered by Sema yet", .{});
+            // §4.7.1 `return e;` assigns the function's return value first.
+            if (r != .none) {
+                const f = s.inlining.items[s.inlining.items.len - 1];
+                const ret = unit.binds.get(decl.canonical(vir, f)).?.slot;
+                const v = try expr.lower(s, b, r);
+                if (try notIntegral(s, b, v, ret.ty, src)) return;
+                _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(ret.alloc), .rhs = try expr.coerce(s, b, v, ret.ty) } } });
+            }
             try br(s, b, target, .none);
             b.dead = true;
         },
         .contrib => try contrib.contribute(s, b, decl.payloadOf(vir, Inst.Bin, i), src),
         .brk, .cont => {
+            // §5.11 a jump never leaves an unrolled analog `for`.
+            if (b.loop == null and b.analog_for) return s.fail(.E0440, unit.file, src, "`{s}`", .{if (tag == .brk) "break" else "continue"});
             const l = b.loop orelse return s.fail(.E0512, unit.file, src, "`{s}` outside a loop", .{if (tag == .brk) "break" else "continue"});
             try br(s, b, if (tag == .brk) l.exit else l.cont, .none);
             // What follows a jump in the same body never runs.
@@ -212,7 +262,9 @@ fn stmt(s: *Sema, b: *Block, i: Inst.Index, tag: Inst.Tag) Allocator.Error!void 
         },
         .variable => try local(s, b, i),
         // A paramset's `.name = value` was applied in elaboration.
-        .param, .event, .ps_override, .aliasparam => {},
+        // §3.4.1/§4.7.2 a block's or function's own parameter: a constant.
+        .param => try @import("variable.zig").localParam(s, b.unit, i),
+        .event, .ps_override, .aliasparam => {},
         .event_wait => try eventWait(s, b, decl.payloadOf(vir, Inst.EventWait, i), src),
         .contrib_indirect => try contrib.indirect(s, b, decl.payloadOf(vir, Inst.Triple, i), src),
         .trigger => try trigger(s, b, vir.instructions.items(.data)[@backingInt(i)].un_node.operand, src),
@@ -227,7 +279,13 @@ fn stmt(s: *Sema, b: *Block, i: Inst.Index, tag: Inst.Tag) Allocator.Error!void 
 /// A task enable: a system task, or a user task.
 fn task(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!void {
     const vir = b.unit.vir;
-    if (vir.instructions.items(.tag)[@backingInt(i)] == .call_sys) return syscall.task(s, b, decl.payloadOf(vir, Inst.SysCall, i), i.toRef());
+    if (vir.instructions.items(.tag)[@backingInt(i)] == .call_sys) {
+        const c = decl.payloadOf(vir, Inst.SysCall, i);
+        // §9.7.3 `$fatal`/`$error` set a sticky status a cache hit keeps.
+        const name = vir.string(c.name);
+        if (!std.mem.eql(u8, name, "$fatal") and !std.mem.eql(u8, name, "$error") and try @import("timepoint.zig").refuse(s, b, i.toRef(), "a system task")) return;
+        return syscall.task(s, b, c, i.toRef());
+    }
     try s.fail(.E0512, b.unit.file, i.toRef(), "a user task enable is not lowered by Sema yet", .{});
 }
 
@@ -240,6 +298,9 @@ fn block(s: *Sema, b: *Block, x: Inst.Block) Allocator.Error!void {
     // spec says otherwise; a value that does not fold is E0525.
     const outer_nodiff = b.nodiff;
     defer b.nodiff = outer_nodiff;
+    const outer_timepoint = b.timepoint;
+    defer b.timepoint = outer_timepoint;
+    try @import("timepoint.zig").enter(s, b, x.attrs);
     for (b.unit.vir.list(Inst.Attr, x.attrs)) |a| if (std.mem.eql(u8, b.unit.vir.string(a.name), "vera_nodiff")) {
         if (a.value.len == 0) {
             b.nodiff = true;
@@ -425,49 +486,6 @@ fn condbr(s: *Sema, b: *Block, x: Inst.CondBr) Allocator.Error!void {
     else_b.runtime += rt;
     try body(s, &else_b, x.@"else");
     try ifElse(s, b, c, &then_b, &else_b);
-}
-
-/// §5.8.3 `case`: the subject once, then each arm's labels in order, the
-/// first equal one's statements run; `default` when none is.
-fn case(s: *Sema, b: *Block, x: Inst.Case) Allocator.Error!void {
-    const vir = b.unit.vir;
-    if (x.flags.kind != .case) return s.fail(.E0512, b.unit.file, .none, "`casex`/`casez` in an analog body", .{});
-    const subject = try expr.lower(s, b, x.operand);
-    const arms = vir.list(Inst.Arm, x.arms);
-    var default: ?Inst.Arm = null;
-    for (arms) |a| if (a.flags.default) {
-        default = a;
-    };
-    try caseFrom(s, b, subject, arms, default, 0);
-}
-
-/// The arms from `k` on, as nested `if`s.
-fn caseFrom(s: *Sema, b: *Block, subject: Sema.Value, arms: []const Inst.Arm, default: ?Inst.Arm, k: usize) Allocator.Error!void {
-    var at = k;
-    while (at < arms.len and arms[at].flags.default) at += 1;
-    if (at == arms.len) {
-        if (default) |d| try body(s, b, d.body);
-        return;
-    }
-    const arm = arms[at];
-    var hit: ?Air.Inst.Ref = null;
-    for (b.unit.vir.list(Inst.Ref, arm.values)) |label| {
-        const l = try expr.lower(s, b, label);
-        const real = subject.ty == .real or l.ty == .real;
-        const ty: Sema.Ty = if (real) .real else .integer;
-        const eq = try expr.binOp(s, b, if (real) .feq else .ieq, try expr.coerce(s, b, subject, ty), try expr.coerce(s, b, l, ty));
-        hit = if (hit) |h| try expr.binOp(s, b, .logor, h, eq) else eq;
-    }
-    const rt: u32 = @intFromBool(!op.isStatic(s, hit orelse .fromIntern(.zero), 0));
-    var then_b = b.child();
-    then_b.conditional += 1;
-    then_b.runtime += rt;
-    try body(s, &then_b, arm.body);
-    var else_b = b.child();
-    else_b.conditional += 1;
-    else_b.runtime += rt;
-    try caseFrom(s, &else_b, subject, arms, default, at + 1);
-    try ifElse(s, b, hit orelse .fromIntern(.zero), &then_b, &else_b);
 }
 
 /// §5.9.3/§5.9.4 `while (c) s` and `for (i; c; step) s` (the init is the

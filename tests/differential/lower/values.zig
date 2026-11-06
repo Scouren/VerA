@@ -53,11 +53,14 @@ const Observe = struct {
     /// Each display row's operands at its last run this point, or null.
     display_args: []?[]const Air.interp.Value,
     /// The operands of the print call `hostCall` answered last.
-    last_args: []const Air.interp.Value = &.{},
+    last_args: ?[]const Air.interp.Value = null,
     fn seen(ctx: *anyopaque, inst: Air.Inst.Index, val: Air.interp.Value) void {
         const o: *Observe = @ptrCast(@alignCast(ctx));
         const i = @backingInt(inst);
-        if (o.display_of[i]) |k| o.display_args[k] = o.last_args;
+        if (o.display_of[i]) |k| if (o.last_args) |a| {
+            o.display_args[k] = a;
+        };
+        o.last_args = null;
         if (o.air.instructions.items(.tag)[i] != .assign) return;
         const slot = o.air.instructions.items(.data)[i].bin_op.lhs.toIndex().?;
         o.finals[@backingInt(slot)] = val;

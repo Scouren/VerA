@@ -39,10 +39,25 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
     // The root's rows whose default reads a parameter.
     var derived: std.ArrayList(struct { Device.Param.Index, Vir.Body }) = .empty;
     for ([_]Vir.Body{ unit.module.params, unit.module.body }) |b| for (vir.body(b)) |i| {
+        // A.7.1 a specify block's specparams: local rows of their folded
+        // values, in declaration order (the old flattener's).
+        if (vir.instructions.items(.tag)[@backingInt(i)] == .specify) {
+            for (vir.body(decl.payloadOf(vir, Inst.Process, i).body)) |sp| {
+                if (vir.instructions.items(.tag)[@backingInt(sp)] != .param) continue;
+                const p = decl.payloadOf(vir, Inst.Param, sp);
+                const value: InternPool.Index = if (try decl.foldBody(s, unit, p.value)) |c| try decl.intern(s, c) else .undef;
+                const row = try addRow(s, unit, vir.string(p.name), p, .unspecified, value);
+                try unit.binds.put(s.arena, decl.canonical(vir, sp), .{ .param = row });
+            }
+            continue;
+        }
+        if (vir.instructions.items(.tag)[@backingInt(i)] == .aliasparam) {
+            try systemAlias(s, unit, i);
+            continue;
+        }
         if (vir.instructions.items(.tag)[@backingInt(i)] != .param) continue;
         defer at += 1;
         const p = decl.payloadOf(vir, Inst.Param, i);
-        if (p.flags.kind == .specparam) continue;
         const ty: Device.Param.Type = switch (p.flags.storage) {
             .real, .realtime => .real,
             .integer, .time => .integer,
@@ -64,6 +79,34 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
 }
 
 // ---- private ----
+
+/// §3.4.7/§9.18 `aliasparam m = $mfactor;` on the root: the first alias of
+/// a hierarchical system parameter is a card row of Table 9-29's top-level
+/// value, and the root's reads of the parameter read it (the old
+/// `aliasSystemParam`); a later alias names the same row.
+fn systemAlias(s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
+    if (unit.prefix.len != 0) return;
+    const vir = unit.vir;
+    const a = decl.payloadOf(vir, Inst.Aliasparam, i);
+    const k = Zcu.SystemParam.fromName(vir.string(a.target)) orelse return;
+    if (s.sys_alias.get(k) != null) return;
+    const ip = &s.zcu.intern_pool;
+    const row: Device.Param.Index = @fromBackingInt(@intCast(s.device.params.len));
+    try s.device.params.append(s.gpa, .{
+        .name = try ip.getString(s.gpa, vir.string(a.name)),
+        .ty = .real,
+        .local = false,
+        .default = try decl.intern(s, .{ .real = k.initial() }),
+        .ranges_start = @intCast(s.device.ranges.items.len),
+        .ranges_len = 0,
+        .instance = decl.rowInstance(unit.instance),
+        .derive = .none,
+    });
+    const arg = try s.air.addInst(s.gpa, .{ .tag = .arg, .data = .{ .ty_index = .{ .ty = decl.typeIndex(.real), .index = @backingInt(row) } } });
+    try s.prologue.append(s.arena, arg);
+    try s.param_args.append(s.arena, .{ .ref = .fromIndex(arg), .ty = .real });
+    s.sys_alias.set(k, row);
+}
 
 /// §6.4.1 a paramset instance's own parameters (the selected paramset's,
 /// folded at its level): local rows `u.<paramset>.<name>` with their
@@ -114,7 +157,11 @@ fn paramsetRows(s: *Sema, unit: *Unit) Allocator.Error!void {
         const r: Device.Param.Index = @fromBackingInt(@intCast(s.device.params.len));
         try s.device.params.append(s.gpa, .{
             .name = try ip.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}{s}.{s}", .{ unit.prefix, vir.string(row.name), vir.string(p.name) })),
-            .ty = ty,
+            .ty = if (ty != .unspecified) ty else switch (ip.indexToKey(value)) {
+                .int => .integer,
+                .str => .string,
+                else => .real, // else: a real, or a value that did not fold
+            },
             .local = true,
             .default = value,
             .ranges_start = ranges_start,
@@ -175,15 +222,23 @@ fn stateRead(s: *Sema, unit: *Unit, b: Vir.Body) Allocator.Error!?[]const u8 {
 
 /// Appends one card row named `name` (under the unit's prefix) of value
 /// `value`, its ranges, and its `arg` in the prologue.
-fn addRow(s: *Sema, unit: *Unit, name: []const u8, p: Inst.Param, ty: Device.Param.Type, value: InternPool.Index) Allocator.Error!Device.Param.Index {
+fn addRow(s: *Sema, unit: *Unit, name: []const u8, p: Inst.Param, declared: Device.Param.Type, value: InternPool.Index) Allocator.Error!Device.Param.Index {
     const ip = &s.zcu.intern_pool;
+    // §3.4.1 an untyped parameter takes its value's type; one that does
+    // not fold is real (the old `lowerParam`).
+    const ty: Device.Param.Type = if (declared != .unspecified) declared else switch (ip.indexToKey(value)) {
+        .int => .integer,
+        .str => .string,
+        else => .real, // else: a real, or a value that did not fold
+    };
     const row: Device.Param.Index = @fromBackingInt(@intCast(s.device.params.len));
     const ranges_start: u32 = @intCast(s.device.ranges.items.len);
     for (unit.vir.list(Inst.ValueRange, p.ranges)) |r| try s.device.ranges.append(s.gpa, try rangeOf(s, unit, r));
     try s.device.params.append(s.gpa, .{
         .name = try ip.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, name })),
         .ty = ty,
-        .local = p.flags.local or unit.prefix.len != 0,
+        // §3.4.5 a localparam and a specparam are no card value.
+        .local = p.flags.local or p.flags.kind != .parameter or unit.prefix.len != 0,
         .default = value,
         .ranges_start = ranges_start,
         .ranges_len = @intCast(s.device.ranges.items.len - ranges_start),

@@ -117,6 +117,9 @@ table_effect: ?Air.Inst.Index = null,
 limit_seeds: std.ArrayList(Air.Inst.Ref) = .empty,
 /// The user functions being inlined, outermost first (func.zig).
 inlining: std.ArrayList(Inst.Index) = .empty,
+/// §3.4.7 the card row an `aliasparam` of each hierarchical system
+/// parameter made on the root (param.zig); the root's reads read it.
+sys_alias: std.EnumArray(Zcu.SystemParam, ?Air.Device.Param.Index) = .initFill(null),
 /// The contribution rows a reactive term was added to (contrib.zig).
 react_written: std.AutoHashMapUnmanaged(Air.Device.Contribution.Index, void) = .empty,
 /// §6.4.3 each paramset instance's output variables by flat name, and the
@@ -281,6 +284,12 @@ pub const Block = struct {
     /// VerA's `vera_nodiff` (§2.9) is on here: an assigned real carries no
     /// derivative (control.zig).
     nodiff: bool = false,
+    /// Inside a VerA `vera_timepoint` statement (§2.9): what it may not
+    /// hold is E0530 (control.zig).
+    timepoint: bool = false,
+    /// Inside an unrolled analog `for` over a genvar, with no run-time loop
+    /// nearer (genfor.zig): a jump is E0440.
+    analog_for: bool = false,
 
     /// A loop's targets: the `block` a `break` leaves and the one a
     /// `continue` leaves (the step follows it).
@@ -299,7 +308,7 @@ pub const Block = struct {
 
     /// A child of `parent`: the same instance and restrictions, no instructions.
     pub fn child(parent: *Block) Block {
-        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .runtime = parent.runtime, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path, .function = parent.function, .label = parent.label, .nodiff = parent.nodiff };
+        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .runtime = parent.runtime, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path, .function = parent.function, .label = parent.label, .nodiff = parent.nodiff, .timepoint = parent.timepoint, .analog_for = parent.analog_for };
     }
 };
 

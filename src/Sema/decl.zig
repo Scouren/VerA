@@ -96,6 +96,7 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     const zcu = s.zcu;
     assert(s.units.items.len == 0);
     assert(s.device.nodes.len == 0);
+    try @import("nature.zig").check(s);
     try units(s);
     if (s.units.items.len == 0) return finish(s, &.{});
     try contrib.loadDisciplines(s);
@@ -113,6 +114,7 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     for (s.units.items) |*u| try held.mark(s, u);
     for (s.units.items) |*u| try @import("attr.zig").check(s, u);
     for (s.units.items) |*u| try variable.declare(s, u);
+    try net.pullDrives(s);
     var main: Block = .{ .parent = null, .unit = &s.units.items[0] };
     // The old flattener's order (`elab/instance.zig` inlineInstance,
     // `Flatten.run`): each placed instance's blocks as the walk reaches it,

@@ -109,6 +109,15 @@ pub const File = struct {
     /// subcircuits): they may be instantiated but are never a root, and a
     /// user paramset of the same name shadows one.
     builtin_end: u32,
+    /// §3.13.1 the source file each declaration-table row came from,
+    /// borrowed: 0 for the annex D prelude the tool supplies, any other
+    /// value one file the source names. Empty when the caller does not
+    /// know: the per-file nature and discipline rules (E0335, E0336, E0342)
+    /// are then not judged (nature.zig).
+    decl_files: []const u32 = &.{},
+    /// The source `include`d annex D.1 itself, so the prelude's natures join
+    /// §3.13.2's access uniqueness rule (VD-096).
+    annex_d_included: bool = false,
 
     pub const Index = enum(u32) { _ };
 };

@@ -17,6 +17,7 @@
 //! - `pub fn vectorArg(s: *Sema, b: *Block, r: Inst.Ref, out: *std.ArrayList(Ref)) Allocator.Error!bool`
 //! - `pub fn checkPlace(s: *Sema, b: *Block, tag: SysFn.Tag, src: Inst.Ref) Allocator.Error!bool`
 //! - `pub fn isStatic(s: *const Sema, r: Air.Inst.Ref, depth: u32) bool`
+//! - `pub fn abstolArg(s: *Sema, b: *Block, tag: SysFn.Tag, a: Inst.Ref, src: Inst.Ref) Allocator.Error!?Air.Inst.Ref`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -41,6 +42,9 @@ const Ref = Air.Inst.Ref;
 pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
     const file = b.unit.file;
     if (!try checkPlace(s, b, tag, src)) return expr.poison;
+    // VerA's `vera_timepoint` (§2.9): an operator with history advances
+    // per accepted step and reads its input every iterate.
+    if (tag != .ddx and tag != .limexp and try @import("timepoint.zig").refuse(s, b, src, "an analog operator (§4.5)")) return expr.poison;
     if (tag == .ddx) return ddx(s, b, args, src);
     const min: usize = switch (tag) {
         .absdelay => 2,
@@ -68,6 +72,10 @@ pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
             return expr.poison;
         }
         if (coef and (k == 1 or k == 2)) if (try vectorArg(s, b, a, &vals)) continue;
+        if (abstolSlot(tag) == k) {
+            try vals.append(s.arena, (try abstolArg(s, b, tag, a, src)) orelse return expr.poison);
+            continue;
+        }
         const v = try expr.lower(s, b, a);
         try vals.append(s.arena, if (v.ty == .string) v.ref else try expr.coerce(s, b, v, .real));
     }
@@ -78,12 +86,35 @@ pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
     }
 }
 
+/// A `ddt`/`idt`/`idtmod` abstol argument: §4.5 "a nature ... the abstol
+/// of the nature is used" when it names one (no local of the name), else a
+/// constant expression (E0515 for one that moves, Table 4-20).
+pub fn abstolArg(s: *Sema, b: *Block, tag: SysFn.Tag, a: Inst.Ref, src: Inst.Ref) Allocator.Error!?Ref {
+    const vir = b.unit.vir;
+    if (a.toIndex()) |i| if (vir.instructions.items(.tag)[@backingInt(i)] == .str_ref) {
+        const name = vir.string(vir.instructions.items(.data)[@backingInt(i)].str_tok.start);
+        if (s.zcu.natures.contains(try s.zcu.intern_pool.getString(s.gpa, name))) {
+            const tol = try @import("hier.zig").natureAttrOf(s, name, "abstol", 0);
+            return .fromIntern(try decl.intern(s, .{ .real = if (tol) |t| t.asReal() else 0 }));
+        }
+    };
+    const v = try expr.lower(s, b, a);
+    if (v.ty == .string) return v.ref;
+    if (!isStatic(s, v.ref, 0)) {
+        try s.fail(.E0515, b.unit.file, src, "`{t}()` abstol is a constant expression argument (Table 4-20), and this one moves during the analysis", .{tag});
+        return null;
+    }
+    return try expr.coerce(s, b, v, .real);
+}
+
 /// §4.6.3 `ac_stim` and the §4.6.4 noise sources: a `call` of their
 /// operands (a table flattened `count, f0, p0, ...`, a label as its string),
 /// recorded in `device.noise`. Its value is 0 outside a small-signal
 /// analysis; the host reads the call.
 pub fn noise(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
     const file = b.unit.file;
+    // VerA's `vera_timepoint` (§2.9): a source is a stamp, not a value.
+    if (try @import("timepoint.zig").refuse(s, b, src, "a noise function (§4.6.4)")) return expr.poison;
     const vir = b.unit.vir;
     // A.8.2 brackets only trailing optional arguments: no empty slot.
     for (args) |a| if (a == .none) {
@@ -227,6 +258,16 @@ pub fn vectorArg(s: *Sema, b: *Block, r: Inst.Ref, out: *std.ArrayList(Ref)) All
 }
 
 // ---- private ----
+
+/// The argument position of `tag`'s abstol (Table 4-20), or null.
+fn abstolSlot(tag: SysFn.Tag) ?usize {
+    return switch (tag) {
+        .ddt => 1,
+        .idt => 3,
+        .idtmod => 4,
+        else => null, // else: no abstol argument
+    };
+}
 
 /// §4.5.14 `ddx(f, V(n))` / `ddx(f, I(br))`: a `ddx` call of `f` and the
 /// unknown's row, negated when the access spells the pair reversed; 0 when

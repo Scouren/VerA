@@ -12,6 +12,7 @@
 //! - `pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error!Value`
 //! - `pub const Deferred = struct`
 //! - `pub fn task(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error!void`
+//! - `pub fn fileRow(s: *Sema, tag: SysFn.Tag, call: Air.Inst.Ref) Allocator.Error!void`
 //! - `pub fn finishDisplays(s: *Sema, b: *Block) Allocator.Error!void`
 
 const std = @import("std");
@@ -86,7 +87,11 @@ pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Erro
                 return expr.poison;
             }
             if (tag == .@"$port_connected") return portConnected(s, b, args, src);
+            // §3.4.7 the root reads an aliased system parameter's card row.
+            if (@import("../Zcu.zig").SystemParam.fromName(name)) |k| if (s.sys_alias.get(k)) |row|
+                if (b.unit.instance == s.units.items[0].instance) return s.param_args.items[@backingInt(row)];
             if (tag == .@"$param_given") if (try paramGiven(s, b, args)) |v| return v;
+            if ((tag == .@"$simparam" or tag == .@"$simparam$str") and try unknownSimparam(s, b, tag, args, src)) return expr.poison;
             const ty: Sema.Ty = switch (info.ty) {
                 .real => .real,
                 .int => .integer,
@@ -95,10 +100,20 @@ pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Erro
             };
             const refs = try lowerArgs(s, b, args);
             const host = try expr.call(s, b, @backingInt(tag), ty, refs);
+            try fileRow(s, tag, host);
             if (@import("../Zcu.zig").SystemParam.fromName(name)) |k| return .{ .ref = try hierRead(s, b, k, host), .ty = .real };
             return .{ .ref = host, .ty = ty };
         },
     }
+}
+
+/// §9.5.9 a descriptor call (`$fopen`, `$fgets`, ...) is a `device.displays`
+/// row as well: its effect belongs to the accepted point's I/O phase, in
+/// order with the prints (the old `sequenceFileCall`).
+pub fn fileRow(s: *Sema, tag: SysFn.Tag, call: Ref) Allocator.Error!void {
+    if (SysFn.get(tag).family != .file_func) return;
+    const i = call.toIndex() orelse return;
+    try s.device.displays.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, @tagName(tag)), .call = i });
 }
 
 /// A system task enable (`$strobe(...)`): a `call` with no result; a
@@ -135,7 +150,7 @@ pub fn task(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error
     // The old `systask`: a task that takes a format, and §9.7's simulation
     // controls, are rows of `displays`.
     const row_kind = switch (tag) {
-        .@"$monitoron", .@"$monitoroff", .@"$fclose", .@"$fflush" => false,
+        .@"$monitoron", .@"$monitoroff" => false,
         else => info.family == .display or info.family == .file_out or info.family == .simctl,
     };
     if (!row_kind) {
@@ -206,6 +221,22 @@ fn hierRead(s: *Sema, b: *Block, k: @import("../Zcu.zig").SystemParam, host: Ref
         .xposition, .yposition => expr.binOp(s, b, .fadd, host, .fromIntern(try decl.intern(s, .{ .real = here - at_top }))),
         .angle => expr.binOp(s, b, .fmod, try expr.binOp(s, b, .fadd, host, .fromIntern(try decl.intern(s, .{ .real = @mod(here - at_top, 360) }))), .fromIntern(try decl.intern(s, .{ .real = 360 }))),
     };
+}
+
+/// §9.15 "If param_name is not known, and the optional expression is not
+/// supplied, then an error is generated" (E0811): a name that folds and
+/// that Table 9-27 (`$simparam`) or 9-28 (`$simparam$str`, which takes no
+/// fallback) does not hold. True when raised.
+fn unknownSimparam(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!bool {
+    if (args.len == 0 or args[0] == .none or (tag == .@"$simparam" and args.len > 1)) return false;
+    const c = (try decl.foldRef(s, b.unit, args[0])) orelse return false;
+    if (c != .str) return false;
+    const known = if (tag == .@"$simparam") SysFn.simparam_names else SysFn.simparam_str_names;
+    // `timeUnit`/`timePrecision` are known only under a `timescale.
+    const timescale = std.mem.eql(u8, c.str, "timeUnit") or std.mem.eql(u8, c.str, "timePrecision");
+    if (known.has(c.str) and (!timescale or b.unit.module.stamp.flags.has_timescale)) return false;
+    try s.fail(.E0811, b.unit.file, src, "`\"{s}\"` is not a §9.15 simulation parameter VerA knows", .{c.str});
+    return true;
 }
 
 /// §9.19 `$param_given(p)` in an instance under the top: whether its

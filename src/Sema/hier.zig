@@ -12,6 +12,7 @@
 //! - `pub const Hit = union(enum)`
 //! - `pub fn resolve(s: *Sema, b: *Block, r: Inst.Ref, src: Inst.Ref) Allocator.Error!?Hit`
 //! - `pub fn isBranch(s: *Sema, b: *Block, r: Inst.Ref) Allocator.Error!bool`
+//! - `pub fn natureAttrOf(s: *Sema, name: []const u8, attr: []const u8, depth: u32) Allocator.Error!?eval.Const`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -72,6 +73,30 @@ pub fn isBranch(s: *Sema, b: *Block, r: Inst.Ref) Allocator.Error!bool {
     if (!try pathOf(s, b.unit, r, &parts, 0)) return false;
     const hit = (try find(s, b.unit, parts.items)) orelse return false;
     return hit == .bind and hit.bind.bind == .branch;
+}
+
+/// Nature `name`'s attribute `attr`, or its parent's (§3.6.1.2).
+pub fn natureAttrOf(s: *Sema, name: []const u8, attr: []const u8, depth: u32) Allocator.Error!?eval.Const {
+    if (depth > parts_max or name.len == 0) return null;
+    const zcu = s.zcu;
+    const d = zcu.natures.get(try zcu.intern_pool.getString(s.gpa, name)) orelse return null;
+    const vir = zcu.fileVir(d.file);
+    const n = decl.payloadOf(vir, Inst.Nature, zcu.declRow(d).inst);
+    for (vir.list(Inst.Attr, n.attrs)) |a| if (std.mem.eql(u8, vir.string(a.name), attr)) return foldIn(s, vir, a.value);
+    if (n.parent == .empty) return null;
+    const parent = vir.string(n.parent);
+    if (n.flags.parent_kind == .none) return natureAttrOf(s, parent, attr, depth + 1);
+    // `nature n : disc.potential`: the discipline's nature of that half.
+    const dd = zcu.disciplines.get(try zcu.intern_pool.getString(s.gpa, parent)) orelse return null;
+    const dvir = zcu.fileVir(dd.file);
+    const want: @FieldType(Inst.DisciplineItem, "kind") = if (n.flags.parent_kind == .potential) .potential else .flow;
+    const over: @FieldType(Inst.DisciplineItem, "kind") = if (n.flags.parent_kind == .potential) .potential_attr else .flow_attr;
+    const items = dvir.list(Inst.DisciplineItem, decl.payloadOf(dvir, Inst.Discipline, zcu.declRow(dd).inst).items);
+    // §3.6.1.1 the parent is the discipline's half as declared, its
+    // §3.6.2.3 override of the attribute included.
+    for (items) |item| if (item.kind == over and std.mem.eql(u8, dvir.string(item.name), attr)) return foldIn(s, dvir, item.value);
+    for (items) |item| if (item.kind == want) return natureAttrOf(s, dvir.string(item.name), attr, depth + 1);
+    return null;
 }
 
 // ---- private ----
@@ -212,30 +237,6 @@ fn natureAttr(s: *Sema, b: *Block, parts: []const []const u8, src: Inst.Ref) All
             if (try foldIn(s, vir, item.value)) |c| return .{ .attr = c };
     }
     if (try natureAttrOf(s, nature, attr, 0)) |c| return .{ .attr = c };
-    return null;
-}
-
-/// Nature `name`'s attribute `attr`, or its parent's (§3.6.1.2).
-fn natureAttrOf(s: *Sema, name: []const u8, attr: []const u8, depth: u32) Allocator.Error!?eval.Const {
-    if (depth > parts_max or name.len == 0) return null;
-    const zcu = s.zcu;
-    const d = zcu.natures.get(try zcu.intern_pool.getString(s.gpa, name)) orelse return null;
-    const vir = zcu.fileVir(d.file);
-    const n = decl.payloadOf(vir, Inst.Nature, zcu.declRow(d).inst);
-    for (vir.list(Inst.Attr, n.attrs)) |a| if (std.mem.eql(u8, vir.string(a.name), attr)) return foldIn(s, vir, a.value);
-    if (n.parent == .empty) return null;
-    const parent = vir.string(n.parent);
-    if (n.flags.parent_kind == .none) return natureAttrOf(s, parent, attr, depth + 1);
-    // `nature n : disc.potential`: the discipline's nature of that half.
-    const dd = zcu.disciplines.get(try zcu.intern_pool.getString(s.gpa, parent)) orelse return null;
-    const dvir = zcu.fileVir(dd.file);
-    const want: @FieldType(Inst.DisciplineItem, "kind") = if (n.flags.parent_kind == .potential) .potential else .flow;
-    const over: @FieldType(Inst.DisciplineItem, "kind") = if (n.flags.parent_kind == .potential) .potential_attr else .flow_attr;
-    const items = dvir.list(Inst.DisciplineItem, decl.payloadOf(dvir, Inst.Discipline, zcu.declRow(dd).inst).items);
-    // §3.6.1.1 the parent is the discipline's half as declared, its
-    // §3.6.2.3 override of the attribute included.
-    for (items) |item| if (item.kind == over and std.mem.eql(u8, dvir.string(item.name), attr)) return foldIn(s, dvir, item.value);
-    for (items) |item| if (item.kind == want) return natureAttrOf(s, dvir.string(item.name), attr, depth + 1);
     return null;
 }
 

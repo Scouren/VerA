@@ -437,3 +437,10 @@ verilog-ams/ch09_system_tasks/diagnostic_info_initial.va codegen does not spell 
 verilog-ams/ch09_system_tasks/driver_strength_next_strength_type.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
 verilog-ams/ch09_system_tasks/finish_in_analog_initial_skips_simulation.va codegen does not spell a §5.10 held variable
 verilog-ams/ch09_system_tasks/receiver_segregation_ignored_without_driver_value.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+netlist/hdl/veriloga_wide_ladder.assets/ladder70.va codegen: more than 64 unknowns
+verilog-a/annex_g_change_history/generate_replaced_by_analog_for.va codegen: a call of `transition`
+verilog-a/ch03_data_types/string_comparison_in_a_constant_expression.va codegen: parameter `mode` is not a number
+verilog-a/ch04_expressions/replication_real_count.va codegen: a slot of type 2 (a string)
+verilog-a/ch06_hierarchy/mfactor_scales_named_branch_flow.va codegen: a flow contribution to a potential source's branch
+verilog-a/ch06_hierarchy/undeclared_interconnect_port_binding.va codegen: a flow contribution to a potential source's branch
+verilog-a/ch06_hierarchy/vector_port_past_256_unknowns.va codegen: more than 64 unknowns

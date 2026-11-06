@@ -9,6 +9,7 @@
 //! Contents:
 //! - `pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void`
 //! - `pub fn checkRedeclared(s: *Sema, unit: *const Unit, i: Inst.Index) Allocator.Error!void`
+//! - `pub fn localParam(s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void`
 //! - `pub fn addHeld(s: *Sema, name: []const u8, bind: Sema.Bind, init: InternPool.Index) Allocator.Error!void`
 
 const std = @import("std");
@@ -109,6 +110,24 @@ pub fn checkRedeclared(s: *Sema, unit: *const Unit, i: Inst.Index) Allocator.Err
         .variable, .param, .net => try s.fail(.E0362, unit.file, i.toRef(), "`{s}`", .{vir.string(decl.nameOf(vir, i))}),
         else => {}, // else: a port's direction, or a formal
     }
+}
+
+/// §3.4.1/§4.7.2 a parameter declared in a named block or an analog
+/// function: its default folded in the instance, in its declared type, bound
+/// as a constant (no model card reaches it). One that does not fold is no
+/// binding (the read refuses it).
+pub fn localParam(s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
+    const vir = unit.vir;
+    // A paramset's own parameter is already its card row (param.zig).
+    if (unit.binds.contains(decl.canonical(vir, i))) return;
+    const p = decl.payloadOf(vir, Inst.Param, i);
+    const c = (try decl.foldBody(s, unit, p.value)) orelse return;
+    const typed: @import("eval.zig").Const = switch (p.flags.storage) {
+        .real, .realtime => .{ .real = c.asReal() },
+        .integer, .time => .{ .int = c.asIntExact() orelse return },
+        .none, .reg, .string => c,
+    };
+    try unit.binds.put(s.arena, decl.canonical(vir, i), .{ .constant = try decl.intern(s, typed) });
 }
 
 /// A §5.10 held row named `name` for a variable's (or array's) slots.

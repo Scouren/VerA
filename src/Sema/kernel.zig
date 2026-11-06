@@ -33,7 +33,11 @@ const Ref = Air.Inst.Ref;
 pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
     const zero: Value = .{ .ref = .fromIntern(.zero_real), .ty = .real };
     switch (tag) {
-        .@"$limit" => return limit(s, b, args, src),
+        .@"$limit" => {
+            // VerA's `vera_timepoint` (§2.9): a limiter reads the iterate.
+            if (try @import("timepoint.zig").refuse(s, b, src, "`$limit` (§9.17.3)")) return @import("expr.zig").poison;
+            return limit(s, b, args, src);
+        },
         .@"$bound_step" => try boundStep(s, b, args, src),
         .@"$discontinuity" => try discontinuity(s, b, args, src),
         .@"$vera_reject_step" => try rejectStep(s, b, args, src),

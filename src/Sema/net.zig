@@ -13,6 +13,7 @@
 //! - `pub fn nets(s: *Sema, unit: *Unit) Allocator.Error!void`
 //! - `pub fn bindChildPorts(s: *Sema, unit: *Unit) Allocator.Error!void`
 //! - `pub fn bindBridges(s: *Sema) Allocator.Error!void`
+//! - `pub fn pullDrives(s: *Sema) Allocator.Error!void`
 //! - `pub fn netDiscipline(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.Error!InternPool.String`
 
 const std = @import("std");
@@ -156,7 +157,51 @@ pub fn netDiscipline(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.E
     return .empty;
 }
 
+/// IEEE 1364-2005 §19.9 `unconnected_drive`: each child's `input` port its
+/// instance leaves unconnected is held at potential 0 (`pull0`) or 1
+/// (`pull1`) by a potential source, when its discipline binds a potential
+/// (the old `applyUnconnectedDrive`). Runs before any analog block lowers.
+/// ponytail: 1.0 stands in for §19.9's Pu1 strength (the old's choice).
+pub fn pullDrives(s: *Sema) Allocator.Error!void {
+    const zcu = s.zcu;
+    for (s.units.items[1..]) |*unit| {
+        const drive = unit.module.stamp.flags.drive;
+        if (drive == .float) continue;
+        const list = zcu.instances.items(.ports)[@backingInt(unit.instance)];
+        for (zcu.ports.items(.formal)[list.start..][0..list.len], zcu.ports.items(.actual)[list.start..][0..list.len]) |formal, actual| {
+            if (actual != .none) continue;
+            const first = portDecl(unit.vir, formal) orelse continue;
+            if (!isInput(unit, first)) continue;
+            const bind = unit.binds.get(first) orelse continue;
+            if (bind != .node or bind.node == .ground) continue;
+            const disc = s.device.nodes.items(.discipline)[@backingInt(bind.node)];
+            const d = zcu.disciplines.get(disc) orelse continue;
+            const dvir = zcu.fileVir(d.file);
+            const binds_potential = for (dvir.list(Inst.DisciplineItem, payloadOf(dvir, Inst.Discipline, zcu.declRow(d).inst).items)) |it| {
+                if (it.kind == .potential) break true;
+            } else false;
+            if (!binds_potential) continue;
+            const b: Sema.Block = .{ .parent = null, .unit = unit };
+            const row = try @import("contrib.zig").rowOf(s, &b, .{ .access = .potential, .branch = .unnamed, .hi = bind.node, .lo = .ground, .neg = false });
+            const c = s.device.contributions.get(@backingInt(row));
+            const level: InternPool.Index = if (drive == .pull1) .one_real else .zero_real;
+            try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(c.resist), .rhs = .fromIntern(level) } } }));
+            try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(c.wrote), .rhs = .fromIntern(.one_real) } } }));
+        }
+    }
+}
+
 // ---- private ----
+
+/// Whether any declaration of `first`'s name is an `input`.
+fn isInput(unit: *const Unit, first: Inst.Index) bool {
+    const vir = unit.vir;
+    for ([_]Vir.Body{ unit.module.ports, unit.module.body }) |body| for (vir.body(body)) |i| {
+        if (vir.instructions.items(.tag)[@backingInt(i)] != .io or canonical(vir, i) != first) continue;
+        if (payloadOf(vir, Inst.Io, i).flags.dir == .input) return true;
+    };
+    return false;
+}
 
 /// §7.8.4 the lower side of each connect module inserted in `parent`,
 /// after its declared nets and before its implicit ones (the old

@@ -427,7 +427,10 @@ pub fn leafName(l: *Lower, i: Inst.Index) Error!Name {
     }
     const vir = l.virOf(l.frame);
     const data = vir.instructions.items(.data)[@backingInt(i)];
-    if (Lower.tag(vir, i) == .decl_ref) return declName(l, data.decl_tok.decl);
+    if (Lower.tag(vir, i) == .decl_ref) {
+        if (l.compiling) try boundBefore(l, i, data.decl_tok.decl);
+        return declName(l, data.decl_tok.decl);
+    }
     if (Lower.tag(vir, i) == .field) return hier.field(l, i);
     assert(Lower.tag(vir, i) == .str_ref);
     const n = l.implicit.get(.{ .frame = l.rootFrame(l.frame), .name = data.str_tok.start }) orelse return l.reject(l.frame, i.toRef(), "undeclared digital variable");
@@ -435,6 +438,22 @@ pub fn leafName(l: *Lower, i: Inst.Index) Error!Name {
 }
 
 // ---- private ----
+
+/// lib/sim/digital's `lookupAt`: in compiled code, use `i` of declaration
+/// `d` comes at or after the place its frame bound it (`Lower.bound_at`).
+fn boundBefore(l: *Lower, i: Inst.Index, d: Inst.Index) Error!void {
+    var f = l.frame;
+    var steps: u32 = 0;
+    while (f != none) : (f = l.frames.items[f].parent) {
+        steps += 1;
+        assert(steps <= l.frames.items.len);
+        const row = l.frames.items[f].names.get(d) orelse continue;
+        const at = l.bound_at.get(.{ .frame = f, .decl = @import("../decl.zig").canonical(l.virOf(f), d) }) orelse return;
+        if (at <= l.srcOffset(l.frame, i)) return;
+        if (l.names.items[row].kind == .event) return l.reject(l.frame, i.toRef(), "§9.7.3: a named event is declared before it is used");
+        return l.reject(l.frame, i.toRef(), "a name is used before its declaration");
+    }
+}
 
 /// `addSlot`: each slot once, in first-seen order.
 fn addSlot(l: *Lower, out: *std.ArrayList(u32), slot: u32) Error!void {

@@ -91,6 +91,20 @@ pub const Lowered = struct {
     /// declaration assignment, a continuous driver), its first pc and
     /// source offset (`none` for a driver Vir holds no position of).
     proc_sites: []const ProcSite = &.{},
+    /// Per `Program.slots` row, the `Program.scopes` row of the frame its
+    /// declaration (or implicit net) was bound in, `none` for a cell; and
+    /// its declared `[msb:lsb]` as written (reversed or negative kept),
+    /// `width - 1 : 0` without one.
+    slot_scope: []const u32 = &.{},
+    slot_msb: []const i64 = &.{},
+    slot_lsb: []const i64 = &.{},
+    /// Per `Program.scopes` row, the `Zcu.instances` row whose frame owns
+    /// it, or `none`.
+    scope_instance: []const u32 = &.{},
+    /// Per `Zcu.instances` row, its ports (`top.ports`, its own slots) and
+    /// its `specs` row.
+    instance_ports: []const []const Port = &.{},
+    instance_spec: []const u32 = &.{},
 };
 
 /// One module specialization: its name, its `Zcu` key (the module and its
@@ -101,6 +115,9 @@ pub const Spec = struct {
     key: Zcu.Instance.Key,
     instance: u32,
     ports: []const Port,
+    /// No override reached the spec (no `#(...)`, defparam or paramset
+    /// at some instance of it): its values are the module's defaults.
+    defaults: bool,
 };
 
 /// A process's first pc (`Program.insts` row) and source offset.
@@ -113,6 +130,8 @@ pub const ProcSite = struct { pc: u32, at: u32 };
 /// `time` variable.
 pub const Port = struct {
     name: []const u8,
+    /// 1-based, in the module's list of ports, null ports counted (A.1.3).
+    position: u32,
     dir: enum { input, output, inout },
     slot: u32,
     ty: Program.Ty,
@@ -334,9 +353,15 @@ pub const Lower = struct {
     /// Every declaration bound to slots, in bind order (`Lowered.slot_names`).
     declared: std.ArrayList(Declared) = .empty,
     proc_sites: std.ArrayList(ProcSite) = .empty,
+    /// Where lib/sim/digital bound each declaration of a frame (its first,
+    /// `redecl.bindOrder`): a use before it in compiled code is an error.
+    bound_at: std.AutoHashMapUnmanaged(struct { frame: u32, decl: Inst.Index }, u32) = .empty,
+    /// Processes and drivers are being compiled (lib/sim/digital's pass
+    /// two), where a name is visible only from its binding on.
+    compiling: bool = false,
 
     /// Declaration `decl` of frame `frame`, bound to `count` slots from `slot`.
-    pub const Declared = struct { frame: u32, decl: Inst.Index, slot: u32, count: u32 };
+    pub const Declared = struct { frame: u32, decl: Inst.Index, slot: u32, count: u32, msb: i64, lsb: i64 };
 
     /// A.6.5 a `disable` at pc `pc` of the name `name`, written in frame `frame`.
     pub const Disable = struct { pc: u32, frame: u32, name: []const u8, inst: Inst.Index };
@@ -469,7 +494,7 @@ pub const Lower = struct {
     pub fn bind(l: *Lower, f: u32, d: Inst.Index, n: Name) Error!u32 {
         assert(f < l.frames.items.len);
         const at: u32 = @intCast(l.names.items.len);
-        if (n.kind != .sub and n.kind != .scope) try l.declared.append(l.a, .{ .frame = f, .decl = d, .slot = n.slot, .count = n.count });
+        if (n.kind != .sub and n.kind != .scope) try l.declared.append(l.a, .{ .frame = f, .decl = d, .slot = n.slot, .count = n.count, .msb = n.msb, .lsb = n.lsb });
         try l.names.append(l.a, n);
         try l.frames.items[f].names.put(l.a, d, at);
         return at;
@@ -633,7 +658,7 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Low
         why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
         return e;
     };
-    const slots = try top.slotNames(&l, program.slots.len);
+    const slots = try top.slotNames(&l, program.slots.items(.ty));
     return .{
         .program = program,
         .check_sites = l.check_sites.items,
@@ -645,12 +670,19 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Low
         .slot_names = slots.names,
         .slot_at = slots.at,
         .proc_sites = l.proc_sites.items,
+        .slot_scope = slots.scope,
+        .slot_msb = slots.msb,
+        .slot_lsb = slots.lsb,
+        .scope_instance = specs.scope_instance,
+        .instance_ports = specs.instance_ports,
+        .instance_spec = specs.of_instance,
     };
 }
 
 // ---- private ----
 
 fn spine(l: *Lower) Error!void {
+    try gates.checkUdps(l);
     if (l.zcu.instances.len == 0) {
         l.why = "digital execution found no top-level module";
         l.why_at = moduleAt(l, firstModule(l) orelse return error.Rejected);

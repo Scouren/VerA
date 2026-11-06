@@ -52,6 +52,8 @@ pub fn compileAll(l: *Lower) Error!void {
     var early: std.ArrayList(u32) = .empty;
     var queued: std.ArrayList(u32) = .empty;
     try vars.compileParams(l);
+    // lib/sim/digital's pass two: a name is visible from its binding on.
+    l.compiling = true;
     try nets.compileDrivers(l);
     try gates.compileTrans(l);
     try sub.compileBodies(l);
@@ -90,6 +92,17 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
     const vir = l.virOf(l.frame);
     const scope = l.frames.items[l.frame].scope;
     const tg = Lower.tag(vir, i);
+    // §10.4.4: "Functions shall not contain any time-controlled statements"
+    // nor "any nonblocking assignments", nor enable tasks.
+    // An assignment is reported at its target, as lib/sim/digital does.
+    if (l.in_function) switch (tg) {
+        .store_nb => return l.reject(l.frame, Lower.payload(vir, Inst.Bin, i).lhs, "§10.4.4: a function body cannot contain a nonblocking assignment"),
+        .store_nb_timed => return l.reject(l.frame, Lower.payload(vir, Inst.Timed, i).lhs, "§10.4.4: a function body cannot contain a nonblocking assignment"),
+        .store_timed => return l.reject(l.frame, Lower.payload(vir, Inst.Timed, i).lhs, "§10.4.4: a function body cannot contain a time control"),
+        .delay, .event_wait, .wait => return l.reject(l.frame, i.toRef(), "§10.4.4: a function body cannot contain a time control"),
+        .call => return l.reject(l.frame, i.toRef(), "§10.4.4: a function cannot enable a task"),
+        else => {}, // else: a statement a function may hold
+    };
     switch (tg) {
         .block => try block(l, i, depth),
         .condbr => {

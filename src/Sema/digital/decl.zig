@@ -313,6 +313,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
         if (!gop.found_existing) gop.value_ptr.* = .empty;
         try gop.value_ptr.append(l.a, i);
     }
+    try redecl.bindOrder(l, f, all);
     for (later.values()) |decls| try redecl.check(l, f, decls.items, .module, w.list);
     const top = l.frames.items[f].parent == none;
     if (top and l.options.mixed) w.domain = try domain_mod.of(l.a, vir, body, w.index == 0);

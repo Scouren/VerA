@@ -1,0 +1,11 @@
+# Allowed differences between Air.interp and the old opcode.fold
+# (tests/differential/air.zig, `zig build diff-air`).
+# One line: <opcode> <kind> [<ulps>] <reason>. Kinds: declines (the fold has
+# no value, the interpreter has one), ulp N (both real, at most N ulps
+# apart), wide (both integer, an operand past 32 bits). A line whose kind
+# never occurs over the sweep fails the run.
+#
+# Not here: exp, pow, tan and log10 differ from the fold (VerA's gm) but the
+# f128 reference settles every such operand set for the interpreter, which
+# computes them in f128 and rounds once; diff-air prints each as an
+# old-side bug.

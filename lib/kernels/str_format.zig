@@ -10,14 +10,14 @@
 
 const zstd = @import("std");
 // The device has these at file scope; the host compile aliases them.
-const zCReal = @import("str_real.zig").zCReal;
-const zcFlag = @import("str_real.zig").zcFlag;
-const zcAltOk = @import("str_real.zig").zcAltOk;
-const zc_left = @import("str_real.zig").zc_left;
-const zc_plus = @import("str_real.zig").zc_plus;
-const zc_space = @import("str_real.zig").zc_space;
-const zc_zero = @import("str_real.zig").zc_zero;
-const zc_alt = @import("str_real.zig").zc_alt;
+const zCReal = @import("contract").str_real.zCReal;
+const zcFlag = @import("contract").str_real.zcFlag;
+const zcAltOk = @import("contract").str_real.zcAltOk;
+const zc_left = @import("contract").str_real.zc_left;
+const zc_plus = @import("contract").str_real.zc_plus;
+const zc_space = @import("contract").str_real.zc_space;
+const zc_zero = @import("contract").str_real.zc_zero;
+const zc_alt = @import("contract").str_real.zc_alt;
 const zSOver = @import("str_store.zig").zSOver;
 const zSTmp = @import("str_store.zig").zSTmp;
 

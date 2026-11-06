@@ -65,6 +65,8 @@ const DeviceFlags = struct {
     optimize: std.lang.Optimize,
     backend: zigbuild.Backend,
     debug_info: bool,
+    /// `--jobs=N` (`zigbuild.Options.jobs`).
+    jobs: ?u32,
     /// Where `--emit-so` keeps the prebuilt engine (`engineCache`).
     engine_cache: []const u8,
 };
@@ -222,6 +224,7 @@ pub fn run(
         .optimize = s.optimize,
         .backend = s.backend,
         .debug_info = cli.debug_info,
+        .jobs = cli.jobs,
         .engine_cache = try engineCache(arena, environ_map, cli.work_dir),
     });
     if (!cli.run_exe) return emitDigital(j, .{
@@ -471,6 +474,7 @@ fn buildLibrary(j: Job, dev: native.DeviceRoot, f: DeviceFlags) !?u8 {
         .modules = &modules,
         .zig_exe = f.zig_exe,
         .debug_info = f.debug_info,
+        .jobs = f.jobs,
     };
     // The engine is built once per sources, compiler, target and flags; only
     // the design is built here (`rt/engine.zig`). The self-hosted backend

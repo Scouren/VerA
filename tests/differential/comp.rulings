@@ -1,0 +1,5 @@
+# diff-comp's rulings: a fixture on which the old vera is wrong, settled by
+# the fixture's own verdict (its //! reject, its accept, or its .expected.txt
+# gold; tests/differential/comp.zig `tiebreak`). One line each: the fixture
+# path, then the //! lrm clause and why the old side is wrong.
+verilog/19_compiler_directives/macro_text_1800_forms_warn.v IEEE 1364-2005 §19.3.1: W0151 points at each `define; the old side points past the first body (11:34) and the second at 13:33, a line with no macro text

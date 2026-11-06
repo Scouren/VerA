@@ -6,7 +6,7 @@
 //! Cites: none of the LRM's beyond the emitter's.
 //!
 //! Contents:
-//! - `pub fn emit(gpa: Allocator, io: Io, arena: Allocator, result: *const Result, v: Request.Verilog, out_path: ?[]const u8, in_path: []const u8, err: *Io.Writer, o: *Outcome) request.CompileError!void`
+//! - `pub fn emit(gpa: Allocator, io: Io, arena: Allocator, result: *const Result, v: Config.Verilog, out_path: ?[]const u8, in_path: []const u8, err: *Io.Writer, o: *Outcome) request.CompileError!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -15,7 +15,7 @@ const Io = std.Io;
 const preprocessor = @import("frontend").preprocessor;
 const beh_verilog = @import("verilog");
 const request = @import("request.zig");
-const Request = request.Request;
+const Config = @import("Config.zig");
 const Outcome = request.Outcome;
 const Result = @import("Result.zig");
 const readFailed = @import("read_failed.zig").readFailed;
@@ -30,7 +30,7 @@ pub fn emit(
     io: Io,
     arena: Allocator,
     result: *const Result,
-    v: Request.Verilog,
+    v: Config.Verilog,
     out_path: ?[]const u8,
     in_path: []const u8,
     err: *Io.Writer,

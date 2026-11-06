@@ -42,7 +42,7 @@ test "E0154: an include tree past 65535 files is a coded refusal in both front e
     var o: vera.Outcome = .{};
     defer o.deinit(gpa);
     const source = try includes(arena, past, "module m; endmodule\n");
-    try vera.compile(gpa, io, arena, source, .{ .options = .{ .file_name = "m.va", .include_dirs = &.{dir} } }, &bag, &o);
+    try vera.compile(gpa, io, arena, source, .{ .file_name = "m.va", .include_dirs = &.{dir} }, &bag, &o);
     try std.testing.expect(o.status != 0);
     try std.testing.expect(hasCode(&bag, .E0154));
 

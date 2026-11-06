@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **A host prints a device's recorded reals as the device does** (§9.4.3;
+  C11 7.21.6.1): `contract.formatC`, behind `formatSay` and `formatStatus`,
+  rendered `%e/%f/%g` through Zig's float formatter, which rounds a tie
+  away from zero, so `%.0f` of 2.5 printed `3` where the device and C print
+  `2`; held to glibc's `snprintf`, 16,306 of 92,432 conversions differed.
+  `%r` now spells 10³ `K` and carries 999.996 to `1.00K`, as the device
+  does. The real conversions are the contract's own (`contract.str_real`),
+  and `zig build test-printf` holds `formatC` to `snprintf` (#132).
+- **A split device build runs at most `--jobs=N` `zig` processes at once**
+  (default: the CPU count), where it started every part and setup chunk
+  together, up to 67 (#133).
+
 ## v0.23.0 — 2026-11-02
 
 On Suite VAMS-CONFORMANCE, we score Verilog-A 2452/2452, Verilog 3611/3611, Verilog-AMS 755/755, Cumulative: 6818/6818.

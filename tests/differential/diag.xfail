@@ -1,0 +1,4 @@
+# Fixtures whose diagnostics may render differently through the vams Diag than
+# through lib/diag, one per line: <path under tests/conformance/tests> <reason>.
+# An entry that agrees fails diff-diag. A difference the LRM settles for the new
+# bundle is a line of diag.rulings, not of this file.

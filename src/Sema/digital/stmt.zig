@@ -52,6 +52,8 @@ pub fn compileAll(l: *Lower) Error!void {
     var early: std.ArrayList(u32) = .empty;
     var queued: std.ArrayList(u32) = .empty;
     try vars.compileParams(l);
+    // lib/sim/digital's pass two: a name is visible from its binding on.
+    l.compiling = true;
     try nets.compileDrivers(l);
     try gates.compileTrans(l);
     try sub.compileBodies(l);

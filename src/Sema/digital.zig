@@ -330,6 +330,12 @@ pub const Lower = struct {
     /// Every declaration bound to slots, in bind order (`Lowered.slot_names`).
     declared: std.ArrayList(Declared) = .empty,
     proc_sites: std.ArrayList(ProcSite) = .empty,
+    /// Where lib/sim/digital bound each declaration of a frame (its first,
+    /// `redecl.bindOrder`): a use before it in compiled code is an error.
+    bound_at: std.AutoHashMapUnmanaged(struct { frame: u32, decl: Inst.Index }, u32) = .empty,
+    /// Processes and drivers are being compiled (lib/sim/digital's pass
+    /// two), where a name is visible only from its binding on.
+    compiling: bool = false,
 
     /// Declaration `decl` of frame `frame`, bound to `count` slots from `slot`.
     pub const Declared = struct { frame: u32, decl: Inst.Index, slot: u32, count: u32 };

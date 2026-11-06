@@ -1508,6 +1508,33 @@ src/
   `.v` exe (step 1: the embedded Program run by std_sim's interpreter) has none.
   701 fixtures differ only in those notes; `digital_exe.xfail` lists them as
   "digital_exe (build remarks)".
-  - If step 2 (native codegen, kept only if its benchmark wins) ships, it can print
-    the remarks that are still true, and the lines go away.
-  - If step 2 doesn't ship, dropping the remarks is the user's call.
+  - The remarks describe the old 2-state/auto mode ("2-state once", "4-state: <why>",
+    "not native"). The new engine is 4-state throughout, so none of them is
+    printed; dropping them is the user's call.
+  - Speed: interpreted 3.41 s vs old native 0.36 s (lfsr, 2M cycles). About 60% of
+    that is eval's per-value allocation, which is being fixed first. Native codegen
+    is built only if a clear gap remains.
+- **Versioned units: preliminary numbers (rw-codegen2).** ReleaseFast, least of 201 runs.
+  - diode: strict 5.8 ns, versioned with the new `Fast` family trait 4.4 ns (24% faster).
+  - abs: about equal.
+  - MOSFET: strict 6.5 ns, versioned about 13 ns. The per-point box guard makes LLVM turn
+    region selects into mispredicting branches.
+  - Being tried first: a per-batch or branchless guard (AGENTS.md: dispatch per batch).
+  - If versioning still loses on a real device after that, keeping it is the user's call.
+  - `Fast` is an optional, additive trait in the device ABI (contract/family.zig). ESPice
+    gains it only if its family provides `Fast`.
+- **Versioned units: the measured result (rw-codegen2, bench-fast, median ns/eval).**
+
+  | Device | Strict | Versioned + Fast | Change |
+  |---|---|---|---|
+  | diode | 13.32 | 10.18 | +24% |
+  | tanh OTA | 29.52 | 27.80 | +6% |
+  | MOSFET | 12.95 | 14.15 | -9% |
+  | abs | 6.34 | 7.45 | -17% |
+
+  - The per-point box check costs more than fast math saves on polynomial devices.
+  - Decision (lead, within the compiler-inferred policy): version a unit only when its
+    fast slice holds a transcendental. bench-fast now fails if any device is slower
+    versioned than strict.
+  - Batch-level dispatch for ESPice would need a contract change (`batch_ok` hosts).
+    It is recorded as future work, not built.

@@ -1,0 +1,30 @@
+# diff-rtlil's rulings (tests/differential/comp.zig): `<fixture> <clause>: <reason>`.
+# Each fixture's own `//! reject` is the tiebreaker: the new side must refuse it
+# (status 1 to 125). Two kinds: old --emit-rtlil built RTLIL of a design the clause
+# rejects; or the new side rejects at an earlier stage, with the error --run gives
+# (diff-comp agrees on the fixture).
+verilog/09_behavioral_modeling/nonblocking_to_net_rejected.v IEEE 1364-2005 9.2 9.2.2: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/09_behavioral_modeling/procedural_to_net_rejected.v IEEE 1364-2005 9.2 9.2.1: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/11_scheduling/primitive_output_to_reg_rejected.v IEEE 1364-2005 11.6.6: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/complete_port_redeclared_rejected.v IEEE 1364-2005 12.3.3: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/input_declared_reg_rejected.v IEEE 1364-2005 12.3.9 12.3.9.1: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/listed_port_undeclared_rejected.v IEEE 1364-2005 6.2: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/mixed_ordered_named_ports_rejected.v IEEE 1364-2005 6.5.5: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/module_instance_delay_rejected.v IEEE 1364-2005 A.4.1: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/nonansi_port_integer_rejected.v IEEE 1364-2005 12.3.3: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/nonansi_port_reg_range_mismatch_rejected.v IEEE 1364-2005 12.3.3: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/nonansi_port_scalar_vs_vector_rejected.v IEEE 1364-2005 12.3.3: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/nonansi_port_time_rejected.v IEEE 1364-2005 12.3.3: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/nonansi_port_vector_vs_scalar_rejected.v IEEE 1364-2005 12.3.3: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/output_to_expression_rejected.v IEEE 1364-2005 12.3.9.2: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/output_to_variable_rejected.v IEEE 1364-2005 12.3.9 12.3.9.2 12.3.8: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/port_completed_net_redeclared_rejected.v IEEE 1364-2005 12.3.3 4.11: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/port_connected_twice_rejected.v IEEE 1364-2005 12.3.6: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/port_range_mismatch_rejected.v IEEE 1364-2005 6.5.2.2: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/15_timing_checks/hold_negative_limit_rejected.v IEEE 1364-2005 15.2.2: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/15_timing_checks/notifier_net_rejected.v IEEE 1364-2005 15.5: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/15_timing_checks/recovery_negative_limit_rejected.v IEEE 1364-2005 15.2.5: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/15_timing_checks/recrem_signal_limit_rejected.v IEEE 1364-2005 15.2.6: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/15_timing_checks/removal_negative_limit_rejected.v IEEE 1364-2005 15.2.4: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/15_timing_checks/setup_negative_limit_rejected.v IEEE 1364-2005 15.2.1: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/15_timing_checks/setuphold_signal_limit_rejected.v IEEE 1364-2005 15.2.3: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it

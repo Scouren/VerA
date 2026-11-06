@@ -37,6 +37,8 @@ pub fn add(g: Graph, all: *Build.Step) void {
     o.addOption([]const u8, "filter", b.option([]const u8, "comp-filter", "diff-comp: only the fixtures whose path holds this") orelse "");
     o.addOption(u32, "jobs", b.option(u32, "comp-jobs", "diff-comp: fixtures compared at once (default 4; the machine is shared)") orelse 4);
     o.addOption(u32, "j1_sample", b.option(u32, "comp-j1", "diff-comp: also run this many fixtures' new side at -j1 and compare the bytes with -jN (default 200)") orelse 200);
+    // diff-rtlil's tiebreaker (tests/differential/comp/yosys.zig): required, never skipped.
+    o.addOption([]const u8, "yosys", b.option([]const u8, "yosys", "diff-rtlil, rtlil-equiv: the Yosys executable (default `yosys` on PATH, as `nix develop .#external` has it)") orelse "yosys");
     o.addOption(bool, "rebaseline", b.option(bool, "comp-rebaseline", "diff-comp: write every disagreement to zig-out/comp.xfail.new instead of failing on it") orelse false);
     // diff-comp itself, then the `.v` backends' runs (docs/rewrite/digital.md):
     // the same fixtures with `--run` swapped for the backend's flag, each
@@ -59,6 +61,14 @@ pub fn add(g: Graph, all: *Build.Step) void {
         b.step(run_row.step, run_row.what).dependOn(&r.step);
         all.dependOn(&r.step);
     }
+
+    // rtlil-equiv: diff-rtlil's Yosys tiebreaker on its canary and on tests/rtlil.
+    const eq_mod = g.m.make("tests/differential/rtlil_equiv.zig", &.{});
+    eq_mod.addOptions("comp_options", o);
+    const eq = testRun(b, "rtlil-equiv", eq_mod, g.runner, g.results_dir);
+    eq.has_side_effects = true; // Runs both drivers and Yosys.
+    b.step("rtlil-equiv", "tests/rtlil through vera and vera-next --emit-rtlil, held equivalent by Yosys (required: `nix develop .#external`), and a planted fault caught").dependOn(&eq.step);
+    // ponytail: joins `rewrite` once the emitter holds it green (rw-rtlil, next commit).
 
     // §12: concurrent --check runs of one model in one directory.
     const race_mod = g.m.make("tests/differential/comp_check.zig", &.{});

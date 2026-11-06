@@ -35,6 +35,7 @@ const v_run = @import("v_options");
 const fixture = @import("comp/fixture.zig");
 const judge = @import("comp/judge.zig");
 const device = @import("comp/device.zig");
+const yosys = @import("comp/yosys.zig");
 const Fixture = fixture.Fixture;
 
 /// One fixture's outcome.
@@ -49,6 +50,9 @@ const Outcome = union(enum) {
     /// A `comp.rulings` line settled the difference: the old side is wrong
     /// and the new one meets the fixture's own verdict.
     ruled: []const u8,
+    /// diff-rtlil: both built, and Yosys proves the two RTLIL texts
+    /// equivalent (`comp/yosys.zig`).
+    equivalent,
 };
 
 /// The shared state of one run, read by every worker.
@@ -127,7 +131,7 @@ fn worker(s: *Shared) void {
         s.lock.lockUncancelable(s.io);
         defer s.lock.unlock(s.io);
         s.outcomes[k] = switch (out) {
-            .pending, .agree => out,
+            .pending, .agree, .equivalent => out,
             .not_built => |b| .{ .not_built = std.heap.smp_allocator.dupe(u8, b) catch "?" },
             .differ => |d| .{ .differ = .{ .owner = std.heap.smp_allocator.dupe(u8, d.owner) catch "?", .why = std.heap.smp_allocator.dupe(u8, d.why) catch "?" } },
             .nondeterministic => |w| .{ .nondeterministic = std.heap.smp_allocator.dupe(u8, w) catch "?" },
@@ -160,6 +164,11 @@ fn one(arena: Allocator, s: *Shared, k: u32) !Outcome {
     old.stderr = try std.mem.replaceOwned(u8, arena, old.stderr, root, "");
     new.stderr = try std.mem.replaceOwned(u8, arena, new.stderr, root, "");
     const why = (try judge.compare(arena, old, new, f.lang == .verilog)) orelse return .agree;
+    // Two RTLIL texts of one circuit agree: Yosys is the judge.
+    if (std.mem.eql(u8, v_run.flag, "--emit-rtlil") and old.status == 0 and new.status == 0 and old.stdout.len != 0 and new.stdout.len != 0 and std.mem.eql(u8, old.stderr, new.stderr)) {
+        const miss = try yosys.equivalent(arena, s.io, options.yosys, try std.fmt.allocPrint(arena, "{s}/{d}-y", .{ s.work, k }), old.stdout, new.stdout);
+        if (miss == null) return .equivalent;
+    }
     if (s.rulings.get(f.rel)) |clause| {
         const miss: ?[]const u8 = if (std.mem.eql(u8, v_run.flag, "--check"))
             try deviceTiebreak(arena, s, f, new, args, try std.fmt.allocPrint(arena, "{s}/{d}-d", .{ s.work, k }))
@@ -176,7 +185,7 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
     const xfail = try readList(arena, io, "tests/differential/" ++ v_run.name ++ ".xfail");
     var out: Io.Writer.Allocating = .init(arena);
     var new_list: Io.Writer.Allocating = .init(arena);
-    var t: struct { ruled: u32 = 0, agree: u32 = 0, not_built: u32 = 0, differ: u32 = 0, listed: u32 = 0, failed: u32 = 0 } = .{};
+    var t: struct { equivalent: u32 = 0, ruled: u32 = 0, agree: u32 = 0, not_built: u32 = 0, differ: u32 = 0, listed: u32 = 0, failed: u32 = 0 } = .{};
     var by_owner: std.StringArrayHashMapUnmanaged(u32) = .empty;
     for (fixtures, outcomes) |f, o| {
         if (o == .ruled) {
@@ -186,7 +195,7 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
         }
         const line: ?[]const u8 = switch (o) {
             .pending => unreachable, // Every worker finished its fixtures.
-            .agree => null,
+            .agree, .equivalent => null,
             .not_built => |b| try std.fmt.allocPrint(arena, "not built: backend {s}", .{b}),
             .differ => |d| try std.fmt.allocPrint(arena, "{s}: {s}", .{ d.owner, d.why }),
             .nondeterministic => |w| try std.fmt.allocPrint(arena, "rw-comp (determinism): -j1 and -jN differ: {s}", .{w}),
@@ -194,6 +203,10 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
         };
         switch (o) {
             .agree => t.agree += 1,
+            .equivalent => {
+                t.agree += 1;
+                t.equivalent += 1;
+            },
             .not_built => t.not_built += 1,
             else => t.differ += 1,
         }
@@ -233,7 +246,7 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
     if (options.rebaseline) try Io.Dir.cwd().writeFile(io, .{ .sub_path = try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", v_run.name ++ ".xfail.new" }), .data = new_list.written() });
     var owners: Io.Writer.Allocating = .init(arena);
     for (by_owner.keys(), by_owner.values()) |k, v| try owners.writer.print("  {d} {s}\n", .{ v, k });
-    std.debug.print("{s}" ++ v_run.name ++ ": {d} fixtures in {d} s: {d} agree, {d} ruled (old-side bugs), {d} need a backend vera-next has not got, {d} differ; {d} in " ++ v_run.name ++ ".xfail, {d} failures. By owner:\n{s}", .{ out.written(), fixtures.len, secs, t.agree, t.ruled, t.not_built, t.differ, t.listed, t.failed, owners.written() });
+    std.debug.print("{s}" ++ v_run.name ++ ": {d} fixtures in {d} s: {d} agree ({d} by Yosys equivalence), {d} ruled (old-side bugs), {d} need a backend vera-next has not got, {d} differ; {d} in " ++ v_run.name ++ ".xfail, {d} failures. By owner:\n{s}", .{ out.written(), fixtures.len, secs, t.agree, t.equivalent, t.ruled, t.not_built, t.differ, t.listed, t.failed, owners.written() });
     if (t.failed != 0 and !options.rebaseline) return error.DiffCompFailed;
 }
 

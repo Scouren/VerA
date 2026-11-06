@@ -261,11 +261,23 @@ fn asType(s: *Sema, ty: Device.Param.Type, v: InternPool.Index, zero: bool) Allo
 }
 
 /// §3.4.2 a parameter's value inside its `from` ranges and outside its
-/// `exclude` ones (E0361); a bound folds over every parameter.
+/// `exclude` ones (E0361); a bound folds over every parameter. A range
+/// whose first bound is not below its second is E0347 ("The first
+/// expression in the range shall be numerically smaller than the second"),
+/// and the value is then not judged.
 fn checkRange(s: *Sema, unit: *Unit, i: Inst.Index, p: Inst.Param, value: InternPool.Index) Allocator.Error!void {
     const vir = unit.vir;
     const ip = &s.zcu.intern_pool;
     const name = vir.string(p.name);
+    const before = s.zcu.failed.len;
+    for (vir.list(Inst.ValueRange, p.ranges)) |r| {
+        if (r.flags.set or !r.flags.interval) continue;
+        const lo = (try decl.foldBody(s, unit, r.lo)) orelse continue;
+        const hi = (try decl.foldBody(s, unit, r.hi)) orelse continue;
+        if (lo == .str or hi == .str or lo.asReal() < hi.asReal()) continue;
+        try s.fail(.E0347, unit.file, i.toRef(), "`{s}` {s} bounds {d} and {d} are not in increasing order", .{ name, if (r.flags.exclude) "exclude" else "from", lo.asReal(), hi.asReal() });
+    }
+    if (s.zcu.failed.len != before) return;
     var has_from = false;
     var in_from = false;
     switch (ip.indexToKey(value)) {

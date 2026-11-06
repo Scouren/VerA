@@ -22,6 +22,7 @@ const Sema = @import("../Sema.zig");
 const Zcu = @import("../Zcu.zig");
 const eval = @import("eval.zig");
 const walk = @import("walk.zig");
+const netlist = @import("netlist.zig");
 const defparam = @import("defparam.zig");
 const dist = @import("dist.zig");
 const Vir = vams.Vir;
@@ -54,6 +55,9 @@ pub fn resolve(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, target: InternPool
     var own: InternPool.Index = .none;
     var base: ?Zcu.Hier = null;
     var prev: Zcu.Decl = .none;
+    // E.2.1: SPICE is case-insensitive, so a name no declaration spells
+    // exactly names the netlist module it folds to.
+    if (zcu.modules.get(name) == null and !try hasParamset(s, name)) name = try netlist.moduleNamed(s, name) orelse name;
     for (0..zcu.paramsets.items.len + 1) |_| {
         // Annex E: a user paramset shadows a shipped primitive of its name.
         if (zcu.modules.get(name)) |d| if (!zcu.isBuiltin(d) or !try hasParamset(s, name))
@@ -132,6 +136,14 @@ fn select(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, name: InternPool.String
         // A chain's link names neither: reported at that paramset.
         if (link) |l| {
             try s.fail(.E0904, l.file, s.zcu.declRow(l).inst.toRef(), "`{s}`, the module this paramset specializes", .{shown});
+            return null;
+        }
+        // E.1.2 "a particular SPICE netlist can reference a primitive which
+        // is unsupported": its `.MODEL` is named as that.
+        for (s.zcu.netlist_unsupported) |card| {
+            const space = std.mem.findScalar(u8, card, ' ').?; // `name type`
+            if (!std.ascii.eqlIgnoreCase(card[0..space], shown)) continue;
+            try s.fail(.E0952, file, src, "`{s}` is a SPICE `.MODEL` of type `{s}`, a primitive Table E.1 and VerA do not provide", .{ shown, card[space + 1 ..] });
             return null;
         }
         try s.failRule(.{ .rule = .cell_unbound, .name = shown }, .E0904, file, src, "`{s}`", .{shown});

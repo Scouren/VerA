@@ -47,6 +47,10 @@ const named_depth_max = 1 << 12;
 /// A §7.7.2 statement's answer: its `resolveto` discipline, or `exclude`.
 const Resolution = struct { result: []const u8, exclude: bool };
 
+/// A child segment reaching a net: the child, its port and the
+/// connection, and the discipline it brings. The reports point at it.
+const Arrival = struct { child: Instance.Index, formal: Inst.Index, actual: Inst.Ref, discipline: []const u8 };
+
 /// Resolves every instance's nets, children before parents, after Annex
 /// F.2.1 step 3's out-of-context declarations. Asserts that `kids` lists
 /// each instance's children.
@@ -231,10 +235,12 @@ fn collectOoc(s: *Sema) Allocator.Error!Oocs {
             const abs = if (std.mem.startsWith(u8, text, "$root.")) text["$root.".len..] else try std.fmt.allocPrint(s.arena, "{f}.{s}", .{ zcu.fmtPath(i), text });
             const dot = std.mem.findScalarLast(u8, abs, '.') orelse continue;
             const owner = paths.get(abs[0..dot]) orelse continue;
+            const dot_root = std.mem.findScalar(u8, abs, '.').?;
             const key: Zcu.NetKey = .{ .instance = owner, .net = try zcu.intern_pool.getString(s.gpa, abs[dot + 1 ..]) };
             const gop = try out.getOrPut(s.arena, key);
             if (gop.found_existing) {
-                try s.fail(.E0902, module.file, n.toRef(), "`{s}` already has the out-of-context discipline `{s}`", .{ abs, gop.value_ptr.discipline });
+                // The old elaborator's path: below the root.
+                try s.fail(.E0902, module.file, n.toRef(), "`{s}` already has the out-of-context discipline `{s}`", .{ abs[dot_root + 1 ..], gop.value_ptr.discipline });
                 continue;
             }
             gop.value_ptr.* = .{ .discipline = vir.string(net.discipline), .file = module.file, .src = n.toRef() };
@@ -259,8 +265,8 @@ fn resolveInstance(s: *Sema, kids: []const std.ArrayList(Instance.Index), ooc: *
         if (ooc.get(.{ .instance = i, .net = e.key_ptr.* })) |o| {
             // §3.6.2: overriding an explicit declaration needs a compatible
             // discipline (§3.11.1); a shipped primitive's is a placeholder.
-            if (e.value_ptr.discipline.len != 0 and !zcu.isBuiltin(module) and !try discipline.compatible(s, e.value_ptr.discipline, o.discipline))
-                try s.fail(.E0375, o.file, o.src, "`{f}.{s}` is declared `{s}` and cannot be overridden with `{s}` (§3.11.1)", .{ zcu.fmtPath(i), name, e.value_ptr.discipline, o.discipline });
+            if (e.value_ptr.discipline.len != 0 and !zcu.isBuiltin(module)) if (try discipline.conflict(s, e.value_ptr.discipline, o.discipline)) |why|
+                try s.fail(.E0375, o.file, o.src, "`{f}{s}{s}` is declared `{s}` and cannot be overridden with `{s}` ({s})", .{ zcu.fmtPathBelowRoot(i), if (zcu.instances.items(.parent)[@backingInt(i)] == .none) "" else ".", name, e.value_ptr.discipline, o.discipline, why });
             try zcu.net_discipline.put(s.gpa, .{ .instance = i, .net = e.key_ptr.* }, try zcu.intern_pool.getString(s.gpa, o.discipline));
             continue;
         }
@@ -268,6 +274,8 @@ fn resolveInstance(s: *Sema, kids: []const std.ArrayList(Instance.Index), ooc: *
             try zcu.net_discipline.put(s.gpa, .{ .instance = i, .net = e.key_ptr.* }, try zcu.intern_pool.getString(s.gpa, e.value_ptr.discipline));
     }
     var cands: std.AutoArrayHashMapUnmanaged(String, std.ArrayList([]const u8)) = .empty;
+    // Each net's child segments, in arrival order, for the reports.
+    var arrivals: std.AutoHashMapUnmanaged(String, std.ArrayList(Arrival)) = .empty;
     const vir = zcu.fileVir(module.file);
     // §3.6.2.4: a net with no discipline that digital behavioral code uses
     // is discrete: its discrete child segments resolve it, and with none it
@@ -289,6 +297,9 @@ fn resolveInstance(s: *Sema, kids: []const std.ArrayList(Instance.Index), ooc: *
             const gop = try cands.getOrPut(s.arena, sig);
             if (!gop.found_existing) gop.value_ptr.* = .empty;
             try gop.value_ptr.append(s.arena, zcu.intern_pool.stringToSlice(lower));
+            const seg = try arrivals.getOrPut(s.arena, sig);
+            if (!seg.found_existing) seg.value_ptr.* = .empty;
+            try seg.value_ptr.append(s.arena, .{ .child = c, .formal = formal, .actual = actual, .discipline = zcu.intern_pool.stringToSlice(lower) });
         }
     }
     var dit = digital.keyIterator();
@@ -306,7 +317,8 @@ fn resolveInstance(s: *Sema, kids: []const std.ArrayList(Instance.Index), ooc: *
         if (kept == 0) try gop.value_ptr.append(s.arena, discipline.behavioral);
     }
     for (cands.keys(), cands.values()) |sig, list| {
-        const d = try merge(s, i, list.items) orelse continue;
+        const segs = if (arrivals.get(sig)) |a| a.items else &.{};
+        const d = try merge(s, i, zcu.intern_pool.stringToSlice(sig), segs, list.items) orelse continue;
         try zcu.net_discipline.put(s.gpa, .{ .instance = i, .net = sig }, try zcu.intern_pool.getString(s.gpa, d));
     }
 }
@@ -318,8 +330,11 @@ fn resolveInstance(s: *Sema, kids: []const std.ArrayList(Instance.Index), ooc: *
 /// (exactly, else as a subset; W0950 when several do, the first wins), and
 /// one that `exclude`s them is E0917; with no statement the discipline is
 /// unknown, an error (E0903) when the net also joins the other domain, and
-/// insertion then reads the first candidate.
-fn merge(s: *Sema, i: Instance.Index, list: []const []const u8) Allocator.Error!?[]const u8 {
+/// insertion then reads the first candidate. `net` is the net's name, as
+/// the reports spell it, and `segs` its child segments: E0917 and E0903
+/// point at the first one's port, E0355 at the incompatible one's
+/// connection.
+fn merge(s: *Sema, i: Instance.Index, net: []const u8, segs: []const Arrival, list: []const []const u8) Allocator.Error!?[]const u8 {
     assert(list.len != 0);
     assert(@backingInt(i) < s.zcu.instances.len);
     assert(list.len != 0);
@@ -342,20 +357,29 @@ fn merge(s: *Sema, i: Instance.Index, list: []const []const u8) Allocator.Error!
     if (cands.items.len == 1) return cands.items[0];
     const zcu = s.zcu;
     const file = zcu.instances.items(.module)[@backingInt(i)].file;
+    const at_file = if (segs.len == 0) file else zcu.instances.items(.module)[@backingInt(segs[0].child)].file;
+    const at: Inst.Ref = if (segs.len == 0) .none else segs[0].formal.toRef();
     for ([_]bool{ true, false }) |exact| if (try resolution(s, cands.items, exact, file)) |r| {
         if (r.exclude) {
-            try s.fail(.E0917, file, .none, "the disciplines of a net of `{f}` match `connect ... resolveto exclude`", .{zcu.fmtPath(i)});
+            try s.fail(.E0917, at_file, at, "the disciplines of `{s}` match `connect ... resolveto exclude`", .{net});
             return null;
         }
         return r.result;
     };
     // §3.11 "It shall be an error to connect two ports or nets of the same
     // domain with incompatible disciplines".
-    for (cands.items[1..]) |c| if (!try discipline.compatible(s, cands.items[0], c)) {
-        try s.fail(.E0355, file, .none, "a net of `{f}` joins `{s}` and `{s}`, incompatible disciplines of one domain (§3.11.1)", .{ zcu.fmtPath(i), cands.items[0], c });
+    for (cands.items[1..]) |c| if (try discipline.conflict(s, cands.items[0], c)) |why| {
+        const seg = for (segs) |g| {
+            if (std.mem.eql(u8, g.discipline, c)) break g;
+        } else {
+            try s.fail(.E0355, file, .none, "`{s}` joins `{s}` and `{s}` ({s})", .{ net, cands.items[0], c, why });
+            return cands.items[0];
+        };
+        const cvir = zcu.fileVir(zcu.instances.items(.module)[@backingInt(seg.child)].file);
+        try s.fail(.E0355, file, seg.actual, "port `{f}.{s}` is of discipline `{s}` and is connected to `{s}`, of discipline `{s}` ({s})", .{ zcu.fmtPathBelowRoot(seg.child), portName(cvir, seg.formal), c, net, cands.items[0], why });
         return cands.items[0];
     };
-    if (mixed) try s.fail(.E0903, file, .none, "a net of `{f}` joins {d} {t} disciplines no resolution statement resolves, and a mixed port", .{ zcu.fmtPath(i), cands.items.len, want });
+    if (mixed) try s.fail(.E0903, at_file, at, "`{s}` has candidate disciplines {{`{s}`, `{s}`{s}}} and no matching `resolveto`", .{ net, cands.items[0], cands.items[1], if (cands.items.len > 2) ", ..." else "" });
     return cands.items[0];
 }
 

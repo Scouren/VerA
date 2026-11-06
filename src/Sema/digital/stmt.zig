@@ -425,6 +425,9 @@ fn process(l: *Lower, p: Proc) Error!u32 {
             if (n.dims.len != 0) return l.reject(p.frame, p.inst.toRef(), "an unpacked array declaration takes no initializer");
             if (n.kind != .variable) return l.refuse("an initialized net port");
             const init = vir.body(init_body);
+            // §6.2.1: "The assignment shall be to a constant expression."
+            if (try @import("constness.zig").offender(l, vir, init[init.len - 1].toRef(), false) != null)
+                return l.reject(p.frame, init[init.len - 1].toRef(), "§6.2.1: a constant expression is required here");
             _ = try l.b.inst(.init_var, n.slot, try expr.evalFor(l, init[init.len - 1].toRef(), n.ty), scope);
             _ = try l.b.inst(.stop, 0, 0, scope);
         },

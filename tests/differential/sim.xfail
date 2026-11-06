@@ -6,14 +6,7 @@
 # line goes.
 verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v old run failed (E1100: §3.8: an attribute value must be a constant expression), new run completed
 verilog/03_lexical_conventions/escaped_system_task_rejected.v lowering: a hierarchical task or function name
-verilog/04_data_types/nonconstant_declaration_assignment_rejected.v old run failed (E1100: §6.2.1: a constant expression is required here), new run completed
-verilog/04_data_types/parameter_assigned_specify_block_specparam_rejected.v lowering: a name declared by `param` that has no slot
-verilog/04_data_types/parameter_assigned_specparam_rejected.v old run failed (E1100: §4.10.3: a module parameter cannot be assigned an expression that includes a specify parameter), new run completed
-verilog/04_data_types/parameter_from_variable_rejected.v old run failed (E1100: §4.10.1: a parameter's value is a constant expression of numbers and previously defined parameters, and this name is neither), new run completed
-verilog/04_data_types/port_list_body_parameter_override_rejected.v old run failed (E1100: §12.2: `Q` is a local parameter, which a defparam cannot override), new run completed
-verilog/04_data_types/specparam_before_declaration_rejected.v old run failed (E1100: §4.10.3: a specify parameter is declared before it is referenced), new run completed
 verilog/04_data_types/type_uwire_multiple_drivers_rejected.v old run failed (E1100: a uwire net accepts a single driver per bit), new run completed
-verilog/05_expressions/constant_time_rejected.v old run failed (E1100: a constant expression is required here), new run completed
 verilog/05_expressions/native_wide_index_bound_limit.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
 verilog/07_gate_switch_level/split_array_rejected.v old run failed (E1100: §7.1.5: `t_nand` names two instances; one instance identifier has one range), new run completed
 verilog/10_tasks_functions/constant_function_hierarchical_rejected.v old run failed (E1100: §10.4.5: a function called during elaboration is a constant function, and it contains a hierarchical reference), new run completed
@@ -21,9 +14,7 @@ verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v old run f
 verilog/12_hierarchy/defparam_across_generate_instances_rejected.v old run failed (E1100: §12.2.1: a defparam inside `somename[0]` cannot change a parameter outside the generate block instance or array element it is in), new run completed
 verilog/12_hierarchy/defparam_early_resolution_rejected.v old E1100 at byte 87: §12.8.2: this defparam's hierarchical name was resolved before the hierarchy was complete and would resolve differently once it is; new E0907 at byte 87: elaboration refuses it (E0907)
 verilog/12_hierarchy/defparam_names_nothing_rejected.v old E0901 at byte 121: §12.2.1: this defparam's hierarchical name `foo` names nothing in the design; new E0907 at byte 121: elaboration refuses it (E0907)
-verilog/12_hierarchy/defparam_nonconstant_rejected.v old run failed (E1100: a constant expression is required here), new run completed
 verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v old E1100 at byte 126: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element it is in; new E0907 at byte 126: elaboration refuses it (E0907)
-verilog/12_hierarchy/localparam_override_rejected.v old run failed (E1100: §12.2: `LP` is a local parameter, which a defparam cannot override), new run completed
 verilog/12_hierarchy/port_width_mismatch_vams_rejected.v old run failed (E1100: §6.5.7.1: the sizes of the port and the net connected to it shall match), new run completed
 verilog/12_hierarchy/real_connected_to_port_rejected.v old run failed (E1100: §12.3.7: a real cannot be connected to a port), new run completed
 verilog/12_hierarchy/unnamed_block_referenced_rejected.v old run failed (E1100: undeclared instance in a hierarchical reference), new run completed

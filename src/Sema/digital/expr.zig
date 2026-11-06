@@ -448,7 +448,14 @@ fn boundBefore(l: *Lower, i: Inst.Index, d: Inst.Index) Error!void {
         steps += 1;
         assert(steps <= l.frames.items.len);
         const row = l.frames.items[f].names.get(d) orelse continue;
-        const at = l.bound_at.get(.{ .frame = f, .decl = @import("../decl.zig").canonical(l.virOf(f), d) }) orelse return;
+        const vir = l.virOf(f);
+        const first = @import("../decl.zig").canonical(vir, d);
+        // §4.10.3 a specify parameter is declared before it is referenced.
+        if (Lower.tag(vir, first) == .param and Lower.payload(vir, Inst.Param, first).flags.kind == .specparam) {
+            if (l.srcOffset(f, first) > l.srcOffset(l.frame, i)) return l.reject(l.frame, i.toRef(), "§4.10.3: a specify parameter is declared before it is referenced");
+            return;
+        }
+        const at = l.bound_at.get(.{ .frame = f, .decl = first }) orelse return;
         if (at <= l.srcOffset(l.frame, i)) return;
         if (l.names.items[row].kind == .event) return l.reject(l.frame, i.toRef(), "§9.7.3: a named event is declared before it is used");
         return l.reject(l.frame, i.toRef(), "a name is used before its declaration");

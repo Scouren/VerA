@@ -46,6 +46,8 @@ pub const TranRow = struct {
 
 /// Gate-level instance `i` of frame `f`, by its keyword.
 pub fn instance(l: *Lower, f: u32, i: Inst.Index) Error!void {
+    l.sink_use = .gate;
+    defer l.sink_use = .assign;
     const vir = l.virOf(f);
     const in = Lower.payload(vir, Inst.Instance, i);
     const saved = l.frame;
@@ -83,6 +85,8 @@ pub fn instance(l: *Lower, f: u32, i: Inst.Index) Error!void {
 /// one driver of its output net per instance, valued by the UDP's table.
 /// A.5.4: its `#( )` is a `delay2`.
 pub fn udp(l: *Lower, f: u32, i: Inst.Index, d: Zcu.Decl) Error!void {
+    l.sink_use = .gate;
+    defer l.sink_use = .assign;
     const vir = l.virOf(f);
     const in = Lower.payload(vir, Inst.Instance, i);
     const pvir = l.zcu.fileVir(d.file);

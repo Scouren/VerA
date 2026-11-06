@@ -28,6 +28,9 @@ const Inst = Vir.Inst;
 /// A target's slot and, for a select of a vector net, its bits.
 const Target = struct { slot: u32, lo: u32 = 0, width: u32 = 0, net: bool, slot_width: u32 };
 
+/// §9.3.1's refusal of an `assign` or `deassign` of a net.
+const net_assign = "§9.3.1: assign/deassign take a variable; a net is forced";
+
 /// §9.3 procedural continuous assignment statement `i`.
 pub fn statement(l: *Lower, i: Inst.Index) Error!void {
     if (l.in_function) return l.refuse("§10.4.4 a procedural continuous assignment in a function");
@@ -51,12 +54,15 @@ pub fn statement(l: *Lower, i: Inst.Index) Error!void {
         var lo = of;
         for (ops) |x| {
             const t = try target(l, x);
+            if (!force and t.net) return l.reject(l.frame, x, net_assign);
             lo -= widthOf(t);
             try override(l, t, value, force, lo, of);
         }
         return;
     }
-    try override(l, try target(l, lhs), value, force, 0, 0);
+    const t = try target(l, lhs);
+    if (!force and t.net) return l.reject(l.frame, lhs, net_assign);
+    try override(l, t, value, force, 0, 0);
 }
 
 // ---- private ----

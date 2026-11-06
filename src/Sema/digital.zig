@@ -184,6 +184,9 @@ pub const Lower = struct {
     why_at: u32 = none,
     /// `reject`'s code: set before a `reject` whose rule has its own.
     why_code: vams.Diag.Code = .E1100,
+    /// What a `nets.sink` lvalue is driven by, for lib/sim/digital's
+    /// message when it is no net: set by a gate's or a port's caller.
+    sink_use: enum { assign, gate, port } = .assign,
     /// VAMS §7.3.5 a mixed design's analog events (`Program.monitors`).
     monitors: std.ArrayList(Program.A2d) = .empty,
     /// VAMS §7.8 each bridge's segment net, by its `Zcu.instances` row,
@@ -274,7 +277,7 @@ pub const Lower = struct {
     implicit: std.AutoHashMapUnmanaged(Implicit, u32) = .empty,
 
     /// A.6.5 a `disable` at pc `pc` of the name `name`, written in frame `frame`.
-    pub const Disable = struct { pc: u32, frame: u32, name: []const u8 };
+    pub const Disable = struct { pc: u32, frame: u32, name: []const u8, inst: Inst.Index };
 
     /// A parameter `Sema/eval.zig` does not fold: its slot and type, its
     /// final value expression and the frame it is written in, and once

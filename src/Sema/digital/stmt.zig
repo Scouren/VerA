@@ -171,7 +171,7 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
                 _ = try l.b.inst(.trigger_elem, try place.elemRow(l, s), 0, scope);
                 return;
             };
-            const n = (try expr.nameOf(l, r)) orelse return l.refuse("a trigger of no named event");
+            const n = (try expr.nameOf(l, r)) orelse return l.reject(l.frame, r, "§9.7.3: an event array takes an index, not a part-select");
             if (n.kind != .event) return l.refuse("§5.10.4 `->` of a variable or net");
             _ = try l.b.inst(.trigger, n.slot, 0, scope);
         },
@@ -197,7 +197,7 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
                 else => return l.refuse("a disable of a hierarchical name"),
             };
             const at = try l.b.inst(.disable_block, 0, 0, scope);
-            try l.disables.append(l.a, .{ .pc = at, .frame = l.frame, .name = name });
+            try l.disables.append(l.a, .{ .pc = at, .frame = l.frame, .name = name, .inst = i });
         },
         .ret, .brk, .cont => return l.refuse("return, break or continue"),
         .variable, .param, .event => {},

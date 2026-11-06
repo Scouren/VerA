@@ -285,7 +285,7 @@ pub fn selectOf(l: *Lower, i: Inst.Index) Error!Sel {
         x = b.lhs;
     }
     const base = x.toIndex().?;
-    if (Lower.tag(vir, base) != .decl_ref and Lower.tag(vir, base) != .str_ref and Lower.tag(vir, base) != .field) return l.refuse("a select of an expression");
+    if (Lower.tag(vir, base) != .decl_ref and Lower.tag(vir, base) != .str_ref and Lower.tag(vir, base) != .field) return l.reject(l.frame, i.toRef(), "a select is of a whole vector or an unpacked array element");
     const n = try expr.leafName(l, base);
     if (n.kind == .sub or n.kind == .scope) return l.refuse("a select of a task, function or scope");
     const dims = n.dims.len;

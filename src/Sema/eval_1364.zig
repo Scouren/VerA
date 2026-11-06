@@ -369,7 +369,9 @@ pub const Eval = struct {
                     .time => .{ .width = 64, .signed = false },
                     .real, .realtime => .{ .width = 64, .signed = true, .real = true },
                     .string => null,
-                    .none, .reg => if (try e.env.param(d)) |c| switch (c) {
+                    // §12.2 "the type of the final value assigned": the
+                    // default's own, while the value is still the default's.
+                    .none, .reg => if (try e.defaultType(d, p)) |t| t else if (try e.env.param(d)) |c| switch (c) {
                         .real => .{ .width = 64, .signed = true, .real = true },
                         .int => |v| .{ .width = if (std.math.cast(i32, v) != null) 32 else 64, .signed = true },
                         .str => |s| .{ .width = @intCast(@max(1, s.len) * 8), .signed = false },
@@ -383,6 +385,21 @@ pub const Eval = struct {
             },
             else => null, // else: a net, variable or scope has no elaboration value
         };
+    }
+
+    /// Untyped parameter `d`'s default's integral type when its folded
+    /// value is the default's value (no override changed it), else null.
+    fn defaultType(e: *Eval, d: Inst.Index, p: Inst.Param) Allocator.Error!?Type {
+        const b = e.vir().body(p.value);
+        if (b.len == 0) return null;
+        const t = (try e.typeOf(b[b.len - 1].toRef())) orelse return null;
+        if (t.real) return null;
+        const c = (try e.env.param(d)) orelse return null;
+        if (c != .int) return null;
+        const own = (try e.self(b[b.len - 1].toRef())) orelse return null;
+        const v = own.asExactInt() orelse return null;
+        if (v != c.int) return null;
+        return .{ .width = t.width, .signed = t.signed or p.flags.signed };
     }
 
     /// The value the name declaration `d` reads, in its type.

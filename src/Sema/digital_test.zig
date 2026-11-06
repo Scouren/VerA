@@ -163,6 +163,13 @@ fn rejection(a: std.mem.Allocator, src: []const u8) !digital.Why {
     return error.TestExpectedError;
 }
 
+/// The slot `name` (its first) declares in `lowered`, or a test failure.
+fn slotNamed(lowered: *const digital.Lowered, name: []const u8) !u32 {
+    for (lowered.slot_names, 0..) |n, k| if (std.mem.eql(u8, n, name)) return @intCast(k);
+    std.debug.print("no slot named `{s}`\n", .{name});
+    return error.TestUnexpectedResult;
+}
+
 fn isMultiArrayList(comptime T: type) bool {
     return @typeInfo(T) == .@"struct" and @hasDecl(T, "Field") and @hasDecl(T, "Slice");
 }
@@ -787,4 +794,59 @@ test "§12.2 the backends' tables: one spec per (module, parameters), each scope
     try std.testing.expectEqual(@as(u32, 1), initials);
     try std.testing.expectEqual(@as(u32, 3), always);
     try std.testing.expectEqual(@as(u32, 1), drivers);
+}
+
+test "§12.2/A.1.3/§5.5 the netlist tables: each slot's scope and declared range, each scope's instance, each instance's ports and spec, a port's header position, a spec's defaults" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    // By hand: `leaf(a, , , y)` puts y at position 4; `d` has no override,
+    // `e` a `#(2)` and `f` a defparam; `NIB - 4'd4` is 4 bits wide (§5.5:
+    // self-determined, max(4, 4)), so 3 - 4 is 4'hf and `u` is [15:0].
+    const src =
+        \\module top; wire i, o1, o2, o3; wire [-2:5] asc; wire [4:-3] desc;
+        \\  localparam NIB = 4'd3; wire [NIB - 4'd4 : 0] u;
+        \\  leaf d(i, , , o1); leaf #(2) e(i, , , o2); leaf f(i, , , o3);
+        \\  defparam f.P = 3;
+        \\endmodule
+        \\module leaf(a, , , y); parameter P = 1; input a; output y; reg [P:0] r; assign y = a; endmodule
+        \\
+    ;
+    const lowered = try lowerSource(arena_state.allocator(), src, false);
+    const p = &lowered.program;
+    try std.testing.expectEqual(p.slots.len, lowered.slot_scope.len);
+    try std.testing.expectEqual(p.slots.len, lowered.slot_msb.len);
+    try std.testing.expectEqual(p.slots.len, lowered.slot_lsb.len);
+    try std.testing.expectEqual(p.scopes.len, lowered.scope_instance.len);
+    // Ranges as declared, reversed and negative ones kept.
+    const asc = try slotNamed(&lowered, "asc");
+    try std.testing.expect(lowered.slot_msb[asc] == -2 and lowered.slot_lsb[asc] == 5);
+    const desc = try slotNamed(&lowered, "desc");
+    try std.testing.expect(lowered.slot_msb[desc] == 4 and lowered.slot_lsb[desc] == -3);
+    const u = try slotNamed(&lowered, "u");
+    try std.testing.expect(lowered.slot_msb[u] == 15 and lowered.slot_lsb[u] == 0);
+    try std.testing.expectEqual(Program.Ty.int(16, false), p.slots.items(.ty)[u]);
+    // `top`'s slots are in the root scope, row 0 of instance 0.
+    try std.testing.expectEqual(@as(u32, 0), lowered.slot_scope[asc]);
+    try std.testing.expectEqual(@as(u32, 0), lowered.scope_instance[0]);
+    // Instances in `Zcu.instances` order: top, d, e, f.
+    try std.testing.expectEqual(@as(usize, 4), lowered.instance_ports.len);
+    try std.testing.expectEqual(@as(usize, 4), lowered.instance_spec.len);
+    for (lowered.instance_ports[1..]) |ports| {
+        try std.testing.expectEqual(@as(usize, 2), ports.len);
+        try std.testing.expectEqual(@as(u32, 1), ports[0].position);
+        try std.testing.expectEqualStrings("y", ports[1].name);
+        try std.testing.expectEqual(@as(u32, 4), ports[1].position);
+    }
+    // Each leaf's `r` sits in its own instance's scope.
+    for (p.slots.items(.ty), 0..) |_, k| if (std.mem.eql(u8, lowered.slot_names[k], "r")) {
+        const inst = lowered.scope_instance[lowered.slot_scope[k]];
+        try std.testing.expect(inst >= 1 and inst <= 3);
+    };
+    // Specs: top, leaf P=1 (d: defaults), leaf P=2 (e), leaf P=3 (f).
+    const spec = lowered.specs;
+    try std.testing.expectEqual(@as(usize, 4), spec.len);
+    try std.testing.expect(spec[lowered.instance_spec[0]].defaults);
+    try std.testing.expect(spec[lowered.instance_spec[1]].defaults);
+    try std.testing.expect(!spec[lowered.instance_spec[2]].defaults);
+    try std.testing.expect(!spec[lowered.instance_spec[3]].defaults);
 }

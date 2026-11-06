@@ -10,13 +10,14 @@
 //! - `pub fn ports(l: *Lower, k: u32) Error![]const digital.Port`
 //! - `pub fn topAt(l: *const Lower) u32`
 //! - `pub fn specs(l: *Lower) Error!Specs`, `pub const Specs = struct`
-//! - `pub fn slotNames(l: *Lower, n: usize) Error!SlotNames`, `pub const SlotNames = struct`
+//! - `pub fn slotNames(l: *Lower, tys: []const std_sim.Program.Ty) Error!SlotNames`, `pub const SlotNames = struct`
 
 const std = @import("std");
 const assert = std.debug.assert;
 const vams = @import("vams");
 const digital = @import("../digital.zig");
 const decl = @import("../decl.zig");
+const std_sim = @import("std_sim");
 const Zcu = @import("../../Zcu.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
@@ -24,10 +25,16 @@ const Vir = vams.Vir;
 const Inst = Vir.Inst;
 
 /// `Lowered.specs` and `Lowered.scope_spec`.
-pub const Specs = struct { rows: []const digital.Spec, of_scope: []const u32 };
+pub const Specs = struct {
+    rows: []const digital.Spec,
+    of_scope: []const u32,
+    of_instance: []const u32,
+    scope_instance: []const u32,
+    instance_ports: []const []const digital.Port,
+};
 
 /// `Lowered.slot_names` and `Lowered.slot_at`.
-pub const SlotNames = struct { names: []const []const u8, at: []const u32 };
+pub const SlotNames = struct { names: []const []const u8, at: []const u32, scope: []const u32, msb: []const i64, lsb: []const i64 };
 
 /// Instance `k`'s ports (a `Zcu.instances` row), in its list of ports'
 /// order; a port that names no one declaration with a direction is left out.
@@ -37,7 +44,7 @@ pub fn ports(l: *Lower, k: u32) Error![]const digital.Port {
     const vir = l.virOf(f);
     const m = Lower.payload(vir, Inst.Module, l.zcu.declRow(l.zcu.instances.items(.module)[k]).inst);
     var out: std.ArrayList(digital.Port) = .empty;
-    for (vir.body(m.ports)) |formal| {
+    for (vir.body(m.ports), 1..) |formal, position| {
         const first: Inst.Index, const name: []const u8 = switch (Lower.tag(vir, formal)) {
             .io => .{ decl.canonical(vir, formal), vir.string(Lower.payload(vir, Inst.Io, formal).name) },
             .port => blk: {
@@ -77,6 +84,7 @@ pub fn ports(l: *Lower, k: u32) Error![]const digital.Port {
         const n: ?digital.Name = if (l.lookup(f, first)) |at| l.names.items[at] else null;
         try out.append(l.a, .{
             .name = name,
+            .position = @intCast(position),
             .dir = switch (d) {
                 .input => .input,
                 .output => .output,
@@ -115,44 +123,85 @@ pub fn specs(l: *Lower) Error!Specs {
     var rows: std.ArrayList(digital.Spec) = .empty;
     var by_key: std.AutoHashMapUnmanaged(Zcu.Instance.Key, u32) = .empty;
     const of_instance = try l.a.alloc(u32, n);
+    const instance_ports = try l.a.alloc([]const digital.Port, n);
     for (0..n) |k| {
         const key: Zcu.Instance.Key = .{ .module = zcu.instances.items(.module)[k], .params = zcu.instances.items(.params)[k] };
+        instance_ports[k] = try ports(l, @intCast(k));
         const gop = try by_key.getOrPut(l.a, key);
         if (!gop.found_existing) {
             gop.value_ptr.* = @intCast(rows.items.len);
             const vir = zcu.fileVir(key.module.file);
-            try rows.append(l.a, .{ .module = vir.string(zcu.declRow(key.module).name), .key = key, .instance = @intCast(k), .ports = try ports(l, @intCast(k)) });
+            try rows.append(l.a, .{ .module = vir.string(zcu.declRow(key.module).name), .key = key, .instance = @intCast(k), .ports = instance_ports[k], .defaults = false });
         }
+        // Equal values: one instance without an override shows them defaults.
+        if (!overridden(l, @intCast(k))) rows.items[gop.value_ptr.*].defaults = true;
         of_instance[k] = gop.value_ptr.*;
     }
     const of_scope = try l.a.alloc(u32, l.b.scopes.items.len);
+    const scope_instance = try l.a.alloc(u32, l.b.scopes.items.len);
     @memset(of_scope, digital.none);
-    for (l.frames.items) |fr| of_scope[fr.scope] = of_instance[@backingInt(fr.instance)];
+    @memset(scope_instance, digital.none);
+    for (l.frames.items) |fr| {
+        of_scope[fr.scope] = of_instance[@backingInt(fr.instance)];
+        scope_instance[fr.scope] = @backingInt(fr.instance);
+    }
     assert(rows.items.len <= n);
-    return .{ .rows = rows.items, .of_scope = of_scope };
+    return .{ .rows = rows.items, .of_scope = of_scope, .of_instance = of_instance, .scope_instance = scope_instance, .instance_ports = instance_ports };
 }
 
-/// Per slot of `n`, the name and source offset of the first declaration
-/// bound to it (`Lower.declared`), then of the implicit net it is.
-pub fn slotNames(l: *Lower, n: usize) Error!SlotNames {
+/// Per slot of `n` (of types `tys`), the name, source offset, scope and
+/// declared `[msb:lsb]` of the first declaration bound to it
+/// (`Lower.declared`), then of the implicit net it is; a cell no
+/// declaration names keeps "", `none`, `none` and `width - 1 : 0`.
+pub fn slotNames(l: *Lower, tys: []const std_sim.Program.Ty) Error!SlotNames {
+    const n = tys.len;
     const names = try l.a.alloc([]const u8, n);
     const at = try l.a.alloc(u32, n);
+    const scope = try l.a.alloc(u32, n);
+    const msb = try l.a.alloc(i64, n);
+    const lsb = try l.a.alloc(i64, n);
     @memset(names, "");
     @memset(at, digital.none);
+    @memset(scope, digital.none);
+    for (msb, lsb, tys) |*m, *s, t| {
+        m.* = @as(i64, t.width) - 1;
+        s.* = 0;
+    }
     for (l.declared.items) |d| {
         assert(d.slot + d.count <= n);
         const vir = l.virOf(d.frame);
-        if (Inst.dataKind(Lower.tag(vir, d.decl)) != .pl_node) continue;
-        const name = vir.string(decl.nameOf(vir, d.decl));
-        for (names[d.slot..][0..d.count], at[d.slot..][0..d.count]) |*nm, *o| if (nm.len == 0) {
-            nm.* = name;
-            o.* = l.srcOffset(d.frame, d.decl);
+        const named = Inst.dataKind(Lower.tag(vir, d.decl)) == .pl_node;
+        for (d.slot..d.slot + d.count) |k| if (scope[k] == digital.none) {
+            scope[k] = l.frames.items[d.frame].scope;
+            msb[k] = d.msb;
+            lsb[k] = d.lsb;
+            if (!named) continue;
+            names[k] = vir.string(decl.nameOf(vir, d.decl));
+            at[k] = l.srcOffset(d.frame, d.decl);
         };
     }
     var it = l.implicit.iterator();
     while (it.next()) |e| {
         const slot = l.names.items[e.value_ptr.*].slot;
-        if (names[slot].len == 0) names[slot] = l.virOf(e.key_ptr.frame).string(e.key_ptr.name);
+        if (scope[slot] != digital.none) continue;
+        names[slot] = l.virOf(e.key_ptr.frame).string(e.key_ptr.name);
+        scope[slot] = l.frames.items[e.key_ptr.frame].scope;
     }
-    return .{ .names = names, .at = at };
+    return .{ .names = names, .at = at, .scope = scope, .msb = msb, .lsb = lsb };
+}
+
+// ---- private ----
+
+/// Whether an override reached instance `k`: a `#(...)` on its instance,
+/// a §6.3.1 defparam, or a §6.4 paramset.
+fn overridden(l: *const Lower, k: u32) bool {
+    const zcu = l.zcu;
+    if (zcu.instances.items(.paramset)[k].file != Zcu.Decl.none.file) return true;
+    for (zcu.defparams.keys()) |d| if (@backingInt(d.instance) == k) return true;
+    const parent = zcu.instances.items(.parent)[k];
+    if (parent == .none) return false;
+    const src = zcu.instances.items(.src)[k].toIndex() orelse return false;
+    const vir = zcu.fileVir(zcu.instances.items(.module)[@backingInt(parent)].file);
+    if (Lower.tag(vir, src) != .instance) return false;
+    return Lower.payload(vir, Inst.Instance, src).params.len != 0;
 }

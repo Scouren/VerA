@@ -155,6 +155,52 @@ pub fn compileTrans(l: *Lower) Error!void {
     assert(out.len == l.trans.items.len);
 }
 
+/// §8.1.2/§8.1.3 every UDP declaration's own rules, instantiated or not,
+/// as lib/sim/digital checks them before elaborating: a sequential UDP's
+/// output is a reg and a combinational one's is not; an `initial`
+/// statement assigns the output a one-bit literal.
+pub fn checkUdps(l: *Lower) Error!void {
+    for (0..l.zcu.files.len) |fi| {
+        const vir = l.zcu.fileVir(@fromBackingInt(@intCast(fi)));
+        const tree = l.options.sources[fi].tree;
+        for (vir.decls()) |d| {
+            if (d.kind != .primitive) continue;
+            const prim = Lower.payload(vir, Inst.Primitive, d.inst);
+            l.why_at = tree.tokenStart(tree.nodeMainToken(vir.instructions.items(.data)[@backingInt(d.inst)].pl_node.src_node));
+            const ports_ = vir.list(Vir.String, prim.ports);
+            assert(ports_.len != 0);
+            const has_reg = for (vir.body(prim.body)) |i| switch (Lower.tag(vir, i)) {
+                .variable => break true,
+                .io => if (Lower.payload(vir, Inst.Io, i).flags.storage == .reg) break true,
+                else => {}, // else: no reg declaration
+            } else false;
+            if (prim.flags.sequential and !has_reg) return refuseAt(l, "§8.1.2: a sequential UDP's output needs a reg declaration");
+            if (!prim.flags.sequential and has_reg) return refuseAt(l, "§8.1.2: a combinational UDP cannot contain a reg declaration");
+            const b = vir.body(prim.init);
+            if (b.len == 0 or Lower.tag(vir, b[b.len - 1]) != .store) continue;
+            const st = Lower.payload(vir, Inst.Bin, b[b.len - 1]);
+            const target = st.lhs.toIndex() orelse continue;
+            const name: Vir.String = switch (Lower.tag(vir, target)) {
+                .decl_ref => @import("../decl.zig").nameOf(vir, vir.instructions.items(.data)[@backingInt(target)].decl_tok.decl),
+                .str_ref => vir.instructions.items(.data)[@backingInt(target)].str_tok.start,
+                else => continue, // else: no name to compare
+            };
+            if (name != ports_[0]) return refuseAt(l, "§8.1.3: a UDP initial statement assigns the output");
+            const v = st.rhs.toIndex() orelse continue;
+            // A sized literal wider than one bit (`2'b01`).
+            if (Lower.tag(vir, v) == .big_int and Lower.payload(vir, Inst.BigInt, v).size > 1) {
+                // At the literal: the token after the statement's `=`.
+                var t = tree.nodeMainToken(vir.instructions.items(.data)[@backingInt(b[b.len - 1])].pl_node.src_node);
+                const end: vams.Ast.TokenIndex = @intCast(tree.tokens.len - 1);
+                while (t < end and tree.tokenTag(t) != .equal) t += 1;
+                l.why_at = tree.tokenStart(t + 1);
+                l.why = "§8.1.3: a UDP initial value is a single-bit literal";
+                return error.Rejected;
+            }
+        }
+    }
+}
+
 // ---- private ----
 
 /// A primitive's terminals, by position, none left open.
@@ -236,52 +282,6 @@ fn initial(l: *Lower, pvir: *const Vir, prim: Inst.Primitive) Error!std_sim.logi
         },
         else => l.refuse("a UDP initial value other than a literal"),
     };
-}
-
-/// §8.1.2/§8.1.3 every UDP declaration's own rules, instantiated or not,
-/// as lib/sim/digital checks them before elaborating: a sequential UDP's
-/// output is a reg and a combinational one's is not; an `initial`
-/// statement assigns the output a one-bit literal.
-pub fn checkUdps(l: *Lower) Error!void {
-    for (0..l.zcu.files.len) |fi| {
-        const vir = l.zcu.fileVir(@fromBackingInt(@intCast(fi)));
-        const tree = l.options.sources[fi].tree;
-        for (vir.decls()) |d| {
-            if (d.kind != .primitive) continue;
-            const prim = Lower.payload(vir, Inst.Primitive, d.inst);
-            l.why_at = tree.tokenStart(tree.nodeMainToken(vir.instructions.items(.data)[@backingInt(d.inst)].pl_node.src_node));
-            const ports_ = vir.list(Vir.String, prim.ports);
-            assert(ports_.len != 0);
-            const has_reg = for (vir.body(prim.body)) |i| switch (Lower.tag(vir, i)) {
-                .variable => break true,
-                .io => if (Lower.payload(vir, Inst.Io, i).flags.storage == .reg) break true,
-                else => {}, // else: no reg declaration
-            } else false;
-            if (prim.flags.sequential and !has_reg) return refuseAt(l, "§8.1.2: a sequential UDP's output needs a reg declaration");
-            if (!prim.flags.sequential and has_reg) return refuseAt(l, "§8.1.2: a combinational UDP cannot contain a reg declaration");
-            const b = vir.body(prim.init);
-            if (b.len == 0 or Lower.tag(vir, b[b.len - 1]) != .store) continue;
-            const st = Lower.payload(vir, Inst.Bin, b[b.len - 1]);
-            const target = st.lhs.toIndex() orelse continue;
-            const name: Vir.String = switch (Lower.tag(vir, target)) {
-                .decl_ref => @import("../decl.zig").nameOf(vir, vir.instructions.items(.data)[@backingInt(target)].decl_tok.decl),
-                .str_ref => vir.instructions.items(.data)[@backingInt(target)].str_tok.start,
-                else => continue, // else: no name to compare
-            };
-            if (name != ports_[0]) return refuseAt(l, "§8.1.3: a UDP initial statement assigns the output");
-            const v = st.rhs.toIndex() orelse continue;
-            // A sized literal wider than one bit (`2'b01`).
-            if (Lower.tag(vir, v) == .big_int and Lower.payload(vir, Inst.BigInt, v).size > 1) {
-                // At the literal: the token after the statement's `=`.
-                var t = tree.nodeMainToken(vir.instructions.items(.data)[@backingInt(b[b.len - 1])].pl_node.src_node);
-                const end: vams.Ast.TokenIndex = @intCast(tree.tokens.len - 1);
-                while (t < end and tree.tokenTag(t) != .equal) t += 1;
-                l.why_at = tree.tokenStart(t + 1);
-                l.why = "§8.1.3: a UDP initial value is a single-bit literal";
-                return error.Rejected;
-            }
-        }
-    }
 }
 
 fn refuseAt(l: *Lower, comptime msg: []const u8) error{Rejected} {

@@ -10,7 +10,7 @@
 //! (connect modules at a digital port).
 //!
 //! Contents:
-//! - `pub const Port = struct`
+//! - `pub const Port = struct` (`Port.no_slot`)
 //! - `pub fn deviceRefusal(program: *const std_sim.Program, ports: []const Port) ?[]const u8`
 //! - `pub fn writeDevice(w: *std.Io.Writer, arena: Allocator, program: *const std_sim.Program, ports: []const Port) (Allocator.Error || std.Io.Writer.Error)!void`
 //! - `pub fn writeExe(w: *std.Io.Writer, arena: Allocator, program: *const std_sim.Program, sources: []const std_sim.exe.Source, sites: []const Diag.Loc, budget: u64) (Allocator.Error || std.Io.Writer.Error)!void`
@@ -41,12 +41,13 @@ pub const Port = struct {
 
 /// Why `program` with top ports `ports` is no contract device (E1103's
 /// text), or null. The old device's refusals that hold for a device over
-/// the interpreter, in its order: a §7.6 pass switch, a file the run
-/// would read (§17.2.9, §17.2.10), §15 timing checks (a device has nowhere
-/// to report W1199), then the ports.
+/// the interpreter, in its order: a §7.6 pass switch, §15 timing checks (a
+/// device has nowhere to report W1199), a file the run would read
+/// (§17.2.9, §17.2.10), then the ports.
 pub fn deviceRefusal(program: *const std_sim.Program, ports: []const Port) ?[]const u8 {
     const P = std_sim.Program;
     if (program.trans.len != 0) return "a §7.6 pass switch";
+    if (program.checks.len != 0) return "IEEE 1364-2005 §15 timing checks";
     for (program.insts.items(.tag), program.insts.items(.data)) |tag, d| {
         if (tag != .task) continue;
         switch (program.extraData(P.Task, d.a).kind) {
@@ -56,7 +57,6 @@ pub fn deviceRefusal(program: *const std_sim.Program, ports: []const Port) ?[]co
             else => {},
         }
     }
-    if (program.checks.len != 0) return "IEEE 1364-2005 §15 timing checks";
     var pins: u64 = 0;
     for (ports) |p| {
         if (p.dir == .inout) return "an inout port: the analog side would drive a §7.9 resolved net";

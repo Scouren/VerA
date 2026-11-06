@@ -351,10 +351,6 @@ fn digitalDevice(comp: *Compilation) !?Job {
 
 /// The root's ports as the device reads them (`Lowered.ports`).
 fn topPorts(comp: *Compilation) ![]const codegen_mod.digital_next.Port {
-    const L = sema.digital.Lowered;
-    // ponytail: until rw-dlower's `Lowered.ports` lands, a design reads as
-    // having no ports.
-    if (!@hasField(L, "ports")) return &.{};
     const l = &comp.lowered.?;
     const out = try comp.arena().alloc(codegen_mod.digital_next.Port, l.ports.len);
     for (out, l.ports) |*o, p| o.* = .{ .name = p.name, .dir = switch (p.dir) {
@@ -368,7 +364,6 @@ fn topPorts(comp: *Compilation) ![]const codegen_mod.digital_next.Port {
 /// Where the device's diagnostics point: the root module's `module`
 /// keyword (`Lowered.top_at`).
 fn topLoc(comp: *Compilation) vams.Diag.Loc {
-    if (!@hasField(sema.digital.Lowered, "top_at")) return .none;
     const at = comp.lowered.?.top_at;
     return errors.relocate(comp.pp.output(), at, at);
 }

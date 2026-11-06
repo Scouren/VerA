@@ -40,7 +40,7 @@ pub fn callTimed(s: *State, a: Allocator, at: u32, pc: u32) Error!u32 {
         const arg = p.extraData(Program.Arg, c.args.start + @as(u32, @intCast(4 * k)));
         in.* = if (arg.in == none) null else try calls.copy(a, try eval.eval(s, a, arg.in));
     }
-    if (s.acts.items.len == 0) try s.acts.append(s.arena, undefined); // 0 is "no activation"
+    if (s.acts.items.len == 0) try s.acts.append(s.arena, .{ .sub = 0, .ret_pc = 0, .ret_ctx = 0, .call = 0 }); // 0 is "no activation"; defined, as `Device` copies every row
     const act: State.Act = .{ .sub = c.sub, .ret_pc = pc + 1, .ret_ctx = s.ctx, .call = at };
     const id: u32 = if (s.free_acts.pop()) |k| blk: {
         s.acts.items[k] = act;

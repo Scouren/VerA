@@ -10,20 +10,23 @@
 //! No LRM clause: this checks VerA's rewrite against VerA.
 //!
 //! Contents:
-//! - `pub fn agrees(arena: Allocator, io: Io, env: *const std.process.Environ.Map, exe_new: []const u8, repo: []const u8, args: []const []const u8, work: []const u8) !?[]const u8`
+//! - `pub fn agrees(arena: Allocator, io: Io, env: *const std.process.Environ.Map, exe_new: []const u8, repo: []const u8, args: []const []const u8, work: []const u8, reject: bool) !?[]const u8`
 
 const std = @import("std");
 const assert = std.debug.assert;
 const Io = std.Io;
 const Allocator = std.mem.Allocator;
 
+/// One child's exit status and output.
+const Out = struct { status: u8, stdout: []const u8, stderr: []const u8 };
+
 /// How long each child (the emit, the host's build, its run, `--run`) may take.
 const timeout_s = 300;
 
 /// Null when the device built from the fixture's `--check` command line
 /// `args` (its first argument the flag) runs the design as `--run` does,
-/// else why not. `work` is created fresh and removed after.
-pub fn agrees(arena: Allocator, io: Io, env: *const std.process.Environ.Map, exe_new: []const u8, repo: []const u8, args: []const []const u8, work: []const u8) !?[]const u8 {
+/// and, for a `reject` fixture, `--run` fails; else why not. `work` is created fresh and removed after.
+pub fn agrees(arena: Allocator, io: Io, env: *const std.process.Environ.Map, exe_new: []const u8, repo: []const u8, args: []const []const u8, work: []const u8, reject: bool) !?[]const u8 {
     assert(args.len >= 2);
     assert(std.mem.eql(u8, args[0], "--check"));
     const cwd = Io.Dir.cwd();
@@ -39,17 +42,17 @@ pub fn agrees(arena: Allocator, io: Io, env: *const std.process.Environ.Map, exe
 
     const lib = try std.fs.path.join(arena, &.{ repo, "lib" });
     const build = [_][]const u8{
-        "zig",                                                                          "build-exe",
-        "--dep",                                                                        "device",
+        "zig",                                                                        "build-exe",
+        "--dep",                                                                      "device",
         try std.fmt.allocPrint(arena, "-Mroot={s}/tests/host/vdev_run.zig", .{repo}), "--dep",
-        "std_sim",                                                                      "--dep",
-        "contract",                                                                     "-Mdevice=dev.zig",
-        "--dep",                                                                        "kernels",
-        "--dep",                                                                        "contract",
-        "--dep",                                                                        "vams",
-        try std.fmt.allocPrint(arena, "-Mstd_sim={s}/std/sim.zig", .{lib}),            "--dep",
-        "contract",                                                                     try std.fmt.allocPrint(arena, "-Mkernels={s}/kernels/root.zig", .{lib}),
-        try std.fmt.allocPrint(arena, "-Mcontract={s}/contract.zig", .{lib}),           try std.fmt.allocPrint(arena, "-Mvams={s}/std/vams.zig", .{lib}),
+        "std_sim",                                                                    "--dep",
+        "contract",                                                                   "-Mdevice=dev.zig",
+        "--dep",                                                                      "kernels",
+        "--dep",                                                                      "contract",
+        "--dep",                                                                      "vams",
+        try std.fmt.allocPrint(arena, "-Mstd_sim={s}/std/sim.zig", .{lib}),           "--dep",
+        "contract",                                                                   try std.fmt.allocPrint(arena, "-Mkernels={s}/kernels/root.zig", .{lib}),
+        try std.fmt.allocPrint(arena, "-Mcontract={s}/contract.zig", .{lib}),         try std.fmt.allocPrint(arena, "-Mvams={s}/std/vams.zig", .{lib}),
         "-femit-bin=host",
     };
     const b = try child(arena, io, env, work, &build);
@@ -59,13 +62,22 @@ pub fn agrees(arena: Allocator, io: Io, env: *const std.process.Environ.Map, exe
 
     const run = try std.mem.concat(arena, []const u8, &.{ &.{ exe_new, "--run" }, args[1..] });
     const r = try child(arena, io, env, work, run);
-    if (!std.mem.eql(u8, h.stderr, r.stdout)) return try std.fmt.allocPrint(arena, "the device's transcript is not --run's: device {d} bytes, run {d}", .{ h.stderr.len, r.stdout.len });
+    // A design the fixture rejects is rejected at run time, as the device
+    // stops: one rejected before it runs has no device to judge.
+    if (reject and r.status == 0) return "a `//! reject` fixture `--run` accepts";
+    // Both print `$stop`'s line straight to stderr (`Interp.task`), never
+    // into the transcript the device holds: it is no transcript line.
+    var said: std.ArrayList(u8) = .empty;
+    var lines = std.mem.splitScalar(u8, h.stderr, '\n');
+    while (lines.next()) |line| if (!std.mem.startsWith(u8, line, "$stop at tick ")) {
+        try said.appendSlice(arena, line);
+        if (lines.index != null) try said.append(arena, '\n');
+    };
+    if (!std.mem.eql(u8, said.items, r.stdout)) return try std.fmt.allocPrint(arena, "the device's transcript is not --run's: device {d} bytes, run {d}", .{ said.items.len, r.stdout.len });
     return null;
 }
 
 // ---- private ----
-
-const Out = struct { status: u8, stdout: []const u8, stderr: []const u8 };
 
 fn child(arena: Allocator, io: Io, env: *const std.process.Environ.Map, work: []const u8, argv: []const []const u8) !Out {
     assert(argv.len != 0);

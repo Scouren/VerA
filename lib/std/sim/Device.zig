@@ -33,12 +33,13 @@
 
 const std = @import("std");
 const assert = std.debug.assert;
-const Allocator = std.mem.Allocator;
 const contract = @import("contract");
 const Program = @import("Program.zig");
 const SimState = @import("State.zig");
 const Interp = @import("Interp.zig");
 const serial = @import("serial.zig");
+const exe = @import("exe.zig");
+const Run = @import("Device/Run.zig");
 const logic = @import("logic.zig");
 const time = @import("time.zig");
 const Bit = logic.Bit;
@@ -172,11 +173,21 @@ pub fn Device(comptime spec: Spec) type {
         /// step has done no work), and the accepted `Instance`. The working
         /// run's transcript goes to stderr when the host commits it, so a
         /// rejected step prints nothing and its retry prints once. The runs
-        /// live on the heap: move a `State`, never copy it.
+        /// live on the heap, at most two at once (`runs`): a step frees the
+        /// run it replaces, so memory never grows per step. Move a `State`,
+        /// never copy it. The old device kept its two boundaries inline; this
+        /// one's last accepted run and its program outlive the instance, as
+        /// the contract has no teardown.
         pub const State = struct {
             accepted: ?*Run = null,
             work: ?*Run = null,
             inst: Instance = .{},
+            /// What this step's run printed, held until commit (the old
+            /// device's fields, which hosts read): `say[0..say_len]`.
+            say: []const u8 = "",
+            say_len: u32 = 0,
+            /// Runs alive now: the accepted one and the working one.
+            runs: u8 = 0,
         };
 
         /// The digital engine keeps history across accepted steps.
@@ -245,6 +256,7 @@ pub fn Device(comptime spec: Spec) type {
             outputs(m, inst, &r.s, 0, true);
             keep(inst, &r.s);
             st.accepted = r;
+            st.runs = 1;
             // Time 0 is never rejected.
             r.flush();
         }
@@ -258,8 +270,8 @@ pub fn Device(comptime spec: Spec) type {
         /// changed, so the step never needs repeating (`.ok` always).
         pub fn updateState(comptime S: type, m: *const Model, inst: *Instance, x: [n_u]f64, st: *State, sim: contract.SimState) contract.UpdateResult {
             _ = S;
-            if (st.work) |w| w.free();
-            st.work = null;
+            drop(st);
+            defer held(st);
             if (inst.stopped) return .ok;
             if (sim.kind != .tran) {
                 const moved = static(m, inst, x, st, sim.t) catch {
@@ -270,6 +282,22 @@ pub fn Device(comptime spec: Spec) type {
             }
             transient(m, inst, x, st, sim.t) catch poison(inst);
             return .ok;
+        }
+
+        /// Frees the working run, if any.
+        fn drop(st: *State) void {
+            const w = st.work orelse return;
+            assert(st.runs == 2);
+            w.free();
+            st.work = null;
+            st.runs = 1;
+        }
+
+        /// `State.say`: the working run's transcript, or nothing.
+        fn held(st: *State) void {
+            st.say = if (st.work) |w| w.say.written() else "";
+            st.say_len = @intCast(st.say.len);
+            assert(st.say.len == st.say_len);
         }
 
         fn static(m: *const Model, inst: *Instance, x: [n_u]f64, st: *State, t: f64) !bool {
@@ -349,15 +377,28 @@ pub fn Device(comptime spec: Spec) type {
         /// This step's run: a copy of the accepted one.
         fn open(st: *State) !*SimState {
             assert(st.work == null); // `updateState` dropped the last one.
+            assert(st.runs == 1);
             const r = try st.accepted.?.fork();
             st.work = r;
+            st.runs = 2;
             return &r.s;
         }
 
-        /// Every event at a tick up to `limit`; a run-time error fails.
+        /// Every event at a tick up to `limit`, on a `exe.stack_size`
+        /// thread as `vera --run` runs (the activations nest with the
+        /// design, past a host thread's stack); a run-time error fails.
         fn run(s: *SimState, limit: u64) !void {
             assert(limit >= s.scheduler.now); // The clock never runs back.
-            const stop = try Interp.runUntil(s, limit);
+            var result: SimState.Error!Interp.Stop = .idle;
+            // ponytail: one thread per run, as `exe.run`; keep one parked
+            // per instance if hosts step fast enough for the spawn to show.
+            const t = std.Thread.spawn(.{ .stack_size = exe.stack_size }, struct {
+                fn go(st: *SimState, l: u64, r: *SimState.Error!Interp.Stop) void {
+                    r.* = Interp.runUntil(st, l);
+                }
+            }.go, .{ s, limit, &result }) catch return error.OutOfMemory;
+            t.join();
+            const stop = try result;
             assert(stop == .idle); // No analog link: only `idle` stops it.
             assert(s.scheduler.now <= limit);
         }
@@ -442,9 +483,11 @@ pub fn Device(comptime spec: Spec) type {
                 .query => return inst.late_cross,
                 .commit => {
                     if (st.work) |w| {
+                        assert(st.runs == 2);
                         w.flush();
                         st.accepted.?.free();
                         st.accepted = w;
+                        st.runs = 1;
                     }
                     st.work = null;
                     inst.late_cross = false;
@@ -456,11 +499,13 @@ pub fn Device(comptime spec: Spec) type {
                     inst.* = st.inst;
                     inst.dc_lvl = lvl;
                     inst.dc_g = g;
-                    if (st.work) |w| w.free();
-                    st.work = null;
+                    drop(st);
                 },
             }
             assert(st.work == null);
+            assert(st.runs <= 1);
+            held(st);
+            assert(st.say_len == 0);
             return false;
         }
 
@@ -543,146 +588,6 @@ pub fn Device(comptime spec: Spec) type {
             return .{ .inst = inst.* };
         }
     };
-}
-
-/// One run of the device's program on the heap, its memory its own arena,
-/// its transcript held until `flush`.
-const Run = struct {
-    arena: std.heap.ArenaAllocator,
-    say: std.Io.Writer.Allocating,
-    s: SimState,
-
-    const gpa = std.heap.smp_allocator;
-
-    /// Time 0 of `p`.
-    fn init(p: *const Program) !*Run {
-        const r = try gpa.create(Run);
-        r.arena = .init(gpa);
-        errdefer r.free();
-        r.say = .init(r.arena.allocator());
-        r.s = try SimState.init(r.arena.allocator(), p, &r.say.writer);
-        assert(r.s.out == &r.say.writer);
-        return r;
-    }
-
-    /// A deep copy of `r` at its tick boundary, with an empty transcript.
-    fn fork(r: *const Run) !*Run {
-        const c = try gpa.create(Run);
-        c.arena = .init(gpa);
-        errdefer c.free();
-        const a = c.arena.allocator();
-        c.say = .init(a);
-        c.s = try dupe(SimState, a, r.s);
-        c.s.arena = a;
-        c.s.out = &c.say.writer;
-        c.s.scratch = .init(a);
-        assert(c.s.p == r.s.p);
-        return c;
-    }
-
-    /// The held transcript to stderr: a host's stdout may carry its own
-    /// results.
-    fn flush(r: *Run) void {
-        const said = r.say.written();
-        if (said.len != 0) std.debug.print("{s}", .{said});
-        r.say.clearRetainingCapacity();
-        assert(r.say.written().len == 0);
-    }
-
-    fn free(r: *Run) void {
-        r.arena.deinit();
-        gpa.destroy(r);
-    }
-};
-
-/// A deep copy of `x` into `a`: every slice and list it reaches is new;
-/// single pointers (the `Program`, the writer) are shared. The fields
-/// `fork` resets (allocators, the scratch arena) are copied shallow here.
-fn dupe(comptime T: type, a: Allocator, x: T) Allocator.Error!T {
-    if (comptime !hasSlice(T)) return x;
-    if (comptime isMulti(T)) return x.clone(a);
-    if (comptime isList(T)) {
-        var out = try @TypeOf(x).initCapacity(a, x.capacity);
-        for (x.items) |e| out.appendAssumeCapacity(try dupe(@TypeOf(x.items[0]), a, e));
-        return out;
-    }
-    if (comptime isQueue(T)) {
-        const buf = try a.alloc(@TypeOf(x.items[0]), x.cap);
-        for (buf[0..x.items.len], x.items) |*d, e| d.* = try dupe(@TypeOf(e), a, e);
-        var out = x;
-        out.items = buf[0..x.items.len];
-        return out;
-    }
-    if (comptime isHashMap(T)) {
-        var out = try x.clone(a);
-        var it = out.valueIterator();
-        while (it.next()) |v| v.* = try dupe(@TypeOf(v.*), a, v.*);
-        return out;
-    }
-    switch (@typeInfo(T)) {
-        .optional => |o| return if (x) |v| try dupe(o.child, a, v) else null,
-        .array => |ar| {
-            var out: T = undefined;
-            for (&out, x) |*d, e| d.* = try dupe(ar.child, a, e);
-            return out;
-        },
-        .pointer => |ptr| {
-            comptime assert(ptr.size == .slice);
-            const out = try a.alloc(ptr.child, x.len);
-            for (out, x) |*d, e| d.* = try dupe(ptr.child, a, e);
-            return out;
-        },
-        .@"struct" => |s| {
-            var out: T = x;
-            inline for (s.field_names, s.field_types) |name, F| @field(out, name) = try dupe(F, a, @field(x, name));
-            return out;
-        },
-        .@"union" => switch (x) {
-            inline else => |v, tag| return @unionInit(T, @tagName(tag), try dupe(@TypeOf(v), a, v)),
-        },
-        else => @compileError("Device.dupe: no copy for " ++ @typeName(T)),
-    }
-}
-
-/// Whether a value of `T` reaches memory a copy must duplicate: a slice,
-/// or a container of the standard library holding one.
-fn hasSlice(comptime T: type) bool {
-    @setEvalBranchQuota(100_000);
-    if (T == Allocator or T == std.heap.ArenaAllocator or T == std.Io) return false;
-    if (isMulti(T) or isList(T) or isQueue(T) or isHashMap(T)) return true;
-    return switch (@typeInfo(T)) {
-        .optional => |o| hasSlice(o.child),
-        .array => |ar| hasSlice(ar.child),
-        .pointer => |ptr| switch (ptr.size) {
-            .slice => true,
-            // The `Program` and the writer: shared.
-            .one => false,
-            .many, .c => @compileError("Device.dupe: a many-pointer in " ++ @typeName(T)),
-        },
-        .@"struct" => |s| inline for (s.field_types) |F| {
-            if (hasSlice(F)) break true;
-        } else false,
-        .@"union" => |u| inline for (u.field_types) |F| {
-            if (hasSlice(F)) break true;
-        } else false,
-        else => false,
-    };
-}
-
-fn isMulti(comptime T: type) bool {
-    return @typeInfo(T) == .@"struct" and @hasDecl(T, "Field") and @hasDecl(T, "Slice") and @hasField(T, "bytes");
-}
-
-fn isList(comptime T: type) bool {
-    return @typeInfo(T) == .@"struct" and @hasField(T, "items") and @hasField(T, "capacity");
-}
-
-fn isQueue(comptime T: type) bool {
-    return @typeInfo(T) == .@"struct" and @hasField(T, "items") and @hasField(T, "cap");
-}
-
-fn isHashMap(comptime T: type) bool {
-    return @typeInfo(T) == .@"struct" and @hasDecl(T, "KV") and @hasField(T, "metadata");
 }
 
 test "Device: a step over a one-slot design keeps a run its next step forks" {

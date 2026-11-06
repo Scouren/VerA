@@ -18,7 +18,9 @@
 //! The `.v` backends' runs (`v_options`: diff-digital-exe, diff-rtlil,
 //! diff-digital-device) take every `.v` fixture through `--emit-exe` (then
 //! the binary it built), `--emit-rtlil` or `--check` in place of `--run`,
-//! each against its own list (`tests/differential/<name>.xfail`).
+//! each against its own list (`tests/differential/<name>.xfail`) and
+//! rulings (`<name>.rulings`); a `--check` ruling's tiebreaker runs the
+//! device the new side builds (`comp/device.zig`).
 //! No LRM clause: this checks VerA's rewrite against VerA.
 //!
 //! Contents: tests only.
@@ -249,13 +251,13 @@ fn tiebreak(arena: Allocator, io: Io, f: Fixture, new: judge.Run) !bool {
     return std.mem.eql(u8, gold, new.stdout);
 }
 
-/// diff-digital-device's tiebreaker: the old side failed a design that is
-/// no `//! reject`, and the new side's device builds and runs it as
-/// `--run` does (`comp/device.zig`). Null when it holds, else why not.
+/// diff-digital-device's tiebreaker: the old side failed the design, and
+/// the new side's device builds and runs it as `--run` does
+/// (`comp/device.zig`); a `//! reject` fixture's `--run` must fail too.
+/// Null when it holds, else why not.
 fn deviceTiebreak(arena: Allocator, s: *Shared, f: Fixture, new: judge.Run, args: []const []const u8, work: []const u8) !?[]const u8 {
-    if (f.reject) return "a `//! reject` fixture";
     if (new.status != 0) return "the new side builds no device";
-    return device.agrees(arena, s.io, s.env, s.exe_new, options.repo_root, args, work);
+    return device.agrees(arena, s.io, s.env, s.exe_new, options.repo_root, args, work, f.reject);
 }
 
 /// The run's rulings (`<name>.rulings`): `<path> <clause and reason>`

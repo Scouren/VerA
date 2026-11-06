@@ -518,9 +518,3 @@ verilog-ams/ch07_mixed_signal/node_abstol_resolved_segment.va point 0: display r
 verilog-ams/ch07_mixed_signal/special_float_values_in_digital_expressions.va point 0: display record value 1: old 1e0, versioned 0e0
 verilog-ams/ch08_scheduling/procedural_assign_deassign_semantics.va display site 0: old format "the assign followed its source over a procedural write, and the deassign kept its value got=%10d want=%11d ok=%d\n", new "the assign followed its source over a procedural write, and the deassign kept its value got=%d want=%11d ok=%d\n"
 verilog-ams/ch08_scheduling/procedural_continuous_semantics.va display site 0: old format "the force followed its source, and the release stopped it got=%10d want=%11d ok=%d\n", new "the force followed its source, and the release stopped it got=%d want=%11d ok=%d\n"
-verilog-a/ch04_expressions/modulo_integer_display_zero.va the new device stopped the process at point 0 (wait status 0x4), the old device did not
-verilog-a/ch04_expressions/ddx.va codegen: a call of `ddx`
-verilog-a/ch04_expressions/ddx_flow_column_in_eval.va codegen: a call of `ddx`
-verilog-a/ch09_system_tasks/kernel_control_tasks_together.va codegen: a call of `$limit`
-verilog-a/ch09_system_tasks/limit.va codegen: a call of `$limit`
-verilog-a/ch10_directives/predefined_compact_modeling.va codegen: a call of `ddx`

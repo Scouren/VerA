@@ -9,6 +9,8 @@
 //!
 //! Contents:
 //! - `pub fn eval(s: *State, a: Allocator, e: u32) Error!Literal`
+//! - `pub fn evalRow(s: *State, a: Allocator, e: u32) Error!Literal`
+//! - `pub fn selection(s: *State, a: Allocator, sl: Program.Select) Error!?Sel`
 //! - `pub fn real(s: *State, a: Allocator, e: u32) Error!f64`
 //! - `pub fn truth(s: *State, a: Allocator, e: u32) Error!Bit`
 //! - `pub fn read(s: *const State, a: Allocator, slot: u32) Error!Literal`
@@ -30,6 +32,7 @@ const queues = @import("queues.zig");
 const time = @import("time.zig");
 const wide = @import("wide.zig");
 const driver_access = @import("driver_access.zig");
+const small = @import("small.zig");
 const Literal = logic.Literal;
 const Bit = logic.Bit;
 const Error = State.Error;
@@ -41,8 +44,18 @@ const normalize = logic.normalize;
 pub const Sel = struct { first: i64, count: u32 };
 
 /// Row `e`'s value, in its `ty`. The result may alias a constant's or a
-/// slot's scratch copy; it lives in `a`.
+/// slot's scratch copy; it lives in `a`. A row of at most 64 bits is
+/// `small.value`'s, copied out.
 pub fn eval(s: *State, a: Allocator, e: u32) Error!Literal {
+    const ty = s.p.exprs.items(.ty)[e];
+    if (!small.fits(ty)) return evalRow(s, a, e);
+    const planes = try a.create([2]u64);
+    return small.literal(planes, try small.value(s, a, e), ty);
+}
+
+/// `eval` of row `e` by its tag over `Literal`s: every row `small.value`
+/// does not compute itself.
+pub fn evalRow(s: *State, a: Allocator, e: u32) Error!Literal {
     const p = s.p;
     assert(e < p.exprs.len);
     const row = p.exprs.get(e);
@@ -318,8 +331,9 @@ pub fn real(s: *State, a: Allocator, e: u32) Error!f64 {
 /// integral row is its `Literal.truth` (0, 1 or x).
 pub fn truth(s: *State, a: Allocator, e: u32) Error!Bit {
     assert(e < s.p.exprs.len);
-    if (s.p.exprs.items(.ty)[e].real) return if (try real(s, a, e) != 0) .one else .zero;
-    const b = (try eval(s, a, e)).truth();
+    const ty = s.p.exprs.items(.ty)[e];
+    if (ty.real) return if (try real(s, a, e) != 0) .one else .zero;
+    const b = if (small.fits(ty)) small.truthOf(try small.value(s, a, e), ty.width) else (try eval(s, a, e)).truth();
     assert(b != .z);
     return b;
 }
@@ -350,7 +364,7 @@ pub fn address(s: *State, a: Allocator, el: Program.Elem) Error!?u32 {
     while (k != 0) {
         k -= 1;
         const d = dims[n * k ..][0..n];
-        const idx = indexOf(try eval(s, a, d[0])) orelse return null;
+        const idx = std.math.cast(i64, (try indexRow(s, a, d[0])) orelse return null) orelse return null;
         const low: i64 = @bitCast(@as(u64, d[1]) | @as(u64, d[2]) << 32);
         const high: i64 = @bitCast(@as(u64, d[3]) | @as(u64, d[4]) << 32);
         if (idx < low or idx > high) inside = false;
@@ -405,6 +419,23 @@ pub fn write(s: *State, a: Allocator, slot: u32, sel: ?Sel, value: Literal) Erro
     const hi = @min(b.first + @as(i64, b.count), @as(i64, merged.width));
     if (lo < hi) logic.copyBits(merged, @intCast(lo), value, @intCast(lo - b.first), @intCast(hi - lo));
     return s.store(slot, merged);
+}
+
+/// The bits select `sl` names now; null for an x/z index.
+pub fn selection(s: *State, a: Allocator, sl: Program.Select) Error!?Sel {
+    const first: i64 = switch (sl.mode) {
+        .const_part => sl.first,
+        .bit => position(sl, std.math.cast(i64, (try indexRow(s, a, sl.index)) orelse return null) orelse return null),
+        .up, .down => blk: {
+            const base = (try indexRow(s, a, sl.index)) orelse return null;
+            const ascending = sl.msb >= sl.lsb;
+            const p = if (ascending) base -| sl.lsb else @as(i128, sl.lsb) -| base;
+            break :blk std.math.lossyCast(i64, if (ascending == (sl.mode == .up)) p else p -| (sl.count - 1));
+        },
+    };
+    const width = s.p.slots.items(.ty)[sl.slot].width;
+    if (first >= width or first <= -@as(i64, sl.count)) return null;
+    return .{ .first = first, .count = sl.count };
 }
 
 // ---- private ----
@@ -477,26 +508,16 @@ fn indexOf(v: Literal) ?i64 {
     return std.math.cast(i64, v.asIndex() orelse return null);
 }
 
+/// Row `e`'s `Literal.asIndex`: null for an x or z bit.
+fn indexRow(s: *State, a: Allocator, e: u32) Error!?i128 {
+    const ty = s.p.exprs.items(.ty)[e];
+    if (small.fits(ty)) return small.indexOf(try small.value(s, a, e), ty);
+    return (try eval(s, a, e)).asIndex();
+}
+
 fn selectSlot(s: *State, a: Allocator, sl: Program.Select) Error!?u32 {
     if (sl.elem == std.math.maxInt(u32)) return sl.slot;
     return address(s, a, s.p.extraData(Program.Elem, sl.elem));
-}
-
-/// The bits select `sl` names now; null for an x/z index.
-fn selection(s: *State, a: Allocator, sl: Program.Select) Error!?Sel {
-    const first: i64 = switch (sl.mode) {
-        .const_part => sl.first,
-        .bit => position(sl, indexOf(try eval(s, a, sl.index)) orelse return null),
-        .up, .down => blk: {
-            const base = (try eval(s, a, sl.index)).asIndex() orelse return null;
-            const ascending = sl.msb >= sl.lsb;
-            const p = if (ascending) base -| sl.lsb else @as(i128, sl.lsb) -| base;
-            break :blk std.math.lossyCast(i64, if (ascending == (sl.mode == .up)) p else p -| (sl.count - 1));
-        },
-    };
-    const width = s.p.slots.items(.ty)[sl.slot].width;
-    if (first >= width or first <= -@as(i64, sl.count)) return null;
-    return .{ .first = first, .count = sl.count };
 }
 
 /// Storage position of declared index `i` of a `[msb:lsb]` vector.

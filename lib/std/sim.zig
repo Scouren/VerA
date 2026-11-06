@@ -6,7 +6,7 @@
 //!
 //! Contents:
 //! - `pub const Program`, `pub const Builder`, `pub const State`, `pub const Interp`
-//! - `pub const eval`, `pub const display`, `pub const logic`, `pub const net`, `pub const resolve`, `pub const calls`, `pub const readmem`, `pub const holds`, `pub const files`, `pub const tchk`, `pub const vcd`, `pub const evcd`, `pub const sdf`, `pub const sdf_text`, `pub const scan`, `pub const queues`, `pub const pla`, `pub const activations`, `pub const wide`
+//! - `pub const eval`, `pub const display`, `pub const logic`, `pub const net`, `pub const resolve`, `pub const calls`, `pub const readmem`, `pub const holds`, `pub const files`, `pub const tchk`, `pub const vcd`, `pub const evcd`, `pub const sdf`, `pub const sdf_text`, `pub const scan`, `pub const queues`, `pub const pla`, `pub const activations`, `pub const wide`, `pub const small`
 //! - `pub const scheduler`, `pub const time`, `pub const analog`, `pub const serial`, `pub const mixed`, `pub const exe`, `pub const Device`, `pub const DevicePin`, `pub const bench`, `pub const bench_data`
 
 pub const Program = @import("sim/Program.zig");
@@ -32,6 +32,8 @@ pub const queues = @import("sim/queues.zig");
 pub const pla = @import("sim/pla.zig");
 pub const activations = @import("sim/activations.zig");
 pub const wide = @import("sim/wide.zig");
+/// The evaluator's fast half: rows of at most 64 bits as two u64 planes.
+pub const small = @import("sim/small.zig");
 pub const scheduler = @import("sim/scheduler.zig");
 pub const time = @import("sim/time.zig");
 pub const analog = @import("sim/analog.zig");
@@ -78,6 +80,7 @@ test {
     _ = pla;
     _ = activations;
     _ = wide;
+    _ = small;
     _ = scheduler;
     _ = time;
     _ = @import("sim/driver_access.zig");

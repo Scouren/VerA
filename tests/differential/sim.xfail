@@ -12,9 +12,6 @@ verilog/07_gate_switch_level/split_array_rejected.v old run failed (E1100: §7.1
 verilog/10_tasks_functions/constant_function_hierarchical_rejected.v old run failed (E1100: §10.4.5: a function called during elaboration is a constant function, and it contains a hierarchical reference), new run completed
 verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v old run failed (E1100: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element it is in), new run completed
 verilog/12_hierarchy/defparam_across_generate_instances_rejected.v old run failed (E1100: §12.2.1: a defparam inside `somename[0]` cannot change a parameter outside the generate block instance or array element it is in), new run completed
-verilog/12_hierarchy/defparam_early_resolution_rejected.v old E1100 at byte 87: §12.8.2: this defparam's hierarchical name was resolved before the hierarchy was complete and would resolve differently once it is; new E0907 at byte 87: elaboration refuses it (E0907)
-verilog/12_hierarchy/defparam_names_nothing_rejected.v old E0901 at byte 121: §12.2.1: this defparam's hierarchical name `foo` names nothing in the design; new E0907 at byte 121: elaboration refuses it (E0907)
-verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v old E1100 at byte 126: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element it is in; new E0907 at byte 126: elaboration refuses it (E0907)
 verilog/12_hierarchy/port_width_mismatch_vams_rejected.v old run failed (E1100: §6.5.7.1: the sizes of the port and the net connected to it shall match), new run completed
 verilog/12_hierarchy/real_connected_to_port_rejected.v old run failed (E1100: §12.3.7: a real cannot be connected to a port), new run completed
 verilog/12_hierarchy/unnamed_block_referenced_rejected.v old run failed (E1100: undeclared instance in a hierarchical reference), new run completed
@@ -22,18 +19,14 @@ verilog/13_configuration/cell_not_in_its_library_rejected.v old run failed (E110
 verilog/13_configuration/config_in_map_rejected.v a `//@` line the cli refuses
 verilog/13_configuration/design_cell_missing_rejected.v old run failed (E1100: undeclared module in instantiation: library `work` holds no cell `missing`), new run completed
 verilog/13_configuration/design_names_config_rejected.v old run failed (E1100: undeclared module in instantiation: library `work` holds no cell `cfg`), new run completed
-verilog/13_configuration/every_config_referenced_rejected.v old run failed (E0243: every configuration is named by another's `use` clause, so none is the design's (IEEE 1364-2005 §13.4.4)), new run completed
 verilog/13_configuration/library_without_path_rejected.v a `//@` line the cli refuses
-verilog/13_configuration/rule_inside_other_config_rejected.v old run failed (E0243: instance clause `top.bot.a1` names an instance inside `top.bot`, whose hierarchy another config (`bot`) specifies (IEEE 1364-2005 §13.3.2)), new run completed
 verilog/13_configuration/source_text_in_map_rejected.v a `//@` line the cli refuses
 verilog/13_configuration/two_libraries_match_rejected.v a `//@` line the cli refuses
-verilog/13_configuration/two_unreferenced_configs_rejected.v old run failed (E0243: configurations `cfg_a` and `cfg_b` are both unreferenced, so neither is the design's (IEEE 1364-2005 §13.4.4)), new run completed
 verilog/13_configuration/undeclared_library_rejected.v old run failed (E1100: undeclared module in instantiation: no library of the search order (nosuch) holds cell `adder`), new run completed
 verilog/18_vcd/dumpports_duplicate_scope_rejected.v old run failed (E1100: §18.3.1: each $dumpports scope shall be unique), new run completed
 verilog/18_vcd/dumpports_variable_scope_rejected.v old run failed (E1100: §18.3.1: a $dumpports scope is a module instance: only modules are allowed, not variables), new run completed
 verilog/19_compiler_directives/timescale_inside_module_rejected.v old run failed (E1100: §19.8: a `timescale directive is written outside a module definition, not inside one), new run completed
 verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v a `//@` line the cli refuses
 verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v a `//@` line the cli refuses
-verilog-ams/digital/reject_wreal_connected_to_wand.v old run failed (E0919: `n` is a wand and port `o` is a wreal), new run completed
 verilog-ams/digital/scaled_delay_udp_rejected.v old E0247 at byte 186: a scaled literal in `scaled_delay_udp`'s UDP delay; new E0247 at byte 190: elaboration refuses it (E0247)
 verilog-ams/digital/vams_digital_temperature_refused.v lowering: the system function `$temperature`

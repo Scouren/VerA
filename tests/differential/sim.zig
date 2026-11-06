@@ -238,8 +238,15 @@ fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, op
     try sema.Sema.elaborate(&zcu, .{ .roots = .all, .ieee1364 = true });
     const zf = zcu.failed.slice();
     for (zf.items(.code), zf.items(.src), zf.items(.rule), zf.items(.part)) |code, src, rule, part| if (@tagName(code)[0] == 'E') {
-        // vera-next's IEEE 1364 route reports a `Rule` under lib/sim/digital's code.
-        const as: []const u8 = if (rule == .none) @tagName(code) else if (rule == .defparam_unknown) "E0907" else "E1100";
+        // vera-next's IEEE 1364 route reports a `Rule` under lib/sim/digital's
+        // code (src/next/Compilation/legacy.zig's `rule`, mirrored).
+        const as: []const u8 = switch (rule) {
+            .none => @tagName(code),
+            .defparam_unknown => "E0907",
+            .config => "E0243",
+            .defparam_nothing => "E0901",
+            else => "E1100", // else: legacy.zig's catch-all
+        };
         return .{ .earlier = .{ .why = try a.print("elaboration refuses it ({t})", .{code}), .code = as, .at = if (sema.locate.part(tree, &vir, src, part)) |span| span.bytes(tree).start else 0 } };
     };
     var why: sema.digital.Why = .{};

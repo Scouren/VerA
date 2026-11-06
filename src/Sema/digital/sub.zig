@@ -111,6 +111,7 @@ pub fn callRow(l: *Lower, i: Inst.Index) Error!u32 {
         o.* = .{ .in = none, .place = none, .ty = ty };
         if (dir != .output) o.in = try expr.evalFor(l, a, typeOfTy(ty));
         if (dir != .input) {
+            if (!place.isLvalue(l, a)) return l.rejectArg(l.frame, i, k, "§10.2.2: a task output actual must be a procedural lvalue");
             o.place = try place.place(l, a);
             o.ty = try l.tyOf(try place.targetType(l, a));
         }
@@ -275,7 +276,7 @@ fn storage(l: *Lower, outer: u32, scope: u32, i: Inst.Index) Error!Storage {
             .io => Lower.payload(vir, Inst.Io, d).prev,
             .variable => blk: {
                 const v = Lower.payload(vir, Inst.Variable, d);
-                if (v.init.len != 0) return l.refuse("an initialized subroutine variable");
+                if (v.init.len != 0) return l.reject(outer, d.toRef(), "an initialized task or function variable is not implemented");
                 break :blk v.prev;
             },
             else => continue, // else: declared below, or a statement

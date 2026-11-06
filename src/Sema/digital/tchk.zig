@@ -88,8 +88,8 @@ pub fn check(l: *Lower, f: u32, i: Inst.Index) Error!void {
             c.stamp_cond = try cond(l, arg(args, 5));
             c.check_cond = try cond(l, arg(args, 6));
             // §15.5.4 the negative timing option off: a negative limit is 0.
-            const a: u64 = @intCast(@max(try limitTicks(l, f, arg(args, 2)), 0));
-            const b: u64 = @intCast(@max(try limitTicks(l, f, arg(args, 3)), 0));
+            const a: u64 = @intCast(@max(try limitTicks(l, f, arg(args, 2), name), 0));
+            const b: u64 = @intCast(@max(try limitTicks(l, f, arg(args, 3), name), 0));
             c.lim = if (kind == .setuphold) .{ a, b } else .{ b, a };
             c.notifier = try notifier(l, arg(args, 4));
             try delayed(l, f, args[0], arg(args, 7));
@@ -114,8 +114,8 @@ pub fn check(l: *Lower, f: u32, i: Inst.Index) Error!void {
             try event(l, &c, 0, args[0]);
             try event(l, &c, 1, arg(args, 1));
             if (c.ev[0].mask == 0) return l.refuse("§15.3.6 a $nochange reference event that is no edge");
-            c.lim[0] = @bitCast(try limitTicks(l, f, arg(args, 2)));
-            const end = try limitTicks(l, f, arg(args, 3));
+            c.lim[0] = @bitCast(try limitTicks(l, f, arg(args, 2), name));
+            const end = try limitTicks(l, f, arg(args, 3), name);
             if (end < 0) return l.refuse("§15.3.6 a $nochange with a negative end edge offset");
             c.lim[1] = @intCast(end);
             c.notifier = try notifier(l, arg(args, 4));
@@ -304,9 +304,12 @@ fn literalBit(l: *Lower, r: Inst.Ref) Error!?Bit {
 }
 
 /// A limit in ticks, with its sign: "constant expression" (§15.1).
-fn limitTicks(l: *Lower, f: u32, r: Inst.Ref) Error!i64 {
+fn limitTicks(l: *Lower, f: u32, r: Inst.Ref, name: []const u8) Error!i64 {
     if (r == .none) return l.refuse("a timing check with an omitted limit");
-    const c = (try l.constOf(f, r)) orelse return l.refuse("a timing check limit Sema/eval.zig does not fold");
+    const c = (try l.constOf(f, r)) orelse {
+        l.why_code = .E1148;
+        return l.rejectFmt(f, r, "a limit of `{s}` is a constant expression (IEEE 1364-2005 §15.1); this one reads a signal", .{name});
+    };
     const scale = l.b.times.items[l.frames.items[f].scope].scale;
     const negative, const mag = switch (c) {
         .int => |v| .{ v < 0, scale.unsignedDelay(@abs(v)) catch return l.refuse("a timing check limit past 2^64 ticks") },
@@ -322,7 +325,7 @@ fn limitTicks(l: *Lower, f: u32, r: Inst.Ref) Error!i64 {
 /// is lib/sim/digital's E1148.
 fn nonNegative(l: *Lower, f: u32, r: Inst.Ref, name: []const u8, what: []const u8) Error!u64 {
     assert(name.len > 0 and what.len > 0);
-    const v = try limitTicks(l, f, r);
+    const v = try limitTicks(l, f, r, name);
     if (v < 0) {
         l.why_code = .E1148;
         return l.rejectFmt(f, r, "the {s} of `{s}` is a non-negative constant expression (IEEE 1364-2005 §15), and this one is negative", .{ what, name });

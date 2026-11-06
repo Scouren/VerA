@@ -79,7 +79,7 @@ pub fn typeOf(l: *Lower, r: Inst.Ref) Error!Type {
         },
         .pos, .neg, .bit_not => blk: {
             const t = try typeValue(l, data.un_node.operand);
-            if (t.real and Lower.tag(vir, i) == .bit_not) return l.refuse("~ of a real");
+            if (t.real and Lower.tag(vir, i) == .bit_not) return l.reject(l.frame, r, "§5.1.1: this operator does not take a real operand");
             break :blk t;
         },
         .not, .red_and, .red_nand, .red_or, .red_nor, .red_xor, .red_xnor => blk: {
@@ -91,7 +91,7 @@ pub fn typeOf(l: *Lower, r: Inst.Ref) Error!Type {
             const b = Lower.payload(vir, Inst.Bin, i);
             const x = try typeValue(l, b.lhs);
             const y = try typeValue(l, b.rhs);
-            if ((x.real or y.real) and Lower.tag(vir, i) != .add and Lower.tag(vir, i) != .sub and Lower.tag(vir, i) != .mul and Lower.tag(vir, i) != .div) return l.refuse("a real operand of %, a bitwise or a shift operator");
+            if ((x.real or y.real) and Lower.tag(vir, i) != .add and Lower.tag(vir, i) != .sub and Lower.tag(vir, i) != .mul and Lower.tag(vir, i) != .div) return l.reject(l.frame, r, "§5.1.1: this operator does not take a real operand");
             break :blk common(x, y);
         },
         .pow => blk: {
@@ -111,7 +111,7 @@ pub fn typeOf(l: *Lower, r: Inst.Ref) Error!Type {
             const b = Lower.payload(vir, Inst.Bin, i);
             const x = try typeValue(l, b.lhs);
             const y = try typeValue(l, b.rhs);
-            if ((x.real or y.real) and (Lower.tag(vir, i) == .case_eq or Lower.tag(vir, i) == .case_neq)) return l.refuse("=== of a real");
+            if ((x.real or y.real) and (Lower.tag(vir, i) == .case_eq or Lower.tag(vir, i) == .case_neq)) return l.reject(l.frame, r, "§5.1.1: this operator does not take a real operand");
             break :blk .{ .width = 1, .signed = false };
         },
         .ternary => blk: {
@@ -122,15 +122,15 @@ pub fn typeOf(l: *Lower, r: Inst.Ref) Error!Type {
         .mintypmax => typeValue(l, Lower.payload(vir, Inst.Triple, i).b),
         .elem, .slice, .slice_up, .slice_down => blk: {
             const s = try place.selectOf(l, i);
-            if (s.name.kind == .event) return l.refuse("a named event element read as a value");
+            if (s.name.kind == .event) return l.reject(l.frame, r, "§9.7.3: a named event holds no data; it can only be triggered and waited on");
             break :blk s.ty;
         },
         .concat => blk: {
             var width: u32 = 0;
-            for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |arg| {
+            for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i)), 0..) |arg, k| {
                 const t = try typeOf(l, arg);
                 if (t.real) return l.refuse("a real concatenation operand");
-                if (try unsized(l, arg)) return l.refuse("an unsized concatenation operand");
+                if (try unsized(l, arg)) return l.rejectOperand(l.frame, arg, i, @intCast(k), "unsized constant numbers are not allowed as concatenation operands");
                 width = std.math.add(u32, width, t.width) catch return l.refuse("a concatenation past 2^32 bits");
             }
             if (width == 0) return l.refuse("a concatenation of zero width");
@@ -261,7 +261,7 @@ pub fn ctx(l: *Lower, r: Inst.Ref, ty: Type) Error!u32 {
         .replicate => {
             const b = Lower.payload(vir, Inst.Bin, i);
             const count = try replication(l, b.lhs);
-            if (count == 0) return l.refuse("a zero replication outside a concatenation");
+            if (count == 0) return l.reject(l.frame, r, "zero replication requires an immediately enclosing concatenation with a positive-width operand");
             return l.b.expr(.replicate, t, try self_(l, b.rhs, 0), count);
         },
         .call_sys => return sysfn.sysCall(l, i, t, nat),
@@ -313,7 +313,7 @@ pub fn real(l: *Lower, r: Inst.Ref) Error!u32 {
         },
         .elem => {
             const s = try place.selectOf(l, i);
-            if (!s.whole_elem) return l.refuse("a select of a real");
+            if (!s.whole_elem) return l.reject(l.frame, r, "§4.8: a real has no bits to select");
             return l.b.expr(.elem, rt, try place.elemRow(l, s), 0);
         },
         .pos => return real(l, data.un_node.operand),
@@ -394,7 +394,7 @@ pub fn constant(l: *Lower, v: Literal, ty: Type) Error!u32 {
 /// `typeOf`, refused for a zero replication outside a concatenation.
 pub fn typeValue(l: *Lower, r: Inst.Ref) Error!Type {
     const t = try typeOf(l, r);
-    if (t.width == 0) return l.refuse("a zero replication outside a concatenation");
+    if (t.width == 0) return l.reject(l.frame, r, "zero replication requires an immediately enclosing concatenation with a positive-width operand");
     return t;
 }
 

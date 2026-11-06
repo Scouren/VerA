@@ -329,7 +329,7 @@ pub fn sink(l: *Lower, r: Inst.Ref) Error!Sink {
         .decl_ref, .str_ref, .field => {
             const n = (try expr.nameOf(l, r)) orelse return l.refuse("a continuous assignment to a hierarchical net");
             if (n.kind != .net) return l.refuse("a continuous assignment to a variable");
-            if (n.dims.len != 0) return l.refuse("a continuous assignment to a whole net array");
+            if (n.dims.len != 0) return l.reject(l.frame, r, "an unpacked array reference requires an element index");
             return .{ .net = n.net, .lo = 0, .width = l.nets.items[n.net].width };
         },
         .elem, .slice, .slice_up, .slice_down => {

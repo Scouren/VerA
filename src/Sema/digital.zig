@@ -15,7 +15,7 @@
 //! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Named = struct`, `pub const SegmentRef = struct`, `pub const Why = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
-//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `reject`, `rejectFmt`, `rejectArg`, `rejectArgFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
+//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `reject`, `rejectFmt`, `rejectOperand`, `rejectArg`, `rejectArgFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
 //! - `pub const none: u32`
 //! - `pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Lowered`
 
@@ -292,6 +292,42 @@ pub const Lower = struct {
     pub fn refuse(l: *Lower, comptime why: []const u8) error{Unsupported} {
         l.why = why;
         return error.Unsupported;
+    }
+
+    /// `reject` at operand `r` of bracketed form `i` (a select, a
+    /// concatenation) of frame `f`: at `r` when Vir holds its position, else
+    /// at the first token of the form's operand `k`, counting the top-level
+    /// `,` and `:` after its opening bracket (a literal has no position in
+    /// Vir; lib/sim/digital reports at its token).
+    pub fn rejectOperand(l: *Lower, f: u32, r: Inst.Ref, i: Inst.Index, k: u32, comptime msg: []const u8) error{Rejected} {
+        if (r.toIndex()) |ri| if (l.srcOffset(f, ri) != 0) return l.reject(f, r, msg);
+        l.why = msg;
+        l.why_at = l.srcOffset(f, i);
+        const vir = l.virOf(f);
+        if (Inst.dataKind(tag(vir, i)) != .pl_node) return error.Rejected;
+        const tree = l.options.sources[@backingInt(l.fileOf(f))].tree;
+        const end: vams.Ast.TokenIndex = @intCast(tree.tokens.len);
+        var t = tree.nodeMainToken(vir.instructions.items(.data)[@backingInt(i)].pl_node.src_node);
+        while (t < end and tree.tokenTag(t) != .l_bracket and tree.tokenTag(t) != .l_brace and tree.tokenTag(t) != .l_paren) t += 1;
+        var depth: u32 = 0;
+        var seen: u32 = 0;
+        t += 1;
+        while (t < end) : (t += 1) {
+            const tt = tree.tokenTag(t);
+            const separator = tt == .comma or tt == .colon;
+            const closer = tt == .r_bracket or tt == .r_brace or tt == .r_paren;
+            if (depth == 0 and seen == k and !separator and !closer) {
+                l.why_at = tree.tokenStart(t);
+                return error.Rejected;
+            }
+            if (closer) {
+                if (depth == 0) break;
+                depth -= 1;
+            } else if (tt == .l_bracket or tt == .l_brace or tt == .l_paren) {
+                depth += 1;
+            } else if (separator and depth == 0) seen += 1;
+        }
+        return error.Rejected;
     }
 
     /// `rejectArg` with a formatted message.

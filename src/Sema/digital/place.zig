@@ -91,7 +91,7 @@ pub fn place(l: *Lower, r: Inst.Ref) Error!u32 {
         .decl_ref, .str_ref, .field => {
             const n = try expr.leafName(l, i);
             try writable(l, n, r);
-            if (n.dims.len != 0) return l.refuse("an assignment to a whole unpacked array");
+            if (n.dims.len != 0) return l.reject(l.frame, r, "an unpacked array reference requires an element index");
             return l.b.extraOf(Program.Place{ .kind = .slot, .a = n.slot });
         },
         .elem, .slice, .slice_up, .slice_down => {
@@ -289,12 +289,20 @@ pub fn selectOf(l: *Lower, i: Inst.Index) Error!Sel {
     const n = try expr.leafName(l, base);
     if (n.kind == .sub or n.kind == .scope) return l.refuse("a select of a task, function or scope");
     const dims = n.dims.len;
-    if (indices.items.len < dims) return l.refuse("a select of a whole array dimension");
-    for (indices.items) |r| if ((try expr.typeOf(l, r)).real) return l.refuse("a real index");
+    if (indices.items.len < dims) return if (n.kind == .event)
+        l.reject(l.frame, i.toRef(), "§9.7.3: a named event array requires one index per dimension")
+    else if (top_tag != .elem)
+        l.reject(l.frame, i.toRef(), "§5.2.2: each array dimension takes an index, not a part-select")
+    else
+        l.reject(l.frame, base.toRef(), "an unpacked array reference requires an element index");
+    for (indices.items) |r| if ((try expr.typeOf(l, r)).real) return if (n.kind == .event)
+        l.reject(l.frame, r, "§9.7.3: an event array index must be integral")
+    else
+        l.rejectOperand(l.frame, r, i, 0, "§4.8.1: a real is not a bit-select index");
     if (top_tag == .elem and indices.items.len == dims) return .{ .name = n, .indices = indices.items, .whole_elem = true, .ty = n.ty };
     if (n.kind == .event) return l.refuse("a select of a named event");
-    if (n.ty.real) return l.refuse("a select of a real");
-    if (n.scalar) return l.refuse("§5.2.1 a select of a scalar");
+    if (n.ty.real) return l.reject(l.frame, i.toRef(), "§4.8: a real has no bits to select");
+    if (n.scalar) return l.reject(l.frame, i.toRef(), "§5.2.1: a scalar has no bits to select");
     if (n.kind == .event) return l.refuse("a select of a named event");
     var s: Sel = .{ .name = n, .indices = indices.items[0..dims], .whole_elem = false, .ty = .{ .width = 1, .signed = false } };
     switch (top_tag) {
@@ -308,7 +316,7 @@ pub fn selectOf(l: *Lower, i: Inst.Index) Error!Sel {
             const t = Lower.payload(vir, Inst.Triple, i);
             const msb = try l.intOf(l.frame, t.b);
             const lsb = try l.intOf(l.frame, t.c);
-            if (msb != lsb and (msb > lsb) != (n.msb >= n.lsb)) return l.refuse("§5.2.1 a part-select reversed against its declaration");
+            if (msb != lsb and (msb > lsb) != (n.msb >= n.lsb)) return l.reject(l.frame, i.toRef(), "§5.2.1: a part-select names its more significant bit first");
             s.mode = .const_part;
             s.count = std.math.cast(u32, @abs(@as(i128, msb) - lsb) + 1) orelse return l.refuse("a part-select past 2^32 bits");
             s.first = if (n.msb >= n.lsb) lsb -| n.lsb else n.lsb -| lsb;
@@ -318,7 +326,7 @@ pub fn selectOf(l: *Lower, i: Inst.Index) Error!Sel {
             if (indices.items.len != dims) return l.refuse("a part-select of a bit");
             const t = Lower.payload(vir, Inst.Triple, i);
             const width = try l.intOf(l.frame, t.c);
-            if (width < 1 or width >= std.math.maxInt(u32)) return l.refuse("§5.2.1 an indexed part-select width that is not a positive constant");
+            if (width < 1 or width >= std.math.maxInt(u32)) return l.rejectOperand(l.frame, t.c, i, 1, "§5.2.1: an indexed part-select's width is a positive constant");
             if ((try expr.typeOf(l, t.b)).real) return l.refuse("a real part-select base");
             s.mode = if (top_tag == .slice_up) .up else .down;
             s.index = t.b;
@@ -359,8 +367,10 @@ fn writable(l: *Lower, n: Name, r: Inst.Ref) Error!void {
     switch (n.kind) {
         .variable => {},
         .net => return l.reject(l.frame, r, "a net is driven by a continuous assignment; there is no procedural assignment to a net"),
-        .param, .genvar => return l.refuse("an assignment to a parameter"),
-        .event, .sub, .scope => return l.refuse("an assignment to a named event, task, function or scope"),
+        .param => return l.reject(l.frame, r, "§12.2: a parameter is a constant; it cannot be assigned"),
+        .genvar => return l.refuse("an assignment to a genvar"),
+        .event => return l.reject(l.frame, r, "§9.7.3: a named event holds no data; it cannot be assigned"),
+        .sub, .scope => return l.refuse("an assignment to a task, function or scope"),
     }
 }
 

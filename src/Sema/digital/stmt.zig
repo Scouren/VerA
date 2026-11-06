@@ -401,7 +401,7 @@ fn process(l: *Lower, p: Proc) Error!u32 {
                 else => unreachable, // else: `declare.items` records these two
             };
             const n = l.names.items[l.lookup(p.frame, prev.toIndex() orelse p.inst) orelse return l.refuse("an initialized declaration with no slot")];
-            if (n.dims.len != 0) return l.refuse("an initialized array");
+            if (n.dims.len != 0) return l.reject(p.frame, p.inst.toRef(), "an unpacked array declaration takes no initializer");
             if (n.kind != .variable) return l.refuse("an initialized net port");
             const init = vir.body(init_body);
             _ = try l.b.inst(.init_var, n.slot, try expr.evalFor(l, init[init.len - 1].toRef(), n.ty), scope);

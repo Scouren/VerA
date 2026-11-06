@@ -54,6 +54,7 @@ pub fn part(tree: *const Ast, vir: *const Vir, src: Inst.Ref, p: Zcu.Part) ?Span
     const k: u32, const list_open: ?Token = switch (p) {
         .whole => return inst(tree, vir, src),
         .target => return .{ .token = target(tree, vir, src) orelse return inst(tree, vir, src) },
+        .scaled => return .{ .token = scaled(tree, vir, src) orelse return inst(tree, vir, src) },
         .rule => |k| return .{ .token = rule(tree, vir, src, k) orelse return inst(tree, vir, src), .point = true },
         .rhs => {
             const eq = instToken(tree, vir, src) orelse return null;
@@ -147,6 +148,27 @@ fn rule(tree: *const Ast, vir: *const Vir, src: Inst.Ref, k: u32) ?Token {
         semis += 1;
         if (semis == k + 2) return t + 1;
     }
+    return null;
+}
+
+/// The first number literal with a §2.6.2 scale factor (`2u`) in instance
+/// `src`'s `#(...)`, or null.
+fn scaled(tree: *const Ast, vir: *const Vir, src: Inst.Ref) ?Token {
+    const open = paramOpen(tree, vir, src) orelse return null;
+    var t = open + 1;
+    var depth: u32 = 0;
+    // Bounded by the token count: each turn moves one token on.
+    while (tree.tokenTag(t) != .eof) : (t += 1) switch (tree.tokenTag(t)) {
+        .l_paren => depth += 1,
+        .r_paren => if (depth == 0) return null else {
+            depth -= 1;
+        },
+        .number_literal => {
+            const text = tree.tokenSlice(t);
+            if (std.mem.findScalar(u8, "TGMKkmunpfa", text[text.len - 1]) != null and std.mem.findScalar(u8, text, '\'') == null) return t;
+        },
+        else => {},
+    };
     return null;
 }
 

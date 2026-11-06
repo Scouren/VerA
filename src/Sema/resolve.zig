@@ -384,7 +384,7 @@ fn merge(s: *Sema, i: Instance.Index, net: []const u8, segs: []const Arrival, li
 }
 
 /// The first §7.7.2 statement whose list holds every candidate (`exact`:
-/// and nothing else); W0950 when several do.
+/// and nothing else); W0950 once, at the second, when several do.
 fn resolution(s: *Sema, cands: []const []const u8, exact: bool, at: Zcu.File.Index) Allocator.Error!?Resolution {
     assert(cands.len > 1);
     assert(@backingInt(at) < s.zcu.files.len);
@@ -404,8 +404,9 @@ fn resolution(s: *Sema, cands: []const []const u8, exact: bool, at: Zcu.File.Ind
             } else true;
             if (!covers or (exact and names.len != cands.len)) continue;
             if (first != null) {
+                // Once, at the second match, as the old elaborator stopped there.
                 try s.fail(.W0950, at, i.toRef(), "multiple {s} resolution rules apply; using the first", .{if (exact) "exact" else "subset"});
-                continue;
+                return first;
             }
             first = .{ .result = vir.string(r.result), .exclude = r.flags.exclude };
         };

@@ -48,7 +48,8 @@ const Rule = struct { module: Zcu.Decl, file: Zcu.File.Index, src: Inst.Index, c
 const Hit = struct { parent: Instance.Index, child: Instance.Index, port: Inst.Index, terminal: u32 = 0, name: String, port_name: String, sig: String, bottom: []const u8, rule: u32 };
 
 /// A port's or terminal's place, for E0922/E0927 and its `Hit`.
-const Site = struct { parent: Instance.Index, child: Instance.Index, port: Inst.Index, terminal: u32, name: String, port_name: String, file: Zcu.File.Index, src: Inst.Ref };
+/// `part`: the connection the reports point at (the instance's when none).
+const Site = struct { parent: Instance.Index, child: Instance.Index, port: Inst.Index, terminal: u32, name: String, port_name: String, file: Zcu.File.Index, src: Inst.Ref, part: Zcu.Part = .whole };
 
 /// Resolves, inserts, and restores preorder; a defparam `waiting` for an
 /// inserted connect module sets its parameter (§7.8.5 names are
@@ -171,6 +172,7 @@ fn mixedPorts(s: *Sema, rules: []const Rule, p: Instance.Index, c: Instance.Inde
             .port_name = try zcu.intern_pool.getString(s.gpa, resolve.portName(cvir, formal)),
             .file = pmod.file,
             .src = zcu.instances.items(.src)[@backingInt(c)],
+            .part = if (connIndex(vir, zcu.instances.items(.src)[@backingInt(c)], actual)) |k| .{ .conn = k } else .whole,
         }, dir, sig, up, low, hits);
     }
 }
@@ -188,9 +190,10 @@ fn judge(s: *Sema, rules: []const Rule, at: Site, dir: Inst.Direction, sig: Stri
         n += 1;
         if (found == null) found = @intCast(ri);
     };
-    if (n > 1) return s.fail(.E0922, at.file, at.src, "port `{s}` of `{s}` matches more than one connect statement ({d})", .{ ip.stringToSlice(at.port_name), ip.stringToSlice(at.name), n });
+    const why: Sema.Why = .{ .part = at.part };
+    if (n > 1) return if (at.part == .whole) s.fail(.E0922, at.file, at.src, "port `{s}` of `{s}` matches more than one connect statement ({d})", .{ ip.stringToSlice(at.port_name), ip.stringToSlice(at.name), n }) else s.failRule(why, .E0922, at.file, at.src, "port `{s}` of `{s}` matches more than one connect statement ({d})", .{ ip.stringToSlice(at.port_name), ip.stringToSlice(at.name), n });
     const rule = found orelse
-        return s.fail(.E0927, at.file, at.src, "port `{s}` of `{s}` is `{s}` and its net `{s}` is `{s}`, and no connect statement bridges them", .{ ip.stringToSlice(at.port_name), ip.stringToSlice(at.name), low, ip.stringToSlice(sig), up });
+        return if (at.part == .whole) s.fail(.E0927, at.file, at.src, "port `{s}` of `{s}` is `{s}` and its net `{s}` is `{s}`, and no connect statement bridges them", .{ ip.stringToSlice(at.port_name), ip.stringToSlice(at.name), low, ip.stringToSlice(sig), up }) else s.failRule(why, .E0927, at.file, at.src, "port `{s}` of `{s}` is `{s}` and its net `{s}` is `{s}`, and no connect statement bridges them", .{ ip.stringToSlice(at.port_name), ip.stringToSlice(at.name), low, ip.stringToSlice(sig), up });
     try hits.append(s.arena, .{ .parent = at.parent, .child = at.child, .port = at.port, .terminal = at.terminal, .name = at.name, .port_name = at.port_name, .sig = sig, .bottom = low, .rule = rule });
 }
 

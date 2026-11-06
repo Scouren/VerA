@@ -269,8 +269,9 @@ pub const Failure = struct {
 /// or instance, by position among its prefix specs; a failure about one
 /// is located at its first token (`value`: a parameter value's expression,
 /// past a named one's `.name(`; `rhs`: a defparam's value; `rule`: a
-/// configuration's k-th rule after its `design` statement).
-pub const Part = union(enum) { whole, conn: u32, param: u32, value: u32, target, rhs, attr: u32, rule: u32 };
+/// configuration's k-th rule after its `design` statement; `scaled`: the
+/// first Table 2-1 scaled literal of an instance's `#(...)`).
+pub const Part = union(enum) { whole, conn: u32, param: u32, value: u32, target, rhs, attr: u32, rule: u32, scaled };
 
 /// The rules a catalogue code covers whose IEEE 1364 report lib/sim/digital
 /// wrote in its own words: the instance's ports (§12.3.6) and parameter

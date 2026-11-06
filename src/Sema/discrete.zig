@@ -52,6 +52,12 @@ pub fn mark(s: *Sema, unit: *Unit) Allocator.Error!void {
     };
     for (vir.body(unit.module.body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
         .initial, .always => try writes(vir, decl.payloadOf(vir, Inst.Process, i).body, &owned, s.arena, 0),
+        // A.2.7 a task is enabled only from the discrete context, so what its
+        // body writes is digital-owned too (every task, enabled or not).
+        .function => {
+            const f = decl.payloadOf(vir, Inst.Function, i);
+            if (f.flags.task) try writes(vir, f.body, &owned, s.arena, 0);
+        },
         else => {}, // else: no digital process
     };
     var reads: std.AutoArrayHashMapUnmanaged(Inst.Index, void) = .empty;

@@ -190,21 +190,26 @@ fn splits(o: Options, device: Output) bool {
 }
 
 /// `buildLibrary` past the artifact cache: spawn, write, compile, link,
-/// publish. `arena` holds what lives only for the build.
+/// publish. A split build runs its pieces in batches of `jobs(o)` children,
+/// each batch reaped before the next spawns. `arena` holds what lives only
+/// for the build.
 fn compile(gpa: Allocator, io: Io, arena: Allocator, o: Options, device: Output, generation: u32, split: bool) BuildError!Artifact {
     const all = try pieces(arena, if (split) device.setup_chunks else 0);
     const children: []const ?Piece = if (split) all else &.{null};
     assert(children.len > 0);
     assert(children.len <= pieces_max);
+    const batch = jobs(o);
+    assert(batch >= 1);
 
-    // Spawned before the tree is written, so the compilers start up while
-    // VerA writes.
+    // `servers[closed..started]` are the live children.
     const servers = try arena.alloc(Server, children.len);
     var started: usize = 0;
-    defer for (servers[0..started]) |*s| s.close(io);
-    for (servers, children) |*s, p| {
-        try s.spawn(io, arena, try argv.libraryArgv(arena, o, p));
-        started += 1;
+    var closed: usize = 0;
+    defer for (servers[closed..started]) |*s| s.close(io);
+    // The first batch is spawned before the tree is written, so its
+    // compilers start up while VerA writes.
+    while (started < @min(children.len, batch)) : (started += 1) {
+        try servers[started].spawn(io, arena, try argv.libraryArgv(arena, o, children[started]));
     }
 
     const engine: shim.Engine = if (o.engine != null) .prebuilt else .none;
@@ -218,28 +223,41 @@ fn compile(gpa: Allocator, io: Io, arena: Allocator, o: Options, device: Output,
             _ = try tree.writeIfChanged(gpa, io, dir, try shim.fileName(arena, p.?), text);
         }
     }
-    // Every update is sent before any reply is read: the pieces compile at once.
-    for (servers) |*s| try s.update(io);
 
-    if (!split) return switch (try servers[0].wait(gpa)) {
-        .failed => |b| .{ .failed = b },
-        .ok => |digest| .{ .ok = try publish(gpa, io, o, digest, generation) },
-    };
+    if (!split) {
+        try servers[0].update(io);
+        return switch (try servers[0].wait(gpa)) {
+            .failed => |b| .{ .failed = b },
+            .ok => |digest| .{ .ok = try publish(gpa, io, o, digest, generation) },
+        };
+    }
 
     // Each piece analyses the whole device, so a device error arrives once
     // per piece; the first piece's report is the one returned.
     const objects = try arena.alloc([]const u8, children.len);
     var failed: ?std.zig.ErrorBundle = null;
     errdefer if (failed) |*b| b.deinit(gpa);
-    for (servers, children, objects) |*s, p, *object| switch (try s.wait(gpa)) {
-        .failed => |b| if (failed == null) {
-            failed = b;
-        } else {
-            var extra = b;
-            extra.deinit(gpa);
-        },
-        .ok => |digest| object.* = try objectPath(arena, o, digest, p.?),
-    };
+    while (closed < children.len) {
+        const hi = @min(children.len, closed + batch);
+        while (started < hi) : (started += 1) {
+            try servers[started].spawn(io, arena, try argv.libraryArgv(arena, o, children[started]));
+        }
+        // Every update of a batch is sent before any reply is read: its
+        // pieces compile at once.
+        for (servers[closed..hi]) |*s| try s.update(io);
+        for (servers[closed..hi], children[closed..hi], objects[closed..hi]) |*s, p, *object| switch (try s.wait(gpa)) {
+            .failed => |b| if (failed == null) {
+                failed = b;
+            } else {
+                var extra = b;
+                extra.deinit(gpa);
+            },
+            .ok => |digest| object.* = try objectPath(arena, o, digest, p.?),
+        };
+        for (servers[closed..hi]) |*s| s.close(io);
+        closed = hi;
+    }
+    assert(closed == started);
     if (failed) |b| {
         failed = null;
         return .{ .failed = b };
@@ -254,6 +272,13 @@ fn compile(gpa: Allocator, io: Io, arena: Allocator, o: Options, device: Output,
         .failed => |b| .{ .failed = b },
         .ok => |digest| .{ .ok = try publish(gpa, io, o, digest, generation) },
     };
+}
+
+/// The most `zig` children a split build keeps alive: `o.jobs`, or the CPU
+/// count (1 when it cannot be read).
+fn jobs(o: Options) u32 {
+    const n = o.jobs orelse @as(u32, @intCast(@min(std.Thread.getCpuCount() catch 1, pieces_max)));
+    return @max(n, 1);
 }
 
 /// The pieces of a split build: the `Part`s in order, then `setup`'s chunks.

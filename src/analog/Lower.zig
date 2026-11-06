@@ -258,6 +258,9 @@ pub const Options = struct {
     /// Where a §9.21.1 `$table_model` data file is looked for, in order: the
     /// `include` search path. Empty means the working directory only.
     include_dirs: []const []const u8 = &.{},
+    /// Reads a `$table_model` data file: the compilation's own. Null reads
+    /// none, so every data file is unreadable.
+    files: ?*@import("frontend").Files = null,
     /// §3.4 compile-time overrides of the top module's parameters.
     param_overrides: []const ParamOverride = &.{},
     /// §9.4 the build drops the display family (`codegen.Options.display`), so

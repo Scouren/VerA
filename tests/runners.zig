@@ -83,7 +83,7 @@ fn one(gpa: Allocator, io: Io, arena: Allocator, kind: Kind, fixture: []const u8
     const spec = try tb.Spec.parse(arena, source, null);
     var bag: vera.diag.Bag = .init(gpa);
     defer bag.deinit(gpa);
-    const settings: vera.Settings = .{ .file_name = fixture, .include_dirs = includes, .require_std_includes = true, .display = .emit };
+    const settings: vera.Config = .{ .file_name = fixture, .include_dirs = includes, .require_std_includes = true, .display = .emit };
     var result = try vera.analyze(gpa, source, settings, &bag);
     defer result.deinit(gpa);
     const facts = try tb.compileFacts(arena, result.lowered, result.mir);

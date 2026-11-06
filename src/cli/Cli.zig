@@ -98,6 +98,8 @@ debug_info: bool = false,
 optimize: ?std.lang.Optimize = null,
 /// Null: `Backend.auto`.
 zig_backend: ?zigbuild.Backend = null,
+/// `--jobs=N`: most `zig` children a build keeps alive; null is the CPU count.
+jobs: ?u32 = null,
 spice_path: ?[]const u8 = null,
 /// `--protect-keys`: the key file for IEEE 1364-2005 §28 decryption
 /// envelopes (`frontend.protect.parseKeys`).

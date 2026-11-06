@@ -1,4 +1,4 @@
-//! The `vera` module: a Verilog-A/AMS source and a `Request` in, the
+//! The `vera` module: a Verilog-A/AMS source and a `Config` in, the
 //! artifacts the request names out (a device, a testbench, a library, a
 //! behavioural Verilog module) plus the text `vera` prints. `compile` below
 //! is the spine `vera` calls for a `.va`: read the testbench's `//!`
@@ -18,11 +18,11 @@
 //! - `pub const version`, `pub const diag`, `pub const Display`,
 //!   `pub const ParamOverride`, `pub const DisciplineResolution`,
 //!   `pub const KeywordSet`, `pub const Sim`
-//! - `pub const Settings`, `pub const Result`, `pub const Device`,
+//! - `pub const Config`, `pub const Result`, `pub const Device`,
 //!   `pub const Codegen`, `pub const AnalyzeError`, `pub const analyze`
 //! - `pub const ReadError`, `pub const readFailed`, `pub const CompileError`,
-//!   `pub const Request`, `pub const Outcome`
-//! - `pub fn compile(gpa: Allocator, io: Io, arena: Allocator, source: []const u8, req: Request, bag: *diag.Bag, o: *Outcome) CompileError!void`
+//!   `pub const Outcome`
+//! - `pub fn compile(gpa: Allocator, io: Io, arena: Allocator, source: []const u8, req: Config, bag: *diag.Bag, o: *Outcome) CompileError!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -47,20 +47,20 @@ const deep_stack = @import("base").deep_stack;
 pub const version = @import("kernels").vera_version;
 /// Diagnostic codes, the `Bag` every stage reports into, and rendering.
 pub const diag = @import("diag");
-/// §9.4's display modes (`Settings.display`).
+/// §9.4's display modes (`Config.display`).
 pub const Display = @import("device").Display;
-/// A `--param name=value` compile-time override (`Settings.param_overrides`, §3.4).
+/// A `--param name=value` compile-time override (`Config.param_overrides`, §3.4).
 pub const ParamOverride = @import("base").ParamOverride;
-/// §7.4.4 resolution mode (`Settings.discipline_resolution`).
+/// §7.4.4 resolution mode (`Config.discipline_resolution`).
 pub const DisciplineResolution = @import("base").DisciplineResolution;
 /// The settings of one analysis.
-pub const Settings = @import("Compilation/Settings.zig");
+pub const Config = @import("Compilation/Config.zig");
 /// One analysed source; `Result.generate` makes its device.
 pub const Result = @import("Compilation/Result.zig");
 
-/// The keyword set a `--std=` selects (`Settings.language`).
+/// The keyword set a `--std=` selects (`Config.language`).
 pub const KeywordSet = frontend.keyword.KeywordSet;
-/// The language family a `--sim=` selects (`Settings.sim`).
+/// The language family a `--sim=` selects (`Config.sim`).
 pub const Sim = frontend.keyword.Sim;
 /// A generated device.zig, owned by the caller.
 pub const Device = Result.Device;
@@ -79,7 +79,6 @@ pub const readFailed = read_failed.readFailed;
 /// Every way `compile` fails, as opposed to refusing (`Outcome.status`).
 pub const CompileError = request.CompileError;
 /// What one `compile` call builds.
-pub const Request = request.Request;
 /// What `compile` did, for its caller to print.
 pub const Outcome = request.Outcome;
 
@@ -183,17 +182,17 @@ pub fn compile(
     io: Io,
     arena: Allocator,
     source: []const u8,
-    req: Request,
+    req: Config,
     bag: *diag.Bag,
     o: *Outcome,
 ) CompileError!void {
     assert(bag.isEmpty());
     assert(o.result == null);
-    assert(req.options.file_name.len != 0);
+    assert(req.file_name.len != 0);
     var ew: Io.Writer.Allocating = .init(arena);
     const err = &ew.writer;
     defer o.err = ew.written();
-    const in_path = req.options.file_name;
+    const in_path = req.file_name;
 
     // --emit-exe's `//!` directives, read up front: a `//! param` card of a
     // SHAPE parameter is a compile-time value (below).
@@ -207,16 +206,20 @@ pub fn compile(
     // that flavor of SPICE netlist can be referenced". Read whole: a `+`
     // continuation makes a card longer than a line. Without `--spice`, a
     // testbench's own `//! spice` cards are the netlist, read beside the source.
+    // Every file the compilation reads goes through `files` (`Config.files`).
+    const files = try arena.create(frontend.Files);
+    files.* = .init(io, arena);
     const netlist: []const u8 = if (req.spice_path) |p|
-        frontend.preprocessor.readText(io, .cwd(), p, arena) catch |e| {
+        files.read(p, frontend.preprocessor.max_text_bytes) catch |e| {
             try readFailed(err, p, e);
             return o.done(2);
         }
     else
         spec.harness.spice;
-    var settings = req.options;
+    var settings = req;
+    if (settings.files == null) settings.files = files;
     settings.spice_netlist = netlist;
-    settings.spice_path = req.spice_path orelse if (spec.harness.spice.len != 0) in_path else "";
+    settings.spice_path = req.spice_path orelse if (spec.harness.spice.len != 0) in_path else null;
     // A check accepts a source_text with no module; a device request does not.
     settings.empty_unit_ok = req.check or req.lints();
     if (spec.harness.display_record) settings.display = .record;
@@ -237,7 +240,7 @@ pub fn compile(
     // §3.4 the testbench's card values for shape parameters are compile-time
     // values; a `--param` of the same name wins. The second pass reports
     // everything again, so the first pass' bag is dropped.
-    const typed = req.options.param_overrides;
+    const typed = req.param_overrides;
     const overrides = try withShapeCards(arena, typed, spec.bench.params, &o.result.?);
     if (overrides.len != typed.len) {
         bag.deinit(gpa);
@@ -369,13 +372,13 @@ test compile {
     var arena_state: std.heap.ArenaAllocator = .init(gpa);
     defer arena_state.deinit();
     const arena = arena_state.allocator();
-    const Case = struct { src: []const u8, req: Request, status: u8, report: std.meta.Tag(Outcome.Report), text: bool, err: []const u8 };
+    const Case = struct { src: []const u8, req: Config, status: u8, report: std.meta.Tag(Outcome.Report), text: bool, err: []const u8 };
     for ([_]Case{
         .{ .src = fixtures.resistor, .req = .{}, .status = 0, .report = .after, .text = false, .err = "" },
         .{ .src = fixtures.resistor, .req = .{ .zig = true }, .status = 0, .report = .after, .text = true, .err = "" },
         .{
             .src = fixtures.resistor,
-            .req = .{ .options = .{ .file_name = "res.va", .param_overrides = &.{.{ .name = "rr", .value = 1 }} } },
+            .req = .{ .file_name = "res.va", .param_overrides = &.{.{ .name = "rr", .value = 1 }} },
             .status = 2,
             .report = .none,
             .text = false,
@@ -832,7 +835,7 @@ test "§9.4 W0850 names each task the requested device drops, and no other" {
 // forces analysis of every top-level pub decl of every stage.
 test "every top-level pub decl of every stage type-checks" {
     const fe = @import("frontend");
-    inline for (.{ @This(), @import("base").BigArena, fe.token, fe.keyword, fe.preprocessor, fe.lexer, fe.Ast, fe.Parser, @import("ir").Mir, @import("prove").Analysis, @import("analog").Ssa, @import("elab"), @import("analog").Lower, @import("prove").proof, @import("ir").names, @import("device"), zigbuild, Settings, Result, request, analysis, osdi, verilog, testbench, library, read_failed }) |stage| {
+    inline for (.{ @This(), @import("base").BigArena, fe.token, fe.keyword, fe.preprocessor, fe.lexer, fe.Ast, fe.Parser, @import("ir").Mir, @import("prove").Analysis, @import("analog").Ssa, @import("elab"), @import("analog").Lower, @import("prove").proof, @import("ir").names, @import("device"), zigbuild, Config, Result, request, analysis, osdi, verilog, testbench, library, read_failed }) |stage| {
         std.testing.refAllDecls(stage);
     }
 }

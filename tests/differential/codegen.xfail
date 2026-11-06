@@ -1,0 +1,439 @@
+# Fixtures whose new device (codegen's Zig backend) still differs from the
+# old one (`zig build diff-codegen`, tests/differential/codegen.zig). One line
+# each: the fixture path under tests/conformance/tests, then why. A listed
+# fixture that agrees fails the run until its line goes.
+netlist/hdl/a09_absdelay_accepted_only.assets/a09_cross_rejector.va codegen: a call of `cross`
+netlist/hdl/a09_absdelay_accepted_only.assets/a09_delayed_ramp.va codegen: a call of `absdelay`
+netlist/hdl/a09_abstime_per_attempt.assets/a09_cross_rejector.va codegen: a call of `cross`
+netlist/hdl/a09_analog_initial_once.assets/a09_cross_rejector.va codegen: a call of `cross`
+netlist/hdl/a09_analog_initial_once.assets/a09_initial_once.va point 1: row 2: old -2.7955979655914724e0, new -3.7955979655914724e0
+netlist/hdl/a09_cross_count_revert.assets/a09_cross_rejector.va codegen: a call of `cross`
+netlist/hdl/a09_idt_bystander_reject.assets/a09_cross_rejector.va codegen: a call of `cross`
+netlist/hdl/a09_idt_self_reject.assets/a09_idt_latched.va codegen: a call of `cross`
+netlist/hdl/veriloga_timer_rearm.assets/va_tick.va codegen: a call of `timer`
+netlist/hdl/veriloga_transition_reject.assets/va_cmp.va codegen: a call of `cross`
+netlist/hdl/veriloga_vpi_app.assets/va_vpi_gain.va codegen: a call of a user function (callee 4294967295)
+netlist/hdl/veriloga_vpi_callbacks.assets/va_vpi_scaled.va codegen: a call of a user function (callee 4294967295)
+netlist/invalid/veriloga_systf.assets/va_systf_value.va codegen: a call of a user function (callee 4294967295)
+verilog-a/annex_a_syntax/event_control.va codegen: a call of `cross`
+verilog-a/annex_c_analog_subset/analog_event.va codegen: a call of `cross`
+verilog-a/annex_d_standard_definitions/electrical_definitions.va point 0: row 2: old -1.455553325670242e0, new 1e0
+verilog-a/ch01_intro/flow_signal_flow.va point 0: row 1: old 2.000578565135318e0, new -3.5679308067735205e-1
+verilog-a/ch01_intro/signal_flow_single_nature_contributions.va point 0: row 2: old -1.1524062148530296e0, new -4.6680035262893504e-1
+verilog-a/ch03_data_types/dependent_control_unknown_local.va codegen: parameter `amount`'s default does not fold
+verilog-a/ch03_data_types/integer_parameter_precision_control.va codegen: a call of `absdelay`
+verilog-a/ch03_data_types/natureless_domainless_port_compatibility.va codegen: a flow contribution to a potential source's branch
+verilog-a/ch03_data_types/operator_equation_tolerances.va codegen: a call of `idt$hold`
+verilog-a/ch03_data_types/output_variable_access_from_sibling.va codegen: a call of a user function (callee 4294967295)
+verilog-a/ch04_expressions/absdelay.va codegen: a call of `absdelay`
+verilog-a/ch04_expressions/absdelay_ac_phase.va codegen: a call of `absdelay`
+verilog-a/ch04_expressions/absdelay_history_beyond_capacity.va codegen: a call of `absdelay`
+verilog-a/ch04_expressions/absdelay_maxdelay_substitution.va codegen: a call of `absdelay`
+verilog-a/ch04_expressions/absdelay_td_frozen_without_maxdelay.va codegen: a call of `absdelay`
+verilog-a/ch04_expressions/absdelay_vera_interp_linear.va codegen: a call of `absdelay`
+verilog-a/ch04_expressions/filter_null_zeros_argument.va codegen: a call of `laplace_zp`
+verilog-a/ch04_expressions/idt_assert_release_resumes.va codegen: a call of `idt$hold`
+verilog-a/ch04_expressions/idt_hold_revert.va codegen: a call of `idt$hold`
+verilog-a/ch04_expressions/idt_reset_rejected.va codegen: a call of `idt$hold`
+verilog-a/ch04_expressions/idtmod_ic_forces_dc_solution.va codegen: a call of `idtmod`
+verilog-a/ch04_expressions/idtmod_offset_window_negative_integrand.va codegen: a call of `idtmod`
+verilog-a/ch04_expressions/laplace_ac_response.va codegen: a call of `laplace_nd`
+verilog-a/ch04_expressions/laplace_filters.va codegen: a call of `laplace_zp`
+verilog-a/ch04_expressions/laplace_nd_dc_gain.va codegen: a call of `laplace_nd`
+verilog-a/ch04_expressions/laplace_nd_ramp_response.va codegen: a call of `laplace_nd`
+verilog-a/ch04_expressions/laplace_nd_slow_pole_holds_dc_gain.va codegen: a call of `laplace_nd`
+verilog-a/ch04_expressions/laplace_np_dc_gain.va codegen: a call of `laplace_np`
+verilog-a/ch04_expressions/laplace_np_real_pole_zero_imaginary.va codegen: a call of `laplace_np`
+verilog-a/ch04_expressions/laplace_transcendental_coefficient.va codegen: a call of `laplace_nd`
+verilog-a/ch04_expressions/laplace_zd_conjugate_zeros.va codegen: a call of `laplace_zd`
+verilog-a/ch04_expressions/laplace_zp_dynamic_pole_sampled.va codegen: a call of `laplace_zp`
+verilog-a/ch04_expressions/laplace_zp_lrm_example.va codegen: a call of `laplace_zp`
+verilog-a/ch04_expressions/last_crossing.va codegen: a call of `last_crossing`
+verilog-a/ch04_expressions/last_crossing_in_creating_step.va codegen: a call of `last_crossing`
+verilog-a/ch04_expressions/modulo_integer_display_zero.va the new device stopped the process at point 0 (wait status 0x4), the old device did not
+verilog-a/ch04_expressions/operator_under_constant_condition.va codegen: a call of `transition`
+verilog-a/ch04_expressions/rc_88_operator_outside_event.va codegen: a call of `cross`
+verilog-a/ch04_expressions/rollback_a04_rollback_ops.va codegen: a call of `slew`
+verilog-a/ch04_expressions/slew.va codegen: a call of `slew`
+verilog-a/ch04_expressions/slew_small_signal.va codegen: a call of `slew`
+verilog-a/ch04_expressions/transition.va codegen: a call of `transition`
+verilog-a/ch04_expressions/transition_interrupted_falling_higher.va codegen: a call of `transition`
+verilog-a/ch04_expressions/transition_interrupted_falling_lower.va codegen: a call of `transition`
+verilog-a/ch04_expressions/transition_interrupted_rising.va codegen: a call of `transition`
+verilog-a/ch04_expressions/transition_interrupted_rising_higher.va codegen: a call of `transition`
+verilog-a/ch04_expressions/transition_resolution.va codegen: a call of `transition`
+verilog-a/ch04_expressions/transition_simulator_default.va codegen: a call of `transition`
+verilog-a/ch04_expressions/transition_transport_delay.va codegen: a call of `transition`
+verilog-a/ch04_expressions/z_transform_filters.va codegen: a call of `zi_nd`
+verilog-a/ch04_expressions/zi_ac_response.va codegen: a call of `zi_nd`
+verilog-a/ch04_expressions/zi_dc_gains.va codegen: a call of `zi_zp`
+verilog-a/ch04_expressions/zi_nd_output_at_sample_instant.va codegen: a call of `zi_nd`
+verilog-a/ch04_expressions/zi_sampling_period.va codegen: a call of `zi_zp`
+verilog-a/ch04_expressions/zi_transition_time_and_first_transition.va codegen: a call of `zi_nd`
+verilog-a/ch05_analog_behavior/above_enable_integer.va codegen: a call of `above`
+verilog-a/ch05_analog_behavior/above_fires_in_dc_sweep_cross_does_not.va codegen: a call of `above`
+verilog-a/ch05_analog_behavior/batch_per_instance_state.va codegen: a §5.6.1.2 path latch (`path_prev`)
+verilog-a/ch05_analog_behavior/block_local_is_static_between_events.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/conditional_potential_open.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch05_analog_behavior/cross_direction_out_of_range_is_inert.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/cross_does_not_fire_at_time_zero.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/cross_string_literal_is_an_integer.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/cross_tolerances_are_not_the_enable.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/event_above.va codegen: a call of `above`
+verilog-a/ch05_analog_behavior/event_above_enable.va codegen: a call of `above`
+verilog-a/ch05_analog_behavior/event_above_tolerance.va codegen: a call of `above`
+verilog-a/ch05_analog_behavior/event_bounds_cross_legal.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/event_cross.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/event_cross_any.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/event_cross_enable.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/event_cross_falling.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/event_cross_fires.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/event_cross_fires_on_a_time_grid.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/event_cross_param_direction.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/event_cross_rising_and_falling.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/event_cross_runtime_direction.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/event_initial_or_cross.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/event_list_comma_equals_or.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/event_or.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/event_timer.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/event_timer_enable.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/event_timer_one_shot.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/function_locals_have_no_lifetime.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/held_survives_an_inout_function_argument.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/held_value_is_visible_before_its_event_statement.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/implicit_zero_contribution.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch05_analog_behavior/many_timers_instance_defaults.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/rc_event_cross_tolerance_with_direction.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/shadowed_block_locals_hold_independently.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/spice_cross_latch_device.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/spice_timer_steps_device.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/static_switch_elision.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch05_analog_behavior/switch_branch.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch05_analog_behavior/switch_branch_solved.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch05_analog_behavior/timer_body_clog2_controls.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/timer_body_controls.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/timer_body_function_controls.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/timer_controls.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/timer_dynamic.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/timer_dynamic_period.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/timer_enable_integer.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/timer_enable_resumes_on_grid.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/timer_fixed.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/timer_nonpositive_period_fires_once.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/timer_start_rearmed_earlier.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/unassigned_switch_arm.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch06_hierarchy/defparam_unsupported.va point 0: row 0: old -1.3718699125012017e0, new -1.805058536009031e0
+verilog-a/ch06_hierarchy/hierarchy_empty_named_semantics.va point 0: row 0: old 1.721061922738219e1, new 4.302654806845547e0
+verilog-a/ch06_hierarchy/mfactor_conditional_only.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch06_hierarchy/string_derived_parameter.va codegen: parameter `u.mode` is not a number
+verilog-a/ch08_scheduling/above_initial_event.va codegen: a call of `above`
+verilog-a/ch08_scheduling/analog_event.va codegen: a call of `cross`
+verilog-a/ch08_scheduling/cross_wakeup.va codegen: a call of `cross`
+verilog-a/ch08_scheduling/event_state.va codegen: a call of `timer`
+verilog-a/ch08_scheduling/explicit_guard.va codegen: a call of `cross`
+verilog-a/ch08_scheduling/timer_wakeup.va codegen: a call of `timer`
+verilog-a/ch09_system_tasks/arandom.va codegen: a call of `$arandom`
+verilog-a/ch09_system_tasks/arandom_no_seed.va codegen: a call of `$arandom`
+verilog-a/ch09_system_tasks/binding_detection.va codegen: a call of `$port_connected`
+verilog-a/ch09_system_tasks/dist_chi_square.va codegen: a call of `$dist_chi_square`
+verilog-a/ch09_system_tasks/dist_erlang.va codegen: a call of `$dist_erlang`
+verilog-a/ch09_system_tasks/dist_exponential.va codegen: a call of `$dist_exponential`
+verilog-a/ch09_system_tasks/dist_ieee1364_reference_digits.va codegen: a call of `$dist_normal`
+verilog-a/ch09_system_tasks/dist_poisson.va codegen: a call of `$dist_poisson`
+verilog-a/ch09_system_tasks/dist_t.va codegen: a call of `$dist_t`
+verilog-a/ch09_system_tasks/dist_uniform.va codegen: a call of `$dist_uniform`
+verilog-a/ch09_system_tasks/distribution.va codegen: a call of `$dist_normal`
+verilog-a/ch09_system_tasks/error.va point 0: row 0: old 0e0, new 1.2818376926435355e0
+verilog-a/ch09_system_tasks/fatal.va point 1: row 0: old 0e0, new 2.823830431439182e0
+verilog-a/ch09_system_tasks/fatal_finish_number_0_exit_status.va point 0: row 0: old 0e0, new 4.7942962489144225e-1
+verilog-a/ch09_system_tasks/fatal_finish_number_2_exit_status.va point 0: row 0: old 0e0, new -2.5370237327075364e0
+verilog-a/ch09_system_tasks/fatal_in_iteration_terminates.va point 0: row 0: old 0e0, new -1.6025419903108231e0
+verilog-a/ch09_system_tasks/fatal_terminates.va point 0: row 0: old 0e0, new -2.789674796957345e0
+verilog-a/ch09_system_tasks/plusargs.va codegen: a call of `$test$plusargs`
+verilog-a/ch09_system_tasks/plusargs_prefix.va codegen: a call of `$test$plusargs`
+verilog-a/ch09_system_tasks/plusargs_value_order.va codegen: a call of `$value$plusargs`
+verilog-a/ch09_system_tasks/port_connected.va codegen: a call of `$port_connected`
+verilog-a/ch09_system_tasks/port_mask.va codegen: a call of `$port_connected`
+verilog-a/ch09_system_tasks/random.va codegen: a call of `$random`
+verilog-a/ch09_system_tasks/random_ieee1364_digits.va codegen: a call of `$random`
+verilog-a/ch09_system_tasks/random_no_seed.va codegen: a call of `$random`
+verilog-a/ch09_system_tasks/rdist_chi_square.va codegen: a call of `$rdist_chi_square`
+verilog-a/ch09_system_tasks/rdist_erlang.va codegen: a call of `$rdist_erlang`
+verilog-a/ch09_system_tasks/rdist_exponential.va codegen: a call of `$rdist_exponential`
+verilog-a/ch09_system_tasks/rdist_normal.va codegen: a call of `$rdist_normal`
+verilog-a/ch09_system_tasks/rdist_poisson.va codegen: a call of `$rdist_poisson`
+verilog-a/ch09_system_tasks/rdist_positive_mean_at_run_time.va codegen: a call of `$rdist_exponential`
+verilog-a/ch09_system_tasks/rdist_t.va codegen: a call of `$rdist_t`
+verilog-a/ch09_system_tasks/rdist_zero_mean_at_run_time_is_an_error.va codegen: a call of `$rdist_exponential`
+verilog-a/ch09_system_tasks/real_distribution.va codegen: a call of `$rdist_uniform`
+verilog-a/ch09_system_tasks/rng_reference_large_count.va codegen: a call of `$rdist_chi_square`
+verilog-a/ch09_system_tasks/rng_short_circuit.va codegen: a call of `$rdist_exponential`
+verilog-a/ch09_system_tasks/severity_tasks.va point 0: row 0: old 0e0, new 3.3735730291752675e0
+verilog-a/ch09_system_tasks/simparam_fallback_as_parameter_default.va codegen: parameter `lo`'s default does not fold
+verilog-a/ch09_system_tasks/simparam_gmin_source_scale_host_written.va codegen: parameter `g`'s default does not fold
+verilog-a/ch09_system_tasks/simparam_minr_hicum_l2_default.va codegen: parameter `minr`'s default does not fold
+verilog-a/ch09_system_tasks/simparam_newton_tolerances_host_written.va codegen: parameter `rt`'s default does not fold
+verilog-a/ch09_system_tasks/simparam_timescale.va point 0: row 0: old -4.511869783264559e-1, new -4.511869793274559e-1
+verilog-a/ch09_system_tasks/test_plusargs.va codegen: a call of `$test$plusargs`
+verilog-a/ch09_system_tasks/top_port_connected_controls_ddt.va codegen: a call of `$port_connected`
+verilog-a/ch09_system_tasks/value_plusargs.va codegen: a call of `$value$plusargs`
+verilog-a/ch10_directives/default_transition_ramp.va codegen: a call of `transition`
+verilog-a/combined/optional_port_environment.va codegen: a call of `$port_connected`
+verilog-a/combined/optional_port_hierarchy.va codegen: a call of `$port_connected`
+verilog-a/combined/parameter_binding_environment.va codegen: a call of `$port_connected`
+verilog-a/exhaustive/event_hold.va codegen: a call of `cross`
+verilog-a/exhaustive/laplace_dc_gain.va codegen: a call of `laplace_nd`
+verilog-a/exhaustive/timer_breakpoint_one_shot.va codegen: a call of `timer`
+verilog-a/exhaustive/timer_breakpoint_periodic.va codegen: a call of `timer`
+verilog-a/exhaustive/zi_sample_hold.va codegen: a call of `zi_nd`
+verilog-ams/ch03_data_types/operator_equation_tolerances.va codegen: a call of `idt$hold`
+verilog-ams/ch04_expressions/slew_small_signal.va codegen: a call of `slew`
+verilog-ams/ch04_expressions/transition_resolution.va codegen: a call of `transition`
+verilog-ams/ch04_expressions/transition_simulator_default.va codegen: a call of `transition`
+verilog-ams/ch05_analog_behavior/analog_initial.va codegen: a call of `timer`
+verilog-ams/ch05_analog_behavior/timer_body_clog2_controls.va codegen: a call of `timer`
+verilog-ams/ch05_analog_behavior/timer_body_controls.va codegen: a call of `timer`
+verilog-ams/ch05_analog_behavior/timer_body_function_controls.va codegen: a call of `timer`
+verilog-ams/ch05_analog_behavior/timer_controls.va codegen: a call of `timer`
+verilog-ams/ch05_analog_behavior/timer_dynamic.va codegen: a call of `timer`
+verilog-ams/ch05_analog_behavior/timer_fixed.va codegen: a call of `timer`
+verilog-ams/ch06_hierarchy/child_initial_block_is_carried.va point 0: row 0: old 2.0933731531943653e0, new 0e0
+verilog-ams/ch06_hierarchy/top_initial_block_with_a_child.va point 0: row 0: old 6.5464810545468115e0, new 2.182160351515604e0
+verilog-ams/ch07_mixed_signal/analog_event.va codegen: a call of `cross`
+verilog-ams/ch08_scheduling/analog_digital_initial_order.va point 0: row 0: old 2e0, new 1e0
+verilog-ams/ch09_system_tasks/fatal_in_analog_initial_skips_simulation.va point 0: row 0: old 0e0, new -1.3104359321989143e0
+verilog-ams/ch09_system_tasks/port_mask.va codegen: a call of `$port_connected`
+verilog-ams/ch11_vpi/analog_system_task_registration.va the old device stopped the process at point 0 (wait status 0xb), the new device did not
+verilog-ams/ch12_vpi_routines/analog_systf_resistor_call.va the old device stopped the process at point 0 (wait status 0xb), the new device did not
+verilog-ams/ch12_vpi_routines/analog_systf_sampler_call.va codegen: a call of a user function (callee 4294967295)
+verilog-ams/ch12_vpi_routines/cap_ramp.va codegen: a flow contribution to a potential source's branch
+verilog-ams/ch12_vpi_routines/cube_solve.va the old device stopped the process at point 0 (wait status 0xb), the new device did not
+verilog-ams/ch12_vpi_routines/dc_divider.va codegen: a flow contribution to a potential source's branch
+verilog-ams/ch12_vpi_routines/env_probe.va codegen: a call of a user function (callee 4294967295)
+verilog-ams/ch12_vpi_routines/env_twin.va codegen: a call of a user function (callee 4294967295)
+verilog-ams/ch12_vpi_routines/functype.va codegen: a call of a user function (callee 4294967295)
+verilog-ams/ch12_vpi_routines/ramp_load.va codegen: a flow contribution to a potential source's branch
+verilog-ams/ch12_vpi_routines/sampnhold.va codegen: a flow contribution to a potential source's branch
+verilog-ams/ch12_vpi_routines/square_law.va codegen: a call of a user function (callee 4294967295)
+verilog-ams/ch12_vpi_routines/systf_devices.va codegen: a flow contribution to a potential source's branch
+verilog-ams/ch12_vpi_routines/two_sites.va codegen: a call of a user function (callee 4294967295)
+verilog-a/ch09_system_tasks/say_ops.va point 7: row 0: old 0e0, new 3.364633961015358e-2
+verilog-ams/ch09_system_tasks/say_ops.va point 3: row 0: old 0e0, new 4.6634348525820456e-2
+netlist/hdl/a09_limit_root_transient.assets/a09_limit_ramp.va codegen: a §9.17.3 `$limit`
+netlist/hdl/veriloga_limit.assets/va_limit.va codegen: a §9.17.3 `$limit`
+netlist/hdl/veriloga_limit.assets/va_limit_state.va codegen: a §9.17.3 `$limit`
+netlist/noise/va_noise.assets/ntab_card.va the new device does not build: n22.zig:80: unused local constant
+spice/limit_fet.va codegen: a call of `$limit`
+spice/limit_pnj.va codegen: a call of `$limit`
+spice/limit_pnjlimds_bsim_pmos_von_at_old.va codegen: a call of `$limit`
+spice/limit_pnjlimds_bulk_rung.va codegen: a call of `$limit`
+spice/limit_pnjlimds_dangling_returns_probe.va codegen: a call of `$limit`
+spice/limit_seed_bsim3_pmos_initjct.va codegen: a call of `$limit`
+spice/limit_seed_conditional_on_card.va codegen: a call of `$limit`
+spice/limit_seed_explicit_beats_default.va codegen: a call of `$limit`
+spice/limit_seed_mos1_initjct.va codegen: a call of `$limit`
+spice/limit_vds.va codegen: a call of `$limit`
+spice/primitive_source_scale_factor.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+spice/primitive_vexp.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+spice/primitive_vpulse.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+spice/primitive_vpwl.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+spice/primitive_vsine.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+spice/spice_source_primitives.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+spice/vsine_dc_is_the_operating_point_value.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/annex_a_syntax/indirect_contribution.va codegen: a §5.6.7 indirect contribution
+verilog-a/ch01_intro/signal_flow_bound_to_conservative_node.va codegen: a flow contribution to a potential source's branch
+verilog-a/ch04_expressions/absdelay_vera_interp_quadratic.va codegen: a call of `absdelay`
+verilog-a/ch04_expressions/absdelay_vera_interp_quadratic_uneven.va codegen: a call of `absdelay`
+verilog-a/ch04_expressions/ac_stim.va codegen: a call of `ac_stim`
+verilog-a/ch04_expressions/ac_stim_ac_analysis.va codegen: a call of `ac_stim`
+verilog-a/ch04_expressions/ac_stim_dynamic_magnitude.va codegen: a call of `ac_stim`
+verilog-a/ch04_expressions/ac_stim_long_node_names.va codegen: a call of `ac_stim`
+verilog-a/ch04_expressions/ac_stim_noise_analysis.va codegen: a call of `ac_stim`
+verilog-a/ch04_expressions/ac_stim_quadrature.va codegen: a call of `ac_stim`
+verilog-a/ch04_expressions/ddx.va codegen: a call of `ddx`
+verilog-a/ch04_expressions/ddx_flow_column_in_eval.va codegen: a call of `ddx`
+verilog-a/ch04_expressions/ddx_in_noise_power.va codegen: a call of `ddx`
+verilog-a/ch04_expressions/diode_noise_sources_in_dc.va the new device does not build: n9.zig:81: unused local constant
+verilog-a/ch04_expressions/filter_parameter_arrays.va codegen: a call of `laplace_nd`
+verilog-a/ch04_expressions/laplace_nd_zero_padded_coefficients.va codegen: a call of `laplace_nd`
+verilog-a/ch04_expressions/laplace_np_parameter_roots_unpaired_is_nan.va codegen: a call of `laplace_np`
+verilog-a/ch04_expressions/laplace_zp_parameter_roots_ac.va codegen: a call of `laplace_zp`
+verilog-a/ch04_expressions/laplace_zp_parameter_roots_step.va codegen: a call of `laplace_zp`
+verilog-a/ch04_expressions/noise_anticorrelated_coefficient.va the new device does not build: n22.zig:59: unused local constant
+verilog-a/ch04_expressions/noise_coefficient_beside_a_loop.va the new device does not build: n23.zig:61: unused local constant
+verilog-a/ch04_expressions/noise_coefficient_through_a_conditional.va the new device does not build: n0.zig:66: unused local constant
+verilog-a/ch04_expressions/noise_correlated_scale.va the new device does not build: n1.zig:59: unused local constant
+verilog-a/ch04_expressions/noise_psd_beside_a_held_history.va the new device does not build: n3.zig:95: unused local constant
+verilog-a/ch04_expressions/noise_source_through_variable.va the new device does not build: n5.zig:62: unused local constant
+verilog-a/ch04_expressions/noise_sources.va the new device does not build: n6.zig:63: unused local constant
+verilog-a/ch04_expressions/noise_table_array_parameter.va the new device does not build: n7.zig:90: unused local constant
+verilog-a/ch04_expressions/noise_table_card_knots.va the new device does not build: n8.zig:82: unused local constant
+verilog-a/ch04_expressions/partially_correlated_noise.va the new device does not build: n18.zig:72: unused local constant
+verilog-a/ch04_expressions/psd_bias_dependent.va the new device does not build: n3.zig:85: unused local constant
+verilog-a/ch04_expressions/psd_white_flicker_export.va the new device does not build: n4.zig:65: unused local constant
+verilog-a/ch04_expressions/small_signal_linearization.va codegen: a call of `ac_stim`
+verilog-a/ch04_expressions/spice_noise_rc_white.va the new device does not build: n2.zig:59: unused local constant
+verilog-a/ch04_expressions/spice_noise_series_resistor.va the new device does not build: n3.zig:56: unused local constant
+verilog-a/ch04_expressions/spice_noise_shared_pair.va the new device does not build: n4.zig:62: unused local constant
+verilog-a/ch04_expressions/status_site_beside_noise.va the new device does not build: n7.zig:72: unused local constant
+verilog-a/ch04_expressions/white_noise_topology.va the new device does not build: n23.zig:63: unused local constant
+verilog-a/ch05_analog_behavior/absdelay_short_delay.va codegen: a call of `absdelay`
+verilog-a/ch05_analog_behavior/analog_signals_nets_branches_contributions.va codegen: a §5.6.7 indirect contribution
+verilog-a/ch05_analog_behavior/child_named_branch_potential_and_flow_access.va codegen: a flow contribution to a potential source's branch
+verilog-a/ch05_analog_behavior/held_array_element_between_events.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/hierarchical_contribution_creates_a_new_branch.va codegen: a flow contribution to a potential source's branch
+verilog-a/ch05_analog_behavior/indirect_and_direct_on_different_pairs.va codegen: a §5.6.7 indirect contribution
+verilog-a/ch05_analog_behavior/indirect_contribution.va codegen: a §5.6.7 indirect contribution
+verilog-a/ch05_analog_behavior/indirect_equation_lhs_tolerance.va codegen: a §5.6.7 indirect contribution
+verilog-a/ch05_analog_behavior/multiple_indirect.va codegen: a §5.6.7 indirect contribution
+verilog-a/ch05_analog_behavior/simprobe_reads_a_sibling_output_variable.va codegen: a call of a user function (callee 4294967295)
+verilog-a/ch05_analog_behavior/simprobe_scope_is_the_parent.va codegen: a call of a user function (callee 4294967295)
+verilog-a/ch05_analog_behavior/static_switch_port_probe.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch05_analog_behavior/timer_body_index_controls.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/vera_reject_step_retry.va codegen: a call of `above`
+verilog-a/ch05_analog_behavior/vera_timepoint_cache.va codegen: a call of `timer`
+verilog-a/ch06_hierarchy/inherited_flow_tolerance_minimum.va codegen: a flow contribution to a potential source's branch
+verilog-a/ch06_hierarchy/mfactor_divides_a_flow_probe.va codegen: a flow contribution to a potential source's branch
+verilog-a/ch06_hierarchy/oomr_branch_probe_two_levels.va codegen: a flow contribution to a potential source's branch
+verilog-a/ch06_hierarchy/paramset_hidden_output_variable_takes_the_fallback.va codegen: a call of a user function (callee 4294967295)
+verilog-a/ch09_system_tasks/kernel_control_tasks_together.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_constant_history.va codegen: a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_fetlim_with_vth.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_flow_probe_returns_probe.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_initialize_limiting.va codegen: a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_named.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_newton_convergence.va codegen: a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_omitted_algorithm_neighbour.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_pnjlim_internal_node_honoured.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_polarity_sign_argument_honoured.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_steplim_internal_node_honoured.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_too_few_arguments_returns_probe.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_too_many_arguments_returns_probe.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_under_if_returns_probe.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_unknown_algorithm_returns_probe.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/limit_user_function.va codegen: a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_user_function_multiple_sites.va codegen: a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_user_function_previous_iterate.va codegen: a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/limit_with_derivative.va codegen: a §9.17.3 `$limit`
+verilog-a/ch09_system_tasks/port_connected_controls_analog_operator.va codegen: a call of `transition`
+verilog-a/ch09_system_tasks/simprobe_string_parameter_name_resolves.va codegen: a call of a user function (callee 4294967295)
+verilog-a/ch09_system_tasks/status_ops.va codegen: a call of `ac_stim`
+verilog-a/ch09_system_tasks/table_capture_rejected_step_recaptures.va codegen: a call of `above`
+verilog-a/ch09_system_tasks/table_snapshot.va codegen: a call of `$limit`
+verilog-a/ch09_system_tasks/table_snapshot_collapse.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch09_system_tasks/table_status.va codegen: a call of `$limit`
+verilog-a/ch10_directives/compact_modeling_nonlin_res_example.va codegen: a call of `ddx`
+verilog-a/ch10_directives/predefined_compact_modeling.va codegen: a call of `ddx`
+verilog-a/combined/limit_and_discontinuity.va codegen: a call of `$limit`
+verilog-a/combined/named_limiter_nonlinear.va codegen: a call of `$limit`
+verilog-a/combined/noise_and_analysis.va the new device does not build: n16.zig:71: unused local constant
+verilog-a/combined/noise_temperature_analysis.va the new device does not build: n17.zig:73: unused local constant
+verilog-a/exhaustive/indirect_contribution.va codegen: a §5.6.7 indirect contribution
+verilog-ams/ch05_analog_behavior/cross_expr_tol_and_time_tol_both_hold.va codegen: a call of `cross`
+verilog-ams/ch05_analog_behavior/event_array_index_change_is_not_an_event.va codegen: a call of `timer`
+verilog-ams/ch05_analog_behavior/indirect_equation_lhs_tolerance.va codegen: a §5.6.7 indirect contribution
+verilog-ams/ch05_analog_behavior/named_event_has_no_time_duration.va codegen: a call of `timer`
+verilog-ams/ch05_analog_behavior/timer_body_index_controls.va codegen: a call of `timer`
+verilog-ams/ch07_mixed_signal/a2d_tick_quantization.va codegen: a call of `cross`
+verilog-ams/ch07_mixed_signal/mixed_top_with_an_analog_child.va codegen: a flow contribution to a potential source's branch
+verilog-ams/ch07_mixed_signal/named_event_from_analog_reaches_digital.va codegen: a call of `timer`
+verilog-ams/ch07_mixed_signal/timer_runtime_body_period.va codegen: a call of `timer`
+verilog-ams/ch07_mixed_signal/timer_runtime_controls.va codegen: a call of `timer`
+verilog-ams/ch07_mixed_signal/timer_runtime_drift.va codegen: a call of `timer`
+verilog-ams/ch07_mixed_signal/timer_runtime_enable.va codegen: a call of `timer`
+verilog-ams/ch09_system_tasks/status_ops.va codegen: a call of `ac_stim`
+verilog-ams/ch09_system_tasks/table_status.va codegen: a call of `$limit`
+verilog-ams/ch12_vpi_routines/rc_ac.va codegen: a call of `ac_stim`
+verilog-a/ch06_hierarchy/paramset_outer_defparam_shape.va codegen: parameter `mode` is not a number
+verilog-a/ch06_hierarchy/paramset_output_reads_a_module_output.va codegen: a call of a user function (callee 4294967295)
+verilog-a/ch06_hierarchy/paramset_string_range_selection.va codegen: parameter `u.h01_type_ps.t` is not a number
+verilog-a/ch06_hierarchy/paramset_variable_is_an_output_variable.va codegen: a call of a user function (callee 4294967295)
+verilog-a/ch06_hierarchy/paramset_outer_defparam_selection_parameter.va point 0: row 0: old -4.790351634458477e0, new -5.8077535073955335e0
+verilog-a/annex_a_syntax/declarations.va codegen does not spell a slot of type 2 (a string)
+verilog-a/annex_a_syntax/system_task_null_argument_space.va codegen does not spell a §5.10 held variable
+verilog-a/ch03_data_types/multidimensional_strings.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/parameter_types.va codegen does not spell parameter `string_parameter` is not a number
+verilog-a/ch03_data_types/string_arrays.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_comparison_context.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_comparisons.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_concatenation.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_concatenation_runtime_operand.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_literal_operand_is_a_number.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_nul_removal.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_parameter_range.va codegen does not spell parameter `device_type` is not a number
+verilog-a/ch03_data_types/string_range_overrides.va codegen does not spell parameter `u.kind` is not a number
+verilog-a/ch03_data_types/string_replication.va codegen does not spell a §5.10 held variable
+verilog-a/ch03_data_types/string_replication_4096_bytes.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_replication_parameter_multiplier.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_replication_past_4096_bytes.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_replication_runtime_multiplier.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch03_data_types/string_variables.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch04_expressions/ac_stim_label_inactive_in_large_signal.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch05_analog_behavior/held_sformat_string_survives_rejected_step.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/simparam_dynamic_name.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch05_analog_behavior/string_written_in_event_body_is_held.va codegen does not spell a §5.10 held variable
+verilog-a/ch05_analog_behavior/timer_body_context_controls.va codegen does not spell a §5.10 held variable
+verilog-a/ch06_hierarchy/conditional_direct_nesting_is_not_a_scope.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/analog_decimal_is_auto_sized.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/analog_radix_of_integer_expression_is_32_bits.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/diagnostic_finish_initial.va codegen does not spell a device with no unknowns
+verilog-a/ch09_system_tasks/diagnostic_info_initial.va codegen does not spell a device with no unknowns
+verilog-a/ch09_system_tasks/display_argument_runs.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/display_c_format_flags.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/display_formats.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/display_library_binding.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/display_radix_of_integer_is_32_bits.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/integer_default_fields.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/l_format_library_cell.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/m_format_hierarchical_name.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/null_argument_consumed_by_s.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/percent_escape_prints_one_percent.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/real_conversion_rounds_half_to_even.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/real_engineering_notation.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/real_flags_sign_before_zero_fill.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/real_format_fields.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/real_g_conversion_is_significant_digits.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/real_hash_flag_e_always_prints_the_point.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/real_hash_flag_f_always_prints_the_point.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/real_hash_flag_g_keeps_trailing_zeros.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/reject_simprobe_runtime_name.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/scan_destination_preservation.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/sformat_32_conversions.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/sformat_field_width_over_4096.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/sformat_runtime_width_past_its_row_rejected.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/sformat_runtime_width_within_its_row.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/sformat_variable_format_mismatch_continues.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/simparam_str_analysis_name_host_table.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/simparam_str_analysis_type_tran_op.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/simparam_str_cwd_and_analysis_name.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/simparam_str_cwd_host_table.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/simparam_string.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/sscanf.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/sscanf_invalid_conversion_runtime_choice.va codegen does not spell a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/sscanf_literal_and_excess_arguments.va codegen does not spell a call of `$sscanf`
+verilog-a/ch09_system_tasks/sscanf_reads_a_string_variable.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/string_concat_past_4096_bytes.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/string_formatting.va codegen does not spell a §5.10 held variable
+verilog-a/ch09_system_tasks/swrite_s_with_argument.va codegen does not spell a §5.10 held variable
+verilog-a/ch10_directives/compact_modeling_extension_set.va codegen does not spell a §5.10 held variable
+verilog-a/ch10_directives/file_macro_is_the_opened_path.va codegen does not spell a slot of type 2 (a string)
+verilog-ams/annex_a_syntax/analog_initial.va codegen does not spell a §5.10 held variable
+verilog-ams/ch05_analog_behavior/analog_initial_integer.va codegen does not spell a §5.10 held variable
+verilog-ams/ch05_analog_behavior/analog_initial_real.va codegen does not spell a §5.10 held variable
+verilog-ams/ch05_analog_behavior/multiple_analog_initial_blocks_concatenate.va codegen does not spell a §5.10 held variable
+verilog-ams/ch05_analog_behavior/timer_body_context_controls.va codegen does not spell a §5.10 held variable
+verilog-ams/ch07_mixed_signal/display_binary_operand_analog.va codegen does not spell a §5.10 held variable
+verilog-ams/ch07_mixed_signal/driver_count_excludes_connectmodule.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/driver_delay_and_next_state.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/receiver_count_reports_ordinary_receivers.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/receiver_default_bypass.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch07_mixed_signal/receiver_value_set_by_connectmodule.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch08_scheduling/analog_initial_order.va codegen does not spell a §5.10 held variable
+verilog-ams/ch08_scheduling/analog_initial_parameter_sweep.va codegen does not spell a §5.10 held variable
+verilog-ams/ch08_scheduling/declaration_assignment_order.va codegen does not spell a §5.10 held variable
+verilog-ams/ch09_system_tasks/diagnostic_finish_initial.va codegen does not spell a device with no unknowns
+verilog-ams/ch09_system_tasks/diagnostic_info_initial.va codegen does not spell a device with no unknowns
+verilog-ams/ch09_system_tasks/driver_strength_next_strength_type.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`
+verilog-ams/ch09_system_tasks/finish_in_analog_initial_skips_simulation.va codegen does not spell a §5.10 held variable
+verilog-ams/ch09_system_tasks/receiver_segregation_ignored_without_driver_value.va codegen does not spell a potential contribution whose flow unknown is not `flow(hi,lo)`

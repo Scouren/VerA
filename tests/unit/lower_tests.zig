@@ -197,6 +197,9 @@ fn tableVerdict(body: []const u8, tbl: []const u8) !?@import("diag").Code {
     defer h.deinit();
     const dirs = [_][]const u8{dir};
     h.low.opts.include_dirs = &dirs;
+    // A stage reads no file but through the compilation's `Files`.
+    var disk: @import("frontend").Files = .init(std.testing.io, h.arena_state.allocator());
+    h.low.opts.files = &disk;
     if (try h.lower() != null) return null;
     return h.bag.at(0).code;
 }

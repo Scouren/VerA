@@ -12,6 +12,7 @@
 //! - `pub fn readsNoAutomatic(l: *Lower, r: Inst.Ref, comptime what: []const u8) Error!void`
 //! - `pub fn indexReads(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void`
 //! - `pub fn bodyReads(l: *Lower, b: Vir.Body, out: *std.ArrayList(u32)) Error!void`
+//! - `pub fn isLvalue(l: *Lower, r: Inst.Ref) bool`
 //! - `pub fn terms(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void`
 //! - `pub fn selectOf(l: *Lower, i: Inst.Index) Error!Sel`
 //! - `pub fn elemRow(l: *Lower, s: Sel) Error!u32`
@@ -50,6 +51,16 @@ pub const Sel = struct {
     count: u32 = 1,
     first: i64 = 0,
 };
+
+/// Whether `r` is a procedural lvalue's form: a name, a select of one, or
+/// a concatenation (A.8.5), not a literal or other expression.
+pub fn isLvalue(l: *Lower, r: Inst.Ref) bool {
+    const i = r.toIndex() orelse return false;
+    return switch (Lower.tag(l.virOf(l.frame), i)) {
+        .decl_ref, .str_ref, .field, .elem, .slice, .slice_up, .slice_down, .concat => true,
+        else => false, // else: an expression or literal
+    };
+}
 
 /// The type an assignment to lvalue `r` converts its value to: the
 /// variable's (an element's), a select's (unsigned), a concatenation's sum.

@@ -168,6 +168,11 @@ fn argumentForms(l: *Lower, i: Inst.Index, f: SysFn, args: []const Inst.Ref) Err
         .time, .stime => if (args.len != 0) return l.reject(l.frame, at, "$time and $stime take no arguments"),
         .realtime, .abstime => if (args.len != 0) return l.reject(l.frame, at, "$realtime and $abstime take no arguments"),
         .rtoi, .itor, .realtobits, .bitstoreal => if (!one) return l.reject(l.frame, at, "a §17.8 conversion takes exactly one argument"),
+        // §17.9.1 "The seed argument shall be a reg, integer, or time variable".
+        .random, .dist_uniform, .dist_normal, .dist_exponential, .dist_poisson, .dist_chi_square, .dist_t, .dist_erlang => if (args.len != 0 and args[0] != .none) {
+            const n = if (place.isLvalue(l, args[0])) try expr.nameOf(l, args[0]) else null;
+            if (n == null or n.?.kind != .variable or n.?.ty.real) return l.rejectArg(l.frame, i, 0, "§17.9.1: the seed argument shall be a reg, integer or time variable");
+        },
         .clog2 => {
             if (!one) return l.reject(l.frame, at, "$clog2 takes exactly one argument");
             if ((try expr.typeValue(l, args[0])).real) return l.rejectArg(l.frame, i, 0, "§17.11.1: $clog2 takes an integer or vector argument, not a real");

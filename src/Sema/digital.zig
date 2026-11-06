@@ -301,7 +301,8 @@ pub const Lower = struct {
     /// concatenation) of frame `f`: at `r` when Vir holds its position, else
     /// at the first token of the form's operand `k`, counting the top-level
     /// `,` and `:` after its opening bracket (a literal has no position in
-    /// Vir; lib/sim/digital reports at its token).
+    /// Vir; lib/sim/digital reports at its token, an empty one at the token
+    /// after it).
     pub fn rejectOperand(l: *Lower, f: u32, r: Inst.Ref, i: Inst.Index, k: u32, comptime msg: []const u8) error{Rejected} {
         if (r.toIndex()) |ri| if (l.srcOffset(f, ri) != 0) return l.reject(f, r, msg);
         l.why = msg;
@@ -319,7 +320,8 @@ pub const Lower = struct {
             const tt = tree.tokenTag(t);
             const separator = tt == .comma or tt == .colon;
             const closer = tt == .r_bracket or tt == .r_brace or tt == .r_paren;
-            if (depth == 0 and seen == k and !separator and !closer) {
+            // An empty slot is reported at the token that ends it.
+            if (depth == 0 and seen == k) {
                 l.why_at = tree.tokenStart(t);
                 return error.Rejected;
             }
@@ -530,7 +532,11 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Low
 // ---- private ----
 
 fn spine(l: *Lower) Error!void {
-    if (l.zcu.instances.len == 0) return l.refuse("a design with no instance");
+    if (l.zcu.instances.len == 0) {
+        l.why = "digital execution found no top-level module";
+        l.why_at = moduleAt(l, firstModule(l) orelse return error.Rejected);
+        return error.Rejected;
+    }
     // §17.2.1/§17.2.9 a relative data file is looked for beside the design.
     const pp = l.options.sources[0].pp;
     if (pp.files.len != 0) l.b.p.file_name = try l.b.string(pp.files[0].name);
@@ -565,7 +571,11 @@ fn timeScales(l: *Lower) Error!void {
             finest = @min(finest, @backingInt(p));
         }
     }
-    if (set != 0 and set != total) return l.refuse("§19.8 some modules with a `timescale and some without");
+    if (set != 0 and set != total) {
+        l.why = "§19.8: it shall be an error if some modules have a `timescale specified and others do not";
+        l.why_at = moduleAt(l, zcu.instances.items(.module)[0]);
+        return error.Rejected;
+    }
     l.b.p.finest = finest;
     const global: std_sim.time.Quantum = @fromBackingInt(@intCast(finest));
     ahead = true;
@@ -584,6 +594,25 @@ fn timeScales(l: *Lower) Error!void {
             try l.module_times.put(l.a, .{ .file = file, .index = @fromBackingInt(@intCast(k)) }, .{ .scale = scale, .unit_exp = @backingInt(unit) });
         }
     }
+}
+
+/// The first module any file declares.
+fn firstModule(l: *const Lower) ?Zcu.Decl {
+    for (0..l.zcu.files.len) |f| {
+        const file: Zcu.File.Index = @fromBackingInt(@intCast(f));
+        for (l.zcu.fileVir(file).decls(), 0..) |d, k| if (d.kind == .module or d.kind == .macromodule)
+            return .{ .file = file, .index = @fromBackingInt(@intCast(k)) };
+    }
+    return null;
+}
+
+/// The source offset of module `d`'s declaration (its main token), where
+/// lib/sim/digital reports a whole-design error.
+fn moduleAt(l: *const Lower, d: Zcu.Decl) u32 {
+    const vir = l.zcu.fileVir(d.file);
+    const tree = l.options.sources[@backingInt(d.file)].tree;
+    const n = vir.instructions.items(.data)[@backingInt(l.zcu.declRow(d).inst)].pl_node.src_node;
+    return tree.tokenStart(tree.nodeMainToken(n));
 }
 
 /// The stamp of a mixed design's first module with a `timescale.

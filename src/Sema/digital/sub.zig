@@ -111,6 +111,7 @@ pub fn callRow(l: *Lower, i: Inst.Index) Error!u32 {
         o.* = .{ .in = none, .place = none, .ty = ty };
         if (dir != .output) o.in = try expr.evalFor(l, a, typeOfTy(ty));
         if (dir != .input) {
+            if (!place.isLvalue(l, a)) return l.rejectArg(l.frame, i, k, "§10.2.2: a task output actual must be a procedural lvalue");
             o.place = try place.place(l, a);
             o.ty = try l.tyOf(try place.targetType(l, a));
         }

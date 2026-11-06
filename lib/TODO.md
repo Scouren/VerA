@@ -1503,3 +1503,11 @@ src/
     | codegen.xfail | 435 lines |
     | diff-comp | 1330 agree |
     | not built | VPI 114, libmap 21 |
+- **Morning item: `.v --emit-exe` build remarks.** The old native digital codegen prints
+  `note:` remarks on how it built a design ("4-state: nothing delays", ...). The new
+  `.v` exe (step 1: the embedded Program run by std_sim's interpreter) has none.
+  701 fixtures differ only in those notes; `digital_exe.xfail` lists them as
+  "digital_exe (build remarks)".
+  - If step 2 (native codegen, kept only if its benchmark wins) ships, it can print
+    the remarks that are still true, and the lines go away.
+  - If step 2 doesn't ship, dropping the remarks is the user's call.

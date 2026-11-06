@@ -1,0 +1,293 @@
+# Fixtures on which vera-next does not yet do what vera does under --emit-exe (then the binary it built)
+# (`zig build diff-digital-exe`, tests/differential/comp.zig with v_options): every
+# .v fixture's harness command line with `--run` swapped for the flag. One
+# line each: the fixture path under tests/conformance/tests, its owner, then
+# the first difference. Each line is its owner's debt; a line whose fixture
+# also differs under `--run` is comp.xfail's too. A listed fixture that
+# agrees fails the run until its line goes. Refresh: -Dcomp-rebaseline
+# writes zig-out/digital_exe.xfail.new.
+verilog/03_lexical_conventions/attribute_positions.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_3_8_2_inv` primitive`
+verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/03_lexical_conventions/escaped_system_task_rejected.v not built: backend digital_lowering
+verilog/03_lexical_conventions/forward_reference_reg_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/04_data_types/array_row_write_rejected.v not built: backend digital_lowering
+verilog/04_data_types/array_slice_write_rejected.v not built: backend digital_lowering
+verilog/04_data_types/continuous_assign_to_reg_rejected.v not built: backend digital_lowering
+verilog/04_data_types/memory_as_vector_rejected.v not built: backend digital_lowering
+verilog/04_data_types/named_localparam_override_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.2: `L` is a local parameter, which a parameter value assignment cannot override`, new `error[E0907]: override names no parameter of the module: `L` is not a parameter of `b_4_10_2_leaf``
+verilog/04_data_types/native_real_edge_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/04_data_types/native_real_select_rejected.v not built: backend digital_lowering
+verilog/04_data_types/nonconstant_declaration_assignment_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/04_data_types/parameter_assigned_specify_block_specparam_rejected.v not built: backend digital_lowering
+verilog/04_data_types/parameter_assigned_specparam_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/04_data_types/parameter_from_variable_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/04_data_types/parameter_redeclares_net_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/04_data_types/port_list_body_parameter_override_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/04_data_types/posedge_real_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/04_data_types/real_index_rejected.v not built: backend digital_lowering
+verilog/04_data_types/real_range_bound_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/04_data_types/specparam_before_declaration_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/04_data_types/task_named_like_variable_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/04_data_types/type_net_array_whole_assign_rejected.v not built: backend digital_lowering
+verilog/04_data_types/type_uwire_multiple_drivers_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/04_data_types/undeclared_procedural_target_rejected.v not built: backend digital_lowering
+verilog/04_data_types/variable_range_bound_rejected.v not built: backend digital_lowering
+verilog/04_data_types/whole_memory_write_rejected.v not built: backend digital_lowering
+verilog/05_expressions/constant_time_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/05_expressions/expr_concat_unsized_rejected.v not built: backend digital_lowering
+verilog/05_expressions/expr_zero_replication_alone_rejected.v not built: backend digital_lowering
+verilog/05_expressions/native_select_variable_width_rejected.v not built: backend digital_lowering
+verilog/05_expressions/native_select_zero_width_rejected.v not built: backend digital_lowering
+verilog/05_expressions/native_wide_index_bound_limit.v not built: backend digital_lowering
+verilog/05_expressions/partial_address_rejected.v not built: backend digital_lowering
+verilog/05_expressions/real_bit_select_rejected.v not built: backend digital_lowering
+verilog/05_expressions/real_case_equality_rejected.v not built: backend digital_lowering
+verilog/05_expressions/real_modulus_rejected.v not built: backend digital_lowering
+verilog/05_expressions/real_operand_diagnostic_clause_rejected.v not built: backend digital_lowering
+verilog/05_expressions/reversed_part_select_rejected.v not built: backend digital_lowering
+verilog/05_expressions/scalar_bit_select_rejected.v not built: backend digital_lowering
+verilog/05_expressions/scalar_element_part_select_rejected.v not built: backend digital_lowering
+verilog/05_expressions/variable_part_select_rejected.v not built: backend digital_lowering
+verilog/06_assignments/array_declaration_assignment_rejected.v not built: backend digital_lowering
+verilog/06_assignments/continuous_assign_to_integer_rejected.v not built: backend digital_lowering
+verilog/06_assignments/real_array_initializer_rejected.v not built: backend digital_lowering
+verilog/06_assignments/task_variable_initializer_rejected.v not built: backend digital_lowering
+verilog/07_gate_switch_level/split_array_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/07_gate_switch_level/switch_three_delays_rejected.v not built: backend digital_lowering
+verilog/07_gate_switch_level/unknown_gate_keyword_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: undeclared module in instantiation: no library of the search order (work) holds cell `AND``, new `error[E0904]: instance names no module: `AND``
+verilog/08_udp/combinational_reg_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/08_udp/definition_inside_module_rejected.v rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `q``, new `error[E0205]: unsupported module item: found table`
+verilog/08_udp/definition_placement.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv_before` primitive`
+verilog/08_udp/header_forms.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `and_a` primitive`
+verilog/08_udp/initial_to_input_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/08_udp/initial_values.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `i0` primitive`
+verilog/08_udp/input_minimums.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `and10` primitive`
+verilog/08_udp/instance_array.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv` primitive`
+verilog/08_udp/instances.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `gt` primitive`
+verilog/08_udp/jk_edge_ff.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `jk_edge_ff` primitive`
+verilog/08_udp/multibit_initial_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/08_udp/multiplexer.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `multiplexer` primitive`
+verilog/08_udp/output_bit_select.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv` primitive`
+verilog/08_udp/output_not_first_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §8.1.1: the output port shall be the first port of a UDP`, new `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port, and it is the first port`
+verilog/08_udp/output_reg_initializer.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `hdr` primitive`
+verilog/08_udp/overlapping_entries_agree.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `nand_overlap` primitive`
+verilog/08_udp/sequential_64_inputs.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `seq64` primitive`
+verilog/08_udp/sequential_hold_agrees.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `latch_agree` primitive`
+verilog/08_udp/sequential_without_reg_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/08_udp/table_symbols.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `pn` primitive`
+verilog/08_udp/three_delays_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §8.6: a UDP instance takes at most two delays`, new `error[E0239]: a UDP instance's delay is more than a delay2: `inv #(…) g`: 3 value(s)`
+verilog/08_udp/two_delays.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv` primitive`
+verilog/08_udp/two_outputs_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port`, new `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port, and it is the first port`
+verilog/08_udp/udp_65_inputs.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `and65` primitive`
+verilog/08_udp/udp_comb.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `udp_mux` primitive`
+verilog/08_udp/udp_dff.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `udp_dff` primitive`
+verilog/08_udp/udp_header_order.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `audit_header_udp` primitive`
+verilog/08_udp/udp_latch.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `udp_latch` primitive`
+verilog/08_udp/udp_named_terminal_rejected.v not built: backend digital_lowering
+verilog/08_udp/udp_null_terminal_rejected.v not built: backend digital_lowering
+verilog/08_udp/udp_potential_edges_dominance.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `audit_edges_udp` primitive`
+verilog/09_behavioral_modeling/assign_bit_select_rejected.v not built: backend digital_lowering
+verilog/09_behavioral_modeling/assign_memory_word_rejected.v not built: backend digital_lowering
+verilog/09_behavioral_modeling/assign_to_net_rejected.v not built: backend digital_lowering
+verilog/09_behavioral_modeling/assign_to_reg_select_rejected.v not built: backend digital_lowering
+verilog/09_behavioral_modeling/event_array_assign_rejected.v not built: backend digital_lowering
+verilog/09_behavioral_modeling/event_array_part_select_rejected.v not built: backend digital_lowering
+verilog/09_behavioral_modeling/event_array_posedge_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/09_behavioral_modeling/event_array_rank_rejected.v not built: backend digital_lowering
+verilog/09_behavioral_modeling/event_array_selector_trigger_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function body cannot contain an event trigger`, new `error[E1100]: digital source execution failed: §10.4.2: subroutine calls nested past 20000 activations`
+verilog/09_behavioral_modeling/event_array_value_rejected.v not built: backend digital_lowering
+verilog/09_behavioral_modeling/event_holds_no_data_rejected.v not built: backend digital_lowering
+verilog/09_behavioral_modeling/event_used_before_declaration_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/09_behavioral_modeling/force_variable_bit_select_rejected.v not built: backend digital_lowering
+verilog/09_behavioral_modeling/forever_without_timing_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: more than 10000000 loop iterations and events at time 0: a loop with no delay keeps simulation time from advancing`, new `error[E1100]: digital source execution failed: more than 10000000 loop iterations and events at time 0: a
+verilog/09_behavioral_modeling/multiple_default_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/09_behavioral_modeling/native_wide_event_real_index_rejected.v not built: backend digital_lowering
+verilog/09_behavioral_modeling/undeclared_event_rejected.v not built: backend digital_lowering
+verilog/09_behavioral_modeling/unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
+verilog/09_behavioral_modeling/unnamed_fork_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
+verilog/09_behavioral_modeling/zero_delay_always_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: more than 10000000 loop iterations and events at time 0: a loop with no delay keeps simulation time from advancing`, new `error[E1100]: digital source execution failed: more than 10000000 loop iterations and events at time 0: a
+verilog/10_tasks_functions/constant_function_hierarchical_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/10_tasks_functions/disable_function_rejected.v not built: backend digital_lowering
+verilog/10_tasks_functions/function_call_statement_rejected.v not built: backend digital_lowering
+verilog/10_tasks_functions/function_enables_task_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function cannot enable a task`, new `error[E0214]: expected '<+' or '=': found `;``
+verilog/10_tasks_functions/function_event_trigger_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/10_tasks_functions/function_nonblocking_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function body cannot contain a nonblocking assignment`, new `error[E0214]: expected '<+' or '=': found `;``
+verilog/10_tasks_functions/function_output_argument_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function argument is an input, not an output or inout`, new `error[E0207]: unexpected token: found `output`: A.2.6 gives a function `input` formals only; an `analog function` or a task takes `output``
+verilog/10_tasks_functions/function_scope_object_named_as_function_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/10_tasks_functions/function_time_control_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function body cannot contain a time control`, new `error[E0254]: a delay control in an analog block`
+verilog/10_tasks_functions/function_without_input_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.1: a function shall have at least one input declared`, new `error[E0224]: an analog function declares no formal argument: `f` has an empty formal list`
+verilog/10_tasks_functions/module_object_named_as_function_rejected.v not built: backend digital_lowering
+verilog/10_tasks_functions/recursion_without_end_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: nesting here exhausts the 1987 MiB stack VerA reserved for it`, new `error[E1100]: digital source execution failed: §10.4.2: subroutine calls nested past 20000 activations`
+verilog/10_tasks_functions/subroutine_parameter_assignment_rejected.v not built: backend digital_lowering
+verilog/10_tasks_functions/task_as_operand_rejected.v not built: backend digital_lowering
+verilog/10_tasks_functions/task_null_argument_rejected.v not built: backend digital_lowering
+verilog/10_tasks_functions/task_output_expression_rejected.v not built: backend digital_lowering
+verilog/11_scheduling/primitive_output_to_reg_rejected.v not built: backend digital_lowering
+verilog/11_scheduling/zero_delay_loop_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: more than 10000000 events at time 0: a zero-delay loop keeps simulation time from advancing`, new `error[E1100]: digital source execution failed: more than 10000000 events at time 0: a zero-delay loop keeps simulation time from
+verilog/12_hierarchy/assign_before_net_declaration_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/12_hierarchy/connections_to_portless_module_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: more port connections than the module has ports`, new `error[E0906]: port connections do not match the module's ports: `noports` declares 0 ports, and this instance connects 1`
+verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/12_hierarchy/defparam_across_generate_instances_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/12_hierarchy/defparam_early_resolution_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.8.2: this defparam's hierarchical name was resolved before the hierarchy was complete and would resolve diff`, new `error[E0907]: override names no parameter of the module: `m.n.p` names no parameter of the elab
+verilog/12_hierarchy/defparam_names_no_parameter_rejected.v rw-comp (elab) message: stderr: line 1: old `error[E0907]: override names no parameter of the module: §12.2.1: this defparam names `Z`, which is no parameter of its module`, new `error[E0907]: override names no parameter of the module: `Z` is not a parameter of `inner``
+verilog/12_hierarchy/defparam_names_nothing_rejected.v rw-comp (elab): stderr: line 1: old `error[E0901]: hierarchical name names nothing in the elaborated design: §12.2.1: this defparam's hierarchical name `foo` names nothing in the design`, new `error[E0907]: override names no parameter of the module: `foo` is not a parameter of `triage_defparam_name
+verilog/12_hierarchy/defparam_nonconstant_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element`, new `error[E0907]: override names no parameter of the module: `u[1].x.p` names no parameter of the e
+verilog/12_hierarchy/duplicate_module_later_wins.v rw-comp (elab) message: stderr: line 1: old `warning[W1152]: two cells with one name in one library: `work.a` is defined again; this later definition is the cell`, new `warning[W1152]: two cells with one name in one library: `a` is defined again; this later definition is the module`
+verilog/12_hierarchy/duplicate_port_name_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/12_hierarchy/extra_ordered_connection_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: more port connections than the module has ports`, new `error[E0906]: port connections do not match the module's ports: `m` declares 2 ports, and this instance connects 3`
+verilog/12_hierarchy/extra_ordered_parameter_value_ignored.v rw-comp (elab): exit status old 0, new 1
+verilog/12_hierarchy/extra_ordered_value_ignored.v rw-comp (elab): exit status old 0, new 1
+verilog/12_hierarchy/function_port_range_scope_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/generate_loop_repeated_genvar_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/generate_nonterminating_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/hierarchy_simple_name_stops_at_module_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/input_declared_reg_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/instance_select_out_of_range_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/listed_port_undeclared_rejected.v rw-comp (astgen): stderr: line 1: old `error[E1100]: digital source execution failed: §12.3.3: port `b` has no direction declaration`, new `error[E0376]: port has no direction declaration: port `b` of module `m` is not declared `input`, `output` or `inout``
+verilog/12_hierarchy/localparam_override_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/12_hierarchy/mixed_ordered_named_ports_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.3.6: an instance mixes ordered and named port connections`, new `error[E0906]: port connections do not match the module's ports: an ordered connection in a list of named connections`
+verilog/12_hierarchy/module_instance_delay_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/named_connection_to_concatenation_port_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: the instantiated module has no such port`, new `error[E0906]: port connections do not match the module's ports: `c` is not a port of `complex_ports``
+verilog/12_hierarchy/net_type_warning.v rw-comp (elab): stderr: line 1: old `warning[W1160]: dissimilar net types joined through a port: §12.3.10: a `wand` port joined to a `wor` net is a Table 12-1 warn cell of the net type table`, new ``
+verilog/12_hierarchy/no_top_level_module_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/12_hierarchy/non_ancestor_module_name_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/nonconstant_generate_scheme_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/null_port_extra_connection_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: more port connections than the module has ports`, new `error[E0906]: port connections do not match the module's ports: `null_leaf` declares 4 ports, and this instance connects 5`
+verilog/12_hierarchy/output_to_expression_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/output_to_variable_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/parameter_assigned_twice_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.2.2: parameter `size` is assigned twice`, new `error[E0908]: a parameter is overridden more than once: `size` is given more than one value`
+verilog/12_hierarchy/port_connected_twice_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.3.6: port `a` is connected twice`, new `error[E0906]: port connections do not match the module's ports: `a` is connected twice`
+verilog/12_hierarchy/port_width_mismatch_vams_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/12_hierarchy/real_connected_to_port_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/12_hierarchy/select_warning.v rw-comp (elab): stderr: line 1: old `warning[W1160]: dissimilar net types joined through a port: §12.3.10: a `wand` port joined to a `wor` net is a Table 12-1 warn cell of the net type table`, new ``
+verilog/12_hierarchy/self_instantiation_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/12_hierarchy/unknown_parameter_name_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.2.2: the module has no such parameter: `width``, new `error[E0907]: override names no parameter of the module: `width` is not a parameter of `vdff``
+verilog/12_hierarchy/unknown_port_name_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: the instantiated module has no such port`, new `error[E0906]: port connections do not match the module's ports: `zz` is not a port of `m``
+verilog/12_hierarchy/unnamed_block_referenced_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/13_configuration/cell_not_in_its_library_rejected.v not built: backend libmap
+verilog/13_configuration/cfg1_default_liblist.v not built: backend libmap
+verilog/13_configuration/cfg2_gate_first.v not built: backend libmap
+verilog/13_configuration/cfg3_cell_use.v not built: backend libmap
+verilog/13_configuration/cfg4_instance_liblist.v not built: backend libmap
+verilog/13_configuration/cfg6_hierarchical.v not built: backend libmap
+verilog/13_configuration/command_line_search_order.v not built: backend libmap
+verilog/13_configuration/config_in_map_rejected.v not built: backend libmap
+verilog/13_configuration/config_overrides_command_line.v not built: backend libmap
+verilog/13_configuration/default_search_order.v not built: backend libmap
+verilog/13_configuration/design_cell_missing_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/13_configuration/design_names_config_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/13_configuration/every_config_referenced_rejected.v rw-comp (elab): exit status old 1, new 0
+verilog/13_configuration/include_map.v not built: backend libmap
+verilog/13_configuration/library_without_path_rejected.v not built: backend libmap
+verilog/13_configuration/parent_library_by_map.v not built: backend libmap
+verilog/13_configuration/resolution_order.v not built: backend libmap
+verilog/13_configuration/rule_inside_other_config_rejected.v rw-comp (elab): exit status old 1, new 0
+verilog/13_configuration/same_name_cell_last_wins.v rw-comp (elab) message: stderr: line 1: old `warning[W1152]: two cells with one name in one library: `work.leaf` is defined again; this later definition is the cell`, new `warning[W1152]: two cells with one name in one library: `leaf` is defined again; this later definition is the module`
+verilog/13_configuration/source_text_in_map_rejected.v not built: backend libmap
+verilog/13_configuration/two_libraries_match_rejected.v not built: backend libmap
+verilog/13_configuration/two_unreferenced_configs_rejected.v rw-comp (elab): exit status old 1, new 0
+verilog/13_configuration/unbound_instance_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: undeclared module in instantiation: no library of the search order (work) holds cell `absent``, new `error[E0904]: instance names no module: `absent``
+verilog/13_configuration/undeclared_library_rejected.v not built: backend libmap
+verilog/15_timing_checks/conditions.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in b_15_6_conditions.u: timestamp event at 20, timecheck event at 22`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/fullskew_checks_both_orders.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$fullskew` in fullskew_checks_both_orders.forward: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/hold.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$hold` in b_15_2_2_hold.u: timestamp event at 10, timecheck event at 10`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/negative_timing_disabled_copies_signals.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setuphold` in negative_timing_disabled_copies_signals.u: timestamp event at 10, timecheck event at 10`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/nochange_high_window.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$nochange` in nochange_high_window.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/notifier.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in b_15_5_notifier.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/notifier_net_rejected.v not built: backend digital_lowering
+verilog/15_timing_checks/period.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$period` in b_15_3_5_period.u: timestamp event at 20, timecheck event at 28`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/recovery.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$recovery` in b_15_2_5_recovery.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/recrem.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$recrem` in b_15_2_6_recrem.u: timestamp event at 10, timecheck event at 11`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/recrem_signal_limit_rejected.v not built: backend digital_lowering
+verilog/15_timing_checks/removal.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$removal` in b_15_2_4_removal.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/setup.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in b_15_2_1_setup.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/setuphold.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setuphold` in b_15_2_3_setuphold.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/setuphold_signal_limit_rejected.v not built: backend digital_lowering
+verilog/15_timing_checks/setuphold_timecheck_condition.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setuphold` in b_15_5_2_setuphold_timecheck_condition.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/setuphold_timestamp_condition.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setuphold` in b_15_5_2_setuphold_timestamp_condition.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/skew_late_data_notifies.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$skew` in skew_late_data_notifies.u: timestamp event at 20, timecheck event at 25`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/skew_waits_for_data_event.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$skew` in skew_waits_for_data_event.u: timestamp event at 10, timecheck event at 30`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/timeskew_missing_event_and_rearm.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$timeskew` in timeskew_missing_event_and_rearm.u: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/timeskew_remain_active.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$timeskew` in timeskew_remain_active.u: timestamp event at 10, timecheck event at 14`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/vector.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in b_15_7_vector.u: timestamp event at 100, timecheck event at 105`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/15_timing_checks/width.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$width` in b_15_3_4_width.u: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/16_sdf/sdf_timing_check_limit.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in sdf_timing_check_limit.u: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
+verilog/17_system_tasks/closed_channel_not_written.v rw-dlower (run): stderr: line 1: old `warning[W1154]: no file this descriptor names is open for writing: the output is not written`, new ``
+verilog/17_system_tasks/dist_nonpositive_warning.v rw-dlower (run): stderr: line 1: old `warning[W1151]: a $dist_ mean, degree of freedom or k_stage is not positive: the result is 0 and the seed is unchanged`, new ``
+verilog/17_system_tasks/dist_seed_constant_rejected.v not built: backend digital_lowering
+verilog/17_system_tasks/fclose_two_descriptors_rejected.v not built: backend digital_lowering
+verilog/17_system_tasks/fread_multidim_rejected.v not built: backend digital_lowering
+verilog/17_system_tasks/fwrite_no_descriptor_rejected.v not built: backend digital_lowering
+verilog/17_system_tasks/math_arguments_rejected.v not built: backend digital_lowering
+verilog/17_system_tasks/native_sformat_dynamic.v rw-dlower (run): stderr: line 1: old `warning[W1153]: $sformat: the format's specifiers and the arguments after it do not pair up`, new ``
+verilog/17_system_tasks/printtimescale_unknown_scope_rejected.v not built: backend digital_lowering
+verilog/17_system_tasks/random_seed_constant_rejected.v not built: backend digital_lowering
+verilog/17_system_tasks/readmem_address_outside_memory.v rw-dlower (run): stderr: line 1: old `warning[W1156]: memory file address @8 is outside the memory's declared range [0:3]; its words are skipped`, new ``
+verilog/17_system_tasks/readmem_address_outside_task_range.v rw-dlower (run): stderr: line 1: old `warning[W1157]: §17.2.9: memory file address @3 is outside the load range [0:1] the task gives (the words before it stay loaded); the $readmem load is terminat`, new ``
+verilog/17_system_tasks/readmem_address_range_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: §17.2.9: memory file address @2 is outside the load range [0:1] the task gives (the words before it stay loaded); the $readmem load is terminat`, new ``
+verilog/17_system_tasks/readmem_address_x_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed `@` address; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_binary_file_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed data word; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_count_warning.v rw-dlower (run): stderr: line 1: old `warning[W1150]: memory file data word count does not match load range: found 2, expected 4`, new ``
+verilog/17_system_tasks/readmem_edge_address_bad_digit_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed `@` address; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_edge_address_gap_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed `@` address; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_edge_address_overflow_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed `@` address; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_edge_after_range_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed data word; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_edge_underscore_leading_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed data word; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_edge_underscore_only_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed data word; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_excess_legal_neighbor.v rw-dlower (run): stderr: line 1: old `warning[W1150]: memory file data word count does not match load range: found 2, expected 1`, new ``
+verilog/17_system_tasks/readmem_invalid_high_binary_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed data word; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_invalid_high_hex_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed data word; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_malformed_base_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed data word; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_malformed_base_wide_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed data word; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_malformed_binary_digit_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed data word; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_malformed_hex_digit_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed data word; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_malformed_punctuation_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed data word; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_malformed_width_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed data word; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_malformed_width_wide_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: the memory file has a malformed data word; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_overflow_rejected.v rw-dlower (run): stderr: line 1: old `warning[W1150]: memory file data word count does not match load range: found 5, expected 4`, new ``
+verilog/17_system_tasks/readmem_start_address_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: §17.2.9: memory file address @2 is outside the load range [3:3] the task gives (the words before it stay loaded); the $readmem load is terminat`, new ``
+verilog/17_system_tasks/readmem_unknown_bound_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: a $readmem start or finish address evaluates to x or z; the $readmem load is terminated, the simulation goes on`, new ``
+verilog/17_system_tasks/readmem_warn_binary_excess_start.v rw-dlower (run): stderr: line 1: old `warning[W1150]: memory file data word count does not match load range: found 3, expected 2`, new ``
+verilog/17_system_tasks/readmem_warn_binary_short_start.v rw-dlower (run): stderr: line 1: old `warning[W1150]: memory file data word count does not match load range: found 1, expected 2`, new ``
+verilog/17_system_tasks/readmem_warn_empty.v rw-dlower (run): stderr: line 1: old `warning[W1150]: memory file data word count does not match load range: found 0, expected 4`, new ``
+verilog/17_system_tasks/readmem_warn_hex_excess_down.v rw-dlower (run): stderr: line 1: old `warning[W1150]: memory file data word count does not match load range: found 5, expected 4`, new ``
+verilog/17_system_tasks/readmem_warn_hex_excess_up.v rw-dlower (run): stderr: line 1: old `warning[W1150]: memory file data word count does not match load range: found 5, expected 4`, new ``
+verilog/17_system_tasks/readmem_warn_hex_short_down.v rw-dlower (run): stderr: line 1: old `warning[W1150]: memory file data word count does not match load range: found 2, expected 4`, new ``
+verilog/17_system_tasks/readmem_warn_hex_short_up.v rw-dlower (run): stderr: line 1: old `warning[W1150]: memory file data word count does not match load range: found 2, expected 4`, new ``
+verilog/17_system_tasks/sdf_annotate_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1102]: an SDF file the annotator cannot read: sdf_annotate_rejected.sdf: the SDF file cannot be read`, new `error[E1100]: digital source execution failed: sdf_annotate_rejected.sdf: the SDF file cannot be read`
+verilog/17_system_tasks/sformat_excess_argument_warning.v rw-dlower (run): stderr: line 1: old `warning[W1153]: $sformat: the format's specifiers and the arguments after it do not pair up`, new ``
+verilog/17_system_tasks/stop_suspends.v rw-dlower (digital lowering): stderr: line 1: old `$stop at tick 1, verilog/17_system_tasks/stop_suspends.v byte 107`, new `$stop at tick 1, verilog/17_system_tasks/stop_suspends.v byte 797`
+verilog/18_vcd/dumplimit_without_size_rejected.v not built: backend digital_lowering
+verilog/18_vcd/dumpports_duplicate_scope_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/18_vcd/dumpports_same_file_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/18_vcd/dumpports_same_file_rejected.v:28:19`, new `  = note: LRM 8.5`
+verilog/18_vcd/dumpports_variable_scope_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/18_vcd/dumpvars_later_time_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: §18.1.2: every $dumpvars shall execute at the same simulation time`, new `error[E1100]: digital source execution failed: §18.1.2: every $dumpvars shall execute at the same simulation time`
+verilog/18_vcd/dumpvars_memory_word_rejected.v not built: backend digital_lowering
+verilog/18_vcd/dumpvars_unknown_scope_rejected.v not built: backend digital_lowering
+verilog/18_vcd/part_select_rejected.v not built: backend digital_lowering
+verilog/19_compiler_directives/default_nettype_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^`
+verilog/19_compiler_directives/macro_text_1800_forms_warn.v rw-comp (preprocess) location: stderr: line 2: old `  --> verilog/19_compiler_directives/macro_text_1800_forms_warn.v:11:34`, new `  --> verilog/19_compiler_directives/macro_text_1800_forms_warn.v:11:1`
+verilog/19_compiler_directives/mixed_timescale_rejected.v not built: backend digital_lowering
+verilog/19_compiler_directives/none_implicit_net_rejected.v not built: backend digital_lowering
+verilog/19_compiler_directives/some_modules_without_rejected.v not built: backend digital_lowering
+verilog/19_compiler_directives/timescale_inside_module_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/19_compiler_directives/unconnected_drive_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^^^^`
+verilog/A_formal_syntax/b_A_1_1_incdir.v not built: backend libmap
+verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v not built: backend libmap
+verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v not built: backend libmap
+verilog/A_formal_syntax/b_A_1_1_library_text.v not built: backend libmap
+verilog/A_formal_syntax/b_A_2_2_1_dimension_and_initializer_rejected.v not built: backend digital_lowering
+verilog/A_formal_syntax/b_A_2_6_function_output_port_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function argument is an input, not an output or inout`, new `error[E0207]: unexpected token: found `output`: A.2.6 gives a function `input` formals only; an `analog function` or a task takes `output``
+verilog/A_formal_syntax/b_A_2_8_net_block_item_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found `;``, new `error: could not compile due to 1 previous error(s)`
+verilog/A_formal_syntax/b_A_4_1_mixed_port_connections_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.3.6: an instance mixes ordered and named port connections`, new `error[E0906]: port connections do not match the module's ports: a named connection in a list of ordered connections`
+verilog/A_formal_syntax/b_A_5_1_udp_declarations.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_A_5_1_mux` primitive`
+verilog/A_formal_syntax/b_A_5_2_two_outputs_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port`, new `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port, and it is the first port`
+verilog/A_formal_syntax/b_A_5_3_udp_body.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_A_5_3_xor` primitive`
+verilog/A_formal_syntax/b_A_5_4_udp_delay3_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §8.6: a UDP instance takes at most two delays`, new `error[E0239]: a UDP instance's delay is more than a delay2: `b_A_5_4_buf #(…) u`: 3 value(s)`
+verilog/A_formal_syntax/b_A_6_3_unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found k`, new `error: could not compile due to 1 previous error(s)`
+verilog/A_formal_syntax/b_A_6_9_empty_task_argument_rejected.v not built: backend digital_lowering
+verilog/A_formal_syntax/b_A_8_2_empty_function_call_rejected.v not built: backend digital_lowering
+verilog/A_formal_syntax/b_A_8_4_select_after_range_rejected.v not built: backend digital_lowering
+verilog/A_formal_syntax/b_A_source_text.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_A_inv` primitive`
+verilog/A_formal_syntax/grammar_empty_case_rejected.v not built: backend digital_lowering

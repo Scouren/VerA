@@ -13,7 +13,7 @@
 //!
 //! Contents:
 //! - `pub const Run = struct` (`File`), `pub const Verdict = union(enum)`
-//! - `pub fn run(arena: Allocator, io: Io, exe: []const u8, args: []const []const u8, work: []const u8, env: *const std.process.Environ.Map) !Run`
+//! - `pub fn run(arena: Allocator, io: Io, exe: []const u8, args: []const []const u8, work: []const u8, env: *const std.process.Environ.Map, exec: bool) !Run`
 //! - `pub fn compare(arena: Allocator, old: Run, new: Run, digital: bool) !?[]const u8`
 //! - `pub fn notBuilt(new: Run) ?[]const u8`
 //! - `pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool) ![]const u8`
@@ -50,8 +50,12 @@ const timeout_s = 300;
 const files_max: u32 = 1 << 12;
 
 /// Runs `exe args` in `work` (created fresh, removed after) and returns
-/// what it printed and wrote, in `arena`.
-pub fn run(arena: Allocator, io: Io, exe: []const u8, args: []const []const u8, work: []const u8, env: *const std.process.Environ.Map) !Run {
+/// what it printed and wrote, in `arena`. With `exec` (an `--emit-exe`),
+/// a successful run's binary (the first line of its stdout) runs too, in
+/// `work`: its status and stdout are the run's, its stderr follows the
+/// build's, whose `note:` lines (the old native codegen's remarks on how
+/// it built) are dropped.
+pub fn run(arena: Allocator, io: Io, exe: []const u8, args: []const []const u8, work: []const u8, env: *const std.process.Environ.Map, exec: bool) !Run {
     assert(exe.len != 0);
     const cwd = Io.Dir.cwd();
     cwd.deleteTree(io, work) catch {};
@@ -71,6 +75,26 @@ pub fn run(arena: Allocator, io: Io, exe: []const u8, args: []const []const u8, 
         .exited => |c| c,
         else => 255,
     };
+    if (exec and status == 0) {
+        const bin = std.mem.trimEnd(u8, r.stdout[0 .. std.mem.findScalar(u8, r.stdout, '\n') orelse r.stdout.len], " \r");
+        if (bin.len != 0) {
+            const x = std.process.run(arena, io, .{
+                .argv = &.{bin},
+                .cwd = .{ .path = work },
+                .environ_map = env,
+                .timeout = .{ .duration = .{ .raw = .fromSeconds(timeout_s), .clock = .awake } },
+            }) catch |e| switch (e) {
+                error.Timeout => return .{ .status = 255, .stdout = "", .stderr = "timed out", .files = &.{} },
+                else => return e,
+            };
+            const x_status: u8 = switch (x.term) {
+                .exited => |c| c,
+                else => 255,
+            };
+            const built = try withoutNotes(arena, r.stderr);
+            return .{ .status = x_status, .stdout = x.stdout, .stderr = try unthreaded(arena, try std.mem.concat(arena, u8, &.{ built, x.stderr })), .files = try written(arena, io, work) };
+        }
+    }
     return .{ .status = status, .stdout = r.stdout, .stderr = try unthreaded(arena, r.stderr), .files = try written(arena, io, work) };
 }
 
@@ -136,6 +160,20 @@ fn earliestUnmatched(arena: Allocator, a: []const []const u8, b: []const []const
         best = y;
     };
     return best;
+}
+
+/// `text` without its lines that open with `note: `.
+fn withoutNotes(arena: Allocator, text: []const u8) ![]const u8 {
+    var out: std.ArrayList(u8) = .empty;
+    var it = std.mem.splitScalar(u8, text, '\n');
+    var first = true;
+    while (it.next()) |line| {
+        if (std.mem.startsWith(u8, line, "note: ")) continue;
+        if (!first) try out.append(arena, '\n');
+        first = false;
+        try out.appendSlice(arena, line);
+    }
+    return out.items;
 }
 
 /// Whether `b` differs from `a` only by lines `a` has and `b` lacks: `b`'s

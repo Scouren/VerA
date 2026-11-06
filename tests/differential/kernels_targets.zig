@@ -6,10 +6,14 @@
 //! `llvm.fmuladd` and no `contract`/`fast` flag, which each target may fuse
 //! or not. An explicit `@mulAdd` (`llvm.fma`) rounds once everywhere, at
 //! comptime too, so it is allowed: the bits a fold computes are the bits
-//! every target computes (lib/TODO.md §11.8). The family's derivative lanes
-//! may fuse (the contract's numerics table makes FMA optional there), so the
-//! full set is built, not grepped. `fma_control` is the probe's own canary:
-//! an optimized-mode `a * b + c`, which the step requires the grep to find.
+//! every target computes (lib/TODO.md §11.8). With `family_only` it exports
+//! the generic kernels over the strict reference family (`k_family`), held
+//! to the same rule: a strict body never fuses but by an explicit
+//! `@mulAdd`. With `fast` it exports them over the family's `Fast` twin, a
+//! versioned unit's fast body (§11.9), which the step requires to carry the
+//! fast flags: the proof that `.optimized` reaches the family's
+//! arithmetic. `fma_control` is the probe's own canary: an optimized-mode
+//! `a * b + c`, which the step requires the grep to find.
 //! Cites: VAMS §4.3 (Tables 4-14, 4-15), §4.5, §4.5.15.
 //!
 //! Contents: none public; exported symbols only.
@@ -21,11 +25,15 @@ const options = @import("kernels_targets_options");
 
 const m = k.math;
 const Ref = contract.RefFamily(f64, &[2]u8{ 0, 1 }, .{ .math = k.math });
-const K = k.family.Family(2, ~@as(u64, 0)).zL(Ref, 3);
+const Fam = if (options.fast) Ref.Fast else Ref;
+const K = k.family.Family(2, ~@as(u64, 0)).zL(Fam, 3);
 
 comptime {
     if (options.control) {
         @export(&fmaControl, .{ .name = "fma_control" });
+    } else if (options.family_only) {
+        @export(&kFamily, .{ .name = "k_family" });
+        @export(&kArith, .{ .name = "k_arith" });
     } else {
         for (.{ "exp", "log", "sin", "cos", "tan", "tanh", "sinh", "cosh", "expm1", "log1p", "atan", "log10", "asinh", "acosh", "atanh" }) |name|
             @export(&Unary(name).f, .{ .name = "k_" ++ name });
@@ -90,6 +98,15 @@ fn kFamily(x: f64, y: f64, d: f64) callconv(.c) f64 {
     r = k.ops.zSlew(K, r, x, 1e-3, 1e3, 1e3);
     r = k.ops.zTransition(K, r, x, y, 0, d, 1e-3, 1e-6, 1e-6);
     return r.val() + r.ddxAt(0);
+}
+
+/// The family's own arithmetic, nothing but primitives: a product and a
+/// sum with lanes, and a quotient. The fast part's flags show here.
+fn kArith(x: f64, y: f64, z: f64) callconv(.c) f64 {
+    const a: K = .{ .v = .{ .v = x, .d = .{ 1, 0 } } };
+    const b: K = .{ .v = .{ .v = y, .d = .{ 0, 1 } } };
+    const r = a.mul(b).add(K.con(z)).div(b.add(K.con(2.0)));
+    return r.val() + r.ddxAt(0) + r.ddxAt(1);
 }
 
 fn fmaControl(a: f64, b: f64, c: f64) callconv(.c) f64 {

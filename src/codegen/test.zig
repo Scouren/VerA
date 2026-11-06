@@ -157,16 +157,18 @@ test "§11.10 the bsource stack: no memset, a one-word reset, every read behind 
 }
 
 test "§11.9 a versioned unit: the box checked at entry, the fast body inside it, the strict one outside" {
-    // V(p,n)/r with r from [1:1e6] is finite for |V| <= 10 (Float's default
-    // unknown bound): Float rates the root `.optimized` under that box, so
-    // the entry checks each probe and the parameter, one compare pair each.
+    // exp(V(p,n)/r) with r from [1:1e6] is finite for |V| <= 10 (Float's
+    // default unknown bound): Float rates the root `.optimized` under that
+    // box and the body holds a transcendental, so the entry checks each probe and the parameter, one compare pair each,
+    // `&`ed into one branch; the fast body runs on the family's `Fast` twin
+    // and the strict one is out of line.
     const gpa = std.testing.allocator;
     const src =
         \\module r(p, n);
         \\  inout p, n;
         \\  electrical p, n;
         \\  parameter real r = 1k from [1:1e6];
-        \\  analog I(p, n) <+ V(p, n) / r;
+        \\  analog I(p, n) <+ exp(V(p, n) / r);
         \\endmodule
     ;
     var r = try emitWith(gpa, src, false);
@@ -177,8 +179,9 @@ test "§11.9 a versioned unit: the box checked at entry, the fast body inside it
         "zIn(x[0], -1e1, false, 1e1, false, false)",
         "zIn(x[1], -1e1, false, 1e1, false, false)",
         "zIn(model.r, 1e0, false, 1e6, false, false)",
-        "return @call(.always_inline, core, .{ S, .optimized, xs, model, inst, sim });",
-        "return @call(.always_inline, core, .{ S, .strict, xs, model, inst, sim });",
+        ") != 0) return fast(S, x, xs, model, inst, sim);",
+        "const f = @call(.always_inline, core, .{ S.Fast, .optimized, D.zProbe(S.Fast, x), model, inst, sim });",
+        "return @call(.never_inline, core, .{ S, .strict, xs, model, inst, sim });",
     }) |want| {
         if (std.mem.find(u8, text, want) == null) {
             std.debug.print("missing `{s}` in\n{s}\n", .{ want, text });
@@ -190,4 +193,23 @@ test "§11.9 a versioned unit: the box checked at entry, the fast body inside it
     defer s.deinit(gpa);
     try std.testing.expect(std.mem.find(u8, s.ok.text, "zIn(") == null);
     try std.testing.expect(std.mem.find(u8, s.ok.text, ".optimized") == null);
+}
+
+test "§11.9 a polynomial body is not versioned: its entry check costs more than fast-math saves" {
+    // The same box proves V(p,n)/r, but the body holds no transcendental
+    // (`bench-fast`: a square law and abs ran slower versioned).
+    const gpa = std.testing.allocator;
+    const src =
+        \\module r(p, n);
+        \\  inout p, n;
+        \\  electrical p, n;
+        \\  parameter real r = 1k from [1:1e6];
+        \\  analog I(p, n) <+ V(p, n) / r;
+        \\endmodule
+    ;
+    var r = try emitWith(gpa, src, false);
+    defer r.deinit(gpa);
+    try expectParses(gpa, r.ok.text);
+    try std.testing.expect(std.mem.find(u8, r.ok.text, "zIn(") == null);
+    try std.testing.expect(std.mem.find(u8, r.ok.text, ".optimized") == null);
 }

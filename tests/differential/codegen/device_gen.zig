@@ -1,7 +1,9 @@
 //! The new pipeline's device for one fixture (`sides.new`, strict), written
 //! to a file the build compiles a `tests/host/*_host.zig` against: argv is
-//! the fixture, its include directory and the output path. diff-codegen's
-//! host phase runs the contract's behavioural hosts on the new devices.
+//! the fixture, its include directory and the output path, then `versioned`
+//! for the versioned device (§11.9) instead. diff-codegen's host phase runs
+//! the contract's behavioural hosts on the new devices; `bench-fast` times
+//! the strict device against the versioned one.
 //! No LRM clause: each host cites its own.
 //!
 //! Contents: `main` only.
@@ -14,7 +16,7 @@ pub fn main(init: std.process.Init) !void {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
     const args = try init.minimal.args.toSlice(arena);
-    if (args.len != 4) return error.Usage;
+    if (args.len != 4 and !(args.len == 5 and std.mem.eql(u8, args[4], "versioned"))) return error.Usage;
     const source = try std.Io.Dir.cwd().readFileAlloc(init.io, args[1], arena, .limited(1 << 26));
     const dirs = [_][]const u8{ std.fs.path.dirname(args[1]).?, args[2] };
     switch (try sides.new(init.gpa, arena, init.io, args[1], source, &dirs)) {
@@ -23,6 +25,6 @@ pub fn main(init: std.process.Init) !void {
             std.debug.print("codegen: {s}\n", .{why});
             return error.CodegenFailed;
         },
-        .ok => |n| try std.Io.Dir.cwd().writeFile(init.io, .{ .sub_path = args[3], .data = n.text }),
+        .ok => |n| try std.Io.Dir.cwd().writeFile(init.io, .{ .sub_path = args[3], .data = if (args.len == 5) n.versioned orelse return error.NotVersioned else n.text }),
     }
 }

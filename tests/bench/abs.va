@@ -1,0 +1,14 @@
+// The fast-math benchmark's abs (`zig build bench-fast`): §4.3.1 abs over a
+// polynomial conductance, no transcendental.
+`include "disciplines.vams"
+module bench_abs(p, n);
+  inout p, n;
+  electrical p, n;
+  parameter real g = 1e-3 from [0:1e3];
+  parameter real k3 = 1e-4 from [-1e3:1e3];
+  real v;
+  analog begin
+    v = V(p, n);
+    I(p, n) <+ g * abs(v) * v + k3 * v * v * v;
+  end
+endmodule

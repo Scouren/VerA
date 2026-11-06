@@ -1,0 +1,21 @@
+// The fast-math benchmark's diode (`zig build bench-fast`): a grounded
+// junction behind a series resistance, §4.3 exp and §4.2 arithmetic. One
+// node voltage under the exp, so the §11.9 box proves it (a junction across
+// two nodes reads 2B/vt, past exp's 709 at B = 10: Air/Float.zig).
+`include "disciplines.vams"
+module bench_diode(a);
+  inout a;
+  electrical a, x;
+  parameter real is = 1e-14 from (0:1e-6];
+  parameter real n = 1.05 from [1:3];
+  parameter real rs = 10 from [1e-3:1e6];
+  parameter real gmin = 1e-12 from [0:1e-6];
+  real vd, vt, id;
+  analog begin
+    vt = n * 0.025852;
+    vd = V(x);
+    id = is * (exp(vd / vt) - 1.0) + gmin * vd;
+    I(x) <+ id;
+    I(a, x) <+ V(a, x) / rs;
+  end
+endmodule

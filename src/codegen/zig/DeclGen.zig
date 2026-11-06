@@ -81,12 +81,32 @@ pub const Options = struct {
 /// `failure` says what.
 pub const Error = error{ OutOfMemory, CodegenFail };
 
-/// `zIn`, the entry check of one input: inside `[lo, hi]` (each end open or
-/// closed, 0 excluded under `nonzero`), so NaN fails it; every point of a
-/// batch must pass.
+/// `fast`, a versioned unit's fast body: `core` under `.optimized` on the
+/// family's `Fast` twin (the contract's optional trait), whose primitives
+/// carry the fast flags, each field brought back by `fromFast`; on `S`
+/// itself for a family without it. `@setFloatMode` reaches only the
+/// operators of its own function body, so the mode lives in the family
+/// whose methods hold the arithmetic.
+const fast =
+    \\
+    \\inline fn fast(comptime S: type, x: *const [n_u]S.V, xs: D.zX(S), model: *const Model, inst: InstancePtr, sim: contract.SimState) Core(S) {
+    \\    if (comptime !@hasDecl(S, "Fast")) return @call(.always_inline, core, .{ S, .optimized, xs, model, inst, sim });
+    \\    const f = @call(.always_inline, core, .{ S.Fast, .optimized, D.zProbe(S.Fast, x), model, inst, sim });
+    \\    const info = @typeInfo(Core(S)).@"struct";
+    \\    var out: Core(S) = undefined;
+    \\    inline for (info.field_names, info.field_types) |name, T| @field(out, name) = if (T == i64) @field(f, name) else S.fromFast(@field(f, name));
+    \\    return out;
+    \\}
+    \\
+;
+
+/// `zIn`, the entry check of one input: 1 inside `[lo, hi]` (each end open
+/// or closed, 0 excluded under `nonzero`), so NaN fails it; every point of a
+/// batch must pass. A bit, so the guards `&` together into one branch
+/// (`bench-fast`: eleven short-circuit `and`s doubled a MOSFET's eval).
 const zin =
     \\
-    \\inline fn zIn(v: anytype, comptime lo: f64, comptime lo_open: bool, comptime hi: f64, comptime hi_open: bool, comptime nonzero: bool) bool {
+    \\inline fn zIn(v: anytype, comptime lo: f64, comptime lo_open: bool, comptime hi: f64, comptime hi_open: bool, comptime nonzero: bool) u1 {
     \\    const T = @TypeOf(v);
     \\    const vec = @typeInfo(T) == .vector;
     \\    const l: T = if (vec) @splat(lo) else lo;
@@ -94,8 +114,8 @@ const zin =
     \\    const z: T = if (vec) @splat(0.0) else 0.0;
     \\    const a = if (lo_open) v > l else v >= l;
     \\    const b = if (hi_open) v < h else v <= h;
-    \\    if (vec) return @reduce(.And, a) and @reduce(.And, b) and (!nonzero or @reduce(.And, v != z));
-    \\    return a and b and (!nonzero or v != z);
+    \\    if (vec) return @intFromBool(@reduce(.And, a)) & @intFromBool(@reduce(.And, b)) & @intFromBool(!nonzero or @reduce(.And, v != z));
+    \\    return @intFromBool(a) & @intFromBool(b) & @intFromBool(!nonzero or v != z);
     \\}
     \\
 ;
@@ -376,13 +396,16 @@ fn genCore(dg: *DeclGen, w: *std.Io.Writer, uses: Function.Uses, body: []const u
     });
     const guards_opt = try dg.box();
     const checked = if (guards_opt) |g| g.len != 0 else false;
-    try dg.print(w, "\nfn run(comptime S: type, x: *const [n_u]S.V, xs: D.zX(S), model: *const Model, inst: InstancePtr, sim: contract.SimState) Core(S) {{\n{s}", .{if (checked) "" else "    _ = x;\n"});
-    // An `.optimized` unit proven on the whole line needs no check.
-    const tail_mode = if (guards_opt != null and !checked) "optimized" else "strict";
-    if (guards_opt) |guards| if (checked) {
-        try dg.print(w, "    if (", .{});
+    try dg.print(w, "\nfn run(comptime S: type, x: *const [n_u]S.V, xs: D.zX(S), model: *const Model, inst: InstancePtr, sim: contract.SimState) Core(S) {{\n{s}", .{if (guards_opt != null) "" else "    _ = x;\n"});
+    if (guards_opt) |guards| {
+        if (!checked) {
+            // An `.optimized` unit proven on the whole line needs no check.
+            try dg.print(w, "    return fast(S, x, xs, model, inst, sim);\n}}\n{s}", .{fast});
+            return;
+        }
+        try dg.print(w, "    if ((", .{});
         for (guards, 0..) |g, k| {
-            if (k != 0) try dg.print(w, " and ", .{});
+            if (k != 0) try dg.print(w, " & ", .{});
             try dg.print(w, "zIn(", .{});
             switch (g.leaf) {
                 .probe => try dg.print(w, "x[{d}]", .{g.index}),
@@ -393,28 +416,45 @@ fn genCore(dg: *DeclGen, w: *std.Io.Writer, uses: Function.Uses, body: []const u
             }
             try dg.print(w, ", {f}, {any}, {f}, {any}, {any})", .{ Real{ .x = g.iv.lo }, g.iv.lo_open, Real{ .x = g.iv.hi }, g.iv.hi_open, g.iv.nonzero });
         }
-        try dg.print(w, ") return @call(.always_inline, core, .{{ S, .optimized, xs, model, inst, sim }});\n", .{});
-    };
-    try dg.print(w, "    return @call(.always_inline, core, .{{ S, .{s}, xs, model, inst, sim }});\n}}\n", .{tail_mode});
-    if (checked) try dg.print(w, "{s}", .{zin});
+        try dg.print(w, ") != 0) return fast(S, x, xs, model, inst, sim);\n", .{});
+    }
+    // A versioned unit's strict body is the cold path, out of line, so the
+    // fast body is laid out alone (`bench-fast`: inlined beside it, the
+    // MOSFET ran at half speed).
+    try dg.print(w, "    return @call(.{s}, core, .{{ S, .strict, xs, model, inst, sim }});\n}}\n", .{if (checked) "never_inline" else "always_inline"});
+    if (checked) try dg.print(w, "{s}{s}", .{ fast, zin });
 }
 
 /// The guard box of the versioned unit, or null for one strict body: every
 /// root's box when each is `.optimized`, since `core` is shared and
-/// `.strict` absorbs (`Float.Mode.strictest`).
+/// `.strict` absorbs (`Float.Mode.strictest`). Only a body that computes a
+/// transcendental is versioned: `bench-fast` measured the fast body paying
+/// for its entry check there (a diode's exp, an OTA's tanh) and losing to it
+/// on polynomial bodies (a square-law MOSFET, abs).
 // ponytail: one box for the whole core; per-root bodies (the old
 // `plan/jobs.zig` slicing) let an `.optimized` root run fast beside a
 // `.strict` one.
 fn box(dg: *DeclGen) Error!?[]const Air.Float.Guard {
     if (dg.options.strict) return null;
     const v = dg.verdict orelse return null;
-    if (v.modes.len == 0) return null;
+    if (v.modes.len == 0 or !transcendental(dg.air.*)) return null;
     var guards: std.ArrayList(Air.Float.Guard) = .empty;
     for (v.modes, 0..) |mode, r| {
         if (mode == .strict) return null;
         try guards.appendSlice(dg.arena, v.box(r));
     }
     return guards.items;
+}
+
+/// Whether `air` computes a §4.3 transcendental (or §4.5.13 `limexp`, an
+/// `exp`): the work fast-math's flags pay off on.
+fn transcendental(air: Air) bool {
+    for (air.instructions.items(.tag), air.instructions.items(.data)) |tag, data| switch (tag) {
+        .exp, .expm1, .ln, .ln1p, .log10, .pow, .hypot, .sin, .cos, .tan, .asin, .acos, .atan, .atan2, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh => return true,
+        .call => if (air.extraData(Air.Call, data.ty_pl.payload).data.callee == @backingInt(SysFn.Tag.limexp)) return true,
+        else => {}, // else: arithmetic, control and the rest of Table 4-14
+    };
+    return false;
 }
 
 /// `eval` and `q`, each over one `run`.

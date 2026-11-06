@@ -237,10 +237,10 @@ fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, op
         try libraries(a, &zcu, file, tree, out.unit_starts, opts);
     try sema.Sema.elaborate(&zcu, .{ .roots = .all, .ieee1364 = true });
     const zf = zcu.failed.slice();
-    for (zf.items(.code), zf.items(.src), zf.items(.rule)) |code, src, rule| if (@tagName(code)[0] == 'E') {
+    for (zf.items(.code), zf.items(.src), zf.items(.rule), zf.items(.part)) |code, src, rule, part| if (@tagName(code)[0] == 'E') {
         // vera-next's IEEE 1364 route reports a `Rule` under lib/sim/digital's code.
         const as: []const u8 = if (rule == .none) @tagName(code) else if (rule == .defparam_unknown) "E0907" else "E1100";
-        return .{ .earlier = .{ .why = try a.print("elaboration refuses it ({t})", .{code}), .code = as, .at = instAt(tree, &vir, src) } };
+        return .{ .earlier = .{ .why = try a.print("elaboration refuses it ({t})", .{code}), .code = as, .at = if (sema.locate.part(tree, &vir, src, part)) |span| span.bytes(tree).start else 0 } };
     };
     var why: sema.digital.Why = .{};
     const lowered = sema.digital.lower(a, &zcu, .{ .sources = &.{.{ .tree = tree, .pp = out }} }, &why) catch |e| switch (e) {
@@ -367,23 +367,6 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
         return std.fmt.allocPrint(a, "the timing checks that violated differ: old at bytes {any}, new {any}", .{ old.sites, new.sites });
     try std.process.setCurrentDir(io, home);
     return sameFiles(a, io, old_dir.dir, new_dir.dir);
-}
-
-/// Where instruction `src` was written, as vera-next places an
-/// elaboration error: its main token (a call's name, not its `(`), 0 for
-/// none.
-fn instAt(tree: *const vams.Ast, vir: *const vams.Vir, src: vams.Vir.Inst.Ref) u32 {
-    const i = src.toIndex() orelse return 0;
-    const Inst = vams.Vir.Inst;
-    const data = vir.instructions.items(.data)[@backingInt(i)];
-    const tok: vams.Ast.TokenIndex = switch (Inst.dataKind(vir.instructions.items(.tag)[@backingInt(i)])) {
-        .pl_node => tree.nodeMainToken(data.pl_node.src_node),
-        .un_node => tree.nodeMainToken(data.un_node.src_node),
-        .decl_tok => data.decl_tok.src_tok,
-        .str_tok => data.str_tok.src_tok,
-        .int, .float, .str => return 0,
-    };
-    return tree.tokenStart(if (tok > 0 and tree.tokenTag(tok) == .l_paren) tok - 1 else tok);
 }
 
 /// `compare` in a forked child (Linux): its verdict through a pipe, or the

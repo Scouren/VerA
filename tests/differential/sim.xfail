@@ -6,7 +6,6 @@
 # line goes.
 verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v old run failed (E1100: §3.8: an attribute value must be a constant expression), new run completed
 verilog/03_lexical_conventions/escaped_system_task_rejected.v lowering: a hierarchical task or function name
-verilog/04_data_types/named_localparam_override_rejected.v old E1100 at byte 166: §12.2: `L` is a local parameter, which a parameter value assignment cannot override; new E1100 at byte 173: elaboration refuses it (E0907)
 verilog/04_data_types/nonconstant_declaration_assignment_rejected.v old run failed (E1100: §6.2.1: a constant expression is required here), new run completed
 verilog/04_data_types/parameter_assigned_specify_block_specparam_rejected.v lowering: a name declared by `param` that has no slot
 verilog/04_data_types/parameter_assigned_specparam_rejected.v old run failed (E1100: §4.10.3: a module parameter cannot be assigned an expression that includes a specify parameter), new run completed
@@ -18,25 +17,15 @@ verilog/05_expressions/constant_time_rejected.v old run failed (E1100: a constan
 verilog/05_expressions/native_wide_index_bound_limit.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
 verilog/07_gate_switch_level/split_array_rejected.v old run failed (E1100: §7.1.5: `t_nand` names two instances; one instance identifier has one range), new run completed
 verilog/10_tasks_functions/constant_function_hierarchical_rejected.v old run failed (E1100: §10.4.5: a function called during elaboration is a constant function, and it contains a hierarchical reference), new run completed
-verilog/12_hierarchy/connections_to_portless_module_rejected.v old E1100 at byte 143: more port connections than the module has ports; new E1100 at byte 141: elaboration refuses it (E0906)
 verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v old run failed (E1100: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element it is in), new run completed
 verilog/12_hierarchy/defparam_across_generate_instances_rejected.v old run failed (E1100: §12.2.1: a defparam inside `somename[0]` cannot change a parameter outside the generate block instance or array element it is in), new run completed
-verilog/12_hierarchy/defparam_early_resolution_rejected.v old E1100 at byte 87: §12.8.2: this defparam's hierarchical name was resolved before the hierarchy was complete and would resolve differently once it is; new E0907 at byte 93: elaboration refuses it (E0907)
-verilog/12_hierarchy/defparam_names_no_parameter_rejected.v old E0907 at byte 139: §12.2.1: this defparam names `Z`, which is no parameter of its module; new E0907 at byte 145: elaboration refuses it (E0907)
-verilog/12_hierarchy/defparam_names_nothing_rejected.v old E0901 at byte 121: §12.2.1: this defparam's hierarchical name `foo` names nothing in the design; new E0907 at byte 125: elaboration refuses it (E0907)
+verilog/12_hierarchy/defparam_early_resolution_rejected.v old E1100 at byte 87: §12.8.2: this defparam's hierarchical name was resolved before the hierarchy was complete and would resolve differently once it is; new E0907 at byte 87: elaboration refuses it (E0907)
+verilog/12_hierarchy/defparam_names_nothing_rejected.v old E0901 at byte 121: §12.2.1: this defparam's hierarchical name `foo` names nothing in the design; new E0907 at byte 121: elaboration refuses it (E0907)
 verilog/12_hierarchy/defparam_nonconstant_rejected.v old run failed (E1100: a constant expression is required here), new run completed
-verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v old E1100 at byte 126: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element it is in; new E0907 at byte 135: elaboration refuses it (E0907)
-verilog/12_hierarchy/extra_ordered_connection_rejected.v old E1100 at byte 163: more port connections than the module has ports; new E1100 at byte 155: elaboration refuses it (E0906)
+verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v old E1100 at byte 126: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element it is in; new E0907 at byte 126: elaboration refuses it (E0907)
 verilog/12_hierarchy/localparam_override_rejected.v old run failed (E1100: §12.2: `LP` is a local parameter, which a defparam cannot override), new run completed
-verilog/12_hierarchy/mixed_ordered_named_ports_rejected.v old E1100 at byte 157: §12.3.6: an instance mixes ordered and named port connections; new E1100 at byte 148: elaboration refuses it (E0906)
-verilog/12_hierarchy/named_connection_to_concatenation_port_rejected.v old E1100 at byte 220: the instantiated module has no such port; new E1100 at byte 217: elaboration refuses it (E0906)
-verilog/12_hierarchy/null_port_extra_connection_rejected.v old E1100 at byte 174: more port connections than the module has ports; new E1100 at byte 159: elaboration refuses it (E0906)
-verilog/12_hierarchy/parameter_assigned_twice_rejected.v old E1100 at byte 180: §12.2.2.2: parameter `size` is assigned twice; new E1100 at byte 191: elaboration refuses it (E0908)
-verilog/12_hierarchy/port_connected_twice_rejected.v old E1100 at byte 157: §12.3.6: port `a` is connected twice; new E1100 at byte 148: elaboration refuses it (E0906)
 verilog/12_hierarchy/port_width_mismatch_vams_rejected.v old run failed (E1100: §6.5.7.1: the sizes of the port and the net connected to it shall match), new run completed
 verilog/12_hierarchy/real_connected_to_port_rejected.v old run failed (E1100: §12.3.7: a real cannot be connected to a port), new run completed
-verilog/12_hierarchy/unknown_parameter_name_rejected.v old E1100 at byte 168: §12.2.2.2: the module has no such parameter: `width`; new E1100 at byte 180: elaboration refuses it (E0907)
-verilog/12_hierarchy/unknown_port_name_rejected.v old E1100 at byte 152: the instantiated module has no such port; new E1100 at byte 143: elaboration refuses it (E0906)
 verilog/12_hierarchy/unnamed_block_referenced_rejected.v old run failed (E1100: undeclared instance in a hierarchical reference), new run completed
 verilog/13_configuration/cell_not_in_its_library_rejected.v old run failed (E1100: undeclared module in instantiation: library `gateLib` holds no cell `top`), new run completed
 verilog/13_configuration/config_in_map_rejected.v a `//@` line the cli refuses
@@ -54,7 +43,6 @@ verilog/18_vcd/dumpports_variable_scope_rejected.v old run failed (E1100: §18.3
 verilog/19_compiler_directives/timescale_inside_module_rejected.v old run failed (E1100: §19.8: a `timescale directive is written outside a module definition, not inside one), new run completed
 verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v a `//@` line the cli refuses
 verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v a `//@` line the cli refuses
-verilog/A_formal_syntax/b_A_4_1_mixed_port_connections_rejected.v old E1100 at byte 203: §12.3.6: an instance mixes ordered and named port connections; new E1100 at byte 194: elaboration refuses it (E0906)
 verilog-ams/digital/reject_wreal_connected_to_wand.v old run failed (E0919: `n` is a wand and port `o` is a wreal), new run completed
 verilog-ams/digital/scaled_delay_udp_rejected.v old E0247 at byte 186: a scaled literal in `scaled_delay_udp`'s UDP delay; new E0247 at byte 190: elaboration refuses it (E0247)
 verilog-ams/digital/vams_digital_temperature_refused.v lowering: the system function `$temperature`

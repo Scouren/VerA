@@ -163,6 +163,7 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
             _ = try l.b.inst(if (tg == .store) .assign else .assign_nb, try place.place(l, s.lhs), try expr.evalFor(l, s.rhs, target), scope);
         },
         .trigger => {
+            if (l.in_function) return l.reject(l.frame, i.toRef(), "§10.4.4: a function body cannot contain an event trigger");
             const r = vir.instructions.items(.data)[@backingInt(i)].un_node.operand;
             // §9.7.3 an element of an event array, chosen when it runs.
             if (r.toIndex()) |ri| if (Lower.tag(vir, ri) == .elem) {
@@ -343,6 +344,9 @@ fn caseStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
     const c = Lower.payload(vir, Inst.Case, i);
     const arms = vir.list(Inst.Arm, c.arms);
     if (arms.len == 0) return l.reject(l.frame, i.toRef(), "a case statement requires at least one item");
+    var defaults: u32 = 0;
+    for (arms) |arm| defaults += @intFromBool(arm.flags.default);
+    if (defaults > 1) return l.reject(l.frame, i.toRef(), "a case statement cannot have multiple default items");
     var ty = try expr.typeValue(l, c.operand);
     for (arms) |arm| for (vir.list(Inst.Ref, arm.values)) |v| {
         ty = expr.common(ty, try expr.typeValue(l, v));

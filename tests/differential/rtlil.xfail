@@ -8,61 +8,38 @@
 # interpreted executable has none (a behaviour change the lead decides on).
 # A listed fixture that agrees fails the run until its line goes. Refresh:
 # -Dcomp-rebaseline writes zig-out/rtlil.xfail.new.
-verilog/04_data_types/named_localparam_override_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §12.2: `L` is a local parameter, which a parameter value assignment cannot override` (--run differs too: comp.xfail)
-verilog/04_data_types/type_uwire_multiple_drivers_rejected.v rw-dlower (digital lowering): stdout: line 2: old `module \audit_type_uwire_multiple_drivers_rejected`, new `` (--run differs too: comp.xfail)
-verilog/07_gate_switch_level/unknown_gate_keyword_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: undeclared module in instantiation: no library of the search order (work) holds cell `AND`` (--run differs too: comp.xfail)
-verilog/08_udp/definition_inside_module_rejected.v rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `q``, new `error[E0205]: unsupported module item: found table` (--run differs too: comp.xfail)
-verilog/08_udp/output_not_first_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1201]: a user-defined primitive --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §8.1.1: the output port shall be the first port of a UDP` (--run differs too: comp.xfail)
-verilog/08_udp/three_delays_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1201]: a user-defined primitive --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §8.6: a UDP instance takes at most two delays` (--run differs too: comp.xfail)
-verilog/08_udp/two_outputs_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1201]: a user-defined primitive --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port` (--run differs too: comp.xfail)
-verilog/09_behavioral_modeling/unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)` (--run differs too: comp.xfail)
-verilog/09_behavioral_modeling/unnamed_fork_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)` (--run differs too: comp.xfail)
-verilog/12_hierarchy/connections_to_portless_module_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: more port connections than the module has ports` (--run differs too: comp.xfail)
-verilog/12_hierarchy/defparam_early_resolution_rejected.v rw-comp (elab): stderr: line 1: old `error[E1202]: an analog block --emit-rtlil does not lower`, new `error[E0907]: override names no parameter of the module: `n.m.n.p` names no parameter of the elaborated design` (--run differs too: comp.xfail)
-verilog/12_hierarchy/defparam_names_no_parameter_rejected.v rw-comp (elab): stderr: line 1: old `error[E1205]: a defparam --emit-rtlil does not lower`, new `error[E0907]: override names no parameter of the module: §12.2.1: this defparam names `Z`, which is no parameter of its module` (--run differs too: comp.xfail)
-verilog/12_hierarchy/defparam_names_nothing_rejected.v rw-comp (elab): stderr: line 1: old `error[E1205]: a defparam --emit-rtlil does not lower`, new `error[E0907]: override names no parameter of the module: §12.2.1: this defparam names `foo`, which is no parameter of its module` (--run differs too: comp.xfail)
-verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v rw-comp (elab): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E0907]: override names no parameter of the module: `u[0].u[1].x.p` names no parameter of the elaborated design` (--run differs too: comp.xfail)
-verilog/12_hierarchy/module_without_process.v rw-dlower (digital lowering): stdout: line 2: old `module \b_12_1_module_without_process`, new ``
-verilog/12_hierarchy/named_connection_to_concatenation_port_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1212]: a port expression --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: the instantiated module has no such port` (--run differs too: comp.xfail)
-verilog/12_hierarchy/parameter_assigned_twice_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §12.2.2.2: parameter `size` is assigned twice` (--run differs too: comp.xfail)
-verilog/12_hierarchy/port_width_mismatch_vams_rejected.v rw-dlower (digital lowering): stdout: line 2: old `module \copy`, new `` (--run differs too: comp.xfail)
-verilog/12_hierarchy/unknown_parameter_name_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §12.2.2.2: the module has no such parameter: `width`` (--run differs too: comp.xfail)
-verilog/13_configuration/cell_not_in_its_library_rejected.v not built: backend libmap
-verilog/13_configuration/cfg1_default_liblist.v not built: backend libmap
-verilog/13_configuration/cfg2_gate_first.v not built: backend libmap
-verilog/13_configuration/cfg3_cell_use.v not built: backend libmap
-verilog/13_configuration/cfg4_instance_liblist.v not built: backend libmap
-verilog/13_configuration/cfg6_hierarchical.v not built: backend libmap
-verilog/13_configuration/command_line_search_order.v not built: backend libmap
-verilog/13_configuration/config_in_map_rejected.v not built: backend libmap
-verilog/13_configuration/config_overrides_command_line.v not built: backend libmap
-verilog/13_configuration/default_search_order.v not built: backend libmap
-verilog/13_configuration/every_config_referenced_rejected.v rw-dlower (digital lowering): stdout: line 2: old `module \leaf`, new `` (--run differs too: comp.xfail)
-verilog/13_configuration/include_map.v not built: backend libmap
-verilog/13_configuration/library_without_path_rejected.v not built: backend libmap
-verilog/13_configuration/parent_library_by_map.v not built: backend libmap
-verilog/13_configuration/resolution_order.v not built: backend libmap
-verilog/13_configuration/source_text_in_map_rejected.v not built: backend libmap
-verilog/13_configuration/two_libraries_match_rejected.v not built: backend libmap
-verilog/13_configuration/unbound_instance_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: undeclared module in instantiation: no library of the search order (work) holds cell `absent`` (--run differs too: comp.xfail)
-verilog/13_configuration/undeclared_library_rejected.v not built: backend libmap
-verilog/19_compiler_directives/default_nettype_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^` (--run differs too: comp.xfail)
-verilog/19_compiler_directives/macro_text_1800_forms_warn.v rw-comp (preprocess): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `warning[W0151]: IEEE 1800 macro text in an IEEE 1364 unit: `msg``
-verilog/19_compiler_directives/unconnected_drive_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^^^^` (--run differs too: comp.xfail)
-verilog/28_protected_envelopes/protected_des_base64.v rw-comp (preprocess): stderr: line 1: old `error[E0152]: no key for a protected envelope: no key for data_keyowner="VerAConformance", data_keyname="des-fixture"`, new `error[E1251]: an initial block that is not constant assignments`
-verilog/28_protected_envelopes/protected_des_uuencode.v rw-comp (preprocess): stderr: line 1: old `error[E0152]: no key for a protected envelope: no key for data_keyowner="VerAConformance", data_keyname="des-fixture"`, new `error[E1251]: an initial block that is not constant assignments`
-verilog/28_protected_envelopes/protected_eight_nested_envelopes.v rw-comp (preprocess): stderr: line 1: old `error[E0152]: no key for a protected envelope: no key for data_keyowner="VerAConformance", data_keyname="des-fixture"`, new `error[E1251]: an initial block that is not constant assignments`
-verilog/28_protected_envelopes/protected_md5_digest.v rw-comp (preprocess): stderr: line 1: old `error[E0152]: no key for a protected envelope: no key for data_keyowner="VerAConformance", data_keyname="des-fixture"`, new `error[E1251]: an initial block that is not constant assignments`
-verilog/28_protected_envelopes/protected_session_key_block.v rw-comp (preprocess): stderr: line 1: old `error[E0152]: no key for a protected envelope: no key for key_keyowner="VerAConformance", key_keyname="exchange-fixture"`, new `error[E1251]: an initial block that is not constant assignments`
-verilog/28_protected_envelopes/protected_sha1_digest.v rw-comp (preprocess): stderr: line 1: old `error[E0152]: no key for a protected envelope: no key for data_keyowner="VerAConformance", data_keyname="des-fixture"`, new `error[E1251]: an initial block that is not constant assignments`
-verilog/A_formal_syntax/b_A_1_1_incdir.v not built: backend libmap
-verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v not built: backend libmap
-verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v not built: backend libmap
-verilog/A_formal_syntax/b_A_1_1_library_text.v not built: backend libmap
-verilog/A_formal_syntax/b_A_2_8_net_block_item_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found `;``, new `error: could not compile due to 1 previous error(s)` (--run differs too: comp.xfail)
-verilog/A_formal_syntax/b_A_4_1_mixed_port_connections_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §12.3.6: an instance mixes ordered and named port connections` (--run differs too: comp.xfail)
-verilog/A_formal_syntax/b_A_5_2_two_outputs_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1201]: a user-defined primitive --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §8.1.1: a UDP has exactly one output port` (--run differs too: comp.xfail)
-verilog/A_formal_syntax/b_A_5_4_udp_delay3_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1201]: a user-defined primitive --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §8.6: a UDP instance takes at most two delays` (--run differs too: comp.xfail)
-verilog/A_formal_syntax/b_A_6_3_unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found k`, new `error: could not compile due to 1 previous error(s)` (--run differs too: comp.xfail)
-verilog/12_hierarchy/no_top_level_module_rejected.v rw-dlower (digital lowering): stdout: line 1: old `autoidx 1`, new `` (new exits 0 on a design with no top; --run differs too: comp.xfail)
-verilog/12_hierarchy/self_instantiation_rejected.v rw-dlower (digital lowering): stdout: line 1: old `autoidx 1`, new `` (new exits 0 on a design with no top; --run differs too: comp.xfail)
+# Every line below is a fixture that differs under --run too: its tag names
+# the comp.xfail owner whose fix clears it (none is rw-rtlil's own).
+verilog/08_udp/definition_inside_module_rejected.v rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `q``, new `error[E0205]: unsupported module item: found table` [comp.xfail: rw-comp (astgen)]
+verilog/09_behavioral_modeling/unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)` [comp.xfail: rw-comp (parse)]
+verilog/09_behavioral_modeling/unnamed_fork_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)` [comp.xfail: rw-comp (parse)]
+verilog/12_hierarchy/defparam_early_resolution_rejected.v rw-comp (elab): stderr: line 1: old `error[E1202]: an analog block --emit-rtlil does not lower`, new `error[E0907]: override names no parameter of the module: `n.m.n.p` names no parameter of the elaborated design` [comp.xfail: rw-comp (elab)]
+verilog/12_hierarchy/defparam_names_nothing_rejected.v rw-comp (elab): stderr: line 1: old `error[E1205]: a defparam --emit-rtlil does not lower`, new `error[E0907]: override names no parameter of the module: §12.2.1: this defparam names `foo`, which is no parameter of its m [comp.xfail: rw-comp (elab)]
+verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v rw-comp (elab): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E0907]: override names no parameter of the module: `u[0].u[1].x.p` names no parameter of the elaborated de [comp.xfail: rw-comp (elab)]
+verilog/12_hierarchy/no_top_level_module_rejected.v rw-dlower (digital lowering): stdout: line 1: old `autoidx 1`, new `` [comp.xfail: rw-dlower (digital lowering)]
+verilog/12_hierarchy/self_instantiation_rejected.v rw-dlower (digital lowering): stdout: line 1: old `autoidx 1`, new `` [comp.xfail: rw-dlower (digital lowering)]
+verilog/13_configuration/cell_not_in_its_library_rejected.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/cfg1_default_liblist.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/cfg2_gate_first.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/cfg3_cell_use.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/cfg4_instance_liblist.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/cfg6_hierarchical.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/command_line_search_order.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/config_in_map_rejected.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/config_overrides_command_line.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/default_search_order.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/include_map.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/library_without_path_rejected.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/parent_library_by_map.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/resolution_order.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/source_text_in_map_rejected.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/two_libraries_match_rejected.v not built: backend libmap [comp.xfail: not built]
+verilog/13_configuration/undeclared_library_rejected.v not built: backend libmap [comp.xfail: not built]
+verilog/19_compiler_directives/default_nettype_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^` [comp.xfail: rw-comp (parse) location]
+verilog/19_compiler_directives/unconnected_drive_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^^^^` [comp.xfail: rw-comp (parse) location]
+verilog/A_formal_syntax/b_A_1_1_incdir.v not built: backend libmap [comp.xfail: not built]
+verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v not built: backend libmap [comp.xfail: not built]
+verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v not built: backend libmap [comp.xfail: not built]
+verilog/A_formal_syntax/b_A_1_1_library_text.v not built: backend libmap [comp.xfail: not built]
+verilog/A_formal_syntax/b_A_2_8_net_block_item_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found `;``, new `error: could not compile due to 1 previous error(s)` [comp.xfail: rw-comp (parse)]
+verilog/A_formal_syntax/b_A_6_3_unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found k`, new `error: could not compile due to 1 previous error(s)` [comp.xfail: rw-comp (parse)]

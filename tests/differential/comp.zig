@@ -73,6 +73,12 @@ const Shared = struct {
     rulings: std.StringHashMapUnmanaged([]const u8),
 };
 
+/// A diff-rtlil ruling whose clause starts with this: old `--emit-rtlil`
+/// preprocessed the design with front-end options of its own (no
+/// `--protect-keys`, no IEEE 1364 macro-text warning), and the new side
+/// follows the front end `--run` uses.
+const front_end_ruling = "front end:";
+
 // ---- private ----
 
 fn runAll() !void {
@@ -178,6 +184,8 @@ fn one(arena: Allocator, s: *Shared, k: u32) !Outcome {
     if (s.rulings.get(f.rel)) |clause| {
         const miss: ?[]const u8 = if (std.mem.eql(u8, v_run.flag, "--check"))
             try deviceTiebreak(arena, s, f, new, args, try std.fmt.allocPrint(arena, "{s}/{d}-d", .{ s.work, k }))
+        else if (std.mem.startsWith(u8, clause, front_end_ruling))
+            try frontEndTiebreak(arena, s, f, new, try std.fmt.allocPrint(arena, "{s}/{d}-r", .{ s.work, k }))
         else if (try tiebreak(arena, s.io, f, new)) null else "the new side misses the fixture's own verdict";
         if (miss == null) return .{ .ruled = clause };
         return .{ .differ = .{ .owner = v_run.name ++ ".rulings", .why = try std.fmt.allocPrint(arena, "the ruling ({s}) does not hold: {s}; {s}", .{ clause, miss.?, why }) } };
@@ -277,6 +285,32 @@ fn tiebreak(arena: Allocator, io: Io, f: Fixture, new: judge.Run) !bool {
 fn deviceTiebreak(arena: Allocator, s: *Shared, f: Fixture, new: judge.Run, args: []const []const u8, work: []const u8) !?[]const u8 {
     if (new.status != 0) return "the new side builds no device";
     return device.agrees(arena, s.io, s.env, s.exe_new, options.repo_root, args, work, f.reject);
+}
+
+/// The tiebreaker of a `front_end_ruling`: old `vera` on the fixture's own
+/// `--run` line reports the preprocessor's diagnostics (codes E01xx/W01xx)
+/// the new side does, in order. Null when it holds, else why not.
+fn frontEndTiebreak(arena: Allocator, s: *Shared, f: Fixture, new: judge.Run, work: []const u8) !?[]const u8 {
+    const run_args = try fixture.argv(arena, f, options.fixture_root);
+    const ref = try judge.run(arena, s.io, s.exe_old, run_args, work, s.env, false);
+    const want = try preprocessCodes(arena, ref.stderr);
+    const got = try preprocessCodes(arena, new.stderr);
+    if (std.mem.eql(u8, want, got)) return null;
+    return try std.fmt.allocPrint(arena, "old --run's preprocessor reports `{s}`, the new side `{s}`", .{ want, got });
+}
+
+/// The `[E01xx]`/`[W01xx]` codes of `stderr`'s headlines, in order.
+fn preprocessCodes(arena: Allocator, stderr: []const u8) ![]const u8 {
+    var out: Io.Writer.Allocating = .init(arena);
+    var lines = std.mem.splitScalar(u8, stderr, '\n');
+    while (lines.next()) |line| {
+        const at = std.mem.find(u8, line, "[") orelse continue;
+        if (at + 7 > line.len or line[at + 6] != ']') continue;
+        if (!std.mem.startsWith(u8, line, "error[") and !std.mem.startsWith(u8, line, "warning[")) continue;
+        const code = line[at + 1 .. at + 6];
+        if (std.mem.startsWith(u8, code[1..], "01")) try out.writer.print("{s} ", .{code});
+    }
+    return out.written();
 }
 
 /// The run's rulings (`<name>.rulings`): `<path> <clause and reason>`

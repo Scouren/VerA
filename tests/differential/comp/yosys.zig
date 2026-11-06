@@ -26,8 +26,8 @@ pub fn equivalent(arena: Allocator, io: Io, yosys: []const u8, work: []const u8,
     try cwd.writeFile(io, .{ .sub_path = g, .data = gold });
     try cwd.writeFile(io, .{ .sub_path = n, .data = gate });
     const script = try std.fmt.allocPrint(arena,
-        \\read_rtlil {s}; hierarchy -auto-top; proc; flatten; opt_clean; rename -top gold; design -stash gold;
-        \\read_rtlil {s}; hierarchy -auto-top; proc; flatten; opt_clean; rename -top gate; design -stash gate;
+        \\read_rtlil {s}; hierarchy -auto-top; proc; flatten; async2sync; tribuf -formal; opt_clean; rename -top gold; design -stash gold;
+        \\read_rtlil {s}; hierarchy -auto-top; proc; flatten; async2sync; tribuf -formal; opt_clean; rename -top gate; design -stash gate;
         \\design -copy-from gold -as gold gold; design -copy-from gate -as gate gate;
         \\equiv_make gold gate equiv; hierarchy -top equiv; equiv_simple -seq 4; equiv_induct -seq 4; equiv_status -assert
     , .{ g, n });

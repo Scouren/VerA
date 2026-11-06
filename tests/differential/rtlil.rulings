@@ -28,3 +28,24 @@ verilog/15_timing_checks/recrem_signal_limit_rejected.v IEEE 1364-2005 15.2.6: o
 verilog/15_timing_checks/removal_negative_limit_rejected.v IEEE 1364-2005 15.2.4: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
 verilog/15_timing_checks/setup_negative_limit_rejected.v IEEE 1364-2005 15.2.1: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
 verilog/15_timing_checks/setuphold_signal_limit_rejected.v IEEE 1364-2005 15.2.3: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/04_data_types/named_localparam_override_rejected.v IEEE 1364-2005 4.10.2: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
+verilog/07_gate_switch_level/unknown_gate_keyword_rejected.v IEEE 1364-2005 7.1.1: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
+verilog/08_udp/output_not_first_rejected.v IEEE 1364-2005 8.1.1: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
+verilog/08_udp/three_delays_rejected.v IEEE 1364-2005 8.6: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
+verilog/08_udp/two_outputs_rejected.v IEEE 1364-2005 8 8.1.1: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
+verilog/12_hierarchy/connections_to_portless_module_rejected.v IEEE 1364-2005 6.2.2: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
+verilog/12_hierarchy/defparam_names_no_parameter_rejected.v IEEE 1364-2005 12.2.1: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
+verilog/12_hierarchy/named_connection_to_concatenation_port_rejected.v IEEE 1364-2005 12.3.2 12.3.6: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
+verilog/12_hierarchy/parameter_assigned_twice_rejected.v IEEE 1364-2005 6.3.3: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
+verilog/12_hierarchy/unknown_parameter_name_rejected.v IEEE 1364-2005 6.3.3: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
+verilog/13_configuration/unbound_instance_rejected.v IEEE 1364-2005 13.1: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
+verilog/19_compiler_directives/macro_text_1800_forms_warn.v front end: IEEE 1364-2005 19.3.1 (W0151 on IEEE 1800 macro text); old --emit-rtlil preprocessed without the warning, the new side warns as --run does
+verilog/28_protected_envelopes/protected_des_base64.v front end: IEEE 1364-2005 28.4 (the envelope decrypted with --protect-keys); old --emit-rtlil preprocessed without the keys (E0152), the new side decrypts as --run does
+verilog/28_protected_envelopes/protected_des_uuencode.v front end: IEEE 1364-2005 28.4 (the envelope decrypted with --protect-keys); old --emit-rtlil preprocessed without the keys (E0152), the new side decrypts as --run does
+verilog/28_protected_envelopes/protected_eight_nested_envelopes.v front end: IEEE 1364-2005 28.4 (the envelope decrypted with --protect-keys); old --emit-rtlil preprocessed without the keys (E0152), the new side decrypts as --run does
+verilog/28_protected_envelopes/protected_md5_digest.v front end: IEEE 1364-2005 28.4 (the envelope decrypted with --protect-keys); old --emit-rtlil preprocessed without the keys (E0152), the new side decrypts as --run does
+verilog/28_protected_envelopes/protected_session_key_block.v front end: IEEE 1364-2005 28.4 (the envelope decrypted with --protect-keys); old --emit-rtlil preprocessed without the keys (E0152), the new side decrypts as --run does
+verilog/28_protected_envelopes/protected_sha1_digest.v front end: IEEE 1364-2005 28.4 (the envelope decrypted with --protect-keys); old --emit-rtlil preprocessed without the keys (E0152), the new side decrypts as --run does
+verilog/A_formal_syntax/b_A_4_1_mixed_port_connections_rejected.v IEEE 1364-2005 A.4.1: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
+verilog/A_formal_syntax/b_A_5_2_two_outputs_rejected.v IEEE 1364-2005 A.5.2: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
+verilog/A_formal_syntax/b_A_5_4_udp_delay3_rejected.v IEEE 1364-2005 A.5.4: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)

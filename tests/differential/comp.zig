@@ -81,7 +81,8 @@ fn runAll() !void {
     };
     const env = try arena.create(std.process.Environ.Map);
     env.* = try std.testing.environ.createMap(arena);
-    const work = try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", "comp-work" });
+    // One directory per run: the four runs go in parallel under `rewrite`.
+    const work = try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", "comp-work-" ++ v_run.name });
     try env.put("ZIG_LOCAL_CACHE_DIR", try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", "comp-zig-cache" }));
     const outcomes = try arena.alloc(Outcome, picked.items.len);
     @memset(outcomes, .pending);

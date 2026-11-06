@@ -28,6 +28,23 @@ const prelude =
     \\
 ;
 
+/// A connect module on `n` that drives its own discrete port (§9.22.6's
+/// `assign d = out`), two ordinary drivers and two ordinary receivers.
+const driver_bench =
+    \\connectmodule c2e(d, a);
+    \\  input d; output a; ddiscrete d; electrical a;
+    \\  reg out; assign d = out;
+    \\  wire w; assign w = out;
+    \\  initial begin out = 1'b0; #1 $display("%0d %0d %0d", $driver_count(d), $receiver_count(d), $driver_count(w)); end
+    \\  analog V(a) <+ 0.0;
+    \\endmodule
+    \\module drv(o); output o; ddiscrete o; reg o; initial o = 1'b0; endmodule
+    \\module ear(i); input i; ddiscrete i; endmodule
+    \\module top; electrical n; drv hi(.o(n)); drv lo(.o(n)); ear e1(.i(n)); ear e2(.i(n)); endmodule
+    \\connectrules r; connect c2e merged inout ddiscrete, inout electrical; endconnectrules
+    \\
+;
+
 // ---- private ----
 
 /// Lowers `mixed` and its twin with the analog half blanked; both must
@@ -114,6 +131,36 @@ fn drives(p: *const Program, src: u32, net_slot: u32) bool {
         if (d.source == .bridge and d.source.bridge.src == src) return true;
     }
     return false;
+}
+
+/// The §17 transcript of running `p` in std_sim to its end.
+fn transcript(a: std.mem.Allocator, p: *const Program) ![]const u8 {
+    var out: std.Io.Writer.Allocating = .init(a);
+    var st: std_sim.State = try .init(a, p, &out.writer);
+    try std_sim.Interp.run(&st);
+    return out.written();
+}
+
+/// The rejection lowering `src` (mixed) raises; any other outcome fails.
+fn rejection(a: std.mem.Allocator, src: []const u8) !digital.Why {
+    var pp: vams.Preprocessor = .init(a, .{ .std_defs = false });
+    try pp.addUnit("mixed.vams", src);
+    while (try pp.run()) |_| return error.UnexpectedInclude;
+    const out = try a.create(vams.Preprocessor.Output);
+    out.* = pp.output();
+    const text = try a.dupeSentinel(u8, out.text, 0);
+    const tree = try a.create(vams.Ast);
+    tree.* = try vams.Ast.parse(a, text, .{});
+    const vir = try vams.AstGen.generate(a, tree, .{ .directives = out.directives });
+    var zcu: Zcu = try .init(a);
+    _ = try zcu.addFile("mixed.vams", vir, 0);
+    try Sema.elaborate(&zcu, .{ .roots = .first });
+    var why: digital.Why = .{};
+    _ = digital.lower(a, &zcu, .{ .sources = &.{.{ .tree = tree, .pp = out }}, .mixed = true }, &why) catch |e| switch (e) {
+        error.Rejected => return why,
+        else => return e,
+    };
+    return error.TestExpectedError;
 }
 
 fn isMultiArrayList(comptime T: type) bool {
@@ -536,4 +583,116 @@ test "A.8.5 a one-operand concatenation as a switch, pull or MOS terminal is its
     , true);
     try expectEqualPrograms(&plain.program, &braced.program);
     try std.testing.expectEqual(@as(usize, 1), braced.program.trans.len);
+}
+
+test "§9.22.1/§9.22.2 the counts: ordinary drivers and receivers only, the connect module's own driver not one (driver_count_excludes_connectmodule.va)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const lowered = try lowerSource(a, prelude ++ driver_bench, true);
+    // `hi.o` and `lo.o` drive; `e1.i` and `e2.i` receive. §9.22 ¶3 leaves
+    // out `assign d = out` (§7.9 puts it on the receivers' net) and the
+    // connect module's own `assign w = out`: `w` has no ordinary driver.
+    try std.testing.expectEqualStrings("2 2 0\n", try transcript(a, &lowered.program));
+}
+
+test "§9.22 a driver access function outside a connect module is E0818" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const why = try rejection(arena_state.allocator(), prelude ++
+        \\module top; wire w; assign w = 1'b1; initial $display("%0d", $driver_count(w)); endmodule
+        \\
+    );
+    try std.testing.expectEqual(vams.Diag.Code.E0818, why.code);
+}
+
+test "§7.9/§9.22.6 segregation: the connect module reads the ordinary drivers, an ordinary input reads the connect module's driver (receiver_value_set_by_connectmodule.va)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const lowered = try lowerSource(a, prelude ++
+        \\connectmodule c2e(d, a);
+        \\  input d; output a; ddiscrete d; electrical a;
+        \\  reg out; assign d = out;
+        \\  initial begin out = 1'b1; #1 $display("d=%b", d); end
+        \\  analog V(a) <+ 0.0;
+        \\endmodule
+        \\module drv(o); output o; ddiscrete o; reg o; initial o = 1'b0; endmodule
+        \\module ear(i); input i; ddiscrete i; initial #2 $display("i=%b", i); endmodule
+        \\module top; electrical n; drv hi(.o(n)); ear e1(.i(n)); endmodule
+        \\connectrules r; connect c2e merged inout ddiscrete, inout electrical; endconnectrules
+        \\
+    , true);
+    // §9.22.6: `d` "will be used to read the driver values" (hi's 0) and the
+    // connect module's `assign d = out` "will drive the receivers" (1).
+    // One shared net would resolve 0 against 1 to x for both.
+    try std.testing.expectEqualStrings("d=0\ni=1\n", try transcript(a, &lowered.program));
+}
+
+test "§9.22.3/§9.22.4/§9.23 a driver's state, strength, type, pending state and delay (driver_delay_and_next_state.va)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const lowered = try lowerSource(a, prelude ++
+        \\connectmodule c2e(d, a);
+        \\  input d; output a; ddiscrete d; electrical a;
+        \\  reg out; assign d = out;
+        \\  initial begin
+        \\    out = 1'b0;
+        \\    #25 $display("%b %0.1f %b %0d %0d", $driver_state(d, 0), $driver_delay(d, 0), $driver_next_state(d, 0), $driver_strength(d, 0), $driver_type(d, 0));
+        \\    #10 $display("%b %0.1f %b", $driver_state(d, 0), $driver_delay(d, 0), $driver_next_state(d, 0));
+        \\    #10 $display("%b %0.1f %b", $driver_state(d, 0), $driver_delay(d, 0), $driver_next_state(d, 0));
+        \\    #11 $display("%b %0.1f %b %b", $driver_state(d, 0), $driver_delay(d, 0), $driver_next_state(d, 0), $driver_state(d, 1));
+        \\  end
+        \\  analog V(a) <+ 0.0;
+        \\endmodule
+        \\module drv(o); output o; ddiscrete o; reg o; initial begin o = 1'b0; #30 o <= #20 1'b1; end endmodule
+        \\module top; electrical n; drv dr(.o(n)); endmodule
+        \\connectrules r; connect c2e merged input ddiscrete, output electrical; endconnectrules
+        \\
+    , true);
+    // `dr.o <= #20 1'b1` at 30 lands at 50: pending from 30, 15 then 5 ns
+    // away at 35 and 45, active at 56. §9.22.4 a strong 0: 6 << 3 | 6; Annex
+    // D.3 a port window: DRIVER_ASSIGN's 16. Index 1 names no driver: x.
+    try std.testing.expectEqualStrings(
+        \\0 -1.0 0 54 16
+        \\0 15.0 1
+        \\0 5.0 1
+        \\1 -1.0 1 x
+        \\
+    , try transcript(a, &lowered.program));
+}
+
+test "§9.22.5 driver_update fires on every assignment of a port's reg, a change or not, and not for the connect module's own driver (driver_update_without_resolved_change.va)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const lowered = try lowerSource(a, prelude ++
+        \\connectmodule c2e(d, a);
+        \\  input d; output a; ddiscrete d; electrical a;
+        \\  reg out; integer updates;
+        \\  assign d = out;
+        \\  always @(driver_update d) updates = updates + 1;
+        \\  initial begin
+        \\    updates = 0; out = 1'b0;
+        \\    #15 $display("%0d", updates);
+        \\    #20 $display("%0d", updates);
+        \\    #20 out = 1'b1;
+        \\    #1 $display("%0d", updates);
+        \\    #10 $display("%0d", updates);
+        \\  end
+        \\  analog V(a) <+ 0.0;
+        \\endmodule
+        \\module drv(o); output o; ddiscrete o; reg o;
+        \\  initial begin #10 o = 1'b1; #20 o = 1'b1; #30 o <= #5 1'b0; end
+        \\endmodule
+        \\module top; electrical n; drv dr(.o(n)); endmodule
+        \\connectrules r; connect c2e merged input ddiscrete, output electrical; endconnectrules
+        \\
+    , true);
+    // t=10 `o = 1`: 1. t=30 `o = 1` again, no change: 2 (§9.22.5 "whether
+    // or not there is a change"). t=55 the connect module's own `out = 1`:
+    // still 2 (§9.22 ¶3, its driver is no ordinary one). t=60 `o <= #5 0`
+    // is queued: 3, and landing at 65 is no second update: still 3.
+    try std.testing.expectEqualStrings("1\n2\n2\n3\n", try transcript(a, &lowered.program));
 }

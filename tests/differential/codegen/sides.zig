@@ -55,7 +55,7 @@ pub const New = union(enum) {
 pub fn old(gpa: Allocator, arena: Allocator, path: []const u8, source: []const u8, include: []const []const u8) !?[]const u8 {
     var bag: diag.Bag = .init(gpa);
     defer bag.deinit(gpa);
-    var r = vera.analyze(gpa, source, .{ .file_name = path, .include_dirs = include }, &bag) catch |e| switch (e) {
+    var r = vera.analyze(gpa, source, .{ .file_name = path, .include_dirs = include, .display = .record }, &bag) catch |e| switch (e) {
         error.OutOfMemory => return e,
         else => return null, // else: a refusal before codegen
     };

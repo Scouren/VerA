@@ -55,7 +55,7 @@ pub fn task(l: *Lower, i: Inst.Index, op: Program.DumpOp, args: []const Inst.Ref
             }
         } else for (l.roots.items) |sc| try targets.appendSlice(l.a, &.{ 0, sc }),
         .limit => {
-            if (args.len != 1) return l.refuse("$dumplimit without one argument");
+            if (args.len != 1) return l.reject(l.frame, i.toRef(), "$dumplimit takes one file size");
             arg = try expr.self_(l, args[0], 0);
         },
         .off, .on, .all, .flush => {},
@@ -168,7 +168,7 @@ pub fn target(l: *Lower, r: Inst.Ref) Error!struct { slot: bool, at: u32 } {
     const i = r.toIndex() orelse return l.refuse("an omitted $dumpvars argument");
     switch (Lower.tag(vir, i)) {
         .str_ref => {
-            const k = rootNamed(l, vir.string(vir.instructions.items(.data)[@backingInt(i)].str_tok.start)) orelse return l.refuse("a $dumpvars argument naming no root module");
+            const k = rootNamed(l, vir.string(vir.instructions.items(.data)[@backingInt(i)].str_tok.start)) orelse return l.reject(l.frame, r, "$dumpvars names a module instance or a variable");
             return .{ .slot = false, .at = l.frames.items[l.instance_frame[k]].scope };
         },
         .decl_ref => {
@@ -185,7 +185,7 @@ pub fn target(l: *Lower, r: Inst.Ref) Error!struct { slot: bool, at: u32 } {
             const n = (try namesOf(l, f)).get(want) orelse return l.refuse("a $dumpvars argument its instance does not declare");
             return .{ .slot = true, .at = (try varName(l, n)).slot };
         },
-        else => return l.refuse("a $dumpvars argument that names no scope or variable"),
+        else => return l.reject(l.frame, r, "$dumpvars names a module instance or a variable"), // else: no scope or variable
     }
 }
 

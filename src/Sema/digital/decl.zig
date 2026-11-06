@@ -309,7 +309,7 @@ fn items(w: *Walk, f: u32, scope: u32, header: Vir.Body, body: Vir.Body, prefix:
         },
         .instance => try childInstance(w, f, scope, i, prefix),
         .gen_if, .gen_case => try scheme(w, f, scope, i, prefix),
-        .gen_for => try genFor(w, f, scope, Lower.payload(vir, Inst.GenFor, i), prefix),
+        .gen_for => try genFor(w, f, scope, i, prefix),
         .gen_block => try genBlock(w, f, scope, i, null, &.{}, prefix),
         .assign => try nets.assign(l, f, i),
         .function => {}, // declared above
@@ -333,7 +333,7 @@ fn scheme(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8) Error
         // The IEEE 1364 mode: a constant function, an x/z bit.
         const cb = vir.body(g.cond);
         if (cb.len == 0) return l.refuse("a generate condition with no expression");
-        const v = (try eval.v1364.value(env, cb[cb.len - 1].toRef())) orelse return l.refuse("a generate condition Sema/eval.zig does not fold");
+        const v = (try eval.v1364.value(env, cb[cb.len - 1].toRef())) orelse return l.reject(f, i.toRef(), "a constant expression is required here");
         break :blk switch (v) {
             .int => |x| x.truth() == .one,
             .real => |x| x != 0,
@@ -397,7 +397,8 @@ fn genCase(w: *Walk, f: u32, scope: u32, g: Inst.GenCase, prefix: []const u8) Er
 
 /// §12.4.1 a loop generate scheme: one `name[value]` block per iteration,
 /// its genvar bound to the iteration's value.
-fn genFor(w: *Walk, f: u32, scope: u32, g: Inst.GenFor, prefix: []const u8) Error!void {
+fn genFor(w: *Walk, f: u32, scope: u32, gi: Inst.Index, prefix: []const u8) Error!void {
+    const g = Lower.payload(w.l.virOf(f), Inst.GenFor, gi);
     const l = w.l;
     const vir = l.virOf(f);
     const init = storeOf(vir, g.init) orelse return l.refuse("a loop generate scheme without a genvar assignment");
@@ -407,7 +408,7 @@ fn genFor(w: *Walk, f: u32, scope: u32, g: Inst.GenFor, prefix: []const u8) Erro
     var n: u32 = 0;
     var seen: std.AutoHashMapUnmanaged(i64, void) = .empty;
     while (n < loop_max) : (n += 1) {
-        if ((try seen.fetchPut(l.a, v, {})) != null) return l.refuse("§12.4.1 a loop generate scheme repeating a genvar value");
+        if ((try seen.fetchPut(l.a, v, {})) != null) return l.reject(f, gi.toRef(), "§12.4.1: a genvar value is repeated, so this loop generate does not terminate");
         const outer = l.frames.items[f].genvars;
         const genvars = try l.a.alloc(Frame.Genvar, outer.len + 1);
         @memcpy(genvars[0..outer.len], outer);
@@ -456,7 +457,7 @@ fn childInstance(w: *Walk, f: u32, scope: u32, i: Inst.Index, prefix: []const u8
     }
     const target = try l.zcu.intern_pool.getString(l.a, vir.string(in.target));
     if (l.zcu.modules.get(target)) |d| if (l.zcu.declRow(d).kind == .primitive) return gates.udp(l, f, i, d);
-    if (in.flags.kind == .udp) return l.refuse("a UDP instance of no primitive");
+    if (in.flags.kind == .udp) return l.reject(f, i.toRef(), "A.4.1.1: a module instance takes no delay; `#( … )` is its parameter value assignment");
     const name = vir.string(in.name);
     const at = l.srcOffset(f, i);
     if (in.range.len == 0) return place(w, f, scope, i, prefix, name, null, null, at);
@@ -525,7 +526,13 @@ fn signal(w: *Walk, f: u32, first: Inst.Index, decls: []const Inst.Index, conn: 
     const c = conn orelse return;
     if (dir != .output) {
         if (c.actual == .none) return;
-        return l.refuse("§12.3.3 an input or inout port declared as a variable");
+        // At the list of ports' entry naming it, as lib/sim/digital reports.
+        const entry: Inst.Ref = for (vir.body(w.list)) |p| {
+            if (Lower.tag(vir, p) != .port) continue;
+            const v = vir.body(Lower.payload(vir, Inst.Port, p).value);
+            if (v.len != 0 and Lower.tag(vir, v[0]) == .decl_ref and vir.instructions.items(.data)[@backingInt(v[0])].decl_tok.decl == first) break v[0].toRef();
+        } else first.toRef();
+        return l.reject(f, entry, "§12.3.3: only an output port may be declared as a variable");
     }
     try ports.outputVariable(l, f, l.names.items[at], c, &w.deferred);
 }

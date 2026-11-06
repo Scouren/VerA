@@ -142,7 +142,7 @@ pub fn task(l: *Lower, i: Inst.Index) Error!void {
         .fshow => |sh| .{ .kind = .fshow, .a = try fileShow(l, i, args, sh, at) },
         .fstrobe => |sh| .{ .kind = .fstrobe, .a = try fileShow(l, i, args, sh, at) },
         .fmonitor => |sh| blk: {
-            if (args.len == 0 or args[0] == .none) return l.refuse("a file task with no descriptor");
+            if (args.len == 0 or args[0] == .none) return l.reject(l.frame, i.toRef(), "a §17.2.2 file output task's first argument is a descriptor");
             break :blk .{ .kind = .monitor, .a = try monitor(l, i, args[1..], sh, at, try expr.self_(l, args[0], 0)) };
         },
         .swrite, .sformat => blk: {
@@ -153,7 +153,7 @@ pub fn task(l: *Lower, i: Inst.Index) Error!void {
         },
         .readmem => |radix| .{ .kind = .readmem, .a = try readmem(l, args, radix) },
         .fclose => blk: {
-            if (args.len != 1) return l.refuse("$fclose without one argument");
+            if (args.len != 1) return l.reject(l.frame, i.toRef(), "$fclose takes one descriptor");
             break :blk .{ .kind = .fclose, .a = try expr.self_(l, args[0], 0) };
         },
         .fflush => .{ .kind = .fflush, .a = 0 },
@@ -344,7 +344,7 @@ fn location(l: *Lower, i: Inst.Index) Error![]const u8 {
 /// §17.2.2 a file output task's `Program.FShow`: its descriptor, then the
 /// display of the rest.
 fn fileShow(l: *Lower, call: Inst.Index, args: []const Inst.Ref, sh: Show, pc: u32) Error!u32 {
-    if (args.len == 0 or args[0] == .none) return l.refuse("a file task with no descriptor");
+    if (args.len == 0 or args[0] == .none) return l.reject(l.frame, call.toRef(), "a §17.2.2 file output task's first argument is a descriptor");
     const fd = try expr.self_(l, args[0], 0);
     return l.b.extraOf(Program.FShow{ .show = try format.show(l, call, args[1..], sh, pc, false), .fd = fd });
 }

@@ -19,7 +19,9 @@
 //!   parameter near its default inside its ranges; a time in [0, 1 ms]):
 //!   the residual rows, their Jacobian (with `jac_const`), the reactive rows
 //!   and theirs, bit for bit (NaN as NaN), save the named libm and fast-math
-//!   ulp bounds below; where a side stops the process (§4.2.4's zero
+//!   ulp bounds below; the §9.4 display records `say` writes at each
+//!   accepted point and the `say_sites` formats, exactly (the old device
+//!   built `.record`); where a side stops the process (§4.2.4's zero
 //!   divisor), every side must stop there by the same signal, and the run
 //!   goes on past the point;
 //! - the bsource stack (`codegen.examples.stack`) against `Air.interp`, and
@@ -99,7 +101,13 @@ const Tally = struct {
 const Ready = struct { rel: []const u8, old: []const u8, new: []const u8, ver: ?[]const u8, card: sides.Card };
 
 /// The C entry `dyn.zig` exports per device.
-const RunFn = *const fn ([*]const [*:0]const u8, [*]const f64, u32, [*]const f64, u32, f64, u32, [*]f64, u32) callconv(.c) i32;
+const RunFn = *const fn ([*]const [*:0]const u8, [*]const f64, u32, [*]const f64, u32, f64, u32, [*]f64, u32, [*]f64, u32, *u32) callconv(.c) i32;
+
+/// `dyn.zig`'s `cg_<decl>_site`: a §9.4 site's format.
+const SiteFn = *const fn (u32, *usize) callconv(.c) ?[*]const u8;
+
+/// The f64s of display records one point may write.
+const say_cap = 1 << 14;
 
 // ---- private ----
 
@@ -285,6 +293,10 @@ fn runBatch(gpa: Allocator, arena: Allocator, io: Io, q: *link.Queue, work: []co
                 try whys.put(arena, r.rel, try arena.print("the unknowns differ: old {d}, new {d}", .{ nu[0], nu[1] }));
                 continue;
             }
+            if (try sitesDiffer(arena, libs[0].lookup(SiteFn, try arena.printSentinel("cg_o{d}_site", .{k}, 0)).?, libs[1].lookup(SiteFn, try arena.printSentinel("cg_n{d}_site", .{k}, 0)).?)) |why| {
+                try whys.put(arena, r.rel, why);
+                continue;
+            }
             var rn = r;
             rn.card.n_u = nu[0];
             if (try compareIsolated(arena, rn, old_fn, new_fn, ver_fn, tally)) |why| try whys.put(arena, r.rel, why);
@@ -428,6 +440,9 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?Ru
     const n = r.card.n_u;
     const len = 2 * n + 2 * n * n;
     const outs = [3][]f64{ try arena.alloc(f64, len), try arena.alloc(f64, len), try arena.alloc(f64, len) };
+    const says = [3][]f64{ try arena.alloc(f64, say_cap), try arena.alloc(f64, say_cap), try arena.alloc(f64, say_cap) };
+    var say_lens: [3]u32 = @splat(0);
+    var say_why: ?[]const u8 = null;
     const x = try arena.alloc(f64, n);
     const vals = try arena.alloc(f64, r.card.names.len);
     const names = try arena.alloc([*:0]const u8, r.card.names.len);
@@ -442,6 +457,21 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?Ru
         const span: f64 = if (p % 4 == 3) 80 else 4;
         for (x) |*v| v.* = (rand.float(f64) - 0.5) * span;
         for (vals, r.card.defaults, r.card.ranges) |*v, def, ranges| v.* = drawIn(rand, def, ranges);
+        // Every fourth point is drawn from the versioned unit's box: each
+        // guarded unknown and parameter inside its guard, so the fast body
+        // runs whatever the ranges' defaults are.
+        if (p % 4 == 1) if (r.card.box) |box| for (box) |g| {
+            const lo = @max(g.iv.lo, -1e3);
+            const hi = @min(g.iv.hi, 1e3);
+            if (!(lo <= hi)) continue;
+            const v = lo + rand.float(f64) * (hi - lo);
+            switch (g.leaf) {
+                .probe => x[g.index] = v,
+                .arg => for (r.card.arg_of, vals) |k, *val| {
+                    if (k == g.index) val.* = v;
+                },
+            }
+        };
         for (r.card.arg_of, vals) |k, v| args[k] = v;
         // A transient: the points in time order, each accepted.
         const t = @as(f64, @floatFromInt(p)) * 1e-6;
@@ -462,13 +492,13 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?Ru
         if (probe) |pr| if (pr.point == p) {
             const rec: u32 = @intCast(p << 2 | pr.side);
             _ = std.os.linux.write(fd, @ptrCast(&rec), 4);
-            _ = fns[pr.side].?(names.ptr, vals.ptr, @intCast(vals.len), x.ptr, n, t, @intCast(p), outs[pr.side].ptr, @intCast(len));
+            _ = fns[pr.side].?(names.ptr, vals.ptr, @intCast(vals.len), x.ptr, n, t, @intCast(p), outs[pr.side].ptr, @intCast(len), says[pr.side].ptr, say_cap, &say_lens[pr.side]);
             return null;
         };
         for (fns[0..sides_n], outs[0..sides_n], ([3][]const u8{ "old", "new", "versioned" })[0..sides_n], 0..) |f, out, side, s| {
             const rec: u32 = @intCast(p << 2 | s);
             _ = std.os.linux.write(fd, @ptrCast(&rec), 4);
-            const rc = f.?(names.ptr, vals.ptr, @intCast(vals.len), x.ptr, n, t, @intCast(p), out.ptr, @intCast(len));
+            const rc = f.?(names.ptr, vals.ptr, @intCast(vals.len), x.ptr, n, t, @intCast(p), out.ptr, @intCast(len), says[s].ptr, say_cap, &say_lens[s]);
             if (rc != 0) return try arena.print("the {s} device's entry returned {d} (card: {s})", .{ side, rc, try std.mem.join(arena, ",", @ptrCast(r.card.names)) });
         }
         for (1..sides_n) |s| for (outs[0], outs[s], 0..) |a, b, i| {
@@ -485,11 +515,47 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?Ru
             const part, const at = if (i < n) .{ "row", i } else if (i < n + n * n) .{ "d row", i - n } else if (i < 2 * n + n * n) .{ "q row", i - n - n * n } else .{ "d q row", i - 2 * n - n * n };
             return try arena.print("point {d}: {s} {d}: old {e}, {s} {e}{s}", .{ p, part, at, a, if (s == 1) "new" else "versioned", b, if (s == 2 and !inside) " (outside the box: the strict body ran)" else "" });
         };
+        // §9.4 the point's display records: bit for bit, save the rows'
+        // own bounds. The first difference is kept and the rows go on
+        // through every point, so a print never hides a wrong Jacobian.
+        // ponytail: a child that stops later loses it; the resumed child
+        // finds it again only past the stop.
+        if (say_why == null) for (1..sides_n) |s| {
+            const a = says[0][0..say_lens[0]];
+            const b = says[s][0..say_lens[s]];
+            if (a.len != b.len) {
+                say_why = try arena.print("point {d}: the old device recorded {d} display values, the {s} {d}", .{ p, a.len, if (s == 1) "new" else "versioned", b.len });
+                break;
+            }
+            for (a, b, 0..) |va, vb, i| {
+                if (sameBits(va, vb)) continue;
+                const apart = ulpsApart(va, vb);
+                if (libm and apart <= libm_ulps) continue;
+                if (s == 2 and inside and apart <= fast_ulps) continue;
+                say_why = try arena.print("point {d}: display record value {d}: old {e}, {s} {e}", .{ p, i, va, if (s == 1) "new" else "versioned", vb });
+                break;
+            }
+        };
         counts[0] += 1;
     }
     // A device versioned on a box no point reached proved nothing.
     if (ver_fn != null and counts[2] == 0) return "the versioned device's box admitted none of the points";
-    return null;
+    return say_why;
+}
+
+/// Why the two devices' §9.4 `say_sites` formats differ, or null.
+fn sitesDiffer(arena: Allocator, old: SiteFn, new: SiteFn) !?[]const u8 {
+    var i: u32 = 0;
+    // Each pass reads one site of each; a device has finitely many.
+    while (true) : (i += 1) {
+        var la: usize = 0;
+        var lb: usize = 0;
+        const a = old(i, &la);
+        const b = new(i, &lb);
+        if (a == null and b == null) return null;
+        if (a == null or b == null) return try arena.print("the display sites differ in number: {s} has site {d}", .{ if (a != null) "only the old" else "only the new", i });
+        if (!std.mem.eql(u8, a.?[0..la], b.?[0..lb])) return try arena.print("display site {d}: old format \"{f}\", new \"{f}\"", .{ i, std.zig.fmtString(a.?[0..la]), std.zig.fmtString(b.?[0..lb]) });
+    }
 }
 
 /// Whether every guard of `box` admits the point (`Float.Guard.admits`, the

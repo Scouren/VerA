@@ -46,12 +46,14 @@ pub const TranRow = struct {
 
 /// Gate-level instance `i` of frame `f`, by its keyword.
 pub fn instance(l: *Lower, f: u32, i: Inst.Index) Error!void {
+    l.sink_use = .gate;
+    defer l.sink_use = .assign;
     const vir = l.virOf(f);
     const in = Lower.payload(vir, Inst.Instance, i);
     const saved = l.frame;
     defer l.frame = saved;
     l.frame = f;
-    const t = try terminals(l, vir, in);
+    const t = try terminals(l, vir, in, null);
     if (t.len == 0) return l.refuse("a gate with no terminal");
     const lanes: u32 = if (in.range.len == 0) 1 else (try vars.rangeOf(l, f, in.range)).width;
     const arrayed = in.range.len != 0;
@@ -72,7 +74,10 @@ pub fn instance(l: *Lower, f: u32, i: Inst.Index) Error!void {
     const resistive = kw[0] == 'r';
     const base = if (resistive) kw[1..] else kw;
     if (std.mem.eql(u8, base, "nmos") or std.mem.eql(u8, base, "pmos") or std.mem.eql(u8, base, "cmos")) return mos(l, f, base, resistive, t, lanes, arrayed, d);
-    if (std.mem.startsWith(u8, base, "tran")) return tran(l, f, base, resistive, t, lanes, d);
+    if (std.mem.startsWith(u8, base, "tran")) {
+        if (d.values[2] != .none) return l.reject(f, i.toRef(), "§7.6: a pass switch takes at most two delays");
+        return tran(l, f, base, resistive, t, lanes, d);
+    }
     return l.refuseFmt("the primitive `{s}`", .{kw});
 }
 
@@ -80,6 +85,8 @@ pub fn instance(l: *Lower, f: u32, i: Inst.Index) Error!void {
 /// one driver of its output net per instance, valued by the UDP's table.
 /// A.5.4: its `#( )` is a `delay2`.
 pub fn udp(l: *Lower, f: u32, i: Inst.Index, d: Zcu.Decl) Error!void {
+    l.sink_use = .gate;
+    defer l.sink_use = .assign;
     const vir = l.virOf(f);
     const in = Lower.payload(vir, Inst.Instance, i);
     const pvir = l.zcu.fileVir(d.file);
@@ -87,7 +94,7 @@ pub fn udp(l: *Lower, f: u32, i: Inst.Index, d: Zcu.Decl) Error!void {
     const saved = l.frame;
     defer l.frame = saved;
     l.frame = f;
-    const t = try terminals(l, vir, in);
+    const t = try terminals(l, vir, in, i);
     if (t.len != prim.ports.len) return l.refuse("§8 a UDP instance not connecting its output and every input, in order");
     const params = vir.list(Inst.Arg, in.params);
     var delay = try nets.delay3(l, f, in.delay);
@@ -150,11 +157,13 @@ pub fn compileTrans(l: *Lower) Error!void {
 // ---- private ----
 
 /// A primitive's terminals, by position, none left open.
-fn terminals(l: *Lower, vir: *const Vir, in: Inst.Instance) Error![]const Inst.Ref {
+fn terminals(l: *Lower, vir: *const Vir, in: Inst.Instance, udp_at: ?Inst.Index) Error![]const Inst.Ref {
     var terms: std.ArrayList(Inst.Ref) = .empty;
-    for (vir.list(Inst.Arg, in.conns)) |c| {
-        if (vir.string(c.name).len != 0) return l.refuse("a primitive terminal connected by name");
+    for (vir.list(Inst.Arg, in.conns), 0..) |c, k| {
         const b = vir.body(c.value);
+        // §8 a UDP instance's terminals: by position, every one connected.
+        if (udp_at) |u| if (vir.string(c.name).len != 0 or b.len == 0) return l.rejectOperand(l.frame, .none, u, @intCast(k), "§8: a UDP instance connects its terminals by position, none left open");
+        if (vir.string(c.name).len != 0) return l.refuse("a primitive terminal connected by name");
         if (b.len == 0) return l.refuse("an unconnected primitive terminal");
         try terms.append(l.a, b[b.len - 1].toRef());
     }
@@ -303,7 +312,6 @@ fn mos(l: *Lower, f: u32, base: []const u8, resistive: bool, t: []const Inst.Ref
 fn tran(l: *Lower, f: u32, base: []const u8, resistive: bool, t: []const Inst.Ref, lanes: u32, d: nets.Delay3) Error!void {
     const gated = base.len != 4;
     if (t.len != @as(usize, if (gated) 3 else 2)) return l.refuse("a pass switch with the wrong number of terminals");
-    if (d.values[2] != .none) return l.refuse("§7.6 a pass switch with three delays");
     for (0..lanes) |k| {
         const a = try terminal(l, t[0], lanes, @intCast(k));
         const b = try terminal(l, t[1], lanes, @intCast(k));

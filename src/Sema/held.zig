@@ -388,13 +388,15 @@ pub fn mark(s: *Sema, unit: *Unit) Allocator.Error!void {
 
 /// The first argument system call `i` writes (§9.5.3 `$sformat`/`$swrite`
 /// its destination, §9.5.4 `$fgets` its string, §9.5.4.2 `$sscanf`/`$fscanf`
-/// every argument from the third, §9.12 `$value$plusargs` its second), or
+/// every argument from the third, §9.5.7 `$ferror` and §9.12
+/// `$value$plusargs` their second), or
 /// null for a call that writes none.
 fn writtenFrom(vir: *const Vir, i: Inst.Index) ?usize {
     const name = vir.string(decl.payloadOf(vir, Inst.SysCall, i).name);
     const table = std.StaticStringMap(usize).initComptime(.{
         .{ "$sformat", 0 }, .{ "$swrite", 0 }, .{ "$fgets", 0 },
         .{ "$sscanf", 2 },  .{ "$fscanf", 2 }, .{ "$value$plusargs", 1 },
+        .{ "$ferror", 1 },
     });
     return table.get(name);
 }

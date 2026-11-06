@@ -12,7 +12,7 @@
 //! Cites: IEEE 1364-2005 §9.9, §11.4, §12.4, §12.5, §19.8.
 //!
 //! Contents:
-//! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Named = struct`, `pub const SegmentRef = struct`, `pub const Why = struct`
+//! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Port = struct`, `pub const Named = struct`, `pub const SegmentRef = struct`, `pub const Why = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
 //! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `reject`, `rejectFmt`, `rejectOperand`, `rejectArg`, `rejectArgFmt`, `lookup`, `readsSignal`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
@@ -65,6 +65,27 @@ pub const Lowered = struct {
     program: Program,
     check_sites: []const u32 = &.{},
     names: []const Named = &.{},
+    /// The root instance's ports, in its list of ports' order (`Port`).
+    ports: []const Port = &.{},
+    /// The source offset of the root module's `module` keyword, in
+    /// `check_sites`' offset space.
+    top_at: u32 = 0,
+};
+
+/// One port of the root instance as a device host drives it: its name,
+/// direction, the `Program.slots` row behind it (`maxInt` when none: a
+/// continuous port of a mixed design), its type and declared `[msb:lsb]`,
+/// `scalar` when declared without a range, `integer` for an `integer` or
+/// `time` variable.
+pub const Port = struct {
+    name: []const u8,
+    dir: enum { input, output, inout },
+    slot: u32,
+    ty: Program.Ty,
+    msb: i64,
+    lsb: i64,
+    scalar: bool,
+    integer: bool,
 };
 
 /// VAMS §7.3 one variable or net a mixed host reads (D2A) or writes (A2D):
@@ -562,7 +583,12 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Low
         why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
         return e;
     } else &.{};
-    return .{ .program = program, .check_sites = l.check_sites.items, .names = named };
+    const top = @import("digital/top.zig");
+    const root_ports = top.ports(&l) catch |e| {
+        why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
+        return e;
+    };
+    return .{ .program = program, .check_sites = l.check_sites.items, .names = named, .ports = root_ports, .top_at = top.topAt(&l) };
 }
 
 // ---- private ----

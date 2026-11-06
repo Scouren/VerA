@@ -696,3 +696,32 @@ test "§9.22.5 driver_update fires on every assignment of a port's reg, a change
     // is queued: 3, and landing at 65 is no second update: still 3.
     try std.testing.expectEqualStrings("1\n2\n2\n3\n", try transcript(a, &lowered.program));
 }
+
+test "§12.3.2/§12.3.3 the root's ports for a device host: list-of-ports order, direction, slot, type, range and kind; top_at at `module`" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    // No directive: the preprocessed text is the source, offset for offset.
+    const src =
+        \\module top(a, b, c, n);
+        \\  input [3:0] a; output b; reg b; inout c; output n; integer n;
+        \\endmodule
+        \\
+    ;
+    const lowered = try lowerSource(arena_state.allocator(), src, false);
+    const p = lowered.ports;
+    try std.testing.expectEqual(@as(usize, 4), p.len);
+    // `a`: an input vector [3:0]; `b`: a scalar output reg; `c`: a scalar
+    // inout net; `n`: an `integer` output, 32 bits signed, [31:0].
+    try std.testing.expectEqualStrings("a", p[0].name);
+    try std.testing.expect(p[0].dir == .input and p[0].msb == 3 and p[0].lsb == 0 and !p[0].scalar and !p[0].integer);
+    try std.testing.expectEqual(Program.Ty.int(4, false), p[0].ty);
+    try std.testing.expectEqualStrings("b", p[1].name);
+    try std.testing.expect(p[1].dir == .output and p[1].scalar and !p[1].integer);
+    try std.testing.expectEqualStrings("c", p[2].name);
+    try std.testing.expect(p[2].dir == .inout and p[2].scalar);
+    try std.testing.expectEqualStrings("n", p[3].name);
+    try std.testing.expect(p[3].dir == .output and p[3].integer and !p[3].scalar and p[3].msb == 31 and p[3].lsb == 0);
+    try std.testing.expectEqual(Program.Ty.int(32, true), p[3].ty);
+    for (p, 0..) |x, k| for (p[0..k]) |y| try std.testing.expect(x.slot != y.slot);
+    try std.testing.expectEqualStrings("module top", src[lowered.top_at..][0.."module top".len]);
+}

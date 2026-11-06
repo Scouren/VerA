@@ -479,11 +479,11 @@ verilog-a/ch04_expressions/logical_and.va rw-lower (analog lowering): exit statu
 verilog-a/ch04_expressions/logical_equal.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/logical_not.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/logical_unequal.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch04_expressions/modulo_integer_display_zero.va rw-zero (air passes): stderr: line 2: old `error[E0601]: LRM 4.2.4: integer modulus divisor is zero`, new `Illegal instruction at address 0x120eacb`
+verilog-a/ch04_expressions/modulo_integer_display_zero.va rw-zero (air passes): stderr: line 2: old `error[E0601]: LRM 4.2.4: integer modulus divisor is zero`, new `Illegal instruction at address 0x120dd6b`
 verilog-a/ch04_expressions/modulo_integer_dynamic.va rw-zero (air passes) message: stderr: line 28: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — co
 verilog-a/ch04_expressions/modulo_integer_dynamic_nonzero.va rw-zero (air passes) location: exit status old 0, new 1
 verilog-a/ch04_expressions/modulo_integer_dynamic_zero.va rw-zero (air passes): stderr: line 1: old `only the nonzero point completes got=          2 want=          2 ok=1`, new `narrow_check FAIL: dres[p]/dx[p]: a unit step moves the row by 1e0, jac_const says 0e0`
-verilog-a/ch04_expressions/modulo_integer_unused_zero.va rw-zero (air passes): stderr: line 2: old `error[E0601]: LRM 4.2.4: integer modulus divisor is zero`, new `Illegal instruction at address 0x120e1eb`
+verilog-a/ch04_expressions/modulo_integer_unused_zero.va rw-zero (air passes): stderr: line 2: old `error[E0601]: LRM 4.2.4: integer modulus divisor is zero`, new `Illegal instruction at address 0x120d73b`
 verilog-a/ch04_expressions/modulo_real_dynamic_zero.va rw-zero (air passes): stderr: line 2: old `error[E0601]: LRM 4.2.4: real modulus divisor is zero`, new `Illegal instruction at address 0x11fd394`
 verilog-a/ch04_expressions/nodeset_phase_has_no_evaluation.va rw-lower (analog lowering): stderr: line 5: old `analysis("nodeset") is 0 (VD-117) got=                   0 want=          0 ok=1`, new `analysis("nodeset") is 0 (VD-117) got=          0 want=          0 ok=1`
 verilog-a/ch04_expressions/noise_anticorrelated_coefficient.va rw-zero (air passes): exit status old 0, new 1
@@ -565,8 +565,8 @@ verilog-a/ch04_expressions/replication_zero_beside_sized_operand.va rw-lower (an
 verilog-a/ch04_expressions/replication_zero_effect.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/replication_zero_width.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/rollback_a04_rollback_ops.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch04_expressions/runtime_ln1p_domain_rejected.va rw-zero (air passes): exit status old 1, new 0
-verilog-a/ch04_expressions/runtime_ln_domain_rejected.va rw-zero (air passes): exit status old 1, new 0
+verilog-a/ch04_expressions/runtime_ln1p_domain_rejected.va rw-zero (air passes): stderr: line 2: old `error[E0603]: LRM 4.3.2: ln1p() input value is outside the valid range x > -1: -1`, new `thread panic: division by zero`
+verilog-a/ch04_expressions/runtime_ln_domain_rejected.va rw-zero (air passes): stderr: line 2: old `error[E0602]: LRM 4.3.2: ln() input value is outside the valid range x > 0: 0`, new `thread panic: division by zero`
 verilog-a/ch04_expressions/runtime_log_domain_rejected.va rw-zero (air passes): exit status old 1, new 0
 verilog-a/ch04_expressions/runtime_pow_constant_exponent_rejected.va rw-zero (air passes): exit status old 1, new 0
 verilog-a/ch04_expressions/runtime_pow_domain_rejected.va rw-zero (air passes): exit status old 1, new 0
@@ -1102,7 +1102,7 @@ verilog-a/ch09_system_tasks/file_output_real_descriptor_rejected.va rw-lower (an
 verilog-a/ch09_system_tasks/file_position_status.va rw-zero (air passes): exit status old 0, new 1
 verilog-a/ch09_system_tasks/file_read_scan.va rw-zero (air passes): exit status old 0, new 1
 verilog-a/ch09_system_tasks/finish_in_rejected_iteration_has_no_effect.va rw-lower (analog lowering): stderr: line 5: old `the accepted vector is the iterate after the vetoed one got=2 want=2 ok=1`, new `the accepted vector is the iterate after the vetoed one got=1 want=2 ok=0`
-verilog-a/ch09_system_tasks/finish_terminates.va rw-lower (analog lowering): stderr: line 6: old `$finish: p=1 memory=15564 kB cpu=0.001 s (ch09_finish_terminates)`, new `  res[p] = 1.000000e0`
+verilog-a/ch09_system_tasks/finish_terminates.va rw-lower (analog lowering): stderr: line 6: old `$finish: p=1 memory=15688 kB cpu=0.001 s (ch09_finish_terminates)`, new `  res[p] = 1.000000e0`
 verilog-a/ch09_system_tasks/finish_two_arguments_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0887]: wrong number of arguments to a system task or function: `$finish` takes at most 1 argument, got 2`, new `error[E0887]: wrong number of arguments to a system task or function: `$finish` takes 0 to 1 arguments, got 2`
 verilog-a/ch09_system_tasks/floor.va rw-zero (air passes): stderr: line 13: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch09_system_tasks/fmonitor.va rw-codegen (codegen): exit status old 0, new 1
@@ -1122,17 +1122,13 @@ verilog-a/ch09_system_tasks/fseek_without_operation_rejected.va rw-lower (analog
 verilog-a/ch09_system_tasks/fstrobe.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch09_system_tasks/ftell.va rw-zero (air passes): exit status old 0, new 1
 verilog-a/ch09_system_tasks/fwrite.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch09_system_tasks/geometry_angle_negative_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/geometry_angle_negative_rejected.va:13:27`, new `  --> verilog-a/ch09_system_tasks/geometry_angle_negative_rejected.va:12:33`
-verilog-a/ch09_system_tasks/geometry_angle_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/geometry_angle_rejected.va:11:34`, new `  --> verilog-a/ch09_system_tasks/geometry_angle_rejected.va:11:40`
 verilog-a/ch09_system_tasks/geometry_card_mfactor_outside_domain_is_fatal.va rw-comp (elab): exit status old 1, new 0
 verilog-a/ch09_system_tasks/geometry_defparam_alias.va rw-lower (analog lowering): stderr: line 3: old `defparam x alias replaces, then adds got=-1 want=-1 ok=1`, new `defparam x alias replaces, then adds got=0 want=-1 ok=0`
-verilog-a/ch09_system_tasks/geometry_hflip_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/geometry_hflip_rejected.va:10:34`, new `  --> verilog-a/ch09_system_tasks/geometry_hflip_rejected.va:10:38`
 verilog-a/ch09_system_tasks/geometry_hierarchical_overrides.va rw-lower (analog lowering): stderr: line 3: old `outer x got=2 want=2 ok=1`, new `outer x got=0 want=2 ok=0`
 verilog-a/ch09_system_tasks/geometry_parameter_sweep.va rw-zero (air passes): stderr: line 4: old `swept x got=2 want=2 ok=1`, new `swept x got=0 want=2 ok=0`
 verilog-a/ch09_system_tasks/geometry_paramset.va rw-lower (analog lowering): stderr: line 3: old `paramset x got=5 want=5 ok=1`, new `paramset x got=0 want=5 ok=0`
 verilog-a/ch09_system_tasks/geometry_state_read_rejected.va rw-lower (analog lowering): exit status old 1, new 0
 verilog-a/ch09_system_tasks/geometry_top_alias_host.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch09_system_tasks/geometry_vflip_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/geometry_vflip_rejected.va:15:3`, new `  --> verilog-a/ch09_system_tasks/geometry_vflip_rejected.va:11:21`
 verilog-a/ch09_system_tasks/hflip.va rw-zero (air passes) message: stderr: line 13: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — co
 verilog-a/ch09_system_tasks/hierarchical_parameters.va rw-zero (air passes) message: stderr: line 9: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — com
 verilog-a/ch09_system_tasks/hypot.va rw-zero (air passes): stderr: line 15: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
@@ -1176,7 +1172,6 @@ verilog-a/ch09_system_tasks/math_trig.va rw-zero (air passes) message: stderr: l
 verilog-a/ch09_system_tasks/math_unary.va rw-zero (air passes) message: stderr: line 10: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — co
 verilog-a/ch09_system_tasks/mcd_channels_exhausted_at_bit_31.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch09_system_tasks/mfactor.va rw-zero (air passes): stderr: line 12: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — compiles with @setFloatMode(.strict)`
-verilog-a/ch09_system_tasks/mfactor_zero_override_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/mfactor_zero_override_rejected.va:32:21`, new `  --> verilog-a/ch09_system_tasks/mfactor_zero_override_rejected.va:32:25`
 verilog-a/ch09_system_tasks/monitor_ignores_abstime.va rw-zero (air passes): exit status old 0, new 1
 verilog-a/ch09_system_tasks/monitor_reports_every_change.va rw-zero (air passes): exit status old 0, new 1
 verilog-a/ch09_system_tasks/monitor_suppresses_an_unchanged_step.va rw-zero (air passes): exit status old 0, new 1
@@ -1438,15 +1433,12 @@ verilog-ams/annex_a_syntax/specify_path_delay_mintypmax_list.va rw-codegen (run)
 verilog-ams/annex_a_syntax/specify_path_delays_design_runs.va rw-codegen (run): stderr: line 23: old `  res[p] = 0.000000e0`, new `  x[uZ2ec] = 0.000000e0`
 verilog-ams/annex_a_syntax/specify_paths_design_runs.va rw-codegen (run): stderr: line 38: old `  res[p] = 0.000000e0`, new `  x[uZ2ea] = 0.000000e0`
 verilog-ams/annex_a_syntax/specparam_module_item_value.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/annex_a_syntax/task_declaration_enabled_from_initial.va rw-lower (analog lowering): stderr: line 4: old `A.2.7 two declared tasks ran from a digital initial block got=         10 want=         10 ok=1`, new `A.2.7 two declared tasks ran from a digital initial block got=          0 want=         10 ok=0`
 verilog-ams/annex_a_syntax/timing_checks_design_runs.va rw-codegen (run): stderr: line 15: old `  res[p] = 0.000000e0`, new `  x[uZ2eclk] = 0.000000e0`
 verilog-ams/annex_a_syntax/timing_checks_unsupported.va rw-codegen (run): stderr: line 18: old `warning[W0251]: specify block read, and part or all of it is not modelled: $setup, $hold, $width, $period never evaluated by the analog solver`, new ``
 verilog-ams/annex_a_syntax/udp_declared_and_instantiated.va rw-lower (analog lowering): stderr: line 45: old `warning[W0252]: gate primitive accepted, and it computes nothing: b8_udp_mux primitive`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b8_udp_dff` primitive`
 verilog-ams/annex_a_syntax/udp_instantiation_unsupported.va rw-lower (analog lowering): stderr: line 16: old `warning[W0252]: gate primitive accepted, and it computes nothing: annex_a_udp_pulse primitive`, new ``
 verilog-ams/annex_c_analog_subset/casex_accepted.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/annex_c_analog_subset/casez_accepted.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/annex_c_analog_subset/connectmodule_is_not_a_device.va rw-comp (elab): exit status old 1, new 0
-verilog-ams/annex_c_analog_subset/connectrules_is_not_a_device.va rw-comp (elab): stderr: line 1: old `error[E1001]: source contains no module declaration`, new `error[E0915]: connect insertion names no connect module: nothing declares `a2d``
 verilog-ams/annex_c_analog_subset/digital_event_control_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-ams/annex_c_analog_subset/digital_event_control_rejected.va:51:11`, new `  --> verilog-ams/annex_c_analog_subset/digital_event_control_rejected.va:51:9`
 verilog-ams/annex_c_analog_subset/digital_initial_accepted.va rw-lower (analog lowering): stderr: line 4: old `a digital initial block leaves its constant in the variable it assigns got=          1 want=          1 ok=1`, new `a digital initial block leaves its constant in the variable it assigns got=          0 want=          1 ok=0`
 verilog-ams/annex_c_analog_subset/named_event_in_subset.va rw-zero (air passes) message: stderr: line 6: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,gnd) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — c
@@ -1482,7 +1474,6 @@ verilog-ams/ch03_data_types/nodeset_non_continuous.va rw-lower (analog lowering)
 verilog-ams/ch03_data_types/wand_interconnect_resolves_wired_and.va rw-lower (analog lowering): stderr: line 5: old `the wand interconnect resolves 1 and 0 to 0 got=          1 want=          1 ok=1`, new `the wand interconnect resolves 1 and 0 to 0 got=1 want=          1 ok=1`
 verilog-ams/ch03_data_types/wire_without_discipline_in_analog_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0337]: net has no declared discipline: `w` has no discipline, so `V` names nothing on it`, new `error[E0512]: unknown function: an access of a name with no node`
 verilog-ams/ch03_data_types/wire_without_discipline_is_discrete.va rw-lower (analog lowering): stderr: line 5: old `the always block saw the discrete net's value got=          0 want=          0 ok=1`, new `the always block saw the discrete net's value got=0 want=          0 ok=1`
-verilog-ams/ch03_data_types/wreal_connected_to_wand_rejected.va rw-comp (elab): exit status old 1, new 0
 verilog-ams/ch03_data_types/wreal_net_undriven_zero_and_driven.va rw-zero (air passes) message: stderr: line 13: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — co
 verilog-ams/ch03_data_types/wreal_wire_port_merge.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch04_expressions/case_equality.va rw-codegen (display phase): stderr: line 8: old `   = help: use `==`; for reals prefer `abs(a - b) < tol``, new `   = help: run `vera --explain E0369` for a detailed explanation`
@@ -1656,7 +1647,6 @@ verilog-ams/ch07_mixed_signal/wide_reg_matches_digital_300.va rw-lower (analog l
 verilog-ams/ch07_mixed_signal/wide_reg_matches_digital_65600.va rw-lower (analog lowering): stderr: line 1: old `error[E0316]: unsupported assignment target: `a1` is a reg: an analog procedural assignment targets an integer, real or string (§5.7)`, new `error[E0512]: unknown function: a bit or part select of a scalar is not lowered by Sema yet`
 verilog-ams/ch07_mixed_signal/wide_reg_matches_digital_72.va rw-lower (analog lowering): stderr: line 1: old `error[E0316]: unsupported assignment target: `a1` is a reg: an analog procedural assignment targets an integer, real or string (§5.7)`, new `error[E0512]: unknown function: a bit or part select of a scalar is not lowered by Sema yet`
 verilog-ams/ch07_mixed_signal/wide_reg_part_select_above_31.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/wreal_port_joined_to_wand_rejected.va rw-comp (elab): exit status old 1, new 0
 verilog-ams/ch07_mixed_signal/x_case_equality_compared.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/x_case_equality_input_net.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/x_literal_unsupported.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0130]: literal requires digital value support in the execution backend: `1'bx`: the analog backend cannot execute this 1-bit four-state literal`, new `error[E0130]: literal requires digital value support in the execution backend: the an
@@ -1822,51 +1812,34 @@ verilog-ams/ch12_vpi_routines/two_libraries_two_instances.c not built: backend v
 verilog-ams/ch12_vpi_routines/vpi_routines_not_va_functions.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0512]: unknown function: `vpi_chk_error``, new `error[E0512]: unknown function: `vpi_chk_error` is not lowered by Sema yet`
 verilog-ams/digital/bare_event_trigger_in_analog_rejected.va rw-codegen (display phase): stderr: line 8: old `   = help: only `@(<event>) -> ev;` is legal`, new `   = help: run `vera --explain E0434` for a detailed explanation`
 verilog-ams/digital/digital_delay_primitive_notation.v rw-lower (analog lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `digital_delay_buffer` primitive`
-verilog-ams/digital/reject_wreal_connected_to_wand.v rw-comp (elab): exit status old 1, new 0
 verilog-ams/digital/scaled_delay_udp_rejected.v rw-lower (analog lowering): stderr: line 2: old `  --> verilog-ams/digital/scaled_delay_udp_rejected.v:18:25`, new `  --> verilog-ams/digital/scaled_delay_udp_rejected.v:18:29`
 verilog-ams/digital/std_1364_ams_keywords_reserved_by_default.v rw-comp (parse): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `error[E0219]: a null statement is not an analog statement`
 verilog-ams/digital/vams_digital_temperature_refused.v not built: backend digital_lowering
 verilog/03_lexical_conventions/attribute_positions.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_3_8_2_inv` primitive`
 verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/03_lexical_conventions/escaped_system_task_rejected.v not built: backend digital_lowering
-verilog/03_lexical_conventions/forward_reference_reg_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/native_real_edge_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/nonconstant_declaration_assignment_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/parameter_assigned_specify_block_specparam_rejected.v not built: backend digital_lowering
-verilog/04_data_types/parameter_assigned_specparam_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/parameter_from_variable_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/parameter_redeclares_net_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/port_list_body_parameter_override_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/posedge_real_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/real_range_bound_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/specparam_before_declaration_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/task_named_like_variable_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/03_lexical_conventions/forward_reference_reg_rejected.v rw-dlower (digital lowering) location: stderr: line 10: old ``, new `error: could not compile due to 1 previous error(s)`
 verilog/04_data_types/type_uwire_multiple_drivers_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/04_data_types/undeclared_procedural_target_rejected.v not built: backend digital_lowering
-verilog/04_data_types/variable_range_bound_rejected.v not built: backend digital_lowering
-verilog/05_expressions/constant_time_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/05_expressions/native_select_variable_width_rejected.v not built: backend digital_lowering
 verilog/05_expressions/native_wide_index_bound_limit.v not built: backend digital_lowering
-verilog/05_expressions/variable_part_select_rejected.v not built: backend digital_lowering
 verilog/07_gate_switch_level/split_array_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/08_udp/combinational_reg_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/08_udp/combinational_reg_rejected.v rw-dlower (digital lowering): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `comb_reg` primitive`
 verilog/08_udp/definition_inside_module_rejected.v rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `q``, new `error[E0205]: unsupported module item: found table`
 verilog/08_udp/definition_placement.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv_before` primitive`
 verilog/08_udp/header_forms.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `and_a` primitive`
-verilog/08_udp/initial_to_input_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/08_udp/initial_to_input_rejected.v rw-dlower (digital lowering): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `input_init` primitive`
 verilog/08_udp/initial_values.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `i0` primitive`
 verilog/08_udp/input_minimums.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `and10` primitive`
 verilog/08_udp/instance_array.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv` primitive`
 verilog/08_udp/instances.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `gt` primitive`
 verilog/08_udp/jk_edge_ff.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `jk_edge_ff` primitive`
-verilog/08_udp/multibit_initial_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/08_udp/multibit_initial_rejected.v rw-dlower (digital lowering): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `wide_init` primitive`
 verilog/08_udp/multiplexer.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `multiplexer` primitive`
 verilog/08_udp/output_bit_select.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv` primitive`
 verilog/08_udp/output_reg_initializer.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `hdr` primitive`
 verilog/08_udp/overlapping_entries_agree.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `nand_overlap` primitive`
 verilog/08_udp/sequential_64_inputs.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `seq64` primitive`
 verilog/08_udp/sequential_hold_agrees.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `latch_agree` primitive`
-verilog/08_udp/sequential_without_reg_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/08_udp/sequential_without_reg_rejected.v rw-dlower (digital lowering): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `latch_no_reg` primitive`
 verilog/08_udp/table_symbols.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `pn` primitive`
 verilog/08_udp/two_delays.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv` primitive`
 verilog/08_udp/udp_65_inputs.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `and65` primitive`
@@ -1877,45 +1850,18 @@ verilog/08_udp/udp_latch.v rw-dlower (digital lowering): stderr: line 1: old ``,
 verilog/08_udp/udp_named_terminal_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1100]: digital source execution failed: §8: a UDP instance connects its terminals by position, none left open`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `triage_pass` primitive`
 verilog/08_udp/udp_null_terminal_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1100]: digital source execution failed: §8: a UDP instance connects its terminals by position, none left open`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `mux` primitive`
 verilog/08_udp/udp_potential_edges_dominance.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `audit_edges_udp` primitive`
-verilog/09_behavioral_modeling/event_array_posedge_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/09_behavioral_modeling/event_array_selector_trigger_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function body cannot contain an event trigger`, new `error[E1100]: digital source execution failed: §10.4.2: subroutine calls nested past 20000 activations`
-verilog/09_behavioral_modeling/event_used_before_declaration_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/09_behavioral_modeling/forever_without_timing_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/09_behavioral_modeling/forever_without_timing_rejected.v:20:1`, new `  = note: LRM 8.5`
-verilog/09_behavioral_modeling/multiple_default_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/09_behavioral_modeling/undeclared_event_rejected.v not built: backend digital_lowering
 verilog/09_behavioral_modeling/unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
 verilog/09_behavioral_modeling/unnamed_fork_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
 verilog/09_behavioral_modeling/zero_delay_always_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/09_behavioral_modeling/zero_delay_always_rejected.v:14:1`, new `  = note: LRM 8.5`
 verilog/10_tasks_functions/constant_function_hierarchical_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/10_tasks_functions/function_enables_task_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/10_tasks_functions/function_event_trigger_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/10_tasks_functions/function_nonblocking_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/10_tasks_functions/function_output_argument_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/10_tasks_functions/function_scope_object_named_as_function_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/10_tasks_functions/function_time_control_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/10_tasks_functions/function_without_input_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/10_tasks_functions/module_object_named_as_function_rejected.v not built: backend digital_lowering
 verilog/10_tasks_functions/recursion_without_end_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: nesting here exhausts the 1987 MiB stack VerA reserved for it`, new `error[E1100]: digital source execution failed: §10.4.2: subroutine calls nested past 20000 activations`
 verilog/11_scheduling/zero_delay_loop_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/11_scheduling/zero_delay_loop_rejected.v:16:1`, new `  = note: LRM 8.5`
-verilog/12_hierarchy/assign_before_net_declaration_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/defparam_across_generate_instances_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/defparam_early_resolution_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.8.2: this defparam's hierarchical name was resolved before the hierarchy was complete and would resolve diff`, new `error[E0907]: override names no parameter of the module: `n.m.n.p` names no parameter of the el
-verilog/12_hierarchy/defparam_names_nothing_rejected.v rw-comp (elab): stderr: line 1: old `error[E0901]: hierarchical name names nothing in the elaborated design: §12.2.1: this defparam's hierarchical name `foo` names nothing in the design`, new `error[E0907]: override names no parameter of the module: §12.2.1: this defparam names `foo`, which is no 
-verilog/12_hierarchy/defparam_nonconstant_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element`, new `error[E0907]: override names no parameter of the module: `u[0].u[1].x.p` names no parameter of 
-verilog/12_hierarchy/duplicate_port_name_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/function_port_range_scope_rejected.v not built: backend digital_lowering
-verilog/12_hierarchy/hierarchy_simple_name_stops_at_module_rejected.v not built: backend digital_lowering
-verilog/12_hierarchy/instance_select_out_of_range_rejected.v not built: backend digital_lowering
-verilog/12_hierarchy/localparam_override_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/net_type_warning.v rw-comp (elab): stderr: line 1: old `warning[W1160]: dissimilar net types joined through a port: §12.3.10: a `wand` port joined to a `wor` net is a Table 12-1 warn cell of the net type table`, new ``
-verilog/12_hierarchy/no_top_level_module_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/non_ancestor_module_name_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element`, new `error[E1100]: digital source execution failed: §12.2.1: a defparam insid
 verilog/12_hierarchy/port_width_mismatch_vams_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/real_connected_to_port_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/select_warning.v rw-comp (elab): stderr: line 1: old `warning[W1160]: dissimilar net types joined through a port: §12.3.10: a `wand` port joined to a `wor` net is a Table 12-1 warn cell of the net type table`, new ``
-verilog/12_hierarchy/self_instantiation_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/unnamed_block_referenced_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/cell_not_in_its_library_rejected.v not built: backend libmap
 verilog/13_configuration/cfg1_default_liblist.v not built: backend libmap
@@ -1929,15 +1875,12 @@ verilog/13_configuration/config_overrides_command_line.v not built: backend libm
 verilog/13_configuration/default_search_order.v not built: backend libmap
 verilog/13_configuration/design_cell_missing_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/design_names_config_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/13_configuration/every_config_referenced_rejected.v rw-comp (elab): exit status old 1, new 0
 verilog/13_configuration/include_map.v not built: backend libmap
 verilog/13_configuration/library_without_path_rejected.v not built: backend libmap
 verilog/13_configuration/parent_library_by_map.v not built: backend libmap
 verilog/13_configuration/resolution_order.v not built: backend libmap
-verilog/13_configuration/rule_inside_other_config_rejected.v rw-comp (elab): exit status old 1, new 0
 verilog/13_configuration/source_text_in_map_rejected.v not built: backend libmap
 verilog/13_configuration/two_libraries_match_rejected.v not built: backend libmap
-verilog/13_configuration/two_unreferenced_configs_rejected.v rw-comp (elab): exit status old 1, new 0
 verilog/13_configuration/undeclared_library_rejected.v not built: backend libmap
 verilog/15_timing_checks/conditions.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in b_15_6_conditions.u: timestamp event at 20, timecheck event at 22`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/fullskew_checks_both_orders.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$fullskew` in fullskew_checks_both_orders.forward: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
@@ -1963,7 +1906,6 @@ verilog/16_sdf/sdf_timing_check_limit.v rw-dlower (run) message: stderr: line 1:
 verilog/17_system_tasks/closed_channel_not_written.v rw-dlower (run): stderr: line 1: old `warning[W1154]: file output not written: no file this descriptor names is open for writing: the output is not written`, new ``
 verilog/17_system_tasks/dist_nonpositive_warning.v rw-dlower (run): stderr: line 1: old `warning[W1151]: probabilistic distribution argument not positive: a $dist_ mean, degree of freedom or k_stage is not positive: the result is 0 and the seed is u`, new ``
 verilog/17_system_tasks/native_sformat_dynamic.v rw-dlower (run): stderr: line 1: old `warning[W1153]: format specifiers and arguments do not pair up: $sformat: the format's specifiers and the arguments after it do not pair up`, new ``
-verilog/17_system_tasks/printtimescale_unknown_scope_rejected.v not built: backend digital_lowering
 verilog/17_system_tasks/readmem_address_outside_memory.v rw-dlower (run): stderr: line 1: old `warning[W1156]: memory file address outside the memory: memory file address @8 is outside the memory's declared range [0:3]; its words are skipped`, new ``
 verilog/17_system_tasks/readmem_address_outside_task_range.v rw-dlower (run): stderr: line 1: old `warning[W1157]: a $readmem load terminated: §17.2.9: memory file address @3 is outside the load range [0:1] the task gives (the words before it stay loaded); t`, new ``
 verilog/17_system_tasks/readmem_address_range_load_terminated.v rw-dlower (run): stderr: line 1: old `warning[W1157]: a $readmem load terminated: §17.2.9: memory file address @2 is outside the load range [0:1] the task gives (the words before it stay loaded); t`, new ``
@@ -2004,14 +1946,12 @@ verilog/18_vcd/dumpports_same_file_rejected.v rw-dlower (digital lowering) locat
 verilog/18_vcd/dumpports_variable_scope_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/18_vcd/dumpvars_later_time_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/18_vcd/dumpvars_later_time_rejected.v:11:8`, new `  = note: LRM 8.5`
 verilog/19_compiler_directives/default_nettype_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^`
-verilog/19_compiler_directives/none_implicit_net_rejected.v not built: backend digital_lowering
 verilog/19_compiler_directives/timescale_inside_module_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/19_compiler_directives/unconnected_drive_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^^^^`
 verilog/A_formal_syntax/b_A_1_1_incdir.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_library_text.v not built: backend libmap
-verilog/A_formal_syntax/b_A_2_6_function_output_port_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/A_formal_syntax/b_A_2_8_net_block_item_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found `;``, new `error: could not compile due to 1 previous error(s)`
 verilog/A_formal_syntax/b_A_5_1_udp_declarations.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_A_5_1_mux` primitive`
 verilog/A_formal_syntax/b_A_5_3_udp_body.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_A_5_3_xor` primitive`

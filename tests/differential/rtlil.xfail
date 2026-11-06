@@ -25,7 +25,7 @@ verilog/03_lexical_conventions/directive_takes_effect_when_read.v not built: bac
 verilog/03_lexical_conventions/escaped_keyword.v not built: backend rtlil
 verilog/03_lexical_conventions/escaped_system_task_rejected.v not built: backend digital_lowering
 verilog/03_lexical_conventions/examples.v not built: backend rtlil
-verilog/03_lexical_conventions/forward_reference_reg_rejected.v not built: backend rtlil
+verilog/03_lexical_conventions/forward_reference_reg_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: a name is used before its declaration`
 verilog/03_lexical_conventions/free_format_layout.v not built: backend rtlil
 verilog/03_lexical_conventions/identifier_examples.v not built: backend rtlil
 verilog/03_lexical_conventions/lexical_decimal_unknown.v not built: backend rtlil
@@ -60,35 +60,34 @@ verilog/04_data_types/memory_as_vector_rejected.v rw-dlower (digital lowering): 
 verilog/04_data_types/name_spaces.v not built: backend rtlil
 verilog/04_data_types/named_localparam_override_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §12.2: `L` is a local parameter, which a parameter value assignment cannot override`
 verilog/04_data_types/native_real_arrays.v not built: backend rtlil
-verilog/04_data_types/native_real_edge_rejected.v not built: backend rtlil
+verilog/04_data_types/native_real_edge_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1217]: a memory --emit-rtlil does not lower: `a` has unpacked dimensions`, new `error[E1100]: digital source execution failed: §4.8.1: posedge and negedge do not apply to a real variable`
 verilog/04_data_types/native_real_select_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1217]: a memory --emit-rtlil does not lower: `a` has unpacked dimensions`, new `error[E1100]: digital source execution failed: §4.8: a real has no bits to select`
 verilog/04_data_types/net_declaration_drive_strength.v not built: backend rtlil
 verilog/04_data_types/net_takes_driver_value.v not built: backend rtlil
 verilog/04_data_types/net_types.v not built: backend rtlil
 verilog/04_data_types/net_x_before_delayed_driver.v not built: backend rtlil
-verilog/04_data_types/nonconstant_declaration_assignment_rejected.v not built: backend rtlil
-verilog/04_data_types/parameter_assigned_specify_block_specparam_rejected.v not built: backend digital_lowering
-verilog/04_data_types/parameter_assigned_specparam_rejected.v not built: backend rtlil
-verilog/04_data_types/parameter_from_variable_rejected.v not built: backend rtlil
+verilog/04_data_types/nonconstant_declaration_assignment_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §6.2.1: a constant expression is required here`
+verilog/04_data_types/parameter_assigned_specify_block_specparam_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §4.10.3: a module parameter cannot be assigned an expression that includes a specify parameter`
+verilog/04_data_types/parameter_assigned_specparam_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §4.10.3: a module parameter cannot be assigned an expression that includes a specify parameter`
+verilog/04_data_types/parameter_from_variable_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1223]: a parameter default --emit-rtlil cannot fold to a constant: `P``, new `error[E1100]: digital source execution failed: §4.10.1: a parameter's value is a constant expression of numbers and previously defined parameters, and this nam`
 verilog/04_data_types/parameter_range_selects.v not built: backend rtlil
-verilog/04_data_types/parameter_redeclares_net_rejected.v not built: backend rtlil
 verilog/04_data_types/parameter_types_and_ranges.v not built: backend rtlil
 verilog/04_data_types/parameter_width.v not built: backend rtlil
 verilog/04_data_types/parameter_widths.v not built: backend rtlil
-verilog/04_data_types/port_list_body_parameter_override_rejected.v not built: backend rtlil
+verilog/04_data_types/port_list_body_parameter_override_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §12.2: `Q` is a local parameter, which a defparam cannot override`
 verilog/04_data_types/port_list_parameter_defparam.v not built: backend rtlil
-verilog/04_data_types/posedge_real_rejected.v not built: backend rtlil
+verilog/04_data_types/posedge_real_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1218]: a real variable --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §4.8.1: posedge and negedge do not apply to a real variable`
 verilog/04_data_types/real_index_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §4.8.1: a real is not a bit-select index`
 verilog/04_data_types/real_integer_conversion.v not built: backend rtlil
 verilog/04_data_types/real_integer_conversion_widths.v not built: backend rtlil
-verilog/04_data_types/real_range_bound_rejected.v not built: backend rtlil
+verilog/04_data_types/real_range_bound_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1220]: a range --emit-rtlil cannot fold to a constant`, new `error[E1100]: digital source execution failed: §4.3.1: a bound is a constant integer expression, not a real`
 verilog/04_data_types/reg_holds_between_assignments.v not built: backend rtlil
 verilog/04_data_types/scalar_and_vector.v not built: backend rtlil
 verilog/04_data_types/scalared_vectored.v not built: backend rtlil
 verilog/04_data_types/signed_ranged_parameter.v not built: backend rtlil
-verilog/04_data_types/specparam_before_declaration_rejected.v not built: backend rtlil
+verilog/04_data_types/specparam_before_declaration_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §4.10.3: a specify parameter is declared before it is referenced`
 verilog/04_data_types/specparam_module_body_delay.v not built: backend rtlil
-verilog/04_data_types/task_named_like_variable_rejected.v not built: backend rtlil
+verilog/04_data_types/task_named_like_variable_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1206]: a task --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §10.4.2: duplicate declaration of `t`, a task or function name in this scope`
 verilog/04_data_types/time_parameter_is_unsigned_64.v not built: backend rtlil
 verilog/04_data_types/type_multidimensional_array.v not built: backend rtlil
 verilog/04_data_types/type_negative_vector_bounds.v not built: backend rtlil
@@ -97,7 +96,7 @@ verilog/04_data_types/type_net_array_whole_assign_rejected.v rw-dlower (digital 
 verilog/04_data_types/type_net_resolution_tables.v not built: backend rtlil
 verilog/04_data_types/type_uwire_multiple_drivers_rejected.v not built: backend rtlil
 verilog/04_data_types/type_uwire_single_driver.v not built: backend rtlil
-verilog/04_data_types/undeclared_procedural_target_rejected.v not built: backend digital_lowering
+verilog/04_data_types/undeclared_procedural_target_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1224]: a name not declared in its module: `undeclared_r``, new `error[E1100]: digital source execution failed: undeclared digital variable`
 verilog/04_data_types/unknown_bits_to_real.v not built: backend rtlil
 verilog/04_data_types/unsized_unknown_literal_to_real.v not built: backend rtlil
 verilog/04_data_types/untyped_parameter_width.v not built: backend rtlil
@@ -105,7 +104,7 @@ verilog/04_data_types/uwire_per_bit_drivers.v not built: backend rtlil
 verilog/04_data_types/value_set.v not built: backend rtlil
 verilog/04_data_types/variable_arrays.v not built: backend rtlil
 verilog/04_data_types/variable_initial_values.v not built: backend rtlil
-verilog/04_data_types/variable_range_bound_rejected.v not built: backend digital_lowering
+verilog/04_data_types/variable_range_bound_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1220]: a range --emit-rtlil cannot fold to a constant`, new `error[E1100]: digital source execution failed: a constant expression is required here`
 verilog/04_data_types/vector_and_memory.v not built: backend rtlil
 verilog/04_data_types/vector_ranges.v not built: backend rtlil
 verilog/04_data_types/whole_memory_write_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1217]: a memory --emit-rtlil does not lower: `mema` has unpacked dimensions`, new `error[E1100]: digital source execution failed: an unpacked array reference requires an element index`
@@ -119,7 +118,7 @@ verilog/05_expressions/conditional_real_x.v not built: backend rtlil
 verilog/05_expressions/conditional_z_select.v not built: backend rtlil
 verilog/05_expressions/constant_operands.v not built: backend rtlil
 verilog/05_expressions/constant_select_and_function.v not built: backend rtlil
-verilog/05_expressions/constant_time_rejected.v not built: backend rtlil
+verilog/05_expressions/constant_time_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1223]: a parameter default --emit-rtlil cannot fold to a constant: `P``, new `error[E1100]: digital source execution failed: a constant expression is required here`
 verilog/05_expressions/copy_concatenate_compare.v not built: backend rtlil
 verilog/05_expressions/division_modulus_power.v not built: backend rtlil
 verilog/05_expressions/element_selects.v not built: backend rtlil
@@ -150,7 +149,7 @@ verilog/05_expressions/native_array_selects.v not built: backend rtlil
 verilog/05_expressions/native_indexed_selects.v not built: backend rtlil
 verilog/05_expressions/native_real_conditionals.v not built: backend rtlil
 verilog/05_expressions/native_select_boundaries.v not built: backend rtlil
-verilog/05_expressions/native_select_variable_width_rejected.v not built: backend digital_lowering
+verilog/05_expressions/native_select_variable_width_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: a constant expression is required here`
 verilog/05_expressions/native_select_zero_width_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §5.2.1: an indexed part-select's width is a positive constant`
 verilog/05_expressions/native_wide_index_bound_limit.v not built: backend digital_lowering
 verilog/05_expressions/native_wide_index_edges.v not built: backend rtlil
@@ -181,7 +180,7 @@ verilog/05_expressions/string_test.v not built: backend rtlil
 verilog/05_expressions/sum_width_from_lhs.v not built: backend rtlil
 verilog/05_expressions/table_5_22_widths.v not built: backend rtlil
 verilog/05_expressions/truncation_examples.v not built: backend rtlil
-verilog/05_expressions/variable_part_select_rejected.v not built: backend digital_lowering
+verilog/05_expressions/variable_part_select_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: a constant expression is required here`
 verilog/06_assignments/adder_concatenation_lhs.v not built: backend rtlil
 verilog/06_assignments/array_declaration_assignment_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1217]: a memory --emit-rtlil does not lower: `array` has unpacked dimensions`, new `error[E1100]: digital source execution failed: an unpacked array declaration takes no initializer`
 verilog/06_assignments/assign_delay_inertial.v not built: backend rtlil
@@ -273,17 +272,17 @@ verilog/07_gate_switch_level/wired_ambiguous_strength.v not built: backend rtlil
 verilog/07_gate_switch_level/wired_equal_strength_table.v not built: backend rtlil
 verilog/07_gate_switch_level/wired_logic_under_strength.v not built: backend rtlil
 verilog/07_gate_switch_level/wired_unequal_strength.v not built: backend rtlil
-verilog/08_udp/combinational_reg_rejected.v not built: backend rtlil
+verilog/08_udp/combinational_reg_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1201]: a user-defined primitive --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §8.1.2: a combinational UDP cannot contain a reg declaration`
 verilog/08_udp/definition_inside_module_rejected.v rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `q``, new `error[E0205]: unsupported module item: found table`
 verilog/08_udp/definition_placement.v not built: backend rtlil
 verilog/08_udp/header_forms.v not built: backend rtlil
-verilog/08_udp/initial_to_input_rejected.v not built: backend rtlil
+verilog/08_udp/initial_to_input_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1201]: a user-defined primitive --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §8.1.3: a UDP initial statement assigns the output`
 verilog/08_udp/initial_values.v not built: backend rtlil
 verilog/08_udp/input_minimums.v not built: backend rtlil
 verilog/08_udp/instance_array.v not built: backend rtlil
 verilog/08_udp/instances.v not built: backend rtlil
 verilog/08_udp/jk_edge_ff.v not built: backend rtlil
-verilog/08_udp/multibit_initial_rejected.v not built: backend rtlil
+verilog/08_udp/multibit_initial_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1201]: a user-defined primitive --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §8.1.3: a UDP initial value is a single-bit literal`
 verilog/08_udp/multiplexer.v not built: backend rtlil
 verilog/08_udp/output_bit_select.v not built: backend rtlil
 verilog/08_udp/output_not_first_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1201]: a user-defined primitive --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §8.1.1: the output port shall be the first port of a UDP`
@@ -291,7 +290,7 @@ verilog/08_udp/output_reg_initializer.v not built: backend rtlil
 verilog/08_udp/overlapping_entries_agree.v not built: backend rtlil
 verilog/08_udp/sequential_64_inputs.v not built: backend rtlil
 verilog/08_udp/sequential_hold_agrees.v not built: backend rtlil
-verilog/08_udp/sequential_without_reg_rejected.v not built: backend rtlil
+verilog/08_udp/sequential_without_reg_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1201]: a user-defined primitive --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §8.1.2: a sequential UDP's output needs a reg declaration`
 verilog/08_udp/table_symbols.v not built: backend rtlil
 verilog/08_udp/three_delays_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1201]: a user-defined primitive --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §8.6: a UDP instance takes at most two delays`
 verilog/08_udp/two_delays.v not built: backend rtlil
@@ -333,14 +332,14 @@ verilog/09_behavioral_modeling/event_array_native_automatic.v not built: backend
 verilog/09_behavioral_modeling/event_array_native_effects.v not built: backend rtlil
 verilog/09_behavioral_modeling/event_array_native_selection.v not built: backend rtlil
 verilog/09_behavioral_modeling/event_array_part_select_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1208]: a named event --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §9.7.3: an event array takes an index, not a part-select`
-verilog/09_behavioral_modeling/event_array_posedge_rejected.v not built: backend rtlil
+verilog/09_behavioral_modeling/event_array_posedge_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1208]: a named event --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §9.7.3: a named event has no value for a posedge or negedge`
 verilog/09_behavioral_modeling/event_array_rank_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1208]: a named event --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §9.7.3: a named event array requires one index per dimension`
-verilog/09_behavioral_modeling/event_array_selector_trigger_rejected.v not built: backend rtlil
+verilog/09_behavioral_modeling/event_array_selector_trigger_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1206]: a task --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §10.4.4: a function body cannot contain an event trigger`
 verilog/09_behavioral_modeling/event_array_value_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1208]: a named event --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §9.7.3: a named event holds no data; it can only be triggered and waited on`
 verilog/09_behavioral_modeling/event_arrays.v not built: backend rtlil
 verilog/09_behavioral_modeling/event_holds_no_data_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1208]: a named event --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §9.7.3: a named event holds no data; it cannot be assigned`
 verilog/09_behavioral_modeling/event_or.v not built: backend rtlil
-verilog/09_behavioral_modeling/event_used_before_declaration_rejected.v not built: backend rtlil
+verilog/09_behavioral_modeling/event_used_before_declaration_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1208]: a named event --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §9.7.3: a named event is declared before it is used`
 verilog/09_behavioral_modeling/expression_event.v not built: backend rtlil
 verilog/09_behavioral_modeling/force_immediate.v not built: backend rtlil
 verilog/09_behavioral_modeling/force_net_selects.v not built: backend rtlil
@@ -360,7 +359,7 @@ verilog/09_behavioral_modeling/intra_assignment_delay_nonblocking.v not built: b
 verilog/09_behavioral_modeling/intra_assignment_event_blocking.v not built: backend rtlil
 verilog/09_behavioral_modeling/loop_rules.v not built: backend rtlil
 verilog/09_behavioral_modeling/lvalue_forms.v not built: backend rtlil
-verilog/09_behavioral_modeling/multiple_default_rejected.v not built: backend rtlil
+verilog/09_behavioral_modeling/multiple_default_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: a case statement cannot have multiple default items`
 verilog/09_behavioral_modeling/named_block_reg.v not built: backend rtlil
 verilog/09_behavioral_modeling/named_block_variables.v not built: backend rtlil
 verilog/09_behavioral_modeling/named_event_digital.v not built: backend rtlil
@@ -403,7 +402,7 @@ verilog/09_behavioral_modeling/select_edge.v not built: backend rtlil
 verilog/09_behavioral_modeling/select_edge_glitch.v not built: backend rtlil
 verilog/09_behavioral_modeling/sequential_block.v not built: backend rtlil
 verilog/09_behavioral_modeling/specify_block_specparam.v not built: backend rtlil
-verilog/09_behavioral_modeling/undeclared_event_rejected.v not built: backend digital_lowering
+verilog/09_behavioral_modeling/undeclared_event_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: undeclared named event`
 verilog/09_behavioral_modeling/unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
 verilog/09_behavioral_modeling/unnamed_fork_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
 verilog/09_behavioral_modeling/untimed_loop_under_budget.v not built: backend rtlil
@@ -438,16 +437,16 @@ verilog/10_tasks_functions/function_automatic_recursion.v not built: backend rtl
 verilog/10_tasks_functions/function_call_operand.v not built: backend rtlil
 verilog/10_tasks_functions/function_call_statement_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1206]: a task --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §10.4: a function is called in an expression, not enabled`
 verilog/10_tasks_functions/function_declaration_forms.v not built: backend rtlil
-verilog/10_tasks_functions/function_enables_task_rejected.v not built: backend rtlil
-verilog/10_tasks_functions/function_event_trigger_rejected.v not built: backend rtlil
-verilog/10_tasks_functions/function_nonblocking_rejected.v not built: backend rtlil
-verilog/10_tasks_functions/function_output_argument_rejected.v not built: backend rtlil
+verilog/10_tasks_functions/function_enables_task_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1206]: a task --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §10.4.4: a function cannot enable a task`
+verilog/10_tasks_functions/function_event_trigger_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1206]: a task --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §10.4.4: a function body cannot contain an event trigger`
+verilog/10_tasks_functions/function_nonblocking_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1206]: a task --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §10.4.4: a function body cannot contain a nonblocking assignment`
+verilog/10_tasks_functions/function_output_argument_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1206]: a task --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §10.4.4: a function argument is an input, not an output or inout`
 verilog/10_tasks_functions/function_return_variable.v not built: backend rtlil
 verilog/10_tasks_functions/function_return_width_is_the_boundary.v not built: backend rtlil
-verilog/10_tasks_functions/function_scope_object_named_as_function_rejected.v not built: backend rtlil
-verilog/10_tasks_functions/function_time_control_rejected.v not built: backend rtlil
-verilog/10_tasks_functions/function_without_input_rejected.v not built: backend rtlil
-verilog/10_tasks_functions/module_object_named_as_function_rejected.v not built: backend digital_lowering
+verilog/10_tasks_functions/function_scope_object_named_as_function_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1206]: a task --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: duplicate digital variable`
+verilog/10_tasks_functions/function_time_control_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1206]: a task --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §10.4.4: a function body cannot contain a time control`
+verilog/10_tasks_functions/function_without_input_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1206]: a task --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §10.4.1: a function shall have at least one input declared`
+verilog/10_tasks_functions/module_object_named_as_function_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1206]: a task --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §10.4.2: duplicate declaration of `f`, a task or function name in this scope`
 verilog/10_tasks_functions/native_real_subroutines.v not built: backend rtlil
 verilog/10_tasks_functions/nested_task_completion.v not built: backend rtlil
 verilog/10_tasks_functions/nonansi_function_port_typed_later.v not built: backend rtlil
@@ -495,31 +494,31 @@ verilog/11_scheduling/switch_x_gate.v not built: backend rtlil
 verilog/11_scheduling/terminal_and_port_connections.v not built: backend rtlil
 verilog/11_scheduling/update_events.v not built: backend rtlil
 verilog/11_scheduling/zero_delay_loop_rejected.v not built: backend rtlil
-verilog/12_hierarchy/assign_before_net_declaration_rejected.v not built: backend rtlil
+verilog/12_hierarchy/assign_before_net_declaration_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: duplicate digital variable`
 verilog/12_hierarchy/complete_port_redeclared_rejected.v rw-dlower (digital lowering): exit status old 0, new 1
 verilog/12_hierarchy/connections_to_portless_module_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: more port connections than the module has ports`
 verilog/12_hierarchy/defparam_absolute_inside_array_element.v not built: backend rtlil
 verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v not built: backend rtlil
 verilog/12_hierarchy/defparam_across_generate_instances_rejected.v not built: backend rtlil
 verilog/12_hierarchy/defparam_before_generate.v not built: backend rtlil
-verilog/12_hierarchy/defparam_early_resolution_rejected.v rw-comp (elab): stderr: line 1: old `error[E1202]: an analog block --emit-rtlil does not lower`, new `error[E0907]: override names no parameter of the module: `n.m.n.p` names no parameter of the elaborated design`
+verilog/12_hierarchy/defparam_early_resolution_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1202]: an analog block --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §12.8.2: this defparam's hierarchical name was resolved before the hierarchy was complete and would resolve diff`
 verilog/12_hierarchy/defparam_inside_generate_block.v not built: backend rtlil
 verilog/12_hierarchy/defparam_last_wins.v not built: backend rtlil
 verilog/12_hierarchy/defparam_names_no_parameter_rejected.v rw-comp (elab): stderr: line 1: old `error[E1205]: a defparam --emit-rtlil does not lower`, new `error[E0907]: override names no parameter of the module: §12.2.1: this defparam names `Z`, which is no parameter of its module`
-verilog/12_hierarchy/defparam_names_nothing_rejected.v rw-comp (elab): stderr: line 1: old `error[E1205]: a defparam --emit-rtlil does not lower`, new `error[E0907]: override names no parameter of the module: §12.2.1: this defparam names `foo`, which is no parameter of its module`
-verilog/12_hierarchy/defparam_nonconstant_rejected.v not built: backend rtlil
-verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v rw-comp (elab): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E0907]: override names no parameter of the module: `u[0].u[1].x.p` names no parameter of the elaborated design`
+verilog/12_hierarchy/defparam_names_nothing_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1205]: a defparam --emit-rtlil does not lower`, new `error[E0901]: hierarchical name names nothing in the elaborated design: §12.2.1: this defparam's hierarchical name `foo` names nothing in the design`
+verilog/12_hierarchy/defparam_nonconstant_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: a constant expression is required here`
+verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §12.2.1: a defparam inside `����` cannot change a parameter outside the generate block instance or array element`
 verilog/12_hierarchy/defparam_upward_and_indexed_paths.v not built: backend rtlil
 verilog/12_hierarchy/direct_nesting_and_recursion.v not built: backend rtlil
 verilog/12_hierarchy/duplicate_module_later_wins.v not built: backend rtlil
-verilog/12_hierarchy/duplicate_port_name_rejected.v not built: backend rtlil
+verilog/12_hierarchy/duplicate_port_name_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1212]: a port expression --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §12.3.2: a port defined twice in the list of ports: `p``
 verilog/12_hierarchy/explicit_port_names.v not built: backend rtlil
 verilog/12_hierarchy/external_type_cells.v not built: backend rtlil
 verilog/12_hierarchy/extra_ordered_parameter_value_ignored.v not built: backend rtlil
 verilog/12_hierarchy/extra_ordered_value_ignored.v not built: backend rtlil
 verilog/12_hierarchy/ffnand_instances.v not built: backend rtlil
 verilog/12_hierarchy/function_in_generate_block.v not built: backend rtlil
-verilog/12_hierarchy/function_port_range_scope_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/function_port_range_scope_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1206]: a task --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: a constant expression is required here`
 verilog/12_hierarchy/generate_block_continuous_assign.v not built: backend rtlil
 verilog/12_hierarchy/generate_block_variables.v not built: backend rtlil
 verilog/12_hierarchy/generate_localparam_visible.v not built: backend rtlil
@@ -537,7 +536,7 @@ verilog/12_hierarchy/hierarchical_task_call_suspends.v not built: backend rtlil
 verilog/12_hierarchy/hierarchy_deeper_than_64.v not built: backend rtlil
 verilog/12_hierarchy/hierarchy_explicit_port_concat.v not built: backend rtlil
 verilog/12_hierarchy/hierarchy_port_signedness.v not built: backend rtlil
-verilog/12_hierarchy/hierarchy_simple_name_stops_at_module_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/hierarchy_simple_name_stops_at_module_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1224]: a name not declared in its module: `j``, new `error[E1100]: digital source execution failed: undeclared digital variable`
 verilog/12_hierarchy/hierarchy_unselected_instance_not_top.v not built: backend rtlil
 verilog/12_hierarchy/hierarchy_upward_reference.v not built: backend rtlil
 verilog/12_hierarchy/implicit_net_in_instance_expression.v not built: backend rtlil
@@ -548,10 +547,10 @@ verilog/12_hierarchy/instance_array_constant_port.v not built: backend rtlil
 verilog/12_hierarchy/instance_array_width_product.v not built: backend rtlil
 verilog/12_hierarchy/instance_array_width_product_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1270]: an array of module instances --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §12.1.2: only an expression as wide as the port or as the port times the array size is connected across an insta`
 verilog/12_hierarchy/instance_select.v not built: backend rtlil
-verilog/12_hierarchy/instance_select_out_of_range_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/instance_select_out_of_range_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §12.5: `arr[5]`: an instance select out of range, or of no array`
 verilog/12_hierarchy/internal_type_cells.v not built: backend rtlil
 verilog/12_hierarchy/listed_port_undeclared_rejected.v rw-dlower (digital lowering): exit status old 0, new 1
-verilog/12_hierarchy/localparam_override_rejected.v not built: backend rtlil
+verilog/12_hierarchy/localparam_override_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §12.2: `LP` is a local parameter, which a defparam cannot override`
 verilog/12_hierarchy/mixed_ordered_named_ports_rejected.v rw-dlower (digital lowering): exit status old 0, new 1
 verilog/12_hierarchy/module_header_forms.v not built: backend rtlil
 verilog/12_hierarchy/module_instance_delay_rejected.v rw-dlower (digital lowering): exit status old 0, new 1
@@ -559,8 +558,8 @@ verilog/12_hierarchy/module_without_process.v not built: backend rtlil
 verilog/12_hierarchy/named_block_items.v not built: backend rtlil
 verilog/12_hierarchy/named_connection_to_concatenation_port_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1212]: a port expression --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: the instantiated module has no such port`
 verilog/12_hierarchy/net_type_warning.v not built: backend rtlil
-verilog/12_hierarchy/no_top_level_module_rejected.v rw-dlower (digital lowering): stdout: line 1: old `autoidx 1`, new ``
-verilog/12_hierarchy/non_ancestor_module_name_rejected.v not built: backend digital_lowering
+verilog/12_hierarchy/no_top_level_module_rejected.v rw-dlower (digital lowering): exit status old 0, new 1
+verilog/12_hierarchy/non_ancestor_module_name_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: undeclared instance in a hierarchical reference`
 verilog/12_hierarchy/nonansi_port_integer_rejected.v rw-dlower (digital lowering): exit status old 0, new 1
 verilog/12_hierarchy/nonansi_port_reg_range_mismatch_rejected.v rw-dlower (digital lowering): exit status old 0, new 1
 verilog/12_hierarchy/nonansi_port_scalar_vs_vector_rejected.v rw-dlower (digital lowering): exit status old 0, new 1
@@ -594,7 +593,7 @@ verilog/12_hierarchy/scope_lexical_shadow.v not built: backend rtlil
 verilog/12_hierarchy/select_and_concatenation_ports.v not built: backend rtlil
 verilog/12_hierarchy/select_sinks.v not built: backend rtlil
 verilog/12_hierarchy/select_warning.v not built: backend rtlil
-verilog/12_hierarchy/self_instantiation_rejected.v rw-dlower (digital lowering): stdout: line 1: old `autoidx 1`, new ``
+verilog/12_hierarchy/self_instantiation_rejected.v rw-dlower (digital lowering): exit status old 0, new 1
 verilog/12_hierarchy/structural_sinks_and_expression_sources.v not built: backend rtlil
 verilog/12_hierarchy/two_top_level_modules.v not built: backend rtlil
 verilog/12_hierarchy/unknown_parameter_name_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §12.2.2.2: the module has no such parameter: `width``
@@ -620,7 +619,7 @@ verilog/13_configuration/default_search_order.v not built: backend libmap
 verilog/13_configuration/design_cell_missing_rejected.v not built: backend rtlil
 verilog/13_configuration/design_names_config_rejected.v not built: backend rtlil
 verilog/13_configuration/empty_liblist_parent_library.v not built: backend rtlil
-verilog/13_configuration/every_config_referenced_rejected.v not built: backend rtlil
+verilog/13_configuration/every_config_referenced_rejected.v rw-comp (elab): exit status old 0, new 1
 verilog/13_configuration/every_instance_bound.v not built: backend rtlil
 verilog/13_configuration/every_rule_form.v not built: backend rtlil
 verilog/13_configuration/hierarchical_config.v not built: backend rtlil
@@ -630,11 +629,11 @@ verilog/13_configuration/library_without_path_rejected.v not built: backend libm
 verilog/13_configuration/multiple_top_cells.v not built: backend rtlil
 verilog/13_configuration/parent_library_by_map.v not built: backend libmap
 verilog/13_configuration/resolution_order.v not built: backend libmap
-verilog/13_configuration/rule_inside_other_config_rejected.v not built: backend rtlil
+verilog/13_configuration/rule_inside_other_config_rejected.v rw-comp (elab): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E0243]: a configuration rule IEEE 1364-2005 §13.3 forbids: instance clause `top.bot.a1` names an instance inside `top.bot`, whose hierarchy another confi`
 verilog/13_configuration/same_name_cell_last_wins.v not built: backend rtlil
 verilog/13_configuration/source_text_in_map_rejected.v not built: backend libmap
 verilog/13_configuration/two_libraries_match_rejected.v not built: backend libmap
-verilog/13_configuration/two_unreferenced_configs_rejected.v not built: backend rtlil
+verilog/13_configuration/two_unreferenced_configs_rejected.v rw-comp (elab): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E0243]: a configuration rule IEEE 1364-2005 §13.3 forbids: configurations `cfg_a` and `cfg_b` are both unreferenced, so neither is the design's (IEEE 136`
 verilog/13_configuration/unbound_instance_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: undeclared module in instantiation: no library of the search order (work) holds cell `absent``
 verilog/13_configuration/undeclared_library_rejected.v not built: backend libmap
 verilog/14_specify_blocks/delay_selection.v not built: backend rtlil
@@ -768,7 +767,7 @@ verilog/17_system_tasks/printtimescale_current_scope.v not built: backend rtlil
 verilog/17_system_tasks/printtimescale_named_module.v not built: backend rtlil
 verilog/17_system_tasks/printtimescale_names_parameter.v not built: backend rtlil
 verilog/17_system_tasks/printtimescale_prints_argument.v not built: backend rtlil
-verilog/17_system_tasks/printtimescale_unknown_scope_rejected.v not built: backend digital_lowering
+verilog/17_system_tasks/printtimescale_unknown_scope_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: undeclared instance in a hierarchical reference`
 verilog/17_system_tasks/q_add_arguments_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: the §17.6 queue tasks take four arguments`
 verilog/17_system_tasks/q_exam.v not built: backend rtlil
 verilog/17_system_tasks/q_exam_arguments_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: the §17.6 queue tasks take four arguments`
@@ -944,7 +943,7 @@ verilog/19_compiler_directives/mixed_timescale_rejected.v rw-dlower (digital low
 verilog/19_compiler_directives/no_timescale_is_1s_1s.v not built: backend rtlil
 verilog/19_compiler_directives/noconfig.v not built: backend rtlil
 verilog/19_compiler_directives/none_all_declared.v not built: backend rtlil
-verilog/19_compiler_directives/none_implicit_net_rejected.v not built: backend digital_lowering
+verilog/19_compiler_directives/none_implicit_net_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: undeclared digital variable`
 verilog/19_compiler_directives/parameter_example.v not built: backend rtlil
 verilog/19_compiler_directives/pragma_unrecognized_no_effect.v not built: backend rtlil
 verilog/19_compiler_directives/resetall_keeps_begin_keywords.v not built: backend rtlil
@@ -997,7 +996,7 @@ verilog/A_formal_syntax/b_A_2_4_pathpulse_error_limit.v not built: backend rtlil
 verilog/A_formal_syntax/b_A_2_4_pathpulse_mintypmax.v not built: backend rtlil
 verilog/A_formal_syntax/b_A_2_5_ranges.v not built: backend rtlil
 verilog/A_formal_syntax/b_A_2_6_function_declarations.v not built: backend rtlil
-verilog/A_formal_syntax/b_A_2_6_function_output_port_rejected.v not built: backend rtlil
+verilog/A_formal_syntax/b_A_2_6_function_output_port_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1206]: a task --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §10.4.4: a function argument is an input, not an output or inout`
 verilog/A_formal_syntax/b_A_2_6_real_functions.v not built: backend rtlil
 verilog/A_formal_syntax/b_A_2_7_task_declarations.v not built: backend rtlil
 verilog/A_formal_syntax/b_A_2_8_block_item_declarations.v not built: backend rtlil

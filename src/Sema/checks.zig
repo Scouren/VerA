@@ -42,7 +42,10 @@ pub fn run(s: *Sema) Allocator.Error!void {
                 if (zcu.isBuiltin(.{ .file = file, .index = @fromBackingInt(@intCast(k)) })) continue;
                 try netDisciplines(s, file, payloadOf(vir, Inst.Module, d.inst));
             },
-            .paramset => try paramsetRanges(s, file, d.inst),
+            .paramset => {
+                try paramsetRanges(s, file, d.inst);
+                try paramsetReach(s, file, d.inst);
+            },
             .connectrules => try connectRules(s, file, payloadOf(vir, Inst.ConnectRules, d.inst)),
             .primitive, .nature, .discipline, .config => {},
         };
@@ -101,6 +104,37 @@ fn paramsetRanges(s: *Sema, file: Zcu.File.Index, inst: Inst.Index) Allocator.Er
             const hi = (try env.body(r.hi)) orelse continue;
             if (lo == .str or hi == .str or lo.asReal() < hi.asReal()) continue;
             try s.fail(.E0347, file, p.toRef(), "`{s}` of paramset `{s}`: {s} bounds {d} and {d} are not in increasing order", .{ vir.string(decl.name), vir.string(ps.name), if (r.flags.exclude) "exclude" else "from", lo.asReal(), hi.asReal() });
+        }
+    }
+}
+
+/// §6.4.1 a paramset statement reaches out of module only to a module's
+/// local parameter: `m.p` naming a `parameter` of module `m` is E0907.
+fn paramsetReach(s: *Sema, file: Zcu.File.Index, inst: Inst.Index) Allocator.Error!void {
+    assert(s.zcu.fileVir(file).instructions.items(.tag)[@backingInt(inst)] == .paramset);
+    const before = s.zcu.failed.len;
+    defer assert(s.zcu.failed.len >= before);
+    const zcu = s.zcu;
+    const vir = zcu.fileVir(file);
+    const ps = payloadOf(vir, Inst.Paramset, inst);
+    for (vir.body(ps.body)) |i| {
+        if (vir.instructions.items(.tag)[@backingInt(i)] != .ps_override) continue;
+        for (vir.body(payloadOf(vir, Inst.Override, i).value)) |e| {
+            if (vir.instructions.items(.tag)[@backingInt(e)] != .field) continue;
+            const f = payloadOf(vir, Inst.Field, e);
+            const head = f.operand.toIndex() orelse continue;
+            if (vir.instructions.items(.tag)[@backingInt(head)] != .str_ref) continue;
+            const mname = vir.string(vir.instructions.items(.data)[@backingInt(head)].str_tok.start);
+            const m = zcu.modules.get(try zcu.intern_pool.getString(s.gpa, mname)) orelse continue;
+            if (zcu.declRow(m).kind == .primitive) continue;
+            const mvir = zcu.fileVir(m.file);
+            const mod = payloadOf(mvir, Inst.Module, zcu.declRow(m).inst);
+            const p = for (mvir.body(mod.body)) |q| {
+                if (mvir.instructions.items(.tag)[@backingInt(q)] != .param) continue;
+                if (std.mem.eql(u8, mvir.string(payloadOf(mvir, Inst.Param, q).name), vir.string(f.name))) break q;
+            } else continue;
+            if (!walk.isOverridable(mvir, p)) continue;
+            try s.fail(.E0907, file, head.toRef(), "`{s}.{s}` is a parameter, and §6.4.1 allows a paramset to reach out of module only to a LOCAL parameter", .{ mname, vir.string(f.name) });
         }
     }
 }

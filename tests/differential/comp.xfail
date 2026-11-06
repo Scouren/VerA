@@ -2192,10 +2192,10 @@ verilog-ams/ch07_mixed_signal/discrete_bus_part_select_above_31_analog_assigned.
 verilog-ams/ch07_mixed_signal/discrete_discipline.va rw-codegen (display phase): stderr: line 5: old `a net bound to a discrete-domain discipline leaves the analog node alone got=0.75 want=0.75 ok=1`, new `  res[p] = 7.500000e-1`
 verilog-ams/ch07_mixed_signal/discrete_real_from_analog.va rw-lower (analog lowering): stderr: line 4: old `a discrete-owned real is read from the continuous context with no conversion got=1.25 want=1.25 ok=1`, new `  res[p] = 0.000000e0`
 verilog-ams/ch07_mixed_signal/display_binary_operand_analog.va rw-codegen (codegen): exit status old 0, new 1
-verilog-ams/ch07_mixed_signal/driver_count_excludes_connectmodule.va not built: backend exe
-verilog-ams/ch07_mixed_signal/driver_delay_and_next_state.va not built: backend exe
-verilog-ams/ch07_mixed_signal/driver_state_histogram.va not built: backend exe
-verilog-ams/ch07_mixed_signal/driver_update_without_resolved_change.va not built: backend exe
+verilog-ams/ch07_mixed_signal/driver_count_excludes_connectmodule.va rw-codegen (codegen): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/driver_delay_and_next_state.va rw-codegen (codegen): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/driver_state_histogram.va rw-codegen (codegen): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/driver_update_without_resolved_change.va rw-codegen (codegen): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/event_bounds_absdelta_negative_delta_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0517]: monitored event argument is the wrong type or out of range: `absdelta()` delta shall be non-negative, got -0.25`, new `=== event_bounds_absdelta_negative_delta_rejected ===`
 verilog-ams/ch07_mixed_signal/event_bounds_absdelta_negative_expr_tol_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0517]: monitored event argument is the wrong type or out of range: `absdelta()` expr_tol shall be non-negative, got -0.001`, new `=== event_bounds_absdelta_negative_expr_tol_rejected ===`
 verilog-ams/ch07_mixed_signal/event_bounds_absdelta_negative_time_tol_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0517]: monitored event argument is the wrong type or out of range: `absdelta()` time_tol shall be non-negative, got -0.000000000001`, new `=== event_bounds_absdelta_negative_time_tol_rejected ===`
@@ -2253,10 +2253,10 @@ verilog-ams/ch07_mixed_signal/prim_connect_vector_terminal_rejected.va rw-lower 
 verilog-ams/ch07_mixed_signal/primitive_generated_ports_unsupported.va rw-lower (analog lowering): stderr: line 1: old `warning[W0252]: gate primitive accepted, and it computes nothing: `and` primitive`, new `error[E0907]: override names no parameter of the module: `a__gate_instance__in1.threshold` names no parameter of the elaborated design`
 verilog-ams/ch07_mixed_signal/probe_in_continuous_assign_refused.va rw-lower (analog lowering): exit status old 1, new 0
 verilog-ams/ch07_mixed_signal/probe_of_a_discrete_net_in_digital_rejected.va rw-lower (analog lowering): exit status old 1, new 0
-verilog-ams/ch07_mixed_signal/receiver_count_reports_ordinary_receivers.va not built: backend exe
-verilog-ams/ch07_mixed_signal/receiver_default_bypass.va not built: backend exe
-verilog-ams/ch07_mixed_signal/receiver_reads_loaded_analog_state.va not built: backend exe
-verilog-ams/ch07_mixed_signal/receiver_value_set_by_connectmodule.va not built: backend exe
+verilog-ams/ch07_mixed_signal/receiver_count_reports_ordinary_receivers.va rw-codegen (codegen): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/receiver_default_bypass.va rw-codegen (codegen): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/receiver_reads_loaded_analog_state.va rw-lower (analog lowering): exit status old 0, new 1
+verilog-ams/ch07_mixed_signal/receiver_value_set_by_connectmodule.va rw-codegen (codegen): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/reject_ambiguous_connect_statements.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-ams/ch07_mixed_signal/reject_ambiguous_connect_statements.va:90:14`, new `  --> verilog-ams/ch07_mixed_signal/reject_ambiguous_connect_statements.va:90:11`
 verilog-ams/ch07_mixed_signal/reject_display_x_operand_analog.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0130]: literal requires digital value support in the execution backend: `1'bx`: the analog backend cannot execute this 1-bit four-state literal`, new `error[E0130]: literal requires digital value support in the execution backend: the an
 verilog-ams/ch07_mixed_signal/reject_mixed_port_no_connect_statement.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-ams/ch07_mixed_signal/reject_mixed_port_no_connect_statement.va:34:33`, new `  --> verilog-ams/ch07_mixed_signal/reject_mixed_port_no_connect_statement.va:34:26`
@@ -2332,7 +2332,7 @@ verilog-ams/ch09_system_tasks/clog2_inferred_parameter_width.va rw-lower (analog
 verilog-ams/ch09_system_tasks/clog2_reg_analog_conversion.va rw-lower (analog lowering): exit status old 1, new 0
 verilog-ams/ch09_system_tasks/connectmodule_driver_access_example.va rw-codegen (display phase): stderr: line 5: old `the file carrying the §9.22.7 example compiles and runs got=0.5 want=0.5 ok=1`, new `  res[p] = 5.000000e-1`
 verilog-ams/ch09_system_tasks/driver_delay_in_connectmodule_analog_block_rejected.va rw-codegen (display phase): stderr: line 8: old `   = note: §9.2 Tables 9-19/9-20: "Supported in analog context of connectmodule: No"; call it from an `always` or `initial` block of the connect module`, new `   = help: run `vera --explain E0806` for a detailed explanation`
-verilog-ams/ch09_system_tasks/driver_strength_next_strength_type.va not built: backend exe
+verilog-ams/ch09_system_tasks/driver_strength_next_strength_type.va rw-codegen (codegen): exit status old 0, new 1
 verilog-ams/ch09_system_tasks/driver_update_connectmodule.va rw-codegen (display phase): stderr: line 5: old `the file carrying the §9.22.4 connectmodule compiles and runs got=0.5 want=0.5 ok=1`, new `  res[p] = 5.000000e-1`
 verilog-ams/ch09_system_tasks/error_in_analog_initial_stops_after_initialization.va rw-codegen (codegen): stderr: line 1: old `=== error_in_analog_initial_stops_after_initialization ===`, new `error: verilog-ams/ch09_system_tasks/error_in_analog_initial_stops_after_initialization.va: codegen refused a construct; generated output is not usable`
 verilog-ams/ch09_system_tasks/fatal_in_analog_initial_skips_simulation.va rw-codegen (codegen): stderr: line 1: old `=== fatal_in_analog_initial_skips_simulation ===`, new `error: verilog-ams/ch09_system_tasks/fatal_in_analog_initial_skips_simulation.va: codegen refused a construct; generated output is not usable`
@@ -2357,7 +2357,7 @@ verilog-ams/ch09_system_tasks/port_alias_to_a_net_returns_zero.va rw-lower (anal
 verilog-ams/ch09_system_tasks/r_format_in_the_digital_context.va rw-codegen (codegen): exit status old 0, new 1
 verilog-ams/ch09_system_tasks/r_format_in_the_digital_context_without_argument_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0810]: not enough arguments for the format specifiers: the format string has 1 consuming format specifiers but 0 arguments follow it`, new `error[E1100]: digital source execution failed: missing display argument`
 verilog-ams/ch09_system_tasks/receiver_net_resolution_assign.va rw-codegen (display phase): stderr: line 5: old `the file carrying the §9.22.6 connectmodule compiles and runs got=0.5 want=0.5 ok=1`, new `  res[p] = 5.000000e-1`
-verilog-ams/ch09_system_tasks/receiver_segregation_ignored_without_driver_value.va not built: backend exe
+verilog-ams/ch09_system_tasks/receiver_segregation_ignored_without_driver_value.va rw-codegen (codegen): exit status old 0, new 1
 verilog-ams/ch09_system_tasks/reject_clog2_reg_width.va rw-codegen (codegen): exit status old 1, new 0
 verilog-ams/ch09_system_tasks/rng_constant_distribution_stream.va rw-codegen (codegen): exit status old 0, new 1
 verilog-ams/ch09_system_tasks/severity_task_digital_context_rejected.va not built: backend exe
@@ -2497,7 +2497,6 @@ verilog-ams/ch12_vpi_routines/two_libraries_two_instances.c not built: backend v
 verilog-ams/ch12_vpi_routines/vpi_routines_not_va_functions.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0512]: unknown function: `vpi_chk_error``, new `error[E0512]: unknown function: `vpi_chk_error` is not lowered by Sema yet`
 verilog-ams/digital/bare_event_trigger_in_analog_rejected.va rw-codegen (display phase): stderr: line 8: old `   = help: only `@(<event>) -> ev;` is legal`, new `   = help: run `vera --explain E0434` for a detailed explanation`
 verilog-ams/digital/digital_delay_primitive_notation.v rw-lower (analog lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `digital_delay_buffer` primitive`
-verilog-ams/digital/driver_count_in_an_ordinary_module_rejected.v not built: backend digital_device
 verilog-ams/digital/reject_wreal_connected_to_wand.v rw-comp (elab): exit status old 1, new 0
 verilog-ams/digital/scaled_delay_udp_rejected.v rw-lower (analog lowering): stderr: line 2: old `  --> verilog-ams/digital/scaled_delay_udp_rejected.v:18:25`, new `  --> verilog-ams/digital/scaled_delay_udp_rejected.v:18:29`
 verilog-ams/digital/std_1364_ams_keywords_reserved_by_default.v rw-comp (parse): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `error[E0219]: a null statement is not an analog statement`
@@ -2549,7 +2548,6 @@ verilog/06_assignments/continuous_assign_to_integer_rejected.v not built: backen
 verilog/06_assignments/real_array_initializer_rejected.v not built: backend digital_device
 verilog/06_assignments/task_variable_initializer_rejected.v not built: backend digital_device
 verilog/07_gate_switch_level/split_array_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/07_gate_switch_level/switch_three_delays_rejected.v not built: backend digital_device
 verilog/07_gate_switch_level/unknown_gate_keyword_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: undeclared module in instantiation: no library of the search order (work) holds cell `AND``, new `error[E0904]: instance names no module: `AND``
 verilog/08_udp/combinational_reg_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/08_udp/definition_inside_module_rejected.v rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `q``, new `error[E0205]: unsupported module item: found table`
@@ -2582,10 +2580,7 @@ verilog/08_udp/udp_latch.v rw-dlower (digital lowering): stderr: line 1: old ``,
 verilog/08_udp/udp_named_terminal_rejected.v not built: backend digital_device
 verilog/08_udp/udp_null_terminal_rejected.v not built: backend digital_device
 verilog/08_udp/udp_potential_edges_dominance.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `audit_edges_udp` primitive`
-verilog/09_behavioral_modeling/assign_bit_select_rejected.v not built: backend digital_device
-verilog/09_behavioral_modeling/assign_memory_word_rejected.v not built: backend digital_device
 verilog/09_behavioral_modeling/assign_to_net_rejected.v not built: backend digital_device
-verilog/09_behavioral_modeling/assign_to_reg_select_rejected.v not built: backend digital_device
 verilog/09_behavioral_modeling/event_array_assign_rejected.v not built: backend digital_device
 verilog/09_behavioral_modeling/event_array_part_select_rejected.v not built: backend digital_device
 verilog/09_behavioral_modeling/event_array_posedge_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
@@ -2594,7 +2589,6 @@ verilog/09_behavioral_modeling/event_array_selector_trigger_rejected.v rw-dlower
 verilog/09_behavioral_modeling/event_array_value_rejected.v not built: backend digital_device
 verilog/09_behavioral_modeling/event_holds_no_data_rejected.v not built: backend digital_device
 verilog/09_behavioral_modeling/event_used_before_declaration_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/09_behavioral_modeling/force_variable_bit_select_rejected.v not built: backend digital_device
 verilog/09_behavioral_modeling/forever_without_timing_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/09_behavioral_modeling/forever_without_timing_rejected.v:20:1`, new `  = note: LRM 8.5`
 verilog/09_behavioral_modeling/multiple_default_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/09_behavioral_modeling/native_wide_event_real_index_rejected.v not built: backend digital_device
@@ -2604,7 +2598,6 @@ verilog/09_behavioral_modeling/unnamed_fork_declaration_rejected.v rw-comp (pars
 verilog/09_behavioral_modeling/zero_delay_always_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/09_behavioral_modeling/zero_delay_always_rejected.v:14:1`, new `  = note: LRM 8.5`
 verilog/10_tasks_functions/constant_function_hierarchical_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/10_tasks_functions/disable_function_rejected.v not built: backend digital_device
-verilog/10_tasks_functions/function_call_statement_rejected.v not built: backend digital_device
 verilog/10_tasks_functions/function_enables_task_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function cannot enable a task`, new `error[E0214]: expected '<+' or '=': found `;``
 verilog/10_tasks_functions/function_event_trigger_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/10_tasks_functions/function_nonblocking_rejected.v rw-comp (parse): stderr: line 1: old `error[E1100]: digital source execution failed: §10.4.4: a function body cannot contain a nonblocking assignment`, new `error[E0214]: expected '<+' or '=': found `;``
@@ -2615,8 +2608,6 @@ verilog/10_tasks_functions/function_without_input_rejected.v rw-comp (parse): st
 verilog/10_tasks_functions/module_object_named_as_function_rejected.v not built: backend digital_device
 verilog/10_tasks_functions/recursion_without_end_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: nesting here exhausts the 1987 MiB stack VerA reserved for it`, new `error[E1100]: digital source execution failed: §10.4.2: subroutine calls nested past 20000 activations`
 verilog/10_tasks_functions/subroutine_parameter_assignment_rejected.v not built: backend digital_device
-verilog/10_tasks_functions/task_as_operand_rejected.v not built: backend digital_device
-verilog/10_tasks_functions/task_null_argument_rejected.v not built: backend digital_device
 verilog/10_tasks_functions/task_output_expression_rejected.v not built: backend digital_device
 verilog/11_scheduling/primitive_output_to_reg_rejected.v not built: backend digital_device
 verilog/11_scheduling/zero_delay_loop_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/11_scheduling/zero_delay_loop_rejected.v:16:1`, new `  = note: LRM 8.5`
@@ -2691,7 +2682,6 @@ verilog/15_timing_checks/hold.v rw-dlower (run) message: stderr: line 1: old `wa
 verilog/15_timing_checks/negative_timing_disabled_copies_signals.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setuphold` in negative_timing_disabled_copies_signals.u: timestamp event at 10, timecheck event at 10`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/nochange_high_window.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$nochange` in nochange_high_window.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/notifier.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in b_15_5_notifier.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
-verilog/15_timing_checks/notifier_net_rejected.v not built: backend digital_device
 verilog/15_timing_checks/period.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$period` in b_15_3_5_period.u: timestamp event at 20, timecheck event at 28`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/recovery.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$recovery` in b_15_2_5_recovery.u: timestamp event at 10, timecheck event at 12`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/recrem.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$recrem` in b_15_2_6_recrem.u: timestamp event at 10, timecheck event at 11`, new `warning[W1199]: timing violation: a timing check reported a violation`
@@ -2712,10 +2702,6 @@ verilog/16_sdf/sdf_timing_check_limit.v rw-dlower (run) message: stderr: line 1:
 verilog/17_system_tasks/closed_channel_not_written.v rw-dlower (run): stderr: line 1: old `warning[W1154]: file output not written: no file this descriptor names is open for writing: the output is not written`, new ``
 verilog/17_system_tasks/dist_nonpositive_warning.v rw-dlower (run): stderr: line 1: old `warning[W1151]: probabilistic distribution argument not positive: a $dist_ mean, degree of freedom or k_stage is not positive: the result is 0 and the seed is u`, new ``
 verilog/17_system_tasks/dist_seed_constant_rejected.v not built: backend digital_device
-verilog/17_system_tasks/fclose_two_descriptors_rejected.v not built: backend digital_device
-verilog/17_system_tasks/fread_multidim_rejected.v not built: backend digital_device
-verilog/17_system_tasks/fwrite_no_descriptor_rejected.v not built: backend digital_device
-verilog/17_system_tasks/math_arguments_rejected.v not built: backend digital_device
 verilog/17_system_tasks/native_sformat_dynamic.v rw-dlower (run): stderr: line 1: old `warning[W1153]: format specifiers and arguments do not pair up: $sformat: the format's specifiers and the arguments after it do not pair up`, new ``
 verilog/17_system_tasks/printtimescale_unknown_scope_rejected.v not built: backend digital_device
 verilog/17_system_tasks/random_seed_constant_rejected.v not built: backend digital_device
@@ -2754,14 +2740,10 @@ verilog/17_system_tasks/readmem_warn_hex_short_up.v rw-dlower (run): stderr: lin
 verilog/17_system_tasks/sdf_annotate_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1102]: an SDF file the annotator cannot read: sdf_annotate_rejected.sdf: the SDF file cannot be read`, new `error[E1100]: digital source execution failed: sdf_annotate_rejected.sdf: the SDF file cannot be read`
 verilog/17_system_tasks/sformat_excess_argument_warning.v rw-dlower (run): stderr: line 1: old `warning[W1153]: format specifiers and arguments do not pair up: $sformat: the format's specifiers and the arguments after it do not pair up`, new ``
 verilog/17_system_tasks/stop_suspends.v rw-dlower (digital lowering): stderr: line 1: old `$stop at tick 1, verilog/17_system_tasks/stop_suspends.v byte 107`, new `$stop at tick 1, verilog/17_system_tasks/stop_suspends.v byte 797`
-verilog/18_vcd/dumplimit_without_size_rejected.v not built: backend digital_device
 verilog/18_vcd/dumpports_duplicate_scope_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/18_vcd/dumpports_same_file_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/18_vcd/dumpports_same_file_rejected.v:28:19`, new `  = note: LRM 8.5`
 verilog/18_vcd/dumpports_variable_scope_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/18_vcd/dumpvars_later_time_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/18_vcd/dumpvars_later_time_rejected.v:11:8`, new `  = note: LRM 8.5`
-verilog/18_vcd/dumpvars_memory_word_rejected.v not built: backend digital_device
-verilog/18_vcd/dumpvars_unknown_scope_rejected.v not built: backend digital_device
-verilog/18_vcd/part_select_rejected.v not built: backend digital_device
 verilog/19_compiler_directives/default_nettype_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^`
 verilog/19_compiler_directives/mixed_timescale_rejected.v not built: backend digital_device
 verilog/19_compiler_directives/none_implicit_net_rejected.v not built: backend digital_device
@@ -2781,11 +2763,8 @@ verilog/A_formal_syntax/b_A_5_2_two_outputs_rejected.v rw-dlower (digital loweri
 verilog/A_formal_syntax/b_A_5_3_udp_body.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_A_5_3_xor` primitive`
 verilog/A_formal_syntax/b_A_5_4_udp_delay3_rejected.v rw-comp (elab): stderr: line 1: old `error[E1100]: digital source execution failed: §8.6: a UDP instance takes at most two delays`, new `error[E0239]: a UDP instance's delay is more than a delay2: `b_A_5_4_buf #(…) u`: 3 value(s)`
 verilog/A_formal_syntax/b_A_6_3_unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found k`, new `error: could not compile due to 1 previous error(s)`
-verilog/A_formal_syntax/b_A_6_9_empty_task_argument_rejected.v not built: backend digital_device
-verilog/A_formal_syntax/b_A_8_2_empty_function_call_rejected.v not built: backend digital_device
 verilog/A_formal_syntax/b_A_8_4_select_after_range_rejected.v not built: backend digital_device
 verilog/A_formal_syntax/b_A_source_text.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_A_inv` primitive`
-verilog/A_formal_syntax/grammar_empty_case_rejected.v not built: backend digital_device
 verilog/pli/analog_attributes.c not built: backend vpi
 verilog/pli/argument_handle_delays_evaluation.c not built: backend vpi
 verilog/pli/argument_handle_delays_evaluation.v not built: backend vpi

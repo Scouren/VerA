@@ -265,6 +265,9 @@ pub fn compileDrivers(l: *Lower) Error!void {
             .pull => |bit| .{ .pull = bit },
             .gate => |g| blk: {
                 const rows = try l.a.alloc(u32, g.ins.len);
+                // VAMS §7.8.5.1 an array lane reads its own bridge's segment.
+                l.gate_lane = g.lane orelse 0;
+                defer l.gate_lane = none;
                 for (g.ins, rows) |x, *row| {
                     row.* = try expr.self_(l, x, 1);
                     try expr.reads(l, x, &sensitivity);
@@ -325,13 +328,13 @@ pub fn sink(l: *Lower, r: Inst.Ref) Error!Sink {
     switch (Lower.tag(vir, i)) {
         .decl_ref, .str_ref, .field => {
             const n = (try expr.nameOf(l, r)) orelse return l.refuse("a continuous assignment to a hierarchical net");
-            if (n.kind != .net) return l.refuse("a continuous assignment to a variable");
-            if (n.dims.len != 0) return l.refuse("a continuous assignment to a whole net array");
+            if (n.kind != .net) return notNet(l, r);
+            if (n.dims.len != 0) return l.reject(l.frame, r, "an unpacked array reference requires an element index");
             return .{ .net = n.net, .lo = 0, .width = l.nets.items[n.net].width };
         },
         .elem, .slice, .slice_up, .slice_down => {
             const s = try place.selectOf(l, i);
-            if (s.name.kind != .net) return l.refuse("a continuous assignment to a variable");
+            if (s.name.kind != .net) return notNet(l, r);
             // §4.9.1 a net array element is a net of its own.
             const at = if (s.name.dims.len == 0) s.name.net else try elementNet(l, s);
             if (s.whole_elem) return .{ .net = at, .lo = 0, .width = l.nets.items[at].width };
@@ -349,7 +352,16 @@ pub fn sink(l: *Lower, r: Inst.Ref) Error!Sink {
             if (first < 0 or first + s.count > w) return l.refuse("§12.3.9.2 a select outside its net");
             return .{ .net = at, .lo = @intCast(first), .width = s.count };
         },
-        else => return l.refuse("a continuous assignment to an expression"),
+        // A.8.5 a one-operand concatenation is its operand (`tran ({a}, b)`).
+        .concat => {
+            const ops = vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i));
+            if (ops.len != 1) return l.refuse("a continuous assignment to an expression");
+            return sink(l, ops[0]);
+        },
+        else => return if (l.sink_use == .port)
+            l.reject(l.frame, r, "§12.3.9.2: an output port connects to a net, a net array element, a constant bit-select or part-select of a vector net, or a concatenation of them")
+        else
+            l.refuse("a continuous assignment to an expression"),
     }
 }
 
@@ -389,6 +401,14 @@ pub fn delayOf(l: *Lower, d: Delay3, rows: *[3]u32) Error!net.Delay {
 }
 
 // ---- private ----
+/// lib/sim/digital's refusal of lvalue `r`, a variable, as `sink_use` drives it.
+fn notNet(l: *Lower, r: Inst.Ref) Error {
+    return switch (l.sink_use) {
+        .assign => l.reject(l.frame, r, "a continuous assignment can only drive a net"),
+        .gate => l.reject(l.frame, r, "a gate's output terminal must be a net"),
+        .port => l.reject(l.frame, r, "an output port can only drive a net"),
+    };
+}
 
 /// §4.2.1 a net type's value with no driver.
 fn undriven(kind: net.NetKind) Bit {

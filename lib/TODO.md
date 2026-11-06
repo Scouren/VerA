@@ -1451,3 +1451,75 @@ src/
     - Interval's library margin is derived from the device kernel's measured error,
       not a flat 2 ulps.
     - The float falsifier evaluates with std_kernels rather than interp.
+- **Backends (2026-11-04):** `comp.xfail` lists 1752 fixtures under "not built: backend exe",
+  114 under vpi and 100 under digital_device. rw-zero takes exe
+  (`docs/rewrite/exe.md`, new `src/codegen/bench/`, renamed to `exe` at the switch-over).
+  VPI and digital_device follow as slots free.
+- **Morning item: E1100 on the 1364 route.** The conformance suite's `.v` reject
+  fixtures expect `//! reject E1100`, the old digital engine's catch-all code,
+  where the new front end has specific codes: E0906 "connected twice", E0904,
+  E0907, E0908, E0239, E0376, and others. vera-next reports them as E1100 with
+  the old wording through one table in the driver, so conformance-next passes
+  the suite unedited. Switching the 1364 route to the specific codes means
+  editing the suite (the user's repository) and deleting that table. That is
+  the user's call.
+- **Morning item: versioned units bought nothing until now.** rw-codegen found that
+  `@setFloatMode(.optimized)` in a device's fast body reaches only the operators
+  written directly in it. Every float op goes through a kernel-family method, whose
+  body stays strict, so the fast body was bit-identical to the strict one.
+  Fix underway: the float mode becomes a comptime parameter of the family.
+  - The strict instantiation keeps the "no optional contraction" rule.
+  - A probe proves the optimized instantiation carries the fast flags.
+  - In-box ulp bounds are measured per root.
+  - A ReleaseFast benchmark decides whether versioning stays. If the gain is not
+    measurable, deleting versioned units (simpler code) is the user's call,
+    with the numbers.
+- **abs.va "zero Jacobian" was a false alarm:** a one-off filter script dropped the
+  "    d res" lines. The runner matches the old transcript. The scare led to a
+  bench-run test that checks a lane-derived Jacobian against sign(v); it goes red
+  on zeroed lanes. It also surfaced the fast-body finding above.
+
+- **Paused (user, 2026-11-04).** All five agents and the lead's gate were stopped. Branches
+  and worktrees are kept under `.claude/worktrees/agent-*`.
+  - `refactor` is at `fae3345b`. That is the merge of rw-dlower's 79b003f9: its own
+    merge of the green `0930e59c`, gated on its branch. The lead's full gate and the
+    comp.xfail rebaseline for that merge were stopped mid-run.
+  - **On resume:**
+    1. `nix develop -c zig build check test-unit rewrite test-comp test-vera-next bench-run -Dcomp-rebaseline=true -j6`.
+    2. Install `zig-out/comp.xfail.new` after the path-set regression check.
+    3. Resume the agents by name, each from its branch head:
+       - rw-codegen: the display phase, then the real fast body;
+       - rw-lower: re-merge refactor, then lower.xfail;
+       - rw-dlower: sim.xfail, then the 88 digital_lowering lines;
+       - rw-zero: the .v backends and the `-Dcomp-v-flag` oracle;
+       - rw-comp: its Sema.zig conflict, then astgen/elab/parse, W1199 and conformance-next.
+  - **State at pause:**
+
+    | Oracle | Status |
+    |---|---|
+    | parse, astgen, elab, pp, diag, air, kernels, spice, link | 0 lines |
+    | diff-sim | 1161/1281 |
+    | diff-lower | 1974/2628 |
+    | codegen.xfail | 435 lines |
+    | diff-comp | 1330 agree |
+    | not built | VPI 114, libmap 21 |
+- **Morning item: `.v --emit-exe` build remarks.** The old native digital codegen prints
+  `note:` remarks on how it built a design ("4-state: nothing delays", ...). The new
+  `.v` exe (step 1: the embedded Program run by std_sim's interpreter) has none.
+  701 fixtures differ only in those notes; `digital_exe.xfail` lists them as
+  "digital_exe (build remarks)".
+  - The remarks describe the old 2-state/auto mode ("2-state once", "4-state: <why>",
+    "not native"). The new engine is 4-state throughout, so none of them is
+    printed; dropping them is the user's call.
+  - Speed: interpreted 3.41 s vs old native 0.36 s (lfsr, 2M cycles). About 60% of
+    that is eval's per-value allocation, which is being fixed first. Native codegen
+    is built only if a clear gap remains.
+- **Versioned units: preliminary numbers (rw-codegen2).** ReleaseFast, least of 201 runs.
+  - diode: strict 5.8 ns, versioned with the new `Fast` family trait 4.4 ns (24% faster).
+  - abs: about equal.
+  - MOSFET: strict 6.5 ns, versioned about 13 ns. The per-point box guard makes LLVM turn
+    region selects into mispredicting branches.
+  - Being tried first: a per-batch or branchless guard (AGENTS.md: dispatch per batch).
+  - If versioning still loses on a real device after that, keeping it is the user's call.
+  - `Fast` is an optional, additive trait in the device ABI (contract/family.zig). ESPice
+    gains it only if its family provides `Fast`.

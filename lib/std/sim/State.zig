@@ -22,6 +22,7 @@
 //! - `pub fn schedulePut(s: *State, slot: u32, value: Literal, delay: u64) Error!void`
 //! - `pub fn enqueue(s: *State, item: Pending, delay: ?u64, nba: bool) Error!Handle`
 //! - `pub fn enqueueMonitor(s: *State, item: Pending) Error!void`
+//! - `pub fn mark(s: *State, region: sched.Region, item: Pending) Error!Handle`
 //! - `pub fn cancel(s: *State, h: Handle) Error!void`
 //! - `pub fn park(s: *State, pc: u32) Error!u32`
 //! - `pub fn watch(s: *State, id: u32, t: Program.Term) Error!void`
@@ -31,6 +32,7 @@
 //! - `pub fn requestMonitor(s: *State, file: bool) Error!void`
 //! - `pub fn termBits(s: *const State, slot: u32, lo: u32, width: u32) [2]u64`
 //! - `pub fn monitorValue(s: *State, a: Allocator, e: u32) Error![]u64`
+//! - `pub fn matches(edge: Program.Edge, before: Bit, after: Bit) bool`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -38,6 +40,7 @@ const Allocator = std.mem.Allocator;
 const Program = @import("Program.zig");
 const logic = @import("logic.zig");
 const eval = @import("eval.zig");
+const driver_access = @import("driver_access.zig");
 const resolve = @import("resolve.zig");
 const hold = @import("holds.zig");
 const tchk = @import("tchk.zig");
@@ -47,6 +50,7 @@ const vcd = @import("vcd.zig");
 const evcd = @import("evcd.zig");
 const net = @import("net.zig");
 const sched = @import("scheduler.zig");
+const analog_link = @import("analog.zig");
 const kernels = @import("kernels");
 const fmt = kernels.fmt;
 const Literal = logic.Literal;
@@ -91,6 +95,13 @@ pub const Pending = union(enum) {
     /// §14.6 a module path destination's value landing as a plain write
     /// (`slot`, its planes the row's `buf`).
     put: struct { slot: u32, width: u32 },
+    /// VAMS §8.5.1 region 3b: `runUntil` stops with `.analog` (analog.zig).
+    analog_mark,
+    /// VAMS §8.5.3.6 region 1b: `runUntil` stops with `.explicit_d2a`.
+    d2a_mark,
+    /// VAMS §7.3.6.1 an analog event's A2D: wake what waits on named-event
+    /// slot `a2d` (`analog.deliverA2d`).
+    a2d: u32,
 };
 
 /// One payload row, recycled once its event dispatches or is cancelled.
@@ -257,6 +268,8 @@ path_edge: []PathEdge,
 path_changed: []bool,
 /// Per-instruction temporaries, reset before each.
 scratch: std.heap.ArenaAllocator,
+/// VAMS §7.3, §8.5 the link to an analog solver of a mixed run.
+analog: analog_link.Link = .{},
 
 const State = @This();
 
@@ -387,6 +400,8 @@ pub fn store(s: *State, slot: u32, value: Literal) Error!void {
         @memcpy(v, value.values());
         @memcpy(x, value.unknowns());
     }
+    // VAMS §9.22.5 an update need not change the value.
+    if (s.p.driver_updates.len != 0) try driver_access.stored(s, slot, changed);
     if (!changed) return;
     if (s.p.path_source.len != 0 and s.p.path_source[slot]) {
         s.path_edge[slot] = .{ .time = s.scheduler.now, .before = before_words, .after = .{ v[0], x[0] } };
@@ -412,6 +427,7 @@ pub fn trigger(s: *State, slot: u32) Error!void {
 pub fn scheduleWrite(s: *State, slot: u32, sel: ?eval.Sel, value: Literal, delay: ?u64) Error!void {
     assert(slot < s.p.slots.len);
     _ = try s.enqueueBuf(.{ .write = .{ .slot = slot, .sel = sel, .width = value.width, .signed = value.signed } }, value.planes, delay, true);
+    if (s.p.driver_updates.len != 0) try driver_access.scheduled(s, slot);
 }
 
 /// Queues a plain write of `value` into `slot`, `delay` ticks later, in
@@ -430,6 +446,16 @@ pub fn enqueue(s: *State, item: Pending, delay: ?u64, nba: bool) Error!Handle {
 pub fn enqueueMonitor(s: *State, item: Pending) Error!void {
     const at = try claim(s, item, &.{});
     s.rows.items[at].handle = s.scheduler.schedule(s.arena, .monitor, at) catch |e| return schedFail(s, e);
+}
+
+/// Queues `item`, which carries no buffer, in `region` of the current time
+/// (the analog link's marks).
+pub fn mark(s: *State, region: sched.Region, item: Pending) Error!Handle {
+    assert(item == .analog_mark or item == .d2a_mark);
+    const at = try claim(s, item, &.{});
+    const h = s.scheduler.schedule(s.arena, region, at) catch |e| return schedFail(s, e);
+    s.rows.items[at].handle = h;
+    return h;
 }
 
 /// Cancels one queued event; a stale handle is a no-op.
@@ -494,7 +520,7 @@ pub fn stopRange(s: *State, start: u32, end: u32) Error!bool {
             try cancel(s, row.handle);
             hit = true;
         },
-        .write, .strobe, .fstrobe, .monitor_tick, .vcd_tick, .tchk_expiry, .tchk_event, .drive, .net_update, .decay, .put, .tran_switch => {},
+        .write, .strobe, .fstrobe, .monitor_tick, .vcd_tick, .tchk_expiry, .tchk_event, .drive, .net_update, .decay, .put, .tran_switch, .analog_mark, .d2a_mark, .a2d => {},
     };
     return hit;
 }
@@ -539,6 +565,18 @@ pub fn termBits(s: *const State, slot: u32, lo: u32, width: u32) [2]u64 {
         o.* = bits & logic.wordMask(width, 0);
     }
     return out;
+}
+
+/// §9.7.2 Table 9-1: whether bit 0 moving `before` to `after` is `edge`;
+/// `any` is every change (the caller proved one).
+pub fn matches(edge: Program.Edge, before: Bit, after: Bit) bool {
+    if (edge == .any) return true;
+    if (before == after) return false;
+    return switch (edge) {
+        .posedge => before == .zero or after == .one,
+        .negedge => before == .one or after == .zero,
+        .any => unreachable,
+    };
 }
 
 // ---- private ----
@@ -607,6 +645,7 @@ fn wake(s: *State, slot: u32, before: Bit, after: Bit) Error!void {
         _ = try enqueue(s, resumption(pc, ctx), null, false);
     }
     list.shrinkRetainingCapacity(keep);
+    if (s.analog.watch.len != 0 or s.analog.sites.items.len != 0) try analog_link.changed(s, slot, before, after);
 }
 
 /// §9.7.3 an event array term wakes only when its index names `slot` now,
@@ -619,17 +658,6 @@ fn selected(s: *State, t: Term, ctx: u32, slot: u32) Error!bool {
     const at = try eval.address(s, tmp.allocator(), s.p.extraData(Program.Elem, t.select));
     try activations.makeResident(s, s.ctx);
     return at != null and at.? == slot;
-}
-
-/// §9.7.2 Table 9-1: `any` is every change (the caller proved one).
-fn matches(edge: Program.Edge, before: Bit, after: Bit) bool {
-    if (edge == .any) return true;
-    if (before == after) return false;
-    return switch (edge) {
-        .posedge => before == .zero or after == .one,
-        .negedge => before == .one or after == .zero,
-        .any => unreachable,
-    };
 }
 
 fn selectChanged(s: *State, t: *Term, slot: u32) bool {

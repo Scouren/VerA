@@ -24,6 +24,7 @@
 //! - `pub fn isOverridable(vir: *const Vir, p: Inst.Index) bool`
 //! - `pub fn payloadOf(vir: *const Vir, comptime T: type, i: Inst.Index) T`
 //! - `pub fn segment(arena: Allocator, name: []const u8) Allocator.Error![]const u8`
+//! - `pub fn rootShapes(s: *Sema, env: *const Env) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -32,6 +33,8 @@ const vams = @import("vams");
 const InternPool = @import("intern_pool");
 const Sema = @import("../Sema.zig");
 const Zcu = @import("../Zcu.zig");
+const cycle = @import("cycle.zig");
+const netlist = @import("netlist.zig");
 const eval = @import("eval.zig");
 const paramset = @import("paramset.zig");
 const discipline = @import("discipline.zig");
@@ -88,9 +91,6 @@ pub const Walk = struct {
 /// The most iterations one loop generate scheme unrolls.
 const loop_max: u32 = 1 << 16;
 
-/// The deepest instance tree; deeper is a runaway recursion (E0905).
-const depth_max: u32 = 1 << 16;
-
 /// Walks the instance trees under `roots` into `zcu.instances`, until no
 /// late defparam changes a value; returns the defparams left waiting.
 /// Asserts the table is empty.
@@ -120,7 +120,7 @@ pub fn run(s: *Sema, roots: []const Zcu.Decl) Allocator.Error!defparams.Waiting 
         // Each pass adds a late value or changes one; the values a cycle of
         // defparams feeds itself stop changing or the passes run out.
         if (w.rerun and pass > late.count() + 1) for (w.origins.items) |o| if (o.used)
-            try s.fail(.E0907, o.file, o.src, "`{s}` keeps changing the value it reads (IEEE 1364-2005 §12.8.1)", .{o.text});
+            try s.failRule(.{ .part = .target }, .E0907, o.file, o.src, "`{s}` keeps changing the value it reads (IEEE 1364-2005 §12.8.1)", .{o.text});
         if (!w.rerun or pass > late.count() + 1) {
             // Every root is a module, so each made an instance.
             assert(zcu.instances.len >= roots.len);
@@ -141,7 +141,8 @@ pub fn applyGivens(s: *Sema, env: *Env, file: Zcu.File.Index, src: Inst.Ref, giv
     var ordered: u32 = 0;
     var overridable: u32 = 0;
     for (env.positions.keys()) |p| overridable += @intFromBool(isOverridable(vir, p));
-    for (givens) |g| {
+    for (givens, 0..) |g, k| {
+        const at: Zcu.Part = .{ .param = @intCast(k) };
         const p = if (g.name == .empty) ordered: {
             defer ordered += 1;
             var n: u32 = 0;
@@ -151,8 +152,8 @@ pub fn applyGivens(s: *Sema, env: *Env, file: Zcu.File.Index, src: Inst.Ref, giv
             };
             if (ordered == overridable) {
                 if (s.config.ieee1364) {
-                    try s.fail(.W1161, file, src, "§12.2.2.1: `{s}` declares {d} overridable parameters, and this instance gives more values; the extra ones are ignored", .{ vir.string(module), overridable });
-                } else try s.fail(.E0907, file, src, "`{s}` declares {d} overridable parameters, and this instance overrides more", .{ vir.string(module), overridable });
+                    try s.failRule(.{ .rule = .param_extra, .nums = .{ @intCast(givens.len - k), overridable }, .part = at }, .W1161, file, src, "§12.2.2.1: `{s}` declares {d} overridable parameters, and this instance gives more values; the extra ones are ignored", .{ vir.string(module), overridable });
+                } else try s.failRule(.{ .part = at }, .E0907, file, src, "`{s}` declares {d} overridable parameters, and this instance overrides more", .{ vir.string(module), overridable });
             }
             continue;
         } else named: {
@@ -160,12 +161,14 @@ pub fn applyGivens(s: *Sema, env: *Env, file: Zcu.File.Index, src: Inst.Ref, giv
             // §9.18's hierarchical system parameters bind on any instance.
             if (env.systemNamed(name) != null) continue;
             if (env.named(name)) |q| if (isOverridable(vir, q)) break :named q;
-            if (!quiet) try s.fail(.E0907, file, src, "`{s}` is not a parameter of `{s}`", .{ name, vir.string(module) });
+            const rule: Zcu.Rule = if (env.named(name) != null) .param_local else .param_unknown;
+            // §3.4.5 a localparam is not overridable: said so by name.
+            if (!quiet) try s.failRule(.{ .rule = rule, .name = name, .part = at }, .E0907, file, src, "`{s}` is {s} of `{s}`", .{ name, if (rule == .param_local) "a localparam" else "not a parameter", vir.string(module) });
             continue;
         };
         if (g.value == .none) continue;
         const gop = try env.given.getOrPut(s.gpa, p);
-        if (gop.found_existing) try s.fail(.E0908, file, src, "`{s}` is given more than one value", .{vir.string(payloadOf(vir, Inst.Param, p).name)});
+        if (gop.found_existing) try s.failRule(.{ .rule = .param_twice, .name = vir.string(payloadOf(vir, Inst.Param, p).name), .part = at }, .E0908, file, src, "`{s}` and its alias are both given a value", .{vir.string(payloadOf(vir, Inst.Param, p).name)});
         gop.value_ptr.* = g.value;
         try env.spelling.put(s.gpa, p, if (g.name == .empty) vir.string(payloadOf(vir, Inst.Param, p).name) else ip.stringToSlice(g.name));
     }
@@ -213,13 +216,13 @@ pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const G
         const name = zcu.intern_pool.stringToSlice(g.name);
         const k = env.systemNamed(name) orelse continue;
         if (specified.get(k)) |before| if (!std.mem.eql(u8, before.spelling, name))
-            try s.fail(.E0908, file, src, "`{s}` and its alias are both given a value", .{@tagName(k)});
+            try s.fail(.E0908, file, src, "`${s}` is given more than one value", .{@tagName(k)});
         specified.set(k, .{ .value = g.value, .spelling = try s.arena.dupe(u8, name) });
     }
     for (dps) |dp| {
         const k = env.systemNamed(dp.name) orelse continue;
         if (specified.get(k)) |before| if (!std.mem.eql(u8, before.spelling, dp.name))
-            try s.fail(.E0908, dp.file, dp.src, "`{s}` and its alias are both given a value", .{@tagName(k)});
+            try s.failRule(.{ .part = .target }, .E0908, dp.file, dp.src, "`${s}` and its alias are both given a value", .{@tagName(k)});
         specified.set(k, .{ .value = dp.value, .spelling = dp.name });
     }
     var out: Zcu.Hier = undefined;
@@ -236,6 +239,15 @@ pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const G
         out.set(k, if (v) |x| try env.intern(.{ .real = x }) else .undef);
     }
     return out;
+}
+
+/// Files the shape parameters `env` read into `Zcu.shape_params` (the
+/// root's: a testbench card names a root parameter).
+pub fn rootShapes(s: *Sema, env: *const Env) Allocator.Error!void {
+    for (env.shapes.keys()) |p| {
+        const name = env.vir.string(payloadOf(env.vir, Inst.Param, p).name);
+        try s.zcu.shape_params.put(s.gpa, try s.zcu.intern_pool.getString(s.gpa, name), {});
+    }
 }
 
 // ---- private ----
@@ -255,6 +267,7 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     const m = vir.extraData(Inst.Module, vir.instructions.items(.data)[@backingInt(row.inst)].pl_node.payload_index);
     var env: Env = try .init(s.gpa, s.arena, &zcu.intern_pool, vir, &.{ m.params, m.body });
     defer env.deinit();
+    if (netlist.inNetlist(zcu, p.parent)) try netlist.respell(s, &env, w.givens.items[picked.givens.start..][0..picked.givens.len]);
     try applyGivens(s, &env, p.file, p.src, w.givens.items[picked.givens.start..][0..picked.givens.len], p.quiet, row.name);
     // A paramset instance's defparams name the paramset's parameters.
     if (std.meta.eql(picked.paramset, Zcu.Decl.none)) try defparams.applyDefparams(s, &env, dps, row.name);
@@ -268,13 +281,10 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     const base: ?*const Zcu.Hier = if (picked.base) |*b| b else if (p.parent == .none) null else &zcu.instances.items(.hier)[@backingInt(p.parent)];
     env.hier = try hierValues(s, &env, base, w.givens.items[picked.givens.start..][0..picked.givens.len], if (picked.base == null) dps else &.{}, p.file, p.src);
     for (env.positions.keys()) |param_inst| _ = try env.param(param_inst);
-    try arraySizes(s, &env, p);
+    try arraySizes(s, &env, p, picked.module.file, w.givens.items[picked.givens.start..][0..picked.givens.len]);
     const params = try zcu.intern_pool.get(s.gpa, .{ .aggregate = .{ .ty = .none, .elems = env.values.items } });
     const key: Instance.Key = .{ .module = picked.module, .params = params };
-    if (try recursion(w, p, key)) |depth| {
-        try s.fail(.E0905, p.file, p.src, "`{s}` instantiates itself with the same parameters ({d} levels deep)", .{ vir.string(row.name), depth });
-        return;
-    }
+    if (try cycle.refused(w, p, key, vir.string(row.name))) return;
     if (zcu.isBuiltin(picked.module)) try portDisciplineAttrs(s, p);
     const ports = try bindPorts(s, p, vir, m, row.name);
     try zcu.instances.append(s.gpa, .{ .module = picked.module, .parent = p.parent, .name = p.name, .params = params, .paramset = picked.paramset, .paramset_params = picked.own, .src = p.src, .hier = env.hier, .ports = ports });
@@ -287,6 +297,7 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     w.kids.clearRetainingCapacity();
     w.prefixes.clearRetainingCapacity();
     try items(w, &env, index, picked.module.file, m.body, "");
+    if (p.parent == .none) try rootShapes(s, &env);
     var k = w.kids.items.len;
     while (k > 0) {
         k -= 1;
@@ -298,8 +309,10 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
 /// default value of an array parameter shall be of the exact size of the
 /// parameter array", and one whose size an override changed "shall be
 /// assigned an array of the new size" (E0921 for either). A value or range
-/// that does not fold is not judged.
-fn arraySizes(s: *Sema, env: *Env, p: Pending) Allocator.Error!void {
+/// that does not fold is not judged. Located as the old elaborator did: at
+/// the value of the override in `givens`, else at the declaration in
+/// `file`.
+fn arraySizes(s: *Sema, env: *Env, p: Pending, file: Zcu.File.Index, givens: []const Given) Allocator.Error!void {
     assert(env.positions.count() == env.values.items.len);
     for (env.positions.keys(), env.values.items) |q, v| {
         const want = try env.arraySize(q) orelse continue;
@@ -308,12 +321,39 @@ fn arraySizes(s: *Sema, env: *Env, p: Pending) Allocator.Error!void {
         if (k != .aggregate) continue;
         const got = k.aggregate.elems.len;
         if (got == want) continue;
-        const name = env.vir.string(payloadOf(env.vir, Inst.Param, q).name);
+        const own = env.vir.string(payloadOf(env.vir, Inst.Param, q).name);
+        // The old elaborator's path: below the root, the instance's then the parameter's name.
+        const name = if (p.parent == .none) own else try std.fmt.allocPrint(s.arena, "{f}{s}{s}.{s}", .{
+            s.zcu.fmtPathBelowRoot(p.parent),
+            if (s.zcu.instances.items(.parent)[@backingInt(p.parent)] == .none) "" else ".",
+            s.zcu.intern_pool.stringToSlice(p.name),
+            own,
+        });
         if (env.given.contains(q))
-            try s.fail(.E0921, p.file, p.src, "the array assigned to `{s}` has {d} elements, and its declared range has {d}", .{ name, got, want })
+            try s.failRule(.{ .part = givenPart(s, env, givens, q) }, .E0921, p.file, p.src, "the array assigned to `{s}` has {d} elements, and its declared range has {d}", .{ name, got, want })
         else
-            try s.fail(.E0921, p.file, p.src, "an override resized `{s}` to {d} elements, and no array of the new size was assigned to it (its default has {d})", .{ name, want, got });
+            try s.fail(.E0921, file, q.toRef(), "an override resized `{s}` to {d} elements, and no array of the new size was assigned to it (its default has {d})", .{ name, want, got });
     }
+}
+
+/// The value of `givens` that sets parameter `q`: by name, else by
+/// position among the overridable parameters; the whole instance when
+/// neither finds it (a defparam set it).
+fn givenPart(s: *Sema, env: *const Env, givens: []const Given, q: Inst.Index) Zcu.Part {
+    assert(env.positions.contains(q));
+    const vir = env.vir;
+    if (givens.len == 0) return .whole;
+    if (givens[0].name == .empty) {
+        var k: u32 = 0;
+        for (env.positions.keys()) |o| {
+            if (o == q) return if (k < givens.len) .{ .value = k } else .whole;
+            k += @intFromBool(isOverridable(vir, o));
+        }
+        return .whole;
+    }
+    const name = vir.string(payloadOf(vir, Inst.Param, q).name);
+    for (givens, 0..) |g, k| if (std.mem.eql(u8, s.zcu.intern_pool.stringToSlice(g.name), name)) return .{ .value = @intCast(k) };
+    return .whole;
 }
 
 /// Annex E.3.2.1: "The value [of `port_discipline`] shall be of type
@@ -327,19 +367,20 @@ fn portDisciplineAttrs(s: *Sema, p: Pending) Allocator.Error!void {
     assert(vir.instructions.items(.tag)[@backingInt(i)] == .instance);
     var env: Env = try .init(s.gpa, s.arena, &s.zcu.intern_pool, vir, &.{});
     defer env.deinit();
-    for (vir.list(Inst.Attr, payloadOf(vir, Inst.Instance, i).attrs)) |a| {
+    for (vir.list(Inst.Attr, payloadOf(vir, Inst.Instance, i).attrs), 0..) |a, k| {
         if (!std.mem.eql(u8, vir.string(a.name), "port_discipline")) continue;
+        const at: Sema.Why = .{ .part = .{ .attr = @intCast(k) } };
         const c: eval.Const = if (a.value.len == 0) .{ .int = 1 } else (try env.body(a.value)) orelse continue;
         if (c != .str) {
-            try s.fail(.E0358, p.file, p.src, "E.3.2.1: port_discipline requires a string naming a continuous discipline", .{});
+            try s.failRule(at, .E0358, p.file, p.src, "E.3.2.1: port_discipline requires a string naming a continuous discipline", .{});
             continue;
         }
         if (!s.zcu.disciplines.contains(try s.zcu.intern_pool.getString(s.gpa, c.str))) {
-            try s.fail(.E0358, p.file, p.src, "E.3.2.1: port_discipline names an undeclared discipline `{s}`", .{c.str});
+            try s.failRule(at, .E0358, p.file, p.src, "E.3.2.1: port_discipline names an undeclared discipline `{s}`", .{c.str});
             continue;
         }
         if (try discipline.domainOf(s, c.str) != .continuous)
-            try s.fail(.E0358, p.file, p.src, "E.3.2.1: port_discipline requires a continuous discipline; `{s}` is not one", .{c.str});
+            try s.failRule(at, .E0358, p.file, p.src, "E.3.2.1: port_discipline requires a continuous discipline; `{s}` is not one", .{c.str});
     }
 }
 
@@ -359,20 +400,20 @@ fn bindPorts(s: *Sema, p: Pending, vir: *const Vir, m: Inst.Module, module: Vir.
     const formals = vir.body(m.ports);
     const named = conns.len != 0 and conns[0].name != .empty;
     if (!named and conns.len > formals.len)
-        try s.fail(.E0906, p.file, p.src, "`{s}` declares {d} ports, and this instance connects {d}", .{ vir.string(module), formals.len, conns.len });
+        try s.failRule(.{ .rule = .port_count, .part = .{ .conn = @intCast(formals.len) } }, .E0906, p.file, p.src, "`{s}` declares {d} ports, and this instance connects {d}", .{ vir.string(module), formals.len, conns.len });
     for (conns, 0..) |c, k| {
         if (named != (c.name != .empty)) {
-            try s.fail(.E0906, p.file, p.src, "a{s} connection in a list of {s} connections", .{ if (named) "n ordered" else " named", if (named) "named" else "ordered" });
+            try s.failRule(.{ .rule = .port_mixed, .part = .{ .conn = @intCast(k) } }, .E0906, p.file, p.src, "a{s} connection in a list of {s} connections", .{ if (named) "n ordered" else " named", if (named) "named" else "ordered" });
             continue;
         }
         if (!named) continue;
         const n = pvir.string(c.name);
         if (portNamed(vir, formals, n) == null) {
-            try s.fail(.E0906, p.file, p.src, "`{s}` is not a port of `{s}`", .{ n, vir.string(module) });
+            try s.failRule(.{ .rule = .port_unknown, .name = n, .part = .{ .conn = @intCast(k) } }, .E0906, p.file, p.src, "`{s}` is not a port of `{s}`", .{ n, vir.string(module) });
             continue;
         }
         for (conns[0..k]) |prev| if (prev.name != .empty and std.mem.eql(u8, pvir.string(prev.name), n)) {
-            try s.fail(.E0906, p.file, p.src, "`{s}` is connected twice", .{n});
+            try s.failRule(.{ .rule = .port_twice, .name = n, .part = .{ .conn = @intCast(k) } }, .E0906, p.file, p.src, "`{s}` is connected twice", .{n});
             break;
         };
     }
@@ -404,25 +445,6 @@ fn portNamed(vir: *const Vir, formals: []const Inst.Index, name: []const u8) ?In
     return null;
 }
 
-/// E0905's depth when `key` is already on the path from the root to `p`,
-/// or when the tree is past `depth_max`; else null.
-fn recursion(w: *Walk, p: Pending, key: Instance.Key) Allocator.Error!?u32 {
-    assert(key.params != .none);
-    if (p.parent != .none) assert(@backingInt(p.parent) < w.zcu.instances.len);
-    const parents = w.zcu.instances.items(.parent);
-    const modules = w.zcu.instances.items(.module);
-    const params = w.zcu.instances.items(.params);
-    var depth: u32 = 1;
-    var it = p.parent;
-    while (it != .none) : (it = parents[@backingInt(it)]) {
-        depth += 1;
-        if (depth > depth_max) return depth;
-        if (params[@backingInt(it)] == key.params and std.meta.eql(modules[@backingInt(it)], key.module)) return depth;
-    }
-    if (w.zcu.instances.len >= Zcu.instances_max) return depth;
-    return null;
-}
-
 /// One scope's items: its instances (each array element in rising index
 /// order), then its generate constructs, then its defparams.
 fn items(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, body: Vir.Body, prefix: []const u8) Allocator.Error!void {
@@ -439,7 +461,7 @@ fn items(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, body:
             const g = payloadOf(vir, Inst.GenIf, i);
             // ponytail: a scheme that does not fold selects no arm; the
             // per-instance analysis reports the unfoldable condition.
-            const c = (try env.body(g.cond)) orelse continue;
+            const c = (try shapeBody(env, g.cond)) orelse continue;
             try items(w, env, index, file, if (c.isTrue()) g.then else g.@"else", prefix);
         },
         .gen_case => try genCase(w, env, index, file, payloadOf(vir, Inst.GenCase, i), prefix),
@@ -472,7 +494,7 @@ fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i:
         // is no real.
         if (in.flags.scaled) try s.fail(.E0247, file, i.toRef(), "a scaled literal in `{s}`'s UDP delay", .{vir.string(in.target)});
         if (params.len > 2 or (params.len != 0 and params[0].name != .empty))
-            try s.fail(.E0239, file, i.toRef(), "`{s} #(…) {s}`: {d} value(s)", .{ vir.string(in.target), vir.string(in.name), params.len })
+            try s.failRule(.{ .rule = .udp_delay }, .E0239, file, i.toRef(), "`{s} #(…) {s}`: {d} value(s)", .{ vir.string(in.target), vir.string(in.name), params.len })
         else
             // The instance computes nothing in an analog device (a notice
             // stage 5 owns, tests/differential/stages.zig).
@@ -495,8 +517,10 @@ fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i:
     // §6.2.2 an array: one instance per element, lowest index first.
     const r = vir.body(in.range);
     const bin = payloadOf(vir, Inst.Bin, r[r.len - 1]);
+    env.shaping += 1;
     const msb = if (try env.ref(bin.lhs)) |c| c.asIntExact() else null;
     const lsb = if (try env.ref(bin.rhs)) |c| c.asIntExact() else null;
+    env.shaping -= 1;
     if (msb == null or lsb == null) return s.fail(.E0909, file, i.toRef(), "`{s}`", .{name});
     var k: i128 = @min(msb.?, lsb.?);
     while (k <= @max(msb.?, lsb.?)) : (k += 1) {
@@ -520,6 +544,8 @@ fn boundTarget(w: *Walk, parent: Instance.Index, name: InternPool.String, target
 fn genFor(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, g: Inst.GenFor, prefix: []const u8) Allocator.Error!void {
     assert(@backingInt(index) < w.zcu.instances.len);
     assert(env.depth == 0);
+    env.shaping += 1;
+    defer env.shaping -= 1;
     const vir = env.vir;
     const init = storeOf(vir, g.init) orelse return;
     const gv = declOf(vir, init.lhs) orelse return;
@@ -550,12 +576,17 @@ fn genCase(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, g: 
     assert(@backingInt(index) < w.zcu.instances.len);
     assert(env.depth == 0);
     const vir = env.vir;
-    const operand = (try env.body(g.operand)) orelse return;
+    const operand = (try shapeBody(env, g.operand)) orelse return;
     var default: ?Vir.Body = null;
     for (vir.list(Inst.Arm, g.arms)) |arm| {
         if (arm.flags.default) default = arm.body;
         for (vir.list(Inst.Ref, arm.values)) |l| {
-            const label = (try env.ref(l)) orelse continue;
+            env.shaping += 1;
+            const label = (try env.ref(l)) orelse {
+                env.shaping -= 1;
+                continue;
+            };
+            env.shaping -= 1;
             const eq = eval.Const.isTrue(@import("std_kernels").fold.binary(.eq, operand, label, null) orelse continue);
             if (eq) return items(w, env, index, file, arm.body, prefix);
         }
@@ -579,4 +610,11 @@ fn declOf(vir: *const Vir, r: Inst.Ref) ?Inst.Index {
     const i = r.toIndex() orelse return null;
     if (vir.instructions.items(.tag)[@backingInt(i)] != .decl_ref) return null;
     return vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl;
+}
+
+/// `env.body(b)` read as a §3.4 shape (`Env.shaping`).
+fn shapeBody(env: *Env, b: Vir.Body) Allocator.Error!?eval.Const {
+    env.shaping += 1;
+    defer env.shaping -= 1;
+    return env.body(b);
 }

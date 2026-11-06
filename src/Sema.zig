@@ -14,11 +14,13 @@
 //! Contents:
 //! - `pub const Config = struct` (`Roots`, `Override`)
 //! - `pub fn elaborate(zcu: *Zcu, config: Config) Allocator.Error!void`
-//! - `pub const Analysis = struct` (`deinit`)
+//! - `pub const Analysis = struct` (`Src`, `deinit`)
 //! - lowering's types: `pub const Ty`, `pub const Value`, `pub const Slot`, `pub const Bind`, `pub const Unit`, `pub const Bridged`, `pub const ContribKey`, `pub const Block` (`Loop`, `Label`, `restricted`, `child`)
 //! - `pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis`
 //! - `pub fn addInst(s: *Sema, b: *Block, inst: Air.Inst) Allocator.Error!Air.Inst.Ref`
 //! - `pub fn fail(s: *Sema, code: Diag.Code, file: Zcu.File.Index, src: Vir.Inst.Ref, comptime fmt: []const u8, args: anytype) Allocator.Error!void`
+//! - `pub const Why = struct`
+//! - `pub fn failRule(s: *Sema, why: Why, code: Diag.Code, file: Zcu.File.Index, src: Vir.Inst.Ref, comptime fmt: []const u8, args: anytype) Allocator.Error!void`
 //! - `pub fn bound(s: *Sema, cell: InternPool.String, path: []const u8) InternPool.String`
 
 const std = @import("std");
@@ -28,6 +30,7 @@ const vams = @import("vams");
 const InternPool = @import("intern_pool");
 const Air = @import("air");
 const Zcu = @import("Zcu.zig");
+const netlist = @import("Sema/netlist.zig");
 const walk = @import("Sema/walk.zig");
 const paramset = @import("Sema/paramset.zig");
 const checks = @import("Sema/checks.zig");
@@ -79,6 +82,12 @@ contrib_rows: std.AutoHashMapUnmanaged(ContribKey, Air.Device.Contribution.Index
 param_args: std.ArrayList(Value) = .empty,
 /// How deep the expression being lowered nests (expr.zig).
 expr_depth: u32 = 0,
+/// The Vir expression being lowered (expr.zig's `lower`), and each Air
+/// instruction's, by index (`addInst`): `Analysis.srcs`.
+expr_src: Inst.Ref = .none,
+inst_srcs: std.ArrayList(Analysis.Src) = .empty,
+/// A unit has a digital half (`Analysis.mixed`).
+mixed: bool = false,
 /// Each node row's one `probe`, in the prologue (contrib.zig).
 probes: std.AutoHashMapUnmanaged(Air.Device.Node.Index, Air.Inst.Ref) = .empty,
 /// §3.6.2 every access function name and the quantity it reads under a
@@ -135,10 +144,25 @@ pub const Config = struct {
 pub const Analysis = struct {
     air: Air,
     device: Air.Device,
+    /// One per `air` instruction: the Vir expression it was lowered from,
+    /// where a later stage's diagnostic about it points (`Air.Float`'s
+    /// `Input.locs`); `.none` for one no expression wrote.
+    srcs: []const Src,
+    /// §7.2.2 a module of the design has a digital half the analog blocks
+    /// read (discrete.zig): its testbench is the mixed-signal one (§8).
+    mixed: bool = false,
+    /// The digital half of a `mixed` design, lowered by `digital.lower`
+    /// in mixed mode (the driver fills it: the lowering reads the trees);
+    /// arena-owned, so `deinit` leaves it.
+    digital: ?@import("Sema/digital.zig").Lowered = null,
+
+    /// A source: a file and a Vir instruction in it.
+    pub const Src = struct { file: Zcu.File.Index, src: Inst.Ref };
 
     pub fn deinit(a: *Analysis, gpa: Allocator) void {
         a.air.deinit(gpa);
         a.device.deinit(gpa);
+        gpa.free(a.srcs);
         a.* = undefined;
     }
 };
@@ -270,6 +294,16 @@ pub const Block = struct {
     }
 };
 
+/// What `failRule` records beside the message (`Zcu.Failure`'s fields).
+pub const Why = struct {
+    rule: Zcu.Rule = .none,
+    name: []const u8 = "",
+    nums: [2]u32 = .{ 0, 0 },
+    part: Zcu.Part = .whole,
+    note: []const u8 = "",
+    help: []const u8 = "",
+};
+
 const Sema = @This();
 
 /// Elaborates every file of `zcu` into its namespace and instance tree.
@@ -281,6 +315,7 @@ pub fn elaborate(zcu: *Zcu, config: Config) Allocator.Error!void {
     var arena_state: std.heap.ArenaAllocator = .init(zcu.gpa);
     defer arena_state.deinit();
     var s: Sema = .{ .zcu = zcu, .gpa = zcu.gpa, .arena = arena_state.allocator(), .config = config };
+    try netlist.shadows(&s);
     try namespace(&s);
     try checks.run(&s);
     const roots = try pickRoots(&s);
@@ -316,14 +351,22 @@ pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis {
         s.device.deinit(zcu.gpa);
         return null;
     };
-    const air = try s.air.finish(zcu.gpa, main);
+    var air = try s.air.finish(zcu.gpa, main);
+    errdefer air.deinit(zcu.gpa);
     assert(air.mainBody().len == main.len);
-    return .{ .air = air, .device = s.device };
+    const srcs = try zcu.gpa.alloc(Analysis.Src, air.instructions.len);
+    @memset(srcs, .{ .file = @fromBackingInt(0), .src = .none });
+    const n = @min(srcs.len, s.inst_srcs.items.len);
+    @memcpy(srcs[0..n], s.inst_srcs.items[0..n]);
+    return .{ .air = air, .device = s.device, .srcs = srcs, .mixed = s.mixed };
 }
 
 /// Appends `inst` to `b`'s body and returns it as an operand.
 pub fn addInst(s: *Sema, b: *Block, inst: Air.Inst) Allocator.Error!Air.Inst.Ref {
     const i = try s.air.addInst(s.gpa, inst);
+    const k = @backingInt(i);
+    if (s.inst_srcs.items.len <= k) try s.inst_srcs.appendNTimes(s.arena, .{ .file = b.unit.file, .src = .none }, k + 1 - s.inst_srcs.items.len);
+    s.inst_srcs.items[k] = .{ .file = b.unit.file, .src = s.expr_src };
     try b.insts.append(s.arena, i);
     assert(b.insts.items[b.insts.items.len - 1] == i);
     return .fromIndex(i);
@@ -337,6 +380,20 @@ pub fn fail(s: *Sema, code: Diag.Code, file: Zcu.File.Index, src: Inst.Ref, comp
     const before = s.zcu.failed.len;
     try s.zcu.failed.append(s.gpa, .{ .code = code, .file = file, .src = src, .message = message });
     assert(s.zcu.failed.len == before + 1);
+}
+
+/// `fail` naming the rule that refused, what its old words quote, and the
+/// part of the instance it is about.
+pub fn failRule(s: *Sema, why: Why, code: Diag.Code, file: Zcu.File.Index, src: Inst.Ref, comptime fmt: []const u8, args: anytype) Allocator.Error!void {
+    assert(why.rule != .none or why.part != .whole or why.note.len + why.help.len != 0);
+    try s.fail(code, file, src, fmt, args);
+    const row = s.zcu.failed.len - 1;
+    s.zcu.failed.items(.rule)[row] = why.rule;
+    s.zcu.failed.items(.name)[row] = try s.zcu.intern_pool.getString(s.gpa, why.name);
+    s.zcu.failed.items(.nums)[row] = why.nums;
+    s.zcu.failed.items(.part)[row] = why.part;
+    s.zcu.failed.items(.note)[row] = try s.zcu.intern_pool.getString(s.gpa, why.note);
+    s.zcu.failed.items(.help)[row] = try s.zcu.intern_pool.getString(s.gpa, why.help);
 }
 
 /// The cell an instance of `cell` at absolute path `path` binds under the
@@ -424,7 +481,7 @@ fn namespace(s: *Sema) Allocator.Error!void {
                     const gop = try zcu.modules.getOrPut(s.gpa, name);
                     // §13.2.1.1 a cell defined again in its own library.
                     if (gop.found_existing and !zcu.isBuiltin(gop.value_ptr.*) and !zcu.isBuiltin(decl) and std.mem.eql(u8, zcu.libraryOf(gop.value_ptr.*), zcu.libraryOf(decl)))
-                        try s.fail(.W1152, file, d.inst.toRef(), "`{s}` is defined again; this later definition is the module", .{vir.string(d.name)});
+                        try s.failRule(.{ .rule = .cell_again, .name = try std.fmt.allocPrint(s.arena, "{s}.{s}", .{ zcu.libraryOf(decl), vir.string(d.name) }) }, .W1152, file, d.inst.toRef(), "`{s}` is defined again; this later definition is the module", .{vir.string(d.name)});
                     gop.value_ptr.* = decl;
                 },
                 .paramset => try zcu.paramsets.append(s.gpa, decl),

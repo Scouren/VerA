@@ -451,5 +451,5 @@ fn eventWrites(s: *Sema, unit: *Unit, b: Vir.Body, in_event: bool, depth: u32) A
 
 /// Every instruction `i` reads as an operand (control.zig's walk).
 fn operandsOf(s: *Sema, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void {
-    return @import("control.zig").operands(s, vir, i, out);
+    return @import("control.zig").operands(s.arena, vir, i, out);
 }

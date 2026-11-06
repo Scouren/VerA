@@ -11,6 +11,7 @@
 //! - `pub fn bundle(comp: *Compilation) Allocator.Error!Diag`
 //! - `pub fn sources(comp: *Compilation) Allocator.Error![]const Diag.Source`
 //! - `pub fn relocate(out: vams.Preprocessor.Output, start: u32, end: u32) Diag.Loc`
+//! - `pub fn instLoc(out: vams.Preprocessor.Output, u: *const Compilation.Unit, src: Inst.Ref) Diag.Loc`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -20,6 +21,7 @@ const sema = @import("sema");
 const Compilation = @import("../Compilation.zig");
 const Diag = vams.Diag;
 const Inst = vams.Vir.Inst;
+const legacy = @import("legacy.zig");
 
 /// Every diagnostic of `comp`, relocated and sorted; owned by the caller.
 pub fn bundle(comp: *Compilation) Allocator.Error!Diag {
@@ -31,7 +33,11 @@ pub fn bundle(comp: *Compilation) Allocator.Error!Diag {
     for (out.diagnostics) |d| {
         const code = std.meta.stringToEnum(Diag.Code, d.code) orelse unreachable; // The preprocessor reports catalogue codes.
         const loc: Diag.Loc = if (d.file == .none) .none else .{ .file = @fromBackingInt(@backingInt(d.file)), .start = source(out, d.file, d.start), .end = source(out, d.file, d.end) };
-        try w.add(.preprocess, code, loc, "{s}", .{d.message});
+        var b = w.build(.preprocess, code, loc);
+        b.msg("{s}", .{d.message});
+        for (d.notes) |n| b.note("{s}", .{n});
+        if (d.label) |l| b.label(.{ .file = loc.file, .start = source(out, d.file, l.start), .end = source(out, d.file, l.end) }, "{s}", .{l.text});
+        try b.emit();
     }
     if (comp.netlist) |*n| try n.output().report(&w, @fromBackingInt(pp_files));
     for (comp.units.items) |*u| {
@@ -43,16 +49,36 @@ pub fn bundle(comp: *Compilation) Allocator.Error!Diag {
             defer parsed.deinit(comp.gpa);
             try copy(&w, parsed, out);
         }
-        try copy(&w, u.vir.diag, out);
+        // On the IEEE 1364 route a code `legacy` rewords takes the old
+        // engine's words, naming the unit text under its caret.
+        try copyAs(&w, u.vir.diag, out, if (comp.config.digital()) u.text else null);
     }
     const zf = comp.zcu.failed.slice();
-    for (zf.items(.code), zf.items(.file), zf.items(.src), zf.items(.message)) |code, file, src, message| {
+    const ip = &comp.zcu.intern_pool;
+    // lib/sim/digital stopped at its first refusal: the 1364 route reports
+    // elaboration's first error and every warning.
+    var refused = false;
+    for (zf.items(.code), zf.items(.file), zf.items(.src), zf.items(.message), zf.items(.rule), zf.items(.name), zf.items(.nums), zf.items(.part), zf.items(.note), zf.items(.help)) |code, file, src, message, rule, name, nums, part, note, help| {
         const u = &comp.units.items[@backingInt(file)];
-        try w.add(.lower, code, instLoc(out, u, src), "{s}", .{comp.zcu.intern_pool.stringToSlice(message)});
+        const is_error = @tagName(code)[0] == 'E';
+        if (comp.config.digital() and is_error) {
+            if (refused) continue;
+            refused = true;
+        }
+        const loc = partLoc(out, u, src, part);
+        if (rule != .none and comp.config.digital()) {
+            try legacy.rule(&w, rule, loc, ip.stringToSlice(name), nums, try legacy.searchOrder(comp.arena(), &comp.zcu));
+        } else {
+            var b = w.build(.lower, code, loc);
+            b.msg("{s}", .{ip.stringToSlice(message)});
+            if (note != .empty) b.note("{s}", .{ip.stringToSlice(note)});
+            if (help != .empty) b.help("{s}", .{ip.stringToSlice(help)});
+            try b.emit();
+        }
     }
     var own = try comp.wip.toOwnedBundle();
     defer own.deinit(comp.gpa);
-    try copyAs(&w, own, null);
+    try copyAs(&w, own, null, null);
     return w.toOwnedBundle();
 }
 
@@ -79,18 +105,38 @@ pub fn relocate(out: vams.Preprocessor.Output, start: u32, end: u32) Diag.Loc {
     return .{ .file = @fromBackingInt(@backingInt(s.file)), .start = from, .end = @max(from, to) };
 }
 
+/// Where Vir instruction `src` of unit `u` was written, as the old
+/// compiler located it: a statement `<+` at its target's first byte (no
+/// width), a call at its callee's name, anything else at its main token.
+pub fn instLoc(out: vams.Preprocessor.Output, u: *const Compilation.Unit, src: Inst.Ref) Diag.Loc {
+    const span = sema.locate.inst(&u.tree, &u.vir, src) orelse return .none;
+    const r = span.bytes(&u.tree);
+    return relocate(out, r.start, r.end);
+}
+
 // ---- private ----
+
+/// Where part `part` of instruction `src` was written (`sema.locate.part`).
+fn partLoc(out: vams.Preprocessor.Output, u: *const Compilation.Unit, src: Inst.Ref, part: sema.Zcu.Part) Diag.Loc {
+    const span = sema.locate.part(&u.tree, &u.vir, src, part) orelse return .none;
+    const r = span.bytes(&u.tree);
+    return relocate(out, r.start, r.end);
+}
 
 /// Every message of `d`, located in a unit's preprocessed text, into `w`.
 fn copy(w: *Diag.Wip, d: Diag, out: vams.Preprocessor.Output) Allocator.Error!void {
-    try copyAs(w, d, out);
+    try copyAs(w, d, out, null);
 }
 
 /// Copies each message of `d` with its labels and notes; with `out`, every
 /// location is a preprocessed-text range and moves to its original file.
-fn copyAs(w: *Diag.Wip, d: Diag, out: ?vams.Preprocessor.Output) Allocator.Error!void {
+fn copyAs(w: *Diag.Wip, d: Diag, out: ?vams.Preprocessor.Output, route: ?[]const u8) Allocator.Error!void {
     for (d.messages()) |i| {
         const m = d.message(i);
+        if (route) |t| if (legacy.byCode(m.tag.code)) {
+            try legacy.code(w, m.tag.code, move(out, m.loc), t[m.loc.start..m.loc.end]);
+            continue;
+        };
         var b = w.build(m.tag.stage, m.tag.code, move(out, m.loc));
         if (m.msg != .none) b.msg("{s}", .{d.string(m.msg)});
         if (m.point != .none) b.point("{s}", .{d.string(m.point)});
@@ -113,37 +159,4 @@ fn move(out: ?vams.Preprocessor.Output, loc: Diag.Loc) Diag.Loc {
 /// A stripped-text offset of `file` as an offset of its original bytes.
 fn source(out: vams.Preprocessor.Output, file: vams.Preprocessor.File.Index, offset: u32) u32 {
     return vams.Preprocessor.toSourceOffset(out.files[@backingInt(file)].marks, offset);
-}
-
-/// Where Vir instruction `src` of unit `u` was written, as the old
-/// compiler located it: a statement `<+` at its target's first byte (no
-/// width), a call at its callee's name, anything else at its main token.
-fn instLoc(out: vams.Preprocessor.Output, u: *const Compilation.Unit, src: Inst.Ref) Diag.Loc {
-    const i = src.toIndex() orelse return .none;
-    const tag = u.vir.instructions.items(.tag)[@backingInt(i)];
-    if (tag == .contrib or tag == .contrib_indirect) {
-        const at_payload = u.vir.instructions.items(.data)[@backingInt(i)].pl_node.payload_index;
-        const lhs = if (tag == .contrib) u.vir.extraData(Inst.Bin, at_payload).lhs else u.vir.extraData(Inst.Triple, at_payload).a;
-        const t = instToken(u, lhs) orelse return .none;
-        const at = u.tree.tokenStart(t);
-        return relocate(out, at, at);
-    }
-    const t = instToken(u, src) orelse return .none;
-    const at = u.tree.tokenStart(t);
-    return relocate(out, at, at + @as(u32, @intCast(u.tree.tokenSlice(t).len)));
-}
-
-/// The token instruction `ref` names: its main token, or for a call (whose
-/// main token is its `(`) the callee's name; null for a literal.
-fn instToken(u: *const Compilation.Unit, ref: Inst.Ref) ?vams.Ast.TokenIndex {
-    const i = ref.toIndex() orelse return null;
-    const data = u.vir.instructions.items(.data)[@backingInt(i)];
-    const tok: vams.Ast.TokenIndex = switch (Inst.dataKind(u.vir.instructions.items(.tag)[@backingInt(i)])) {
-        .pl_node => u.tree.nodeMainToken(data.pl_node.src_node),
-        .un_node => u.tree.nodeMainToken(data.un_node.src_node),
-        .decl_tok => data.decl_tok.src_tok,
-        .str_tok => data.str_tok.src_tok,
-        .int, .float, .str => return null,
-    };
-    return if (tok > 0 and u.tree.tokenTag(tok) == .l_paren) tok - 1 else tok;
 }

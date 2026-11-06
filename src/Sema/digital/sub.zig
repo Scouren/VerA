@@ -23,6 +23,7 @@ const vams = @import("vams");
 const std_sim = @import("std_sim");
 const digital = @import("../digital.zig");
 const decl = @import("decl.zig");
+const redecl = @import("redecl.zig");
 const vars = @import("vars.zig");
 const expr = @import("expr.zig");
 const place = @import("place.zig");
@@ -79,7 +80,8 @@ const depth_max: u32 = 1 << 12;
 pub fn declare(l: *Lower, f: u32, scope: u32, i: Inst.Index) Error!void {
     const vir = l.virOf(f);
     const s = Lower.payload(vir, Inst.Function, i);
-    if (s.flags.analog) return l.refuse("an analog function");
+    // VAMS §4.7 an analog function is the analog block's to call.
+    if (s.flags.analog) return if (l.options.mixed) {} else l.refuse("an analog function");
     const sc = try decl.newScope(l, scope, vir.string(s.name), null, l.b.times.items[scope], l.srcOffset(f, i), false);
     const own = try storage(l, f, sc, i);
     const row: u32 = @intCast(l.subs.items.len);
@@ -92,7 +94,7 @@ pub fn declare(l: *Lower, f: u32, scope: u32, i: Inst.Index) Error!void {
 /// §10.4.1 the type of function call `i`: its result's.
 pub fn resultType(l: *Lower, i: Inst.Index) Error!Type {
     const row = try callee(l, i);
-    if (!l.subs.items[row].function) return l.refuse("§10.4 a task called as a function");
+    if (!l.subs.items[row].function) return l.reject(l.frame, i.toRef(), "§10.2: a task is enabled as a statement, not called in an expression");
     return l.subs.items[row].result_ty;
 }
 
@@ -109,6 +111,7 @@ pub fn callRow(l: *Lower, i: Inst.Index) Error!u32 {
         o.* = .{ .in = none, .place = none, .ty = ty };
         if (dir != .output) o.in = try expr.evalFor(l, a, typeOfTy(ty));
         if (dir != .input) {
+            if (!place.isLvalue(l, a)) return l.rejectArg(l.frame, i, k, "§10.2.2: a task output actual must be a procedural lvalue");
             o.place = try place.place(l, a);
             o.ty = try l.tyOf(try place.targetType(l, a));
         }
@@ -126,7 +129,7 @@ pub fn callRow(l: *Lower, i: Inst.Index) Error!u32 {
 pub fn enable(l: *Lower, i: Inst.Index, depth: u32) Error!void {
     const row = try callee(l, i);
     const scope = l.frames.items[l.frame].scope;
-    if (l.subs.items[row].function) return l.refuse("§10.4 a function enabled as a task");
+    if (l.subs.items[row].function) return l.reject(l.frame, i.toRef(), "§10.4: a function is called in an expression, not enabled");
     if (!try timed(l, row)) {
         _ = try l.b.inst(.call, try callRow(l, i), 0, scope);
         return;
@@ -178,8 +181,14 @@ pub fn compileBodies(l: *Lower) Error!void {
     }
 }
 
-/// Writes `Program.subs`, one row per subroutine in declaration order.
+/// Writes `Program.subs`, one row per subroutine in declaration order. A
+/// timed task never enabled is compiled out of line first, never run, so
+/// its body is checked as lib/sim/digital checks every body.
 pub fn finish(l: *Lower) Error!void {
+    for (l.subs.items, 0..) |r, k| if (!r.function and r.entry == none and r.body == none and r.ranges.items.len == 0) {
+        l.frame = r.outer;
+        try outOfLine(l, @intCast(k), 0);
+    };
     const out = try l.a.alloc(Program.Sub, l.subs.items.len);
     for (l.subs.items, out) |r, *s| {
         assert(r.ranges.items.len % 2 == 0);
@@ -267,7 +276,7 @@ fn storage(l: *Lower, outer: u32, scope: u32, i: Inst.Index) Error!Storage {
             .io => Lower.payload(vir, Inst.Io, d).prev,
             .variable => blk: {
                 const v = Lower.payload(vir, Inst.Variable, d);
-                if (v.init.len != 0) return l.refuse("an initialized subroutine variable");
+                if (v.init.len != 0) return l.reject(outer, d.toRef(), "an initialized task or function variable is not implemented");
                 break :blk v.prev;
             },
             else => continue, // else: declared below, or a statement
@@ -276,6 +285,7 @@ fn storage(l: *Lower, outer: u32, scope: u32, i: Inst.Index) Error!Storage {
         if (!gop.found_existing) gop.value_ptr.* = .empty;
         try gop.value_ptr.append(l.a, d);
     }
+    for (later.values()) |decls| try redecl.check(l, outer, decls.items, .subroutine, .empty);
     for (later.keys(), later.values()) |d, decls| _ = try vars.variable(l, f, d, decls.items);
     for (all) |d| if (Lower.tag(vir, d) == .event) {
         _ = try vars.event(l, f, d);
@@ -289,6 +299,7 @@ fn storage(l: *Lower, outer: u32, scope: u32, i: Inst.Index) Error!Storage {
         try decl.preBlocks(l, f, s.body, 0);
     }
     const count: u32 = @as(u32, @intCast(l.b.p.slots.len)) - first;
+    if (s.flags.automatic) for (first..first + count) |k| try l.auto_slots.put(l.a, @intCast(k), {});
     for (all) |d| if (Lower.tag(vir, d) == .param) {
         _ = try vars.param(l, f, d);
     };
@@ -364,8 +375,11 @@ fn callee(l: *Lower, i: Inst.Index) Error!u32 {
 fn argsOf(l: *Lower, i: Inst.Index, r: Row) Error![]const Inst.Ref {
     const vir = l.virOf(l.frame);
     const args = vir.list(Inst.Ref, Lower.payload(vir, Inst.Call, i).args);
-    if (args.len != r.own.ports.len) return l.refuse("§10.2.2 a call with one argument per formal not given");
-    for (args) |a| if (a == .none) return l.refuse("§10.2.2 an omitted argument");
+    if (args.len != r.own.ports.len) {
+        const dv = l.virOf(r.outer);
+        return l.rejectFmt(l.frame, i.toRef(), "`{s}` takes {d} arguments, not {d}", .{ dv.string(Lower.payload(dv, Inst.Function, r.decl).name), r.own.ports.len, args.len });
+    }
+    for (args) |a| if (a == .none) return l.reject(l.frame, i.toRef(), "§10.2.2: null task arguments are not permitted");
     return args;
 }
 

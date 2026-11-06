@@ -59,10 +59,21 @@ pub fn check(ag: *AstGen, node: Node.Index) Error!void {
         output = AstGen.identText(tree, tree.nodeMainToken(d));
     };
     const first = AstGen.identText(tree, tree.nodeMainToken(ports[0]));
-    if (outputs != 1 or !std.mem.eql(u8, output orelse "", first))
-        try ag.report(.E1100, kw, "§8.1.1: a UDP has exactly one output port, and it is the first port", .{});
+    const is_first = std.mem.eql(u8, output orelse "", first);
+    if (outputs != 1 or !is_first) {
+        // Both old routes pointed at the keyword's first byte; the digital
+        // one said which half failed.
+        const at = tree.tokenStart(kw);
+        var b = ag.wip.build(.parse, .E1100, .{ .file = .root, .start = at, .end = at });
+        if (!ag.options.ieee1364) {
+            b.msg("§8.1.1: a UDP has exactly one output port, and it is the first port", .{});
+        } else if (outputs != 1) {
+            b.msg("§8.1.1: a UDP has exactly one output port", .{});
+        } else b.msg("§8.1.1: the output port shall be the first port of a UDP", .{});
+        try b.emit();
+    }
 
-    for (items) |it| if (tree.nodeTag(it) == .udp_table) try conflicts(ag, kw + 1, full.list(tree, it), ports.len - 1);
+    for (items) |it| if (tree.nodeTag(it) == .udp_table) try conflicts(ag, kw, full.list(tree, it), ports.len - 1);
 }
 
 // ---- private ----
@@ -84,8 +95,9 @@ fn headerOutput(tree: *const Ast, t: Ast.TokenIndex) bool {
 /// §8.1.4: two entries that overlap on every input (and the current state)
 /// and give different next states, `-` reading as the current state. A
 /// level entry and an edge entry never conflict (§8.8), nor do edge
-/// entries on different inputs. O(rows²), as the old check.
-fn conflicts(ag: *AstGen, name_tok: Ast.TokenIndex, entries: []const Node.Index, inputs: usize) Error!void {
+/// entries on different inputs. O(rows²), as the old check. Reported at
+/// `kw`, the `primitive` keyword, naming the UDP after it.
+fn conflicts(ag: *AstGen, kw: Ast.TokenIndex, entries: []const Node.Index, inputs: usize) Error!void {
     const rows = try ag.arena.alloc(Row, entries.len);
     var sequential = false;
     for (entries, rows, 0..) |e, *r, k| {
@@ -124,7 +136,7 @@ fn conflicts(ag: *AstGen, name_tok: Ast.TokenIndex, entries: []const Node.Index,
                 const out_a = if (a.output == '-') cur else std.ascii.toLower(a.output);
                 const out_b = if (b.output == '-') cur else std.ascii.toLower(b.output);
                 if (out_a == out_b) continue;
-                try ag.report(.E0248, name_tok, "`{s}`: entries {d} and {d} share an input combination and give it {c} and {c}", .{ AstGen.identText(ag.tree, name_tok), i + 1, j + 1, out_a, out_b });
+                try ag.report(.E0248, kw, "`{s}`: entries {d} and {d} share an input combination and give it {c} and {c}", .{ AstGen.identText(ag.tree, kw + 1), i + 1, j + 1, out_a, out_b });
                 break;
             }
         }

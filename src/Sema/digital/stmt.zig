@@ -141,7 +141,7 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
             if (e.event == .none) {
                 // §9.7.5 `@*`: every slot the statement reads.
                 var slots: std.ArrayList(u32) = .empty;
-                try bodyReads(l, e.body, &slots);
+                try place.bodyReads(l, e.body, &slots);
                 for (slots.items) |s| try terms.appendSlice(l.a, &.{ s, @backingInt(Program.Edge.any), 0, 0, none });
             } else try place.terms(l, e.event, &terms);
             _ = try l.b.inst(.wait_event, try l.b.extraOf(.{ .l = try l.b.listOf(terms.items) }), 0, scope);
@@ -158,6 +158,7 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
         },
         .store, .store_nb => {
             const s = Lower.payload(vir, Inst.Bin, i);
+            if (tg == .store_nb) try place.notAutomatic(l, s.lhs, "a nonblocking assignment");
             const target = try place.targetType(l, s.lhs);
             _ = try l.b.inst(if (tg == .store) .assign else .assign_nb, try place.place(l, s.lhs), try expr.evalFor(l, s.rhs, target), scope);
         },
@@ -170,7 +171,7 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
                 _ = try l.b.inst(.trigger_elem, try place.elemRow(l, s), 0, scope);
                 return;
             };
-            const n = (try expr.nameOf(l, r)) orelse return l.refuse("a trigger of no named event");
+            const n = (try expr.nameOf(l, r)) orelse return l.reject(l.frame, r, "§9.7.3: an event array takes an index, not a part-select");
             if (n.kind != .event) return l.refuse("§5.10.4 `->` of a variable or net");
             _ = try l.b.inst(.trigger, n.slot, 0, scope);
         },
@@ -196,7 +197,7 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
                 else => return l.refuse("a disable of a hierarchical name"),
             };
             const at = try l.b.inst(.disable_block, 0, 0, scope);
-            try l.disables.append(l.a, .{ .pc = at, .frame = l.frame, .name = name });
+            try l.disables.append(l.a, .{ .pc = at, .frame = l.frame, .name = name, .inst = i });
         },
         .ret, .brk, .cont => return l.refuse("return, break or continue"),
         .variable, .param, .event => {},
@@ -247,6 +248,10 @@ fn timedStore(l: *Lower, i: Inst.Index, depth: u32) Error!void {
     const t = Lower.payload(vir, Inst.Timed, i);
     const nb = Lower.tag(vir, i) == .store_nb_timed;
     const ti = t.timing.toIndex() orelse return l.refuse("an intra-assignment timing control of nothing");
+    if (nb) {
+        try place.notAutomatic(l, t.lhs, "a nonblocking assignment");
+        if (Lower.tag(vir, ti) != .delay_ctl) try place.readsNoAutomatic(l, t.timing, "a nonblocking assignment's event control");
+    }
     var delay: Inst.Ref = .none;
     var event: Inst.Ref = .none;
     var count: Inst.Ref = .none;
@@ -319,7 +324,7 @@ fn waitIntra(l: *Lower, event: Inst.Ref, value: Inst.Ref, target: Inst.Ref) Erro
     if (event == .none) {
         var slots: std.ArrayList(u32) = .empty;
         try expr.reads(l, value, &slots);
-        try indexReads(l, target, &slots);
+        try place.indexReads(l, target, &slots);
         for (slots.items) |s| try terms.appendSlice(l.a, &.{ s, @backingInt(Program.Edge.any), 0, 0, none });
     } else try place.terms(l, event, &terms);
     _ = try l.b.inst(.wait_event, try l.b.extraOf(.{ .l = try l.b.listOf(terms.items) }), 0, scope);
@@ -334,7 +339,7 @@ fn caseStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
     const scope = l.frames.items[l.frame].scope;
     const c = Lower.payload(vir, Inst.Case, i);
     const arms = vir.list(Inst.Arm, c.arms);
-    if (arms.len == 0) return l.refuse("§9.5 a case statement with no item");
+    if (arms.len == 0) return l.reject(l.frame, i.toRef(), "a case statement requires at least one item");
     var ty = try expr.typeValue(l, c.operand);
     for (arms) |arm| for (vir.list(Inst.Ref, arm.values)) |v| {
         ty = expr.common(ty, try expr.typeValue(l, v));
@@ -396,7 +401,7 @@ fn process(l: *Lower, p: Proc) Error!u32 {
                 else => unreachable, // else: `declare.items` records these two
             };
             const n = l.names.items[l.lookup(p.frame, prev.toIndex() orelse p.inst) orelse return l.refuse("an initialized declaration with no slot")];
-            if (n.dims.len != 0) return l.refuse("an initialized array");
+            if (n.dims.len != 0) return l.reject(p.frame, p.inst.toRef(), "an unpacked array declaration takes no initializer");
             if (n.kind != .variable) return l.refuse("an initialized net port");
             const init = vir.body(init_body);
             _ = try l.b.inst(.init_var, n.slot, try expr.evalFor(l, init[init.len - 1].toRef(), n.ty), scope);
@@ -468,71 +473,6 @@ fn statements(l: *Lower, b: Vir.Body) Error![]const Inst.Index {
         if (isStatement(tg)) try out.append(l.a, i);
     }
     return out.items;
-}
-
-/// The slots the index expressions of lvalue `r` read (not its targets).
-fn indexReads(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
-    const vir = l.virOf(l.frame);
-    const i = r.toIndex() orelse return;
-    switch (Lower.tag(vir, i)) {
-        .elem => {
-            const b = Lower.payload(vir, Inst.Bin, i);
-            try indexReads(l, b.lhs, out);
-            try expr.reads(l, b.rhs, out);
-        },
-        .slice, .slice_up, .slice_down => {
-            const t = Lower.payload(vir, Inst.Triple, i);
-            try indexReads(l, t.a, out);
-            try expr.reads(l, t.b, out);
-            try expr.reads(l, t.c, out);
-        },
-        .concat => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |x| try indexReads(l, x, out),
-        else => {}, // else: a name, whose slot is written, not read
-    }
-}
-
-/// Every slot the statements of body `b` read (§9.7.5's `@*`).
-fn bodyReads(l: *Lower, b: Vir.Body, out: *std.ArrayList(u32)) Error!void {
-    const vir = l.virOf(l.frame);
-    for (vir.body(b)) |i| switch (Lower.tag(vir, i)) {
-        .store, .store_nb => {
-            const s = Lower.payload(vir, Inst.Bin, i);
-            try expr.reads(l, s.rhs, out);
-            // §9.7.5 the target's index expressions are read too.
-            try indexReads(l, s.lhs, out);
-        },
-        .condbr => {
-            const c = Lower.payload(vir, Inst.CondBr, i);
-            try expr.reads(l, c.cond, out);
-            try bodyReads(l, c.then, out);
-            try bodyReads(l, c.@"else", out);
-        },
-        .block => try bodyReads(l, Lower.payload(vir, Inst.Block, i).body, out),
-        .case => {
-            const c = Lower.payload(vir, Inst.Case, i);
-            try expr.reads(l, c.operand, out);
-            for (vir.list(Inst.Arm, c.arms)) |arm| {
-                for (vir.list(Inst.Ref, arm.values)) |v| try expr.reads(l, v, out);
-                try bodyReads(l, arm.body, out);
-            }
-        },
-        .call_sys => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.SysCall, i).args)) |a| try expr.reads(l, a, out),
-        // A nested `@` suspends on its own terms; its statement's reads join.
-        .event_wait => try bodyReads(l, Lower.payload(vir, Inst.EventWait, i).body, out),
-        .loop => {
-            const lp = Lower.payload(vir, Inst.Loop, i);
-            const cond = vir.body(lp.cond);
-            if (cond.len != 0) try expr.reads(l, cond[cond.len - 1].toRef(), out);
-            try bodyReads(l, lp.body, out);
-            try bodyReads(l, lp.step, out);
-        },
-        .repeat => {
-            const r = Lower.payload(vir, Inst.Repeat, i);
-            try expr.reads(l, r.count, out);
-            try bodyReads(l, r.body, out);
-        },
-        else => if (isStatement(Lower.tag(vir, i))) return l.refuseFmt("the slots `@*` reads in `{t}`", .{Lower.tag(vir, i)}),
-    };
 }
 
 /// Adds every operand `i` reads to `used`.

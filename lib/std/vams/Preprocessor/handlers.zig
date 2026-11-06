@@ -34,8 +34,8 @@ pub fn defaultDiscipline(pp: *Pass, rest: []const u8, off: usize) Error!void {
     const word = if (disc.len == 0) "" else r.ident() orelse "";
     const qual = std.meta.stringToEnum(events.Qualifier, word);
     if (word.len != 0 and qual == null)
-        return pp.fail(pp.spanAt(off + r.i - word.len, off + r.i), "E0127", "`{s}` is not a qualifier", .{word});
-    try expectEnd(pp, &r, off, "E0127", "qualifier");
+        return pp.failNoted(pp.spanAt(off + r.i - word.len, off + r.i), "E0127", "`{s}` is not a qualifier", .{word}, &.{"Syntax 10-1 allows one of: integer, real, reg, wreal, wire, tri, wand, triand, wor, trior, trireg, tri0, tri1, supply0, supply1"});
+    try expectEnd(pp, &r, off, "E0127", "qualifier", "Syntax 10-1 is `default_discipline [ discipline_identifier [ qualifier ] ], and nothing more");
     try pp.events.disciplines.append(pp.arena, .{ .at = @intCast(pp.out.items.len), .qualifier = qual, .discipline = disc });
 }
 
@@ -53,7 +53,7 @@ pub fn defaultTransition(pp: *Pass, rest: []const u8, off: usize) Error!void {
     while (r.i < r.s.len and !scan.isSpace(r.s[r.i])) r.i += 1;
     const text = r.s[start..r.i];
     if (text.len == 0)
-        return pp.fail(pp.spanAt(off, off + r.s.len), "E0129", "`default_transition needs a transition time and this one has none", .{});
+        return pp.failNoted(pp.spanAt(off, off + r.s.len), "E0129", "`default_transition needs a transition time and this one has none", .{}, &.{"Syntax 10-2 is `default_transition transition_time, and the operand is not optional"});
     // One signed §2.6 number token: `parseFloat` alone also reads C's
     // `0x10`, `1.` and `_1`.
     const num = if (text[0] == '+' or text[0] == '-') text[1..] else text;
@@ -61,7 +61,7 @@ pub fn defaultTransition(pp: *Pass, rest: []const u8, off: usize) Error!void {
     // §4.5.8: a time; a negative one finishes before it starts.
     if (t == null or !(t.? >= 0.0) or !std.math.isFinite(t.?))
         return pp.fail(pp.spanAt(off + start, off + r.i), "E0129", "`{s}` is not a transition time", .{text});
-    try expectEnd(pp, &r, off, "E0129", "transition time");
+    try expectEnd(pp, &r, off, "E0129", "transition time", "Syntax 10-2 is `default_transition transition_time, and nothing more");
     try pp.mark(&pp.events.transitions, t);
 }
 
@@ -74,16 +74,16 @@ pub fn timescale(pp: *Pass, rest: []const u8, off: usize) Error!void {
     // Marked null first and filled in on success.
     try pp.mark(&pp.events.timescales, null);
     var r: Rest = .{ .s = rest };
-    const unit = timeLiteral(&r) orelse return badTimescale(pp, off, &r);
+    const unit = timeLiteral(&r) orelse return badTimescale(pp, off, &r, "a Table 19-1 time unit");
     r.skipSpace();
-    if (r.peek() != '/') return badTimescale(pp, off, &r);
+    if (r.peek() != '/') return badTimescale(pp, off, &r, "`/` and then the time precision");
     r.i += 1;
-    const precision = timeLiteral(&r) orelse return badTimescale(pp, off, &r);
+    const precision = timeLiteral(&r) orelse return badTimescale(pp, off, &r, "a Table 19-1 time precision");
     // "The time precision shall be at least as precise as the time unit".
     if (precision > unit)
-        return pp.fail(pp.spanAt(off, off + r.s.len), "E0142", "the time precision is coarser than the time unit", .{});
+        return pp.failNoted(pp.spanAt(off, off + r.s.len), "E0142", "the time precision is coarser than the time unit", .{}, &.{"§19.8: \"The time precision shall be at least as precise as the time unit\""});
     r.skipSpace();
-    if (r.i < r.s.len) return badTimescale(pp, off, &r);
+    if (r.i < r.s.len) return badTimescale(pp, off, &r, "nothing more");
     pp.events.timescales.items[before].value = .{ .unit = unit, .precision = precision };
 }
 
@@ -94,9 +94,12 @@ pub fn defaultNettype(pp: *Pass, rest: []const u8, off: usize) Error!void {
     defer assert(pp.events.nettypes.items.len <= before + 1);
     var r: Rest = .{ .s = rest };
     const word = r.ident() orelse "";
-    const value = std.meta.stringToEnum(events.NetType, word) orelse
-        return pp.fail(pp.spanAt(off, off + r.s.len), "E0140", "`{s}` is not a net type", .{word});
-    try expectEnd(pp, &r, off, "E0140", "net type");
+    const value = std.meta.stringToEnum(events.NetType, word) orelse {
+        const note: []const []const u8 = &.{"§19.2 allows one of: wire, tri, tri0, tri1, wand, triand, wor, trior, trireg, uwire, none"};
+        if (word.len == 0) return pp.failNoted(pp.spanAt(off, off + r.s.len), "E0140", "`default_nettype needs a net type and this one has none", .{}, note);
+        return pp.failNoted(pp.spanAt(off, off + r.s.len), "E0140", "`{s}` is not a net type", .{word}, note);
+    };
+    try expectEnd(pp, &r, off, "E0140", "net type", "§19.2 is `default_nettype default_nettype_value, and nothing more");
     try pp.mark(&pp.events.nettypes, value);
 }
 
@@ -112,9 +115,12 @@ pub fn unconnectedDrive(pp: *Pass, rest: []const u8, off: usize) Error!void {
         .pull0
     else if (std.mem.eql(u8, word, "pull1"))
         .pull1
-    else
-        return pp.fail(pp.spanAt(off, off + r.s.len), "E0141", "`{s}` is not a pull value", .{word});
-    try expectEnd(pp, &r, off, "E0141", "pull value");
+    else {
+        const note: []const []const u8 = &.{"§19.9 is `unconnected_drive pull1 | pull0; the form with no operand is `nounconnected_drive"};
+        if (word.len == 0) return pp.failNoted(pp.spanAt(off, off + r.s.len), "E0141", "`unconnected_drive needs a pull value and this one has none", .{}, note);
+        return pp.failNoted(pp.spanAt(off, off + r.s.len), "E0141", "`{s}` is not a pull value", .{word}, note);
+    };
+    try expectEnd(pp, &r, off, "E0141", "pull value", "§19.9 takes one operand and nothing more");
     try pp.mark(&pp.events.drives, value);
 }
 
@@ -170,17 +176,22 @@ pub fn line(pp: *Pass, rest: []const u8, at: usize, off: usize) Error!void {
 
 // ---- private ----
 
-fn badTimescale(pp: *Pass, off: usize, r: *const Rest) Error {
+/// E0142 naming what §19.8's grammar wanted. `r.i` is undefined after a
+/// failed `timeLiteral`, so the span is the whole operand list.
+fn badTimescale(pp: *Pass, off: usize, r: *const Rest, wanted: []const u8) Error {
+    assert(wanted.len > 0);
     const wrote = std.mem.trim(u8, r.s, " \t\r");
-    return pp.fail(pp.spanAt(off, off + r.s.len), "E0142", "`{s}` is not a `timescale <time_unit>/<time_precision>", .{wrote});
+    const notes = try pp.arena.dupe([]const u8, &.{ try pp.arena.print("§19.8 is `timescale <time_unit>/<time_precision>; here it wanted {s}", .{wanted}), "each operand is 1, 10 or 100 glued to one of s ms us ns ps fs" });
+    if (wrote.len == 0) return pp.failNoted(pp.spanAt(off, off + r.s.len), "E0142", "`timescale has no operands", .{}, notes);
+    return pp.failNoted(pp.spanAt(off, off + r.s.len), "E0142", "`{s}` is not a `timescale", .{wrote}, notes);
 }
 
 /// Fails with `code` if anything but white space is left on the line: the
-/// operand, named by `what`, is the last thing its syntax allows.
-fn expectEnd(pp: *Pass, r: *Rest, off: usize, comptime code: []const u8, what: []const u8) Error!void {
+/// operand, named by `what`, is the last thing `syntax` (the note) allows.
+fn expectEnd(pp: *Pass, r: *Rest, off: usize, comptime code: []const u8, what: []const u8, comptime syntax: []const u8) Error!void {
     r.skipSpace();
     if (r.i == r.s.len) return;
-    return pp.fail(pp.spanAt(off + r.i, off + r.s.len), code, "`{s}` follows the {s}", .{ std.mem.trim(u8, r.s[r.i..], " \t\r"), what });
+    return pp.failNoted(pp.spanAt(off + r.i, off + r.s.len), code, "`{s}` follows the {s}", .{ std.mem.trim(u8, r.s[r.i..], " \t\r"), what }, &.{syntax});
 }
 
 /// Reads one Table 19-1 time literal (`1`, `10` or `100` glued to one of

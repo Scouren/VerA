@@ -83,18 +83,35 @@ const Tally = struct {
 // ---- private ----
 
 /// Every netlist under `tests/`, sorted by key (`Dir.walk` order is
-/// undefined).
+/// undefined). A worktree's `tests/conformance` is a symlink to the main
+/// checkout's (docs/rewrite/README.md), which `Dir.walk` does not follow, so
+/// it is walked as its own root under the same keys.
 fn collect(a: Allocator, io: std.Io, tests_root: []const u8) ![]const Case {
-    var dir = try std.Io.Dir.cwd().openDir(io, tests_root, .{ .iterate = true });
+    var list: std.ArrayList(Case) = .empty;
+    try collectRoot(a, io, &list, tests_root, "");
+    std.mem.sort(Case, list.items, {}, struct {
+        fn lt(_: void, x: Case, y: Case) bool {
+            return std.mem.lessThan(u8, x.key, y.key);
+        }
+    }.lt);
+    return list.items;
+}
+
+fn collectRoot(a: Allocator, io: std.Io, list: *std.ArrayList(Case), tests_root: []const u8, prefix: []const u8) !void {
+    const root = try std.fs.path.join(a, &.{ tests_root, prefix });
+    var dir = try std.Io.Dir.cwd().openDir(io, root, .{ .iterate = true });
     defer dir.close(io);
     var walker = try dir.walk(a);
     defer walker.deinit();
-    var list: std.ArrayList(Case) = .empty;
     while (try walker.next(io)) |entry| {
+        if (entry.kind == .sym_link and prefix.len == 0 and std.mem.eql(u8, entry.path, "conformance")) {
+            try collectRoot(a, io, list, tests_root, "conformance");
+            continue;
+        }
         if (entry.kind != .file) continue;
         const ext = std.fs.path.extension(entry.path);
-        const path = try std.fs.path.join(a, &.{ tests_root, entry.path });
-        const key = try a.dupe(u8, entry.path);
+        const key = try std.fs.path.join(a, &.{ prefix, entry.path });
+        const path = try std.fs.path.join(a, &.{ tests_root, key });
         if (isAny(ext, &.{ ".sp", ".inc", ".lib", ".spice", ".cir" })) {
             try list.append(a, .{ .key = key, .text = try readText(io, .cwd(), path, a), .path = path });
         } else if (isAny(ext, &.{ ".va", ".vams", ".v" })) {
@@ -102,12 +119,6 @@ fn collect(a: Allocator, io: std.Io, tests_root: []const u8) ![]const Case {
             if (cards.len != 0) try list.append(a, .{ .key = key, .text = cards, .path = path });
         }
     }
-    std.mem.sort(Case, list.items, {}, struct {
-        fn lt(_: void, x: Case, y: Case) bool {
-            return std.mem.lessThan(u8, x.key, y.key);
-        }
-    }.lt);
-    return list.items;
 }
 
 fn isAny(ext: []const u8, set: []const []const u8) bool {

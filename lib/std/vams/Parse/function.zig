@@ -67,12 +67,12 @@ pub fn parseFunction(p: *Parse) Error!Node.Index {
             _ = try p.skipAttributes();
             switch (p.tokenTag(p.tok_i)) {
                 .keyword_input, .keyword_output, .keyword_inout => |d| {
-                    if (input_only and d != .keyword_input) try p.warn(.invalid_port_declaration);
+                    if (input_only and d != .keyword_input) try p.warnSite(.invalid_port_declaration, .function_input_only, p.tok_i, 0);
                     try p.push(try decl.parsePortDecl(p, header));
                 },
                 else => {
                     // A.2.6/A.2.7: a 1364 list opens with a direction.
-                    if (p.discrete and !analog and entry == 0) try p.warn(.invalid_port_declaration);
+                    if (p.discrete and !analog and entry == 0) try p.warnSite(.invalid_port_declaration, .tf_port_list_direction, p.tok_i, 0);
                     const name = try p.expectIdent();
                     try p.push(try p.addNode(.declarator, name, .{ .extra_and_opt_node = .{ try p.addExtra(try p.listToSpan(&.{})), .none } }));
                 },
@@ -95,7 +95,7 @@ pub fn parseFunction(p: *Parse) Error!Node.Index {
         const before = p.tok_i;
         const item = switch (t) {
             .keyword_input, .keyword_output, .keyword_inout => port: {
-                if (input_only and t != .keyword_input) try p.warn(.invalid_port_declaration);
+                if (input_only and t != .keyword_input) try p.warnSite(.invalid_port_declaration, .function_input_only, p.tok_i, 0);
                 break :port decl.parsePortDecl(p, body);
             },
             .keyword_parameter, .keyword_localparam, .keyword_integer, .keyword_real, .keyword_string, .keyword_realtime, .keyword_time => decl.parseBlockDecl(p),

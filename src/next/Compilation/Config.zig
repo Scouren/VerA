@@ -50,6 +50,9 @@ event_budget: u64 = 10_000_000,
 negative_timing: bool = false,
 /// What the compilation builds.
 target: Target = .lint,
+/// `--validate-contract`: an `--emit-exe`/`--run` runner declares
+/// `vera_validate_contract`, which turns the contract's checks on.
+validate_contract: bool = false,
 /// `--check` beside another target (`--emit-zig -o x --check`).
 check: bool = false,
 /// `--emit-zig` or `-o` beside `--check`/`--emit-so`: the device text too.

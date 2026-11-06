@@ -33,6 +33,8 @@ const place = @import("place.zig");
 const sysfn = @import("sysfn.zig");
 const sub = @import("sub.zig");
 const hier = @import("hier.zig");
+const domain = @import("domain.zig");
+const ports = @import("ports.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -77,7 +79,7 @@ pub fn typeOf(l: *Lower, r: Inst.Ref) Error!Type {
         },
         .pos, .neg, .bit_not => blk: {
             const t = try typeValue(l, data.un_node.operand);
-            if (t.real and Lower.tag(vir, i) == .bit_not) return l.refuse("~ of a real");
+            if (t.real and Lower.tag(vir, i) == .bit_not) return l.reject(l.frame, r, "§5.1.1: this operator does not take a real operand");
             break :blk t;
         },
         .not, .red_and, .red_nand, .red_or, .red_nor, .red_xor, .red_xnor => blk: {
@@ -89,7 +91,7 @@ pub fn typeOf(l: *Lower, r: Inst.Ref) Error!Type {
             const b = Lower.payload(vir, Inst.Bin, i);
             const x = try typeValue(l, b.lhs);
             const y = try typeValue(l, b.rhs);
-            if ((x.real or y.real) and Lower.tag(vir, i) != .add and Lower.tag(vir, i) != .sub and Lower.tag(vir, i) != .mul and Lower.tag(vir, i) != .div) return l.refuse("a real operand of %, a bitwise or a shift operator");
+            if ((x.real or y.real) and Lower.tag(vir, i) != .add and Lower.tag(vir, i) != .sub and Lower.tag(vir, i) != .mul and Lower.tag(vir, i) != .div) return l.reject(l.frame, r, "§5.1.1: this operator does not take a real operand");
             break :blk common(x, y);
         },
         .pow => blk: {
@@ -109,7 +111,7 @@ pub fn typeOf(l: *Lower, r: Inst.Ref) Error!Type {
             const b = Lower.payload(vir, Inst.Bin, i);
             const x = try typeValue(l, b.lhs);
             const y = try typeValue(l, b.rhs);
-            if ((x.real or y.real) and (Lower.tag(vir, i) == .case_eq or Lower.tag(vir, i) == .case_neq)) return l.refuse("=== of a real");
+            if ((x.real or y.real) and (Lower.tag(vir, i) == .case_eq or Lower.tag(vir, i) == .case_neq)) return l.reject(l.frame, r, "§5.1.1: this operator does not take a real operand");
             break :blk .{ .width = 1, .signed = false };
         },
         .ternary => blk: {
@@ -120,15 +122,15 @@ pub fn typeOf(l: *Lower, r: Inst.Ref) Error!Type {
         .mintypmax => typeValue(l, Lower.payload(vir, Inst.Triple, i).b),
         .elem, .slice, .slice_up, .slice_down => blk: {
             const s = try place.selectOf(l, i);
-            if (s.name.kind == .event) return l.refuse("a named event element read as a value");
+            if (s.name.kind == .event) return l.reject(l.frame, r, "§9.7.3: a named event holds no data; it can only be triggered and waited on");
             break :blk s.ty;
         },
         .concat => blk: {
             var width: u32 = 0;
-            for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |arg| {
+            for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i)), 0..) |arg, k| {
                 const t = try typeOf(l, arg);
                 if (t.real) return l.refuse("a real concatenation operand");
-                if (try unsized(l, arg)) return l.refuse("an unsized concatenation operand");
+                if (try unsized(l, arg)) return l.rejectOperand(l.frame, arg, i, @intCast(k), "unsized constant numbers are not allowed as concatenation operands");
                 width = std.math.add(u32, width, t.width) catch return l.refuse("a concatenation past 2^32 bits");
             }
             if (width == 0) return l.refuse("a concatenation of zero width");
@@ -141,7 +143,7 @@ pub fn typeOf(l: *Lower, r: Inst.Ref) Error!Type {
             break :blk .{ .width = std.math.mul(u32, count, operand.width) catch return l.refuse("a replication past 2^32 bits"), .signed = false };
         },
         .call_sys => sysfn.sysType(l, i),
-        .call => sub.resultType(l, i),
+        .call => if (domain.isProbe(l, i)) Type.real_type else sub.resultType(l, i),
         else => l.refuseFmt("the expression form `{t}`", .{Lower.tag(vir, i)}),
     };
 }
@@ -259,7 +261,7 @@ pub fn ctx(l: *Lower, r: Inst.Ref, ty: Type) Error!u32 {
         .replicate => {
             const b = Lower.payload(vir, Inst.Bin, i);
             const count = try replication(l, b.lhs);
-            if (count == 0) return l.refuse("a zero replication outside a concatenation");
+            if (count == 0) return l.reject(l.frame, r, "zero replication requires an immediately enclosing concatenation with a positive-width operand");
             return l.b.expr(.replicate, t, try self_(l, b.rhs, 0), count);
         },
         .call_sys => return sysfn.sysCall(l, i, t, nat),
@@ -311,7 +313,7 @@ pub fn real(l: *Lower, r: Inst.Ref) Error!u32 {
         },
         .elem => {
             const s = try place.selectOf(l, i);
-            if (!s.whole_elem) return l.refuse("a select of a real");
+            if (!s.whole_elem) return l.reject(l.frame, r, "§4.8: a real has no bits to select");
             return l.b.expr(.elem, rt, try place.elemRow(l, s), 0);
         },
         .pos => return real(l, data.un_node.operand),
@@ -333,7 +335,7 @@ pub fn real(l: *Lower, r: Inst.Ref) Error!u32 {
         },
         .mintypmax => return real(l, Lower.payload(vir, Inst.Triple, i).b),
         .call_sys => return sysfn.sysReal(l, i),
-        .call => return l.b.expr(.call, rt, try sub.callRow(l, i), 0),
+        .call => return if (domain.isProbe(l, i)) domain.probe(l, i) else l.b.expr(.call, rt, try sub.callRow(l, i), 0),
         else => return l.refuseFmt("the real expression form `{t}`", .{tg}),
     }
 }
@@ -367,7 +369,8 @@ pub fn reads(l: *Lower, r: Inst.Ref, out: *std.ArrayList(u32)) Error!void {
         },
         .concat => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Refs, i))) |x| try reads(l, x, out),
         .call_sys => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.SysCall, i).args)) |x| try reads(l, x, out),
-        .call => for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Call, i).args)) |x| try reads(l, x, out),
+        // A probe reads the analog solution, no slot (the host's to watch).
+        .call => if (!domain.isProbe(l, i)) for (vir.list(Inst.Ref, Lower.payload(vir, Inst.Call, i).args)) |x| try reads(l, x, out),
         else => return l.refuseFmt("the slots read by `{t}`", .{Lower.tag(vir, i)}),
     }
 }
@@ -391,7 +394,7 @@ pub fn constant(l: *Lower, v: Literal, ty: Type) Error!u32 {
 /// `typeOf`, refused for a zero replication outside a concatenation.
 pub fn typeValue(l: *Lower, r: Inst.Ref) Error!Type {
     const t = try typeOf(l, r);
-    if (t.width == 0) return l.refuse("a zero replication outside a concatenation");
+    if (t.width == 0) return l.reject(l.frame, r, "zero replication requires an immediately enclosing concatenation with a positive-width operand");
     return t;
 }
 
@@ -409,6 +412,19 @@ pub fn declName(l: *Lower, d: Inst.Index) Error!Name {
 /// net of its instance, or a §12.5 hierarchical `field`) is bound to from
 /// `Lower.frame`.
 pub fn leafName(l: *Lower, i: Inst.Index) Error!Name {
+    // VAMS §7.8.5.1 a bridged primitive terminal is its bridge's segment
+    // (its lane's, for an array whose lanes take one each).
+    if (l.segment_refs.count() != 0) {
+        const key: digital.SegmentRef = .{ .instance = @backingInt(l.frames.items[l.frame].instance), .inst = i };
+        // Outside a lane (a type query) any lane's: every segment is 1 bit.
+        const lane = if (l.lane_split.contains(key) and l.gate_lane != none) l.gate_lane else 0;
+        if (l.segment_refs.get(.{ .instance = key.instance, .inst = i, .lane = lane })) |b| {
+            const seg = try ports.segment(l, b, 1);
+            // §7.9 a gate's input is a receiver: it reads the receivers' net.
+            if (l.gate_lane != none) if (l.receivers.get(seg.net)) |rx| return rx;
+            return seg;
+        }
+    }
     const vir = l.virOf(l.frame);
     const data = vir.instructions.items(.data)[@backingInt(i)];
     if (Lower.tag(vir, i) == .decl_ref) return declName(l, data.decl_tok.decl);

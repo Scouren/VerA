@@ -53,8 +53,6 @@ pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Erro
     };
     const info = SysFn.get(tag);
     if (try refuseContext(s, b, tag, src)) return expr.poison;
-    // §9.5.4/§9.12 a reader assigns its destinations.
-    if (readFrom(tag)) |first| return @import("string.zig").read(s, b, tag, first, args, src);
     // Each of these judges its own argument list, with its clause's codes.
     switch (tag) {
         .white_noise, .flicker_noise, .noise_table, .noise_table_log, .ac_stim => return @import("op.zig").noise(s, b, tag, args, src),
@@ -63,9 +61,11 @@ pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Erro
     // §9.13 a distribution judges its own arity, as E0816.
     if (info.family == .random) return @import("dist.zig").lower(s, b, tag, args, src);
     if (!info.args.admits(args.len)) {
-        try s.fail(.E0506, b.unit.file, src, "`{s}` takes {d} to {d}, given {d}", .{ name, info.args.min, info.args.max, args.len });
+        try arity(s, b, tag, args.len, src);
         return expr.poison;
     }
+    // §9.5.4/§9.12 a reader assigns its destinations.
+    if (readFrom(tag)) |first| return @import("string.zig").read(s, b, tag, first, args, src);
     switch (info.family) {
         .math => return math(s, b, info.math.?, args, src),
         .display, .file_out, .simctl, .string => {
@@ -109,6 +109,11 @@ pub fn task(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error
     };
     const info = SysFn.get(tag);
     if (try refuseContext(s, b, tag, src)) return;
+    switch (info.family) {
+        // Judged in `lower`, each with its clause's code.
+        .math, .analog_op, .kernel, .random => {},
+        else => if (!info.args.admits(args.len)) return arity(s, b, tag, args.len, src),
+    }
     if (tag == .@"$sformat" or tag == .@"$swrite") return @import("string.zig").write(s, b, tag, args, src);
     if (readFrom(tag)) |first| {
         _ = try @import("string.zig").read(s, b, tag, first, args, src);
@@ -170,6 +175,18 @@ pub fn finishDisplays(s: *Sema, b: *Block) Allocator.Error!void {
 }
 
 // ---- private ----
+
+/// A call of `tag` with `n` arguments, which its row does not admit: a
+/// §4.3 function or §4.5 operator is E0506, any other system call E0887
+/// (the old `checkArity`).
+fn arity(s: *Sema, b: *Block, tag: SysFn.Tag, n: usize, src: Inst.Ref) Allocator.Error!void {
+    const a = SysFn.get(tag).args;
+    assert(!a.admits(n));
+    switch (SysFn.get(tag).family) {
+        .math, .analog_op => try s.fail(.E0506, b.unit.file, src, "`{t}` takes {d} to {d}, given {d}", .{ tag, a.min, a.max, n }),
+        else => try s.fail(.E0887, b.unit.file, src, "`{t}` takes {d} to {d} arguments, got {d}", .{ tag, a.min, a.max, n }),
+    }
+}
 
 /// A print operand's value; a null argument is §9.4.1's space.
 fn printArg(s: *Sema, b: *Block, a: Inst.Ref) Allocator.Error!Value {

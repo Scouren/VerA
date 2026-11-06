@@ -17,7 +17,7 @@
 //! - `pub const KeywordSet`
 //! - `pub const ParseOptions = struct`
 //! - `pub const Node = struct`: `Node.Tag`, `Node.Data`, `Node.Index` (`toOptional`), `Node.OptionalIndex`, `Node.SubRange`, and the extra payloads `Module`, `Decl`, `NetDecl`, `ParamAssign`, `ValueRange`, `Branch`, `Instantiation`, `Instance`, `GateInstance`, `Function`, `Udp`, `Insertion`, `For`, `If`, `Timed`, `Indirect`, `MinTypMax`, `Ternary`, `Pair`, `Path`
-//! - `pub const Error = struct` (`Error.Tag`)
+//! - `pub const Error = struct` (`Error.Tag`, `Error.Site`)
 //! - `pub const full`, `pub const parse_errors` (`report`, `code`)
 //! - `pub fn parse(gpa: Allocator, source: [:0]const u8, options: ParseOptions) Allocator.Error!Ast`
 //! - `pub fn deinit(tree: *Ast, gpa: Allocator) void`
@@ -77,6 +77,9 @@ pub const ParseOptions = struct {
     /// error (IEEE 1364-2005 annex A has no production for it). Under a
     /// Verilog-AMS set a null statement is no `analog_statement` (A.6.4).
     keywords: KeywordSet = .vams_2023,
+    /// An IEEE 1364 design (a `.v`, the old digital route) under any
+    /// language: statements are A.6's, as under a 1364 set.
+    discrete: bool = false,
 };
 
 /// One row of the node table, 13 bytes SoA: what it is, the token it is
@@ -437,6 +440,148 @@ pub const Error = struct {
     tag: Tag,
     token: TokenIndex,
     extra: union { none: void, expected_tag: Token.Tag } = .{ .none = {} },
+    /// Which rule of `tag` refused, where its report names it
+    /// (`parse_errors`); `.generic` otherwise.
+    site: Site = .generic,
+    /// What the site's report names beside `token`: a token (a timing
+    /// check's name) or packed counts; the site's doc says which.
+    arg: u32 = 0,
+
+    /// The rules a coarse `Tag` covers whose reports differ.
+    pub const Site = enum(u8) {
+        generic,
+        /// A.7.1: `pulsestyle_*` / `*showcancelled` list in parentheses.
+        specify_list_parenthesized,
+        /// §14.2.4.1 Table 14-1: an operator a state-dependent path's
+        /// condition may not use.
+        specify_condition_operator,
+        /// A.7.1: a token that begins no specify item.
+        specify_item,
+        /// A.7.2: no `=>` or `*>` after the path's inputs.
+        specify_path_arrow,
+        /// Syntax 14-4: polarity before the arrow of an edge-sensitive path.
+        specify_polarity_placement,
+        /// Syntax 14-5: `ifnone` with an edge-sensitive path.
+        specify_ifnone_edge,
+        /// A.7.2: `=>` with a list; `arg` is sources << 16 | destinations.
+        specify_parallel_list,
+        /// A.7.4: a delay count other than 1, 2, 3, 6, 12; `arg` the count.
+        specify_delay_count,
+        /// A.7.5.1: a system name that is no timing check.
+        specify_timing_check_name,
+        /// §15.3.4: `$width`'s threshold or notifier left null.
+        specify_width_null,
+        /// A.7.5.3: `$period`/`$width` reference event without a control;
+        /// `arg` the check's name token.
+        specify_event_control,
+        /// A.7.5.2: a notifier that is no variable name; `arg` the name token.
+        specify_notifier,
+        /// A.7.5.1: the argument count; `arg` is n | min << 8 | max << 16.
+        specify_arity,
+        /// A.7.5.3: an edge descriptor outside the table; `arg` the token
+        /// after it.
+        specify_edge_descriptor,
+        /// A.2.1.2: `reg`/`integer`/`time` on a port that is no `output`.
+        port_variable_type,
+        /// A.2.6: an analog function formal's type; `arg` its direction token.
+        port_analog_typed,
+        /// A.2.6: a digital function formal that is no `input`.
+        function_input_only,
+        /// A.2.7: a task or function port list that opens with a name.
+        tf_port_list_direction,
+        /// A.1.3: a port declaration after a `list_of_ports` port.
+        port_after_list,
+        /// A.2.1.3: two net types in one declaration.
+        net_two_types,
+        /// §4.3.2: `scalared`/`vectored` with no range.
+        net_advised_no_range,
+        /// A.2.1.3: the range after the delay.
+        net_range_after_delay,
+        /// §3.6.3.2: initialized and plain names mixed; `arg` 1 when this
+        /// name has the initializer.
+        net_mixed_init,
+        /// §4.4: a drive strength with no assignment.
+        net_drive_no_init,
+        /// A.2.1.3: a charge strength on a net that is no `trireg`.
+        charge_strength_net,
+        /// A.2.2.2: a charge strength word that is none.
+        charge_strength_word,
+        /// §6.1.4: a drive strength not one 0-side and one 1-side.
+        strength_sides,
+        /// §6.1.4: both drive strengths high impedance.
+        strength_highz,
+        /// A.3.2: a pull gate's single strength on the other side; `arg` 1
+        /// for `pullup`.
+        strength_single,
+        /// A.3.1: a gate's terminal count; `arg` the gate keyword's token.
+        gate_count,
+        /// A.3.3: a gate output that is no net_lvalue.
+        gate_output,
+        /// A.4.1.1: a module instance with no name; `arg` its terminal count.
+        instance_unnamed,
+        /// A.4.1: ordered and named parameter assignments in one list.
+        param_list_mixed,
+        /// A.2.2.3: a delay's list not closed by `)` after its last value.
+        delay_close,
+        /// A.2.5: `from` with a bare value, which only `exclude` takes.
+        value_range_bare_from,
+        /// A.9.1: a keyword as an attribute name.
+        attr_keyword_name,
+        /// A.1.6: a parent nature access that is no `potential`/`flow`.
+        nature_parent_access,
+        /// A.1.7: a domain that is no `continuous`/`discrete`.
+        discipline_domain,
+        /// A.1.7: a token that begins no discipline_item.
+        discipline_item,
+        /// §7.8.3: a connect_mode that is no `merged`/`split`.
+        connect_mode,
+        /// §10.6: a Verilog-AMS construct under a 1364 language; `arg` the
+        /// language (`KeywordSet`).
+        vams_under_language,
+        /// IEEE 1364-2005 §15.1: a timing check as a procedural statement.
+        timing_check_in_procedure,
+        /// A.1.5: a configuration whose first statement is no `design`.
+        config_design_first,
+        /// A.1.5: end of file before `endconfig`.
+        config_no_endconfig,
+        /// A.1.5: a token that begins no config_rule_statement.
+        config_rule_start,
+        /// IEEE 1364-2005 §13.3.1.2: a second default clause.
+        config_two_defaults,
+        /// §13.3.1.4: a library-qualified cell clause with a liblist.
+        config_lib_liblist,
+        /// A.1.5: a rule with no expansion clause; `arg` the rule's token.
+        config_expansion,
+        /// A.1.5: a use_clause's `:` not followed by `config`.
+        config_use_suffix,
+        /// A.5.1: a udp_body that opens with no `table`.
+        udp_body,
+        /// A.5.3: end of file before `endtable`.
+        udp_no_endtable,
+        /// A.5.3: an entry not closed by `;`.
+        udp_entry_semicolon,
+        /// A.5.3: an entry's colon count other than 1 or 2; `arg` the count.
+        udp_colons,
+        /// A.5.3: an entry whose body differs from the first entry's; `arg`
+        /// 1 when this entry is sequential.
+        udp_body_mixed,
+        /// A.5.3: an edge in a combinational entry; `arg` the character.
+        udp_comb_edge,
+        /// §8.4: two input transitions in a sequential entry.
+        udp_two_edges,
+        /// A.5.3: an input that is no level or edge symbol; `arg` the character.
+        udp_input_symbol,
+        /// A.5.3: an edge_indicator that is no `( level level )`.
+        udp_edge_shape,
+        /// A.5.3: a current_state that is no level symbol; `arg` the character.
+        udp_state_symbol,
+        /// A.5.3: a current_state of other than one symbol; `arg` the count.
+        udp_state_count,
+        /// A.5.3: an output of other than one symbol; `arg` the count.
+        udp_output_count,
+        /// A.5.3: an output that is no output symbol; `arg` the character.
+        udp_output_symbol,
+    };
 
     pub const Tag = enum(u8) {
         /// `extra.expected_tag` was wanted at `token`.

@@ -27,6 +27,7 @@
 //! - `pub const Vcd = struct` (`Vcd.VcdScope`, `Vcd.Var`), `pub const DumpCall = struct`, `pub const DumpOp = enum(u32)`
 //! - `pub const EvcdPort = struct`, `pub const PortDir = enum(u8)`, `pub const DumpPorts = struct`, `pub const PortsCall = struct`, `pub const PortsOp = enum(u32)`
 //! - `pub const SdfScope = struct`, `pub const SdfCall = struct`
+//! - `pub const Probe = struct`, `pub const A2d = struct` (`A2d.Kind`), `pub const DriverAccess = struct` (`DriverAccess.Op`), `pub const DriverUpdate = struct`
 //! - `pub const Override = struct`, `pub const OverrideEval = struct`, `pub const Tran = struct`, `pub const Path = struct`, `pub const Sub = struct`, `pub const Call = struct`, `pub const Arg = struct`, `pub const CopyOut = struct`
 //! - `pub fn words(width: u32) u32`
 //! - `pub fn list(p: *const Program, l: List) []const u32`
@@ -41,6 +42,8 @@ const Allocator = std.mem.Allocator;
 const time = @import("time.zig");
 const net = @import("net.zig");
 const Bit = @import("logic.zig").Bit;
+const dump_rows = @import("dump_rows.zig");
+const mixed_rows = @import("mixed_rows.zig");
 
 /// An expression's or a slot's type (§5.5.1): a width and a signedness, or
 /// §4.8's `real`, a double held as its 64 bits. 30 bits of width: 2^30 - 1
@@ -290,6 +293,13 @@ pub const Expr = struct {
         realtime,
         /// VAMS §9.10 `$abstime`: the time in seconds.
         abstime,
+        /// VAMS §7.3.6.3 the analog solution's potential `V(a)`/`V(a, b)`
+        /// at the current time, from the mixed host: `a` the `extra` index
+        /// of a `Probe`.
+        probe,
+        /// VAMS §9.22.3/§9.22.4/§9.23 a driver access call: `a` the `extra`
+        /// index of a `DriverAccess`.
+        driver_access,
         /// §17.8 `$rtoi(a)`, `$realtobits(a)`, `$bitstoreal(a)`, `$itor(a)`.
         rtoi,
         realtobits,
@@ -557,56 +567,17 @@ pub const Override = struct { slot: u32, force: bool, lo: u32, width: u32, start
 /// into `slot` or its bits [lo, lo + width).
 pub const OverrideEval = struct { slot: u32, value: u32, force: bool, lo: u32, width: u32, slice_lo: u32, of: u32 };
 
-/// §18.1 what a `$dumpvars` can select: per scope its `$scope` line,
-/// parent, whether it is lexical and whether it is written as a scope of
-/// its own (`child`); its variables `vars[var_start[s]..var_start[s + 1]]`,
-/// each with the `$var` text around its code.
-pub const Vcd = struct {
-    scopes: []const VcdScope = &.{},
-    var_start: []const u32 = &.{},
-    vars: []const Var = &.{},
-
-    pub const VcdScope = struct { line: List, parent: u32, lexical: bool, child: bool };
-    pub const Var = struct { slot: u32, width: u32, real: bool, event: bool, head: List, tail: List };
-};
-
-/// §18.1 one dump task call: which, its argument row (`$dumpfile`'s name,
-/// `$dumpvars`' levels, `$dumplimit`'s size; `none` when absent), the
-/// `$dumpfile` call's text for §18.2.3.8's `$version`, and `$dumpvars`'
-/// targets (pairs: 0 and a scope, or 1 and a slot).
-pub const DumpCall = struct { op: DumpOp, arg: u32, call: List, targets: List };
-
-/// §18.1's tasks.
-pub const DumpOp = enum(u32) { file, vars, off, on, all, limit, flush };
-
-/// §18.3 one dumped port: its slot, the net it is (`none` for a variable),
-/// its direction, and its net's drivers inside the dumped instance (its
-/// output side) and outside it (its input side), as `drivers` indices.
-pub const EvcdPort = struct { slot: u32, net: u32, dir: PortDir, inside: List, outside: List };
-
-/// A §18.4 port's direction.
-pub const PortDir = enum(u8) { input, output, inout };
-
-/// §18.3.1 one `$dumpports` call: its file name row (`none`: the default
-/// "dumpports.vcd"), the call's text, the header's scope and `$var port`
-/// lines, and its ports (a `List` of `evcd_ports` rows).
-pub const DumpPorts = struct { name_row: u32, call: List, header: List, ports: List };
-
-/// §18.3 one port dump task: which, its `DumpPorts` (for `.ports`), the
-/// file name row it names (`none`: every file) and `$dumpportslimit`'s size.
-pub const PortsCall = struct { op: PortsOp, ports: u32, name: u32, size: u32 };
-
-/// §18.3's tasks.
-pub const PortsOp = enum(u32) { ports, off, on, all, limit, flush };
-
-/// §16 what an annotation matches per scope: its module's name, whether it
-/// is lexical, and its ports and specparams as triples (name start, name
-/// length, slot; `none` for an unbound port) in `extra`.
-pub const SdfScope = struct { module: List, lexical: bool, ports: List, specparams: List };
-
-/// §17.2.10 one `$sdf_annotate` call: the file name row, the annotation
-/// scope, and the mtm_spec row (`none`: TYPICAL).
-pub const SdfCall = struct { name: u32, scope: u32, mtm: u32 };
+/// §18 VCD and EVCD, §16 SDF rows (`dump_rows.zig`).
+pub const Vcd = dump_rows.Vcd;
+pub const DumpCall = dump_rows.DumpCall;
+pub const DumpOp = dump_rows.DumpOp;
+pub const EvcdPort = dump_rows.EvcdPort;
+pub const PortDir = dump_rows.PortDir;
+pub const DumpPorts = dump_rows.DumpPorts;
+pub const PortsCall = dump_rows.PortsCall;
+pub const PortsOp = dump_rows.PortsOp;
+pub const SdfScope = dump_rows.SdfScope;
+pub const SdfCall = dump_rows.SdfCall;
 
 /// §17.9 one `$random`/`$dist_*` call: the distribution, the seed row and
 /// the place its inout seed is written back to (`none` for a seedless
@@ -777,6 +748,12 @@ pub const Arg = struct { in: u32, place: u32, ty: Ty, pad: u32 = 0 };
 /// written to `place`.
 pub const CopyOut = struct { place: u32, slot: u32, ty: Ty };
 
+/// VAMS §7.3 and §9.22 mixed-signal rows (`mixed_rows.zig`).
+pub const Probe = mixed_rows.Probe;
+pub const DriverAccess = mixed_rows.DriverAccess;
+pub const DriverUpdate = mixed_rows.DriverUpdate;
+pub const A2d = mixed_rows.A2d;
+
 /// §7.9 one net: its type, its slot, its drivers (a `List` of `drivers`
 /// indices in `extra`), A.2.1.3's `delay3` on the resolved value, and a
 /// `trireg`'s charge strength and §3.8 decay time (`no_decay`: holds forever).
@@ -919,6 +896,12 @@ counters: u32 = 0,
 holds: u32 = 0,
 /// §17.9.1 the seedless `$random`'s seed at time 0.
 random_seed: i32 = 0,
+/// VAMS §7.3.5 the analog events digital event controls wait on.
+monitors: []const A2d = &.{},
+/// VAMS §7.3.6.3 some expression is a `probe`: the run needs a mixed host.
+has_probes: bool = false,
+/// VAMS §9.22.5 the nets `driver_update` terms watch.
+driver_updates: []const DriverUpdate = &.{},
 
 const Program = @This();
 

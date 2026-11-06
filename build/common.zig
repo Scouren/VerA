@@ -44,13 +44,13 @@ pub const module_specs = [_]struct {
     .{ .name = "air", .path = "src/Air.zig", .imports = &.{ "intern_pool", "vams", "std_kernels" } },
     .{ .name = "base", .path = "lib/base/root.zig" },
     .{ .name = "kernels", .path = "lib/kernels/root.zig", .imports = &.{"contract"} },
-    .{ .name = "std_sim", .path = "lib/std/sim.zig", .imports = &.{ "kernels", "contract" } },
+    .{ .name = "std_sim", .path = "lib/std/sim.zig", .imports = &.{ "kernels", "contract", "vams" } },
     .{ .name = "sema", .path = "src/sema.zig", .imports = &.{ "vams", "intern_pool", "air", "kernels", "std_sim", "std_kernels" } },
     .{ .name = "diag", .path = "lib/diag/root.zig" },
     .{ .name = "dynlib", .path = "src/dynlib.zig" },
     .{ .name = "link", .path = "src/link.zig", .imports = &.{ "contract", "dynlib" } },
     // The Zig device backend (docs/rewrite/codegen.md): Air + Air.Device in, device text out.
-    .{ .name = "codegen", .path = "src/codegen.zig", .imports = &.{ "air", "intern_pool", "vams", "sema", "std_kernels", "contract", "link" } },
+    .{ .name = "codegen", .path = "src/codegen.zig", .imports = &.{ "air", "intern_pool", "vams", "sema", "std_kernels", "std_sim", "contract", "link" } },
     // The rewrite's spine (docs/rewrite/comp.md): `vera-next`'s Compilation.
     .{ .name = "comp", .path = "src/next/Compilation.zig", .imports = &.{ "vams", "intern_pool", "air", "sema", "std_sim", "codegen", "link" } },
     .{ .name = "frontend", .path = "lib/frontend/root.zig", .imports = &.{ "base", "diag", "kernels" } },
@@ -131,12 +131,14 @@ pub fn simSources(b: *Build) *Module {
     const wf = b.addWriteFiles();
     var root: std.Io.Writer.Allocating = .init(b.allocator);
     root.writer.writeAll("pub const files = [_][2][]const u8{\n") catch @panic("OOM");
-    for (globFiles(b, "lib", ".zig")) |path| {
+    // `.zon` too: `vams.Diag`'s code catalogue, which a `.v` executable
+    // renders its diagnostics with (`std_sim.exe`).
+    for ([_][]const u8{ ".zig", ".zon" }) |suffix| for (globFiles(b, "lib", suffix)) |path| {
         b.dependOnFileContents(b.path(path));
         // By contents: addCopyFile hashes the absolute source path, so every worktree missed the cache.
         _ = wf.add(path, configText(b, path));
         root.writer.print("    .{{ \"{s}\", @embedFile(\"{s}\") }},\n", .{ path, path }) catch @panic("OOM");
-    }
+    };
     root.writer.writeAll("};\n") catch @panic("OOM");
     return b.createModule(.{ .root_source_file = wf.add("sim_sources.zig", root.written()) });
 }

@@ -24,6 +24,7 @@
 //! - `pub fn rowInstance(i: Zcu.Instance.Index) Device.Instance`
 //! - `pub fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String`
 //! - `pub fn envOf(s: *Sema, unit: *Unit) Allocator.Error!eval.Env`
+//! - `pub fn eachItem(s: *Sema, unit: *Unit, env: *eval.Env, body: Vir.Body, visitor: anytype, depth: u32) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -56,6 +57,38 @@ const gen_depth_max: u32 = 1 << 10;
 
 /// The most elements one array is lowered to (a slot each).
 const array_cells_max: u64 = 1 << 16;
+
+/// The analog blocks of a body, in source order, generate schemes unrolled
+/// with their genvars bound (§6.6): each block lowered into `main`.
+const Lowering = struct {
+    main: *Block,
+
+    fn item(l: Lowering, s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
+        const vir = unit.vir;
+        const main = l.main;
+        switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+            .analog => {
+                var b = main.child();
+                try control.body(s, &b, payloadOf(vir, Inst.Process, i).body);
+                try main.insts.appendSlice(s.arena, b.insts.items);
+            },
+            // §5.2.1 an `analog initial` body runs on the analysis's first
+            // evaluation only: guarded by `analog$initial`, which the host answers.
+            .analog_initial => {
+                var b = main.child();
+                const flag = try @import("expr.zig").call(s, &b, @backingInt(@import("vams").SysFn.Tag.@"analog$initial"), .integer, &.{});
+                var then_b = b.child();
+                then_b.analog_initial = true;
+                then_b.conditional += 1;
+                try control.body(s, &then_b, payloadOf(vir, Inst.Process, i).body);
+                var else_b = b.child();
+                try control.ifElse(s, &b, flag, &then_b, &else_b);
+                try main.insts.appendSlice(s.arena, b.insts.items);
+            },
+            else => {}, // else: not an analog block
+        }
+    }
+};
 
 /// Lowers the design under `zcu.instances[0]` and returns the main body,
 /// its `ret` included. Asserts that nothing was lowered before.
@@ -194,6 +227,7 @@ pub fn declareArray(s: *Sema, unit: *Unit, first: Inst.Index, dims_body: Vir.Bod
     const vir = unit.vir;
     var env = try envOf(s, unit);
     defer env.deinit();
+    env.shaping += 1;
     var dims: std.ArrayList([2]i64) = .empty;
     var cells: u64 = 1;
     for (vir.body(dims_body)) |d| {
@@ -205,6 +239,7 @@ pub fn declareArray(s: *Sema, unit: *Unit, first: Inst.Index, dims_body: Vir.Bod
         cells = std.math.mul(u64, cells, @abs(msb - lsb) + 1) catch return s.fail(.E1015, unit.file, first.toRef(), "the array is too large", .{});
     }
     if (cells > array_cells_max) return s.fail(.E1015, unit.file, first.toRef(), "the array has {d} elements, past {d}", .{ cells, array_cells_max });
+    if (s.zcu.instances.items(.parent)[@backingInt(unit.instance)] == .none) try @import("walk.zig").rootShapes(s, &env);
     const slots = try s.arena.alloc(Air.Inst.Index, @intCast(cells));
     for (slots) |*slot| slot.* = try addAlloc(s, ty);
     try unit.binds.put(s.arena, first, .{ .array = .{ .slots = slots, .dims = dims.items, .ty = ty } });
@@ -240,6 +275,60 @@ pub fn envOf(s: *Sema, unit: *Unit) Allocator.Error!eval.Env {
     @memcpy(env.values.items, elems);
     env.hier = zcu.instances.items(.hier)[@backingInt(unit.instance)];
     return env;
+}
+
+/// Calls `visitor.item(s, unit, i)` on each item of `body` in source order, with
+/// generate schemes (§6.6) evaluated under `env` and unrolled, their
+/// genvars bound in `env` and `unit.binds` while their bodies are visited.
+pub fn eachItem(s: *Sema, unit: *Unit, env: *eval.Env, body: Vir.Body, visitor: anytype, depth: u32) Allocator.Error!void {
+    const vir = unit.vir;
+    if (depth > gen_depth_max) return;
+    for (vir.body(body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .gen_block => try eachItem(s, unit, env, payloadOf(vir, Inst.GenBlock, i).body, visitor, depth + 1),
+        .gen_if => {
+            const g = payloadOf(vir, Inst.GenIf, i);
+            const c = (try env.body(g.cond)) orelse continue;
+            try eachItem(s, unit, env, if (c.isTrue()) g.then else g.@"else", visitor, depth + 1);
+        },
+        .gen_case => {
+            const g = payloadOf(vir, Inst.GenCase, i);
+            const operand = (try env.body(g.operand)) orelse continue;
+            var arm_body: ?Vir.Body = null;
+            for (vir.list(Inst.Arm, g.arms)) |arm| {
+                if (arm.flags.default and arm_body == null) arm_body = arm.body;
+                for (vir.list(Inst.Ref, arm.values)) |l| {
+                    const label = (try env.ref(l)) orelse continue;
+                    const eq = @import("std_kernels").fold.binary(.eq, operand, label, null) orelse continue;
+                    if (eq.isTrue()) {
+                        arm_body = arm.body;
+                        break;
+                    }
+                } else continue;
+                break;
+            }
+            if (arm_body) |ab| try eachItem(s, unit, env, ab, visitor, depth + 1);
+        },
+        .gen_for => {
+            const g = payloadOf(vir, Inst.GenFor, i);
+            const init = lastStore(vir, g.init) orelse continue;
+            const step = lastStore(vir, g.step) orelse continue;
+            const gvi = init.lhs.toIndex() orelse continue;
+            if (vir.instructions.items(.tag)[@backingInt(gvi)] != .decl_ref) continue;
+            const gv = canonical(vir, vir.instructions.items(.data)[@backingInt(gvi)].decl_tok.decl);
+            var v = ((try env.ref(init.rhs)) orelse continue).asIntExact() orelse continue;
+            defer _ = env.genvars.remove(gv);
+            defer _ = unit.binds.remove(gv);
+            for (0..gen_loop_max) |_| {
+                try env.genvars.put(s.gpa, gv, v);
+                try unit.binds.put(s.arena, gv, .{ .constant = try intern(s, .{ .int = v }) });
+                const c = (try env.body(g.cond)) orelse break;
+                if (!c.isTrue()) break;
+                try eachItem(s, unit, env, g.body, visitor, depth + 1);
+                v = ((try env.ref(step.rhs)) orelse break).asIntExact() orelse break;
+            }
+        },
+        else => try visitor.item(s, unit, i),
+    };
 }
 
 // ---- private ----
@@ -296,79 +385,7 @@ fn lowerUnit(s: *Sema, main: *Block, u: *Unit, depth: u32) Allocator.Error!void 
     main.unit = u;
     var env = try envOf(s, u);
     defer env.deinit();
-    try items(s, main, &env, u.module.body, depth);
-}
-
-/// The analog blocks of a body, in source order, generate schemes unrolled
-/// with their genvars bound (§6.6): each block lowered into `main`.
-fn items(s: *Sema, main: *Block, env: *eval.Env, body: Vir.Body, depth: u32) Allocator.Error!void {
-    const unit = main.unit;
-    const vir = unit.vir;
-    if (depth > gen_depth_max) return;
-    for (vir.body(body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .analog => {
-            var b = main.child();
-            try control.body(s, &b, payloadOf(vir, Inst.Process, i).body);
-            try main.insts.appendSlice(s.arena, b.insts.items);
-        },
-        // §5.2.1 an `analog initial` body runs on the analysis's first
-        // evaluation only: guarded by `analog$initial`, which the host answers.
-        .analog_initial => {
-            var b = main.child();
-            const flag = try @import("expr.zig").call(s, &b, @backingInt(@import("vams").SysFn.Tag.@"analog$initial"), .integer, &.{});
-            var then_b = b.child();
-            then_b.analog_initial = true;
-            then_b.conditional += 1;
-            try control.body(s, &then_b, payloadOf(vir, Inst.Process, i).body);
-            var else_b = b.child();
-            try control.ifElse(s, &b, flag, &then_b, &else_b);
-            try main.insts.appendSlice(s.arena, b.insts.items);
-        },
-        .gen_block => try items(s, main, env, payloadOf(vir, Inst.GenBlock, i).body, depth + 1),
-        .gen_if => {
-            const g = payloadOf(vir, Inst.GenIf, i);
-            const c = (try env.body(g.cond)) orelse continue;
-            try items(s, main, env, if (c.isTrue()) g.then else g.@"else", depth + 1);
-        },
-        .gen_case => {
-            const g = payloadOf(vir, Inst.GenCase, i);
-            const operand = (try env.body(g.operand)) orelse continue;
-            var arm_body: ?Vir.Body = null;
-            for (vir.list(Inst.Arm, g.arms)) |arm| {
-                if (arm.flags.default and arm_body == null) arm_body = arm.body;
-                for (vir.list(Inst.Ref, arm.values)) |l| {
-                    const label = (try env.ref(l)) orelse continue;
-                    const eq = @import("std_kernels").fold.binary(.eq, operand, label, null) orelse continue;
-                    if (eq.isTrue()) {
-                        arm_body = arm.body;
-                        break;
-                    }
-                } else continue;
-                break;
-            }
-            if (arm_body) |ab| try items(s, main, env, ab, depth + 1);
-        },
-        .gen_for => {
-            const g = payloadOf(vir, Inst.GenFor, i);
-            const init = lastStore(vir, g.init) orelse continue;
-            const step = lastStore(vir, g.step) orelse continue;
-            const gvi = init.lhs.toIndex() orelse continue;
-            if (vir.instructions.items(.tag)[@backingInt(gvi)] != .decl_ref) continue;
-            const gv = canonical(vir, vir.instructions.items(.data)[@backingInt(gvi)].decl_tok.decl);
-            var v = ((try env.ref(init.rhs)) orelse continue).asIntExact() orelse continue;
-            defer _ = env.genvars.remove(gv);
-            defer _ = unit.binds.remove(gv);
-            for (0..gen_loop_max) |_| {
-                try env.genvars.put(s.gpa, gv, v);
-                try unit.binds.put(s.arena, gv, .{ .constant = try intern(s, .{ .int = v }) });
-                const c = (try env.body(g.cond)) orelse break;
-                if (!c.isTrue()) break;
-                try items(s, main, env, g.body, depth + 1);
-                v = ((try env.ref(step.rhs)) orelse break).asIntExact() orelse break;
-            }
-        },
-        else => {}, // else: not an analog block or a generate scheme
-    };
+    try eachItem(s, u, &env, u.module.body, Lowering{ .main = main }, depth);
 }
 
 /// A body's last instruction as a `store`, or null.

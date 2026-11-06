@@ -20,7 +20,7 @@
 //! the plan), annex E.2; IEEE 1364-2005 §13.4.1. Each stage cites its own.
 //!
 //! Contents:
-//! - fields `gpa`, `io`, `arena_state`, `config`, `queue`, `next_job`, `reads`, `pp`, `netlist`, `units`, `zcu`, `analysis`, `float`, `device`, `lowered`, `wip`, `outputs`, `stopped`
+//! - fields `gpa`, `io`, `arena_state`, `config`, `queue`, `next_job`, `reads`, `pp`, `netlist`, `units`, `zcu`, `analysis`, `float`, `device`, `bench`, `lowered`, `wip`, `outputs`, `stopped`
 //! - `pub const Config`, `pub const Job`, `pub const Unit`, `pub const Read`, `pub const Outputs`, `pub const Backend`, `pub const not_built_status`, `pub const jobs_max`
 //! - `pub fn create(gpa: Allocator, io: Io, config: Config) Allocator.Error!*Compilation`
 //! - `pub fn destroy(comp: *Compilation) void`
@@ -38,6 +38,7 @@ const vams = @import("vams");
 const sema = @import("sema");
 const Air = @import("air");
 const link = @import("link");
+const codegen = @import("codegen");
 const frontend = @import("Compilation/frontend.zig");
 const backend = @import("Compilation/backend.zig");
 const errors = @import("Compilation/errors.zig");
@@ -69,6 +70,8 @@ analysis: ?sema.Sema.Analysis = null,
 float: ?Air.Float = null,
 /// The device `codegen` wrote; its text on `gpa`.
 device: ?link.Output = null,
+/// `--emit-exe`/`--run`: the input's `//!` testbench directives.
+bench: ?codegen.bench.Spec = null,
 lowered: ?sema.digital.Lowered = null,
 /// The diagnostics of the stages that report through a `Wip` (the SPICE
 /// reader, the float verdict) and of the compilation itself.
@@ -93,9 +96,11 @@ pub const Job = union(enum) {
     run_digital,
 };
 
-/// Every backend `codegen`'s dispatch names. Only `zig` is merged; the
-/// others' prongs report "not built" (`not_built_status`).
-pub const Backend = enum { zig, exe, verilog, osdi, rtlil, digital_device, digital_exe, libmap };
+/// Every backend `codegen`'s dispatch names; a prong not merged reports
+/// "not built" (`not_built_status`). `digital_lowering` is no backend: it
+/// names a `.v` construct Sema's digital lowering does not express yet,
+/// so its fixtures' lines say whose debt they are.
+pub const Backend = enum { zig, exe, verilog, osdi, rtlil, digital_device, digital_exe, libmap, digital_lowering };
 
 /// The exit status of an input that needs a backend not built yet: above
 /// 125, which the conformance harness reads as "the tool could not run
@@ -130,6 +135,10 @@ pub const Outputs = struct {
     /// names a backend.
     status: u8 = 0,
     not_built: ?Backend = null,
+    /// `--emit-exe`/`--run`: the built testbench, which `main` prints or
+    /// runs with `plusargs` (IEEE 1364-2005 §17.10).
+    exe: ?[]const u8 = null,
+    plusargs: []const []const u8 = &.{},
 };
 
 /// Every way `update` fails rather than reports.

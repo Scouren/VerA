@@ -19,7 +19,7 @@
 //! - `pub fn tokenTag(p: *const Parse, i: TokenIndex) Token.Tag`, `pub fn peek(p: *const Parse, n: u32) Token.Tag`, `pub fn tokenText(p: *const Parse, i: TokenIndex) []const u8`
 //! - `pub fn eat(p: *Parse, tag: Token.Tag) ?TokenIndex`, `pub fn expect(p: *Parse, tag: Token.Tag) Error!TokenIndex`, `pub fn identLike(p: *const Parse, i: TokenIndex) bool`, `pub fn expectIdent(p: *Parse) Error!TokenIndex`
 //! - `pub fn addNode(p: *Parse, tag: Node.Tag, main_token: TokenIndex, data: Node.Data) Allocator.Error!Node.Index`, `pub fn addExtra(p: *Parse, extra: anytype) Allocator.Error!ExtraIndex`, `pub fn listToSpan(p: *Parse, list: []const u32) Allocator.Error!Node.SubRange`, `pub fn push(p: *Parse, n: Node.Index) Allocator.Error!void`, `pub fn pushOpt(p: *Parse, n: Node.OptionalIndex) Allocator.Error!void`, `pub fn spanFrom(p: *Parse, top: usize) Allocator.Error!Node.SubRange`
-//! - `pub fn warn(p: *Parse, tag: Ast.Error.Tag) Allocator.Error!void`, `pub fn warnAt(p: *Parse, tag: Ast.Error.Tag, tok: TokenIndex) Allocator.Error!void`, `pub fn fail(p: *Parse, tag: Ast.Error.Tag) Error`, `pub fn failAt(p: *Parse, tag: Ast.Error.Tag, tok: TokenIndex) Error`
+//! - `pub fn warn(p: *Parse, tag: Ast.Error.Tag) Allocator.Error!void`, `pub fn warnAt(p: *Parse, tag: Ast.Error.Tag, tok: TokenIndex) Allocator.Error!void`, `pub fn fail(p: *Parse, tag: Ast.Error.Tag) Error`, `pub fn failAt(p: *Parse, tag: Ast.Error.Tag, tok: TokenIndex) Error`, `pub fn warnSite(p: *Parse, tag: Ast.Error.Tag, site: Ast.Error.Site, tok: TokenIndex, arg: u32) Allocator.Error!void`, `pub fn failSite(p: *Parse, tag: Ast.Error.Tag, site: Ast.Error.Site, tok: TokenIndex, arg: u32) Error`
 //! - `pub fn enter(p: *Parse) Error!void`, `pub fn leave(p: *Parse) void`
 //! - `pub fn skipAttributes(p: *Parse) Allocator.Error!bool`, `pub fn pastAttributes(p: *const Parse) TokenIndex`
 //! - `pub fn recoverItem(p: *Parse, before: TokenIndex) void`
@@ -105,7 +105,7 @@ pub fn run(gpa: Allocator, source: [:0]const u8, tokens: Ast.TokenList.Slice, op
         .gen_depth = 0,
         .attr_depth = 0,
         .in_paramset = false,
-        .discrete = @backingInt(options.keywords) < @backingInt(KeywordSet.vams_2_3),
+        .discrete = options.discrete or @backingInt(options.keywords) < @backingInt(KeywordSet.vams_2_3),
         .connect_module = false,
     };
     defer p.errors.deinit(gpa);
@@ -232,6 +232,20 @@ pub fn warnAt(p: *Parse, tag: Ast.Error.Tag, tok: TokenIndex) Allocator.Error!vo
     try p.errors.append(p.gpa, .{ .tag = tag, .token = tok });
 }
 
+/// `warnAt` naming the rule (`Ast.Error.Site`) and what its report names.
+pub fn warnSite(p: *Parse, tag: Ast.Error.Tag, site: Ast.Error.Site, tok: TokenIndex, arg: u32) Allocator.Error!void {
+    @branchHint(.cold);
+    assert(site != .generic);
+    try p.errors.append(p.gpa, .{ .tag = tag, .token = tok, .site = site, .arg = arg });
+}
+
+/// `failAt` naming the rule (`Ast.Error.Site`) and what its report names.
+pub fn failSite(p: *Parse, tag: Ast.Error.Tag, site: Ast.Error.Site, tok: TokenIndex, arg: u32) Error {
+    @branchHint(.cold);
+    try p.warnSite(tag, site, tok, arg);
+    return error.ParseError;
+}
+
 pub fn fail(p: *Parse, tag: Ast.Error.Tag) Error {
     @branchHint(.cold);
     return p.failAt(tag, p.tok_i);
@@ -329,7 +343,7 @@ fn parseRoot(p: *Parse) Allocator.Error!void {
             break;
         }
         const before = p.tok_i;
-        if (p.vamsWordUnder1364(before)) try p.warn(.vams_construct_under_1364);
+        if (p.vamsWordUnder1364(before)) try p.warnSite(.vams_construct_under_1364, .vams_under_language, before, @backingInt(p.language));
         const node = parseDescription(p) catch |e| switch (e) {
             error.OutOfMemory => return error.OutOfMemory,
             error.ParseError => {
@@ -426,7 +440,7 @@ fn parseAttribute(p: *Parse) Error!void {
     defer p.scratch.shrinkRetainingCapacity(top);
     while (true) {
         const name = p.tok_i;
-        if (!p.identLike(name) and p.tokenTag(name) != .keyword_units) return p.fail(.expected_identifier);
+        if (!p.identLike(name) and p.tokenTag(name) != .keyword_units) return if (p.tokenTag(name).isKeyword()) p.failSite(.expected_identifier, .attr_keyword_name, name, 0) else p.fail(.expected_identifier);
         p.tok_i += 1;
         const value: Node.OptionalIndex = if (p.eat(.equal) != null) (try expr.parseExpr(p)).toOptional() else .none;
         try p.push(try p.addNode(.attr_spec, name, .{ .opt_node = value }));

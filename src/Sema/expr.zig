@@ -60,6 +60,9 @@ pub fn lower(s: *Sema, b: *Block, r: Inst.Ref) Allocator.Error!Value {
     }
     s.expr_depth += 1;
     defer s.expr_depth -= 1;
+    const outer = s.expr_src;
+    s.expr_src = r;
+    defer s.expr_src = outer;
     const v = try inst(s, b, i);
     assert(v.ref != .none);
     return v;

@@ -16,6 +16,7 @@
 //! - `pub fn finishParams(l: *Lower, p: *Program) Error!void`
 
 const std = @import("std");
+const assert = std.debug.assert;
 const vams = @import("vams");
 const std_sim = @import("std_sim");
 const walk = @import("../walk.zig");
@@ -75,7 +76,10 @@ pub fn variable(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Index)
             if (range.len == 0) range = v.range;
             if (dims.len == 0) dims = v.dims;
         },
-        else => unreachable, // else: `signal` passes only these two
+        // VAMS §3.6.2 a discipline declaration of a reg (`ddiscrete o; reg
+        // o;`) names its discipline only: no storage, no type.
+        .net => assert(Lower.payload(vir, Inst.Net, d).flags.net == .none),
+        else => unreachable, // else: `signal` passes only these three
     };
     var n: Name = .{ .kind = .variable };
     switch (storage) {
@@ -106,6 +110,9 @@ pub fn variable(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Index)
 pub fn param(l: *Lower, f: u32, i: Inst.Index) Error!u32 {
     const vir = l.virOf(f);
     const p = Lower.payload(vir, Inst.Param, i);
+    // VAMS §7.2.2 a mixed design's string and array parameters are the
+    // analog block's (lib/sim/digital's mixed elaboration skips them).
+    if (l.options.mixed and (p.dims.len != 0 or p.flags.storage == .string)) return none;
     if (p.dims.len != 0) return l.refuse("a parameter array");
     const env = try l.envAt(f);
     const value = (try env.param(i)) orelse return lateParam(l, f, i);

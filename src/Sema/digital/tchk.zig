@@ -56,10 +56,10 @@ pub fn check(l: *Lower, f: u32, i: Inst.Index) Error!void {
             // §15.3.4 "data event = reference event signal with opposite
             // edge"; §15.3.5 "... with the same edge".
             if (kind == .width) c.ev[1].mask = opposite(c.ev[0].mask);
-            c.lim[0] = try nonNegative(l, f, arg(args, 1));
+            c.lim[0] = try nonNegative(l, f, arg(args, 1), name, "limit");
             if (kind == .width) {
                 // Syntax 15-12: "the default value for the threshold zero".
-                if (arg(args, 2) != .none) c.lim[1] = try nonNegative(l, f, arg(args, 2));
+                if (arg(args, 2) != .none) c.lim[1] = try nonNegative(l, f, arg(args, 2), name, "threshold");
                 c.notifier = try notifier(l, arg(args, 3));
             } else c.notifier = try notifier(l, arg(args, 2));
         },
@@ -67,19 +67,19 @@ pub fn check(l: *Lower, f: u32, i: Inst.Index) Error!void {
         .setup => {
             try event(l, &c, 0, arg(args, 1));
             try event(l, &c, 1, args[0]);
-            c.lim[0] = try nonNegative(l, f, arg(args, 2));
+            c.lim[0] = try nonNegative(l, f, arg(args, 2), name, "limit");
             c.notifier = try notifier(l, arg(args, 3));
         },
         .removal => {
             try event(l, &c, 0, args[0]);
             try event(l, &c, 1, arg(args, 1));
-            c.lim[0] = try nonNegative(l, f, arg(args, 2));
+            c.lim[0] = try nonNegative(l, f, arg(args, 2), name, "limit");
             c.notifier = try notifier(l, arg(args, 3));
         },
         .hold, .recovery => {
             try event(l, &c, 0, args[0]);
             try event(l, &c, 1, arg(args, 1));
-            c.lim[1] = try nonNegative(l, f, arg(args, 2));
+            c.lim[1] = try nonNegative(l, f, arg(args, 2), name, "limit");
             c.notifier = try notifier(l, arg(args, 3));
         },
         .setuphold, .recrem => {
@@ -88,8 +88,8 @@ pub fn check(l: *Lower, f: u32, i: Inst.Index) Error!void {
             c.stamp_cond = try cond(l, arg(args, 5));
             c.check_cond = try cond(l, arg(args, 6));
             // §15.5.4 the negative timing option off: a negative limit is 0.
-            const a: u64 = @intCast(@max(try limitTicks(l, f, arg(args, 2)), 0));
-            const b: u64 = @intCast(@max(try limitTicks(l, f, arg(args, 3)), 0));
+            const a: u64 = @intCast(@max(try limitTicks(l, f, arg(args, 2), name), 0));
+            const b: u64 = @intCast(@max(try limitTicks(l, f, arg(args, 3), name), 0));
             c.lim = if (kind == .setuphold) .{ a, b } else .{ b, a };
             c.notifier = try notifier(l, arg(args, 4));
             try delayed(l, f, args[0], arg(args, 7));
@@ -99,10 +99,10 @@ pub fn check(l: *Lower, f: u32, i: Inst.Index) Error!void {
         .skew, .timeskew, .fullskew => {
             try event(l, &c, 0, args[0]);
             try event(l, &c, 1, arg(args, 1));
-            c.lim[0] = try nonNegative(l, f, arg(args, 2));
+            c.lim[0] = try nonNegative(l, f, arg(args, 2), name, "limit");
             var k: usize = 3;
             if (kind == .fullskew) {
-                c.lim[1] = try nonNegative(l, f, arg(args, 3));
+                c.lim[1] = try nonNegative(l, f, arg(args, 3), name, "limit");
                 k = 4;
             }
             c.notifier = try notifier(l, arg(args, k));
@@ -114,8 +114,8 @@ pub fn check(l: *Lower, f: u32, i: Inst.Index) Error!void {
             try event(l, &c, 0, args[0]);
             try event(l, &c, 1, arg(args, 1));
             if (c.ev[0].mask == 0) return l.refuse("§15.3.6 a $nochange reference event that is no edge");
-            c.lim[0] = @bitCast(try limitTicks(l, f, arg(args, 2)));
-            const end = try limitTicks(l, f, arg(args, 3));
+            c.lim[0] = @bitCast(try limitTicks(l, f, arg(args, 2), name));
+            const end = try limitTicks(l, f, arg(args, 3), name);
             if (end < 0) return l.refuse("§15.3.6 a $nochange with a negative end edge offset");
             c.lim[1] = @intCast(end);
             c.notifier = try notifier(l, arg(args, 4));
@@ -304,9 +304,12 @@ fn literalBit(l: *Lower, r: Inst.Ref) Error!?Bit {
 }
 
 /// A limit in ticks, with its sign: "constant expression" (§15.1).
-fn limitTicks(l: *Lower, f: u32, r: Inst.Ref) Error!i64 {
+fn limitTicks(l: *Lower, f: u32, r: Inst.Ref, name: []const u8) Error!i64 {
     if (r == .none) return l.refuse("a timing check with an omitted limit");
-    const c = (try l.constOf(f, r)) orelse return l.refuse("a timing check limit Sema/eval.zig does not fold");
+    const c = (try l.constOf(f, r)) orelse {
+        l.why_code = .E1148;
+        return l.rejectFmt(f, r, "a limit of `{s}` is a constant expression (IEEE 1364-2005 §15.1); this one reads a signal", .{name});
+    };
     const scale = l.b.times.items[l.frames.items[f].scope].scale;
     const negative, const mag = switch (c) {
         .int => |v| .{ v < 0, scale.unsignedDelay(@abs(v)) catch return l.refuse("a timing check limit past 2^64 ticks") },
@@ -317,10 +320,17 @@ fn limitTicks(l: *Lower, f: u32, r: Inst.Ref) Error!i64 {
     return if (negative) -ticks else ticks;
 }
 
-/// A "non-negative constant expression" limit (Tables 15-1 to 15-12).
-fn nonNegative(l: *Lower, f: u32, r: Inst.Ref) Error!u64 {
-    const v = try limitTicks(l, f, r);
-    if (v < 0) return l.refuse("§15 a negative limit where a non-negative one is required");
+/// A "non-negative constant expression" limit (Tables 15-1 to 15-12),
+/// the `what` (limit or threshold) of timing check `name`; a negative one
+/// is lib/sim/digital's E1148.
+fn nonNegative(l: *Lower, f: u32, r: Inst.Ref, name: []const u8, what: []const u8) Error!u64 {
+    assert(name.len > 0 and what.len > 0);
+    const v = try limitTicks(l, f, r, name);
+    if (v < 0) {
+        l.why_code = .E1148;
+        return l.rejectFmt(f, r, "the {s} of `{s}` is a non-negative constant expression (IEEE 1364-2005 §15), and this one is negative", .{ what, name });
+    }
+    assert(v >= 0);
     return @intCast(v);
 }
 
@@ -328,7 +338,10 @@ fn nonNegative(l: *Lower, f: u32, r: Inst.Ref) Error!u64 {
 fn notifier(l: *Lower, r: Inst.Ref) Error!u32 {
     if (r == .none) return none;
     const n = (try expr.nameOf(l, r)) orelse return l.refuse("a notifier that is no name");
-    if (n.kind != .variable or n.ty.real or n.dims.len != 0) return l.refuse("§15.5.2 a notifier that is no reg");
+    if (n.kind != .variable or n.ty.real or n.dims.len != 0) {
+        l.why_code = .E1147;
+        return l.reject(l.frame, r, "this notifier is not a reg (IEEE 1364-2005 §15.5: \"The notifier is a reg\")");
+    }
     return n.slot;
 }
 

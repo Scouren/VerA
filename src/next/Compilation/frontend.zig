@@ -25,6 +25,7 @@ const Allocator = std.mem.Allocator;
 const vams = @import("vams");
 const sema = @import("sema");
 const InternPool = @import("intern_pool");
+const bench = @import("codegen").bench;
 const Compilation = @import("../Compilation.zig");
 const Zcu = sema.Zcu;
 
@@ -66,6 +67,16 @@ pub fn readInputs(comp: *Compilation) !bool {
         comp.pp.options.protect_keys = vams.Preprocessor.protect.parseKeys(comp.arena(), text) catch |e| {
             try comp.outputs.err.print(comp.arena(), "error: --protect-keys {s}: not a key file ({t})\n", .{ p, e });
             comp.outputs.status = 1;
+            return false;
+        };
+    }
+    // The testbench's `//!` directives, read up front as the old spine
+    // does: a malformed one refuses before anything is analysed.
+    if ((c.target == .exe or c.target == .run) and !c.digital()) {
+        comp.bench = bench.Spec.parse(comp.arena(), (try comp.read(c.paths[0])).bytes, null) catch |e| {
+            if (e == error.OutOfMemory) return error.OutOfMemory;
+            try comp.outputs.err.print(comp.arena(), "error: {s}: `//!` directive: {t}\n", .{ c.paths[0], e });
+            comp.outputs.status = 2;
             return false;
         };
     }
@@ -159,10 +170,15 @@ pub fn astgen(comp: *Compilation, unit: u32, failed: *std.atomic.Value(bool), oo
 /// simulation every uninstantiated module (IEEE 1364-2005 §12.1.1).
 /// Stops on an AstGen or elaboration error.
 pub fn semaTop(comp: *Compilation) !bool {
+    var netlist: std.ArrayList(sema.Zcu.Decl) = .empty;
     for (comp.units.items) |*u| {
         if (u.vir.diag.failed()) return false;
-        _ = try comp.zcu.addFile(comp.config.paths[0], u.vir, u.builtins);
+        const file = try comp.zcu.addFile(comp.config.paths[0], u.vir, u.builtins);
+        for (u.vir.decls()[0..u.builtins], 0..) |d, k| if (d.kind == .module and std.mem.eql(u8, declSource(comp, u, d), netlist_unit))
+            try netlist.append(comp.arena(), .{ .file = file, .index = @fromBackingInt(@intCast(k)) });
     }
+    comp.zcu.netlist_modules = netlist.items;
+    if (comp.netlist) |*n| comp.zcu.netlist_unsupported = n.output().unsupported;
     const overrides = try comp.arena().alloc(sema.Sema.Config.Override, comp.config.overrides.len);
     const ip = &comp.zcu.intern_pool;
     for (overrides, comp.config.overrides) |*o, typed| o.* = .{
@@ -172,7 +188,7 @@ pub fn semaTop(comp: *Compilation) !bool {
         else
             try ip.get(comp.gpa, .{ .float = typed.value }),
     };
-    try sema.Sema.elaborate(&comp.zcu, .{ .roots = if (comp.config.digital()) .all else .first, .overrides = overrides });
+    try sema.Sema.elaborate(&comp.zcu, .{ .roots = if (comp.config.digital()) .all else .first, .overrides = overrides, .ieee1364 = comp.config.digital() });
     for (comp.zcu.failed.items(.code)) |code| if (severity(comp, code) == .err) return false;
     return comp.zcu.instances.len != 0;
 }
@@ -191,27 +207,32 @@ pub fn notBuilt(comp: *Compilation, b: Compilation.Backend, what: []const u8) !v
 fn astgenUnit(comp: *Compilation, unit: u32) Allocator.Error!?void {
     const gpa = comp.gpa;
     const u = &comp.units.items[unit];
-    u.tree = try vams.Ast.parse(gpa, u.text, .{ .keywords = comp.config.language });
+    u.tree = try vams.Ast.parse(gpa, u.text, .{ .keywords = comp.config.language, .discrete = comp.config.digital() });
     u.vir = .{ .instructions = .empty, .extra = &.{}, .string_bytes = &.{}, .diag = .empty };
     if (u.tree.errors.len != 0) return null;
-    u.vir = try vams.AstGen.generate(gpa, &u.tree, .{ .directives = comp.pp.output().directives });
+    u.vir = try vams.AstGen.generate(gpa, &u.tree, .{ .directives = comp.pp.output().directives, .ieee1364 = comp.config.digital() });
     u.builtins = builtinModules(comp, u);
 }
 
 /// The leading modules of `u` that come from shipped text: Table E.1's
 /// primitives and the netlist's subcircuits (annex E.2).
 fn builtinModules(comp: *const Compilation, u: *const Compilation.Unit) u32 {
-    const out = comp.pp.output();
     var n: u32 = 0;
     for (u.vir.decls()) |d| {
         if (d.kind != .module) continue;
-        const data = u.vir.instructions.items(.data)[@backingInt(d.inst)];
-        const at = u.tree.tokenStart(u.tree.nodeMainToken(data.pl_node.src_node));
-        const name = out.files[@backingInt(out.resolve(at).file)].name;
+        const name = declSource(comp, u, d);
         if (!std.mem.eql(u8, name, "spice_primitives.vams") and !std.mem.eql(u8, name, netlist_unit)) break;
         n += 1;
     }
     return n;
+}
+
+/// The name of the file declaration `d` of `u` was written in.
+fn declSource(comp: *const Compilation, u: *const Compilation.Unit, d: vams.Vir.Decl) []const u8 {
+    const out = comp.pp.output();
+    const data = u.vir.instructions.items(.data)[@backingInt(d.inst)];
+    const at = u.tree.tokenStart(u.tree.nodeMainToken(data.pl_node.src_node));
+    return out.files[@backingInt(out.resolve(at).file)].name;
 }
 
 /// The `//! spice CARD` lines of `source`, each card verbatim (a leading

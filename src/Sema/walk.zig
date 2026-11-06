@@ -75,6 +75,9 @@ pub const Walk = struct {
     s: *Sema,
     zcu: *Zcu,
     late: *std.StringArrayHashMapUnmanaged(std.ArrayList(defparams.Late)),
+    /// The defparams (by source) an earlier pass resolved upward past a
+    /// generate block not instantiated then (IEEE 1364-2005 §12.8.2).
+    went_up: *std.AutoHashMapUnmanaged(defparams.Source, void),
     pending: std.ArrayList(Pending) = .empty,
     givens: std.ArrayList(Given) = .empty,
     rows: std.ArrayList(defparams.Row) = .empty,
@@ -101,6 +104,7 @@ pub fn run(s: *Sema, roots: []const Zcu.Decl) Allocator.Error!defparams.Waiting 
     assert(zcu.instances.len == 0);
     const failed_before = zcu.failed.len;
     var late: std.StringArrayHashMapUnmanaged(std.ArrayList(defparams.Late)) = .empty;
+    var went_up: std.AutoHashMapUnmanaged(defparams.Source, void) = .empty;
     var pass: u32 = 0;
     while (true) : (pass += 1) {
         zcu.instances.shrinkRetainingCapacity(0);
@@ -109,7 +113,7 @@ pub fn run(s: *Sema, roots: []const Zcu.Decl) Allocator.Error!defparams.Waiting 
         zcu.defparams.clearRetainingCapacity();
         zcu.defparam_sources.clearRetainingCapacity();
         zcu.failed.shrinkRetainingCapacity(failed_before);
-        var w: Walk = .{ .s = s, .zcu = zcu, .late = &late };
+        var w: Walk = .{ .s = s, .zcu = zcu, .late = &late, .went_up = &went_up };
         var k = roots.len;
         while (k > 0) {
             k -= 1;

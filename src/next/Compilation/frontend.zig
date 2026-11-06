@@ -27,6 +27,7 @@ const sema = @import("sema");
 const InternPool = @import("intern_pool");
 const bench = @import("codegen").bench;
 const Compilation = @import("../Compilation.zig");
+const errors = @import("errors.zig");
 const Zcu = sema.Zcu;
 
 /// Most file requests one reader raises before the compilation gives up
@@ -197,7 +198,17 @@ pub fn semaTop(comp: *Compilation) !bool {
     };
     try sema.Sema.elaborate(&comp.zcu, .{ .roots = if (comp.config.digital()) .all else .first, .overrides = overrides, .ieee1364 = comp.config.digital() });
     for (comp.zcu.failed.items(.code)) |code| if (severity(comp, code) == .err) return false;
-    return comp.zcu.instances.len != 0;
+    if (comp.zcu.instances.len != 0) return true;
+    // IEEE 1364-2005 §12.1.1: a simulation needs a top, a module no other
+    // instantiates; with none it is refused, as lib/sim/digital did, at the
+    // unit's first token. An analog unit with no module of its own got
+    // E1001 above unless it is only checked, which builds nothing (§6.2).
+    if (comp.config.digital()) {
+        const u = &comp.units.items[0];
+        const at = u.tree.tokenStart(0);
+        try comp.wip.add(.lower, .E1100, errors.relocate(comp.pp.output(), at, at), "digital execution found no top-level module", .{});
+    }
+    return false;
 }
 
 /// Writes the "not built" refusal for `b` and sets `not_built_status`: the fixture

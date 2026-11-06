@@ -8,7 +8,8 @@
 //! disciplines"). A net with no declared discipline, or ground, is not
 //! judged here. A port joining a `wreal` to a net type other than wire,
 //! tri or wreal is E0919 (§3.7: "A wreal ... can only be connected to
-//! ... wire, tri and wreal").
+//! ... wire, tri and wreal"). On the IEEE 1364 route a port joined to a
+//! net of a type Table 12-1 marks "warn" is W1160 (§12.3.10).
 //! Cites: VAMS-2023 §3.6.5, §3.7, §3.11, §3.11.1, §3.12, §7.4.4.
 //!
 //! Contents:
@@ -138,8 +139,20 @@ fn wrealPorts(s: *Sema, file: Zcu.File.Index) Allocator.Error!void {
             const conns = vir.list(Inst.Arg, ins.conns);
             for (conns, 0..) |c, n| {
                 const value = vir.body(c.value);
-                if (value.len == 0 or vir.instructions.items(.tag)[@backingInt(value[value.len - 1])] != .decl_ref) continue;
-                const outer_decl = vir.instructions.items(.data)[@backingInt(value[value.len - 1])].decl_tok.decl;
+                if (value.len == 0) continue;
+                // §12.3.10 a select of one net still joins the port to it.
+                const whole, const ref = switch (vir.instructions.items(.tag)[@backingInt(value[value.len - 1])]) {
+                    .decl_ref => .{ true, value[value.len - 1] },
+                    .elem, .slice, .slice_up, .slice_down => |t| sel: {
+                        const sel_at = value[value.len - 1];
+                        const base = if (t == .elem) payloadOf(vir, Inst.Bin, sel_at).lhs else payloadOf(vir, Inst.Triple, sel_at).a;
+                        const at = base.toIndex() orelse continue;
+                        if (vir.instructions.items(.tag)[@backingInt(at)] != .decl_ref) continue;
+                        break :sel .{ false, at };
+                    },
+                    else => continue, // else: only a net or a select of one joins a port to a net
+                };
+                const outer_decl = vir.instructions.items(.data)[@backingInt(ref)].decl_tok.decl;
                 const outer_name = declName(vir, outer_decl) orelse continue;
                 const outer = kindOf(vir, m, vir.string(outer_name)) orelse continue;
                 const formal = if (c.name == .empty) (if (n < header.len) header[n] else continue) else for (header) |h| {
@@ -147,13 +160,51 @@ fn wrealPorts(s: *Sema, file: Zcu.File.Index) Allocator.Error!void {
                 } else continue;
                 const port_name = resolve.portName(cvir, formal);
                 const inner = kindOf(cvir, cm, resolve.internalName(cvir, formal)) orelse .wire;
-                if ((outer == .wreal) == (inner == .wreal)) continue;
+                if (s.config.ieee1364 and warnCell(inner, outer))
+                    try s.fail(.W1160, child.file, formal.toRef(), "§12.3.10: a `{t}` port joined to a `{t}` net is a Table 12-1 warn cell of the net type table", .{ inner, outer });
+                if (!whole or (outer == .wreal) == (inner == .wreal)) continue;
                 const other = if (outer == .wreal) inner else outer;
                 if (other == .wire or other == .tri) continue;
                 try s.failRule(.{ .part = .{ .conn = @intCast(n) } }, .E0919, file, i.toRef(), "`{s}` is a {t} and port `{s}` is a {t}", .{ vir.string(outer_name), outer, port_name, inner });
             }
         }
     }
+}
+
+/// IEEE 1364-2005 §12.3.10 Table 12-1: whether a port of net type
+/// `internal` joined to a net of type `external` is a "warn" cell.
+fn warnCell(internal: NetKind, external: NetKind) bool {
+    const Col = enum { wire, wand, wor, trireg, tri0, tri1, uwire, supply0, supply1, other };
+    const col = struct {
+        fn of(k: NetKind) Col {
+            return switch (k) {
+                .wire, .tri, .none, .ground => .wire,
+                .wand, .triand => .wand,
+                .wor, .trior => .wor,
+                .trireg => .trireg,
+                .tri0 => .tri0,
+                .tri1 => .tri1,
+                .uwire => .uwire,
+                .supply0 => .supply0,
+                .supply1 => .supply1,
+                .wreal => .other,
+            };
+        }
+    }.of;
+    const warns: []const Col = switch (col(internal)) {
+        .wire, .other => &.{},
+        .wand => &.{ .wor, .trireg, .tri0, .tri1, .uwire },
+        .wor => &.{ .wand, .trireg, .tri0, .tri1, .uwire },
+        .trireg => &.{ .wand, .wor, .uwire },
+        .tri0 => &.{ .wand, .wor, .tri1, .uwire },
+        .tri1 => &.{ .wand, .wor, .tri0, .uwire },
+        .uwire => &.{ .wand, .wor, .trireg, .tri0, .tri1 },
+        .supply0 => &.{.supply1},
+        .supply1 => &.{.supply0},
+    };
+    // Table 12-1's diagonal never warns.
+    assert(std.mem.findScalar(Col, warns, col(internal)) == null);
+    return std.mem.findScalar(Col, warns, col(external)) != null;
 }
 
 /// The name a net or port declaration declares, or null for another

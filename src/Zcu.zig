@@ -268,8 +268,9 @@ pub const Failure = struct {
 /// list, a defparam's target name, or an attribute spec of a declaration
 /// or instance, by position among its prefix specs; a failure about one
 /// is located at its first token (`value`: a parameter value's expression,
-/// past a named one's `.name(`; `rhs`: a defparam's value).
-pub const Part = union(enum) { whole, conn: u32, param: u32, value: u32, target, rhs, attr: u32 };
+/// past a named one's `.name(`; `rhs`: a defparam's value; `rule`: a
+/// configuration's k-th rule after its `design` statement).
+pub const Part = union(enum) { whole, conn: u32, param: u32, value: u32, target, rhs, attr: u32, rule: u32 };
 
 /// The rules a catalogue code covers whose IEEE 1364 report lib/sim/digital
 /// wrote in its own words: the instance's ports (§12.3.6) and parameter
@@ -290,6 +291,18 @@ pub const Rule = enum(u8) {
     cell_again,
     /// `nums`: the extra values, the overridable parameters.
     param_extra,
+    /// IEEE 1364-2005 §13.3/§13.4.4 a configuration refused; `name` is the
+    /// whole reason.
+    config,
+    /// IEEE 1364-2005 §12.2.1 a one-name defparam no declaration of its
+    /// module names (E0901); `name` the name.
+    defparam_nothing,
+    /// §12.8.2 a defparam resolved before the hierarchy was complete that
+    /// resolves differently once it is.
+    defparam_early,
+    /// §12.2.1 a defparam inside an array element reaching outside it;
+    /// `name` the element.
+    defparam_outside,
 };
 
 /// `fmtPath`'s value; print it with `{f}`.

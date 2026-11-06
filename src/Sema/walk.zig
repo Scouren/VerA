@@ -33,6 +33,7 @@ const vams = @import("vams");
 const InternPool = @import("intern_pool");
 const Sema = @import("../Sema.zig");
 const Zcu = @import("../Zcu.zig");
+const cycle = @import("cycle.zig");
 const eval = @import("eval.zig");
 const paramset = @import("paramset.zig");
 const discipline = @import("discipline.zig");
@@ -88,9 +89,6 @@ pub const Walk = struct {
 
 /// The most iterations one loop generate scheme unrolls.
 const loop_max: u32 = 1 << 16;
-
-/// The deepest instance tree; deeper is a runaway recursion (E0905).
-const depth_max: u32 = 1 << 16;
 
 /// Walks the instance trees under `roots` into `zcu.instances`, until no
 /// late defparam changes a value; returns the defparams left waiting.
@@ -281,13 +279,10 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     const base: ?*const Zcu.Hier = if (picked.base) |*b| b else if (p.parent == .none) null else &zcu.instances.items(.hier)[@backingInt(p.parent)];
     env.hier = try hierValues(s, &env, base, w.givens.items[picked.givens.start..][0..picked.givens.len], if (picked.base == null) dps else &.{}, p.file, p.src);
     for (env.positions.keys()) |param_inst| _ = try env.param(param_inst);
-    try arraySizes(s, &env, p);
+    try arraySizes(s, &env, p, picked.module.file, w.givens.items[picked.givens.start..][0..picked.givens.len]);
     const params = try zcu.intern_pool.get(s.gpa, .{ .aggregate = .{ .ty = .none, .elems = env.values.items } });
     const key: Instance.Key = .{ .module = picked.module, .params = params };
-    if (try recursion(w, p, key)) |depth| {
-        try s.fail(.E0905, p.file, p.src, "`{s}` instantiates itself with the same parameters ({d} levels deep)", .{ vir.string(row.name), depth });
-        return;
-    }
+    if (try cycle.refused(w, p, key, vir.string(row.name))) return;
     if (zcu.isBuiltin(picked.module)) try portDisciplineAttrs(s, p);
     const ports = try bindPorts(s, p, vir, m, row.name);
     try zcu.instances.append(s.gpa, .{ .module = picked.module, .parent = p.parent, .name = p.name, .params = params, .paramset = picked.paramset, .paramset_params = picked.own, .src = p.src, .hier = env.hier, .ports = ports });
@@ -312,8 +307,10 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
 /// default value of an array parameter shall be of the exact size of the
 /// parameter array", and one whose size an override changed "shall be
 /// assigned an array of the new size" (E0921 for either). A value or range
-/// that does not fold is not judged.
-fn arraySizes(s: *Sema, env: *Env, p: Pending) Allocator.Error!void {
+/// that does not fold is not judged. Located as the old elaborator did: at
+/// the value of the override in `givens`, else at the declaration in
+/// `file`.
+fn arraySizes(s: *Sema, env: *Env, p: Pending, file: Zcu.File.Index, givens: []const Given) Allocator.Error!void {
     assert(env.positions.count() == env.values.items.len);
     for (env.positions.keys(), env.values.items) |q, v| {
         const want = try env.arraySize(q) orelse continue;
@@ -322,12 +319,39 @@ fn arraySizes(s: *Sema, env: *Env, p: Pending) Allocator.Error!void {
         if (k != .aggregate) continue;
         const got = k.aggregate.elems.len;
         if (got == want) continue;
-        const name = env.vir.string(payloadOf(env.vir, Inst.Param, q).name);
+        const own = env.vir.string(payloadOf(env.vir, Inst.Param, q).name);
+        // The old elaborator's path: below the root, the instance's then the parameter's name.
+        const name = if (p.parent == .none) own else try std.fmt.allocPrint(s.arena, "{f}{s}{s}.{s}", .{
+            s.zcu.fmtPathBelowRoot(p.parent),
+            if (s.zcu.instances.items(.parent)[@backingInt(p.parent)] == .none) "" else ".",
+            s.zcu.intern_pool.stringToSlice(p.name),
+            own,
+        });
         if (env.given.contains(q))
-            try s.fail(.E0921, p.file, p.src, "the array assigned to `{s}` has {d} elements, and its declared range has {d}", .{ name, got, want })
+            try s.failRule(.{ .part = givenPart(s, env, givens, q) }, .E0921, p.file, p.src, "the array assigned to `{s}` has {d} elements, and its declared range has {d}", .{ name, got, want })
         else
-            try s.fail(.E0921, p.file, p.src, "an override resized `{s}` to {d} elements, and no array of the new size was assigned to it (its default has {d})", .{ name, want, got });
+            try s.fail(.E0921, file, q.toRef(), "an override resized `{s}` to {d} elements, and no array of the new size was assigned to it (its default has {d})", .{ name, want, got });
     }
+}
+
+/// The value of `givens` that sets parameter `q`: by name, else by
+/// position among the overridable parameters; the whole instance when
+/// neither finds it (a defparam set it).
+fn givenPart(s: *Sema, env: *const Env, givens: []const Given, q: Inst.Index) Zcu.Part {
+    assert(env.positions.contains(q));
+    const vir = env.vir;
+    if (givens.len == 0) return .whole;
+    if (givens[0].name == .empty) {
+        var k: u32 = 0;
+        for (env.positions.keys()) |o| {
+            if (o == q) return if (k < givens.len) .{ .value = k } else .whole;
+            k += @intFromBool(isOverridable(vir, o));
+        }
+        return .whole;
+    }
+    const name = vir.string(payloadOf(vir, Inst.Param, q).name);
+    for (givens, 0..) |g, k| if (std.mem.eql(u8, s.zcu.intern_pool.stringToSlice(g.name), name)) return .{ .value = @intCast(k) };
+    return .whole;
 }
 
 /// Annex E.3.2.1: "The value [of `port_discipline`] shall be of type
@@ -416,25 +440,6 @@ fn portName(vir: *const Vir, f: Inst.Index) []const u8 {
 fn portNamed(vir: *const Vir, formals: []const Inst.Index, name: []const u8) ?Inst.Index {
     assert(name.len != 0);
     for (formals) |f| if (std.mem.eql(u8, portName(vir, f), name)) return f;
-    return null;
-}
-
-/// E0905's depth when `key` is already on the path from the root to `p`,
-/// or when the tree is past `depth_max`; else null.
-fn recursion(w: *Walk, p: Pending, key: Instance.Key) Allocator.Error!?u32 {
-    assert(key.params != .none);
-    if (p.parent != .none) assert(@backingInt(p.parent) < w.zcu.instances.len);
-    const parents = w.zcu.instances.items(.parent);
-    const modules = w.zcu.instances.items(.module);
-    const params = w.zcu.instances.items(.params);
-    var depth: u32 = 1;
-    var it = p.parent;
-    while (it != .none) : (it = parents[@backingInt(it)]) {
-        depth += 1;
-        if (depth > depth_max) return depth;
-        if (params[@backingInt(it)] == key.params and std.meta.eql(modules[@backingInt(it)], key.module)) return depth;
-    }
-    if (w.zcu.instances.len >= Zcu.instances_max) return depth;
     return null;
 }
 

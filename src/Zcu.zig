@@ -33,7 +33,7 @@
 //! - `pub fn declRow(zcu: *const Zcu, d: Decl) Vir.Decl`
 //! - `pub fn continuousDiscipline(zcu: *Zcu, name: []const u8) Allocator.Error!bool`
 //! - `pub fn isBuiltin(zcu: *const Zcu, d: Decl) bool`
-//! - `pub fn fmtPath(zcu: *const Zcu, i: Instance.Index) PathFormatter` (`PathFormatter.format`)
+//! - `pub fn fmtPath(zcu: *const Zcu, i: Instance.Index) PathFormatter` (`PathFormatter.format`), `pub fn fmtPathBelowRoot`
 //! - `pub fn hasCode(zcu: *const Zcu, code: Diag.Code) bool`
 //! - `pub fn libraryOf(zcu: *const Zcu, d: Decl) []const u8`
 //! - `pub fn answerData(zcu: *Zcu, bytes: ?[]const u8) Allocator.Error!void`
@@ -260,8 +260,9 @@ pub const Failure = struct {
 /// A connection or parameter value of an instance, by position in its
 /// list, a defparam's target name, or an attribute spec of a declaration
 /// or instance, by position among its prefix specs; a failure about one
-/// is located at its first token.
-pub const Part = union(enum) { whole, conn: u32, param: u32, target, attr: u32 };
+/// is located at its first token (`value`: a parameter value's expression,
+/// past a named one's `.name(`).
+pub const Part = union(enum) { whole, conn: u32, param: u32, value: u32, target, attr: u32 };
 
 /// The rules a catalogue code covers whose IEEE 1364 report lib/sim/digital
 /// wrote in its own words: the instance's ports (§12.3.6) and parameter
@@ -288,6 +289,8 @@ pub const Rule = enum(u8) {
 pub const PathFormatter = struct {
     zcu: *const Zcu,
     instance: Instance.Index,
+    /// Leave out the root's own name, as the old elaborator's reports do.
+    below_root: bool = false,
 
     /// Writes the path, outermost name first.
     pub fn format(p: PathFormatter, w: *std.Io.Writer) std.Io.Writer.Error!void {
@@ -299,11 +302,12 @@ pub const PathFormatter = struct {
         assert(depth >= 1);
         // ponytail: one walk up per level, quadratic in depth; a stack of
         // indexes if paths ever print on a hot path.
-        var level = depth;
+        const top = if (p.below_root) depth - 1 else depth;
+        var level = top;
         while (level > 0) : (level -= 1) {
             it = p.instance;
             for (1..level) |_| it = parents[@backingInt(it)];
-            if (level != depth) try w.writeByte('.');
+            if (level != top) try w.writeByte('.');
             try w.writeAll(p.zcu.intern_pool.stringToSlice(names[@backingInt(it)]));
         }
     }
@@ -428,6 +432,12 @@ pub fn isBuiltin(zcu: *const Zcu, d: Decl) bool {
 pub fn fmtPath(zcu: *const Zcu, i: Instance.Index) PathFormatter {
     assert(@backingInt(i) < zcu.instances.len);
     return .{ .zcu = zcu, .instance = i };
+}
+
+/// `fmtPath` without the root's name: empty for the root itself.
+pub fn fmtPathBelowRoot(zcu: *const Zcu, i: Instance.Index) PathFormatter {
+    assert(@backingInt(i) < zcu.instances.len);
+    return .{ .zcu = zcu, .instance = i, .below_root = true };
 }
 
 /// §13.2.3 the library design unit `d` maps into (`work` without a map).

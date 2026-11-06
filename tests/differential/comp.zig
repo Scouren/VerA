@@ -13,7 +13,7 @@
 //! agrees, or that is not in the corpus, fails the run until its line goes.
 //! Determinism: `-Dcomp-j1=N` fixtures' new side runs again at `--jobs=1`
 //! and must write the same bytes as at the CPU count.
-//! `-Dcomp-filter=` runs a subset; `-Dcomp-rebaseline` writes every
+//! `-Dcomp-filter=` runs a subset (`|` between alternatives); `-Dcomp-rebaseline` writes every
 //! disagreement to `zig-out/comp.xfail.new` instead of failing.
 //! No LRM clause: this checks VerA's rewrite against VerA.
 //!
@@ -69,7 +69,13 @@ fn runAll() !void {
     const arena = arena_state.allocator();
     const all = try fixture.collect(arena, io, options.fixture_root);
     var picked: std.ArrayList(Fixture) = .empty;
-    for (all) |f| if (options.filter.len == 0 or std.mem.find(u8, f.rel, options.filter) != null) try picked.append(arena, f);
+    for (all) |f| {
+        var alts = std.mem.splitScalar(u8, options.filter, '|');
+        const hit = while (alts.next()) |alt| {
+            if (std.mem.find(u8, f.rel, alt) != null) break true;
+        } else false;
+        if (hit) try picked.append(arena, f);
+    }
     const env = try arena.create(std.process.Environ.Map);
     env.* = try std.testing.environ.createMap(arena);
     const work = try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", "comp-work" });

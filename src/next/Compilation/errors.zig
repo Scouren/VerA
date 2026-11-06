@@ -135,9 +135,10 @@ fn partLoc(out: vams.Preprocessor.Output, u: *const Compilation.Unit, src: Inst.
         .target => return targetLoc(out, u, src),
         .attr => |k| return attrLoc(out, u, src, k),
         .conn => |k| .{ k, connOpen(u, src) },
-        .param => |k| .{ k, paramOpen(u, src) },
+        .param, .value => |k| .{ k, paramOpen(u, src) },
     };
-    const t = itemStart(&u.tree, list_open orelse return instLoc(out, u, src), k) orelse return instLoc(out, u, src);
+    var t = itemStart(&u.tree, list_open orelse return instLoc(out, u, src), k) orelse return instLoc(out, u, src);
+    if (part == .value and u.tree.tokenTag(t) == .period) t += 3;
     const at = u.tree.tokenStart(t);
     return relocate(out, at, at + @as(u32, @intCast(u.tree.tokenSlice(t).len)));
 }
@@ -223,9 +224,19 @@ fn connOpen(u: *const Compilation.Unit, src: Inst.Ref) ?vams.Ast.TokenIndex {
     return null;
 }
 
-/// The `(` after `#` of the instantiation that lists instance `src`.
+/// The `(` after `#` of the instantiation that lists instance `src`, or
+/// of connect statement `src` (§7.7.3).
 fn paramOpen(u: *const Compilation.Unit, src: Inst.Ref) ?vams.Ast.TokenIndex {
-    const n = instanceNode(u, src) orelse return null;
+    const n = instanceNode(u, src) orelse {
+        const i = src.toIndex() orelse return null;
+        if (u.vir.instructions.items(.tag)[@backingInt(i)] != .connect_insert) return null;
+        var t = instToken(u, src) orelse return null;
+        // Bounded by the token count: each turn moves one token on.
+        while (u.tree.tokenTag(t) != .semicolon and u.tree.tokenTag(t) != .eof) : (t += 1) {
+            if (u.tree.tokenTag(t) == .hash and u.tree.tokenTag(t + 1) == .l_paren) return t + 1;
+        }
+        return null;
+    };
     const tree = &u.tree;
     const tags = tree.nodes.items(.tag);
     // Bounded by the node count; a refusal's location only.

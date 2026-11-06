@@ -1523,3 +1523,18 @@ src/
   - If versioning still loses on a real device after that, keeping it is the user's call.
   - `Fast` is an optional, additive trait in the device ABI (contract/family.zig). ESPice
     gains it only if its family provides `Fast`.
+- **Versioned units: the measured result (rw-codegen2, bench-fast, median ns/eval).**
+
+  | Device | Strict | Versioned + Fast | Change |
+  |---|---|---|---|
+  | diode | 13.32 | 10.18 | +24% |
+  | tanh OTA | 29.52 | 27.80 | +6% |
+  | MOSFET | 12.95 | 14.15 | -9% |
+  | abs | 6.34 | 7.45 | -17% |
+
+  - The per-point box check costs more than fast math saves on polynomial devices.
+  - Decision (lead, within the compiler-inferred policy): version a unit only when its
+    fast slice holds a transcendental. bench-fast now fails if any device is slower
+    versioned than strict.
+  - Batch-level dispatch for ESPice would need a contract change (`batch_ok` hosts).
+    It is recorded as future work, not built.

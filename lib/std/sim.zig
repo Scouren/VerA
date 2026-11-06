@@ -7,7 +7,7 @@
 //! Contents:
 //! - `pub const Program`, `pub const Builder`, `pub const State`, `pub const Interp`
 //! - `pub const eval`, `pub const display`, `pub const logic`, `pub const net`, `pub const resolve`, `pub const calls`, `pub const readmem`, `pub const holds`, `pub const files`, `pub const tchk`, `pub const vcd`, `pub const evcd`, `pub const sdf`, `pub const sdf_text`, `pub const scan`, `pub const queues`, `pub const pla`, `pub const activations`, `pub const wide`
-//! - `pub const scheduler`, `pub const time`, `pub const analog`, `pub const serial`, `pub const mixed`, `pub const exe`, `pub const bench`, `pub const bench_data`
+//! - `pub const scheduler`, `pub const time`, `pub const analog`, `pub const serial`, `pub const mixed`, `pub const exe`, `pub const Device`, `pub const DevicePin`, `pub const bench`, `pub const bench_data`
 
 pub const Program = @import("sim/Program.zig");
 pub const Builder = @import("sim/Builder.zig");
@@ -39,6 +39,10 @@ pub const serial = @import("sim/serial.zig");
 pub const mixed = @import("sim/mixed.zig");
 /// A `.v` design's run: `vera --run`'s and the `--emit-exe` executable's.
 pub const exe = @import("sim/exe.zig");
+/// A `.v` design as a contract device (`--emit-zig`, `--check`, `--emit-so`).
+pub const Device = @import("sim/Device.zig").Device;
+/// One pin of a `Device`.
+pub const DevicePin = @import("sim/Device.zig").Pin;
 /// The analog testbench runtime a runner's root runs (reads `@import("root")`).
 pub const bench = @import("sim/bench.zig");
 /// The bench a runner runs, as data: what the compiler writes into it.
@@ -49,6 +53,7 @@ test {
     _ = serial;
     _ = mixed;
     _ = exe;
+    _ = @import("sim/Device.zig");
     _ = bench_data;
     _ = Program;
     _ = Builder;

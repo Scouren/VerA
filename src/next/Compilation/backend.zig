@@ -126,7 +126,7 @@ pub fn codegen(comp: *Compilation, b: Compilation.Backend) !?Job {
         .verilog => return notBuilt(comp, b, "the behavioural Verilog backend (--emit-verilog)"),
         .osdi => return notBuilt(comp, b, "the OSDI backend (--emit-osdi)"),
         .rtlil => return notBuilt(comp, b, "the RTLIL backend (--emit-rtlil)"),
-        .digital_device => return notBuilt(comp, b, "the digital device backend (a .v --emit-zig, --check, --emit-so)"),
+        .digital_device => return digitalDevice(comp),
         .digital_exe => return digitalExe(comp),
         .libmap => unreachable, // Refused before preprocessing.
         .digital_lowering => unreachable, // A stage, not a backend: `semaDigital` names it.
@@ -164,7 +164,7 @@ pub fn link(comp: *Compilation, task: @FieldType(Job, "link")) !?Job {
     const a = comp.arena();
     const slots = try a.alloc(link_mod.Server, c.thread_limit);
     var q: link_mod.Queue = .init(slots);
-    const engine = try engineModules(a, c.contract.?);
+    const engine = try deviceModules(comp);
     switch (task) {
         .check => {
             const dir = scratchDir(comp) catch |e| switch (e) {
@@ -177,7 +177,7 @@ pub fn link(comp: *Compilation, task: @FieldType(Job, "link")) !?Job {
             };
             defer Io.Dir.cwd().deleteTree(comp.io, dir) catch {};
             var err: Io.Writer.Allocating = .init(a);
-            const f: link_mod.File = .{ .kind = .check, .work_dir = dir, .name = "check", .optimize = c.optimize, .modules = &engine, .zig_exe = c.zig_exe, .check_pause = c.check_pause };
+            const f: link_mod.File = .{ .kind = .check, .work_dir = dir, .name = "check", .optimize = c.optimize, .modules = engine, .zig_exe = c.zig_exe, .check_pause = c.check_pause };
             const v = link_mod.typeCheck(f, comp.gpa, comp.io, &q, comp.device.?.text, c.paths[0], &err.writer) catch |e| {
                 try comp.outputs.err.print(a, "error: {s}: type check failed: {t}\n", .{ c.paths[0], e });
                 comp.outputs.status = 1;
@@ -196,8 +196,8 @@ pub fn link(comp: *Compilation, task: @FieldType(Job, "link")) !?Job {
             const wd = c.work_dir orelse return refuse(comp, 2, "error: --emit-so needs --work-dir DIR\n");
             const dyn = c.dyn orelse return refuse(comp, 2, "error: --emit-so needs --dyn PATH\n");
             const top = comp.zcu.intern_pool.stringToSlice(comp.zcu.instances.items(.name)[0]);
-            const mods = engine ++ [_]link_mod.Module{.{ .name = "dyn", .root = dyn, .deps = &.{"contract"} }};
-            const f: link_mod.File = .{ .kind = .so, .work_dir = wd, .name = try link_mod.fileStem(a, top), .optimize = c.optimize, .modules = &mods, .zig_exe = c.zig_exe, .debug_info = c.debug_info };
+            const mods = try std.mem.concat(a, link_mod.Module, &.{ engine, &.{.{ .name = "dyn", .root = dyn, .deps = &.{"contract"} }} });
+            const f: link_mod.File = .{ .kind = .so, .work_dir = wd, .name = try link_mod.fileStem(a, top), .optimize = c.optimize, .modules = mods, .zig_exe = c.zig_exe, .debug_info = c.debug_info };
             var built = f.flush(comp.gpa, comp.io, &q, comp.device.?, 1) catch |e| {
                 try comp.outputs.err.print(a, "error: {s}: building the device failed: {t}\n", .{ c.paths[0], e });
                 comp.outputs.status = 1;
@@ -320,6 +320,73 @@ fn digitalExe(comp: *Compilation) !?Job {
         },
     }
     return null;
+}
+
+/// A `.v` top as a contract device (`codegen.digital_next.writeDevice`):
+/// E1103 when it cannot be one, W1155 when its tick is 1 s, then the
+/// target's link (`--check`, `--emit-so`) or the text (`--emit-zig`).
+fn digitalDevice(comp: *Compilation) !?Job {
+    const c = comp.config;
+    const a = comp.arena();
+    const dn = codegen_mod.digital_next;
+    if (c.target == .osdi) return notBuilt(comp, .digital_device, "the digital device backend (a .v --emit-osdi)");
+    const l = &comp.lowered.?;
+    const ports = try topPorts(comp);
+    const top = comp.zcu.intern_pool.stringToSlice(comp.zcu.instances.items(.name)[0]);
+    const at = topLoc(comp);
+    if (dn.deviceRefusal(&l.program, ports)) |why| {
+        try comp.wip.add(.lower, .E1103, at, "module `{s}`: {s}", .{ top, why });
+        return null;
+    }
+    if (l.program.finest == 0) try comp.wip.add(.lower, .W1155, at, "module `{s}`: no `timescale sets a finer precision", .{top});
+    var text: Io.Writer.Allocating = .init(a);
+    try dn.writeDevice(&text.writer, a, &l.program, ports);
+    assert(text.written().len != 0);
+    comp.device = .{ .text = try comp.gpa.dupe(u8, text.written()) };
+    if (c.check or c.target == .check) return .{ .link = .check };
+    if (c.target == .so) return .{ .link = .so };
+    try writeText(comp);
+    return null;
+}
+
+/// The root's ports as the device reads them (`Lowered.ports`).
+fn topPorts(comp: *Compilation) ![]const codegen_mod.digital_next.Port {
+    const L = sema.digital.Lowered;
+    // ponytail: until rw-dlower's `Lowered.ports` lands, a design reads as
+    // having no ports.
+    if (!@hasField(L, "ports")) return &.{};
+    const l = &comp.lowered.?;
+    const out = try comp.arena().alloc(codegen_mod.digital_next.Port, l.ports.len);
+    for (out, l.ports) |*o, p| o.* = .{ .name = p.name, .dir = switch (p.dir) {
+        .input => .input,
+        .output => .output,
+        .inout => .inout,
+    }, .slot = p.slot, .ty = p.ty, .msb = p.msb, .lsb = p.lsb, .scalar = p.scalar, .integer = p.integer };
+    return out;
+}
+
+/// Where the device's diagnostics point: the root module's `module`
+/// keyword (`Lowered.top_at`).
+fn topLoc(comp: *Compilation) vams.Diag.Loc {
+    if (!@hasField(sema.digital.Lowered, "top_at")) return .none;
+    const at = comp.lowered.?.top_at;
+    return errors.relocate(comp.pp.output(), at, at);
+}
+
+/// The modules a device compiles against: `engineModules`, and for a `.v`
+/// one `std_sim` and what it imports, from the same tree.
+fn deviceModules(comp: *Compilation) ![]const link_mod.Module {
+    const a = comp.arena();
+    const contract = comp.config.contract.?;
+    const engine = try engineModules(a, contract);
+    if (comp.lowered == null) return a.dupe(link_mod.Module, &engine);
+    const tree = std.fs.path.dirname(std.fs.path.dirname(contract) orelse ".") orelse ".";
+    return a.dupe(link_mod.Module, &[_]link_mod.Module{
+        engine[0],
+        .{ .name = "std_sim", .root = try std.fs.path.join(a, &.{ tree, "lib", "std", "sim.zig" }), .deps = &.{ "kernels", "contract", "vams" } },
+        .{ .name = "kernels", .root = try std.fs.path.join(a, &.{ tree, "lib", "kernels", "root.zig" }), .deps = &.{"contract"} },
+        .{ .name = "vams", .root = try std.fs.path.join(a, &.{ tree, "lib", "std", "vams.zig" }) },
+    });
 }
 
 /// Each timing check's W1199 site (`Lowered.check_sites`), relocated to

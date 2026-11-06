@@ -32,6 +32,7 @@
 //! - `pub fn identText(tree: *const Ast, tok: Ast.TokenIndex) []const u8`
 //! - `pub fn isName(tag: Token.Tag) bool`
 //! - `pub fn defaultsAt(ag: *AstGen, tok: Ast.TokenIndex) Allocator.Error!Vir.List(Inst.Default)`
+//! - `pub fn transitionAt(ag: *const AstGen, at: u32) ?f64`
 //! - `pub fn stampAt(ag: *const AstGen, tok: Ast.TokenIndex) Inst.Module.Stamp`
 //! - `pub fn report(ag: *AstGen, c: Diag.Code, tok: Ast.TokenIndex, comptime fmt: []const u8, args: anytype) Allocator.Error!void`
 //! - `pub fn build(ag: *AstGen, c: Diag.Code, tok: Ast.TokenIndex) Diag.Wip.Builder`
@@ -69,6 +70,8 @@ decl_insts: std.AutoHashMapUnmanaged(Node.Index, Inst.Index) = .empty,
 /// Generate arms to the `gen_block` their scope's scan reserved.
 block_insts: std.AutoHashMapUnmanaged(Node.Index, Inst.Index) = .empty,
 decls: std.ArrayList(Vir.Decl) = .empty,
+/// §10.3 the `default_transition` at each `transition` call, in order.
+transitions: std.ArrayList(Vir.TransitionDefault) = .empty,
 wip: Diag.Wip,
 /// Lowering an analog block or analog function statement, where A.8.4's
 /// `analog_primary` has no `( mintypmax )` (E0295).
@@ -161,6 +164,9 @@ pub fn generate(gpa: Allocator, tree: *const Ast, options: Options) Allocator.Er
     const table = try ag.addList(Vir.Decl, ag.decls.items);
     ag.extra.items[@backingInt(Vir.ExtraIndex.decls)] = table.start;
     ag.extra.items[@backingInt(Vir.ExtraIndex.decls) + 1] = table.len;
+    const tr = try ag.addList(Vir.TransitionDefault, ag.transitions.items);
+    ag.extra.items[@backingInt(Vir.ExtraIndex.transitions)] = tr.start;
+    ag.extra.items[@backingInt(Vir.ExtraIndex.transitions) + 1] = tr.len;
 
     var diag = try ag.wip.toOwnedBundle();
     errdefer diag.deinit(gpa);
@@ -324,6 +330,12 @@ pub fn defaultsAt(ag: *AstGen, tok: Ast.TokenIndex) Allocator.Error!Vir.List(Ins
     ag.defaults_seen = seen;
     ag.defaults_list = try ag.addList(Inst.Default, rows[0..n]);
     return ag.defaults_list;
+}
+
+/// §10.3 the `default_transition` in force at byte `at` of the text, or
+/// null (none, or withdrawn by `resetall`).
+pub fn transitionAt(ag: *const AstGen, at: u32) ?f64 {
+    return lastBefore(?f64, ag.options.directives.transitions, at) orelse null;
 }
 
 /// The IEEE 1364 §19 directives in force at token `tok`.

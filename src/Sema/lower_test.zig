@@ -306,6 +306,33 @@ test "§4.2.9 an unsigned operand makes the comparison unsigned, each extended f
     try std.testing.expectEqual(@as(f64, 10.0), try o.value(0, 0, &.{1.0}));
 }
 
+test "§10.3 each transition takes the `default_transition` in force at it" {
+    // Two directives in one module: the first transition follows the first
+    // (offset 0), the second the one placed just before it.
+    const body =
+        \\module m(p, q);
+        \\  inout p, q; electrical p, q;
+        \\  analog begin V(p) <+ transition(V(p), 0); V(q) <+ transition(V(q), 0); end
+        \\endmodule
+    ;
+    const second = prelude.len + comptime std.mem.indexOf(u8, body, "V(q) <+").?;
+    var o = try lowerWith(body, .{ .transitions = &.{ .{ .at = 0, .value = 1e-9 }, .{ .at = second, .value = 3e-9 } } });
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{}, o.codes);
+    var rises: std.ArrayList(f64) = .empty;
+    defer rises.deinit(std.testing.allocator);
+    const a = &o.analysis.?;
+    for (a.air.instructions.items(.tag), a.air.instructions.items(.data)) |t, d| {
+        if (t != .call) continue;
+        const x = a.air.extraData(Air.Call, d.ty_pl.payload);
+        if (x.data.callee != @backingInt(vams.SysFn.Tag.transition)) continue;
+        const args: []const Air.Inst.Ref = @ptrCast(a.air.extra[x.end..][0..x.data.args_len]);
+        if (args.len < 4) continue;
+        try rises.append(std.testing.allocator, if (args[2].toInterned()) |r| o.zcu.intern_pool.indexToKey(r).float else 0);
+    }
+    try std.testing.expectEqualSlices(f64, &.{ 1e-9, 3e-9 }, rises.items);
+}
+
 test "§10.3 `default_transition` fills a transition's absent rise and fall times" {
     var o = try lowerWith(
         \\module m(p);

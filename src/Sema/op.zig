@@ -83,7 +83,7 @@ pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
         .ddt => return .{ .ref = try ddt(s, b, vals.items[0]), .ty = .real },
         .idt => return .{ .ref = try idt(s, b, vals.items), .ty = .real },
         .transition => {
-            try defaultTransition(s, b, &vals);
+            try defaultTransition(s, b, src, &vals);
             return .{ .ref = try expr.call(s, b, @backingInt(tag), .real, vals.items), .ty = .real };
         },
         else => return .{ .ref = try expr.call(s, b, @backingInt(tag), .real, vals.items), .ty = .real },
@@ -327,16 +327,17 @@ fn select(s: *Sema, b: *Block, c: Ref, x: Ref, y: Ref) Allocator.Error!Ref {
 
 /// §10.3 `default_transition` "shall be used for the rise_time and
 /// fall_time ... of transition filters which do not have them specified":
-/// under the directive in force at the module (`Module.stamp`), an absent
+/// under the directive in force at the call ("the directive which
+/// immediately precedes the transition filter", `Vir.transitionDefault`),
+/// an absent
 /// or zero rise time is the directive's value, and an absent or zero fall
 /// time the rise time (§4.5.8 "If only a positive rise_time value is
 /// specified, the simulator uses it for both"); a time known only at run
 /// time is tested where it runs (the old device's `transitionTimes`).
 /// Without the directive the call keeps what the source wrote.
-fn defaultTransition(s: *Sema, b: *Block, vals: *std.ArrayList(Ref)) Allocator.Error!void {
-    const stamp = b.unit.module.stamp;
-    if (!stamp.flags.has_transition) return;
-    const dflt: Ref = .fromIntern(try decl.intern(s, .{ .real = stamp.transition.get() }));
+fn defaultTransition(s: *Sema, b: *Block, src: Inst.Ref, vals: *std.ArrayList(Ref)) Allocator.Error!void {
+    const at = b.unit.vir.transitionDefault(src.toIndex() orelse return) orelse return;
+    const dflt: Ref = .fromIntern(try decl.intern(s, .{ .real = at }));
     while (vals.items.len < 4) try vals.append(s.arena, .fromIntern(.zero_real));
     vals.items[2] = try orWhenZero(s, b, vals.items[2], dflt);
     vals.items[3] = try orWhenZero(s, b, vals.items[3], vals.items[2]);

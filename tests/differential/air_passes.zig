@@ -189,6 +189,7 @@ fn sameValue(x: Value, y: Value) bool {
         .real => |u| y == .real and (@as(u64, @bitCast(u)) == @as(u64, @bitCast(y.real)) or (math.isNan(u) and math.isNan(y.real))),
         .int => |n| y == .int and n == y.int,
         .array => false,
+        .str => |t| y == .str and std.mem.eql(u8, t, y.str),
     };
 }
 

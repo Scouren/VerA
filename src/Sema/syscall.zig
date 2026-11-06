@@ -35,9 +35,11 @@ pub const Deferred = struct {
     tag: SysFn.Tag,
     args: []const Inst.Ref,
     /// Each operand's value at the statement; null for one lowered at the end.
-    pre: []const ?Ref,
+    pre: []const ?Value,
     /// Its `device.displays` row.
     row: u32,
+    /// The statement, for §9.4.3's findings.
+    src: Inst.Ref,
 };
 
 /// A system function call read as a value.
@@ -47,15 +49,19 @@ pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Erro
     const args = vir.list(Inst.Ref, c.args);
     const tag = SysFn.Tag.fromName(name) orelse {
         if (try refuseForeign(s, b, name, src)) return expr.poison;
-        return userCall(s, b, args, .real);
+        return userCall(s, b, name, args, .real);
     };
     const info = SysFn.get(tag);
     if (try refuseContext(s, b, tag, src)) return expr.poison;
+    // §9.5.4/§9.12 a reader assigns its destinations.
+    if (readFrom(tag)) |first| return @import("string.zig").read(s, b, tag, first, args, src);
     // Each of these judges its own argument list, with its clause's codes.
     switch (tag) {
         .white_noise, .flicker_noise, .noise_table, .noise_table_log, .ac_stim => return @import("op.zig").noise(s, b, tag, args, src),
         else => if (info.family == .kernel) return @import("kernel.zig").lower(s, b, tag, args, src), // else: the kernel family by its table row; the rest below
     }
+    // §9.13 a distribution judges its own arity, as E0816.
+    if (info.family == .random) return @import("dist.zig").lower(s, b, tag, args, src);
     if (!info.args.admits(args.len)) {
         try s.fail(.E0506, b.unit.file, src, "`{s}` takes {d} to {d}, given {d}", .{ name, info.args.min, info.args.max, args.len });
         return expr.poison;
@@ -98,11 +104,16 @@ pub fn task(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error
     const args = vir.list(Inst.Ref, c.args);
     const tag = SysFn.Tag.fromName(name) orelse {
         if (try refuseForeign(s, b, name, src)) return;
-        _ = try userCall(s, b, args, null);
+        _ = try userCall(s, b, name, args, null);
         return;
     };
     const info = SysFn.get(tag);
     if (try refuseContext(s, b, tag, src)) return;
+    if (tag == .@"$sformat" or tag == .@"$swrite") return @import("string.zig").write(s, b, tag, args, src);
+    if (readFrom(tag)) |first| {
+        _ = try @import("string.zig").read(s, b, tag, first, args, src);
+        return;
+    }
     switch (info.family) {
         .display, .file_out, .simctl, .string => {},
         else => {
@@ -130,16 +141,18 @@ pub fn task(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error
     try s.device.displays.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .call = undefined });
     if (b.conditional != 0) {
         // A guarded print is minted where it stands.
-        const r = try expr.call(s, b, @backingInt(tag), null, try lowerArgs(s, b, args));
+        const vals = try s.arena.alloc(Value, args.len);
+        for (args, vals) |a, *v| v.* = try printArg(s, b, a);
+        const r = try expr.call(s, b, @backingInt(tag), null, try formatted(s, b, tag, args, vals, src));
         s.device.displays.items(.call)[row] = r.toIndex().?;
         return;
     }
     // §9.4.1 an unconditional print is minted at the end of the analog
     // blocks: an operand that reads a branch flow is lowered there, against
     // the converged sums; every other operand is its value here.
-    const pre = try s.arena.alloc(?Ref, args.len);
-    for (args, pre) |a, *p| p.* = if (a == .none or readsFlow(s, b.unit, a, 0)) null else (try expr.lower(s, b, a)).ref;
-    try s.deferred.append(s.arena, .{ .unit = b.unit, .tag = tag, .args = args, .pre = pre, .row = row });
+    const pre = try s.arena.alloc(?Value, args.len);
+    for (args, pre) |a, *p| p.* = if (a == .none or readsFlow(s, b.unit, a, 0)) null else try expr.lower(s, b, a);
+    try s.deferred.append(s.arena, .{ .unit = b.unit, .tag = tag, .args = args, .pre = pre, .row = row, .src = src });
 }
 
 /// Mints every print `task` deferred, in source order, at the end of `b`
@@ -148,15 +161,30 @@ pub fn finishDisplays(s: *Sema, b: *Block) Allocator.Error!void {
     assert(b.parent == null);
     for (s.deferred.items) |d| {
         b.unit = d.unit;
-        const refs = try s.arena.alloc(Ref, d.args.len);
-        for (d.args, d.pre, refs) |a, p, *r| r.* = p orelse if (a == .none) .fromIntern(.zero_real) else (try expr.lower(s, b, a)).ref;
-        const call = try expr.call(s, b, @backingInt(d.tag), null, refs);
+        const vals = try s.arena.alloc(Value, d.args.len);
+        for (d.args, d.pre, vals) |a, p, *v| v.* = p orelse try printArg(s, b, a);
+        const call = try expr.call(s, b, @backingInt(d.tag), null, try formatted(s, b, d.tag, d.args, vals, d.src));
         s.device.displays.items(.call)[d.row] = call.toIndex().?;
     }
     assert(s.deferred.items.len <= s.device.displays.len);
 }
 
 // ---- private ----
+
+/// A print operand's value; a null argument is §9.4.1's space.
+fn printArg(s: *Sema, b: *Block, a: Inst.Ref) Allocator.Error!Value {
+    if (a == .none) return .{ .ref = .fromIntern(try decl.intern(s, .{ .str = " " })), .ty = .string };
+    return expr.lower(s, b, a);
+}
+
+/// A print's operand refs, after §9.4.3 judged and marked `vals` (format.zig).
+fn formatted(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, vals: []Value, src: Inst.Ref) Allocator.Error![]const Ref {
+    const format = @import("format.zig");
+    try format.operands(s, b, format.skipOf(tag, vals), args, vals, src);
+    const refs = try s.arena.alloc(Ref, vals.len);
+    for (vals, refs) |v, *r| r.* = v.ref;
+    return refs;
+}
 
 /// Whether `r` reads a branch flow (an access whose name is a flow's
 /// anywhere): such an operand is lowered at the end of the blocks.
@@ -191,6 +219,17 @@ fn readsFlow(s: *Sema, unit: *const Sema.Unit, r: Inst.Ref, depth: u32) bool {
         },
         else => return false, // else: a leaf reads no flow
     }
+}
+
+/// The first destination argument of a §9.5.4/§9.12 reader, or null.
+fn readFrom(tag: SysFn.Tag) ?usize {
+    return switch (tag) {
+        .@"$sscanf", .@"$fscanf" => 2,
+        .@"$fgets" => 0,
+        .@"$ferror" => 1,
+        .@"$value$plusargs" => 1,
+        else => null, // else: no destination argument
+    };
 }
 
 /// §9.19 `$port_connected(p)`: the root's port is the host's bit (a call
@@ -252,9 +291,12 @@ fn lowerArgs(s: *Sema, b: *Block, args: []const Inst.Ref) Allocator.Error![]cons
     return out;
 }
 
-fn userCall(s: *Sema, b: *Block, args: []const Inst.Ref, ty: ?Sema.Ty) Allocator.Error!Value {
+/// §12 a user system function or task: a `call` of `user_callee`, its name
+/// in `device.systf` for the host's table.
+fn userCall(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, ty: ?Sema.Ty) Allocator.Error!Value {
     const refs = try lowerArgs(s, b, args);
     const r = try expr.call(s, b, expr.user_callee, ty, refs);
+    try s.device.systf.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .call = r.toIndex().? });
     return .{ .ref = r, .ty = ty orelse .real };
 }
 

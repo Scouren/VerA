@@ -227,6 +227,23 @@ const Walk = struct {
         if (depth > depth_max) return;
         const vir = w.unit.vir;
         const tag = vir.instructions.items(.tag)[@backingInt(i)];
+        // §9.5 a writer's destinations are written, not read.
+        if (tag == .call_sys) if (writtenFrom(vir, i)) |first| {
+            const args = vir.list(Inst.Ref, decl.payloadOf(vir, Inst.SysCall, i).args);
+            for (args, 0..) |a, k| {
+                const dest = k == first or (first >= 2 and k >= first);
+                if (!dest) {
+                    try w.read(a, depth + 1);
+                    continue;
+                }
+                try w.subscripts(a);
+                // Written but not defined, as in the old walk (whose
+                // `stmtEdges` sees a task's arguments only as reads): a
+                // later read is exposed, so the destination is held.
+                if (target(vir, a)) |t| try w.write(t.var_);
+            }
+            return;
+        };
         if (tag == .decl_ref) {
             const k = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl);
             if (vir.instructions.items(.tag)[@backingInt(k)] != .variable) return;
@@ -368,6 +385,21 @@ pub fn mark(s: *Sema, unit: *Unit) Allocator.Error!void {
 }
 
 // ---- private ----
+
+/// The first argument system call `i` writes (§9.5.3 `$sformat`/`$swrite`
+/// its destination, §9.5.4 `$fgets` its string, §9.5.4.2 `$sscanf`/`$fscanf`
+/// every argument from the third, §9.5.7 `$ferror` and §9.12
+/// `$value$plusargs` their second), or
+/// null for a call that writes none.
+fn writtenFrom(vir: *const Vir, i: Inst.Index) ?usize {
+    const name = vir.string(decl.payloadOf(vir, Inst.SysCall, i).name);
+    const table = std.StaticStringMap(usize).initComptime(.{
+        .{ "$sformat", 0 }, .{ "$swrite", 0 }, .{ "$fgets", 0 },
+        .{ "$sscanf", 2 },  .{ "$fscanf", 2 }, .{ "$value$plusargs", 1 },
+        .{ "$ferror", 1 },
+    });
+    return table.get(name);
+}
 
 fn target(vir: *const Vir, r: Inst.Ref) ?Target {
     var at = r;

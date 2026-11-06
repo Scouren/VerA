@@ -27,6 +27,7 @@ pub fn exportDevice(comptime B: type, comptime name: []const u8) void {
     inline for (B.devices, B.names) |D, n| {
         @export(&Run(D).run, .{ .name = "cg_" ++ n });
         @export(&Run(D).unknowns, .{ .name = "cg_" ++ n ++ "_nu" });
+        @export(&Run(D).site, .{ .name = "cg_" ++ n ++ "_site" });
     }
 }
 
@@ -57,6 +58,15 @@ fn Run(comptime D: type) type {
             return n;
         }
 
+        /// §9.4 `say_sites[i]`'s format and its length in `len`, or null
+        /// past the last site.
+        fn site(i: u32, len: *usize) callconv(.c) ?[*]const u8 {
+            const sites: []const contract.SaySite = if (@hasDecl(D, "say_sites")) &D.say_sites else &.{};
+            if (i >= sites.len) return null;
+            len.* = sites[i].fmt.len;
+            return sites[i].fmt.ptr;
+        }
+
         /// The instance and state a transient carries from one step to the next.
         var inst: D.Instance = .{};
         var state: if (@hasDecl(D, "State")) D.State else void = undefined;
@@ -72,8 +82,9 @@ fn Run(comptime D: type) type {
         /// (`initState`) in `analog initial` (§5.2.1), and so does a
         /// process's first step. Returns 0; -1 when
         /// `n_x` is not |U|, -2 when `out` is short, -3 when a name is no
-        /// field of `Model`.
-        fn run(names: [*]const [*:0]const u8, vals: [*]const f64, n_params: u32, x: [*]const f64, n_x: u32, t: f64, step: u32, out: [*]f64, out_len: u32) callconv(.c) i32 {
+        /// field of `Model`, -4 when the display records pass `say_cap`.
+        /// `say_buf[0..say_len]` holds the point's §9.4 records (`D.say`).
+        fn run(names: [*]const [*:0]const u8, vals: [*]const f64, n_params: u32, x: [*]const f64, n_x: u32, t: f64, step: u32, out: [*]f64, out_len: u32, say_buf: [*]f64, say_cap: u32, say_len: *u32) callconv(.c) i32 {
             if (n_x != n) return -1;
             if (out_len < 2 * n + 2 * n * n) return -2;
             var m: D.Model = .{};
@@ -114,6 +125,15 @@ fn Run(comptime D: type) type {
                 out[n + at] += e.g;
                 qo[n + at] += e.c;
             };
+            // §9.4.6 the display records at the accepted point, before
+            // its state moves (as the runner's `sayPoint`).
+            say_len.* = 0;
+            if (@hasDecl(D, "say")) {
+                var s: contract.Say = .{ .buf = say_buf[0..say_cap] };
+                D.say(S, &xv, &m, &inst, sim, &s);
+                if (s.lost != 0) return -4;
+                say_len.* = @intCast(s.len);
+            }
             if (@hasDecl(D, "updateState")) {
                 _ = D.updateState(V, &m, &inst, xv, &state, sim);
                 if (@hasDecl(D, "stateCtl")) _ = D.stateCtl(&m, &inst, &state, .commit);

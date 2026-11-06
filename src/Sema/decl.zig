@@ -67,20 +67,26 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     if (s.units.items.len == 0) return finish(s, &.{});
     try contrib.loadDisciplines(s);
     for (s.units.items) |*u| try discrete.mark(s, u);
+    for (s.units.items) |*u| try @import("discrete_check.zig").check(s, u);
     try net.ports(s, &s.units.items[0]);
     s.device.num_ports = @intCast(s.device.nodes.len);
     for (s.units.items) |*u| try net.nets(s, u);
     for (s.units.items[1..]) |*u| try net.bindChildPorts(s, u);
+    try net.bindBridges(s);
     for (s.units.items) |*u| try param.declare(s, u);
     for (s.units.items) |*u| try discrete.declare(s, u);
+    for (s.units.items[1..]) |*u| try @import("derive.zig").child(s, u);
     for (s.units.items) |*u| try branches(s, u);
     for (s.units.items) |*u| try held.mark(s, u);
     for (s.units.items) |*u| try @import("attr.zig").check(s, u);
     for (s.units.items) |*u| try variable.declare(s, u);
     var main: Block = .{ .parent = null, .unit = &s.units.items[0] };
-    // The old flattener's order: an instance's blocks where its instance
-    // statement stands; then any unit no statement places (an inserted
-    // connect module), in preorder.
+    // The old flattener's order (`elab/instance.zig` inlineInstance,
+    // `Flatten.run`): each placed instance's blocks as the walk reaches it,
+    // in preorder; the top's after every child's (§5.4.2.2: a parent reads
+    // a child's flow after its contribution); then any unit no statement
+    // places (an inserted connect module), in preorder.
+    for (s.units.items[1..]) |*u| if (zcu.instances.items(.src)[@backingInt(u.instance)] != .none) try lowerUnit(s, &main, u, 0);
     try lowerUnit(s, &main, &s.units.items[0], 0);
     for (s.units.items) |*u| if (!u.lowered) try lowerUnit(s, &main, u, 0);
     try syscall.finishDisplays(s, &main);
@@ -280,8 +286,8 @@ fn units(s: *Sema) Allocator.Error!void {
     }
 }
 
-/// Lowers `u`'s analog blocks (and its children's, where their instance
-/// statements stand) into `main`.
+/// Lowers `u`'s own analog blocks into `main` (its children's are lowered
+/// in `run`'s order).
 fn lowerUnit(s: *Sema, main: *Block, u: *Unit, depth: u32) Allocator.Error!void {
     assert(!u.lowered);
     u.lowered = true;
@@ -294,28 +300,31 @@ fn lowerUnit(s: *Sema, main: *Block, u: *Unit, depth: u32) Allocator.Error!void 
 }
 
 /// The analog blocks of a body, in source order, generate schemes unrolled
-/// with their genvars bound (§6.6): each block lowered into `main`; an
-/// instance statement lowers its instances' blocks there.
+/// with their genvars bound (§6.6): each block lowered into `main`.
 fn items(s: *Sema, main: *Block, env: *eval.Env, body: Vir.Body, depth: u32) Allocator.Error!void {
     const unit = main.unit;
     const vir = unit.vir;
     if (depth > gen_depth_max) return;
     for (vir.body(body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .analog, .analog_initial => |tag| {
+        .analog => {
             var b = main.child();
-            b.analog_initial = tag == .analog_initial;
             try control.body(s, &b, payloadOf(vir, Inst.Process, i).body);
             try main.insts.appendSlice(s.arena, b.insts.items);
         },
-        .gen_block => try items(s, main, env, payloadOf(vir, Inst.GenBlock, i).body, depth + 1),
-        .instance => {
-            const zcu = s.zcu;
-            for (s.units.items) |*c| {
-                if (c.lowered or zcu.instances.items(.parent)[@backingInt(c.instance)] != unit.instance) continue;
-                if (zcu.instances.items(.src)[@backingInt(c.instance)] != i.toRef()) continue;
-                try lowerUnit(s, main, c, depth + 1);
-            }
+        // §5.2.1 an `analog initial` body runs on the analysis's first
+        // evaluation only: guarded by `analog$initial`, which the host answers.
+        .analog_initial => {
+            var b = main.child();
+            const flag = try @import("expr.zig").call(s, &b, @backingInt(@import("vams").SysFn.Tag.@"analog$initial"), .integer, &.{});
+            var then_b = b.child();
+            then_b.analog_initial = true;
+            then_b.conditional += 1;
+            try control.body(s, &then_b, payloadOf(vir, Inst.Process, i).body);
+            var else_b = b.child();
+            try control.ifElse(s, &b, flag, &then_b, &else_b);
+            try main.insts.appendSlice(s.arena, b.insts.items);
         },
+        .gen_block => try items(s, main, env, payloadOf(vir, Inst.GenBlock, i).body, depth + 1),
         .gen_if => {
             const g = payloadOf(vir, Inst.GenIf, i);
             const c = (try env.body(g.cond)) orelse continue;

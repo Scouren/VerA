@@ -490,7 +490,6 @@ verilog-a/ch03_data_types/parameter_array_resize_with_value.va not built: backen
 verilog-a/ch03_data_types/parameter_array_resize_without_value_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0921]: parameter array value is not the size its range declares: an override resized `child.coefficients` to 3 elements, and no array of the new size was`, new `error[E0921]: parameter array value is not the size its range declares: an override res
 verilog-a/ch03_data_types/parameter_array_short_override_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0921]: parameter array value is not the size its range declares: the array assigned to `child.coefficients` has 2 elements, and its declared range has 3`, new `error[E0921]: parameter array value is not the size its range declares: the array assign
 verilog-a/ch03_data_types/parameter_assigned_at_runtime.va rw-lower (analog lowering): stderr: line 1: old `error[E0312]: cannot assign to a parameter: `gain``, new `error[E0313]: unknown variable: an assignment to a name that is not a variable`
-verilog-a/ch03_data_types/parameter_default_not_constant_rejected.va not built: backend exe
 verilog-a/ch03_data_types/parameter_default_over_parameter.va not built: backend exe
 verilog-a/ch03_data_types/parameter_desc_attribute_numeric_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch03_data_types/parameter_desc_attribute_numeric_rejected.va:25:8`, new `  --> verilog-a/ch03_data_types/parameter_desc_attribute_numeric_rejected.va:25:49`
 verilog-a/ch03_data_types/parameter_override_reaches_pow_exponent.va not built: backend exe
@@ -752,7 +751,6 @@ verilog-a/ch04_expressions/less_equal.va not built: backend exe
 verilog-a/ch04_expressions/less_than.va not built: backend exe
 verilog-a/ch04_expressions/limexp.va not built: backend exe
 verilog-a/ch04_expressions/limexp_is_exp_at_a_converged_point.va not built: backend exe
-verilog-a/ch04_expressions/limexp_not_a_constant_expression_rejected.va not built: backend exe
 verilog-a/ch04_expressions/ln.va not built: backend exe
 verilog-a/ch04_expressions/ln1p_domain_rejected.va not built: backend exe
 verilog-a/ch04_expressions/ln1p_expm1.va not built: backend exe
@@ -1537,7 +1535,6 @@ verilog-a/ch09_system_tasks/debug_every_iteration.va not built: backend exe
 verilog-a/ch09_system_tasks/discontinuity.va not built: backend exe
 verilog-a/ch09_system_tasks/discontinuity_nonconstant_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/discontinuity_nonconstant_rejected.va:26:33`, new `  --> verilog-a/ch09_system_tasks/discontinuity_nonconstant_rejected.va:26:5`
 verilog-a/ch09_system_tasks/discontinuity_reject_is_limit_verdict.va not built: backend exe
-verilog-a/ch09_system_tasks/display_argument_pairing_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/display_argument_runs.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch09_system_tasks/display_c_format_flags.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch09_system_tasks/display_debug.va not built: backend exe
@@ -1558,7 +1555,6 @@ verilog-a/ch09_system_tasks/dist_type_string_inside_paramset.va not built: backe
 verilog-a/ch09_system_tasks/dist_type_string_misspelled_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/dist_type_string_misspelled_rejected.va:30:35`, new `  = note: LRM 9.13`
 verilog-a/ch09_system_tasks/dist_uniform.va not built: backend exe
 verilog-a/ch09_system_tasks/distribution.va not built: backend exe
-verilog-a/ch09_system_tasks/distribution_arity_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0816]: a $9.13 probabilistic distribution argument: `$rdist_uniform` takes 3 arguments, got 2`, new `error[E0506]: wrong number of arguments to a math function or analog operator: `$rdist_uniform` takes 3 to 4, given 2`
 verilog-a/ch09_system_tasks/driver_access.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: §9.22: "Driver access functions can only be called from connect modules." This is a `module``, new `   = help: run `vera --explain E0818` for a detailed explanation`
 verilog-a/ch09_system_tasks/driver_count_connectmodule_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: §9.22: "Driver access functions can only be called from connect modules." This is a `module``, new `   = help: run `vera --explain E0818` for a detailed explanation`
 verilog-a/ch09_system_tasks/driver_delay_connectmodule_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: §9.22: "Driver access functions can only be called from connect modules." This is a `module``, new `   = help: run `vera --explain E0818` for a detailed explanation`
@@ -1611,7 +1607,6 @@ verilog-a/ch09_system_tasks/fmonitor.va not built: backend exe
 verilog-a/ch09_system_tasks/fopen_multichannel_descriptor.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch09_system_tasks/fopen_type_not_in_table_9_24_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/format_conversion_type_mismatch_rejected.va not built: backend exe
-verilog-a/ch09_system_tasks/format_field_past_its_limit_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/fscanf.va not built: backend exe
 verilog-a/ch09_system_tasks/fscanf_destination_preservation.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch09_system_tasks/fscanf_directive_spans_lines.va not built: backend exe
@@ -1638,7 +1633,6 @@ verilog-a/ch09_system_tasks/geometry_state_read_rejected.va not built: backend e
 verilog-a/ch09_system_tasks/geometry_top_alias_host.va not built: backend exe
 verilog-a/ch09_system_tasks/geometry_unknown_system_rejected.va rw-comp (elab) message: stderr: line 1: old `error[E0907]: override names no parameter of the module: `child.$temperature` names no parameter of the elaborated design`, new `error[E0907]: override names no parameter of the module: `$temperature` is not a parameter of `geometry_unknown_system_child``
 verilog-a/ch09_system_tasks/geometry_vflip_rejected.va rw-comp (elab) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/geometry_vflip_rejected.va:15:3`, new `  --> verilog-a/ch09_system_tasks/geometry_vflip_rejected.va:11:21`
-verilog-a/ch09_system_tasks/hash_flag_without_alternative_form_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/hflip.va not built: backend exe
 verilog-a/ch09_system_tasks/hierarchical_parameters.va not built: backend exe
 verilog-a/ch09_system_tasks/hypot.va not built: backend exe
@@ -1693,7 +1687,6 @@ verilog-a/ch09_system_tasks/monitor_reports_every_change.va not built: backend e
 verilog-a/ch09_system_tasks/monitor_suppresses_an_unchanged_step.va not built: backend exe
 verilog-a/ch09_system_tasks/net_name_display_argument_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0315]: net must be read through an access function: `p``, new `error[E0315]: net must be read through an access function: a net or branch is not a value; read it through an access function`
 verilog-a/ch09_system_tasks/node_alias_outside_initial_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0812]: invalid use of a node alias system function: `$analog_node_alias` is used outside an analog initial block`, new `error[E0315]: net must be read through an access function: a net or branch is not a value; read it through an access functio
-verilog-a/ch09_system_tasks/null_argument_consumed_by_d_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/null_argument_consumed_by_s.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch09_system_tasks/numeric_string.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch09_system_tasks/numeric_string_arithmetic_width_rejected.va not built: backend exe
@@ -1708,7 +1701,6 @@ verilog-a/ch09_system_tasks/param_given_not_overridden.va not built: backend exe
 verilog-a/ch09_system_tasks/param_given_override_equals_default.va not built: backend exe
 verilog-a/ch09_system_tasks/param_given_variable_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/percent_escape_prints_one_percent.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/percent_escape_with_width_rejected.va not built: backend exe
 verilog-a/ch09_system_tasks/plusargs.va not built: backend exe
 verilog-a/ch09_system_tasks/plusargs_prefix.va not built: backend exe
 verilog-a/ch09_system_tasks/plusargs_value_order.va not built: backend exe
@@ -1817,7 +1809,6 @@ verilog-a/ch09_system_tasks/string_formatting.va rw-lower (analog lowering): exi
 verilog-a/ch09_system_tasks/strobe_flow_read_inside_array_pattern_argument.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch09_system_tasks/swrite.va not built: backend exe
 verilog-a/ch09_system_tasks/swrite_s_with_argument.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/swrite_s_without_argument_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0810]: not enough arguments for the format specifiers: the format string has 1 consuming format specifiers but 0 arguments follow it`, new `error[E0321]: arithmetic on a string operand: a string is not a number; §3.3 Table 3-3 gives it no arit
 verilog-a/ch09_system_tasks/table_capture_rejected_step_recaptures.va not built: backend exe
 verilog-a/ch09_system_tasks/table_model.va not built: backend exe
 verilog-a/ch09_system_tasks/table_model_array_control.va not built: backend exe
@@ -2133,8 +2124,6 @@ verilog-ams/ch04_expressions/case_equality.va rw-lower (analog lowering) notes: 
 verilog-ams/ch04_expressions/case_equality_real_operand_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = help: use `==`; for reals prefer `abs(a - b) < tol``, new `   = help: run `vera --explain E0369` for a detailed explanation`
 verilog-ams/ch04_expressions/function_called_outside_analog_rejected.va not built: backend exe
 verilog-ams/ch04_expressions/integer_to_real_xz_bit_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0130]: literal requires digital value support in the execution backend: `4'b10x1`: the analog backend cannot execute this 4-bit four-state literal`, new `error[E0130]: literal requires digital value support in the execution backend: the
-verilog-ams/ch04_expressions/operator_in_always_rejected.va not built: backend exe
-verilog-ams/ch04_expressions/operator_in_initial.va not built: backend exe
 verilog-ams/ch04_expressions/table_4_1_every_operator.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch05_analog_behavior/absdelta_direction_change.va not built: backend exe
 verilog-ams/ch05_analog_behavior/absdelta_dynamic_controls.va not built: backend exe
@@ -2144,7 +2133,6 @@ verilog-ams/ch05_analog_behavior/absdelta_samples_analog_changes.va not built: b
 verilog-ams/ch05_analog_behavior/absdelta_self_disable.va not built: backend exe
 verilog-ams/ch05_analog_behavior/absdelta_time_tol_below_precision.va not built: backend exe
 verilog-ams/ch05_analog_behavior/absdelta_time_tol_filters.va not built: backend exe
-verilog-ams/ch05_analog_behavior/absdelta_without_delta_rejected.va not built: backend exe
 verilog-ams/ch05_analog_behavior/analog_initial.va not built: backend exe
 verilog-ams/ch05_analog_behavior/analog_initial_digital_access_rejected.va not built: backend exe
 verilog-ams/ch05_analog_behavior/analog_initial_event_rejected.va not built: backend exe
@@ -2154,8 +2142,6 @@ verilog-ams/ch05_analog_behavior/array_assignment_from_packed_vector_rejected.va
 verilog-ams/ch05_analog_behavior/bare_event_trigger_in_analog_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = help: only `@(<event>) -> ev;` is legal`, new `   = help: run `vera --explain E0434` for a detailed explanation`
 verilog-ams/ch05_analog_behavior/cross_expr_tol_and_time_tol_both_hold.va not built: backend exe
 verilog-ams/ch05_analog_behavior/event_array_index_change_is_not_an_event.va not built: backend exe
-verilog-ams/ch05_analog_behavior/final_step_in_digital_context_rejected.va not built: backend exe
-verilog-ams/ch05_analog_behavior/initial_step_in_digital_context_rejected.va not built: backend exe
 verilog-ams/ch05_analog_behavior/multiple_analog_initial_blocks_concatenate.va not built: backend exe
 verilog-ams/ch05_analog_behavior/named_event_has_no_time_duration.va not built: backend exe
 verilog-ams/ch05_analog_behavior/named_event_unsupported.va not built: backend exe
@@ -2446,7 +2432,6 @@ verilog-ams/ch09_system_tasks/receiver_net_resolution_assign.va not built: backe
 verilog-ams/ch09_system_tasks/receiver_segregation_ignored_without_driver_value.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch09_system_tasks/reject_clog2_reg_width.va not built: backend exe
 verilog-ams/ch09_system_tasks/rng_constant_distribution_stream.va not built: backend exe
-verilog-ams/ch09_system_tasks/severity_task_digital_context_rejected.va not built: backend exe
 verilog-ams/ch09_system_tasks/stochastic_queue_in_digital_context.va not built: backend exe
 verilog-ams/ch09_system_tasks/stop_in_analog_initial_rejected.va not built: backend exe
 verilog-ams/ch09_system_tasks/strobe_writes_once_per_accepted_solution.va not built: backend exe

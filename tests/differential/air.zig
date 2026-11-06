@@ -129,7 +129,7 @@ const Report = struct {
         for (args) |a| switch (a) {
             .real => |x| std.debug.print(" {e}", .{x}),
             .int => |x| std.debug.print(" {d}", .{x}),
-            .array => unreachable, // the sweep makes scalars only
+            .array, .str => unreachable, // the sweep makes scalars only
         };
         if (want) |w| if (w == .real) std.debug.print(" (fold {e})", .{w.real});
         if (got) |g| if (g == .real) std.debug.print(" (interp {e})", .{g.real}) else {} else |_| {}
@@ -217,7 +217,7 @@ fn sweep(rep: *Report, p: *const Probe, ip: *const InternPool, rnd: std.Random) 
         for (args[0..p.arity], consts[0..p.arity]) |a, *c| c.* = switch (a) {
             .int => |v| .{ .int = v },
             .real => |v| .{ .real = v },
-            .array => unreachable, // the sweep makes scalars only
+            .array, .str => unreachable, // the sweep makes scalars only
         };
         const want = opcode.fold(p.old, consts[0..p.arity]);
         var fba: std.heap.FixedBufferAllocator = .init(&buf);

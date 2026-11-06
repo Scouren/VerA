@@ -28,93 +28,22 @@ const Scope = AstGen.Scope;
 const Error = AstGen.Error;
 const full = Ast.full;
 
-/// Lowers statement `node` into the current body.
+/// Lowers statement `node` into the current body. A statement the §2.9
+/// attribute instances prefix is wrapped in an unnamed block carrying them
+/// (a block carries its own).
 pub fn lower(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
     const tree = ag.tree;
-    const data = tree.nodeData(node);
     switch (tree.nodeTag(node)) {
-        .block => try block(ag, scope, node),
-        .if_stmt => {
-            const cond = try expr.lower(ag, scope, data.node_and_extra[0]);
-            const x = tree.extraData(data.node_and_extra[1], Node.If);
-            _ = try ag.addPl(.condbr, node, Inst.CondBr{ .cond = cond, .then = try body(ag, scope, x.then), .@"else" = try optBody(ag, scope, x.@"else") });
-        },
-        .case_stmt => {
-            const operand = try expr.lower(ag, scope, data.node_and_extra[0]);
-            const items = tree.extraDataSlice(tree.extraData(data.node_and_extra[1], Node.SubRange), Node.Index);
-            const kind: @FieldType(@FieldType(Inst.Case, "flags"), "kind") = switch (tree.tokenTag(tree.nodeMainToken(node))) {
-                .keyword_casex => .casex,
-                .keyword_casez => .casez,
-                else => .case, // else: `case_stmt` opens with one of the three keywords
-            };
-            _ = try ag.addPl(.case, node, Inst.Case{ .flags = .{ .kind = kind }, .operand = operand, .arms = try caseArms(ag, scope, items, body) });
-        },
-        .for_stmt => {
-            const f = tree.extraData(data.extra, Node.For);
-            try lower(ag, scope, f.init);
-            _ = try ag.addPl(.loop, node, Inst.Loop{ .cond = try decl.exprBody(ag, scope, f.cond.toOptional()), .step = try body(ag, scope, f.step), .body = try body(ag, scope, f.body) });
-        },
-        .while_stmt => _ = try ag.addPl(.loop, node, Inst.Loop{ .cond = try decl.exprBody(ag, scope, data.node_and_node[0].toOptional()), .step = .empty, .body = try body(ag, scope, data.node_and_node[1]) }),
-        .forever_stmt => _ = try ag.addPl(.loop, node, Inst.Loop{ .cond = .empty, .step = .empty, .body = try body(ag, scope, data.node) }),
-        .repeat_stmt => {
-            const count = try expr.lower(ag, scope, data.node_and_node[0]);
-            _ = try ag.addPl(.repeat, node, Inst.Repeat{ .count = count, .body = try body(ag, scope, data.node_and_node[1]) });
-        },
-        .wait_stmt => _ = try ag.addPl(.wait, node, Inst.Wait{ .cond = try decl.exprBody(ag, scope, data.node_and_node[0].toOptional()), .body = try body(ag, scope, data.node_and_node[1]) }),
-        .delay_stmt => {
-            const value = try expr.lower(ag, scope, data.node_and_node[0]);
-            _ = try ag.addPl(.delay, node, Inst.Delay{ .value = value, .body = try body(ag, scope, data.node_and_node[1]) });
-        },
-        .event_stmt => {
-            const event: Inst.Ref = if (data.opt_node_and_node[0].unwrap()) |e| try expr.lower(ag, scope, e) else .none;
-            _ = try ag.addPl(.event_wait, node, Inst.EventWait{ .event = event, .body = try body(ag, scope, data.opt_node_and_node[1]) });
-        },
-        .assign, .nonblocking_assign, .contribution => {
-            const lhs = try expr.lower(ag, scope, data.node_and_node[0]);
-            const rhs = try expr.lower(ag, scope, data.node_and_node[1]);
-            const tag: Inst.Tag = switch (tree.nodeTag(node)) {
-                .assign => .store,
-                .nonblocking_assign => .store_nb,
-                else => .contrib, // else: the arm names three tags
-            };
-            _ = try ag.addPl(tag, node, Inst.Bin{ .lhs = lhs, .rhs = rhs });
-        },
-        .assign_timed, .nonblocking_assign_timed => {
-            const t = tree.extraData(data.node_and_extra[1], Node.Timed);
-            const lhs = try expr.lower(ag, scope, data.node_and_extra[0]);
-            const timing = try timingControl(ag, scope, t.timing);
-            const rhs = try expr.lower(ag, scope, t.rhs);
-            _ = try ag.addPl(if (tree.nodeTag(node) == .assign_timed) .store_timed else .store_nb_timed, node, Inst.Timed{ .lhs = lhs, .rhs = rhs, .timing = timing });
-        },
-        .indirect_contribution => {
-            const x = tree.extraData(data.node_and_extra[1], Node.Indirect);
-            const lhs = try expr.lower(ag, scope, data.node_and_extra[0]);
-            const probe = try expr.lower(ag, scope, x.probe);
-            const eqn = try expr.lower(ag, scope, x.eqn);
-            _ = try ag.addPl(.contrib_indirect, node, Inst.Triple{ .a = lhs, .b = probe, .c = eqn });
-        },
-        .procedural_continuous => {
-            const lhs = try expr.lower(ag, scope, data.node_and_opt_node[0]);
-            switch (tree.tokenTag(tree.nodeMainToken(node))) {
-                .keyword_assign, .keyword_force => |kw| {
-                    const rhs = try expr.lower(ag, scope, data.node_and_opt_node[1].unwrap().?);
-                    _ = try ag.addPl(if (kw == .keyword_assign) .proc_assign else .force, node, Inst.Bin{ .lhs = lhs, .rhs = rhs });
-                },
-                .keyword_deassign => _ = try un(ag, .deassign, node, lhs),
-                else => _ = try un(ag, .release, node, lhs), // else: the fourth keyword, `release`
-            }
-        },
-        .task_enable => try taskEnable(ag, scope, data.node),
-        .event_trigger => _ = try un(ag, .trigger, node, try expr.lower(ag, scope, data.node)),
-        .disable => _ = try un(ag, .disable, node, try expr.lower(ag, scope, data.node)),
-        .return_stmt => _ = try un(ag, .ret, node, if (data.opt_node.unwrap()) |v| try expr.lower(ag, scope, v) else .none),
-        .break_stmt => _ = try un(ag, .brk, node, .none),
-        .continue_stmt => _ = try un(ag, .cont, node, .none),
-        .null_stmt => {},
-        // A.6.3 block declarations, scanned by the enclosing `block`.
-        .param_decl, .var_decl, .event_decl => try decl.lower(ag, scope, node),
-        else => unreachable, // else: every other tag is an item or an expression, never a statement
+        .param_decl, .var_decl, .event_decl, .null_stmt => return lowerBare(ag, scope, node),
+        .block => return block(ag, scope, node, try decl.prefixAttrs(ag, scope, tree.nodeMainToken(node))),
+        else => {}, // else: a statement, which an attribute instance may prefix
     }
+    const attrs = try decl.prefixAttrs(ag, scope, leftmost(tree, node));
+    if (attrs.len == 0) return lowerBare(ag, scope, node);
+    const top = ag.scratch.items.len;
+    try lowerBare(ag, scope, node);
+    const b = try ag.bodyFrom(top);
+    _ = try ag.addPl(.block, node, Inst.Block{ .name = .empty, .flags = .{ .fork = false }, .body = b, .attrs = attrs });
 }
 
 /// A body holding statement `node`.
@@ -206,6 +135,111 @@ pub fn caseArms(ag: *AstGen, scope: *Scope, items: []const Node.Index, comptime 
 
 // ---- private ----
 
+/// The first token of statement `node` (an assignment's is its target's).
+fn leftmost(tree: *const Ast, node: Node.Index) Ast.TokenIndex {
+    var n = node;
+    for (0..64) |_| {
+        const data = tree.nodeData(n);
+        n = switch (tree.nodeTag(n)) {
+            .assign, .nonblocking_assign, .contribution, .index, .range => data.node_and_node[0],
+            .assign_timed, .nonblocking_assign_timed, .indirect_contribution, .range_select, .indexed_select_up, .indexed_select_down => data.node_and_extra[0],
+            .field_access => data.node_and_token[0],
+            .task_enable => data.node,
+            else => return tree.nodeMainToken(n), // else: a keyword, a name, a call or a `{`: its main token comes first
+        };
+    }
+    return tree.nodeMainToken(n);
+}
+
+/// Lowers statement `node` itself.
+fn lowerBare(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
+    const tree = ag.tree;
+    const data = tree.nodeData(node);
+    switch (tree.nodeTag(node)) {
+        .block => try block(ag, scope, node, .empty),
+        .if_stmt => {
+            const cond = try expr.lower(ag, scope, data.node_and_extra[0]);
+            const x = tree.extraData(data.node_and_extra[1], Node.If);
+            _ = try ag.addPl(.condbr, node, Inst.CondBr{ .cond = cond, .then = try body(ag, scope, x.then), .@"else" = try optBody(ag, scope, x.@"else") });
+        },
+        .case_stmt => {
+            const operand = try expr.lower(ag, scope, data.node_and_extra[0]);
+            const items = tree.extraDataSlice(tree.extraData(data.node_and_extra[1], Node.SubRange), Node.Index);
+            const kind: @FieldType(@FieldType(Inst.Case, "flags"), "kind") = switch (tree.tokenTag(tree.nodeMainToken(node))) {
+                .keyword_casex => .casex,
+                .keyword_casez => .casez,
+                else => .case, // else: `case_stmt` opens with one of the three keywords
+            };
+            _ = try ag.addPl(.case, node, Inst.Case{ .flags = .{ .kind = kind }, .operand = operand, .arms = try caseArms(ag, scope, items, body) });
+        },
+        .for_stmt => {
+            const f = tree.extraData(data.extra, Node.For);
+            try lower(ag, scope, f.init);
+            _ = try ag.addPl(.loop, node, Inst.Loop{ .cond = try decl.exprBody(ag, scope, f.cond.toOptional()), .step = try body(ag, scope, f.step), .body = try body(ag, scope, f.body) });
+        },
+        .while_stmt => _ = try ag.addPl(.loop, node, Inst.Loop{ .cond = try decl.exprBody(ag, scope, data.node_and_node[0].toOptional()), .step = .empty, .body = try body(ag, scope, data.node_and_node[1]) }),
+        .forever_stmt => _ = try ag.addPl(.loop, node, Inst.Loop{ .cond = .empty, .step = .empty, .body = try body(ag, scope, data.node) }),
+        .repeat_stmt => {
+            const count = try expr.lower(ag, scope, data.node_and_node[0]);
+            _ = try ag.addPl(.repeat, node, Inst.Repeat{ .count = count, .body = try body(ag, scope, data.node_and_node[1]) });
+        },
+        .wait_stmt => _ = try ag.addPl(.wait, node, Inst.Wait{ .cond = try decl.exprBody(ag, scope, data.node_and_node[0].toOptional()), .body = try body(ag, scope, data.node_and_node[1]) }),
+        .delay_stmt => {
+            const value = try expr.lower(ag, scope, data.node_and_node[0]);
+            _ = try ag.addPl(.delay, node, Inst.Delay{ .value = value, .body = try body(ag, scope, data.node_and_node[1]) });
+        },
+        .event_stmt => {
+            const event: Inst.Ref = if (data.opt_node_and_node[0].unwrap()) |e| try expr.lower(ag, scope, e) else .none;
+            _ = try ag.addPl(.event_wait, node, Inst.EventWait{ .event = event, .body = try body(ag, scope, data.opt_node_and_node[1]) });
+        },
+        .assign, .nonblocking_assign, .contribution => {
+            const lhs = try expr.lower(ag, scope, data.node_and_node[0]);
+            const rhs = try expr.lower(ag, scope, data.node_and_node[1]);
+            const tag: Inst.Tag = switch (tree.nodeTag(node)) {
+                .assign => .store,
+                .nonblocking_assign => .store_nb,
+                else => .contrib, // else: the arm names three tags
+            };
+            _ = try ag.addPl(tag, node, Inst.Bin{ .lhs = lhs, .rhs = rhs });
+        },
+        .assign_timed, .nonblocking_assign_timed => {
+            const t = tree.extraData(data.node_and_extra[1], Node.Timed);
+            const lhs = try expr.lower(ag, scope, data.node_and_extra[0]);
+            const timing = try timingControl(ag, scope, t.timing);
+            const rhs = try expr.lower(ag, scope, t.rhs);
+            _ = try ag.addPl(if (tree.nodeTag(node) == .assign_timed) .store_timed else .store_nb_timed, node, Inst.Timed{ .lhs = lhs, .rhs = rhs, .timing = timing });
+        },
+        .indirect_contribution => {
+            const x = tree.extraData(data.node_and_extra[1], Node.Indirect);
+            const lhs = try expr.lower(ag, scope, data.node_and_extra[0]);
+            const probe = try expr.lower(ag, scope, x.probe);
+            const eqn = try expr.lower(ag, scope, x.eqn);
+            _ = try ag.addPl(.contrib_indirect, node, Inst.Triple{ .a = lhs, .b = probe, .c = eqn });
+        },
+        .procedural_continuous => {
+            const lhs = try expr.lower(ag, scope, data.node_and_opt_node[0]);
+            switch (tree.tokenTag(tree.nodeMainToken(node))) {
+                .keyword_assign, .keyword_force => |kw| {
+                    const rhs = try expr.lower(ag, scope, data.node_and_opt_node[1].unwrap().?);
+                    _ = try ag.addPl(if (kw == .keyword_assign) .proc_assign else .force, node, Inst.Bin{ .lhs = lhs, .rhs = rhs });
+                },
+                .keyword_deassign => _ = try un(ag, .deassign, node, lhs),
+                else => _ = try un(ag, .release, node, lhs), // else: the fourth keyword, `release`
+            }
+        },
+        .task_enable => try taskEnable(ag, scope, data.node),
+        .event_trigger => _ = try un(ag, .trigger, node, try expr.lower(ag, scope, data.node)),
+        .disable => _ = try un(ag, .disable, node, try expr.lower(ag, scope, data.node)),
+        .return_stmt => _ = try un(ag, .ret, node, if (data.opt_node.unwrap()) |v| try expr.lower(ag, scope, v) else .none),
+        .break_stmt => _ = try un(ag, .brk, node, .none),
+        .continue_stmt => _ = try un(ag, .cont, node, .none),
+        .null_stmt => {},
+        // A.6.3 block declarations, scanned by the enclosing `block`.
+        .param_decl, .var_decl, .event_decl => try decl.lower(ag, scope, node),
+        else => unreachable, // else: every other tag is an item or an expression, never a statement
+    }
+}
+
 fn optBody(ag: *AstGen, scope: *Scope, node: Node.OptionalIndex) Error!Vir.Body {
     return if (node.unwrap()) |n| body(ag, scope, n) else .empty;
 }
@@ -216,7 +250,7 @@ fn un(ag: *AstGen, tag: Inst.Tag, node: Node.Index, operand: Inst.Ref) Error!Ins
 
 /// A.6.3 `begin|fork [: name] decls stmts end|join`; a named block's
 /// declarations live in its own scope.
-fn block(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
+fn block(ag: *AstGen, scope: *Scope, node: Node.Index, attrs: Vir.List(Inst.Attr)) Error!void {
     const tree = ag.tree;
     const kw = tree.nodeMainToken(node);
     const named = tree.tokenTag(kw + 1) == .colon;
@@ -229,7 +263,7 @@ fn block(ag: *AstGen, scope: *Scope, node: Node.Index) Error!void {
     const top = ag.scratch.items.len;
     for (items) |it| try lower(ag, &inner, it);
     const b = try ag.bodyFrom(top);
-    _ = try ag.addPl(.block, node, Inst.Block{ .name = if (named) try ag.identString(kw + 2) else .empty, .flags = .{ .fork = tree.tokenTag(kw) == .keyword_fork }, .body = b });
+    _ = try ag.addPl(.block, node, Inst.Block{ .name = if (named) try ag.identString(kw + 2) else .empty, .flags = .{ .fork = tree.tokenTag(kw) == .keyword_fork }, .body = b, .attrs = attrs });
 }
 
 /// A task or system task enable: the name or call, called.

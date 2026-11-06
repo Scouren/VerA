@@ -10,6 +10,7 @@
 //! - `pub const Error`, `pub const In`, `pub const Sig`
 //! - `pub fn instanceOf(m: *const Module, slot: u32) u32`
 //! - `pub fn slot(m: *Module, s: u32) Error!Sig`
+//! - `pub fn parameter(m: *const Module, s: u32) bool`
 //! - `pub fn wireLine(m: *Module, name: []const u8, ty: Program.Ty, msb: i64, lsb: i64, dir: ?Port, init: ?[]const u8) Error!void`
 //! - `pub fn fresh(m: *Module, comptime kind: u8) Error![]const u8`
 //! - `pub fn temp(m: *Module, w: u32) Error!Sig`
@@ -64,6 +65,8 @@ next_id: *u32,
 /// The process being written: a read of a slot it wrote by a blocking
 /// assignment takes its temp (§9.2.1).
 redirect: ?*const std.AutoHashMapUnmanaged(u32, Sig) = null,
+/// The variables some process or declaration assignment writes.
+stored: std.AutoHashMapUnmanaged(u32, void) = .empty,
 
 const Module = @This();
 const none = std.math.maxInt(u32);
@@ -85,6 +88,12 @@ pub fn slot(m: *Module, s: u32) Error!Sig {
     const l = m.in.lowered;
     const ty = m.p.slots.items(.ty)[s];
     if (ty.real) return error.Unsupported;
+    // A parameter Sema did not fold into its readers is its time-0 value.
+    if (m.parameter(s)) {
+        const at = m.p.slots.items(.word)[s];
+        const n = Program.words(ty.width);
+        return m.constant(m.p.init_v[at..][0..n], m.p.init_x[at..][0..n], ty.width, ty.signed);
+    }
     const owner = m.instanceOf(s);
     const name = if (owner != none and owner != m.k and m.in.parent[owner] == m.k)
         try m.arena.print("$vera$i{d}${s}", .{ owner, portName(l.instance_ports[owner], s) orelse "" })
@@ -96,6 +105,12 @@ pub fn slot(m: *Module, s: u32) Error!Sig {
     const sig: Sig = .{ .s = name, .w = ty.width, .signed = ty.signed };
     try m.names.put(m.arena, s, sig);
     return sig;
+}
+
+/// Whether slot `s` is a variable nothing writes: a parameter.
+pub fn parameter(m: *const Module, s: u32) bool {
+    const net = s < m.p.slot_net.len and m.p.slot_net[s] != none;
+    return !net and !m.stored.contains(s) and m.in.lowered.slot_names[s].len != 0;
 }
 
 /// `wire width W [signed] [offset O] [upto] [input|output|inout N] name`,

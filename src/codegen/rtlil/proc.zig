@@ -9,6 +9,7 @@
 //! Contents:
 //! - `pub fn initial(m: *Module, start: u32, inits: *std.AutoHashMapUnmanaged(u32, []const u8)) Module.Error!void`
 //! - `pub fn always(m: *Module, start: u32, index: u32) Module.Error!void`
+//! - `pub fn writes(m: *Module, place: u32, out: *std.AutoHashMapUnmanaged(u32, void)) Module.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -227,6 +228,16 @@ pub fn always(m: *Module, start: u32, index: u32) Error!void {
         for (order.items) |s| try syncs.writer.print("      update {s} {s}\n", .{ (try m.slot(s)).s, temps.get(s).?.s });
     }
     try m.cells.writer.print("  process $proc${d}\n{s}{s}  end\n", .{ index, body.written(), syncs.written() });
+}
+
+/// Adds every slot the `Place` at `place` (in `extra`) writes to `out`.
+pub fn writes(m: *Module, place: u32, out: *std.AutoHashMapUnmanaged(u32, void)) Error!void {
+    var slots: std.ArrayList(u32) = .empty;
+    written(m, m.p.extraData(Program.Place, place), &slots) catch |e| switch (e) {
+        error.Unsupported => return, // an element: refused before, reported where it is written
+        else => |x| return x,
+    };
+    for (slots.items) |s| try out.put(m.arena, s, {});
 }
 
 // ---- private ----

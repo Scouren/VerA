@@ -81,8 +81,16 @@ fn module(m: *Module) Error!void {
         try m.wireLine(name, port.ty, port.msb, port.lsb, port, inits.get(port.slot));
         try m.names.put(m.arena, port.slot, .{ .s = name, .w = port.ty.width, .signed = port.ty.signed });
     }
+    // Every net and every variable a process writes is a wire; a parameter
+    // (a variable nothing writes) is folded into its readers.
+    for (0..p.insts.len) |pc| switch (p.insts.items(.tag)[pc]) {
+        .assign, .assign_nb => try proc.writes(m, p.insts.items(.data)[pc].a, &m.stored),
+        .init_var => try m.stored.put(m.arena, p.insts.items(.data)[pc].a, {}),
+        else => {}, // else: writes no variable
+    };
     for (0..p.slots.len) |s| {
         if (m.instanceOf(@intCast(s)) != m.k or l.slot_names[s].len == 0 or m.names.contains(@intCast(s))) continue;
+        if (m.parameter(@intCast(s))) continue;
         const ty = p.slots.items(.ty)[s];
         if (ty.real) return error.Unsupported;
         const name = try Module.publicId(m.arena, l.slot_names[s]);
@@ -152,9 +160,12 @@ fn owner(m: *const Module, dr: Program.Driver) Error!u32 {
 }
 
 /// Whether instance `x`'s module names slot `s`: its own, or one of its
-/// ports (a port joined to a whole parent net is that net's slot).
+/// ports (a port joined to a whole parent net is that net's slot), or an
+/// undeclared one.
 fn visible(m: *const Module, s: u32, x: u32) bool {
-    if (m.instanceOf(s) == x) return true;
+    // A net no declaration names (a select target's own net) is the writer's.
+    const i = m.instanceOf(s);
+    if (i == x or i == none) return true;
     for (m.in.lowered.instance_ports[x]) |port| if (port.slot == s) return true;
     return false;
 }

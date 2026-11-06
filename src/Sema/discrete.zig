@@ -10,6 +10,7 @@
 //! Contents:
 //! - `pub fn mark(s: *Sema, unit: *Unit) Allocator.Error!void`
 //! - `pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void`
+//! - `pub fn base(vir: *const Vir, r: Inst.Ref) ?Inst.Index`
 //! - `pub fn writes(vir: *const Vir, b: Vir.Body, out: *std.ArrayList(Inst.Index), arena: Allocator, depth: u32) Allocator.Error!void`
 
 const std = @import("std");
@@ -110,6 +111,21 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
     assert(s.param_args.items.len == s.device.params.len);
 }
 
+/// The declaration an assignment target names (through its selects).
+pub fn base(vir: *const Vir, r: Inst.Ref) ?Inst.Index {
+    var at = r;
+    for (0..depth_max) |_| {
+        const i = at.toIndex() orelse return null;
+        switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+            .decl_ref => return decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl),
+            .elem => at = decl.payloadOf(vir, Inst.Bin, i).lhs,
+            .slice, .slice_up, .slice_down => at = decl.payloadOf(vir, Inst.Triple, i).a,
+            else => return null, // else: a concatenation target or no name
+        }
+    }
+    return null;
+}
+
 /// Appends every declaration a digital body writes, in order.
 pub fn writes(vir: *const Vir, b: Vir.Body, out: *std.ArrayList(Inst.Index), arena: Allocator, depth: u32) Allocator.Error!void {
     if (depth > depth_max) return;
@@ -187,21 +203,6 @@ fn plain(vir: *const Vir, b: Vir.Body, depth: u32) bool {
 fn continuous(s: *Sema, unit: *const Unit, d: Inst.Index) Allocator.Error!bool {
     const name = decl.payloadOf(unit.vir, Inst.Net, d).discipline;
     return s.zcu.continuousDiscipline(if (name == .empty) "" else unit.vir.string(name));
-}
-
-/// The declaration an assignment target names (through its selects).
-fn base(vir: *const Vir, r: Inst.Ref) ?Inst.Index {
-    var at = r;
-    for (0..depth_max) |_| {
-        const i = at.toIndex() orelse return null;
-        switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-            .decl_ref => return decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl),
-            .elem => at = decl.payloadOf(vir, Inst.Bin, i).lhs,
-            .slice, .slice_up, .slice_down => at = decl.payloadOf(vir, Inst.Triple, i).a,
-            else => return null, // else: a concatenation target or no name
-        }
-    }
-    return null;
 }
 
 /// Every variable or net the analog body `b` reads by name: an access

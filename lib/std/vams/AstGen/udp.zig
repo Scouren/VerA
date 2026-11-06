@@ -60,12 +60,18 @@ pub fn check(ag: *AstGen, node: Node.Index) Error!void {
     };
     const first = AstGen.identText(tree, tree.nodeMainToken(ports[0]));
     const is_first = std.mem.eql(u8, output orelse "", first);
-    // The old discrete route (a 1364 language) said which half failed.
-    if (@backingInt(ag.options.language) < @backingInt(Ast.KeywordSet.vams_2_3)) {
-        if (outputs != 1) {
-            try ag.report(.E1100, kw, "§8.1.1: a UDP has exactly one output port", .{});
-        } else if (!is_first) try ag.report(.E1100, kw, "§8.1.1: the output port shall be the first port of a UDP", .{});
-    } else if (outputs != 1 or !is_first) try ag.report(.E1100, kw, "§8.1.1: a UDP has exactly one output port, and it is the first port", .{});
+    if (outputs != 1 or !is_first) {
+        // Both old routes pointed at the keyword's first byte; the digital
+        // one said which half failed.
+        const at = tree.tokenStart(kw);
+        var b = ag.wip.build(.parse, .E1100, .{ .file = .root, .start = at, .end = at });
+        if (!ag.options.ieee1364) {
+            b.msg("§8.1.1: a UDP has exactly one output port, and it is the first port", .{});
+        } else if (outputs != 1) {
+            b.msg("§8.1.1: a UDP has exactly one output port", .{});
+        } else b.msg("§8.1.1: the output port shall be the first port of a UDP", .{});
+        try b.emit();
+    }
 
     for (items) |it| if (tree.nodeTag(it) == .udp_table) try conflicts(ag, kw, full.list(tree, it), ports.len - 1);
 }

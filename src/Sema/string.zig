@@ -117,28 +117,61 @@ pub fn concat(s: *Sema, b: *Block, i: Inst.Index, src: Inst.Ref) Allocator.Error
 /// §9.5.3 `$sformat(s, fmt, args...)` and `$swrite(s, args...)`: `s`
 /// assigned the call's string, which the host formats.
 pub fn write(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!void {
-    if (args.len == 0 or args[0] == .none) return s.fail(.E0506, b.unit.file, src, "`{t}` writes its first argument", .{tag});
-    const refs = try s.arena.alloc(Ref, args.len - 1);
-    for (args[1..], refs) |a, *r| r.* = if (a == .none) .fromIntern(.zero_real) else (try expr.lower(s, b, a)).ref;
+    const file = b.unit.file;
+    if (args.len == 0 or args[0] == .none) return s.fail(.E0813, file, src, "`{t}` needs a string variable to write into", .{tag});
+    if (slotType(b, args[0])) |t| if (t != .string) return s.fail(.E0813, file, src, "`{t}` writes into a `string` variable, and this one is {t}", .{ tag, t });
+    const ops = args[1..];
+    const vals = try s.arena.alloc(Value, ops.len);
+    for (ops, vals) |a, *v| v.* = if (a == .none) .{ .ref = .fromIntern(try decl.intern(s, .{ .str = " " })), .ty = .string } else try expr.lower(s, b, a);
+    // §9.5.3 `$sformat`'s format may be a string variable, read at run time.
+    const runtime = tag == .@"$sformat" and vals.len != 0 and ops[0] != .none and expr.constOf(s, vals[0].ref) == null;
+    if (runtime and vals[0].ty != .string) return s.fail(.E0813, file, src, "`$sformat`'s format_string is a string, and this one is {t}", .{vals[0].ty});
+    if (!runtime) try @import("format.zig").operands(s, b, 0, ops, vals, src);
+    const refs = try s.arena.alloc(Ref, vals.len);
+    for (vals, refs) |x, *r| r.* = x.ref;
     const v = try expr.call(s, b, @backingInt(tag), .string, refs);
     try @import("control.zig").assignTo(s, b, args[0], .{ .ref = v, .ty = .string }, src);
 }
 
-/// §9.5.4 `$sscanf`/`$fscanf`/`$fgets` and §9.12 `$value$plusargs`: an
-/// integer `call` of the operands it reads (its count or status), then
-/// each destination (argument `first`, and every one after it for a scan)
-/// assigned `scan$item(call, k)` (a number, coerced) or `scan$str(call, k)`.
+/// §9.5.4 `$sscanf`/`$fscanf`/`$fgets`, §9.5.7 `$ferror` and §9.12
+/// `$value$plusargs`: an integer `call` of the operands it reads (its count
+/// or status), then each destination (argument `first`, and every one after
+/// it for a scan) assigned `scan$item(call, k)` (a number, coerced) or
+/// `scan$str(call, k)`. E0813 (the old `string_io`'s): a scan with no source
+/// or format, a `$sscanf` source that is no string, a literal format with a
+/// code §9.5.4.2 does not list, a `$fgets`/`$ferror` destination that is no
+/// `string`; the value is then 0.
 pub fn read(s: *Sema, b: *Block, tag: SysFn.Tag, first: usize, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
+    const file = b.unit.file;
+    const zero: Value = .{ .ref = .fromIntern(.zero), .ty = .integer };
     const many = first >= 2;
+    if (many and (args.len < 2 or args[0] == .none or args[1] == .none)) {
+        try s.fail(.E0813, file, src, "`{t}` needs a source and a format string", .{tag});
+        return zero;
+    }
+    if (many) if (try decl.foldRef(s, b.unit, args[1])) |c| if (c == .str) if (badScanCode(c.str)) |code| {
+        try s.fail(.E0813, file, src, "`{t}` does not support the conversion `%{c}`; §9.5.4.2's codes are %d %o %h %x %b %c %f %e %g %s %r %m", .{ tag, code });
+        return zero;
+    };
+    if (tag == .@"$fgets" or tag == .@"$ferror") if (args.len > first) if (slotType(b, args[first])) |t| if (t != .string) {
+        try s.fail(.E0813, file, src, "`{t}` writes into a `string` variable, and this one is {t}", .{ tag, t });
+        return zero;
+    };
     var ops: std.ArrayList(Ref) = .empty;
     for (args, 0..) |a, k| {
         if (k == first or (many and k > first)) continue;
-        try ops.append(s.arena, if (a == .none) .fromIntern(.zero_real) else (try expr.lower(s, b, a)).ref);
+        const v: Value = if (a == .none) .{ .ref = .fromIntern(.zero_real), .ty = .real } else try expr.lower(s, b, a);
+        // §9.5.4.2 "a string variable, string parameter, or string literal".
+        if (tag == .@"$sscanf" and k == 0 and v.ty != .string) {
+            try s.fail(.E0813, file, src, "`$sscanf` reads from a string variable, string parameter or string literal, and this one is {t}", .{v.ty});
+            return zero;
+        }
+        try ops.append(s.arena, v.ref);
     }
     const r = try expr.call(s, b, @backingInt(tag), .integer, ops.items);
     for (args, 0..) |a, k| {
         if (!(k == first or (many and k > first)) or a == .none) continue;
-        const ty = try destType(s, b, a);
+        const ty = slotType(b, a) orelse .real;
         const at: Ref = .fromIntern(try decl.intern(s, .{ .int = @intCast(k - first) }));
         const v: Value = if (ty == .string)
             .{ .ref = try expr.call(s, b, @backingInt(SysFn.Tag.@"scan$str"), .string, &.{ r, at }), .ty = .string }
@@ -151,28 +184,47 @@ pub fn read(s: *Sema, b: *Block, tag: SysFn.Tag, first: usize, args: []const Ins
 
 // ---- private ----
 
-/// The type of the variable (or array element) `r` names; real when it
-/// names none (the assignment reports it).
-fn destType(s: *Sema, b: *Block, r: Inst.Ref) Allocator.Error!Sema.Ty {
-    _ = s;
+/// The first conversion code of scan format `fmt` that §9.5.4.2's table
+/// does not list (case-sensitive, as the scanner compares it), or null.
+fn badScanCode(fmt: []const u8) ?u8 {
+    var i: usize = 0;
+    while (std.mem.findScalarPos(u8, fmt, i, '%')) |p| {
+        i = p + 1;
+        if (i >= fmt.len) return null;
+        if (fmt[i] == '%') { // a literal percent, matched not converted
+            i += 1;
+            continue;
+        }
+        if (fmt[i] == '*') i += 1;
+        while (i < fmt.len and std.ascii.isDigit(fmt[i])) i += 1;
+        if (i >= fmt.len) return null;
+        const conv = fmt[i];
+        i += 1;
+        if (std.mem.findScalar(u8, "dohxbcfegsrm", conv) == null) return conv;
+    }
+    return null;
+}
+
+/// The type of the variable (or array element) `r` names, or null.
+fn slotType(b: *Block, r: Inst.Ref) ?Sema.Ty {
     const vir = b.unit.vir;
     var at = r;
     for (0..64) |_| {
-        const i = at.toIndex() orelse return .real;
+        const i = at.toIndex() orelse return null;
         switch (vir.instructions.items(.tag)[@backingInt(i)]) {
             .elem => at = decl.payloadOf(vir, Inst.Bin, i).lhs,
             .decl_ref => {
-                const bind = b.unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl)) orelse return .real;
+                const bind = b.unit.binds.get(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl)) orelse return null;
                 return switch (bind) {
                     .slot => |x| x.ty,
                     .array => |x| x.ty,
-                    else => .real, // else: no variable
+                    else => null, // else: no variable
                 };
             },
-            else => return .real, // else: no variable
+            else => return null, // else: no variable
         }
     }
-    return .real;
+    return null;
 }
 
 fn str(s: *Sema, bytes: []const u8) Allocator.Error!Value {

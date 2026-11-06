@@ -359,6 +359,21 @@ test "§7.8.5.1 a gate terminal on a continuous vector net gets no bridge (E0929
     , "dd", &.{.E0929});
 }
 
+test "§7.4.4 a net's second discipline declaration in one scope is E0902; §3.11 a branch or access joining incompatible disciplines is E0355" {
+    const prelude =
+        \\nature V; units = "V"; access = V; endnature
+        \\nature R; units = "rad"; access = R; endnature
+        \\discipline ea; potential V; enddiscipline
+        \\discipline eb; potential V; enddiscipline
+        \\discipline rot; potential R; enddiscipline
+        \\
+    ;
+    try expectCodes(prelude ++ "module top(p); inout p; ea p; eb p; endmodule", .{}, &.{.E0902});
+    try expectCodes(prelude ++ "module top(p); inout p; ea p; endmodule", .{}, &.{});
+    try expectCodes(prelude ++ "module top; ea a; rot b; branch (a, b) br; endmodule", .{}, &.{.E0355});
+    try expectCodes(prelude ++ "module top; ea a; eb b; branch (a, b) br; endmodule", .{}, &.{});
+}
+
 test "Annex F.2.1 step 3 an out-of-context declaration overrides a net's discipline: twice for one segment is E0902, an incompatible override E0375" {
     const prelude =
         \\nature V; units = "V"; access = V; endnature

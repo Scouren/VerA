@@ -149,6 +149,16 @@ fn runAll() !void {
     if (tally.failed != 0) return error.DiffElabFailed;
 }
 
+/// Whether `source` is a `//! reject` fixture, the old side raised no
+/// error and the new one did: the old pipeline refused it after
+/// elaboration, the new one in it.
+fn refusedLater(source: []const u8, old: []const []const u8, new: []const []const u8) bool {
+    if (!std.mem.startsWith(u8, source, "//! reject") and std.mem.find(u8, source, "\n//! reject") == null) return false;
+    for (old) |c| if (c[0] == 'E') return false;
+    for (new) |c| if (c[0] == 'E') return true;
+    return false;
+}
+
 /// Every fixture path relative to the fixture root, sorted.
 fn collect(arena: std.mem.Allocator, io: Io) ![]const []const u8 {
     var dir = try Io.Dir.cwd().openDir(io, options.fixture_root, .{ .iterate = true });
@@ -215,6 +225,10 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, rulings: *set
     const cited = try settle.clauses(arena, source);
     if (!digital and old.judged) {
         const c = try settle.codesDiffer(arena, old.codes, new.codes, .{ .first = .elab, .last = .elab }, cited);
+        // The fixture's own verdict settles a refusal the old elaborator left
+        // to its lowering (E0355, E0902 for one module's nets): a `//! reject`
+        // fixture the old side elaborated without an error.
+        if (c.why != null and refusedLater(source, old.codes, new.codes)) return .{ .verdict = .{ .why = null, .tree = false, .ruled = true } };
         if (c.why) |why| return .{ .verdict = .{ .why = why, .tree = false } };
         try later.add(c.later, cited);
     }

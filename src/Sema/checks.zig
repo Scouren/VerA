@@ -4,7 +4,8 @@
 //! may be declared in any file). The disciplines net and reg declarations
 //! name (E0371), the range order of every paramset parameter (E0347), and
 //! the names and shapes §7.7 `connectrules` statements use (E0915, E0916,
-//! E0923, E0982).
+//! E0923, E0982), and each module's own net disciplines (`scope.zig`:
+//! E0902, E0355).
 //! Cites: VAMS-2023 §3.4.2, §3.6.2, §6.4, §7.6 (Table 7-2), §7.7.1,
 //! §7.7.2, §7.8, A.2.1.3.
 //!
@@ -20,6 +21,7 @@ const Zcu = @import("../Zcu.zig");
 const eval = @import("eval.zig");
 const walk = @import("walk.zig");
 const discipline = @import("discipline.zig");
+const scope = @import("scope.zig");
 const domainOf = discipline.domainOf;
 const Domain = discipline.Domain;
 const Vir = vams.Vir;
@@ -44,6 +46,7 @@ pub fn run(s: *Sema) Allocator.Error!void {
             .connectrules => try connectRules(s, file, payloadOf(vir, Inst.ConnectRules, d.inst)),
             .primitive, .nature, .discipline, .config => {},
         };
+        try scope.run(s, file);
     }
 }
 

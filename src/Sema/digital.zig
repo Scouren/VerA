@@ -15,7 +15,7 @@
 //! - `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Named = struct`, `pub const SegmentRef = struct`, `pub const Why = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
-//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `reject`, `rejectFmt`, `rejectOperand`, `rejectArg`, `rejectArgFmt`, `lookup`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
+//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `refuse`, `refuseFmt`, `reject`, `rejectFmt`, `rejectOperand`, `rejectArg`, `rejectArgFmt`, `lookup`, `readsSignal`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
 //! - `pub const none: u32`
 //! - `pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Lowered`
 
@@ -28,6 +28,7 @@ const InternPool = @import("intern_pool");
 const Zcu = @import("../Zcu.zig");
 const eval = @import("eval.zig");
 const decl = @import("digital/decl.zig");
+const decl_mod = @import("decl.zig");
 const stmt = @import("digital/stmt.zig");
 const nets = @import("digital/nets.zig");
 const time0 = @import("digital/time0.zig");
@@ -444,6 +445,38 @@ pub const Lower = struct {
         return env;
     }
 
+    /// Whether expression `r` of frame `f` reads a variable, a net or a
+    /// named event: no constant expression (§5.2: "a constant expression
+    /// … shall consist of constant numbers and parameters").
+    pub fn readsSignal(l: *Lower, f: u32, r: Inst.Ref) Error!bool {
+        const vir = l.virOf(f);
+        var stack: std.ArrayList(Inst.Index) = .empty;
+        var ops: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
+        try stack.append(l.a, r.toIndex() orelse return false);
+        var steps: usize = 0;
+        while (stack.pop()) |i| : (steps += 1) {
+            assert(steps <= vir.instructions.len * 4);
+            if (tag(vir, i) == .decl_ref) {
+                const d = decl_mod.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl);
+                // Not bound yet (a port whose own range names it): by its form.
+                const at = l.lookup(f, d) orelse switch (tag(vir, d)) {
+                    .variable, .net, .io, .event => return true,
+                    else => continue, // else: a parameter, a genvar, a subroutine
+                };
+                switch (l.names.items[at].kind) {
+                    .variable, .net, .event => return true,
+                    .param, .genvar, .sub, .scope => {},
+                }
+                continue;
+            }
+            ops.clearRetainingCapacity();
+            try @import("control.zig").operands(l.a, vir, i, &ops);
+            var it = ops.keyIterator();
+            while (it.next()) |o| try stack.append(l.a, o.*);
+        }
+        return false;
+    }
+
     /// The folded value of `r` in frame `f`, or null when it has none at
     /// elaboration.
     pub fn constOf(l: *Lower, f: u32, r: Inst.Ref) Error!?eval.Const {
@@ -456,7 +489,10 @@ pub const Lower = struct {
         // The IEEE 1364 mode first: §5.5's widths (a 64-bit parameter's
         // arithmetic), x/z bits, selects, constant functions.
         if (try eval.v1364.int(try l.envAt(f), r)) |v| return v;
-        const c = (try l.constOf(f, r)) orelse return l.refuse("a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)");
+        const c = (try l.constOf(f, r)) orelse return if (try l.readsSignal(f, r))
+            l.reject(f, r, "a constant expression is required here")
+        else
+            l.refuse("a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)");
         return switch (c) {
             .int => |v| v,
             .real => |v| if (std.math.isFinite(v)) @intFromFloat(@round(v)) else l.refuse("a non-finite real where an integer constant is required"),

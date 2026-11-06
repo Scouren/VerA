@@ -113,7 +113,10 @@ pub fn reaching(w: *Walk, p: Pending, index: Instance.Index) Allocator.Error![]c
         while (i < w.rows.items.len) : (i += 1) {
             const r = w.rows.items[i];
             if (r.anchor != p.parent) continue;
-            if (std.mem.eql(u8, r.rel, name)) {
+            // A `$` name no §9.18 system parameter spells reaches nothing:
+            // it is reported unused, as the old elaborator named it.
+            const unknown_system = r.param[0] == '$' and Zcu.SystemParam.fromName(r.param) == null;
+            if (std.mem.eql(u8, r.rel, name) and !unknown_system) {
                 const o = w.origins.items[r.origin];
                 try w.matched.append(s.arena, r.origin);
                 try keepLatest(s, &out, .{ .name = r.param, .value = r.value, .file = o.file, .src = o.src, .writer = o.writer });

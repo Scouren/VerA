@@ -7,6 +7,7 @@
 //! - `pub const Domain`, `pub const behavioral`
 //! - `pub fn domainOf(s: *Sema, name: []const u8) Allocator.Error!?Domain`
 //! - `pub fn compatible(s: *Sema, a: []const u8, b: []const u8) Allocator.Error!bool`
+//! - `pub fn conflict(s: *Sema, a: []const u8, b: []const u8) Allocator.Error!?[]const u8`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -57,21 +58,34 @@ pub fn domainOf(s: *Sema, name: []const u8) Allocator.Error!?Domain {
 /// one base nature, or of equal `units`). A name no discipline declares
 /// conflicts with nothing.
 pub fn compatible(s: *Sema, a: []const u8, b: []const u8) Allocator.Error!bool {
+    return try conflict(s, a, b) == null;
+}
+
+/// The §3.11.1 rule that makes disciplines `a` and `b` incompatible, in
+/// the words E0355 quotes, or null when they are compatible.
+pub fn conflict(s: *Sema, a: []const u8, b: []const u8) Allocator.Error!?[]const u8 {
     assert(a.len < std.math.maxInt(u32));
     assert(b.len < std.math.maxInt(u32));
-    if (std.mem.eql(u8, a, b)) return true;
-    const da = try lookup(s, a) orelse return true;
-    const db = try lookup(s, b) orelse return true;
-    if (try domainOf(s, a) != try domainOf(s, b)) return false;
+    if (std.mem.eql(u8, a, b)) return null;
+    const da = try lookup(s, a) orelse return null;
+    const db = try lookup(s, b) orelse return null;
+    if (try domainOf(s, a) != try domainOf(s, b))
+        return "3.11.1 Domain Incompatibility Rule: disciplines with different domain attributes are incompatible; 3.11 says such nets need a `connect` statement (7.4)";
+    const unrelated = "neither the same nature, nor derived from a common base nature, nor agreed on `units`";
     for ([_]ItemKind{ .potential, .flow }) |half| {
         const na = natureOf(da, half) orelse continue;
         const nb = natureOf(db, half) orelse continue;
         if (std.mem.eql(u8, try baseNature(s, na), try baseNature(s, nb))) continue;
-        const ua = try unitsOf(s, na) orelse return false;
-        const ub = try unitsOf(s, nb) orelse return false;
-        if (!std.mem.eql(u8, ua, ub)) return false;
+        const ua = try unitsOf(s, na);
+        const ub = try unitsOf(s, nb);
+        if (ua != null and ub != null and std.mem.eql(u8, ua.?, ub.?)) continue;
+        return switch (half) {
+            .potential => "3.11.1 Potential Incompatibility Rule: the two potential natures are " ++ unrelated,
+            .flow => "3.11.1 Flow Incompatibility Rule: the two flow natures are " ++ unrelated,
+            else => unreachable, // else: the loop names only the two halves
+        };
     }
-    return true;
+    return null;
 }
 
 // ---- private ----

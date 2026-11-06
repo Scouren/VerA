@@ -4,7 +4,8 @@
 //! may be declared in any file). The disciplines net and reg declarations
 //! name (E0371), the range order of every paramset parameter (E0347), and
 //! the names and shapes §7.7 `connectrules` statements use (E0915, E0916,
-//! E0923, E0982).
+//! E0923, E0982), and each module's own net disciplines (`scope.zig`:
+//! E0902, E0355).
 //! Cites: VAMS-2023 §3.4.2, §3.6.2, §6.4, §7.6 (Table 7-2), §7.7.1,
 //! §7.7.2, §7.8, A.2.1.3.
 //!
@@ -20,6 +21,7 @@ const Zcu = @import("../Zcu.zig");
 const eval = @import("eval.zig");
 const walk = @import("walk.zig");
 const discipline = @import("discipline.zig");
+const scope = @import("scope.zig");
 const domainOf = discipline.domainOf;
 const Domain = discipline.Domain;
 const Vir = vams.Vir;
@@ -44,6 +46,7 @@ pub fn run(s: *Sema) Allocator.Error!void {
             .connectrules => try connectRules(s, file, payloadOf(vir, Inst.ConnectRules, d.inst)),
             .primitive, .nature, .discipline, .config => {},
         };
+        try scope.run(s, file);
     }
 }
 
@@ -97,7 +100,7 @@ fn paramsetRanges(s: *Sema, file: Zcu.File.Index, inst: Inst.Index) Allocator.Er
             const lo = (try env.body(r.lo)) orelse continue;
             const hi = (try env.body(r.hi)) orelse continue;
             if (lo == .str or hi == .str or lo.asReal() < hi.asReal()) continue;
-            try s.fail(.E0347, file, p.toRef(), "`{s}` of paramset `{s}`: bounds {d} and {d} are not in increasing order", .{ vir.string(decl.name), vir.string(ps.name), lo.asReal(), hi.asReal() });
+            try s.fail(.E0347, file, p.toRef(), "`{s}` of paramset `{s}`: {s} bounds {d} and {d} are not in increasing order", .{ vir.string(decl.name), vir.string(ps.name), if (r.flags.exclude) "exclude" else "from", lo.asReal(), hi.asReal() });
         }
     }
 }
@@ -168,14 +171,14 @@ fn connectParams(s: *Sema, file: Zcu.File.Index, at: Inst.Index, ins: Inst.Conne
     for (env.positions.keys()) |p| overridable += @intFromBool(walk.isOverridable(mvir, p));
     if (args[0].name == .empty) {
         if (args.len > overridable)
-            try s.fail(.E0907, file, at.toRef(), "`{s}` declares {d} overridable parameters, and this connect statement sets {d}", .{ mvir.string(mod.name), overridable, args.len });
+            try s.failRule(.{ .part = .{ .param = overridable } }, .E0907, file, at.toRef(), "`{s}` declares {d} overridable parameter{s}, and this connect statement sets {d}", .{ mvir.string(mod.name), overridable, if (overridable == 1) "" else "s", args.len });
         return;
     }
-    for (args) |a| {
+    for (args, 0..) |a, k| {
         const n = vir.string(a.name);
         if (env.systemNamed(n) != null) continue;
         if (env.named(n)) |p| if (walk.isOverridable(mvir, p)) continue;
-        try s.fail(.E0907, file, at.toRef(), "`{s}` is not {s} of connect module `{s}`", .{ n, if (env.named(n) == null) "a parameter" else "an overridable parameter", mvir.string(mod.name) });
+        try s.failRule(.{ .part = .{ .param = @intCast(k) } }, .E0907, file, at.toRef(), "`{s}` is {s} of connect module `{s}`", .{ n, if (env.named(n) == null) "not a parameter" else "a localparam", mvir.string(mod.name) });
     }
 }
 
@@ -194,12 +197,14 @@ fn tableDirections(s: *Sema, file: Zcu.File.Index, at: Inst.Index, m: Zcu.Decl) 
     if (header.len != 2) return;
     var dirs: [2]Inst.Direction = undefined;
     var domains: [2]?Domain = undefined;
-    for (header, &dirs, &domains) |h, *dir, *dom| {
+    var names: [2]Vir.String = undefined;
+    for (header, &dirs, &domains, &names) |h, *dir, *dom, *port| {
         const name = switch (vir.instructions.items(.tag)[@backingInt(h)]) {
             .io => payloadOf(vir, Inst.Io, h).name,
             .port => payloadOf(vir, Inst.Port, h).name,
             else => unreachable, // else: a module header holds only ports and port declarations
         };
+        port.* = name;
         dir.* = .none;
         dom.* = null;
         for ([_]Vir.Body{ mod.ports, mod.body }) |b| for (vir.body(b)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
@@ -221,5 +226,5 @@ fn tableDirections(s: *Sema, file: Zcu.File.Index, at: Inst.Index, m: Zcu.Decl) 
     const dd = dirs[1 - c];
     if (cd == .none or dd == .none) return;
     if ((cd == .input and dd == .output) or (cd == .output and dd == .input) or (cd == .inout and dd == .inout)) return;
-    try s.fail(.E0982, file, at.toRef(), "the continuous port is `{t}` and the discrete port is `{t}`", .{ cd, dd });
+    try s.fail(.E0982, file, at.toRef(), "`{s}`'s continuous port `{s}` is `{t}` and its discrete port `{s}` is `{t}`", .{ vir.string(mod.name), vir.string(names[c]), cd, vir.string(names[1 - c]), dd });
 }

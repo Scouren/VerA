@@ -30,6 +30,7 @@ const vams = @import("vams");
 const InternPool = @import("intern_pool");
 const Air = @import("air");
 const Zcu = @import("Zcu.zig");
+const netlist = @import("Sema/netlist.zig");
 const walk = @import("Sema/walk.zig");
 const paramset = @import("Sema/paramset.zig");
 const checks = @import("Sema/checks.zig");
@@ -314,6 +315,7 @@ pub fn elaborate(zcu: *Zcu, config: Config) Allocator.Error!void {
     var arena_state: std.heap.ArenaAllocator = .init(zcu.gpa);
     defer arena_state.deinit();
     var s: Sema = .{ .zcu = zcu, .gpa = zcu.gpa, .arena = arena_state.allocator(), .config = config };
+    try netlist.shadows(&s);
     try namespace(&s);
     try checks.run(&s);
     const roots = try pickRoots(&s);

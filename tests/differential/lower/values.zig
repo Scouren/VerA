@@ -1,13 +1,17 @@
 //! diff-lower's value check (tests/differential/lower.zig): one fixture's
 //! old MIR and `Lowered`, and its new `Air` and `Air.Device`, in; whether
-//! every contribution's resistive and reactive sum agrees out, evaluated at
-//! `points` seeded points by the old MIR interpreter
+//! every contribution's resistive and reactive sum, and every operand each
+//! display row printed at its last run, agrees out, evaluated at `points`
+//! seeded points by the old MIR interpreter
 //! (`src/codegen/verilog/Interp.zig`) and by `Air.interp`. A print or task
-//! is a 0 on both sides (the old interpreter refuses a run at any call it
-//! does not model); a root the old interpreter refuses is skipped and
-//! counted. Values reached through exp, pow, tan or log10 at run time may
-//! differ by diff-air's named ulps (air.xfail).
-//! No LRM clause: this checks VerA's rewrite against VerA.
+//! is a 0 on both sides and a print operand's width record its operand (the
+//! old interpreter refuses a run at any call it does not model); a root the
+//! old interpreter refuses is skipped and counted. Values reached through
+//! exp, pow, tan or log10 at run time may differ by diff-air's named ulps
+//! (air.xfail). A display operand the old side computes wrong is settled
+//! by `rulings` (its tiebreaker: an LRM clause or a 40-digit reference)
+//! and counted as an old-side bug.
+//! Clauses: §4.3.1 (the abs ruling); otherwise VerA's rewrite against VerA.
 //!
 //! Contents:
 //! - `pub const points`, `pub const libm_ulps: u64`
@@ -44,13 +48,35 @@ const Observe = struct {
     air: *const Air,
     /// Where a host call's string result lives.
     scratch: std.mem.Allocator,
+    /// The display row each `call` instruction is, by instruction.
+    display_of: []const ?u32,
+    /// Each display row's operands at its last run this point, or null.
+    display_args: []?[]const Air.interp.Value,
+    /// The operands of the print call `hostCall` answered last.
+    last_args: []const Air.interp.Value = &.{},
     fn seen(ctx: *anyopaque, inst: Air.Inst.Index, val: Air.interp.Value) void {
         const o: *Observe = @ptrCast(@alignCast(ctx));
         const i = @backingInt(inst);
+        if (o.display_of[i]) |k| o.display_args[k] = o.last_args;
         if (o.air.instructions.items(.tag)[i] != .assign) return;
         const slot = o.air.instructions.items(.data)[i].bin_op.lhs.toIndex().?;
         o.finals[@backingInt(slot)] = val;
     }
+};
+
+/// A display operand the old side computes wrong: the tiebreaker `why`
+/// names gives `want`, which the new side must equal bit for bit.
+const Ruling = struct { fixture: []const u8, display: u32, operand: u32, want: f64, why: []const u8 };
+
+/// Every ruled display operand. cosh(1) against the 40-digit reference
+/// 1.5430806348152437784779...: the nearest double is ...2437, std_kernels'
+/// (Gompute's, the device's kernel, which Sema folds with); the old fold's
+/// gm is 1 ulp above (lib/TODO.md §12, the accepted Gompute ruling).
+const rulings = [_]Ruling{
+    .{ .fixture = "verilog-a/exhaustive/rounding_selection.va", .display = 7, .operand = 2, .want = -0.0, .why = "§4.3.1 \"abs(x) is equivalent to (x > 0) x : -x\": abs(+0.0) is -0.0, as the old device kernel computes; the old fold's @abs gives +0.0" },
+    .{ .fixture = "verilog-a/ch04_expressions/abs.va", .display = 2, .operand = 2, .want = -0.0, .why = "§4.3.1 \"abs(x) is equivalent to (x > 0) x : -x\": abs(+0.0) is -0.0, as the old device kernel computes; the old fold's @abs gives +0.0" },
+    .{ .fixture = "verilog-a/ch04_expressions/cosh.va", .display = 2, .operand = 2, .want = 1.5430806348152437, .why = "cosh(1) correctly rounded (40-digit reference); the old fold's gm is 1 ulp above" },
+    .{ .fixture = "verilog-a/exhaustive/hyperbolic.va", .display = 2, .operand = 2, .want = 1.5430806348152437, .why = "cosh(1) correctly rounded (40-digit reference); the old fold's gm is 1 ulp above" },
 };
 
 /// Evaluates every contribution's sums at `points` seeded points by both
@@ -59,7 +85,15 @@ pub fn compareValues(arena: std.mem.Allocator, rel: []const u8, mir: *Mir, lw: *
     const d = &a.device;
     std.debug.assert(lw.nodes.len == d.nodes.len);
     std.debug.assert(lw.contributions.items.len == d.contributions.len);
-    if (d.contributions.len == 0) return .{ .why = null, .tables = true };
+    std.debug.assert(lw.displays.items.len == d.displays.len);
+    if (d.contributions.len == 0 and d.displays.len == 0) return .{ .why = null, .tables = true };
+    // Each display's operands, read before its call becomes a 0 below.
+    const old_display_args = try arena.alloc([]const Mir.Value, lw.displays.items.len);
+    for (old_display_args, lw.displays.items) |*x, disp| x.* = try arena.dupe(Mir.Value, mir.instData(mir.valueDef(disp.val).inst_result).call.args);
+    const display_of = try arena.alloc(?u32, a.air.instructions.len);
+    @memset(display_of, null);
+    for (d.displays.items(.call), 0..) |call, k| display_of[@backingInt(call)] = @intCast(k);
+    const display_args = try arena.alloc(?[]const Air.interp.Value, d.displays.len);
     // A parameter's reference value, read through the old interpreter.
     // The old interpreter refuses a whole run at any call it does not
     // model; a print or task has no value a contribution reads, so each
@@ -67,7 +101,15 @@ pub fn compareValues(arena: std.mem.Allocator, rel: []const u8, mir: *Mir, lw: *
     for (0..mir.instCount()) |k| {
         const inst: Mir.Inst = @fromBackingInt(@intCast(k));
         if (mir.instOp(inst) != .call) continue;
-        switch (Mir.callee.family(mir.instData(inst).call.callee)) {
+        const call = mir.instData(inst).call;
+        // A print operand's width record is the operand, as `hostCall`
+        // answers it; the old interpreter refuses the whole run at one.
+        if (call.callee == .@"$display$width") {
+            mir.insts.items(.op)[k] = .opt_barrier;
+            mir.insts.items(.a)[k] = @backingInt(call.args[0]);
+            continue;
+        }
+        switch (Mir.callee.family(call.callee)) {
             .display, .simctl, .file_out => {
                 mir.insts.items(.op)[k] = .opt_barrier;
                 mir.insts.items(.a)[k] = @backingInt(Mir.Value.f_zero);
@@ -135,7 +177,8 @@ pub fn compareValues(arena: std.mem.Allocator, rel: []const u8, mir: *Mir, lw: *
             };
         }
         @memset(finals, null);
-        var obs: Observe = .{ .finals = finals, .air = &a.air, .scratch = scratch.allocator() };
+        @memset(display_args, null);
+        var obs: Observe = .{ .finals = finals, .air = &a.air, .scratch = scratch.allocator(), .display_of = display_of, .display_args = display_args };
         const new_result = Air.interp.run(scratch.allocator(), a.air, &zcu.intern_pool, .{
             .args = args,
             .probes = volts,
@@ -172,11 +215,52 @@ pub fn compareValues(arena: std.mem.Allocator, rel: []const u8, mir: *Mir, lw: *
             }
             v.values += 1;
         };
+        if (old_ran) if (try compareDisplays(arena, rel, &old, old_display_args, display_args, libm, &v.old_bugs)) |why| {
+            v.why = why;
+            return v;
+        };
     }
     return v;
 }
 
 // ---- private ----
+
+/// The first display operand both sides computed this point and that
+/// differs, or null. An operand either side did not reach (an untaken
+/// arm, a call the old interpreter refuses) is not compared. Under run-time
+/// libm a real may be ulps apart and a comparison over it may flip. A
+/// difference a `rulings` row settles for the new side counts in `old_bugs`.
+fn compareDisplays(arena: std.mem.Allocator, rel: []const u8, old: *const OldInterp, old_args: []const []const Mir.Value, new_args: []const ?[]const Air.interp.Value, libm: bool, old_bugs: *u32) !?[]const u8 {
+    std.debug.assert(old_args.len == new_args.len);
+    for (old_args, new_args, 0..) |oa, maybe_na, k| {
+        const na = maybe_na orelse continue;
+        if (oa.len != na.len) return try arena.print("display {d}: old {d} operands, new {d}", .{ k, oa.len, na.len });
+        for (oa, na, 0..) |ov, nv, j| {
+            const o = (old.get(ov) catch null) orelse continue;
+            const same = switch (o.c) {
+                .str => |s| nv == .str and std.mem.eql(u8, s, nv.str),
+                .int => nv != .str and (sameBits(o.c.asReal(), realOf(nv)) or (libm and nv == .int)),
+                .real => nv != .str and (sameBits(o.c.real, realOf(nv)) or (libm and ulpsApart(o.c.real, realOf(nv)) <= libm_ulps)),
+            };
+            if (same) continue;
+            if (ruled(rel, @intCast(k), @intCast(j), nv)) {
+                old_bugs.* += 1;
+                continue;
+            }
+            return try arena.print("display {d} operand {d}: old {any}, new {any}", .{ k, j, o.c, nv });
+        }
+    }
+    return null;
+}
+
+/// Whether a `rulings` row names this operand and the new side gives its value.
+fn ruled(rel: []const u8, display: u32, operand: u32, got: Air.interp.Value) bool {
+    for (rulings) |r| {
+        if (r.display != display or r.operand != operand or !std.mem.eql(u8, r.fixture, rel)) continue;
+        return got == .real and sameBits(got.real, r.want);
+    }
+    return false;
+}
 
 /// The new side's model of the host, the old interpreter's
 /// (`src/codegen/verilog/Interp.zig`'s `call`): a print or task is 0; a
@@ -194,7 +278,9 @@ fn hostCall(ctx: *anyopaque, callee: u32, args: []const Air.interp.Value) Air.in
     switch (tag) {
         .transition, .absdelay, .slew => return args[0],
         .limexp => return .{ .real = @exp(realOf(args[0])) },
-        .@"$mfactor" => return .{ .real = 1 },
+        // Table 9-29's top-level values, the old card defaults.
+        .@"$mfactor", .@"$hflip", .@"$vflip" => return .{ .real = 1 },
+        .@"$xposition", .@"$yposition", .@"$angle" => return .{ .real = 0 },
         .@"$temperature" => return .{ .real = 300.15 },
         .@"op$static" => return .{ .int = 0 },
         // A reader's destinations: the old interpreter refuses the reader.
@@ -224,6 +310,7 @@ fn hostCall(ctx: *anyopaque, callee: u32, args: []const Air.interp.Value) Air.in
         else => {}, // else: by family below
     }
     const info = vams.SysFn.get(tag);
+    if (info.family == .display or info.family == .file_out or info.family == .simctl) o.last_args = try o.scratch.dupe(Air.interp.Value, args);
     return switch (info.family) {
         .display, .simctl, .file_out, .string => switch (info.ty) {
             .str => .{ .str = "" },

@@ -48,6 +48,15 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
         const ty = decl.tyOf(v.flags.storage);
         if (v.dims.len != 0) try decl.declareArray(s, unit, first, v.dims, ty) else try unit.binds.put(s.arena, first, .{ .slot = .{ .alloc = try decl.addAlloc(s, ty), .ty = ty } });
         const bind = unit.binds.get(first) orelse continue;
+        // §3.3 Table 3-3 a literal (or a concatenation of literals) given
+        // to an integral variable is its bytes, `""` one zero byte.
+        // ponytail: declaration initializers only; an assignment statement's
+        // literal goes through `expr.coerce` and drops a `""`.
+        const literal: ?[]const u8 = if (ty == .integer and v.init.len != 0) try literalBytes(s, vir, vir.body(v.init)[vir.body(v.init).len - 1].toRef(), 0) else null;
+        // A.6.2 a constant `initial` assignment lands where a declaration
+        // assignment does, after it (discrete.zig's `initial`).
+        const start: ?@import("eval.zig").Const = if (unit.initial.get(first)) |k| k else if (literal) |l| .{ .str = l } else if (v.init.len != 0) try decl.foldBody(s, unit, v.init) else null;
+        const has_init = v.init.len != 0 or unit.initial.contains(first);
         // VerA's `vera_scratch` (§2.9): no held slot, every evaluation starts
         // over; not for a value an `analog initial` or event body leaves
         // for a later read (E0536), nor a digital process's (E0537).
@@ -63,24 +72,24 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
         if (mode != .off and std.mem.findScalar(Inst.Index, unit.discrete.items, first) != null) try s.fail(.E0537, unit.file, i.toRef(), "`{s}`", .{vir.string(v.name)});
         if (mode != .off) {
             _ = unit.held.remove(first);
-            if (mode == .zero and v.init.len == 0 and bind == .slot) try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(bind.slot.alloc), .rhs = .fromIntern(if (ty == .real) .zero_real else .zero) } } }));
+            if (mode == .zero and !has_init and bind == .slot) try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(bind.slot.alloc), .rhs = .fromIntern(if (ty == .real) .zero_real else .zero) } } }));
         }
         if (unit.held.contains(first)) {
-            const init: InternPool.Index = if (v.init.len == 0) .undef else if (try decl.foldBody(s, unit, v.init)) |k| try decl.intern(s, k) else .undef;
+            const init: InternPool.Index = if (start) |k| try decl.intern(s, k) else .undef;
             try addHeld(s, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, vir.string(v.name) }), bind, init);
-        } else if (v.init.len != 0 and bind == .slot) {
+        } else if (has_init and bind == .slot) {
             // §3.2 a variable no evaluation leaves for the next starts each
             // one from its initializer (its folded value when it folds).
             var eb: Block = .{ .parent = null, .unit = unit };
             const init = vir.body(v.init);
             const expr = @import("expr.zig");
-            const val: Sema.Value = if (try decl.foldBody(s, unit, v.init)) |k| switch (k) {
+            const val: Sema.Value = if (start) |k| switch (k) {
                 .int => .{ .ref = .fromIntern(try decl.intern(s, k)), .ty = .integer },
                 .real => .{ .ref = .fromIntern(try decl.intern(s, k)), .ty = .real },
                 .str => if (ty == .string)
                     .{ .ref = .fromIntern(try decl.intern(s, k)), .ty = .string }
                 else
-                    .{ .ref = .fromIntern(try decl.intern(s, .{ .int = @import("std_kernels").fold.strToInt(k.str, 64) })), .ty = .integer },
+                    .{ .ref = .fromIntern(try decl.intern(s, .{ .int = @import("std_kernels").fold.strToInt(k.str, if (v.flags.storage == .integer) 32 else 64) })), .ty = .integer },
             } else try expr.lower(s, &eb, init[init.len - 1].toRef());
             const r = try expr.coerce(s, &eb, val, bind.slot.ty);
             _ = try s.addInst(&eb, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(bind.slot.alloc), .rhs = r } } });
@@ -113,4 +122,25 @@ pub fn addHeld(s: *Sema, name: []const u8, bind: Sema.Bind, init: InternPool.Ind
     // `declareArray` mints the slots back to back.
     assert(@backingInt(slots[slots.len - 1]) - @backingInt(slots[0]) == slots.len - 1);
     try s.device.held.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .slot = slots[0], .count = @intCast(slots.len), .init = init });
+}
+
+// ---- private ----
+
+/// The bytes of `r` when it is a string literal or a concatenation of
+/// them (the old `strLitBytes`), `""` as one zero byte; else null.
+fn literalBytes(s: *Sema, vir: *const vams.Vir, r: Inst.Ref, depth: u32) Allocator.Error!?[]const u8 {
+    const i = r.toIndex() orelse return null;
+    if (depth > 64) return null;
+    switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .str => {
+            const x = vir.instructions.items(.data)[@backingInt(i)].str;
+            return if (x.len == 0) "\x00" else vir.string_bytes[@backingInt(x.start)..][0..x.len];
+        },
+        .concat => {
+            var out: std.ArrayList(u8) = .empty;
+            for (vir.list(Inst.Ref, decl.payloadOf(vir, Inst.Refs, i))) |el| try out.appendSlice(s.arena, (try literalBytes(s, vir, el, depth + 1)) orelse return null);
+            return out.items;
+        },
+        else => return null, // else: not a literal, so no compile-time bytes
+    }
 }

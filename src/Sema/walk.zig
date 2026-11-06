@@ -283,6 +283,11 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     for (env.positions.keys()) |param_inst| _ = try env.param(param_inst);
     try arraySizes(s, &env, p);
     const params = try zcu.intern_pool.get(s.gpa, .{ .aggregate = .{ .ty = .none, .elems = env.values.items } });
+    const given: InternPool.Index = if (env.given.count() == 0) .none else given: {
+        const flags = try s.arena.alloc(InternPool.Index, env.values.items.len);
+        for (flags, env.positions.keys()) |*f, q| f.* = if (env.given.contains(q)) .one else .zero;
+        break :given try zcu.intern_pool.get(s.gpa, .{ .aggregate = .{ .ty = .none, .elems = flags } });
+    };
     const key: Instance.Key = .{ .module = picked.module, .params = params };
     if (try recursion(w, p, key)) |depth| {
         try s.fail(.E0905, p.file, p.src, "`{s}` instantiates itself with the same parameters ({d} levels deep)", .{ vir.string(row.name), depth });
@@ -290,7 +295,7 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     }
     if (zcu.isBuiltin(picked.module)) try portDisciplineAttrs(s, p);
     const ports = try bindPorts(s, p, vir, m, row.name);
-    try zcu.instances.append(s.gpa, .{ .module = picked.module, .parent = p.parent, .name = p.name, .params = params, .paramset = picked.paramset, .paramset_params = picked.own, .src = p.src, .hier = env.hier, .ports = ports });
+    try zcu.instances.append(s.gpa, .{ .module = picked.module, .parent = p.parent, .name = p.name, .params = params, .paramset = picked.paramset, .paramset_params = picked.own, .given = given, .src = p.src, .hier = env.hier, .ports = ports });
     assert(zcu.instances.len == @backingInt(index) + 1);
     const gop = try zcu.instance_map.getOrPut(s.gpa, key);
     if (!gop.found_existing) gop.value_ptr.* = index;

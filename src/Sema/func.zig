@@ -59,7 +59,8 @@ pub fn call(s: *Sema, b: *Block, f: Inst.Index, pre: []const Value, args: []cons
             try expr.coerce(s, b, if (k < pre.len) pre[k] else try expr.lower(s, b, args[k - pre.len]), ty);
         _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slot.alloc), .rhs = v } } });
     }
-    const ret_ty = decl.tyOf(fd.flags.storage);
+    // §4.7.1 "if unspecified, the default is real".
+    const ret_ty: Sema.Ty = if (fd.flags.storage == .none) .real else decl.tyOf(fd.flags.storage);
     const ret: Sema.Slot = .{ .alloc = try decl.addAlloc(s, ret_ty), .ty = ret_ty };
     _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(ret.alloc), .rhs = zeroOf(ret_ty) } } });
     for (formals, slots) |formal, slot| try unit.binds.put(s.arena, decl.canonical(vir, formal), .{ .slot = slot });

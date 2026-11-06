@@ -82,7 +82,7 @@ fn paramsetRows(s: *Sema, unit: *Unit) Allocator.Error!void {
     const values = ip.indexToKey(own).aggregate.elems;
     // The paramset's scope: its own declarations bound to their rows.
     const scope = try s.arena.create(Unit);
-    scope.* = .{ .instance = unit.instance, .file = ps.file, .vir = vir, .module = unit.module, .prefix = unit.prefix };
+    scope.* = .{ .instance = unit.instance, .file = ps.file, .vir = vir, .module = unit.module, .prefix = unit.prefix, .owner = unit };
     unit.paramset = scope;
     var env: eval.Env = try .init(s.gpa, s.arena, ip, vir, &.{});
     defer env.deinit();

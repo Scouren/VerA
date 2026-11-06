@@ -119,6 +119,10 @@ limit_seeds: std.ArrayList(Air.Inst.Ref) = .empty,
 inlining: std.ArrayList(Inst.Index) = .empty,
 /// The contribution rows a reactive term was added to (contrib.zig).
 react_written: std.AutoHashMapUnmanaged(Air.Device.Contribution.Index, void) = .empty,
+/// §6.4.3 each paramset instance's output variables by flat name, and the
+/// module variables an undescribed paramset variable hides (simprobe.zig).
+ps_outputs: std.StringHashMapUnmanaged(Slot) = .empty,
+ps_hidden: std.StringHashMapUnmanaged(void) = .empty,
 
 /// What elaboration reads besides the files.
 pub const Config = struct {
@@ -225,6 +229,12 @@ pub const Unit = struct {
     /// A paramset instance's paramset scope: its declarations bound to
     /// their rows (param.zig).
     paramset: ?*Unit = null,
+    /// A.6.2 a non-mixed instance's constant `initial` values, by variable
+    /// (discrete.zig).
+    initial: std.AutoHashMapUnmanaged(Inst.Index, @import("Sema/eval.zig").Const) = .empty,
+    /// A paramset scope's instance unit, whose module §6.4.3's `.name`
+    /// reads (simprobe.zig).
+    owner: ?*Unit = null,
     /// The variables whose value an `analog initial` or `@(...)` body
     /// leaves for a later evaluation's read (held.zig).
     carried: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty,

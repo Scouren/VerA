@@ -386,6 +386,7 @@ fn lowerUnit(s: *Sema, main: *Block, u: *Unit, depth: u32) Allocator.Error!void 
     var env = try envOf(s, u);
     defer env.deinit();
     try eachItem(s, u, &env, u.module.body, Lowering{ .main = main }, depth);
+    try @import("simprobe.zig").statements(s, main, u);
 }
 
 /// A body's last instruction as a `store`, or null.

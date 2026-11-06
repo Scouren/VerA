@@ -266,6 +266,38 @@ test "§4.7 an analog function is inlined; its output argument is written back" 
     try std.testing.expectEqual(@as(f64, 13.0), try o.value(0, 0, &.{3.0}));
 }
 
+test "A.6.2 a constant `initial` assignment is the variable's start value" {
+    var o = try lower(
+        \\module m(p);
+        \\  inout p; electrical p;
+        \\  integer level;
+        \\  initial level = 10;
+        \\  analog I(p) <+ level * V(p);
+        \\endmodule
+    );
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{}, o.codes);
+    // The block runs once before the analysis: level is 10 throughout.
+    try std.testing.expectEqual(@as(f64, 20.0), try o.value(0, 0, &.{2.0}));
+}
+
+test "§4.7.1 an analog function with no type returns real" {
+    var o = try lower(
+        \\module m(p);
+        \\  inout p; electrical p;
+        \\  analog function halve;
+        \\    input x; real x;
+        \\    halve = 0.5 * x;
+        \\  endfunction
+        \\  analog I(p) <+ halve(V(p));
+        \\endmodule
+    );
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{}, o.codes);
+    // "if unspecified, the default is real": 0.5 * 3 = 1.5, not rounded to 2.
+    try std.testing.expectEqual(@as(f64, 1.5), try o.value(0, 0, &.{3.0}));
+}
+
 test "§6.6 a loop generate scheme unrolls its analog block once per genvar value" {
     var o = try lower(
         \\module m(p);

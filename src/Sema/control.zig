@@ -211,7 +211,8 @@ fn stmt(s: *Sema, b: *Block, i: Inst.Index, tag: Inst.Tag) Allocator.Error!void 
             b.dead = true;
         },
         .variable => try local(s, b, i),
-        .param, .event => {},
+        // A paramset's `.name = value` was applied in elaboration.
+        .param, .event, .ps_override, .aliasparam => {},
         .event_wait => try eventWait(s, b, decl.payloadOf(vir, Inst.EventWait, i), src),
         .contrib_indirect => try contrib.indirect(s, b, decl.payloadOf(vir, Inst.Triple, i), src),
         .trigger => try trigger(s, b, vir.instructions.items(.data)[@backingInt(i)].un_node.operand, src),
@@ -219,7 +220,7 @@ fn stmt(s: *Sema, b: *Block, i: Inst.Index, tag: Inst.Tag) Allocator.Error!void 
         .store_nb, .proc_assign, .force, .store_timed, .store_nb_timed, .deassign, .release, .wait, .delay => try s.fail(.E0512, unit.file, src, "`{t}` is not lowered by Sema yet", .{tag}),
         // An expression: lowered where its statement reads it.
         .decl_ref, .str_ref, .int, .big_int, .real, .str, .pos, .neg, .not, .bit_not, .red_and, .red_nand, .red_or, .red_nor, .red_xor, .red_xnor, .add, .sub, .mul, .div, .mod, .pow, .shl, .shr, .ashl, .ashr, .lt, .gt, .lte, .gte, .eq, .neq, .case_eq, .case_neq, .bit_and, .bit_or, .bit_xor, .bit_xnor, .bool_and, .bool_or, .ternary, .mintypmax, .field, .elem, .slice, .slice_up, .slice_down, .call, .call_sys, .port_branch, .concat, .pattern, .replicate, .pattern_repl, .event_or, .posedge, .negedge, .driver_update, .step_event, .paramset_output, .range, .pulse_limits, .delay_ctl, .event_ctl, .repeat_ctl => {},
-        .module, .nature, .discipline, .paramset, .primitive, .connectrules, .config, .port, .io, .net, .aliasparam, .genvar, .branch, .instance, .assign, .defparam, .analog, .analog_initial, .initial, .always, .function, .gen_for, .gen_if, .gen_case, .gen_block, .specify, .path, .timing_check, .pulse_style, .timing_event, .ps_override, .connect_resolve, .connect_insert => try s.fail(.E0512, unit.file, src, "`{t}` in an analog body", .{tag}),
+        .module, .nature, .discipline, .paramset, .primitive, .connectrules, .config, .port, .io, .net, .genvar, .branch, .instance, .assign, .defparam, .analog, .analog_initial, .initial, .always, .function, .gen_for, .gen_if, .gen_case, .gen_block, .specify, .path, .timing_check, .pulse_style, .timing_event, .connect_resolve, .connect_insert => try s.fail(.E0512, unit.file, src, "`{t}` in an analog body", .{tag}),
     }
 }
 

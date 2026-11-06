@@ -13,6 +13,7 @@
 //! - `pub fn nets(s: *Sema, unit: *Unit) Allocator.Error!void`
 //! - `pub fn bindChildPorts(s: *Sema, unit: *Unit) Allocator.Error!void`
 //! - `pub fn bindBridges(s: *Sema) Allocator.Error!void`
+//! - `pub fn netDiscipline(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.Error!InternPool.String`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -138,6 +139,23 @@ pub fn bindBridges(s: *Sema) Allocator.Error!void {
     }
 }
 
+/// §3.6.2 the discipline of net `first`: the one Annex F resolution gave
+/// it (`zcu.net_discipline`: its declaration's, a `port_discipline`
+/// attribute's, or its segments'), else its declaration's, else the §10.2
+/// `default_discipline` in force at it (one qualified by its net type, else
+/// the unqualified one), else none.
+pub fn netDiscipline(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.Error!InternPool.String {
+    const vir = unit.vir;
+    const ip = &s.zcu.intern_pool;
+    if (try portDisciplineAttr(s, unit, first)) |d| return d;
+    const net = try ip.getString(s.gpa, vir.string(nameOf(vir, first)));
+    if (s.zcu.net_discipline.get(.{ .instance = unit.instance, .net = net })) |d| return d;
+    const declared = disciplineOf(unit, first);
+    if (declared != .empty) return ip.getString(s.gpa, vir.string(declared));
+    if (defaultOf(unit, first)) |dflt| return ip.getString(s.gpa, vir.string(dflt));
+    return .empty;
+}
+
 // ---- private ----
 
 /// §7.8.4 the lower side of each connect module inserted in `parent`,
@@ -197,23 +215,6 @@ fn internNode(s: *Sema, unit: *const Unit, name: []const u8, discipline: InternP
     return row;
 }
 
-/// §3.6.2 the discipline of net `first`: the one Annex F resolution gave
-/// it (`zcu.net_discipline`: its declaration's, a `port_discipline`
-/// attribute's, or its segments'), else its declaration's, else the §10.2
-/// `default_discipline` in force at it (one qualified by its net type, else
-/// the unqualified one), else none.
-fn netDiscipline(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.Error!InternPool.String {
-    const vir = unit.vir;
-    const ip = &s.zcu.intern_pool;
-    if (try portDisciplineAttr(s, unit, first)) |d| return d;
-    const net = try ip.getString(s.gpa, vir.string(nameOf(vir, first)));
-    if (s.zcu.net_discipline.get(.{ .instance = unit.instance, .net = net })) |d| return d;
-    const declared = disciplineOf(unit, first);
-    if (declared != .empty) return ip.getString(s.gpa, vir.string(declared));
-    if (defaultOf(unit, first)) |dflt| return ip.getString(s.gpa, vir.string(dflt));
-    return .empty;
-}
-
 /// Annex E.3.2.1 a shipped primitive's port under its instance's
 /// `port_discipline` attribute (a string naming a discipline; elaboration
 /// judged it, E0358): that discipline. Null for any other net.
@@ -242,26 +243,30 @@ fn portDisciplineAttr(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.
 
 /// §10.2 the `default_discipline` in force at any declaration of `first`'s
 /// name: one qualified by the declaration's net type (`wire` when none is
-/// written), else the unqualified one.
+/// written by any declaration of the name), else the unqualified one.
 fn defaultOf(unit: *const Unit, first: Inst.Index) ?Vir.String {
     const vir = unit.vir;
     const tags = vir.instructions.items(.tag);
+    // `inout q; tri q;`: the net type is the declaration that writes one.
+    var net: Inst.NetKind = .none;
+    var defaults: ?Vir.List(Inst.Default) = null;
     for ([_]Vir.Body{ unit.module.ports, unit.module.body }) |body| for (vir.body(body)) |i| {
         if (canonical(vir, i) != first) continue;
-        const net: Inst.NetKind, const defaults = switch (tags[@backingInt(i)]) {
+        const kind: Inst.NetKind, const stamps = switch (tags[@backingInt(i)]) {
             .net => .{ payloadOf(vir, Inst.Net, i).flags.net, payloadOf(vir, Inst.Net, i).defaults },
             .io => .{ payloadOf(vir, Inst.Io, i).flags.net, payloadOf(vir, Inst.Io, i).defaults },
             else => continue, // else: only a net or a direction carries the stamps
         };
-        const want = std.meta.stringToEnum(@FieldType(@FieldType(Inst.Default, "flags"), "qualifier"), if (net == .none) "wire" else @tagName(net));
-        var fallback: ?Vir.String = null;
-        for (vir.list(Inst.Default, defaults)) |x| {
-            if (x.flags.qualified and want != null and x.flags.qualifier == want.?) return x.discipline;
-            if (!x.flags.qualified) fallback = x.discipline;
-        }
-        if (fallback) |f| return f;
+        if (defaults == null) defaults = stamps;
+        if (net == .none and kind != .none) net = kind;
     };
-    return null;
+    const want = std.meta.stringToEnum(@FieldType(@FieldType(Inst.Default, "flags"), "qualifier"), if (net == .none) "wire" else @tagName(net));
+    var fallback: ?Vir.String = null;
+    for (vir.list(Inst.Default, defaults orelse return null)) |x| {
+        if (x.flags.qualified and want != null and x.flags.qualifier == want.?) return x.discipline;
+        if (!x.flags.qualified) fallback = x.discipline;
+    }
+    return fallback;
 }
 
 /// The discipline any declaration of `first`'s name in the module gives it.

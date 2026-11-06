@@ -16,7 +16,8 @@
 //! - values: when the tables agree, `points` seeded points per fixture
 //!   (every unknown a value in [-2, 2], every real parameter with a folded
 //!   default a value inside its ranges near the default): each
-//!   contribution's resistive and reactive sum by the old MIR interpreter
+//!   contribution's resistive and reactive sum, and each display row's
+//!   operands at its last run, by the old MIR interpreter
 //!   (`src/codegen/verilog/Interp.zig`, over `opcode.fold`) and by
 //!   `Air.interp`, bit for bit, NaN as NaN. A root the old interpreter
 //!   refuses (a call it does not model, an event, an array) is skipped and
@@ -55,7 +56,7 @@ const tables = @import("lower/tables.zig");
 const elab_codes = @import("stages.zig").elab_codes;
 
 /// One fixture's verdict: null `why` when every check agrees.
-pub const Verdict = struct { why: ?[]const u8, tables: bool = false, roots: u32 = 0, values: u64 = 0, values_libm: u64 = 0, skipped: u32 = 0 };
+pub const Verdict = struct { why: ?[]const u8, tables: bool = false, roots: u32 = 0, values: u64 = 0, values_libm: u64 = 0, skipped: u32 = 0, old_bugs: u32 = 0 };
 
 const Tally = struct {
     compared: u32 = 0,
@@ -63,6 +64,8 @@ const Tally = struct {
     roots: u32 = 0,
     values: u64 = 0,
     values_libm: u64 = 0,
+    old_bugs: u32 = 0,
+    old_bug_fixtures: u32 = 0,
     roots_skipped: u32 = 0,
     skipped_old: u32 = 0,
     skipped_new: u32 = 0,
@@ -126,6 +129,9 @@ fn runAll() !void {
         tally.roots += v.roots;
         tally.values += v.values;
         tally.values_libm += v.values_libm;
+        tally.old_bugs += v.old_bugs;
+        tally.old_bug_fixtures += @intFromBool(v.old_bugs != 0);
+        if (v.old_bugs != 0) try out.writer.print("OLD-BUG {s}: {d} display operands the old side computes wrong (values.zig rulings)\n", .{ rel, v.old_bugs });
         tally.roots_skipped += v.skipped;
         const listed = xfail.get(rel) != null;
         if (listed) try seen.put(arena, rel, {});
@@ -146,7 +152,7 @@ fn runAll() !void {
         tally.failed += 1;
         try out.writer.print("STALE {s}: lower.xfail names a fixture that was not compared\n", .{k.*});
     };
-    std.debug.print("{s}diff-lower: {d} fixtures compared ({d} with agreeing tables; {d} roots, {d} values equal bit for bit, {d} within the libm ulp bound, {d} roots the old interpreter refused), {d} agree, {d} listed in lower.xfail, {d} skipped (old front end refused), {d} skipped (new parser refused), {d} failures\n", .{ out.written(), tally.compared, tally.tables, tally.roots, tally.values, tally.values_libm, tally.roots_skipped, tally.agreed, tally.xfailed, tally.skipped_old, tally.skipped_new, tally.failed });
+    std.debug.print("{s}diff-lower: {d} fixtures compared ({d} with agreeing tables; {d} roots, {d} values equal bit for bit, {d} within the libm ulp bound, {d} roots the old interpreter refused, {d} display operands an old-side bug in {d} fixtures), {d} agree, {d} listed in lower.xfail, {d} skipped (old front end refused), {d} skipped (new parser refused), {d} failures\n", .{ out.written(), tally.compared, tally.tables, tally.roots, tally.values, tally.values_libm, tally.roots_skipped, tally.old_bugs, tally.old_bug_fixtures, tally.agreed, tally.xfailed, tally.skipped_old, tally.skipped_new, tally.failed });
     if (tally.failed != 0) return error.DiffLowerFailed;
 }
 

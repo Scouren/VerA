@@ -168,7 +168,8 @@ fn inst(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!Value {
         },
         .field => hierRead(s, b, src),
         .concat, .replicate => @import("string.zig").concat(s, b, i, src),
-        .str_ref, .slice, .slice_up, .slice_down, .pattern, .pattern_repl, .port_branch, .event_or, .posedge, .negedge, .driver_update, .step_event, .paramset_output, .range, .pulse_limits => refuse(s, b, src, @tagName(tag)),
+        .str_ref, .slice, .slice_up, .slice_down, .pattern, .pattern_repl, .port_branch, .event_or, .posedge, .negedge, .driver_update, .step_event, .range, .pulse_limits => refuse(s, b, src, @tagName(tag)),
+        .paramset_output => @import("simprobe.zig").dotted(s, b, vir.string(data.str_tok.start), src),
         .module, .nature, .discipline, .paramset, .primitive, .connectrules, .config, .port, .io, .net, .variable, .param, .aliasparam, .genvar, .event, .branch, .instance, .assign, .defparam, .analog, .analog_initial, .initial, .always, .function, .gen_for, .gen_if, .gen_case, .gen_block, .specify, .path, .timing_check, .pulse_style, .timing_event, .ps_override, .connect_resolve, .connect_insert, .block, .condbr, .case, .loop, .repeat, .wait, .delay, .event_wait, .store, .store_nb, .contrib, .proc_assign, .force, .store_timed, .store_nb_timed, .contrib_indirect, .deassign, .release, .trigger, .disable, .ret, .brk, .cont, .delay_ctl, .event_ctl, .repeat_ctl => unreachable, // AstGen: an operand is an expression
     };
 }

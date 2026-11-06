@@ -21,6 +21,7 @@
 //! - `pub fn target(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!?Target`
 //! - `pub const AccessCall`, `pub fn accessCall(s: *Sema, unit: *const Sema.Unit, r: Inst.Ref) Allocator.Error!?AccessCall`
 //! - `pub fn nodeName(s: *const Sema, n: Node.Index) []const u8`
+//! - `pub fn mfactorOf(s: *const Sema, unit: *const Sema.Unit) f64`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -53,6 +54,25 @@ pub const Target = struct {
     lo: Node.Index,
     neg: bool,
 };
+
+/// §6.3.6 the `$mfactor` `unit`'s instance has over the top's (whose own
+/// stays with the host): 1 for the top and for a value that did not fold.
+pub fn mfactorOf(s: *const Sema, unit: *const Sema.Unit) f64 {
+    const hiers = s.zcu.instances.items(.hier);
+    const top = s.units.items[0].instance;
+    assert(@backingInt(unit.instance) < hiers.len);
+    if (unit.instance == top) return 1;
+    const ip = &s.zcu.intern_pool;
+    const here = switch (ip.indexToKey(hiers[@backingInt(unit.instance)].get(.mfactor))) {
+        .float => |f| f,
+        else => return 1, // else: did not fold (E0890 was raised)
+    };
+    const at_top = switch (ip.indexToKey(hiers[@backingInt(top)].get(.mfactor))) {
+        .float => |f| f,
+        else => return 1, // else: as above
+    };
+    return here / at_top;
+}
 
 /// The access `name` is under any discipline (§3.6.2: a nature's `access`
 /// attribute), or null when no nature names it.
@@ -89,11 +109,13 @@ pub fn access(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src
                     return expr.poison;
                 }
                 const slot = s.device.contributions.items(.resist)[@backingInt(row)];
-                const v = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot) } });
+                const v = try scaled(s, b, try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot) } }), mfactorOf(s, b.unit), true);
                 return .{ .ref = if (t.neg) try expr.unOp(s, b, .fneg, v) else v, .ty = .real };
             };
+            // §6.3.6 "The value returned by any branch flow probe ... shall
+            // be divided by $mfactor".
             const u = try flowUnknown(s, b.unit, t.hi, t.lo);
-            const v = try probe(s, u);
+            const v = try scaled(s, b, try probe(s, u), mfactorOf(s, b.unit), true);
             return .{ .ref = if (t.neg) try expr.unOp(s, b, .fneg, v) else v, .ty = .real };
         },
     }
@@ -128,7 +150,11 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
     try reactive.split(s, b, x.rhs, false, &split);
     if (split.react != null) try s.react_written.put(s.arena, row, {});
     const slots = s.device.contributions.get(@backingInt(row));
-    inline for (.{ "resist", "react" }) |half| if (@field(split, half)) |v0| {
+    // §6.3.6 "All contributions to a branch flow quantity in the analog
+    // block shall be multiplied by $mfactor".
+    const m = if (t.access == .flow) mfactorOf(s, b.unit) else 1;
+    inline for (.{ "resist", "react" }) |half| if (@field(split, half)) |v1| {
+        const v0 = try scaled(s, b, v1, m, false);
         const v = if (t.neg) try expr.unOp(s, b, .fneg, v0) else v0;
         const slot = @field(slots, half);
         const old = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot) } });
@@ -137,7 +163,7 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
     };
     for (split.sites.items) |site| {
         const slot = try decl.addAlloc(s, .real);
-        _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slot), .rhs = site.charge } } });
+        _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slot), .rhs = try scaled(s, b, site.charge, m, false) } } });
         try s.device.charge_sites.append(s.gpa, .{ .contrib = row, .sign = if (site.negate != t.neg) -1.0 else 1.0, .slot = slot });
     }
     _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slots.wrote), .rhs = .fromIntern(.one_real) } } });
@@ -298,6 +324,12 @@ pub fn nodeName(s: *const Sema, n: Node.Index) []const u8 {
 }
 
 // ---- private ----
+
+/// `v` scaled by `m` (`fmul`, or `fdiv` when `div`); `v` itself at 1.
+fn scaled(s: *Sema, b: *Block, v: Ref, m: f64, div: bool) Allocator.Error!Ref {
+    if (m == 1) return v;
+    return expr.binOp(s, b, if (div) .fdiv else .fmul, v, .fromIntern(try decl.intern(s, .{ .real = m })));
+}
 
 /// A nature's `access` attribute, its parent's when it has none.
 fn natureAccess(s: *Sema, name: []const u8, depth: u32) Allocator.Error!?[]const u8 {

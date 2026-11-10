@@ -31,6 +31,7 @@ const logic = @import("logic.zig");
 const net_ = @import("net.zig");
 const Handle = @import("scheduler.zig").Handle;
 const vcd = @import("vcd.zig");
+const small = @import("small.zig");
 const Error = State.Error;
 const Literal = logic.Literal;
 const Bit = logic.Bit;
@@ -96,13 +97,15 @@ pub fn continuous(s: *State, a: Allocator, at: u32, pc: u32) Error!void {
     const d = p.drivers[at];
     const timing = try timingOf(s, a, at);
     var or_z = false;
+    // A value of at most 64 bits lives here: publishing it copies it.
+    var planes: [2]u64 = undefined;
     const value: Literal = switch (d.source) {
         .expr => |x| if (x.slice) blk: {
-            const whole = try eval.eval(s, a, x.value);
+            const whole = try small.evalInto(s, a, &planes, x.value);
             const part = try logic.filled(a, d.width, false, .z);
             logic.copyBits(part, 0, whole, x.lo, d.width);
             break :blk part;
-        } else try eval.eval(s, a, x.value),
+        } else try small.evalInto(s, a, &planes, x.value),
         .bridge => |b| blk: {
             const out = try logic.filled(a, d.width, false, .z);
             const src = try eval.read(s, a, b.src);

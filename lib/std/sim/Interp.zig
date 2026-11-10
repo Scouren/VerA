@@ -177,9 +177,7 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
             .assign, .assign_nb => {
                 // A value of at most 64 bits lives here: every landing copies it.
                 var planes: [2]u64 = undefined;
-                const ty = p.exprs.items(.ty)[d.b];
-                const value = if (small.fits(ty)) small.literal(&planes, try small.value(s, a, d.b), ty) else try eval.eval(s, a, d.b);
-                try eval.put(s, a, d.a, value, tags[pc] == .assign_nb, null);
+                try eval.put(s, a, d.a, try small.evalInto(s, a, &planes, d.b), tags[pc] == .assign_nb, null);
                 pc += 1;
             },
             .delay => {
@@ -405,11 +403,13 @@ fn watchAll(s: *State, id: u32, terms: Program.List) Error!void {
 /// §9.5: the first arm with a label matching the scrutinee; else the fallback.
 fn caseSelect(s: *State, a: Allocator, c: Program.Case) Error!u32 {
     const p = s.p;
-    const value = try eval.eval(s, a, c.scrutinee);
+    // Values of 64 bits or fewer live here: a case reads every label.
+    var planes: [2][2]u64 = undefined;
+    const value = try small.evalInto(s, a, &planes[0], c.scrutinee);
     for (p.list(c.arms)) |arm_at| {
         const arm = p.extraData(Program.Arm, arm_at);
         for (p.list(arm.labels)) |label| {
-            if (caseMatches(c.kind, value, try eval.eval(s, a, label))) return arm.target;
+            if (caseMatches(c.kind, value, try small.evalInto(s, a, &planes[1], label))) return arm.target;
         }
     }
     return c.fallback;
@@ -417,14 +417,18 @@ fn caseSelect(s: *State, a: Allocator, c: Program.Case) Error!u32 {
 
 fn caseMatches(kind: Program.Case.Kind, value: Literal, label: Literal) bool {
     assert(value.width == label.width);
-    if (kind == .normal) return value.equality(.case_equal, label) == .one;
-    // §9.5.1: wildcards on either side; z is (0, 1), x is (1, 1).
+    // §9.5: both planes equal bit for bit (`===`); §9.5.1: wildcards on
+    // either side, z is (0, 1), x is (1, 1).
     for (0..(value.width + 63) / 64) |w| {
         const av = value.values()[w];
         const au = value.unknowns()[w];
         const bv = label.values()[w];
         const bu = label.unknowns()[w];
-        const wild = if (kind == .casex) au | bu else (au & ~av) | (bu & ~bv);
+        const wild = switch (kind) {
+            .normal => 0,
+            .casez => (au & ~av) | (bu & ~bv),
+            .casex => au | bu,
+        };
         if (((av ^ bv) | (au ^ bu)) & ~wild & logic.wordMask(value.width, w) != 0) return false;
     }
     return true;

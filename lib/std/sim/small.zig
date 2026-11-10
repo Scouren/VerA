@@ -9,6 +9,7 @@
 //! - `pub const V = struct { v: u64, x: u64 }`
 //! - `pub fn fits(ty: Program.Ty) bool`
 //! - `pub fn value(s: *State, a: Allocator, e: u32) Error!V`
+//! - `pub fn evalInto(s: *State, a: Allocator, planes: *[2]u64, e: u32) Error!Literal`
 //! - `pub fn literal(planes: *[2]u64, v: V, ty: Program.Ty) Literal`
 //! - `pub fn truthOf(v: V, width: u32) Bit`
 //! - `pub fn indexOf(v: V, ty: Ty) ?i128`
@@ -197,6 +198,14 @@ pub fn value(s: *State, a: Allocator, e: u32) Error!V {
     };
     assert((out.v | out.x) & ~mask(w) == 0);
     return out;
+}
+
+/// `eval.eval` of row `e`, over `planes` when the row `fits` (the result
+/// lives as long as `planes`), else in `a`.
+pub fn evalInto(s: *State, a: Allocator, planes: *[2]u64, e: u32) Error!Literal {
+    const ty = s.p.exprs.items(.ty)[e];
+    if (!fits(ty)) return eval.eval(s, a, e);
+    return literal(planes, try value(s, a, e), ty);
 }
 
 /// `v` as a `Literal` of type `ty` over `planes`, which must outlive it.

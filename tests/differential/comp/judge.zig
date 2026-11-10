@@ -154,7 +154,7 @@ pub fn compare(arena: Allocator, old: Run, new: Run, digital: bool) !?[]const u8
 pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool) ![]const u8 {
     const a = try codes(arena, old.stderr);
     const b = try codes(arena, new.stderr);
-    if (try earliestUnmatched(arena, a, b)) |c| return ownerOf(c, digital);
+    if (try earliestUnmatched(arena, a, b)) |c| return if (c.run) runOwner(digital) else ownerOf(c.code, digital);
     // The old native codegen's build remarks (`note: ... 4-state: ...`),
     // which the interpreted executable has no counterpart of.
     if (old.status == new.status and std.mem.eql(u8, try withoutNotes(arena, old.stderr), new.stderr) and std.mem.eql(u8, old.stdout, new.stdout)) return "digital_exe (build remarks)";
@@ -163,29 +163,42 @@ pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool) ![]const u8 {
     // the device's §9.4 display phase (`$strobe`), which the Zig device
     // backend has not got yet.
     if (!digital and old.status == new.status and dropped(old.stderr, new.stderr)) return "rw-codegen (display phase)";
-    if (a.len != 0 and !std.mem.eql(u8, old.stderr, new.stderr)) return try std.fmt.allocPrint(arena, "{s} {s}", .{ ownerOf(firstChanged(old.stderr, new.stderr) orelse a[0], digital), part(old.stderr, new.stderr) });
+    // Every diagnostic block matches (only their order or the run's text
+    // differs): the run's.
+    if (a.len != 0 and !std.mem.eql(u8, old.stderr, new.stderr)) {
+        const c = firstChanged(old.stderr, new.stderr) orelse return runOwner(digital);
+        return try std.fmt.allocPrint(arena, "{s} {s}", .{ ownerOf(c, digital), part(old.stderr, new.stderr) });
+    }
     return if (digital) "rw-dlower (digital lowering)" else "rw-lower (analog lowering)";
 }
 
 // ---- private ----
 
+/// One headline's code, and whether it came after the run banner
+/// (`=== <name> ===`): a code the run printed is the run stage's,
+/// whatever stage owns it at compile time.
+const Seen = struct { code: []const u8, run: bool };
+
 /// Of the codes in `a` and not `b` or in `b` and not `a` (as multisets),
 /// the one the earliest stage owns; null when the two agree. A code the
-/// catalogue lacks counts as the run stage's.
-fn earliestUnmatched(arena: Allocator, a: []const []const u8, b: []const []const u8) !?[]const u8 {
+/// catalogue lacks counts as the run stage's. W0650 is not counted: its
+/// rule differs by design (lib/TODO.md §11.9), so its presence alone names
+/// no stage.
+fn earliestUnmatched(arena: Allocator, a: []const Seen, b: []const Seen) !?Seen {
     const used = try arena.alloc(bool, b.len);
     @memset(used, false);
-    var best: ?[]const u8 = null;
+    var best: ?Seen = null;
     for (a) |x| {
+        if (std.mem.eql(u8, x.code, "W0650")) continue;
         const hit = for (b, used) |y, *u| {
-            if (!u.* and std.mem.eql(u8, x, y)) {
+            if (!u.* and x.run == y.run and std.mem.eql(u8, x.code, y.code)) {
                 u.* = true;
                 break true;
             }
         } else false;
         if (!hit and earlier(x, best)) best = x;
     }
-    for (b, used) |y, u| if (!u and earlier(y, best)) {
+    for (b, used) |y, u| if (!u and !std.mem.eql(u8, y.code, "W0650") and earlier(y, best)) {
         best = y;
     };
     return best;
@@ -206,8 +219,10 @@ fn withoutNotes(arena: Allocator, text: []const u8) ![]const u8 {
     return out.items;
 }
 
-/// Whether `b` differs from `a` only by lines `a` has and `b` lacks: `b`'s
-/// lines are a subsequence of `a`'s.
+/// Whether `b` differs from `a` only by transcript lines `a` has and `b`
+/// lacks: `b`'s lines are a subsequence of `a`'s, and no line dropped is a
+/// diagnostic's `= note:`/`= help:` (those are Sema's, not the display
+/// phase's).
 fn dropped(a: []const u8, b: []const u8) bool {
     if (std.mem.eql(u8, a, b)) return false;
     var la = std.mem.splitScalar(u8, a, '\n');
@@ -215,19 +230,31 @@ fn dropped(a: []const u8, b: []const u8) bool {
     while (lb.next()) |y| {
         while (la.next()) |x| {
             if (std.mem.eql(u8, x, y)) break;
+            if (isNote(x)) return false;
         } else return false;
     }
+    while (la.next()) |x| if (isNote(x)) return false;
     return true;
 }
 
-fn earlier(code: []const u8, than: ?[]const u8) bool {
-    const t = than orelse return true;
-    return @backingInt(stageOf(code)) < @backingInt(stageOf(t));
+fn isNote(line: []const u8) bool {
+    return std.mem.startsWith(u8, line, "   = note:") or std.mem.startsWith(u8, line, "   = help:");
 }
 
-fn stageOf(code: []const u8) stages.Owner {
-    const c = std.meta.stringToEnum(Code, code) orelse return .run;
+fn earlier(x: Seen, than: ?Seen) bool {
+    const t = than orelse return true;
+    return @backingInt(stageOf(x)) < @backingInt(stageOf(t));
+}
+
+fn stageOf(x: Seen) stages.Owner {
+    if (x.run) return .run;
+    const c = std.meta.stringToEnum(Code, x.code) orelse return .run;
     return stages.owner(c);
+}
+
+/// The run stage's agent.
+fn runOwner(digital: bool) []const u8 {
+    return if (digital) "rw-dlower (run)" else "rw-codegen (run)";
 }
 
 /// The stage that owns `code` (`E0405`) by `stages.owner`, and its agent:
@@ -243,7 +270,7 @@ fn ownerOf(code: []const u8, digital: bool) []const u8 {
         .sema => if (digital) "rw-dlower (digital lowering)" else "rw-lower (analog lowering)",
         .proof => "rw-zero (air passes)",
         .codegen => "rw-codegen (codegen)",
-        .run => if (digital) "rw-dlower (run)" else "rw-codegen (run)",
+        .run => runOwner(digital),
     };
 }
 
@@ -294,15 +321,18 @@ fn codeOf(block: []const u8) []const u8 {
     return if (block.len >= open + 7 and block[open + 6] == ']') block[open + 1 .. open + 6] else "";
 }
 
-/// The codes of a rendered stream's headlines (`error[E0405]:`), in order.
-fn codes(arena: Allocator, text: []const u8) ![]const []const u8 {
-    var list: std.ArrayList([]const u8) = .empty;
+/// The codes of a rendered stream's headlines (`error[E0405]:`), in order,
+/// each marked when it follows the run banner.
+fn codes(arena: Allocator, text: []const u8) ![]const Seen {
+    var list: std.ArrayList(Seen) = .empty;
     var lines = std.mem.splitScalar(u8, text, '\n');
+    var after_banner = false;
     while (lines.next()) |line| {
+        if (std.mem.startsWith(u8, line, "=== ") and std.mem.endsWith(u8, line, " ===")) after_banner = true;
         const open = std.mem.findScalar(u8, line, '[') orelse continue;
         if (!(std.mem.startsWith(u8, line, "error[") or std.mem.startsWith(u8, line, "warning["))) continue;
         if (line.len < open + 7 or line[open + 6] != ']') continue;
-        try list.append(arena, line[open + 1 .. open + 6]);
+        try list.append(arena, .{ .code = line[open + 1 .. open + 6], .run = after_banner });
     }
     return list.items;
 }
@@ -358,4 +388,26 @@ fn written(arena: Allocator, io: Io, work: []const u8) ![]const Run.File {
         }
     }.lt);
     return list.items;
+}
+
+test "owner: matching blocks with a different transcript are the run's (J0)" {
+    var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena.deinit();
+    const block = "warning[W0650]: x\n --> a.va:1:1\n\n";
+    const old: Run = .{ .status = 0, .stdout = "", .stderr = block ++ "=== t ===\n1\n", .files = &.{} };
+    const new: Run = .{ .status = 0, .stdout = "", .stderr = block ++ "=== t ===\n2\n", .files = &.{} };
+    try std.testing.expectEqualStrings("rw-codegen (run)", try owner(arena.allocator(), old, new, false));
+}
+
+test "owner: W0650 presence alone names no stage (J1); a code after the banner is the run's (J3)" {
+    var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena.deinit();
+    const old: Run = .{ .status = 1, .stdout = "", .stderr = "warning[W0650]: x\n\n=== t ===\nerror[E0601]: y\n\n", .files = &.{} };
+    const new: Run = .{ .status = 0, .stdout = "", .stderr = "=== t ===\n", .files = &.{} };
+    try std.testing.expectEqualStrings("rw-codegen (run)", try owner(arena.allocator(), old, new, false));
+}
+
+test "dropped: a missing note line is not the display phase's" {
+    try std.testing.expect(dropped("a\nb\n", "a\n"));
+    try std.testing.expect(!dropped("a\n   = note: n\n", "a\n"));
 }

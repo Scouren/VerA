@@ -30,8 +30,9 @@ the plan's tasks in order and never redecide a `Decision:`.
   LRM clause. A cap or refusal the old side lacks is a regression, never a
   ruling: lower Q8 implements `u32` array cells. A cap no design reaches is a
   `limit-` code: codegen Q7, libmap Q3.
-- **New is right** where the spec says so: `analysis()` integer, `abs(+0)` via
-  `@abs`, C `fmod`, correctly rounded `cosh`; the `libm_kernels` bound widens
+- **New is right** where the spec says so: `abs(+0)` via `@abs`, C `fmod`,
+  correctly rounded `cosh`; `analysis()` stays real like the old side, since
+  §4.6.1 names no type (rw-lower2's 0474ded2); the `libm_kernels` bound widens
   to match the oracle's accuracy (codegen Q1-Q3b, vpi Q3).
 - **Messages:** secondary spans are notes with their own location
   (Zig `ErrorMsg.notes`), never labels (lower Q3).

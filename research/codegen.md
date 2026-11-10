@@ -565,7 +565,7 @@ Each emitted Instance/State struct keeps the existing `comptime assert(@sizeOf(.
 - Old types `analysis()` real (callee_table:138), so VD-120 prints it at 20 columns. New types it `int` and prints 11 columns.
 - VAMS §4.6.1 says only that it "returns one (1)".
 - Recommendation: new is right. It is an integer like `$param_given`. Add 8 `.rulings` lines and a VD entry, rather than make it real.
-- Decision: New is right: VAMS 2.4 §4.6.1 returns the integer one, like `$param_given`. 8 `.rulings` lines and a VD entry.
+- Decision: Match old (real). Revised at step 0: rw-lower2's 0474ded2, now merged, types it real as the old callee table does. §4.6.1 says it returns one and names no type, so the old side is not wrong and a ruling cannot cite it. No `.rulings` lines.
 
 **Q2. `abs(+0)` (W16, 2 lines).**
 - VAMS Table 4-14 gives C `fabs` (+0), but its text gives `(x > 0) ? x : -x` (−0).

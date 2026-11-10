@@ -281,8 +281,10 @@ fn tiebreak(arena: Allocator, io: Io, f: Fixture, new: judge.Run) !bool {
 /// diff-digital-device's tiebreaker: the old side failed the design, and
 /// the new side's device builds and runs it as `--run` does
 /// (`comp/device.zig`); a `//! reject` fixture's `--run` must fail too.
-/// Null when it holds, else why not.
+/// A `//! reject` fixture the new side refuses with a diagnostic (status
+/// 1..125) holds by `tiebreak`'s rule. Null when it holds, else why not.
 fn deviceTiebreak(arena: Allocator, s: *Shared, f: Fixture, new: judge.Run, args: []const []const u8, work: []const u8) !?[]const u8 {
+    if (f.reject and new.status >= 1 and new.status <= 125) return null;
     if (new.status != 0) return "the new side builds no device";
     return device.agrees(arena, s.io, s.env, s.exe_new, options.repo_root, args, work, f.reject);
 }
@@ -356,6 +358,10 @@ fn readList(arena: Allocator, io: Io, rel: []const u8) !std.StringHashMapUnmanag
         try set.put(arena, line[0..sp], line[sp + 1 ..]);
     }
     return set;
+}
+
+test {
+    _ = judge;
 }
 
 test "diff-comp: vera-next does what vera does on every conformance test" {

@@ -130,6 +130,7 @@ fn term(s: *Sema, b: *Block, r: Inst.Ref) Allocator.Error!?Reactive {
             try s.fail(.E0502, b.unit.file, r, "", .{});
             return null;
         }
+        if (args.len > 1) _ = (try @import("op.zig").abstolArg(s, b, .ddt, args[1], r)) orelse return null;
         return .{ .b = try expr.coerce(s, b, try expr.lower(s, b, args[0]), .real) };
     }
     switch (vir.instructions.items(.tag)[@backingInt(i)]) {

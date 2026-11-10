@@ -221,7 +221,11 @@ fn call(ag: *AstGen, scope: *Scope, node: Node.Index) Error!Inst.Ref {
     } else null;
     if (sys_name) |name| {
         const args = try argRefs(ag, scope, slots);
-        return ag.addPl(.call_sys, node, Inst.SysCall{ .name = try ag.string(name), .args = args });
+        const r = try ag.addPl(.call_sys, node, Inst.SysCall{ .name = try ag.string(name), .args = args });
+        // §10.3 the `default_transition` in force at this call.
+        if (std.mem.eql(u8, name, "transition")) if (ag.transitionAt(tree.tokenStart(tree.nodeMainToken(node)))) |v|
+            try ag.transitions.append(ag.arena, .{ .inst = r.toIndex().?, .value = .init(v) });
+        return r;
     }
     const f = try lower(ag, scope, callee);
     const args = try argRefs(ag, scope, slots);

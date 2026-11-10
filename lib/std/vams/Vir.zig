@@ -19,7 +19,7 @@
 //! Contents:
 //! - fields `instructions`, `extra`, `string_bytes`, `diag`
 //! - `pub const String`, `pub const Body`, `pub fn List(comptime T: type) type` (`Elem`, `empty`), `pub const F64` (`init`, `get`)
-//! - `pub const reserved_extra`, `pub const ExtraIndex`
+//! - `pub const reserved_extra`, `pub const ExtraIndex`, `pub const TransitionDefault`, `pub fn transitionDefault(vir: *const Vir, i: Inst.Index) ?f64`
 //! - `pub const Decl` (`Decl.Kind`, `Decl.Index`)
 //! - `pub const Inst` (`Inst.Index`, `Inst.Ref`, `Inst.Tag`, `Inst.Data`, `Inst.DataKind`, `Inst.dataKind`, `Inst.Payload`) and the payloads in `Vir/Inst.zig`
 //! - `pub const print`
@@ -40,10 +40,14 @@ pub const Inst = @import("Vir/Inst.zig");
 pub const print = @import("Vir/print.zig");
 
 instructions: std.MultiArrayList(Inst).Slice,
-/// Payloads and bodies; `extra[0..reserved_extra]` is the declaration table.
+
+/// Payloads and bodies; `extra[0..reserved_extra]` is the declaration table
+/// and the `default_transition` table.
 extra: []u32,
+
 /// NUL-terminated strings; byte 0 is NUL so `String.empty` is "".
 string_bytes: []u8,
+
 /// The per-file checks' diagnostics, located in the tree's source text.
 diag: Diag,
 
@@ -72,13 +76,15 @@ pub const F64 = extern struct {
 };
 
 /// Words `extra` reserves before any payload: the declaration table's
-/// `List(Decl)`, written last.
-pub const reserved_extra = 2;
+/// `List(Decl)` and the `List(TransitionDefault)`, written last.
+pub const reserved_extra = 4;
 
 /// The fixed places in `extra` (Zig's `Zir.ExtraIndex`).
 pub const ExtraIndex = enum(u32) {
     /// `extra[0..2]`: a `List(Decl)`.
     decls = 0,
+    /// `extra[2..4]`: a `List(TransitionDefault)`, by instruction.
+    transitions = 2,
     _,
 };
 
@@ -103,6 +109,9 @@ comptime {
     assert(@sizeOf(F64) == 8);
 }
 
+/// §10.3 the `default_transition` in force at one `transition` call.
+pub const TransitionDefault = extern struct { inst: Inst.Index, value: F64 };
+
 const Vir = @This();
 
 /// `len` records of `T` at `extra[start..]`, each `@sizeOf(T) / 4` words.
@@ -124,6 +133,21 @@ pub fn deinit(vir: *Vir, gpa: Allocator) void {
     gpa.free(vir.string_bytes);
     vir.diag.deinit(gpa);
     vir.* = undefined;
+}
+
+/// §10.3 the `default_transition` in force at `transition` call `i`
+/// ("the directive which immediately precedes the transition filter"),
+/// or null when none is.
+pub fn transitionDefault(vir: *const Vir, i: Inst.Index) ?f64 {
+    assert(vir.extra.len >= reserved_extra);
+    const rows = vir.list(TransitionDefault, vir.extraData(List(TransitionDefault), @backingInt(ExtraIndex.transitions)));
+    // Appended in instruction order.
+    const k = std.sort.binarySearch(TransitionDefault, rows, i, struct {
+        fn order(key: Inst.Index, r: TransitionDefault) std.math.Order {
+            return std.math.order(@backingInt(key), @backingInt(r.inst));
+        }
+    }.order) orelse return null;
+    return rows[k].value.get();
 }
 
 /// The declaration table, in source order, borrowed from `extra`.

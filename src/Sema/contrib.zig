@@ -21,6 +21,7 @@
 //! - `pub fn target(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!?Target`
 //! - `pub const AccessCall`, `pub fn accessCall(s: *Sema, unit: *const Sema.Unit, r: Inst.Ref) Allocator.Error!?AccessCall`
 //! - `pub fn nodeName(s: *const Sema, n: Node.Index) []const u8`
+//! - `pub fn mfactorOf(s: *const Sema, unit: *const Sema.Unit) f64`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -54,6 +55,25 @@ pub const Target = struct {
     neg: bool,
 };
 
+/// §6.3.6 the `$mfactor` `unit`'s instance has over the top's (whose own
+/// stays with the host): 1 for the top and for a value that did not fold.
+pub fn mfactorOf(s: *const Sema, unit: *const Sema.Unit) f64 {
+    const hiers = s.zcu.instances.items(.hier);
+    const top = s.units.items[0].instance;
+    assert(@backingInt(unit.instance) < hiers.len);
+    if (unit.instance == top) return 1;
+    const ip = &s.zcu.intern_pool;
+    const here = switch (ip.indexToKey(hiers[@backingInt(unit.instance)].get(.mfactor))) {
+        .float => |f| f,
+        else => return 1, // else: did not fold (E0890 was raised)
+    };
+    const at_top = switch (ip.indexToKey(hiers[@backingInt(top)].get(.mfactor))) {
+        .float => |f| f,
+        else => return 1, // else: as above
+    };
+    return here / at_top;
+}
+
 /// The access `name` is under any discipline (§3.6.2: a nature's `access`
 /// attribute), or null when no nature names it.
 pub fn accessOf(s: *Sema, b: *Block, name: []const u8) Allocator.Error!?Device.Access {
@@ -68,8 +88,11 @@ pub fn access(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src
         try s.fail(.E0421, b.unit.file, src, "not allowed in {s}", .{ctx});
         return expr.poison;
     }
+    // VerA's `vera_timepoint` (§2.9): a probe is the iterate.
+    if (try @import("timepoint.zig").refuse(s, b, src, "a probe (§4.4)")) return expr.poison;
     if (args.len == 1) if (try portOf(s, b, args[0], src)) |p| return portFlow(s, b, name, p, src);
     const t = (try target(s, b, name, args, src)) orelse return expr.poison;
+    try s.branch_reads.append(s.arena, .{ .access = t.access, .hi = t.hi, .lo = t.lo, .file = b.unit.file, .src = src });
     switch (t.access) {
         .potential => {
             const hi = try probe(s, t.hi);
@@ -89,11 +112,13 @@ pub fn access(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src
                     return expr.poison;
                 }
                 const slot = s.device.contributions.items(.resist)[@backingInt(row)];
-                const v = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot) } });
+                const v = try scaled(s, b, try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot) } }), mfactorOf(s, b.unit), true);
                 return .{ .ref = if (t.neg) try expr.unOp(s, b, .fneg, v) else v, .ty = .real };
             };
+            // §6.3.6 "The value returned by any branch flow probe ... shall
+            // be divided by $mfactor".
             const u = try flowUnknown(s, b.unit, t.hi, t.lo);
-            const v = try probe(s, u);
+            const v = try scaled(s, b, try probe(s, u), mfactorOf(s, b.unit), true);
             return .{ .ref = if (t.neg) try expr.unOp(s, b, .fneg, v) else v, .ty = .real };
         },
     }
@@ -118,6 +143,10 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
     // the module drives in.
     for (vir.list(Inst.Ref, c.args)) |a| if (isPortBranch(b.unit, a)) return s.fail(.E0407, file, src, "a contribution to a port access", .{});
     const t = (try target(s, b, name, vir.list(Inst.Ref, c.args), src)) orelse return;
+    // §1.3.4.1/§1.3.4.2 no contribution to a signal-flow `input` port.
+    for ([_]Node.Index{ t.hi, t.lo }) |n| if (@import("net.zig").inputPortOf(s, n)) |port|
+        if (try @import("net.zig").isSignalFlow(s, s.device.nodes.items(.discipline)[@backingInt(n)]))
+            return s.fail(.E0425, file, src, "`{s}` is an `input` port of a signal-flow discipline", .{port});
     // §5.6.7.2 "Once a value is indirectly assigned to a branch, it cannot
     // be contributed to using the branch contribution operator <+."
     if (indirectOn(s, t.hi, t.lo)) return s.fail(.E0409, file, src, "`({s},{s})`", .{ nodeName(s, t.hi), nodeName(s, t.lo) });
@@ -128,7 +157,11 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
     try reactive.split(s, b, x.rhs, false, &split);
     if (split.react != null) try s.react_written.put(s.arena, row, {});
     const slots = s.device.contributions.get(@backingInt(row));
-    inline for (.{ "resist", "react" }) |half| if (@field(split, half)) |v0| {
+    // §6.3.6 "All contributions to a branch flow quantity in the analog
+    // block shall be multiplied by $mfactor".
+    const m = if (t.access == .flow) mfactorOf(s, b.unit) else 1;
+    inline for (.{ "resist", "react" }) |half| if (@field(split, half)) |v1| {
+        const v0 = try scaled(s, b, v1, m, false);
         const v = if (t.neg) try expr.unOp(s, b, .fneg, v0) else v0;
         const slot = @field(slots, half);
         const old = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot) } });
@@ -137,7 +170,7 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
     };
     for (split.sites.items) |site| {
         const slot = try decl.addAlloc(s, .real);
-        _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slot), .rhs = site.charge } } });
+        _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slot), .rhs = try scaled(s, b, site.charge, m, false) } } });
         try s.device.charge_sites.append(s.gpa, .{ .contrib = row, .sign = if (site.negate != t.neg) -1.0 else 1.0, .slot = slot });
     }
     _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slots.wrote), .rhs = .fromIntern(.one_real) } } });
@@ -299,6 +332,12 @@ pub fn nodeName(s: *const Sema, n: Node.Index) []const u8 {
 
 // ---- private ----
 
+/// `v` scaled by `m` (`fmul`, or `fdiv` when `div`); `v` itself at 1.
+fn scaled(s: *Sema, b: *Block, v: Ref, m: f64, div: bool) Allocator.Error!Ref {
+    if (m == 1) return v;
+    return expr.binOp(s, b, if (div) .fdiv else .fmul, v, .fromIntern(try decl.intern(s, .{ .real = m })));
+}
+
 /// A nature's `access` attribute, its parent's when it has none.
 fn natureAccess(s: *Sema, name: []const u8, depth: u32) Allocator.Error!?[]const u8 {
     if (depth > 64) return null;
@@ -369,6 +408,13 @@ fn terminalBind(s: *Sema, b: *Block, r: Inst.Ref, src: Inst.Ref) Allocator.Error
                 return null;
             };
             return .{ hit.bind.bind, hit.bind.unit };
+        },
+        // §6.5.4 an implicit net an instance connection made (net.zig).
+        .str_ref => {
+            const flat = try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, vir.string(vir.instructions.items(.data)[@backingInt(i)].str_tok.start) });
+            if (s.node_rows.get(try s.zcu.intern_pool.getString(s.gpa, flat))) |n| return .{ .{ .node = n }, unit };
+            try s.fail(.E0512, unit.file, src, "an access of a name with no node", .{});
+            return null;
         },
         else => {
             try s.fail(.E0512, unit.file, src, "an access of a select or a hierarchical name is not lowered by Sema yet", .{});

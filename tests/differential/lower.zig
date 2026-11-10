@@ -16,7 +16,8 @@
 //! - values: when the tables agree, `points` seeded points per fixture
 //!   (every unknown a value in [-2, 2], every real parameter with a folded
 //!   default a value inside its ranges near the default): each
-//!   contribution's resistive and reactive sum by the old MIR interpreter
+//!   contribution's resistive and reactive sum, and each display row's
+//!   operands at its last run, by the old MIR interpreter
 //!   (`src/codegen/verilog/Interp.zig`, over `opcode.fold`) and by
 //!   `Air.interp`, bit for bit, NaN as NaN. A root the old interpreter
 //!   refuses (a call it does not model, an event, an array) is skipped and
@@ -55,7 +56,7 @@ const tables = @import("lower/tables.zig");
 const elab_codes = @import("stages.zig").elab_codes;
 
 /// One fixture's verdict: null `why` when every check agrees.
-pub const Verdict = struct { why: ?[]const u8, tables: bool = false, roots: u32 = 0, values: u64 = 0, values_libm: u64 = 0, skipped: u32 = 0 };
+pub const Verdict = struct { why: ?[]const u8, tables: bool = false, roots: u32 = 0, values: u64 = 0, values_libm: u64 = 0, skipped: u32 = 0, old_bugs: u32 = 0 };
 
 const Tally = struct {
     compared: u32 = 0,
@@ -63,6 +64,8 @@ const Tally = struct {
     roots: u32 = 0,
     values: u64 = 0,
     values_libm: u64 = 0,
+    old_bugs: u32 = 0,
+    old_bug_fixtures: u32 = 0,
     roots_skipped: u32 = 0,
     skipped_old: u32 = 0,
     skipped_new: u32 = 0,
@@ -74,7 +77,10 @@ const Tally = struct {
 const Outcome = union(enum) { old_refused, new_refused, verdict: Verdict };
 
 /// The old side: its codes, and its tables when it lowered.
-const Old = struct { codes: []const []const u8, lw: ?*Lowered, mir: *Mir };
+/// The old side: its codes, and its tables when it lowered; and the
+/// source file of each nature and discipline declaration, in order, 0 for
+/// the prelude's (`Zcu.File.decl_files`).
+const Old = struct { codes: []const []const u8, lw: ?*Lowered, mir: *Mir, nature_files: []const u32, disc_files: []const u32, annex_d_included: bool };
 
 // ---- private ----
 
@@ -126,6 +132,9 @@ fn runAll() !void {
         tally.roots += v.roots;
         tally.values += v.values;
         tally.values_libm += v.values_libm;
+        tally.old_bugs += v.old_bugs;
+        tally.old_bug_fixtures += @intFromBool(v.old_bugs != 0);
+        if (v.old_bugs != 0) try out.writer.print("OLD-BUG {s}: {d} display operands the old side computes wrong (values.zig rulings)\n", .{ rel, v.old_bugs });
         tally.roots_skipped += v.skipped;
         const listed = xfail.get(rel) != null;
         if (listed) try seen.put(arena, rel, {});
@@ -146,7 +155,7 @@ fn runAll() !void {
         tally.failed += 1;
         try out.writer.print("STALE {s}: lower.xfail names a fixture that was not compared\n", .{k.*});
     };
-    std.debug.print("{s}diff-lower: {d} fixtures compared ({d} with agreeing tables; {d} roots, {d} values equal bit for bit, {d} within the libm ulp bound, {d} roots the old interpreter refused), {d} agree, {d} listed in lower.xfail, {d} skipped (old front end refused), {d} skipped (new parser refused), {d} failures\n", .{ out.written(), tally.compared, tally.tables, tally.roots, tally.values, tally.values_libm, tally.roots_skipped, tally.agreed, tally.xfailed, tally.skipped_old, tally.skipped_new, tally.failed });
+    std.debug.print("{s}diff-lower: {d} fixtures compared ({d} with agreeing tables; {d} roots, {d} values equal bit for bit, {d} within the libm ulp bound, {d} roots the old interpreter refused, {d} display operands an old-side bug in {d} fixtures), {d} agree, {d} listed in lower.xfail, {d} skipped (old front end refused), {d} skipped (new parser refused), {d} failures\n", .{ out.written(), tally.compared, tally.tables, tally.roots, tally.values, tally.values_libm, tally.roots_skipped, tally.old_bugs, tally.old_bug_fixtures, tally.agreed, tally.xfailed, tally.skipped_old, tally.skipped_new, tally.failed });
     if (tally.failed != 0) return error.DiffLowerFailed;
 }
 
@@ -206,13 +215,26 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, show: bool) !
         .qualifier = if (e.qualifier) |q| std.meta.stringToEnum(vams.Preprocessor.events.Qualifier, @tagName(q)).? else null,
         .discipline = e.discipline,
     };
-    var vir = try vams.AstGen.generate(gpa, &tree, .{ .directives = .{ .disciplines = defaults } });
+    const E = vams.Preprocessor.events;
+    const transitions = try arena.alloc(E.Region(?f64), pp.directives.transitions.len);
+    for (pp.directives.transitions, transitions) |e, *d| d.* = .{ .at = e.at, .value = e.value };
+    const timescales = try arena.alloc(E.Region(?E.Timescale), pp.directives.timescales.len);
+    for (pp.directives.timescales, timescales) |e, *d| d.* = .{ .at = e.at, .value = if (e.value) |t| .{ .unit = t.unit, .precision = t.precision } else null };
+    const nettypes = try arena.alloc(E.Region(E.NetType), pp.directives.nettypes.len);
+    for (pp.directives.nettypes, nettypes) |e, *d| d.* = .{ .at = e.at, .value = std.meta.stringToEnum(E.NetType, @tagName(e.value)).? };
+    const cells = try arena.alloc(E.Region(bool), pp.directives.cells.len);
+    for (pp.directives.cells, cells) |e, *d| d.* = .{ .at = e.at, .value = e.value };
+    const drives = try arena.alloc(E.Region(E.Drive), pp.directives.drives.len);
+    for (pp.directives.drives, drives) |e, *d| d.* = .{ .at = e.at, .value = std.meta.stringToEnum(E.Drive, @tagName(e.value)).? };
+    var vir = try vams.AstGen.generate(gpa, &tree, .{ .directives = .{ .disciplines = defaults, .transitions = transitions, .timescales = timescales, .nettypes = nettypes, .cells = cells, .drives = drives } });
     defer vir.deinit(gpa);
     var zcu: Zcu = try .init(gpa);
     defer zcu.deinit();
     var modules: u32 = 0;
     for (vir.decls()) |d| modules += @intFromBool(d.kind == .module);
-    _ = try zcu.addFile(path, vir, @min(builtins, modules));
+    const file = try zcu.addFile(path, vir, @min(builtins, modules));
+    zcu.files.items(.decl_files)[@backingInt(file)] = try declFiles(arena, &vir, old);
+    zcu.files.items(.annex_d_included)[@backingInt(file)] = old.annex_d_included;
     try Sema.elaborate(&zcu, .{ .roots = .first });
     const elab_failed = hasError(&zcu, &vir);
     var analysis: ?Sema.Analysis = if (elab_failed or zcu.instances.len == 0) null else try Sema.analyze(&zcu);
@@ -320,7 +342,37 @@ fn oldSide(arena: std.mem.Allocator, pp: frontend.preprocessor.Output, bag: *dia
         lw = try arena.create(Lowered);
         lw.?.* = o.lowered;
     }
-    return .{ .codes = try lowerCodes(arena, codes.items), .lw = lw, .mir = mir };
+    // The old `fileOf`: the file a declaration's token came from; the
+    // seeded prelude's are 0.
+    const seed_natures: usize = if (seed) |sd| sd.file.natures.len else 0;
+    const seed_discs: usize = if (seed) |sd| sd.file.disciplines.len else 0;
+    const nature_files = try arena.alloc(u32, file.natures.len);
+    for (file.natures, nature_files, 0..) |n, *f, k| f.* = if (k < seed_natures) 0 else 1 + @as(u32, @backingInt(bag.locate(frontend.lexer.tokenSpan(pp.text, starts, n.main_tok), .none).file));
+    const disc_files = try arena.alloc(u32, file.disciplines.len);
+    for (file.disciplines, disc_files, 0..) |d, *f, k| f.* = if (k < seed_discs) 0 else 1 + @as(u32, @backingInt(bag.locate(frontend.lexer.tokenSpan(pp.text, starts, d.main_tok), .none).file));
+    return .{ .codes = try lowerCodes(arena, codes.items), .lw = lw, .mir = mir, .nature_files = nature_files, .disc_files = disc_files, .annex_d_included = pp.annex_d_included };
+}
+
+/// Each declaration-table row's source file, from the old side's
+/// (natures and disciplines are in the same order on both sides); empty
+/// when the counts differ.
+fn declFiles(arena: std.mem.Allocator, vir: *const vams.Vir, old: Old) ![]const u32 {
+    const out = try arena.alloc(u32, vir.decls().len);
+    var n: usize = 0;
+    var d: usize = 0;
+    for (vir.decls(), out) |row, *f| f.* = switch (row.kind) {
+        .nature => blk: {
+            defer n += 1;
+            break :blk if (n < old.nature_files.len) old.nature_files[n] else return &.{};
+        },
+        .discipline => blk: {
+            defer d += 1;
+            break :blk if (d < old.disc_files.len) old.disc_files[d] else return &.{};
+        },
+        else => 1, // else: no per-file rule reads another unit's file
+    };
+    if (n != old.nature_files.len or d != old.disc_files.len) return &.{};
+    return out;
 }
 
 /// `codes` less elaboration's, sorted and deduplicated.

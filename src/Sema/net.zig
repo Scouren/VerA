@@ -13,6 +13,11 @@
 //! - `pub fn nets(s: *Sema, unit: *Unit) Allocator.Error!void`
 //! - `pub fn bindChildPorts(s: *Sema, unit: *Unit) Allocator.Error!void`
 //! - `pub fn bindBridges(s: *Sema) Allocator.Error!void`
+//! - `pub fn pullDrives(s: *Sema) Allocator.Error!void`
+//! - `pub fn signalFlowPorts(s: *Sema) Allocator.Error!void`
+//! - `pub fn isSignalFlow(s: *Sema, disc: InternPool.String) Allocator.Error!bool`
+//! - `pub fn inputPortOf(s: *Sema, n: Node.Index) ?[]const u8`
+//! - `pub fn netDiscipline(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.Error!InternPool.String`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -138,7 +143,125 @@ pub fn bindBridges(s: *Sema) Allocator.Error!void {
     }
 }
 
+/// §3.6.2 the discipline of net `first`: the one Annex F resolution gave
+/// it (`zcu.net_discipline`: its declaration's, a `port_discipline`
+/// attribute's, or its segments'), else its declaration's, else the §10.2
+/// `default_discipline` in force at it (one qualified by its net type, else
+/// the unqualified one), else none.
+pub fn netDiscipline(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.Error!InternPool.String {
+    const vir = unit.vir;
+    const ip = &s.zcu.intern_pool;
+    if (try portDisciplineAttr(s, unit, first)) |d| return d;
+    const net = try ip.getString(s.gpa, vir.string(nameOf(vir, first)));
+    if (s.zcu.net_discipline.get(.{ .instance = unit.instance, .net = net })) |d| return d;
+    const declared = disciplineOf(unit, first);
+    if (declared != .empty) return ip.getString(s.gpa, vir.string(declared));
+    if (defaultOf(unit, first)) |dflt| return ip.getString(s.gpa, vir.string(dflt));
+    return .empty;
+}
+
+/// §1.3.4 a signal-flow port (its discipline binds one nature) has the
+/// direction of its one quantity, so the root's `inout` one is E0360.
+pub fn signalFlowPorts(s: *Sema) Allocator.Error!void {
+    const unit = &s.units.items[0];
+    const vir = unit.vir;
+    for (vir.body(unit.module.ports)) |p| {
+        const first = portDecl(vir, p) orelse continue;
+        if (dirOf(unit, first) != .inout) continue;
+        const bind = unit.binds.get(first) orelse continue;
+        const n: Node.Index = switch (bind) {
+            .node => |x| x,
+            .vector => |v| unit.vec_rows.items[v.first],
+            else => continue,
+        };
+        if (n == .ground) continue;
+        const disc = s.device.nodes.items(.discipline)[@backingInt(n)];
+        if (!try isSignalFlow(s, disc)) continue;
+        try s.fail(.E0360, unit.file, first.toRef(), "`{s}` is an `inout` port of discipline `{s}`, which binds one nature only", .{ vir.string(nameOf(vir, first)), s.zcu.intern_pool.stringToSlice(disc) });
+    }
+}
+
+/// §1.3.4 whether discipline `disc` binds exactly one of potential and flow.
+pub fn isSignalFlow(s: *Sema, disc: InternPool.String) Allocator.Error!bool {
+    if (disc == .empty) return false;
+    const zcu = s.zcu;
+    const d = zcu.disciplines.get(disc) orelse return false;
+    const dvir = zcu.fileVir(d.file);
+    var potential = false;
+    var flow = false;
+    for (dvir.list(Inst.DisciplineItem, payloadOf(dvir, Inst.Discipline, zcu.declRow(d).inst).items)) |it| switch (it.kind) {
+        .potential => potential = true,
+        .flow => flow = true,
+        .domain, .potential_attr, .flow_attr, .attr => {},
+    };
+    return potential != flow;
+}
+
+/// The name of the root's `input` port whose node is `n`, or null.
+pub fn inputPortOf(s: *Sema, n: Node.Index) ?[]const u8 {
+    if (n == .ground or @backingInt(n) >= s.device.num_ports) return null;
+    const unit = &s.units.items[0];
+    const vir = unit.vir;
+    for (vir.body(unit.module.ports)) |p| {
+        const first = portDecl(vir, p) orelse continue;
+        const bind = unit.binds.get(first) orelse continue;
+        if (bind != .node or bind.node != n) continue;
+        if (dirOf(unit, first) == .input) return vir.string(nameOf(vir, first));
+    }
+    return null;
+}
+
+/// IEEE 1364-2005 §19.9 `unconnected_drive`: each child's `input` port its
+/// instance leaves unconnected is held at potential 0 (`pull0`) or 1
+/// (`pull1`) by a potential source, when its discipline binds a potential
+/// (the old `applyUnconnectedDrive`). Runs before any analog block lowers.
+/// ponytail: 1.0 stands in for §19.9's Pu1 strength (the old's choice).
+pub fn pullDrives(s: *Sema) Allocator.Error!void {
+    const zcu = s.zcu;
+    for (s.units.items[1..]) |*unit| {
+        const drive = unit.module.stamp.flags.drive;
+        if (drive == .float) continue;
+        const list = zcu.instances.items(.ports)[@backingInt(unit.instance)];
+        for (zcu.ports.items(.formal)[list.start..][0..list.len], zcu.ports.items(.actual)[list.start..][0..list.len]) |formal, actual| {
+            if (actual != .none) continue;
+            const first = portDecl(unit.vir, formal) orelse continue;
+            if (!isInput(unit, first)) continue;
+            const bind = unit.binds.get(first) orelse continue;
+            if (bind != .node or bind.node == .ground) continue;
+            const disc = s.device.nodes.items(.discipline)[@backingInt(bind.node)];
+            const d = zcu.disciplines.get(disc) orelse continue;
+            const dvir = zcu.fileVir(d.file);
+            const binds_potential = for (dvir.list(Inst.DisciplineItem, payloadOf(dvir, Inst.Discipline, zcu.declRow(d).inst).items)) |it| {
+                if (it.kind == .potential) break true;
+            } else false;
+            if (!binds_potential) continue;
+            const b: Sema.Block = .{ .parent = null, .unit = unit };
+            const row = try @import("contrib.zig").rowOf(s, &b, .{ .access = .potential, .branch = .unnamed, .hi = bind.node, .lo = .ground, .neg = false });
+            const c = s.device.contributions.get(@backingInt(row));
+            const level: InternPool.Index = if (drive == .pull1) .one_real else .zero_real;
+            try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(c.resist), .rhs = .fromIntern(level) } } }));
+            try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(c.wrote), .rhs = .fromIntern(.one_real) } } }));
+        }
+    }
+}
+
 // ---- private ----
+
+/// Whether any declaration of `first`'s name is an `input`.
+fn isInput(unit: *const Unit, first: Inst.Index) bool {
+    return dirOf(unit, first) == .input;
+}
+
+/// The direction a declaration of `first`'s name gives, or `.none`.
+fn dirOf(unit: *const Unit, first: Inst.Index) Inst.Direction {
+    const vir = unit.vir;
+    for ([_]Vir.Body{ unit.module.ports, unit.module.body }) |body| for (vir.body(body)) |i| {
+        if (vir.instructions.items(.tag)[@backingInt(i)] != .io or canonical(vir, i) != first) continue;
+        const d = payloadOf(vir, Inst.Io, i).flags.dir;
+        if (d != .none) return d;
+    };
+    return .none;
+}
 
 /// §7.8.4 the lower side of each connect module inserted in `parent`,
 /// after its declared nets and before its implicit ones (the old
@@ -197,23 +320,6 @@ fn internNode(s: *Sema, unit: *const Unit, name: []const u8, discipline: InternP
     return row;
 }
 
-/// §3.6.2 the discipline of net `first`: the one Annex F resolution gave
-/// it (`zcu.net_discipline`: its declaration's, a `port_discipline`
-/// attribute's, or its segments'), else its declaration's, else the §10.2
-/// `default_discipline` in force at it (one qualified by its net type, else
-/// the unqualified one), else none.
-fn netDiscipline(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.Error!InternPool.String {
-    const vir = unit.vir;
-    const ip = &s.zcu.intern_pool;
-    if (try portDisciplineAttr(s, unit, first)) |d| return d;
-    const net = try ip.getString(s.gpa, vir.string(nameOf(vir, first)));
-    if (s.zcu.net_discipline.get(.{ .instance = unit.instance, .net = net })) |d| return d;
-    const declared = disciplineOf(unit, first);
-    if (declared != .empty) return ip.getString(s.gpa, vir.string(declared));
-    if (defaultOf(unit, first)) |dflt| return ip.getString(s.gpa, vir.string(dflt));
-    return .empty;
-}
-
 /// Annex E.3.2.1 a shipped primitive's port under its instance's
 /// `port_discipline` attribute (a string naming a discipline; elaboration
 /// judged it, E0358): that discipline. Null for any other net.
@@ -242,26 +348,30 @@ fn portDisciplineAttr(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.
 
 /// §10.2 the `default_discipline` in force at any declaration of `first`'s
 /// name: one qualified by the declaration's net type (`wire` when none is
-/// written), else the unqualified one.
+/// written by any declaration of the name), else the unqualified one.
 fn defaultOf(unit: *const Unit, first: Inst.Index) ?Vir.String {
     const vir = unit.vir;
     const tags = vir.instructions.items(.tag);
+    // `inout q; tri q;`: the net type is the declaration that writes one.
+    var net: Inst.NetKind = .none;
+    var defaults: ?Vir.List(Inst.Default) = null;
     for ([_]Vir.Body{ unit.module.ports, unit.module.body }) |body| for (vir.body(body)) |i| {
         if (canonical(vir, i) != first) continue;
-        const net: Inst.NetKind, const defaults = switch (tags[@backingInt(i)]) {
+        const kind: Inst.NetKind, const stamps = switch (tags[@backingInt(i)]) {
             .net => .{ payloadOf(vir, Inst.Net, i).flags.net, payloadOf(vir, Inst.Net, i).defaults },
             .io => .{ payloadOf(vir, Inst.Io, i).flags.net, payloadOf(vir, Inst.Io, i).defaults },
             else => continue, // else: only a net or a direction carries the stamps
         };
-        const want = std.meta.stringToEnum(@FieldType(@FieldType(Inst.Default, "flags"), "qualifier"), if (net == .none) "wire" else @tagName(net));
-        var fallback: ?Vir.String = null;
-        for (vir.list(Inst.Default, defaults)) |x| {
-            if (x.flags.qualified and want != null and x.flags.qualifier == want.?) return x.discipline;
-            if (!x.flags.qualified) fallback = x.discipline;
-        }
-        if (fallback) |f| return f;
+        if (defaults == null) defaults = stamps;
+        if (net == .none and kind != .none) net = kind;
     };
-    return null;
+    const want = std.meta.stringToEnum(@FieldType(@FieldType(Inst.Default, "flags"), "qualifier"), if (net == .none) "wire" else @tagName(net));
+    var fallback: ?Vir.String = null;
+    for (vir.list(Inst.Default, defaults orelse return null)) |x| {
+        if (x.flags.qualified and want != null and x.flags.qualifier == want.?) return x.discipline;
+        if (!x.flags.qualified) fallback = x.discipline;
+    }
+    return fallback;
 }
 
 /// The discipline any declaration of `first`'s name in the module gives it.

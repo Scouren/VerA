@@ -118,8 +118,18 @@ table_effect: ?Air.Inst.Index = null,
 limit_seeds: std.ArrayList(Air.Inst.Ref) = .empty,
 /// The user functions being inlined, outermost first (func.zig).
 inlining: std.ArrayList(Inst.Index) = .empty,
+/// §3.4.7 the card row an `aliasparam` of each hierarchical system
+/// parameter made on the root (param.zig); the root's reads read it.
+sys_alias: std.EnumArray(Zcu.SystemParam, ?Air.Device.Param.Index) = .initFill(null),
+/// §1.3.1 every access read: its quantity and node pair, in order
+/// (contrib.zig's `checkProbes`).
+branch_reads: std.ArrayList(struct { access: Air.Device.Access, hi: Air.Device.Node.Index, lo: Air.Device.Node.Index, file: Zcu.File.Index, src: Inst.Ref }) = .empty,
 /// The contribution rows a reactive term was added to (contrib.zig).
 react_written: std.AutoHashMapUnmanaged(Air.Device.Contribution.Index, void) = .empty,
+/// §6.4.3 each paramset instance's output variables by flat name, and the
+/// module variables an undescribed paramset variable hides (simprobe.zig).
+ps_outputs: std.StringHashMapUnmanaged(Slot) = .empty,
+ps_hidden: std.StringHashMapUnmanaged(void) = .empty,
 
 /// What elaboration reads besides the files.
 pub const Config = struct {
@@ -226,6 +236,12 @@ pub const Unit = struct {
     /// A paramset instance's paramset scope: its declarations bound to
     /// their rows (param.zig).
     paramset: ?*Unit = null,
+    /// A.6.2 a non-mixed instance's constant `initial` values, by variable
+    /// (discrete.zig).
+    initial: std.AutoHashMapUnmanaged(Inst.Index, @import("Sema/eval.zig").Const) = .empty,
+    /// A paramset scope's instance unit, whose module §6.4.3's `.name`
+    /// reads (simprobe.zig).
+    owner: ?*Unit = null,
     /// The variables whose value an `analog initial` or `@(...)` body
     /// leaves for a later evaluation's read (held.zig).
     carried: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty,
@@ -272,6 +288,12 @@ pub const Block = struct {
     /// VerA's `vera_nodiff` (§2.9) is on here: an assigned real carries no
     /// derivative (control.zig).
     nodiff: bool = false,
+    /// Inside a VerA `vera_timepoint` statement (§2.9): what it may not
+    /// hold is E0530 (control.zig).
+    timepoint: bool = false,
+    /// Inside an unrolled analog `for` over a genvar, with no run-time loop
+    /// nearer (genfor.zig): a jump is E0440.
+    analog_for: bool = false,
 
     /// A loop's targets: the `block` a `break` leaves and the one a
     /// `continue` leaves (the step follows it).
@@ -290,7 +312,7 @@ pub const Block = struct {
 
     /// A child of `parent`: the same instance and restrictions, no instructions.
     pub fn child(parent: *Block) Block {
-        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .runtime = parent.runtime, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path, .function = parent.function, .label = parent.label, .nodiff = parent.nodiff };
+        return .{ .parent = parent, .unit = parent.unit, .loop = parent.loop, .conditional = parent.conditional, .runtime = parent.runtime, .analog_initial = parent.analog_initial, .in_event = parent.in_event, .path = parent.path, .function = parent.function, .label = parent.label, .nodiff = parent.nodiff, .timepoint = parent.timepoint, .analog_for = parent.analog_for };
     }
 };
 

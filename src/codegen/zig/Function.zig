@@ -581,6 +581,8 @@ fn genCall(f: *Function, inst: Inst.Index, data: Inst.Data) Error!void {
         else => {}, // else: a value, by tag below
     }
     if (!used and !Liveness.effect(air.*, .call, data)) return;
+    // A task with no value (a §9.5 file task) has no spelling here yet.
+    if (air.typeOfIndex(f.dg.ip, inst) == .none) return f.dg.fail("the task `{s}`", .{@tagName(tag)});
     try f.line();
     try f.print("const v{d} = ", .{@backingInt(inst)});
     try calls.gen(f, inst, tag, args);

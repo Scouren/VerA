@@ -17,6 +17,7 @@
 //! - `pub fn vectorArg(s: *Sema, b: *Block, r: Inst.Ref, out: *std.ArrayList(Ref)) Allocator.Error!bool`
 //! - `pub fn checkPlace(s: *Sema, b: *Block, tag: SysFn.Tag, src: Inst.Ref) Allocator.Error!bool`
 //! - `pub fn isStatic(s: *const Sema, r: Air.Inst.Ref, depth: u32) bool`
+//! - `pub fn abstolArg(s: *Sema, b: *Block, tag: SysFn.Tag, a: Inst.Ref, src: Inst.Ref) Allocator.Error!?Air.Inst.Ref`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -41,6 +42,9 @@ const Ref = Air.Inst.Ref;
 pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
     const file = b.unit.file;
     if (!try checkPlace(s, b, tag, src)) return expr.poison;
+    // VerA's `vera_timepoint` (§2.9): an operator with history advances
+    // per accepted step and reads its input every iterate.
+    if (tag != .ddx and tag != .limexp and try @import("timepoint.zig").refuse(s, b, src, "an analog operator (§4.5)")) return expr.poison;
     if (tag == .ddx) return ddx(s, b, args, src);
     const min: usize = switch (tag) {
         .absdelay => 2,
@@ -68,14 +72,43 @@ pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
             return expr.poison;
         }
         if (coef and (k == 1 or k == 2)) if (try vectorArg(s, b, a, &vals)) continue;
+        if (abstolSlot(tag) == k) {
+            try vals.append(s.arena, (try abstolArg(s, b, tag, a, src)) orelse return expr.poison);
+            continue;
+        }
         const v = try expr.lower(s, b, a);
         try vals.append(s.arena, if (v.ty == .string) v.ref else try expr.coerce(s, b, v, .real));
     }
     switch (tag) {
         .ddt => return .{ .ref = try ddt(s, b, vals.items[0]), .ty = .real },
         .idt => return .{ .ref = try idt(s, b, vals.items), .ty = .real },
+        .transition => {
+            try defaultTransition(s, b, src, &vals);
+            return .{ .ref = try expr.call(s, b, @backingInt(tag), .real, vals.items), .ty = .real };
+        },
         else => return .{ .ref = try expr.call(s, b, @backingInt(tag), .real, vals.items), .ty = .real },
     }
+}
+
+/// A `ddt`/`idt`/`idtmod` abstol argument: §4.5 "a nature ... the abstol
+/// of the nature is used" when it names one (no local of the name), else a
+/// constant expression (E0515 for one that moves, Table 4-20).
+pub fn abstolArg(s: *Sema, b: *Block, tag: SysFn.Tag, a: Inst.Ref, src: Inst.Ref) Allocator.Error!?Ref {
+    const vir = b.unit.vir;
+    if (a.toIndex()) |i| if (vir.instructions.items(.tag)[@backingInt(i)] == .str_ref) {
+        const name = vir.string(vir.instructions.items(.data)[@backingInt(i)].str_tok.start);
+        if (s.zcu.natures.contains(try s.zcu.intern_pool.getString(s.gpa, name))) {
+            const tol = try @import("hier.zig").natureAttrOf(s, name, "abstol", 0);
+            return .fromIntern(try decl.intern(s, .{ .real = if (tol) |t| t.asReal() else 0 }));
+        }
+    };
+    const v = try expr.lower(s, b, a);
+    if (v.ty == .string) return v.ref;
+    if (!isStatic(s, v.ref, 0)) {
+        try s.fail(.E0515, b.unit.file, src, "`{t}()` abstol is a constant expression argument (Table 4-20), and this one moves during the analysis", .{tag});
+        return null;
+    }
+    return try expr.coerce(s, b, v, .real);
 }
 
 /// §4.6.3 `ac_stim` and the §4.6.4 noise sources: a `call` of their
@@ -84,6 +117,8 @@ pub fn lower(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
 /// analysis; the host reads the call.
 pub fn noise(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
     const file = b.unit.file;
+    // VerA's `vera_timepoint` (§2.9): a source is a stamp, not a value.
+    if (try @import("timepoint.zig").refuse(s, b, src, "a noise function (§4.6.4)")) return expr.poison;
     const vir = b.unit.vir;
     // A.8.2 brackets only trailing optional arguments: no empty slot.
     for (args) |a| if (a == .none) {
@@ -149,7 +184,14 @@ pub fn noise(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
         .call = r.toIndex().?,
         .name = label,
     });
-    return .{ .ref = r, .ty = .real };
+    // §6.3.6 a noise contribution's power is multiplied by $mfactor on a
+    // flow (whose `<+` multiplies the amplitude by it) and divided by it on
+    // a potential: the amplitude over sqrt($mfactor). `ac_stim` is no noise.
+    const m = @import("contrib.zig").mfactorOf(s, b.unit);
+    if (tag == .ac_stim or m == 1) return .{ .ref = r, .ty = .real };
+    const mc: Ref = .fromIntern(try decl.intern(s, .{ .real = m }));
+    const root = try expr.binOp(s, b, .pow, mc, .fromIntern(try decl.intern(s, .{ .real = 0.5 })));
+    return .{ .ref = try expr.binOp(s, b, .fdiv, r, root), .ty = .real };
 }
 
 /// §5.8.1: an operator with state may not stand under a condition that
@@ -221,6 +263,16 @@ pub fn vectorArg(s: *Sema, b: *Block, r: Inst.Ref, out: *std.ArrayList(Ref)) All
 
 // ---- private ----
 
+/// The argument position of `tag`'s abstol (Table 4-20), or null.
+fn abstolSlot(tag: SysFn.Tag) ?usize {
+    return switch (tag) {
+        .ddt => 1,
+        .idt => 3,
+        .idtmod => 4,
+        else => null, // else: no abstol argument
+    };
+}
+
 /// §4.5.14 `ddx(f, V(n))` / `ddx(f, I(br))`: a `ddx` call of `f` and the
 /// unknown's row, negated when the access spells the pair reversed; 0 when
 /// the flow it names was never read (f cannot depend on it).
@@ -271,6 +323,30 @@ fn idt(s: *Sema, b: *Block, vals: []const Ref) Allocator.Error!Ref {
 fn select(s: *Sema, b: *Block, c: Ref, x: Ref, y: Ref) Allocator.Error!Ref {
     const at = try s.air.addExtra(s.gpa, Air.Bin{ .lhs = x, .rhs = y });
     return s.addInst(b, .{ .tag = .select, .data = .{ .pl_op = .{ .operand = c, .payload = at } } });
+}
+
+/// §10.3 `default_transition` "shall be used for the rise_time and
+/// fall_time ... of transition filters which do not have them specified":
+/// under the directive in force at the call ("the directive which
+/// immediately precedes the transition filter", `Vir.transitionDefault`),
+/// an absent
+/// or zero rise time is the directive's value, and an absent or zero fall
+/// time the rise time (§4.5.8 "If only a positive rise_time value is
+/// specified, the simulator uses it for both"); a time known only at run
+/// time is tested where it runs (the old device's `transitionTimes`).
+/// Without the directive the call keeps what the source wrote.
+fn defaultTransition(s: *Sema, b: *Block, src: Inst.Ref, vals: *std.ArrayList(Ref)) Allocator.Error!void {
+    const at = b.unit.vir.transitionDefault(src.toIndex() orelse return) orelse return;
+    const dflt: Ref = .fromIntern(try decl.intern(s, .{ .real = at }));
+    while (vals.items.len < 4) try vals.append(s.arena, .fromIntern(.zero_real));
+    vals.items[2] = try orWhenZero(s, b, vals.items[2], dflt);
+    vals.items[3] = try orWhenZero(s, b, vals.items[3], vals.items[2]);
+}
+
+/// `x`, or `y` where `x` is zero.
+fn orWhenZero(s: *Sema, b: *Block, x: Ref, y: Ref) Allocator.Error!Ref {
+    if (expr.constOf(s, x)) |c| return if (c.asReal() == 0) y else x;
+    return select(s, b, try expr.binOp(s, b, .fne, x, .fromIntern(.zero_real)), x, y);
 }
 
 /// A §4.5.2 operator unknown, `<op>$<k>`.

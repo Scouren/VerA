@@ -35,7 +35,7 @@ const depth_max: u32 = 1 << 12;
 pub fn mark(s: *Sema, unit: *Unit) Allocator.Error!void {
     assert(unit.discrete.items.len == 0);
     const vir = unit.vir;
-    if (!try isMixed(s, unit)) return;
+    if (!try isMixed(s, unit)) return initial(s, unit);
     s.mixed = true;
     var owned: std.ArrayList(Inst.Index) = .empty;
     for (vir.body(unit.module.body)) |i| if (vir.instructions.items(.tag)[@backingInt(i)] == .assign) {
@@ -168,7 +168,7 @@ fn isMixed(s: *Sema, unit: *Unit) Allocator.Error!bool {
     for (vir.body(unit.module.body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
         .assign, .always => return true,
         .net => if (decl.payloadOf(vir, Inst.Net, i).flags.net == .wreal) return true,
-        .initial => if (!plain(vir, decl.payloadOf(vir, Inst.Process, i).body, 0)) return true,
+        .initial => if (!try plain(s, vir, decl.payloadOf(vir, Inst.Process, i).body, 0)) return true,
         else => {}, // else: no digital half
     };
     // Only a net of no continuous discipline can be a discrete read.
@@ -185,23 +185,89 @@ fn isMixed(s: *Sema, unit: *Unit) Allocator.Error!bool {
     return false;
 }
 
-/// Whether an `initial` body only assigns (no timing, no task, no call):
-/// the old side folds such a block into the initial state.
-fn plain(vir: *const Vir, b: Vir.Body, depth: u32) bool {
+/// A.6.2/§7.2.2 the old `constantShape`: whether an `initial` body is only
+/// blocking assignments of constant expressions to scalar names, in blocks
+/// with no local declarations. Only that body means "this variable holds
+/// this constant for the whole analysis"; any other runs on the kernel.
+fn plain(s: *Sema, vir: *const Vir, b: Vir.Body, depth: u32) Allocator.Error!bool {
     if (depth > depth_max) return false;
     for (vir.body(b)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .store, .store_nb => {},
-        .block => if (!plain(vir, decl.payloadOf(vir, Inst.Block, i).body, depth + 1)) return false,
-        .condbr => {
-            const x = decl.payloadOf(vir, Inst.CondBr, i);
-            if (!plain(vir, x.then, depth + 1) or !plain(vir, x.@"else", depth + 1)) return false;
+        .store => {
+            const x = decl.payloadOf(vir, Inst.Bin, i);
+            const t = x.lhs.toIndex() orelse return false;
+            if (vir.instructions.items(.tag)[@backingInt(t)] != .decl_ref) return false;
+            const d = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(t)].decl_tok.decl);
+            if (vir.instructions.items(.tag)[@backingInt(d)] == .variable and decl.payloadOf(vir, Inst.Variable, d).dims.len != 0) return false;
+            if (!try constant(s, vir, x.rhs, depth + 1)) return false;
         },
-        .variable, .param => {},
-        // A statement the kernel runs: timing, a task or function call, a loop.
-        .case, .loop, .repeat, .wait, .delay, .event_wait, .store_timed, .store_nb_timed, .proc_assign, .force, .deassign, .release, .trigger, .disable, .delay_ctl, .event_ctl, .repeat_ctl, .call, .call_sys => return false,
+        .block => if (!try plain(s, vir, decl.payloadOf(vir, Inst.Block, i).body, depth + 1)) return false,
+        // A local declaration, or a statement the kernel runs.
+        .variable, .param, .store_nb, .condbr, .case, .loop, .repeat, .wait, .delay, .event_wait, .store_timed, .store_nb_timed, .proc_assign, .force, .deassign, .release, .trigger, .disable, .delay_ctl, .event_ctl, .repeat_ctl, .call, .call_sys => return false,
         else => {}, // else: an operand of the statement that reads it
     };
     return true;
+}
+
+/// The old `constantExpr`: whether `r` is built only from literals (no x
+/// or z), parameters, operators, §4.3 math and `$rtoi`/`$itor`/`$clog2`.
+fn constant(s: *Sema, vir: *const Vir, r: Inst.Ref, depth: u32) Allocator.Error!bool {
+    if (depth > depth_max) return false;
+    const i = r.toIndex() orelse return true;
+    const tag = vir.instructions.items(.tag)[@backingInt(i)];
+    switch (tag) {
+        .int, .real, .str => return true,
+        .big_int => {
+            const digits = vir.string(decl.payloadOf(vir, Inst.BigInt, i).digits);
+            return std.mem.findAny(u8, digits, "xz?") == null;
+        },
+        .decl_ref => {
+            const d = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl);
+            return vir.instructions.items(.tag)[@backingInt(d)] == .param;
+        },
+        .call_sys => {
+            const name = vir.string(decl.payloadOf(vir, Inst.SysCall, i).name);
+            const tag_fn = vams.SysFn.Tag.fromName(name) orelse return false;
+            if (tag_fn != .@"$rtoi" and tag_fn != .@"$itor" and tag_fn != .@"$clog2" and vams.SysFn.get(tag_fn).family != .math) return false;
+        },
+        .pos, .neg, .not, .bit_not, .red_and, .red_nand, .red_or, .red_nor, .red_xor, .red_xnor, .add, .sub, .mul, .div, .mod, .pow, .shl, .shr, .ashl, .ashr, .lt, .gt, .lte, .gte, .eq, .neq, .case_eq, .case_neq, .bit_and, .bit_or, .bit_xor, .bit_xnor, .bool_and, .bool_or, .ternary => {},
+        else => return false, // else: a variable, net, call or access is a value only a run computes
+    }
+    var ops: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
+    try @import("control.zig").operands(s.arena, vir, i, &ops);
+    var it = ops.keyIterator();
+    while (it.next()) |o| if (!try constant(s, vir, o.*.toRef(), depth + 1)) return false;
+    return true;
+}
+
+/// A.6.2 a non-mixed instance's `initial` blocks (each `plain`): the value
+/// each assigns a module variable, the last one winning (the old
+/// `collectInitialState`). One whose value does not fold is E0433.
+fn initial(s: *Sema, unit: *Unit) Allocator.Error!void {
+    const vir = unit.vir;
+    for (vir.body(unit.module.body)) |i| {
+        if (vir.instructions.items(.tag)[@backingInt(i)] != .initial) continue;
+        try initialBody(s, unit, decl.payloadOf(vir, Inst.Process, i).body, 0);
+    }
+}
+
+fn initialBody(s: *Sema, unit: *Unit, b: Vir.Body, depth: u32) Allocator.Error!void {
+    if (depth > depth_max) return;
+    const vir = unit.vir;
+    for (vir.body(b)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .block => try initialBody(s, unit, decl.payloadOf(vir, Inst.Block, i).body, depth + 1),
+        .store => {
+            const x = decl.payloadOf(vir, Inst.Bin, i);
+            const t = x.lhs.toIndex().?; // `plain`: a name
+            const d = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(t)].decl_tok.decl);
+            if (vir.instructions.items(.tag)[@backingInt(d)] != .variable) continue;
+            const c = (try decl.foldRef(s, unit, x.rhs)) orelse {
+                try s.fail(.E0433, unit.file, i.toRef(), "`{s}` is assigned a value that is not constant", .{vir.string(decl.nameOf(vir, d))});
+                continue;
+            };
+            try unit.initial.put(s.arena, d, c);
+        },
+        else => {}, // else: an operand (`plain` admitted nothing else)
+    };
 }
 
 /// Whether net `d`'s discipline is of the continuous domain (§3.6.2.2: a

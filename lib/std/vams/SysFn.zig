@@ -20,6 +20,7 @@
 //! - `pub const foreign: std.StaticStringMap(Context)`
 //! - `pub const table: std.EnumArray(Tag, Info)`
 //! - `pub fn get(tag: Tag) *const Info`
+//! - `pub const simparam_names`, `pub const simparam_str_names`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -352,7 +353,8 @@ pub const table = std.EnumArray(Tag, Info).init(.{
     .timer = .{ .ty = .int, .args = .{ .min = 1, .max = 4 }, .family = .event, .context = .analog },
     .initial_step = .{ .ty = .int, .family = .event, .context = .analog },
     .final_step = .{ .ty = .int, .family = .event, .context = .analog },
-    .analysis = .{ .ty = .int, .args = .{ .min = 1 }, .family = .query, .context = .analog },
+    // §4.6.1 the old callee table types the result real (a 1.0 or 0.0).
+    .analysis = .{ .ty = .real, .args = .{ .min = 1 }, .family = .query, .context = .analog },
     .ac_stim = op(.{ .max = 3 }),
     .white_noise = op(.{ .min = 1, .max = 2 }),
     .flicker_noise = op(.{ .min = 2, .max = 3 }),
@@ -510,7 +512,21 @@ pub const table = std.EnumArray(Tag, Info).init(.{
     .@"display$width" = .{ .ty = .int, .args = .{ .min = 2, .max = 3 }, .family = .convert },
 });
 
+/// §9.15 Table 9-27 the `$simparam` names VerA answers (the host's run-time
+/// values, its card fields, the geometry scales, and the `timescale pair);
+/// any other is "not known" (E0811 without a fallback). Case-sensitive.
+pub const simparam_names = std.StaticStringMap(void).initComptime(.{
+    .{"iteration"}, .{"dt"},     .{"timeUnit"}, .{"timePrecision"}, .{"scale"}, .{"shrink"},
+    .{"tnom"},      .{"reltol"}, .{"abstol"},   .{"vntol"},         .{"gmin"},  .{"sourceScaleFactor"},
+});
+
+/// §9.15 Table 9-28 the `$simparam$str` names.
+pub const simparam_str_names = std.StaticStringMap(void).initComptime(.{
+    .{"analysis_name"}, .{"analysis_type"}, .{"cwd"}, .{"module"}, .{"instance"}, .{"path"},
+});
+
 const display: Info = .{ .ty = .none, .family = .display };
+
 const file_out: Info = .{ .ty = .none, .args = .{ .min = 1 }, .family = .file_out };
 
 /// Returns `tag`'s row.
@@ -527,21 +543,27 @@ fn pairs(comptime c: Context, comptime names: []const []const u8) [names.len]str
     for (names, &out) |n, *o| o.* = .{ n, c };
     return out;
 }
+
 fn op(args: Arity) Info {
     return .{ .ty = .real, .args = args, .family = .analog_op, .context = .analog };
 }
+
 fn math1(m: Math) Info {
     return .{ .ty = .real, .args = .exactly(1), .family = .math, .math = m };
 }
+
 fn math2(m: Math) Info {
     return .{ .ty = .real, .args = .exactly(2), .family = .math, .math = m };
 }
+
 fn query(ty: Ty, args: Arity) Info {
     return .{ .ty = ty, .args = args, .family = .query };
 }
+
 fn convert(ty: Ty) Info {
     return .{ .ty = ty, .args = .exactly(1), .family = .convert };
 }
+
 fn random(ty: Ty, args: Arity) Info {
     return .{ .ty = ty, .args = args, .family = .random };
 }

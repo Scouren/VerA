@@ -96,6 +96,7 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     const zcu = s.zcu;
     assert(s.units.items.len == 0);
     assert(s.device.nodes.len == 0);
+    try @import("nature.zig").check(s);
     try units(s);
     if (s.units.items.len == 0) return finish(s, &.{});
     try contrib.loadDisciplines(s);
@@ -105,6 +106,7 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     s.device.num_ports = @intCast(s.device.nodes.len);
     for (s.units.items) |*u| try net.nets(s, u);
     for (s.units.items[1..]) |*u| try net.bindChildPorts(s, u);
+    try net.signalFlowPorts(s);
     try net.bindBridges(s);
     for (s.units.items) |*u| try param.declare(s, u);
     for (s.units.items) |*u| try discrete.declare(s, u);
@@ -113,6 +115,8 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     for (s.units.items) |*u| try held.mark(s, u);
     for (s.units.items) |*u| try @import("attr.zig").check(s, u);
     for (s.units.items) |*u| try variable.declare(s, u);
+    for (s.units.items) |*u| try @import("func.zig").checkRecursion(s, u);
+    try net.pullDrives(s);
     var main: Block = .{ .parent = null, .unit = &s.units.items[0] };
     // The old flattener's order (`elab/instance.zig` inlineInstance,
     // `Flatten.run`): each placed instance's blocks as the walk reaches it,
@@ -123,6 +127,7 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     try lowerUnit(s, &main, &s.units.items[0], 0);
     for (s.units.items) |*u| if (!u.lowered) try lowerUnit(s, &main, u, 0);
     try syscall.finishDisplays(s, &main);
+    try @import("probe.zig").checkProbes(s);
     // §5.4.2 a potential or indirect row's branch current, wherever
     // lowering minted it; a flow row's is its own value.
     const c = s.device.contributions.slice();
@@ -386,6 +391,7 @@ fn lowerUnit(s: *Sema, main: *Block, u: *Unit, depth: u32) Allocator.Error!void 
     var env = try envOf(s, u);
     defer env.deinit();
     try eachItem(s, u, &env, u.module.body, Lowering{ .main = main }, depth);
+    try @import("simprobe.zig").statements(s, main, u);
 }
 
 /// A body's last instruction as a `store`, or null.

@@ -183,16 +183,50 @@ Binding on every change, in every project.
 
 - Run every `zig build` inside `nix develop -c …`. The shell gives each Zig store path its own global cache (`ZIG_GLOBAL_CACHE_DIR=~/.cache/zig-<store path>`). ESPice pins a different build of the same Zig version, so with a shared `~/.cache/zig` the two evict each other's build runner and every `zig build`, even `--help`, takes about 2 minutes. The first build in a fresh cache pays a one-time compile of about 70 s.
 - The steps are the tiers (`TESTING.md`): `check` (pre-commit: type-check and `zig fmt --check`), `test` (the merge gate's fast part), `suite -- <mode>` (the fixture runner: `ams`, `devices`, `ieee1364`, `vpi`, `golden`; no mode runs every fixture, timed), `test-spice`, `test-external` (in `nix develop .#external`), `conformance`, `fuzz`, `build-all`, and `test-<module>` for one module's tests.
-- Edit loop: keep `zig build check --watch -fincremental` running. `check` type-checks every root without emitting or running anything, so an edit is re-checked in under a second. `zig build test-<module> --watch -fincremental` also works, but each rerun costs the tests' run time.
+- Edit loop: keep `zig build check --watch -fincremental --cache-dir .zig-cache-watch` running (see "Building with many agents" for why the private cache dir). `check` type-checks every root without emitting or running anything, so an edit is re-checked in under a second. `test-<module>` works the same way, but each rerun costs the tests' run time.
 - After cloning, run `git submodule update --init tests/conformance`: every fixture lives in that submodule. `--recursive` adds the suite's external suites, which only `zig build conformance` runs.
 - `zig build -Dtarget=wasm32-wasi` builds `vera.wasm`. The front end and every `--emit-*` that only writes text run there; anything that spawns `zig` cannot. Size budgets are asserted with `<=` so they hold on 32-bit targets.
 - VerA does not depend on ESPice; ESPice depends on VerA. `zig build test-spice -Despice=PATH` runs the `.sp` decks on an espice it is handed (an ESPice release, a nix profile or a local build) and grades each against its oracle. That espice compiles the decks' devices with its own VerA, so the step checks compatibility with that release, not this tree; `.github/workflows/spice.yaml` imports a pinned ESPice release and runs it (disabled, by hand only, until ESPice publishes one). Without `-Despice` the step fails.
 - One dependency is fetched: Gompute (the device math), pinned in `build.zig.zon` by commit and content hash. A first `zig build` in a fresh clone fetches it once into the global cache; `nix build` gets it through `fetchFromGitHub` with the same pin and stays offline in the sandbox. Nothing else is fetched. Bump it by tag (`zig fetch --save git+https://github.com/OmarSiwy/Gompute?ref=vX.Y.Z`) together with `flake.nix`'s hash.
 
-## Worktrees
+## Building with many agents
 
-- Symlink a new worktree's `.zig-cache` to the main checkout's (`ln -s <main>/.zig-cache <worktree>/.zig-cache`) so they share build results.
-- Shared caches share incremental state: run one `--watch -fincremental` per artifact at a time across all worktrees.
+Several agents build at once, each in its own worktree. Three facts decide how:
+
+- **Debug is the fast mode.** On x86_64 Linux a Debug build uses Zig's
+  self-hosted backend and linker, about 5× faster than LLVM (0.15 release
+  notes). Never pass `-fllvm` or set `use_llvm = true` in Debug. LLVM and
+  ReleaseFast are only for steps that measure or probe optimized code
+  (`bench-*`, `codegen_probe`, the devices' `-Ofast`).
+- **Incremental state cannot be shared.** `-fincremental` keys its output
+  directory on the options and module paths, not on file contents (pinned
+  Zig `src/Compilation.zig:1348` `CacheMode.incremental`, `:2271`). Module
+  paths are relative to the build root, so two worktrees on one `.zig-cache`
+  get the same `o/<hash>` and overwrite each other's state. A plain build
+  (whole mode) hashes contents, so it is safe and useful to share.
+- **Memory, not CPU, is the limit.** One corpus step (`diff-*`, `rewrite`,
+  `test-comp`, `test-unit`, `bench-*`, `suite`) peaks near 7.5 GB. Seven at
+  once ran the machine out of memory.
+
+So:
+
+1. **Set up a worktree:** `ln -s <main>/.zig-cache <worktree>/.zig-cache`.
+   Every plain build then shares the main checkout's results.
+2. **Edit loop, one per agent, in its own worktree:**
+   `nix develop -c zig build check --watch -fincremental --cache-dir .zig-cache-watch`.
+   The private `--cache-dir` keeps your incremental state from colliding
+   with other worktrees. A re-check takes under a second; a cold `check`
+   takes about 9 s. Use `test-<module>` the same way to run one module's tests.
+3. **Everything that counts is a plain build through the slots:**
+   `tools/build-slot.sh <worktree> <step> [args]`. This covers gates, list
+   rebaselines and anything you report. Never run `-fincremental` here: it
+   has known miscompilations. The script gives corpus steps one of two
+   machine-wide slots at `-j2`, and runs `check` and `test-<module>` at once.
+   Never start a corpus step with a bare `zig build`.
+4. **Narrow before you widen:** first `test-<module>`, then
+   `diff-comp -Dcomp-filter='a|b'` on the fixtures you touched, then the
+   full gate once, at the end.
+5. **Gate on the exit code** (the Builds rule): `tools/build-slot.sh … > log 2>&1; echo $?`.
 
 ## Layout
 

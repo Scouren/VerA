@@ -1,4 +1,5 @@
 .zig-cache
+.zig-cache-watch/
 # The suite's and the VPI apps' scratch builds (build.zig checkoutWorkDir).
 /.vera-work/
 zig-out/

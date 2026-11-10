@@ -1,0 +1,516 @@
+# research/diagcodes-map.tsv: every row of lib/std/vams/Diag/codes.zon (511 keys at 90e93007) -> its proposed key (research/diagcodes.md).
+# kind: rule (a spec sentence the source breaks) | unsup (VerA refuses or drops a legal construct) | limit (an engine capacity) | lint (VerA's own advice) | ice (a compiler defect) | retired.
+# std: AMS = Accellera Verilog-AMS LRM 2023 (docs/specification/VAMS-LRM-2023.pdf); V2005 = IEEE 1364-2005; VERA = VerA's own language extensions (docs). fixtures = files under tests/conformance whose //! directive names the old code; ex = one of them.
+# flag: lrm-wrong (corrected here, the reason given), lrm-empty, split, dup, retitle, abused, conflict. suspect: the quote-in-clause scan found the explain's quotation in another clause; T2 rules on each.
+old	key	tag	kind	sev	std	clause	also	backend	owner	fixtures	ex	title	lrm	flag	suspect	dup	note
+E0101	V2005-19.4a	unterminated_ifdef	rule	error	V2005	19.4			preprocess	1	tests/verilog-a/ch10_directives/ifdef_without_endif_rejected.va	unterminated `ifdef	10.5	lrm-wrong: AMS 10.5 is "Predefined macros"; conditional compilation is IEEE 1364-2005 19.4 (AMS 10.1 inherits it)			
+E0102	AMS-2.4a	unterminated_block_comment	rule	error	AMS	2.4			preprocess	1	tests/verilog-a/ch02_lexical/unclosed_comment.va	unterminated block comment	2.4				
+E0103	AMS-10a	expected_directive_macro_name_after	rule	error	AMS	10			preprocess	1	tests/verilog-a/ch10_directives/grave_accent_needs_a_name_rejected.va	expected a directive or macro name after '`'	10				
+E0104	V2005-19.4b	conditional_directive_requires_macro_name	rule	error	V2005	19.4			preprocess	1	tests/verilog-a/ch10_directives/ifdef_requires_a_name_rejected.va	conditional directive requires a macro name	10.5	lrm-wrong: AMS 10.5 is "Predefined macros"; conditional compilation is IEEE 1364-2005 19.4 (AMS 10.1 inherits it)			
+E0105	V2005-19.4c	else_elsif_without_ifdef	rule	error	V2005	19.4			preprocess	3	tests/verilog-a/ch10_directives/else_without_ifdef_rejected.va	`else / `elsif without `ifdef	10.5	lrm-wrong: AMS 10.5 is "Predefined macros"; conditional compilation is IEEE 1364-2005 19.4 (AMS 10.1 inherits it)			
+E0106	V2005-19.4d	else_elsif_after_else	rule	error	V2005	19.4			preprocess	1	tests/verilog-a/ch10_directives/else_after_else_rejected.va	`else / `elsif after `else	10.5	lrm-wrong: AMS 10.5 is "Predefined macros"; conditional compilation is IEEE 1364-2005 19.4 (AMS 10.1 inherits it)			
+E0107	V2005-19.4e	elsif_requires_macro_name	rule	error	V2005	19.4			preprocess	1	tests/verilog-a/ch10_directives/elsif_requires_a_name_rejected.va	`elsif requires a macro name	10.5	lrm-wrong: AMS 10.5 is "Predefined macros"; conditional compilation is IEEE 1364-2005 19.4 (AMS 10.1 inherits it)			
+E0108	V2005-19.4f	endif_without_ifdef	rule	error	V2005	19.4			preprocess	1	tests/verilog-a/ch10_directives/endif_without_ifdef_rejected.va	`endif without `ifdef	10.5	lrm-wrong: AMS 10.5 is "Predefined macros"; conditional compilation is IEEE 1364-2005 19.4 (AMS 10.1 inherits it)			
+E0109	AMS-10.4a	define_requires_macro_name	rule	error	AMS	10.4			preprocess	1	tests/verilog-a/ch10_directives/macro_name_cannot_start_with_dollar.va	`define requires a macro name	10.4				
+E0110	AMS-10.4b	malformed_formal_argument_list_define	rule	error	AMS	10.4			preprocess	1	tests/verilog-a/ch10_directives/macro_formal_must_be_simple_identifier.va	malformed formal argument list for `define	10.4				
+E0111	AMS-10.4c	unterminated_formal_argument_list_define	rule	error	AMS	10.4			preprocess	1	tests/verilog-a/ch10_directives/define_formal_list_unterminated_rejected.va	unterminated formal argument list for `define	10.4				
+E0112	AMS-10.4d	expected_define_argument_list	rule	error	AMS	10.4			preprocess	1	tests/verilog-a/ch10_directives/define_formals_need_commas_rejected.va	expected ',' or ')' in `define argument list	10.4				
+E0113	AMS-10.4e	undef_requires_macro_name	rule	error	AMS	10.4			preprocess	1	tests/verilog-a/ch10_directives/undef_requires_a_name_rejected.va	`undef requires a macro name	10.4				
+E0114	E0114	E0114	retired	error					preprocess	0		(retired)					
+E0115	AMS-10.4f	undefined_macro	rule	error	AMS	10.4			preprocess	7	tests/verilog-a/annex_g_change_history/default_nodetype_rejected.va	undefined macro	10.4				
+E0116	AMS-10.4g	function_like_macro_used_without	rule	error	AMS	10.4			preprocess	1	tests/verilog-a/ch10_directives/function_macro_used_without_arguments_rejected.va	function-like macro used without an argument list	10.4				
+E0117	AMS-10.4h	macro_argument_count_mismatch	rule	error	AMS	10.4			preprocess	3	tests/verilog-a/ch10_directives/macro_too_few_actuals_rejected.va	macro argument count mismatch	10.4				
+E0118	AMS-10.4i	recursive_macro_expansion	rule	error	AMS	10.4			preprocess	3	tests/verilog-a/ch10_directives/macro_direct_recursion_rejected.va	recursive macro expansion	10.4				
+E0119	limit-include-depth	limit_include_depth	limit	error	AMS	10.4			preprocess	0		macro or `include nesting deeper than memory allows	10.4				
+E0120	AMS-10.4j	unterminated_macro_argument_list	rule	error	AMS	10.4			preprocess	1	tests/verilog-a/ch10_directives/mismatched_macro_argument_bracket.va	unterminated macro argument list	10.4				
+E0121	V2005-19.5a	include_requires_file_name	rule	error	V2005	19.5			preprocess	1	tests/verilog-a/ch10_directives/include_requires_a_file_name_rejected.va	`include requires a file name	10.3	lrm-wrong: AMS 10.3/10.1 is `default_transition/Overview; `include is IEEE 1364-2005 19.5			
+E0122	V2005-19.5b	include_file_name_must_quoted	rule	error	V2005	19.5			preprocess	2	tests/verilog-a/ch10_directives/include_angle_brackets_rejected.va	`include file name must be quoted	10.3	lrm-wrong: AMS 10.3/10.1 is `default_transition/Overview; `include is IEEE 1364-2005 19.5			
+E0123	V2005-19.5c	unterminated_include_file_name	rule	error	V2005	19.5			preprocess	1	tests/verilog-a/ch10_directives/include_file_name_unterminated_rejected.va	unterminated `include file name	10.3	lrm-wrong: AMS 10.3/10.1 is `default_transition/Overview; `include is IEEE 1364-2005 19.5			
+E0124	V2005-19.5d	empty_include_file_name	rule	error	V2005	19.5			preprocess	1	tests/verilog-a/ch10_directives/include_file_name_empty_rejected.va	empty `include file name	10.3	lrm-wrong: AMS 10.3/10.1 is `default_transition/Overview; `include is IEEE 1364-2005 19.5			
+E0125	V2005-19.5e	include_cycle	rule	error	V2005	19.5			preprocess	1	tests/verilog-a/ch10_directives/include_cycle_rejected.va	`include cycle	10.3	lrm-wrong: AMS 10.3/10.1 is `default_transition/Overview; `include is IEEE 1364-2005 19.5			
+E0126	V2005-19.5f	cannot_find_include_file	rule	error	V2005	19.5			preprocess	3	tests/verilog-a/ch10_directives/include_file_not_found_rejected.va	cannot find include file	10.3	lrm-wrong: AMS 10.3/10.1 is `default_transition/Overview; `include is IEEE 1364-2005 19.5			
+E0127	AMS-10.2a	malformed_default_discipline_qualifier	rule	error	AMS	10.2			preprocess	1	tests/verilog-ams/ch10_directives/default_discipline_qualifier_grammar.va	malformed `default_discipline qualifier	10.2				
+E0128	V2005-19.7a	malformed_line_directive	rule	error	V2005	19.7			preprocess	4	tests/verilog-a/ch10_directives/line_directive_requires_every_operand.va	malformed `line directive	10.7	lrm-wrong: AMS 10.7 is `__FILE__/`__LINE__; `line is IEEE 1364-2005 19.7 (explain quotes 19.7)			
+E0129	AMS-10.3a	malformed_default_transition_directive	rule	error	AMS	10.3			preprocess	1	tests/verilog-a/ch10_directives/default_transition_requires_an_operand.va	malformed `default_transition directive	10.3				
+E0130	AMS-2.6.1a	literal_requires_digital_value_support	rule	error	AMS	2.6.1			sema	12	tests/verilog-a/ch09_system_tasks/reject_clog2_wide_unsigned_carrier.va	literal requires digital value support in the execution backend	2.6.1	split: the x/z half is AMS 7.3.2 (rule); the wide-literal half is unsup			
+E0131	AMS-2.6.1b	expected_numeric_base_after_apostrophe	rule	error	AMS	2.6.1			parse	3	tests/verilog-a/ch02_lexical/base_apostrophe_whitespace_rejected.va	expected a numeric base after the apostrophe	2.6.1				
+E0132	AMS-2.6.1c	expected_numeric_digit_after_base	rule	error	AMS	2.6.1			parse	0		expected a numeric digit after the base	2.6.1				
+E0133	AMS-2.6a	invalid_number_literal	rule	error	AMS	2.6			parse	8	tests/verilog-a/ch02_lexical/binary_digit_f_rejected.va	invalid number literal	2.6				
+E0134	E0134	E0134	retired	error					preprocess	0		(retired)					
+E0135	AMS-10.6a	unsupported_keyword_set	rule	error	AMS	10.6			parse	2	tests/verilog-a/ch10_directives/begin_keywords_bad_specifier.va	unsupported keyword set	10.6				
+E0136	AMS-10.6b	end_keywords_without_begin_keywords	rule	error	AMS	10.6			parse	1	tests/verilog-a/ch10_directives/end_keywords_unmatched.va	`end_keywords without `begin_keywords	10.6				
+E0137	E0137	E0137	retired	error					preprocess	0		(retired)					
+E0138	AMS-2.7a	string_literal_may_not_span	rule	error	AMS	2.7			preprocess	8	tests/verilog-a/annex_a_syntax/reject_A_8_8_string_spans_lines.va	a string literal may not span lines	2.7				
+E0139	AMS-10.4k	macro_text_may_not_begin	rule	error	AMS	10.4			preprocess	2	tests/verilog-a/annex_c_analog_subset/define_vams_macro_text_rejected.va	macro text may not begin with __VAMS_	10.4				
+E0140	V2005-19.2a	default_nettype_takes_net_type	rule	error	V2005	19.2			preprocess	2	tests/verilog-ams/ch10_directives/default_nettype_value_grammar.va	`default_nettype takes one net type	10.1	lrm-wrong: `default_nettype is IEEE 1364-2005 19.2			
+E0141	V2005-19.9a	unconnected_drive_takes_pull0_pull1	rule	error	V2005	19.9			preprocess	2	tests/verilog-a/ch10_directives/unconnected_drive_operand_grammar.va	`unconnected_drive takes pull0 or pull1	10.1	lrm-wrong: `unconnected_drive is IEEE 1364-2005 19.9			
+E0142	V2005-19.8a	malformed_timescale	rule	error	V2005	19.8			preprocess	3	tests/verilog-a/ch10_directives/timescale_precision_is_not_coarser_than_the_unit.va	malformed `timescale	10.1	lrm-wrong: `timescale is IEEE 1364-2005 19.8			
+E0143	AMS-10.4l	compiler_directive_cannot_macro_name	rule	error	AMS	10.4			preprocess	2	tests/verilog-a/ch10_directives/directive_name_is_not_a_macro_name.va	a compiler directive cannot be a macro name	10.4				
+E0144	V2005-19.5g	text_after_include_file_name	rule	error	V2005	19.5			preprocess	2	tests/verilog-a/ch10_directives/include_line_holds_only_the_file_name.va	text after the `include file name	10.1	lrm-wrong: AMS 10.3/10.1 is `default_transition/Overview; `include is IEEE 1364-2005 19.5			
+E0145	AMS-10.4m	macro_text_splits_string_literal	rule	error	AMS	10.4			preprocess	2	tests/verilog-a/ch10_directives/macro_text_does_not_split_a_string.va	macro text splits a string literal	10.4				
+E0146	unsup-V2005-28a	unsup_protected_envelope_vera_cannot_process	unsup	error	V2005	28			preprocess	2	tests/verilog/28_protected_envelopes/protect_decryption_envelope_rejected.v	a protected envelope VerA cannot process	IEEE 1364-2005 28				
+E0147	V2005-19.10a	pragma_requires_pragma_name	rule	error	V2005	19.10			preprocess	0		`pragma requires a pragma name	IEEE 1364-2005 19.10				
+E0148	AMS-2.7b	octal_escape_above_377	rule	error	AMS	2.7			parse	1	tests/verilog-a/ch02_lexical/octal_escape_above_377_rejected.va	octal escape is above \\377	2.7				
+W0149	lint-escape	lint_escape	lint	warning	AMS	2.7			parse	1	tests/verilog-a/ch02_lexical/undefined_escape_keeps_character.va	escape is not in Table 2-2	2.7				
+E0150	limit-text-bytes	limit_text_bytes	limit	error	AMS	10.4			preprocess	0		preprocessed text larger than 4294967295 bytes	10.4				
+W0151	lint-sv-macro-text	lint_sv_macro_text	lint	warning	AMS	10.4			preprocess	1	tests/verilog/19_compiler_directives/macro_text_1800_forms_warn.v	IEEE 1800 macro text in an IEEE 1364 unit	10.4				
+E0152	V2005-28.2a	no_key_protected_envelope	rule	error	V2005	28.2			preprocess	0		no key for a protected envelope	IEEE 1364-2005 28.2				
+E0153	V2005-28.2b	protected_envelope_does_not_decrypt	rule	error	V2005	28.2			preprocess	0		a protected envelope does not decrypt	IEEE 1364-2005 28.2				
+E0154	limit-files	limit_files	limit	error					preprocess	0		more than 65535 source files		lrm-empty (engine limit: correct)			
+E0201	AMS-A-a	construct_not_supported_subset	syntax	error	AMS	A			parse	3	tests/verilog-a/ch06_hierarchy/recover_to_paramset_after_error.va	construct is not in the supported subset	A.1.2	retitle: a syntax error (explain), not "the supported subset"			
+E0202	AMS-10.6c	directive_only_legal_outside_design	rule	error	AMS	10.6			parse	6	tests/verilog-a/ch10_directives/begin_keywords_inside_a_paramset.va	directive is only legal outside a design element	10.6				
+E0203	E0203	E0203	retired	error					parse	0		(retired)					
+E0204	E0204	E0204	retired	error					parse	0		(retired)					
+E0205	unsup-AMS-A.1.4a	unsupported_module_item	unsup	error	AMS	A.1.4			parse	3	tests/verilog-a/ch06_hierarchy/paramset_misspelled_item_rejected.va	unsupported module item	A.1.4	split: wreal in Verilog-A is a C.4 rule; the rest is unsup (title says so)			
+E0206	AMS-6.5.1a	identifier_not_port_module	rule	error	AMS	6.5.1			astgen	1	tests/verilog-a/ch06_hierarchy/port_direction_not_a_port_rejected.va	identifier is not a port of this module	6.5.1				
+E0207	AMS-A-b	unexpected_token	syntax	error	AMS	A			parse	102	tests/verilog-a/annex_a_syntax/real_embedded_space_rejected.va	unexpected token	A.1.2	grammar: a generic parser error; its fixtures name the production (G4 exempt)	quote-in-clause scan points at (grammar)		
+E0208	AMS-A-c	expected_identifier	syntax	error	AMS	A			parse	73	tests/verilog-a/annex_a_syntax/reject_A_2_3_empty_entry_in_net_list.va	expected an identifier	2.8	grammar: a generic parser error; its fixtures name the production (G4 exempt)			
+E0209	AMS-A-d	expected_expression	syntax	error	AMS	A			parse	41	tests/verilog-a/annex_a_syntax/reject_A_6_6_if_without_parentheses.va	expected an expression	A.8.3	grammar: a generic parser error; its fixtures name the production (G4 exempt)			
+E0210	AMS-A-e	expected	syntax	error	AMS	A			parse	5	tests/verilog-ams/annex_a_syntax/reject_A_2_2_3_net_with_four_delays.va	expected ')'	A.8.3	grammar: a generic parser error; its fixtures name the production (G4 exempt)			
+E0211	AMS-3.6.2.1a	expected_potential_flow	rule	error	AMS	3.6.2.1			parse	1	tests/verilog-a/ch03_data_types/nature_parent_access_must_be_potential_or_flow_rejected.va	expected 'potential' or 'flow'	3.6.2.1				
+E0212	AMS-3.6.2.2a	expected_continuous_discrete	rule	error	AMS	3.6.2.2			parse	1	tests/verilog-a/ch03_data_types/discipline_domain_is_continuous_or_discrete_rejected.va	expected 'continuous' or 'discrete'	3.6.2.2				
+E0213	AMS-3.6.2a	expected_discipline_item	rule	error	AMS	3.6.2			parse	1	tests/verilog-a/ch03_data_types/discipline_item_needs_a_binding_keyword_rejected.va	expected a discipline item	3.6.2				
+E0214	AMS-5.6a	expected_2	rule	error	AMS	5.6			parse	8	tests/verilog-a/annex_a_syntax/nonblocking_in_analog_rejected.va	expected '<+' or '='	5.6				
+E0215	E0215	E0215	retired	error					parse	0		(retired)					
+E0216	AMS-4.2.13a	concatenation_operand_has_no_bit	rule	error	AMS	4.2.13			sema	1	tests/verilog-a/ch04_expressions/concatenation_unsized_rejected.va	concatenation operand has no bit width	4.2.13				
+E0217	AMS-4.2.13b	concatenation_wider_integer	rule	error	AMS	4.2.13			parse	0		concatenation is wider than an integer	3.2.1	lrm-wrong: AMS 3.2.1 is "Output variables"; concatenation width is 4.2.13 (integer width 3.2)			
+E0218	AMS-6.2a	port_redeclared_module_body	rule	error	AMS	6.2			astgen	3	tests/verilog-a/ch06_hierarchy/ansi_port_redeclared_rejected.va	port redeclared in the module body	6.2				
+E0219	AMS-A.6.4a	null_statement_not_analog_statement	rule	error	AMS	A.6.4			parse	3	tests/verilog-a/annex_a_syntax/reject_A_2_6_null_item_in_analog_function.va	a null statement is not an analog statement	A.6.4				
+E0220	AMS-A.6.5a	empty_analysis_list_step_event	rule	error	AMS	A.6.5			parse	2	tests/verilog-a/annex_g_change_history/final_step_empty_parens_rejected.va	empty analysis list on a step event	A.6.5				
+E0221	AMS-6.6a	generate_block_not_module_item	rule	error	AMS	6.6			parse	1	tests/verilog-a/ch06_hierarchy/generate_region.va	a generate block is not a module item	6.6				
+E0222	AMS-7.3.1a	discrete_bit_grouping_wider_31	rule	error	AMS	7.3.1			codegen	3	tests/verilog-ams/ch07_mixed_signal/discrete_bus_over31_rejected.va	discrete bit grouping wider than 31 bits	7.3.1				
+E0223	AMS-4.2.14a	replication_count_assignment_pattern_not	rule	error	AMS	4.2.14			sema	1	tests/verilog-a/ch04_expressions/assignment_pattern_replication_count_variable_rejected.va	replication count in an assignment pattern is not a non-negative constant	4.2.14				
+E0224	AMS-4.7.1a	analog_function_declares_no_formal	rule	error	AMS	4.7.1			parse	1	tests/verilog-a/ch04_expressions/function_undirected_argument.va	an analog function declares no formal argument	4.7.1				
+E0225	AMS-4.7.1b	analog_function_formal_argument_has	rule	error	AMS	4.7.1			astgen	1	tests/verilog-a/ch04_expressions/function_untyped_argument.va	an analog function formal argument has no data type	4.7.1				
+E0226	AMS-4.7.1c	named_block_not_allowed_analog	rule	error	AMS	4.7.1			parse	2	tests/verilog-a/annex_a_syntax/reject_A_10_1001_function_named_block.va	a named block is not allowed in an analog function	4.7.1				
+E0227	AMS-4.7.2.2a	return_statement_analog_function_specifies	rule	error	AMS	4.7.2.2			parse	1	tests/verilog-a/ch04_expressions/function_bare_return_rejected.va	a return statement in an analog function specifies no expression	4.7.2.2				
+E0228	AMS-6.6b	generate_region_inside_another_generate	rule	error	AMS	6.6			parse	3	tests/verilog-a/ch06_hierarchy/generate_nested_region_rejected.va	a generate region inside another generate region	6.6				
+E0229	AMS-6.6c	parameter_declaration_inside_generate_region	rule	error	AMS	6.6			parse	2	tests/verilog-a/ch06_hierarchy/generate_parameter_declaration_rejected.va	a parameter declaration inside a generate region or block	6.6				
+E0230	AMS-6.6.1a	generate_block_name_collides_another	rule	error	AMS	6.6.1			astgen	6	tests/verilog-a/ch06_hierarchy/generate_array_name_conflict_rejected.va	a generate block name collides with another declaration	6.6.1				
+E0231	AMS-A.9.3a	hierarchical_index_not_constant_expression	rule	error	AMS	A.9.3			parse	0		hierarchical index is not a constant expression	A.9.3				
+E0232	AMS-A.1.1a	library_map_text_source_file	rule	error	AMS	A.1.1			parse	4	tests/verilog-a/annex_a_syntax/library_declaration_in_design_rejected.va	library map text in a source file	A.1.1				
+E0233	AMS-A.5.3a	udp_table_symbol_outside_alphabet	rule	error	AMS	A.5.3			parse	4	tests/verilog/08_udp/no_change_in_combinational_rejected.v	a UDP table symbol is outside the alphabet its column admits	A.5.3				
+E0234	AMS-A.5.3b	udp_table_does_not_derive	rule	error	AMS	A.5.3			parse	1	tests/verilog/08_udp/udp_two_edges_rejected.v	a UDP table does not derive from one udp_body	A.5.3				
+E0235	unsup-AMS-6.6.2a	unsup_not_supported_inside_generate_block	unsup	error	AMS	6.6.2			sema	1	tests/verilog-a/ch05_analog_behavior/event_trigger_global_event_rejected.va	not supported inside a generate block	6.6.2				
+E0236	V2005-19.6a	resetall_inside_module	rule	error	V2005	19.6			parse	2	tests/verilog-a/ch10_directives/resetall_inside_a_module_rejected.va	`resetall inside a module	10.1	lrm-wrong: `resetall is IEEE 1364-2005 19.6 (explain quotes 19.6)			
+E0237	AMS-6.4.1a	paramset_statement_uses_what_6	rule	error	AMS	6.4.1			sema	1	tests/verilog-a/ch06_hierarchy/reject_6_4_1_paramset_variable_assigns_parameter.va	a paramset statement uses what 6.4.1 forbids	6.4.1				
+E0238	AMS-A.4.2a	loop_generate_s_index_not	rule	error	AMS	A.4.2			astgen	2	tests/verilog-a/annex_a_syntax/reject_A_4_2_generate_for_integer_index.va	a loop generate's index is not a genvar	A.4.2				
+E0239	AMS-A.5.4a	udp_instance_s_delay_delay2	rule	error	AMS	A.5.4			elab	1	tests/verilog-ams/annex_a_syntax/reject_A_5_4_udp_three_delays.va	a UDP instance's delay is more than a delay2	A.5.4				
+E0240	AMS-A-f	not_module_item	syntax	error	AMS	A			parse	11	tests/verilog-a/annex_a_syntax/reject_A_1_4_statement_as_module_item.va	not a module item	A.1.4	grammar: a generic parser error; its fixtures name the production (G4 exempt)			
+E0241	limit-nesting	limit_nesting	limit	error					sema	0		nested deeper than memory allows		lrm-empty (engine limit: correct)			
+E0242	AMS-10.6d	verilog_ams_construct_under_ieee	rule	error	AMS	10.6			parse	1	tests/verilog-ams/digital/std_1364_analog_block_rejected.v	a Verilog-AMS construct under an IEEE 1364 language	10.6				
+E0243	V2005-13.3a	configuration_rule_ieee_1364_2005	rule	error	V2005	13.3			elab	5	tests/verilog/13_configuration/every_config_referenced_rejected.v	a configuration rule IEEE 1364-2005 §13.3 forbids	IEEE 1364-2005 13.3				
+E0244	V2005-13.2a	library_map_refused	rule	error	V2005	13.2			parse	7	tests/verilog/13_configuration/config_in_map_rejected.v	library map refused	IEEE 1364-2005 13.2				
+E0245	V2005-14.2a	specify_block_breaks_clause_14	rule	error	V2005	14.2			astgen	0		a specify block breaks a clause 14 rule	IEEE 1364-2005 14.2				
+E0246	AMS-A.1.3a	invalid_module_parameter_list	rule	error	AMS	A.1.3	A.4.1		parse	9	tests/verilog-a/ch06_hierarchy/parameter_list_empty_header_rejected.va	invalid module parameter list	A.1.3 / A.4.1				
+E0247	AMS-2.6.2a	scale_factor_digital_delay	rule	error	AMS	2.6.2			elab	8	tests/verilog-ams/ch02_lexical/digital_scaled_delay_rejected.va	a scale factor in a digital delay	2.6.2				
+E0248	V2005-8.1.4a	udp_table_gives_input_combination	rule	error	V2005	8.1.4			astgen	3	tests/verilog/08_udp/conflicting_entries_rejected.v	a UDP table gives one input combination two outputs	IEEE 1364-2005 8.1.4				
+E0249	AMS-A.6.3a	fork_join_block_analog_block	rule	error	AMS	A.6.3			parse	2	tests/verilog-ams/annex_a_syntax/fork_in_analog_rejected.va	a fork-join block in an analog block	A.6.3				
+E0250	AMS-C.7a	construct_outside_verilog_subset	rule	error	AMS	C.7			parse	0		a construct outside the Verilog-A subset	C.7				
+E0254	AMS-A.6.5b	delay_control_analog_block	rule	error	AMS	A.6.5			parse	2	tests/verilog-a/annex_a_syntax/delay_control_in_analog_rejected.va	a delay control in an analog block	A.6.5				
+E0255	AMS-A.6.5c	wait_statement_analog_block	rule	error	AMS	A.6.5			parse	3	tests/verilog-a/annex_a_syntax/wait_in_analog_rejected.va	a wait statement in an analog block	A.6.5				
+E0256	AMS-A.6.8a	forever_loop_analog_block	rule	error	AMS	A.6.8			parse	2	tests/verilog-a/annex_a_syntax/forever_in_analog_rejected.va	a forever loop in an analog block	A.6.8				
+E0257	AMS-A.2.1.3a	charge_strength_net_not_trireg	rule	error	AMS	A.2.1.3			parse	1	tests/verilog/04_data_types/reject_charge_strength_on_wire.v	a charge strength on a net that is not a trireg	A.2.1.3				
+E0258	AMS-A.6.2a	procedural_continuous_assignment_analog_block	rule	error	AMS	A.6.2			parse	1	tests/verilog-a/annex_a_syntax/force_in_analog_rejected.va	a procedural continuous assignment in an analog block	A.6.2				
+E0295	AMS-A.8.4a	min_typ_max_expression_not	rule	error	AMS	A.8.4			astgen	1	tests/verilog-a/annex_a_syntax/reject_A_8_4_mintypmax_in_analog_expression.va	a min:typ:max expression is not an analog expression	A.8.4				
+E0296	AMS-A.6.8b	forever_loop_needs_statement_not	rule	error	AMS	A.6.8			parse	1	tests/verilog-ams/annex_a_syntax/reject_A_6_8_forever_null_body.va	a forever loop needs a statement, not a null statement	A.6.8				
+E0297	AMS-A.1.9a	paramset_declares_no_item	rule	error	AMS	A.1.9			parse	1	tests/verilog-a/ch06_hierarchy/paramset_without_item_declaration_rejected.va	paramset declares no item	A.1.9				
+E0289	AMS-A.8.2a	function_call_has_empty_argument	rule	error	AMS	A.8.2			parse	1	tests/verilog-a/annex_a_syntax/reject_A_8_2_empty_function_argument.va	a function call has an empty argument	A.8.2				
+E0290	AMS-A.6.3b	declaration_unnamed_block	rule	error	AMS	A.6.3			parse	4	tests/verilog-a/annex_a_syntax/reject_A_6_3_declaration_in_unnamed_block.va	a declaration in an unnamed block	A.6.3				
+E0291	AMS-A.2.6a	analog_function_s_direction_declaration	rule	error	AMS	A.2.6			parse	1	tests/verilog-ams/annex_a_syntax/reject_A_2_6_typed_analog_function_input.va	an analog function's direction declaration carries a data type	A.2.6		quote-in-clause scan points at 4.7.1		
+E0292	AMS-A.2.1.3b	net_declaration_mixes_initialized_plain	rule	error	AMS	A.2.1.3			parse	1	tests/verilog-a/ch03_data_types/reject_A_2_1_3_net_list_mixes_assignment.va	a net declaration mixes initialized and plain names	A.2.1.3				
+E0293	AMS-A.4.1a	module_instance_has_no_instance	rule	error	AMS	A.4.1			parse	1	tests/verilog-a/annex_a_syntax/reject_A_4_1_module_instance_without_name.va	a module instance has no instance name	A.4.1				
+W0250	unsup-AMS-A.3.1a	unsup_switch_primitive_accepted_stamps_nothing	unsup	warning	AMS	A.3.1			sema	0		switch primitive accepted, and it stamps nothing	A.3.1		quote-in-clause scan points at V2005 7.x		
+W0251	unsup-AMS-A.7.1a	unsup_specify_block_read_part_all	unsup	warning	AMS	A.7.1			run	1	tests/verilog-ams/annex_a_syntax/specify_path_delay_mintypmax_list.va	specify block read, and part or all of it is not modelled	A.7.1		quote-in-clause scan points at V2005 14		
+W0252	unsup-AMS-A.3.1b	unsup_gate_primitive_accepted_computes_nothing	unsup	warning	AMS	A.3.1			sema	0		gate primitive accepted, and it computes nothing	A.3.1		quote-in-clause scan points at V2005 7.x		
+W0253	unsup-AMS-A.1.5a	unsup_configuration_read_nothing_binds_through	unsup	warning	AMS	A.1.5			parse	1	tests/verilog-ams/annex_a_syntax/configuration_source_text.va	configuration read, and nothing binds through it	A.1.5		quote-in-clause scan points at V2005 13		
+W0259	lint-math-name	lint_math_name	lint	warning	AMS	10.6			parse	1	tests/verilog-a/ch04_expressions/own_expm1_function_warns.va	a VAMS-2023 math function name declared as a function	10.6				
+E0301	E0301	E0301	retired	error					sema	0		(retired)					
+E0302	E0302	E0302	retired	error					sema	0		(retired)					
+E0303	AMS-3.4.7a	aliasparam_target_not_parameter	rule	error	AMS	3.4.7			sema	1	tests/verilog-a/ch03_data_types/aliasparam_target_must_be_a_parameter_rejected.va	aliasparam target is not a parameter	3.4.7				
+E0304	E0304	E0304	retired	error					sema	0		(retired)					
+E0305	E0305	E0305	retired	error					sema	0		(retired)					
+E0306	AMS-3.12a	expected_net_identifier	rule	error	AMS	3.12			sema	0		expected a net identifier	3.12				
+E0307	AMS-3.2a	array_has_no_declared_dimensions	rule	error	AMS	3.2			sema	0		array has no declared dimensions	3.2				
+E0308	AMS-3.2b	array_bound_not_constant_expression	rule	error	AMS	3.2			sema	2	tests/verilog-a/ch03_data_types/array_bound_not_constant_rejected.va	array bound is not a constant expression	3.2				
+E0309	AMS-3.2c	identifier_not_array	rule	error	AMS	3.2			sema	1	tests/verilog-a/ch03_data_types/real_scalar_is_not_indexable_rejected.va	identifier is not an array	3.2				
+E0310	AMS-3.2d	array_index_out_bounds	rule	error	AMS	3.2			sema	2	tests/verilog-a/ch04_expressions/noise_table_part_select_out_of_range_rejected.va	array index is out of bounds	3.2				
+E0311	AMS-3.2e	array_index_not_constant_expression	rule	error	AMS	3.2			sema	0		array index is not a constant expression	3.2				
+E0312	AMS-3.4a	cannot_assign_parameter	rule	error	AMS	3.4			sema	2	tests/verilog-a/ch03_data_types/parameter_assigned_at_runtime.va	cannot assign to a parameter	3.4				
+E0313	AMS-6.8a	unknown_variable	rule	error	AMS	6.8			sema	1	tests/verilog-a/ch03_data_types/genvar_assigned_outside_loop.va	unknown variable	6.8				
+E0314	AMS-6.8b	unknown_identifier	rule	error	AMS	6.8			sema	10	tests/verilog-a/annex_a_syntax/escaped_system_identifier_rejected.va	unknown identifier	6.8				
+E0315	AMS-4.4a	net_must_read_through_access	rule	error	AMS	4.4			sema	3	tests/verilog-a/ch03_data_types/bare_net_name_not_a_value.va	net must be read through an access function	4.4				
+E0316	AMS-5.7a	unsupported_assignment_target	rule	error	AMS	5.7			sema	5	tests/verilog-a/ch04_expressions/function_inout_nonvariable.va	unsupported assignment target	5.7	retitle: a 5.7 rule (explain), title says "unsupported"			
+E0317	AMS-5.7b	concatenation_not_assignment_target	rule	error	AMS	5.7			sema	2	tests/verilog-a/ch04_expressions/replication_lhs_rejected.va	a concatenation is not an assignment target	5.7		quote-in-clause scan points at 4.2.13		
+E0318	AMS-4.2.9a	bitwise_operator_requires_integer_operands	rule	error	AMS	4.2.9			sema	1	tests/verilog-a/ch04_expressions/bitwise_not_on_real_rejected.va	bitwise operator requires integer operands	4.2.9				
+E0319	AMS-4.2.10a	reduction_operator_requires_integer_operand	rule	error	AMS	4.2.10			sema	1	tests/verilog-a/ch04_expressions/reduction_on_real_rejected.va	reduction operator requires an integer operand	4.2.10				
+E0320	AMS-4.2.10b	xor_reductions_cannot_used_inside	rule	error	AMS	4.2.10			sema	3	tests/verilog-a/ch04_expressions/reduction_xnor_caret_tilde_rejected.va	xor reductions cannot be used inside the analog block	4.2.10				
+E0321	AMS-3.3a	arithmetic_string_operand	rule	error	AMS	3.3			sema	5	tests/verilog-a/ch03_data_types/string_arithmetic_rejected.va	arithmetic on a string operand	3.3				
+E0322	AMS-4.2.9b	bitwise_shift_operators_require_integer	rule	error	AMS	4.2.9			sema	3	tests/verilog-a/annex_c_analog_subset/real_operand_bitwise_rejected.va	bitwise and shift operators require integer operands	4.2.9	dup?: same clause and wording as E0318; review merge		E0318	
+E0323	E0323	E0323	retired	error					sema	0		(retired)					
+E0324	AMS-4.2.11a	arithmetic_shifts_cannot_used_analog	rule	error	AMS	4.2.11			sema	2	tests/verilog-a/ch04_expressions/arithmetic_shift_left_rejected.va	arithmetic shifts cannot be used in an analog block	4.2.11				
+E0325	E0325	E0325	retired	error					sema	0		(retired)					
+E0326	AMS-4.2.13c	empty_concatenation	rule	error	AMS	4.2.13			sema	2	tests/verilog-a/ch04_expressions/concatenation_empty_rejected.va	empty concatenation	4.2.13				
+E0327	AMS-4.2.13d	concatenation_operand_has_no_bit_2	rule	error	AMS	4.2.13			sema	2	tests/verilog-a/ch04_expressions/concatenation_real_operand_rejected.va	concatenation operand has no bit width	4.2.13	dup?: same clause and wording as E0216; review merge		E0216	
+E0328	E0328	E0328	retired	error					sema	0		(retired)					
+E0329	AMS-7.3.1b	select_operand_analog_context_cannot	rule	error	AMS	7.3.1			sema	0		a select or operand the analog context cannot size	7.3.1				
+E0330	AMS-3.2f	unsupported_index_expression	rule	error	AMS	3.2			sema	1	tests/verilog-a/ch04_expressions/select_on_probe_call_rejected.va	unsupported index expression	3.2	retitle or reclassify: "unsupported index expression" with a rule explain			
+E0331	AMS-3.4.7b	aliasparam_name_already_parameter	rule	error	AMS	3.4.7			sema	1	tests/verilog-a/ch03_data_types/alias_identifier_collision.va	aliasparam name is already a parameter	3.4.7				
+E0332	AMS-3.6.1.2a	base_nature_missing_required_attribute	rule	error	AMS	3.6.1.2			sema	3	tests/verilog-a/ch03_data_types/base_nature_missing_access.va	base nature is missing a required attribute	3.6.1.2				
+E0333	AMS-3.6.1.2b	derived_nature_redefines_units	rule	error	AMS	3.6.1.2			sema	1	tests/verilog-a/ch03_data_types/derived_units_immutable.va	derived nature redefines `units`	3.6.1.2				
+E0334	AMS-3.6.1.2c	derived_nature_changes_access	rule	error	AMS	3.6.1.2			sema	1	tests/verilog-a/ch03_data_types/derived_access_immutable.va	derived nature changes `access`	3.6.1.2				
+E0335	AMS-3.13.2a	two_base_natures_share_access	rule	error	AMS	3.13.2			sema	2	tests/verilog-a/ch03_data_types/annex_d_access_v_included_rejected.va	two base natures share an access function	3.13.2				
+E0336	AMS-3.13.1a	identifier_already_declared_nature_discipline	rule	error	AMS	3.13.1			sema	1	tests/verilog-a/ch03_data_types/nature_discipline_namespace_collision.va	identifier is already declared as a nature or a discipline	3.13.1				
+E0337	AMS-3.6.3a	net_has_no_declared_discipline	rule	error	AMS	3.6.3			sema	5	tests/verilog-a/ch06_hierarchy/untyped_child_port_behavioral_use_rejected.va	net has no declared discipline	3.6.3				
+E0338	AMS-3.6.2.1b	conservative_discipline_binds_nature_both	rule	error	AMS	3.6.2.1			sema	1	tests/verilog-a/ch03_data_types/same_nature_both_bindings.va	conservative discipline binds one nature to both halves	3.6.2.1				
+E0339	AMS-3.6.2.2b	domain_discrete_discipline_binds_nature	rule	error	AMS	3.6.2.2			sema	1	tests/verilog-ams/ch03_data_types/discrete_domain_with_natures.va	`domain discrete` on a discipline that binds a nature	3.6.2.2				
+E0340	AMS-3.6.1.2d	nature_attribute_value_wrong_form	rule	error	AMS	3.6.1.2			sema	6	tests/verilog-a/ch03_data_types/ddt_nature_string_rejected.va	nature attribute value of the wrong form	3.6.1.2				
+E0341	AMS-3.6.1.2e	idt_nature_does_not_name	rule	error	AMS	3.6.1.2			sema	4	tests/verilog-a/ch03_data_types/idt_nature_not_a_nature.va	`idt_nature` does not name a related nature	3.6.1.2				
+E0342	AMS-3.13.1b	nature_discipline_already_declared	rule	error	AMS	3.13.1			sema	2	tests/verilog-a/ch03_data_types/duplicate_discipline_name.va	nature or discipline is already declared	3.13.1				
+E0343	AMS-3.6.1.3a	duplicate_user_defined_nature_attribute	rule	error	AMS	3.6.1.3			sema	2	tests/verilog-a/ch03_data_types/discipline_duplicate_user_attribute_rejected.va	duplicate user-defined nature attribute	3.6.1.3				
+E0344	AMS-3.6.4a	ground_net_not_continuous_discipline	rule	error	AMS	3.6.4			sema	1	tests/verilog-ams/ch03_data_types/ground_non_continuous.va	`ground` net is not of a continuous discipline	3.6.4				
+E0345	AMS-3.4.1a	parameter_initializer_type_conflicts_parameter	rule	error	AMS	3.4.1			sema	2	tests/verilog-a/ch03_data_types/real_parameter_from_string.va	parameter initializer type conflicts with the parameter's type	3.4.1				
+E0346	AMS-3.4.1b	array_string_parameter_needs_explicit	rule	error	AMS	3.4.1			sema	2	tests/verilog-a/ch03_data_types/parameter_array_untyped.va	array or string parameter needs an explicit type	3.4.1				
+E0347	AMS-3.4.2a	value_range_bounds_wrong_order	rule	error	AMS	3.4.2			elab	2	tests/verilog-a/ch03_data_types/range_first_expression_larger.va	value range bounds are in the wrong order	3.4.2				
+E0348	AMS-4.2.10c	reduction_operators_cannot_used_inside	rule	error	AMS	4.2.10			sema	4	tests/verilog-a/ch04_expressions/reduction_and_rejected.va	reduction operators cannot be used inside the analog block	4.2.10	dup?: same clause and wording as E0319; review merge		E0319	
+E0349	AMS-3.4b	array_parameter_initialiser_not_assignment	rule	error	AMS	3.4			sema	2	tests/verilog-a/annex_g_change_history/brace_array_initialiser_rejected.va	array parameter initialiser is not an assignment pattern	3.4				
+E0350	AMS-6.5.2.2a	two_declarations_vector_port_give	rule	error	AMS	6.5.2.2			sema	1	tests/verilog-a/ch06_hierarchy/vector_ports.va	the two declarations of a vector port give different ranges	6.5.2.2				
+E0351	AMS-5.5.2a	not_element_vector_net	rule	error	AMS	5.5.2			sema	2	tests/verilog-a/ch05_analog_behavior/access_function_on_whole_vector_rejected.va	not an element of a vector net	5.5.2				
+E0352	AMS-3.6.3b	vector_index_not_constant_inside	rule	error	AMS	3.6.3			sema	7	tests/verilog-a/ch03_data_types/vector_branch_part_select_reversed_rejected.va	vector index is not a constant inside the declared range	3.6.3		quote-in-clause scan points at 5.5.2		
+E0353	AMS-3.12b	branch_terminals_vectors_different_sizes	rule	error	AMS	3.12			sema	1	tests/verilog-a/ch03_data_types/vector_branch_size_mismatch.va	branch terminals are vectors of different sizes	3.12				
+E0354	AMS-3.3b	string_value_cannot_assigned_numeric	rule	error	AMS	3.3			sema	3	tests/verilog-a/ch03_data_types/nonconstant_replication_to_integral.va	a string value cannot be assigned to a numeric variable	3.3		quote-in-clause scan points at 3.4.1		
+E0355	AMS-3.11.1a	incompatible_disciplines	rule	error	AMS	3.11.1			elab	8	tests/spice/primitive_between_incompatible_disciplines_rejected.va	incompatible disciplines	3.11.1				
+E0356	AMS-3.2g	wrong_number_array_subscripts	rule	error	AMS	3.2			sema	1	tests/verilog-a/ch03_data_types/array_extra_subscript_rejected.va	wrong number of array subscripts	3.2				
+E0357	AMS-2.9a	illegal_attribute_value	rule	error	AMS	2.9			sema	4	tests/spice/reject_limit_vera_seed_attr_not_constant.va	illegal attribute value	2.9				
+E0358	AMS-2.9.2a	standard_attribute_value_outside_domain	rule	error	AMS	2.9.2			elab	8	tests/verilog-a/ch02_lexical/desc_attribute_numeric_rejected.va	standard attribute value is outside its domain	2.9.2				
+E0359	AMS-5.5.3a	nature_attribute_reference_has_no	rule	error	AMS	5.5.3			sema	2	tests/verilog-a/ch05_analog_behavior/nature_attribute_nonconstant_invalid.va	nature attribute reference has no constant value	5.5.3				
+E0360	AMS-1.3.4.1a	signal_flow_discipline_inout_port	rule	error	AMS	1.3.4.1			sema	2	tests/verilog-a/ch01_intro/sf_flow_on_inout.va	signal-flow discipline on an `inout` port	1.3.4.1				
+E0361	AMS-3.4.2b	overridden_parameter_value_outside_range	rule	error	AMS	3.4.2			sema	11	tests/verilog-a/ch03_data_types/alias_override_outside_original_range_rejected.va	overridden parameter value is outside its range	3.4.2				
+E0362	AMS-6.8c	identifier_declared_twice_scope	rule	error	AMS	6.8			sema	7	tests/verilog-a/ch02_lexical/duplicate_identifier_rejected.va	identifier is declared twice in one scope	6.8				
+E0363	AMS-3.4c	parameter_default_not_constant_expression	rule	error	AMS	3.4			sema	6	tests/verilog-a/ch03_data_types/parameter_default_not_constant_rejected.va	parameter default is not a constant expression	3.4				
+E0364	E0364	E0364	retired	error					sema	0		(retired)					
+E0365	AMS-3.6.3.2a	net_initializer_not_constant_expression	rule	error	AMS	3.6.3.2			sema	2	tests/verilog-a/ch03_data_types/nodeset_hierarchical_not_constant_rejected.va	net initializer is not a constant expression	3.6.3.2				
+E0366	AMS-3.6.3.2b	net_non_continuous_discipline_has	rule	error	AMS	3.6.3.2			sema	1	tests/verilog-ams/ch03_data_types/nodeset_non_continuous.va	net of a non-continuous discipline has an initializer	3.6.3.2				
+E0367	AMS-3.6.5a	implicit_net_under_default_nettype	rule	error	AMS	3.6.5			sema	3	tests/verilog-a/ch10_directives/default_nettype_crosses_a_file_boundary.va	implicit net under `default_nettype none	3.6.5				
+E0368	AMS-4.2.1.1a	real_value_no_integer_conversion	rule	error	AMS	4.2.1.1			sema	1	tests/verilog-a/ch06_hierarchy/nonfinite_real_to_integer_rejected.va	real value with no integer conversion	4.2.1.1				
+E0369	AMS-4.2.1a	case_equality_real_operand	rule	error	AMS	4.2.1			sema	2	tests/verilog-ams/ch04_expressions/case_equality.va	case equality on a real operand	4.2.1				
+E0370	AMS-3.6.2.5a	discipline_overrides_attribute_no_bound	rule	error	AMS	3.6.2.5			sema	1	tests/verilog-a/ch03_data_types/reject_3_6_2_5_flow_override_without_flow_nature.va	discipline overrides an attribute of no bound nature	3.6.2.5				
+E0371	AMS-3.6.3c	net_declared_undeclared_discipline	rule	error	AMS	3.6.3			elab	2	tests/verilog-a/ch03_data_types/net_declared_with_nature_name_rejected.va	net declared with an undeclared discipline	3.6.3				
+E0372	AMS-3.12.1a	port_branch_names_net_not	rule	error	AMS	3.12.1			sema	1	tests/verilog-a/ch03_data_types/port_branch_on_internal_net_rejected.va	port branch names a net that is not a port	3.12.1				
+E0373	AMS-3.4.7c	aliasparam_name_used_expression	rule	error	AMS	3.4.7			sema	8	tests/verilog-a/ch03_data_types/aliasparam_child_read_rejected.va	aliasparam name used in an expression	3.4.7				
+E0374	AMS-3.6.1.2f	ddt_nature_does_not_name	rule	error	AMS	3.6.1.2			sema	0		`ddt_nature` does not name a related nature	3.6.1.2				
+E0375	AMS-3.6.2b	incompatible_hierarchical_discipline_override	rule	error	AMS	3.6.2			elab	0		incompatible hierarchical discipline override	3.6.2				
+E0376	AMS-6.5.2.2b	port_has_no_direction_declaration	rule	error	AMS	6.5.2.2			astgen	1	tests/verilog-a/ch06_hierarchy/port_without_direction_rejected.va	port has no direction declaration	6.5.2.2				
+E0377	AMS-3.4.2c	model_card_parameter_value_outside	rule	error	AMS	3.4.2			run	2	tests/verilog-a/ch03_data_types/range_card_value_below_from_rejected.va	a model-card parameter value is outside its range	3.4.2				
+E0378	AMS-3.6.2.1c	discipline_binds_undeclared_nature	rule	error	AMS	3.6.2.1			sema	1	tests/verilog-a/ch03_data_types/discipline_binds_undeclared_nature_rejected.va	discipline binds an undeclared nature	3.6.2.1				
+E0401	AMS-A.6.4b	disable_not_analog_statement	rule	error	AMS	A.6.4			sema	2	tests/verilog-a/annex_a_syntax/disable_statement.va	`disable` is not an analog statement	A.6.4				
+E0402	AMS-A.6.5d	disable_does_not_name_block	rule	error	AMS	A.6.5			sema	0		`disable` does not name a block	A.6.5				
+E0403	AMS-4.7.1d	return_outside_analog_function	rule	error	AMS	4.7.1			sema	2	tests/verilog-a/annex_a_syntax/jump_statements.va	`return` outside an analog function	4.7.1				
+E0404	AMS-5.9a	break_continue_outside_loop	rule	error	AMS	5.9			sema	2	tests/verilog-a/ch05_analog_behavior/jump_in_function_outside_loop_invalid.va	`break` or `continue` outside a loop	5.9				
+E0405	AMS-5.2.1a	contribution_not_allowed_context	rule	error	AMS	5.2.1			sema	2	tests/verilog-a/ch04_expressions/function_contribution_ban.va	contribution is not allowed in this context	5.2.1				
+E0406	AMS-5.10a	contribution_inside_event_statement	rule	error	AMS	5.10			sema	4	tests/verilog-a/annex_a_syntax/contribution_in_event_rejected.va	contribution inside an event statement	5.10				
+E0407	AMS-5.4.3a	port_access_function_cannot_contribution	rule	error	AMS	5.4.3			sema	3	tests/verilog-a/annex_c_analog_subset/port_access_contribution_rejected.va	port access function cannot be a contribution target	5.4.3				
+E0408	AMS-5.6b	contribution_target_must_branch_access	rule	error	AMS	5.6			sema	2	tests/verilog-a/annex_a_syntax/contribution_to_variable_rejected.va	contribution target must be a branch access	5.6				
+E0409	AMS-5.6.7.2a	branch_already_indirectly_assigned	rule	error	AMS	5.6.7.2			sema	3	tests/verilog-a/ch05_analog_behavior/hierarchical_contribution_to_indirect_branch_rejected.va	branch is already indirectly assigned	5.6.7.2				
+E0410	AMS-5.2.1b	indirect_contribution_not_allowed_context	rule	error	AMS	5.2.1			sema	1	tests/verilog-a/ch05_analog_behavior/indirect_contribution_in_function_rejected.va	indirect contribution is not allowed in this context	5.2.1				
+E0411	AMS-5.10b	indirect_contribution_inside_event_statement	rule	error	AMS	5.10			sema	1	tests/verilog-a/annex_a_syntax/indirect_contribution_in_event_rejected.va	indirect contribution inside an event statement	5.10				
+E0412	AMS-5.6.7a	indirect_contribution_conditional_loop	rule	error	AMS	5.6.7			sema	2	tests/verilog-a/ch05_analog_behavior/conditional_indirect_invalid.va	indirect contribution in a conditional or loop	5.6.7				
+E0413	AMS-5.6.7b	indirect_contribution_target_must_branch	rule	error	AMS	5.6.7			sema	1	tests/verilog-a/ch05_analog_behavior/indirect_target_must_be_a_branch_rejected.va	indirect contribution target must be a branch access	5.6.7				
+E0414	AMS-5.6.7c	invalid_left_side_indirect_contribution	rule	error	AMS	5.6.7			sema	1	tests/verilog-a/ch05_analog_behavior/indirect_equation_lhs_invalid.va	invalid left side of '==' in an indirect contribution	5.6.7				
+E0415	AMS-5.6.7.2b	branch_already_has_direct_contribution	rule	error	AMS	5.6.7.2			sema	1	tests/verilog-a/ch05_analog_behavior/hierarchical_direct_contribution_to_indirect_branch_rejected.va	branch already has a direct contribution	5.6.7.2				
+E0416	E0416	E0416	retired	error					sema	0		(retired)					
+E0417	AMS-6.6.1b	genvar_loop_bound_not_constant	rule	error	AMS	6.6.1			sema	2	tests/verilog-a/ch06_hierarchy/generate_nonconstant_init_rejected.va	genvar loop bound is not a constant expression	6.6.1				
+E0418	AMS-6.6.1c	genvar_loop_condition_not_constant	rule	error	AMS	6.6.1			sema	2	tests/verilog-a/ch05_analog_behavior/genvar_loop_condition_reads_a_probe_rejected.va	genvar loop condition is not a constant expression	6.6.1				
+E0419	AMS-6.6.1d	genvar_loop_step_not_constant	rule	error	AMS	6.6.1			sema	3	tests/verilog-a/ch03_data_types/genvar_nonstatic_loop_control.va	genvar loop step is not a constant expression	6.6.1				
+E0420	AMS-6.6.1e	genvar_loop_did_not_terminate	rule	error	AMS	6.6.1			sema	1	tests/verilog-a/ch06_hierarchy/generate_nonterminating_rejected.va	genvar loop did not terminate	6.6.1				
+E0421	AMS-4.7.1e	access_function_not_allowed_context	rule	error	AMS	4.7.1			sema	2	tests/verilog-a/ch04_expressions/function_access_ban.va	access function is not allowed in this context	4.7.2	lrm-wrong: "shall not use access functions" is the 4.7.1 list in VAMS-2023			
+E0422	AMS-4.5.15a	analog_operator_not_allowed_context	rule	error	AMS	4.5.15			sema	5	tests/verilog-a/ch04_expressions/function_filter_ban.va	analog operator is not allowed in this context	4.5.15				
+E0423	AMS-5.4.2.1a	both_quantities_probe_branch_read	rule	error	AMS	5.4.2.1			sema	2	tests/verilog-a/ch01_intro/probe_branch_both_quantities.va	both quantities of a probe branch are read	5.4.2.1				
+E0424	AMS-7.3.2.1a	special_floating_point_value_reaches	rule	error	AMS	7.3.2.1			sema	3	tests/verilog-ams/ch07_mixed_signal/inf_contribution.va	a special floating point value reaches a branch	7.3.2.1				
+E0425	AMS-1.3.4.1b	contribution_input_signal_flow_port	rule	error	AMS	1.3.4.1			sema	2	tests/verilog-a/ch01_intro/sf_flow_contribution_to_input.va	contribution to an `input` signal-flow port	1.3.4.1		quote-in-clause scan points at 1.3.4.2		
+E0426	AMS-5.9b	contribution_inside_runtime_loop	rule	error	AMS	5.9			sema	3	tests/verilog-a/ch05_analog_behavior/contribution_in_repeat_rejected.va	contribution inside a runtime loop	5.9				
+E0427	AMS-5.8.3a	default_arm_case_statement	rule	error	AMS	5.8.3			sema	1	tests/verilog-a/ch05_analog_behavior/case_duplicate_default_invalid.va	more than one `default` arm in a case statement	5.8.3				
+E0428	AMS-6.6d	generate_scheme_not_constant_expression	rule	error	AMS	6.6			sema	1	tests/verilog-a/ch06_hierarchy/generate_nonconstant_rejected.va	a generate scheme is not a constant expression	6.6		quote-in-clause scan points at V2005 12.4		
+E0429	AMS-5.7c	incompatible_array_assignment	rule	error	AMS	5.7			sema	3	tests/verilog-a/ch05_analog_behavior/array_assignment_element_types_differ_rejected.va	incompatible array assignment	5.7				
+E0430	AMS-4.7.3a	analog_function_called_outside_analog	rule	error	AMS	4.7.3			sema	2	tests/verilog-ams/ch04_expressions/function_called_outside_analog_rejected.va	analog function called outside the analog context	4.7.3				
+E0431	AMS-5.2.1c	digital_value_read_from_analog	rule	error	AMS	5.2.1			sema	0		digital value read from an analog initial block	5.2.1				
+E0432	AMS-7.2.2a	variable_assigned_both_contexts	rule	error	AMS	7.2.2			sema	2	tests/verilog-ams/ch07_mixed_signal/both_contexts_assignment_rejected.va	variable assigned in both contexts	7.2.2				
+E0433	AMS-7.2.2b	statement_initial_block_not_constant	rule	error	AMS	7.2.2			sema	0		statement in an initial block is not a constant assignment	7.2.2				
+E0434	AMS-A.6.4c	not_analog_statement	rule	error	AMS	A.6.4			sema	2	tests/verilog-ams/ch05_analog_behavior/bare_event_trigger_in_analog_rejected.va	`->` is not an analog statement	A.6.4				
+E0435	AMS-7.3a	continuous_net_cannot_written_from	rule	error	AMS	7.3			sema	3	tests/verilog-ams/ch01_intro/reject_1_2_contribution_from_always_block.va	a continuous net cannot be written from a discrete context	7.3				
+E0436	AMS-7.3.7a	digital_function_cannot_called_from	rule	error	AMS	7.3.7			sema	3	tests/verilog-ams/ch07_mixed_signal/digital_function_from_analog_rejected.va	a digital function cannot be called from the analog context	7.3.7				
+E0437	unsup-AMS-8.5a	unsup_discrete_process_needs_mixed_signal	unsup	error	AMS	8.5			sema	0		this discrete process needs a mixed-signal kernel feature VerA does not implement	8.5				
+E0438	AMS-A.6.1a	continuous_assignment_drives_net_not	rule	error	AMS	A.6.1			sema	3	tests/verilog-a/ch08_scheduling/digital_assignment_unsupported.va	a continuous assignment drives a net, not a variable	A.6.1				
+E0439	AMS-5.6.8.2a	hierarchical_contribution_changes_branch_into	rule	error	AMS	5.6.8.2			sema	3	tests/verilog-a/ch05_analog_behavior/hierarchical_switch_branch_rejected.va	hierarchical contribution changes the branch into a switch branch	5.6.8.2				
+E0440	AMS-5.11a	break_continue_inside_analog_loop	rule	error	AMS	5.11			sema	2	tests/verilog-a/ch05_analog_behavior/jump_in_analog_for_inside_while_invalid.va	`break` or `continue` inside an analog for loop	5.11				
+E0477	AMS-5.6.8.1a	contributions_from_two_module_instances	rule	error	AMS	5.6.8.1			sema	2	tests/verilog-a/ch05_analog_behavior/hierarchical_contribution_closes_a_source_triangle_rejected.va	contributions from two module instances close a loop of potential sources	5.6.8.1				
+E0501	AMS-3.6.1.2g	unknown_access_function	rule	error	AMS	3.6.1.2			sema	20	tests/verilog-a/annex_c_analog_subset/signal_flow_flow_access_rejected.va	unknown access function	3.6.1.2				
+E0502	AMS-4.5.3a	ddt_requires_argument	rule	error	AMS	4.5.3			sema	1	tests/verilog-a/ch04_expressions/operator_null_argument.va	ddt() requires an argument	4.5.3				
+E0503	E0503	E0503	retired	error					sema	0		(retired)					
+E0504	AMS-4.5.6a	ddx_second_argument_must_access	rule	error	AMS	4.5.6			sema	2	tests/verilog-a/ch04_expressions/ddx_nonprobe_argument_rejected.va	ddx() second argument must be an access function	4.5.6				
+E0505	AMS-4.5.14a	analog_operator_does_not_accept	rule	error	AMS	4.5.14			sema	4	tests/verilog-a/ch04_expressions/absdelay_missing_td_rejected.va	analog operator does not accept an empty argument	4.5.14				
+E0506	AMS-4.3a	wrong_number_arguments_math_function	rule	error	AMS	4.3			sema	3	tests/verilog-a/ch04_expressions/hypot_takes_two_arguments_rejected.va	wrong number of arguments to a math function or analog operator	4.3				
+E0507	AMS-5.4.3b	port_access_function_must_flow	rule	error	AMS	5.4.3			sema	1	tests/verilog-a/ch05_analog_behavior/port_potential_invalid.va	port access function must be a flow access	5.4.3				
+E0508	AMS-5.4.3c	port_access_function_names_net	rule	error	AMS	5.4.3			sema	1	tests/verilog-a/ch04_expressions/port_access_not_a_port_rejected.va	port access function names a net that is not a port	5.4.3				
+E0509	AMS-4.2.14b	assignment_pattern_only_legal_where	rule	error	AMS	4.2.14			sema	1	tests/verilog-a/ch04_expressions/assignment_pattern_as_scalar_operand_rejected.va	assignment pattern is only legal where an array is expected	4.5.11	lrm-wrong: AMS 4.5.11 is Laplace filters; assignment patterns are 4.2.14			
+E0510	AMS-4.7.3b	recursive_analog_function	rule	error	AMS	4.7.3			sema	2	tests/verilog-a/ch04_expressions/function_direct_recursion.va	recursive analog function	4.7.1	lrm-wrong: "shall not call itself" sits in 4.7.3 of VAMS-2023			
+E0511	AMS-4.7.3c	wrong_number_arguments_analog_function	rule	error	AMS	4.7.3			sema	5	tests/verilog-a/ch04_expressions/function_array_inout_pattern_size_rejected.va	wrong number of arguments to an analog function	4.7.2	lrm-wrong: AMS 4.7.2 is "Returning a value"; the call rule is 4.7.3			
+E0512	AMS-4.7a	unknown_function	rule	error	AMS	4.7			sema	4	tests/verilog-a/annex_g_change_history/delay_v1_spelling_rejected.va	unknown function	4.7	abused: 33 new-side sites raise it for "is not lowered by Sema yet" (src/Sema/*.zig): a spec-rule code on an engine refusal; give them an unsup code (T1)			
+E0513	AMS-5.10.3.4a	absdelta_only_allowed_initial_always	rule	error	AMS	5.10.3.4			sema	1	tests/verilog-a/ch05_analog_behavior/absdelta_digital_only.va	absdelta() is only allowed in an initial or always block	5.10.3.4				
+E0514	AMS-5.8.1a	analog_operator_under_condition_can	rule	error	AMS	5.8.1			sema	13	tests/verilog-a/ch04_expressions/operator_in_case_rejected.va	analog operator under a condition that can change during the solve	5.8.1		quote-in-clause scan points at 4.5.15		
+E0515	AMS-4.5a	analog_operator_control_argument_not	rule	error	AMS	4.5			codegen	2	tests/verilog-a/ch04_expressions/ddt_abstol_dynamic_rejected.va	analog operator control argument is not a constant or parameter expression	4.5				
+E0516	AMS-4.5b	analog_operator_argument_outside_range	rule	error	AMS	4.5			sema	7	tests/verilog-a/ch04_expressions/absdelay_negative_delay_rejected.va	analog operator argument is outside the range the LRM allows	4.5				
+E0517	AMS-5.10.3a	monitored_event_argument_wrong_type	rule	error	AMS	5.10.3			sema	23	tests/verilog-a/ch05_analog_behavior/above_noninteger_enable_rejected.va	monitored event argument is the wrong type or out of range	5.10.3				
+E0518	AMS-4.5.12a	zero_transition_time_z_filter	rule	error	AMS	4.5.12			sema	1	tests/verilog-a/ch04_expressions/z_filter_zero_transition_branch_rejected.va	a zero-transition-time Z-filter cannot be contributed to a branch	4.5.12				
+E0519	AMS-4.6.4.3a	noise_table_not_usable_frequency	rule	error	AMS	4.6.4.3			sema	3	tests/verilog-a/ch04_expressions/noise_table_duplicate_frequency_rejected.va	noise table is not a usable (frequency, power) table	4.6.4.3				
+E0520	AMS-4.6.4a	noise_generator_has_no_branch	rule	error	AMS	4.6.4			codegen	1	tests/verilog-a/ch04_expressions/noise_generator_without_branch_rejected.va	noise generator has no branch to sit on	4.6.4				
+E0521	AMS-A.8.2b	ac_stim_analysis_name_not	rule	error	AMS	A.8.2			sema	1	tests/verilog-a/ch04_expressions/ac_stim_name_not_literal_rejected.va	ac_stim analysis name is not a string literal	A.8.2				
+E0522	AMS-4.6.4.2a	flicker_noise_requires_exponent	rule	error	AMS	4.6.4.2			sema	1	tests/verilog-a/ch04_expressions/flicker_noise_missing_exponent_rejected.va	flicker_noise requires an exponent	4.6.4.2				
+E0523	VERA-lte-a	vera_lte_needs_constant_value	rule	error	VERA	lte			sema	1	tests/verilog-a/ch05_analog_behavior/reject_charge_site_lte_parameter.va	vera_lte needs a constant value	2.9				
+E0524	VERA-interp-a	vera_interp_1_2	rule	error	VERA	interp			sema	2	tests/verilog-a/ch04_expressions/reject_absdelay_vera_interp_parameter.va	vera_interp is 1 or 2	2.9				
+E0525	VERA-nodiff-a	vera_nodiff_needs_constant_value	rule	error	VERA	nodiff			sema	1	tests/verilog-a/ch04_expressions/reject_vera_nodiff_parameter.va	vera_nodiff needs a constant value	2.9				
+E0526	VERA-nodiff-b	vera_nodiff_covers_contribution	rule	error	VERA	nodiff			sema	1	tests/verilog-a/ch04_expressions/reject_vera_nodiff_contribution.va	vera_nodiff covers a contribution	2.9				
+E0527	VERA-limit_seed-a	limit_seed_reads_solution	rule	error	VERA	limit_seed			codegen	2	tests/spice/reject_limit_seed_reads_solution.va	$limit seed reads the solution	9.17.3				
+E0528	unsup-AMS-5.10.3.3a	unsup_changed_timer_control_would_repeat	unsup	error	AMS	5.10.3.3			sema	5	tests/verilog-a/ch05_analog_behavior/timer_changed_effectful_file_function_input_rejected.va	changed timer control would repeat a side-effecting call	5.10.3.3				
+E0529	VERA-timepoint-a	vera_timepoint_needs_constant_value	rule	error	VERA	timepoint			sema	1	tests/verilog-a/ch05_analog_behavior/reject_vera_timepoint_parameter.va	vera_timepoint needs a constant value	2.9				
+E0530	VERA-timepoint-b	not_allowed_vera_timepoint_statement	rule	error	VERA	timepoint			sema	0		not allowed in a vera_timepoint statement	2.9				
+E0531	VERA-timepoint-c	vera_timepoint_statement_reads_value	rule	error	VERA	timepoint			codegen	1	tests/verilog-a/ch05_analog_behavior/reject_vera_timepoint_reads_iterate.va	vera_timepoint statement reads a value that moves between iterations	2.9				
+E0532	VERA-timepoint-d	vera_timepoint_statement_runs_once	rule	error	VERA	timepoint			sema	1	tests/verilog-a/ch05_analog_behavior/reject_vera_timepoint_in_loop.va	vera_timepoint statement runs more than once per evaluation	2.9				
+E0533	VERA-reject_step-a	vera_reject_step_outside_analog	rule	error	VERA	reject_step			sema	1	tests/verilog-ams/ch05_analog_behavior/reject_vera_reject_step_analog_initial.va	$vera_reject_step outside an analog block	2.8.3				
+E0534	VERA-scratch-a	vera_scratch_needs_constant_value	rule	error	VERA	scratch			sema	1	tests/verilog-a/ch03_data_types/reject_vera_scratch_parameter_value.va	vera_scratch needs a constant value	2.9				
+E0535	VERA-scratch-b	vera_scratch_decorates_something_other	rule	error	VERA	scratch			sema	3	tests/verilog-a/ch03_data_types/reject_vera_scratch_on_genvar.va	vera_scratch decorates something other than a variable	2.9				
+E0536	VERA-scratch-c	vera_scratch_variable_carries_value	rule	error	VERA	scratch			sema	2	tests/verilog-a/ch03_data_types/reject_vera_scratch_event_value.va	vera_scratch variable carries a value between evaluations	5.10				
+E0537	VERA-scratch-d	vera_scratch_variable_written_digital	rule	error	VERA	scratch			sema	1	tests/verilog-ams/ch07_mixed_signal/reject_vera_scratch_digital_variable.va	vera_scratch variable is written by a digital process	7.2.2				
+E0538	VERA-scratch-e	vera_scratch_string_value_not	rule	error	VERA	scratch			sema	1	tests/verilog-a/ch03_data_types/reject_vera_scratch_unknown_string.va	vera_scratch string value is not \"uninit\"	2.9				
+E0539	VERA-scratch-f	vera_scratch_uninit_variable_has	rule	error	VERA	scratch			sema	1	tests/verilog-a/ch03_data_types/reject_vera_scratch_uninit_initializer.va	vera_scratch = \"uninit\" variable has an initializer	2.9				
+E0540	AMS-4.5.11a	filter_root_coefficient_vector_violates	rule	error	AMS	4.5.11			codegen	2	tests/verilog-a/ch04_expressions/reject_4_5_11_1_laplace_zp_parameter_roots.va	filter root or coefficient vector violates a Laplace or Z-transform filter rule	4.5.11				
+E0572	AMS-4.5.1a	filter_coefficient_argument_not_array	rule	error	AMS	4.5.1			sema	2	tests/verilog-a/ch04_expressions/filter_scalar_coefficient_rejected.va	filter coefficient argument is not an array	4.5.1				
+E0573	AMS-4.6.4b	noise_source_label_not_string	rule	error	AMS	4.6.4			sema	1	tests/verilog-a/ch04_expressions/white_noise_numeric_label_rejected.va	noise source label is not a string	4.6.4				
+E0574	AMS-4.6.1a	analysis_argument_not_quoted_analysis	rule	error	AMS	4.6.1			sema	1	tests/verilog-a/ch04_expressions/analysis_numeric_argument_rejected.va	analysis() argument is not a quoted analysis name	4.6.1				
+E0601	AMS-4.2.4a	zero_divisor	rule	error	AMS	4.2.4			proof	5	tests/verilog-a/ch04_expressions/modulo_integer_dynamic_zero.va	zero divisor	4.2.4				
+E0602	AMS-4.3.1a	argument_ln_log_must_positive	rule	error	AMS	4.3.1			proof	3	tests/verilog-a/ch04_expressions/runtime_ln_domain_rejected.va	argument of ln/log must be positive	4.3.1		quote-in-clause scan points at 4.3.2		
+E0603	AMS-4.3.1b	argument_ln1p_must_greater_1	rule	error	AMS	4.3.1			proof	2	tests/verilog-a/ch04_expressions/ln1p_domain_rejected.va	argument of ln1p must be greater than -1	4.3.1				
+E0604	AMS-4.3.1c	argument_sqrt_must_non_negative	rule	error	AMS	4.3.1			proof	2	tests/verilog-a/ch04_expressions/runtime_sqrt_domain_rejected.va	argument of sqrt must be non-negative	4.3.1				
+E0605	AMS-4.3.2a	argument_asin_acos_must_within	rule	error	AMS	4.3.2			proof	1	tests/verilog-a/ch04_expressions/transcendental_domain_rejected.va	argument of asin/acos must be within [-1, 1]	4.3.2				
+E0606	AMS-4.3.2b	argument_atanh_must_within_1	rule	error	AMS	4.3.2			proof	1	tests/verilog-a/ch04_expressions/transcendental_domain_rejected.va	argument of atanh must be within (-1, 1)	4.3.2				
+E0607	AMS-4.3.2c	argument_acosh_must_least_1	rule	error	AMS	4.3.2			proof	1	tests/verilog-a/ch04_expressions/transcendental_domain_rejected.va	argument of acosh must be at least 1	4.3.2				
+E0608	E0608	E0608	retired	error					proof	0		(retired)					
+E0609	AMS-4.3.1d	pow_arguments_violate_sign_rule	rule	error	AMS	4.3.1			proof	3	tests/verilog-a/ch04_expressions/pow_negative_base_fractional_exponent_rejected.va	pow() arguments violate the sign rule	4.3.1				
+W0650	lint-unproven-finite	lint_unproven_finite	lint	warning	AMS	4.3			proof	0		unit is not provably finite, so it compiles in strict float mode	4.3				
+W0651	lint-range-infinity	lint_range_infinity	lint	warning	AMS	3.4.2			proof	1	tests/verilog-a/ch03_data_types/range_closed_on_inf_warns.va	parameter range admits infinity	3.4.2				
+W0652	W0652	W0652	retired	warning					proof	0		(retired)					
+W0653	lint-divisor-maybe-zero	lint_divisor_maybe_zero	lint	warning	AMS	4.2.4			proof	0		integer division by a divisor that may be zero	4.2.4				
+E0701	AMS-5.10c	event_expression_outside	rule	error	AMS	5.10			sema	2	tests/verilog-a/ch05_analog_behavior/cross_used_as_a_value_rejected.va	event expression outside '@()'	5.10				
+E0702	AMS-5.2.1d	event_control_not_allowed_context	rule	error	AMS	5.2.1			sema	2	tests/verilog-a/ch04_expressions/function_event_ban.va	event control is not allowed in this context	5.2.1				
+E0703	AMS-5.10d	nested_event_control_statement	rule	error	AMS	5.10			sema	2	tests/verilog-a/annex_a_syntax/nested_event_control_rejected.va	nested event control statement	5.10				
+E0704	AMS-5.10.1a	posedge_negedge_digital_only	rule	error	AMS	5.10.1			sema	1	tests/verilog-ams/annex_c_analog_subset/digital_event_control_rejected.va	posedge/negedge is digital-only	5.10.1				
+E0705	AMS-5.10.4a	not_declared_named_event	rule	error	AMS	5.10.4			sema	1	tests/verilog-a/ch05_analog_behavior/event_control_undeclared_event_rejected.va	not a declared named event	5.10.4				
+E0706	unsup-AMS-5.10a	unsupported_event_expression	unsup	error	AMS	5.10			sema	0		unsupported event expression	5.10				
+E0707	AMS-5.8a	event_control_statement_under_runtime	rule	error	AMS	5.8			sema	5	tests/verilog-a/ch05_analog_behavior/conditional_event_control_invalid.va	event control statement under a runtime condition or in a loop	5.8				
+E0708	AMS-5.10e	initial_step_final_step_digital	rule	error	AMS	5.10			sema	0		initial_step or final_step in the digital context	5.10				
+W0750	unsup-AMS-5.10.3a	unsup_event_fires_testbench_s_fixed	unsup	warning	AMS	5.10.3			codegen	1	tests/verilog-a/ch05_analog_behavior/event_cross_fires_on_a_time_grid.va	event fires on the testbench's fixed time grid, not at its own time	5.10.3				
+E0801	E0801	E0801	retired	error					sema	0		(retired)					
+E0802	AMS-9.17.2a	bound_step_takes_exactly_argument	rule	error	AMS	9.17.2			sema	1	tests/verilog-a/ch09_system_tasks/bound_step_arity_rejected.va	$bound_step takes exactly one argument	9.17.2				
+E0803	AMS-9.17.2b	bound_step_argument_must_non	rule	error	AMS	9.17.2			sema	1	tests/verilog-a/ch09_system_tasks/bound_step_negative_rejected.va	$bound_step argument must be non-negative	9.17.2				
+E0804	AMS-9.17.1a	discontinuity_takes_most_argument	rule	error	AMS	9.17.1			sema	1	tests/verilog-a/ch09_system_tasks/discontinuity_arity_rejected.va	$discontinuity takes at most one argument	9.17.1				
+E0805	AMS-9.17.1b	discontinuity_argument_not_constant_expression	rule	error	AMS	9.17.1			sema	1	tests/verilog-a/ch09_system_tasks/discontinuity_nonconstant_rejected.va	$discontinuity argument is not a constant expression	9.17.1				
+E0806	AMS-9.2a	system_task_not_supported_analog	rule	error	AMS	9.2			sema	12	tests/verilog-a/annex_c_analog_subset/time_in_analog_rejected.va	system task is not supported in the analog context	9.2				
+E0807	AMS-9.7.2a	stop_shall_not_used_within	rule	error	AMS	9.7.2			sema	1	tests/verilog-ams/ch09_system_tasks/stop_in_analog_initial_rejected.va	$stop shall not be used within an analog initial block	9.7.2				
+E0808	AMS-G.1a	retired_verilog_v1_0_spelling	rule	error	AMS	G.1			sema	1	tests/verilog-a/annex_g_change_history/limexp_v1_spelling_rejected.va	retired Verilog-A v1.0 spelling	G.1				
+E0809	AMS-9.17.3a	limit_missing_argument_algorithm_requires	rule	error	AMS	9.17.3			sema	4	tests/spice/limit_fetlim_missing_vth.va	$limit is missing an argument its algorithm requires	9.17.3				
+E0810	AMS-9.4.3a	not_enough_arguments_format_specifiers	rule	error	AMS	9.4.3			sema	3	tests/verilog-a/ch09_system_tasks/display_argument_pairing_rejected.va	not enough arguments for the format specifiers	9.4.3				
+E0811	AMS-9.15a	simulation_parameter_not_known	rule	error	AMS	9.15			sema	3	tests/verilog-a/ch09_system_tasks/simparam_spice_option_not_known_rejected.va	simulation parameter is not known	9.15				
+E0812	AMS-9.20a	invalid_use_node_alias_system	rule	error	AMS	9.20			sema	6	tests/verilog-a/ch09_system_tasks/node_alias_outside_initial_rejected.va	invalid use of a node alias system function	9.20				
+E0813	AMS-9.5.3a	invalid_argument_string_formatting_scanning	rule	error	AMS	9.5.3			sema	5	tests/verilog-a/ch09_system_tasks/ferror_into_real_rejected.va	invalid argument to a string formatting or scanning task	9.5.3	split: also fires on a scan code VerA does not implement (unsup)			
+E0814	AMS-9.17.3b	limit_limiter_argument_not_input	rule	error	AMS	9.17.3			sema	1	tests/verilog-a/ch09_system_tasks/limit_user_function_output_arg_rejected.va	a $limit limiter argument is not `input`	9.17.3				
+E0815	AMS-9.21a	table_model_data_source_control	rule	error	AMS	9.21			sema	3	tests/verilog-a/ch09_system_tasks/reject_9_21_2_control_substring_too_long.va	$table_model data source or control string	9.21				
+E0816	AMS-9.13a	9_13_probabilistic_distribution_argument	rule	error	AMS	9.13			sema	16	tests/verilog-a/ch09_system_tasks/arandom_type_string_outside_paramset_rejected.va	a $9.13 probabilistic distribution argument	9.13	split: the new side raises it for "fractional or out-of-range count is unsupported" (src/Sema/dist.zig:112,207)			
+E0817	AMS-9.16a	simprobe_resolves_nothing_has_no	rule	error	AMS	9.16			sema	2	tests/verilog-a/ch06_hierarchy/paramset_variable_hides_module_output_variable_rejected.va	$simprobe resolves to nothing and has no fallback	9.16				
+E0818	AMS-9.22a	driver_access_function_outside_connect	rule	error	AMS	9.22			sema	11	tests/verilog-a/ch09_system_tasks/driver_access.va	driver access function outside a connect module	9.22				fires on every call: VerA has no connectmodule element (explain)
+E0819	AMS-9.4.3b	format_conversion_does_not_match	rule	error	AMS	9.4.3			sema	8	tests/verilog-a/ch09_system_tasks/format_conversion_type_mismatch_rejected.va	format conversion does not match the operand's type	9.4.3	split: the new side raises it for "sizing is not implemented" (src/Sema/format.zig:103)			
+W0850	unsup-AMS-9.4a	unsup_task_dropped_device_does_not	unsup	warning	AMS	9.4			codegen	1	tests/verilog-a/ch09_system_tasks/say_device_records.va	task dropped: a device does not print and has no file table	9.4				
+W0852	lint-vpi-sysfn	lint_vpi_sysfn	lint	warning	AMS	2.8.3			codegen	1	tests/verilog-ams/ch12_vpi_routines/analog_systf_sampler_call.va	unregistered system function is left to a VPI host	12.32.3	lrm-wrong: AMS 12.32.3 is an "Examples" subclause; the permission quoted is 2.8.3			
+E0901	AMS-6.7a	hierarchical_name_names_nothing_elaborated	rule	error	AMS	6.7			sema	8	tests/verilog-a/ch05_analog_behavior/hierarchical_reference_to_a_variable_rejected.va	hierarchical name names nothing in the elaborated design	6.7				
+E0902	AMS-7.4.4a	discipline_declaration_net	rule	error	AMS	7.4.4			elab	3	tests/verilog-a/ch03_data_types/conflicting_disciplines_in_context_rejected.va	more than one discipline declaration for one net	7.4.4				
+E0903	AMS-F.2.1a	unknown_discipline_net_mixed_port	rule	error	AMS	F.2.1			elab	2	tests/verilog-ams/annex_f_resolution/unknown_discipline_mixed_port.va	unknown discipline on a net with a mixed-port connection	F.2.1				
+E0904	AMS-6.2.2a	instance_names_no_module	rule	error	AMS	6.2.2			elab	6	tests/spice/case_fallback_does_not_reach_verilog_modules_rejected.va	instance names no module	6.2.2				
+E0905	AMS-6.2.2b	recursive_module_instantiation	rule	error	AMS	6.2.2			elab	1	tests/verilog-a/ch06_hierarchy/recursive_instantiation_rejected.va	recursive module instantiation	6.2.2				
+E0906	AMS-6.2.2c	port_connections_do_not_match	rule	error	AMS	6.2.2			elab	10	tests/spice/primitive_port_name_not_in_table_e1_rejected.va	port connections do not match the module's ports	6.2.2				
+E0907	AMS-6.3a	override_names_no_parameter_module	rule	error	AMS	6.3			elab	18	tests/spice/reject_parameter_name_not_in_table_e1.va	override names no parameter of the module	6.3		quote-in-clause scan points at ?		
+E0908	AMS-6.3.3a	parameter_overridden_once	rule	error	AMS	6.3.3	3.4.7		elab	4	tests/verilog-a/ch03_data_types/alias_double_override.va	a parameter is overridden more than once	6.3.3 / 3.4.7				
+E0909	AMS-6.2.2d	instance_array_range_not_elaboration	rule	error	AMS	6.2.2			elab	1	tests/verilog-a/ch06_hierarchy/instance_array_range_variable_rejected.va	instance array range is not an elaboration-time constant	6.2.2				
+E0910	AMS-6.7.1a	analog_variable_accessed_hierarchically	rule	error	AMS	6.7.1			sema	1	tests/verilog-a/ch06_hierarchy/oomr_variable_read_rejected.va	analog variable accessed hierarchically	6.7.1				
+E0911	AMS-6.4.2a	no_paramset_admits_instance_s	rule	error	AMS	6.4.2			elab	8	tests/spice/binning_paramset_with_no_bin_rejected.va	no paramset admits this instance's parameter values	6.4.2				
+E0912	AMS-6.3.6a	flow_contribution_scaled_mfactor_twice	rule	error	AMS	6.3.6			sema	1	tests/verilog-a/ch06_hierarchy/mfactor_double_scaling_rejected.va	flow contribution scaled by $mfactor twice	6.3.6				
+E0913	E0913	E0913	retired	error					elab	0		(retired)					
+E0914	AMS-6.4.2b	paramset_still_applicable	rule	error	AMS	6.4.2			elab	1	tests/verilog-a/ch06_hierarchy/paramset_ambiguous_rejected.va	more than one paramset is still applicable	6.4.2				
+E0915	AMS-7.7.1a	connect_insertion_names_no_connect	rule	error	AMS	7.7.1			elab	1	tests/verilog-ams/ch07_mixed_signal/connect_insertion_names_an_ordinary_module_rejected.va	connect insertion names no connect module	7.7.1				
+E0916	AMS-7.7.2a	connect_resolution_names_no_discipline	rule	error	AMS	7.7.2			elab	1	tests/verilog-ams/ch07_mixed_signal/connect_resolution_names_no_discipline_rejected.va	connect resolution names no discipline	7.7.2				
+E0917	AMS-7.7.2b	disciplines_excluded_connect_resolution_share	rule	error	AMS	7.7.2			elab	1	tests/verilog-ams/annex_f_resolution/exclude_resolution.va	disciplines excluded by a connect resolution share a net	7.7.2				
+E1001	AMS-6.2b	source_contains_no_module_declaration	rule	error	AMS	6.2			elab	2	tests/verilog-ams/annex_c_analog_subset/connectmodule_is_not_a_device.va	source contains no module declaration	6.2				
+E1002	E1002	E1002	retired	error					codegen	0		(retired)					
+E1003	E1003	E1003	retired	error					codegen	0		(retired)					
+E1004	unsup-AMS-6.3.4a	unsupported_dependent_parameter_expression	unsup	error	AMS	6.3.4			codegen	0		unsupported dependent parameter expression	6.3.4				
+E1010	E1010	E1010	retired	error					codegen	0		(retired)					
+E1011	limit-text-buffer	limit_text_buffer	limit	error					run	1	tests/verilog-a/ch09_system_tasks/sformat_runtime_width_past_its_row_rejected.va	text exceeds the buffer sized for it		lrm-empty (engine limit: correct)			
+E1012	E1012	E1012	retired	error					codegen	0		(retired)					
+E1013	limit-file-bytes	limit_file_bytes	limit	error					preprocess	0		a file is larger than VerA reads		lrm-empty (engine limit: correct)			
+E1014	limit-reserved-sysfn	limit_reserved_sysfn	limit	error					sema	1	tests/verilog-a/ch09_system_tasks/reserved_system_function_name_rejected.va	a system function name VerA reserves		lrm-empty (engine limit: correct)			
+E1015	limit-rows	limit_rows	limit	error					sema	0		more nets and unknowns than a 32-bit row index holds		lrm-empty (engine limit: correct)			
+E1016	limit-array-elements	limit_array_elements	limit	error					sema	0		an array or assignment pattern has more elements than a 32-bit index holds		lrm-empty (engine limit: correct)			
+E1017	E1017	E1017	retired	error					codegen	0		(retired)					
+E1018	E1018	E1018	retired	error					codegen	0		(retired)					
+E1019	limit-literal-bits	limit_literal_bits	limit	error					parse	0		a number literal's size exceeds 4294967295 bits		lrm-empty (engine limit: correct)			
+E1020	ice-codegen-call	ice_codegen_call	ice	error					codegen	0		the code generator met a call it cannot render		lrm-empty (engine limit: correct)			a compiler defect by its own explain: in the new pipeline an assertion (AGENTS: a bug hits an assertion); row kept only as the alias target
+E1021	limit-call-operands	limit_call_operands	limit	error					sema	0		a call has more operands than its 24-bit count holds		lrm-empty (engine limit: correct)			
+E1022	limit-status-sites	limit_status_sites	limit	error					sema	0		a device has more `$fatal` and `$error` sites than its status code holds		lrm-empty (engine limit: correct)			
+E1100	unsup-AMS-8.5b	unsup_digital_source_execution_failed	unsup	error	AMS	8.5			sema	183	tests/verilog-ams/ch07_mixed_signal/probe_in_continuous_assign_refused.va	digital source execution failed	8.5				
+E1101	unsup-V2005-4.1a	unsup_design_refused_under_two_state	unsup	error	V2005	4.1			sema	0		design refused under --two-state	IEEE 1364-2005 4.1				
+E1102	unsup-V2005-17.2.10a	unsup_sdf_file_annotator_cannot_read	unsup	error	V2005	17.2.10			run	1	tests/verilog/17_system_tasks/sdf_annotate_rejected.v	an SDF file the annotator cannot read	IEEE 1364-2005 17.2.10				
+W1105	unsup-V2005-16.2a	unsup_sdf_construct_annotator_does_not	unsup	warning	V2005	16.2			run	0		an SDF construct the annotator does not apply	IEEE 1364-2005 16.2				
+E1103	unsup-AMS-7.8a	unsup_design_cannot_contract_device	unsup	error	AMS	7.8			codegen	0		design cannot be a contract device	7.8				
+E1104	unsup-systemverilog	unsup_systemverilog	unsup	error					parse	0		a SystemVerilog source is not supported		lrm-empty: SystemVerilog is IEEE 1800, a standard VerA does not claim; slug key			
+E1147	unsup-V2005-15.5a	unsup_timing_check_argument_digital_engine	unsup	error	V2005	15.5			run	1	tests/verilog/15_timing_checks/notifier_net_rejected.v	a timing check argument the digital engine cannot bind	IEEE 1364-2005 15.5				
+E1148	V2005-15.1a	timing_check_limit_not_non	rule	error	V2005	15.1			run	6	tests/verilog/15_timing_checks/hold_negative_limit_rejected.v	a timing check limit that is not a non-negative constant	IEEE 1364-2005 15.1				
+E1149	unsup-V2005-15a	unsup_timing_check_vera_s_digital	unsup	error	V2005	15			sema	0		a timing check VerA's digital engine does not evaluate	IEEE 1364-2005 15				
+W1150	V2005-17.2.9a	memory_file_word_count_mismatch	rule	warning	V2005	17.2.9			run	0		memory file word count mismatch	IEEE 1364-2005 17.2.9				IEEE 1364-2005 17.2.9: "A warning message shall be issued"
+W1151	V2005-17.9.2a	probabilistic_distribution_argument_not_positive	rule	warning	V2005	17.9.2			run	0		probabilistic distribution argument not positive	IEEE 1364-2005 17.9.2				IEEE 1364-2005 17.9.2 reference code prints the warning
+W1152	V2005-13.2.1.1a	two_cells_name_library	rule	warning	V2005	13.2.1.1			elab	1	tests/verilog-a/ch06_hierarchy/same_named_module_last_wins.va	two cells with one name in one library	IEEE 1364-2005 13.2.1.1				
+W1153	lint-format-pairs	lint_format_pairs	lint	warning	V2005	17.2.3			run	0		format specifiers and arguments do not pair up	IEEE 1364-2005 17.2.3		quote-in-clause scan points at V2005 17.1.1		
+W1154	lint-file-not-written	lint_file_not_written	lint	warning	V2005	17.2.1			run	0		file output not written	IEEE 1364-2005 17.2.1				
+W1155	lint-tick-1s	lint_tick_1s	lint	warning	V2005	19.8			codegen	0		device digital tick is 1 s	IEEE 1364-2005 19.8				
+W1156	V2005-17.2.9b	memory_file_address_outside_memory	rule	warning	V2005	17.2.9			run	0		memory file address outside the memory	IEEE 1364-2005 17.2.9				IEEE 1364-2005 17.2.9: "A warning message shall be issued"
+W1157	lint-readmem-stopped	lint_readmem_stopped	lint	warning	V2005	17.2.9			run	21	tests/verilog/17_system_tasks/readmem_address_outside_task_range.v	a $readmem load terminated	IEEE 1364-2005 17.2.9				
+W1160	V2005-12.3.10a	dissimilar_net_types_joined_through	rule	warning	V2005	12.3.10			elab	0		dissimilar net types joined through a port	IEEE 1364-2005 12.3.10				Table 12-? "warn = A warning shall be issued"
+W1161	lint-extra-ordered-params	lint_extra_ordered_params	lint	warning	V2005	12.2.2.1			elab	2	tests/verilog/12_hierarchy/extra_ordered_parameter_value_ignored.v	extra ordered parameter values ignored	IEEE 1364-2005 12.2.2.1				
+W1162	V2005-15.5.1a	negative_timing_check_limits_cannot	rule	warning	V2005	15.5.1			sema	0		negative timing check limits that cannot all be met	IEEE 1364-2005 15.5.1				IEEE 1364-2005 15.5.1 "shall issue a warning"
+W1199	V2005-15.2a	timing_violation	rule	warning	V2005	15.2			run	0		timing violation	IEEE 1364-2005 15.2				the timing check's own report (15.2)
+E1200	unsup--7a	unsup_rtlil_analog_mixed_signal_description	unsup	error		7		rtlil	codegen	0		an analog or mixed-signal description --emit-rtlil does not lower		lrm-empty: an analog/mixed description is AMS clause 7 (mixed signal) / 5 (analog)			
+E1201	unsup-V2005-8a	unsup_rtlil_user_defined_primitive	unsup	error	V2005	8		rtlil	codegen	0		a user-defined primitive --emit-rtlil does not lower	IEEE 1364-2005 8				
+E1202	unsup--5.2a	unsup_rtlil_analog_block	unsup	error		5.2		rtlil	codegen	0		an analog block --emit-rtlil does not lower		lrm-empty: an analog block is AMS 5.2			
+E1203	unsup-AMS-7.8b	unsup_rtlil_connect_module	unsup	error	AMS	7.8		rtlil	codegen	0		a connect module --emit-rtlil does not lower	7.8				
+E1204	unsup-V2005-12.4a	unsup_rtlil_generate_construct	unsup	error	V2005	12.4		rtlil	codegen	0		a generate construct --emit-rtlil does not lower	IEEE 1364-2005 12.4				
+E1205	unsup-V2005-12.2.1a	unsup_rtlil_defparam	unsup	error	V2005	12.2.1		rtlil	codegen	0		a defparam --emit-rtlil does not lower	IEEE 1364-2005 12.2.1				
+E1206	unsup-V2005-10.2a	unsup_rtlil_task	unsup	error	V2005	10.2		rtlil	codegen	0		a task --emit-rtlil does not lower	IEEE 1364-2005 10.2				
+E1207	unsup-V2005-10.4a	unsup_rtlil_function	unsup	error	V2005	10.4		rtlil	codegen	0		a function --emit-rtlil does not lower	IEEE 1364-2005 10.4				
+E1208	unsup-V2005-9.7.3a	unsup_rtlil_named_event	unsup	error	V2005	9.7.3		rtlil	codegen	0		a named event --emit-rtlil does not lower	IEEE 1364-2005 9.7.3				
+E1209	unsup-V2005-7.8a	unsup_rtlil_pullup_pulldown	unsup	error	V2005	7.8		rtlil	codegen	0		a pullup or pulldown --emit-rtlil does not lower	IEEE 1364-2005 7.8				
+E1210	unsup-V2005-7.5a	unsup_rtlil_switch_primitive	unsup	error	V2005	7.5		rtlil	codegen	0		a switch primitive --emit-rtlil does not lower	IEEE 1364-2005 7.5				
+E1211	unsup-AMS-3.12a	unsup_rtlil_analog_branch	unsup	error	AMS	3.12		rtlil	codegen	0		an analog branch --emit-rtlil does not lower	3.12				
+E1212	unsup-V2005-12.3.1a	unsup_rtlil_port_expression	unsup	error	V2005	12.3.1		rtlil	codegen	0		a port expression --emit-rtlil does not lower	IEEE 1364-2005 12.3.1				
+E1213	unsup-AMS-A.1.3a	unsup_rtlil_header_port_selects_part	unsup	error	AMS	A.1.3		rtlil	codegen	0		a header port that selects part of its net	A.1.3				
+E1214	unsup-AMS-3.7a	unsup_rtlil_wreal_port	unsup	error	AMS	3.7		rtlil	codegen	0		a wreal port --emit-rtlil does not lower	3.7				
+E1215	unsup-AMS-3.7b	unsup_rtlil_wreal_net	unsup	error	AMS	3.7		rtlil	codegen	0		a wreal net --emit-rtlil does not lower	3.7				
+E1216	unsup-V2005-4.9a	unsup_rtlil_net_array	unsup	error	V2005	4.9		rtlil	codegen	0		a net array --emit-rtlil does not lower	IEEE 1364-2005 4.9				
+E1217	unsup-V2005-4.9.3a	unsup_rtlil_memory	unsup	error	V2005	4.9.3		rtlil	codegen	0		a memory --emit-rtlil does not lower	IEEE 1364-2005 4.9.3				
+E1218	unsup-V2005-4.8a	unsup_rtlil_real_variable	unsup	error	V2005	4.8		rtlil	codegen	0		a real variable --emit-rtlil does not lower	IEEE 1364-2005 4.8				
+E1219	unsup-V2005-3.6a	unsup_rtlil_string_variable	unsup	error	V2005	3.6		rtlil	codegen	0		a string variable --emit-rtlil does not lower		lrm-empty: strings are IEEE 1364-2005 3.6 / 4.2.3			
+E1220	unsup-V2005-4.3.1a	unsup_rtlil_range	unsup	error	V2005	4.3.1		rtlil	codegen	0		a range --emit-rtlil cannot fold to a constant	IEEE 1364-2005 4.3.1				
+E1221	limit-rtlil-wire-offset	limit_rtlil_wire_offset	limit	error	V2005	4.3.1			codegen	0		a range whose bounds do not fit RTLIL's 32-bit wire offset	IEEE 1364-2005 4.3.1				
+E1222	limit-rtlil-wire-width	limit_rtlil_wire_width	limit	error	V2005	4.3.1			codegen	0		a range wider than RTLIL's 2^31 - 1 bits	IEEE 1364-2005 4.3.1				
+E1223	unsup-V2005-12.2a	unsup_rtlil_parameter_default	unsup	error	V2005	12.2		rtlil	codegen	0		a parameter default --emit-rtlil cannot fold to a constant	IEEE 1364-2005 12.2				
+E1224	V2005-4.5a	name_not_declared_module	rule	error	V2005	4.5			codegen	0		a name not declared in its module	IEEE 1364-2005 4.5	dup: the --emit-rtlil path restates the front end's rule (E0314); merge, keep E1224 as an alias		E0314	
+E1225	unsup-V2005-3.5.2a	unsup_rtlil_real_literal	unsup	error	V2005	3.5.2		rtlil	codegen	0		a real literal --emit-rtlil does not lower	IEEE 1364-2005 3.5.2				
+E1226	unsup-V2005-3.6b	unsup_rtlil_string_literal	unsup	error	V2005	3.6		rtlil	codegen	0		a string literal --emit-rtlil does not lower	IEEE 1364-2005 3.6				
+E1227	unsup-V2005-12.5a	unsup_rtlil_hierarchical_reference	unsup	error	V2005	12.5		rtlil	codegen	0		a hierarchical reference --emit-rtlil does not lower	IEEE 1364-2005 12.5				
+E1228	unsup-V2005-10.4b	unsup_rtlil_function_call	unsup	error	V2005	10.4		rtlil	codegen	0		a function call --emit-rtlil does not lower	IEEE 1364-2005 10.4				
+E1229	unsup-V2005-5a	unsup_rtlil_expression_no_synthesizable_design	unsup	error	V2005	5		rtlil	codegen	0		an expression no synthesizable design has here	IEEE 1364-2005 5				
+E1230	unsup-V2005-17a	unsup_rtlil_system_function	unsup	error	V2005	17		rtlil	codegen	0		a system function --emit-rtlil does not lower	IEEE 1364-2005 17				
+E1231	unsup-V2005-17.11.1a	unsup_rtlil_clog2_non_constant	unsup	error	V2005	17.11.1		rtlil	codegen	0		a `$clog2` of a non-constant	IEEE 1364-2005 17.11.1				
+E1232	unsup-V2005-12.2b	unsup_rtlil_real_parameter_read_expression	unsup	error	V2005	12.2		rtlil	codegen	0		a real parameter read in an expression	IEEE 1364-2005 12.2				
+E1233	unsup-V2005-5.1.14a	unsup_rtlil_replication_count	unsup	error	V2005	5.1.14		rtlil	codegen	0		a replication count --emit-rtlil cannot fold to a constant	IEEE 1364-2005 5.1.14				
+E1234	V2005-5.1.14a	replication_count_zero_negative	rule	error	V2005	5.1.14			codegen	0		a replication count that is zero or negative	IEEE 1364-2005 5.1.14	split: a negative count is the rule (5.1.14 "non-negative"); a zero count is legal in IEEE 1364-2005 5.1.14 and is an rtlil unsup			
+E1235	limit-rtlil-replication	limit_rtlil_replication	limit	error	V2005	5.1.14			codegen	0		a replication wider than --emit-rtlil's constant limit	IEEE 1364-2005 5.1.14				
+E1236	unsup-V2005-5.2.1a	unsup_rtlil_part_select_bound	unsup	error	V2005	5.2.1		rtlil	codegen	0		a part-select bound --emit-rtlil cannot fold to a constant	IEEE 1364-2005 5.2.1				
+E1237	unsup-V2005-5.2.1b	unsup_rtlil_indexed_part_select_width	unsup	error	V2005	5.2.1		rtlil	codegen	0		an indexed part-select width --emit-rtlil cannot fold to a constant	IEEE 1364-2005 5.2.1				
+E1238	V2005-5.2.1a	indexed_part_select_width_zero	rule	error	V2005	5.2.1			codegen	0		an indexed part-select width that is zero or negative	IEEE 1364-2005 5.2.1				
+E1239	unsup-V2005-5.2.1c	unsup_rtlil_indexed_part_select_variable	unsup	error	V2005	5.2.1		rtlil	codegen	0		an indexed part-select with a variable base	IEEE 1364-2005 5.2.1				
+E1240	V2005-5.2.1b	select_something_not_declared_name	rule	error	V2005	5.2.1			codegen	0		a select of something that is not a declared name	IEEE 1364-2005 5.2.1	dup: the --emit-rtlil path restates the front end's rule (E0309); merge, keep E1240 as an alias		E0309	
+E1241	unsup-V2005-5.2.1d	unsup_rtlil_select_parameter	unsup	error	V2005	5.2.1		rtlil	codegen	0		a select of a parameter	IEEE 1364-2005 5.2.1				
+E1242	unsup-V2005-5.2.1e	unsup_rtlil_variable_bit_select_ascending	unsup	error	V2005	5.2.1		rtlil	codegen	0		a variable bit select of an ascending vector	IEEE 1364-2005 5.2.1				
+E1243	unsup-V2005-5.2.1f	unsup_rtlil_constant_select_outside_declared	unsup	error	V2005	5.2.1		rtlil	codegen	0		a constant select outside the declared range	IEEE 1364-2005 5.2.1				
+E1244	AMS-A.8.5a	assignment_target_not_declared_name	rule	error	AMS	A.8.5			codegen	0		an assignment target that is not a declared name	A.8.5	dup: the --emit-rtlil path restates the front end's rule (E0313); merge, keep E1244 as an alias		E0313	
+E1245	AMS-A.8.5b	assignment_target_not_name_select	rule	error	AMS	A.8.5			codegen	0		an assignment target that is not a name, a select or a concatenation	A.8.5	dup: the --emit-rtlil path restates the front end's rule (E0316); merge, keep E1245 as an alias		E0316	
+E1246	V2005-4.10a	assignment_parameter	rule	error	V2005	4.10			codegen	0		an assignment to a parameter	IEEE 1364-2005 4.10	dup: the --emit-rtlil path restates the front end's rule (E0312); merge, keep E1246 as an alias		E0312	
+E1247	V2005-9.2a	procedural_assignment_net	rule	error	V2005	9.2			codegen	0		a procedural assignment to a net	IEEE 1364-2005 9.2	dup: the --emit-rtlil path restates the front end's rule (E0482); merge, keep E1247 as an alias		E0482	
+E1248	unsup-V2005-5.2.1g	unsup_rtlil_select_select_assignment_target	unsup	error	V2005	5.2.1		rtlil	codegen	0		a select of a select as an assignment target	IEEE 1364-2005 5.2.1				
+E1249	unsup-V2005-5.2.1h	unsup_rtlil_indexed_part_select_assignment	unsup	error	V2005	5.2.1		rtlil	codegen	0		an indexed part-select as an assignment target	IEEE 1364-2005 5.2.1				
+E1250	unsup-V2005-5.2.1i	unsup_rtlil_variable_bit_select_assignment	unsup	error	V2005	5.2.1		rtlil	codegen	0		a variable bit select as an assignment target	IEEE 1364-2005 5.2.1				
+E1251	unsup-V2005-9.9.1a	unsup_rtlil_initial_block_not_constant	unsup	error	V2005	9.9.1		rtlil	codegen	0		an initial block that is not constant assignments	IEEE 1364-2005 9.9.1				
+E1252	unsup-V2005-9.9.1b	unsup_rtlil_initial_assignment_delay_event	unsup	error	V2005	9.9.1		rtlil	codegen	0		an initial assignment with a delay or event control	IEEE 1364-2005 9.9.1				
+E1253	unsup-V2005-9.9.1c	unsup_rtlil_initial_assignment_select	unsup	error	V2005	9.9.1		rtlil	codegen	0		an initial assignment to a select	IEEE 1364-2005 9.9.1				
+E1254	unsup-V2005-9.9.1d	unsup_rtlil_initial_value	unsup	error	V2005	9.9.1		rtlil	codegen	0		an initial value --emit-rtlil cannot fold to a constant	IEEE 1364-2005 9.9.1				
+E1255	unsup-V2005-9.8a	unsup_rtlil_block_local_declarations	unsup	error	V2005	9.8		rtlil	codegen	0		a block with local declarations	IEEE 1364-2005 9.8				
+E1256	unsup-V2005-9.8.2a	unsup_rtlil_fork_join_block	unsup	error	V2005	9.8.2		rtlil	codegen	0		a fork-join block --emit-rtlil does not lower	IEEE 1364-2005 9.8.2				
+E1257	unsup-V2005-9.9.2a	unsup_rtlil_always_block_without_event	unsup	error	V2005	9.9.2		rtlil	codegen	0		an always block without an event control	IEEE 1364-2005 9.9.2				
+E1258	unsup-V2005-9.7a	unsup_rtlil_always_block_waits_delay	unsup	error	V2005	9.7		rtlil	codegen	0		an always block that waits on a delay or a level	IEEE 1364-2005 9.7				
+E1259	unsup-V2005-9.7.2a	unsup_rtlil_event_control_mixing_edges	unsup	error	V2005	9.7.2		rtlil	codegen	0		an event control mixing edges and levels	IEEE 1364-2005 9.7.2				
+E1260	unsup-V2005-9.7.7a	unsup_rtlil_intra_assignment_delay_event	unsup	error	V2005	9.7.7		rtlil	codegen	0		an intra-assignment delay or event control	IEEE 1364-2005 9.7.7				
+E1261	unsup-V2005-9.3a	unsup_rtlil_procedural_continuous_assignment	unsup	error	V2005	9.3		rtlil	codegen	0		a procedural continuous assignment	IEEE 1364-2005 9.3				
+E1262	unsup-V2005-9.5.1a	unsup_rtlil_casex_casez	unsup	error	V2005	9.5.1		rtlil	codegen	0		a casex or casez --emit-rtlil does not lower	IEEE 1364-2005 9.5.1				
+E1263	unsup-V2005-9.6a	unsup_rtlil_loop	unsup	error	V2005	9.6		rtlil	codegen	0		a loop --emit-rtlil does not lower	IEEE 1364-2005 9.6				
+E1264	unsup-V2005-9.7b	unsup_rtlil_nested_event_delay_control	unsup	error	V2005	9.7		rtlil	codegen	0		a nested event or delay control	IEEE 1364-2005 9.7				
+E1265	unsup-V2005-9.7.3b	unsup_rtlil_event_trigger	unsup	error	V2005	9.7.3		rtlil	codegen	0		an event trigger --emit-rtlil does not lower	IEEE 1364-2005 9.7.3				
+E1266	unsup-V2005-10.3a	unsup_rtlil_disable_statement	unsup	error	V2005	10.3		rtlil	codegen	0		a disable statement --emit-rtlil does not lower	IEEE 1364-2005 10.3				
+E1267	unsup-AMS-A.6.5a	unsup_rtlil_jump_statement	unsup	error	AMS	A.6.5		rtlil	codegen	0		a jump statement --emit-rtlil does not lower	A.6.5				
+E1268	unsup-AMS-5.6a	unsup_rtlil_analog_contribution	unsup	error	AMS	5.6		rtlil	codegen	0		an analog contribution --emit-rtlil does not lower	5.6				
+E1269	unsup-V2005-7.1.5a	unsup_rtlil_array_gate_instances	unsup	error	V2005	7.1.5		rtlil	codegen	0		an array of gate instances --emit-rtlil does not lower	IEEE 1364-2005 7.1.5				
+E1270	unsup-V2005-12.1.2a	unsup_rtlil_array_module_instances	unsup	error	V2005	12.1.2		rtlil	codegen	0		an array of module instances --emit-rtlil does not lower	IEEE 1364-2005 12.1.2				
+E1271	unsup-V2005-12.2.2.1a	unsup_rtlil_ordered_parameter_override_module	unsup	error	V2005	12.2.2.1		rtlil	codegen	0		an ordered parameter override of a module this source does not declare	IEEE 1364-2005 12.2.2.1				
+E1272	V2005-12.2.2.1a	ordered_parameter_overrides_module_declares	rule	error	V2005	12.2.2.1			codegen	0		more ordered parameter overrides than the module declares	IEEE 1364-2005 12.2.2.1	conflict: the digital engine warns and ignores (W1161) where --emit-rtlil refuses; rule the spec (12.2.2.1) once			
+E1273	unsup-V2005-12.2.2a	unsup_rtlil_parameter_override	unsup	error	V2005	12.2.2		rtlil	codegen	0		a parameter override --emit-rtlil cannot fold to an integer	IEEE 1364-2005 12.2.2				
+E1274	unsup-V2005-12.3.6a	unsup_rtlil_ordered_port_connection_module	unsup	error	V2005	12.3.6		rtlil	codegen	0		an ordered port connection to a module this source does not declare	IEEE 1364-2005 12.3.6				
+E1275	limit-rtlil-const-width	limit_rtlil_const_width	limit	error					codegen	0		a constant wider than --emit-rtlil's fold limit		lrm-empty (engine limit: correct)			
+E1276	limit-rtlil-fold-depth	limit_rtlil_fold_depth	limit	error					codegen	0		a constant expression nested deeper than --emit-rtlil's fold limit		lrm-empty (engine limit: correct)			
+E1277	limit-rtlil-stack	limit_rtlil_stack	limit	error					codegen	0		nesting deeper than the stack --emit-rtlil reserved		lrm-empty (engine limit: correct)			
+E1278	limit-rtlil-concat-width	limit_rtlil_concat_width	limit	error	V2005	5.1.14			codegen	0		a concatenation wider than --emit-rtlil's constant limit	IEEE 1364-2005 5.1.14				
+W1050	lint-param-no-value	lint_param_no_value	lint	warning	AMS	3.4.1			codegen	0		parameter default has no compile-time value	3.4.1				
+W0950	lint-resolution-rules	lint_resolution_rules	lint	warning	AMS	7.7.2.1			elab	0		multiple discipline resolution rules match	7.7.2.1				
+W0951	AMS-E.3.3a	verilog_ams_definition_shadows_spice	rule	warning	AMS	E.3.3			elab	3	tests/spice/spice_module_shadow_warning.va	a Verilog-AMS definition shadows a SPICE model or subcircuit	E.3.3				
+E0952	unsup-AMS-E.1.2a	unsup_spice_model_names_primitive_vera	unsup	error	AMS	E.1.2			elab	1	tests/spice/spice_unsupported_model_type_rejected.va	a SPICE model names a primitive VerA does not support	E.1.2				
+E0953	unsup-AMS-E.2a	unsup_spice_device_card_s_model	unsup	error	AMS	E.2			preprocess	1	tests/spice/reject_spice_fet_card_model_has_no_behaviour.va	a SPICE device card's model is a primitive with no behaviour	E.2		quote-in-clause scan points at E.1.2		
+E0820	AMS-9.17.1c	discontinuity_degree_must_nonnegative_1	rule	error	AMS	9.17.1			sema	2	tests/verilog-a/ch04_expressions/discontinuity_string_degree_rejected.va	$discontinuity degree must be nonnegative or -1	9.17.1				
+E0821	AMS-9.2b	system_task_not_supported_digital	rule	error	AMS	9.2			sema	2	tests/verilog-ams/ch09_system_tasks/kernel_control_in_digital_context_rejected.va	system task is not supported in the digital context	9.2				
+E0822	AMS-9.19a	binding_detection_argument_wrong_kind	rule	error	AMS	9.19			sema	2	tests/verilog-a/ch06_hierarchy/param_given_of_a_variable_rejected.va	binding detection argument is the wrong kind of name	9.19				
+E0824	AMS-9.7.3a	fatal_finish_number_not_0	rule	error	AMS	9.7.3			sema	0		$fatal finish_number is not 0, 1 or 2	9.7.3				
+E0918	AMS-6.5.3a	wreal_net_has_driver	rule	error	AMS	6.5.3			astgen	2	tests/verilog-ams/ch06_hierarchy/wreal_net_with_two_drivers_rejected.va	a wreal net has more than one driver	6.5.3		quote-in-clause scan points at 3.7		
+E0919	AMS-3.7a	wreal_net_connected_incompatible_net	rule	error	AMS	3.7			elab	3	tests/verilog-ams/ch03_data_types/wreal_connected_to_wand_rejected.va	a wreal net is connected to an incompatible net type	3.7				
+E0920	E0920	E0920	retired	error					elab	0		(retired)					
+E0921	AMS-3.4.4a	parameter_array_value_not_size	rule	error	AMS	3.4.4			elab	3	tests/verilog-a/ch03_data_types/parameter_array_long_override_rejected.va	parameter array value is not the size its range declares	3.4.4				
+E0922	AMS-7.8.4a	mixed_port_matches_connect_statement	rule	error	AMS	7.8.4			elab	3	tests/verilog-ams/annex_f_resolution/unknown_discipline_mixed_port.va	a mixed port matches more than one connect statement	7.8.4				
+E0923	AMS-7.8a	connect_statement_s_disciplines_not	rule	error	AMS	7.8			elab	2	tests/verilog-ams/ch07_mixed_signal/connect_override_names_no_discipline_rejected.va	a connect statement's disciplines are not one discrete and one continuous	7.8				
+E0924	AMS-6.7.1b	parameter_declaration_makes_out_module	rule	error	AMS	6.7.1			sema	1	tests/verilog-a/ch06_hierarchy/oomr_in_parameter_declaration_rejected.va	parameter declaration makes an out-of-module reference	6.7.1				
+E0925	AMS-6.5.7.1a	port_connected_net_differ_width	rule	error	AMS	6.5.7.1			sema	3	tests/verilog-a/ch06_hierarchy/port_part_select_on_a_scalar_port_rejected.va	port and connected net differ in width	6.5.7.1				
+E0926	AMS-6.4a	defparam_paramset_instance_hierarchy	rule	error	AMS	6.4			sema	6	tests/verilog-a/ch06_hierarchy/paramset_defparam_chain_rejected.va	defparam in a paramset instance hierarchy	6.4				
+E0927	AMS-7.8.4b	mixed_port_matches_no_connect	rule	error	AMS	7.8.4			elab	2	tests/verilog-ams/ch03_data_types/mixed_port_without_connect_statement_rejected.va	a mixed port matches no connect statement	7.8.4				
+E0928	unsup-AMS-E.1.2b	unsup_spice_card_inside_subckt_outside	unsup	error	AMS	E.1.2			preprocess	8	tests/spice/reject_spice_binned_model.va	a SPICE card inside a .SUBCKT is outside VerA's SPICE subset	E.1.2				
+E0929	unsup-AMS-7.8.4a	unsup_mixed_port_s_connect_module	unsup	error	AMS	7.8.4			elab	1	tests/verilog-ams/ch07_mixed_signal/prim_connect_vector_terminal_rejected.va	a mixed port's connect module cannot be inserted	7.8.4				
+E0930	E0930	E0930	retired	error					elab	0		(retired)					
+E0960	AMS-3.9a	digital_primitive_continuous_net_no	rule	error	AMS	3.9			sema	1	tests/verilog-ams/ch03_data_types/digital_primitive_on_mixed_net_rejected.va	a digital primitive on a continuous net with no default discipline	3.9				
+E0982	AMS-7.6a	connect_module_port_directions_not	rule	error	AMS	7.6			elab	1	tests/verilog-ams/ch07_mixed_signal/connect_directions_not_table_7_2_rejected.va	connect module port directions are not a Table 7-2 combination	7.6				
+E0997	unsup-AMS-5.4.3a	unsup_hierarchical_port_access_vera_cannot	unsup	error	AMS	5.4.3			sema	3	tests/verilog-a/ch05_analog_behavior/port_access_hierarchical_potential_source_rejected.va	a hierarchical port access VerA cannot sum	5.4.3				
+E0998	AMS-6.6.2a	hierarchical_name_reaches_into_unnamed	rule	error	AMS	6.6.2			sema	2	tests/verilog-a/ch06_hierarchy/external_genblk_reference_unsupported.va	a hierarchical name reaches into an unnamed generate block	6.6.2				
+E0482	AMS-A.6.2b	procedural_assignment_writes_variable_not	rule	error	AMS	A.6.2			sema	3	tests/verilog-ams/ch08_scheduling/blocking_assignment_to_a_net_rejected.va	a procedural assignment writes a variable, not a net	A.6.2				
+E0483	AMS-A.3.3a	switch_terminal_net_not_variable	rule	error	AMS	A.3.3			sema	1	tests/verilog-ams/ch08_scheduling/switch_terminal_is_a_variable_rejected.va	a switch terminal is a net, not a variable	A.3.3				
+E0484	AMS-8.5.1a	a2d_event_must_analog_event	rule	error	AMS	8.5.1			sema	2	tests/verilog-ams/ch07_mixed_signal/free_variable_in_digital_event_control_rejected.va	an A2D event must be an analog event control	8.5.1		quote-in-clause scan points at 7.3.6.1?		
+E0485	E0485	E0485	retired	error					sema	0		(retired)					
+E0486	AMS-6.6.1f	genvar_set_x_z	rule	error	AMS	6.6.1			sema	0		genvar set to x or z	6.6.1				
+E0887	AMS-9.5a	wrong_number_arguments_system_task	rule	error	AMS	9.5			sema	6	tests/verilog-a/ch09_system_tasks/fclose_two_descriptors_rejected.va	wrong number of arguments to a system task or function	9.5				
+E0888	AMS-9.5.2a	descriptor_argument_not_integer	rule	error	AMS	9.5.2			sema	2	tests/verilog-a/ch09_system_tasks/file_output_real_descriptor_rejected.va	descriptor argument is not an integer	9.5.2				
+E0889	AMS-9.5.1a	fopen_type_not_table_9	rule	error	AMS	9.5.1			sema	1	tests/verilog-a/ch09_system_tasks/fopen_type_not_in_table_9_24_rejected.va	$fopen type is not one of Table 9-24's forms	9.5.1				
+E0890	AMS-9.18a	hierarchical_system_parameter_outside_allowed	rule	error	AMS	9.18			elab	5	tests/verilog-a/ch09_system_tasks/geometry_angle_negative_rejected.va	hierarchical system parameter outside its allowed values	9.18				
+E0891	AMS-9.17.3c	limit_argument_not_form_syntax	rule	error	AMS	9.17.3			sema	2	tests/verilog-a/ch09_system_tasks/limit_numeric_algorithm_rejected.va	$limit argument is not the form Syntax 9-12 requires	9.17.3				
+E0892	AMS-9.14a	clog2_requires_integer_vector_argument	rule	error	AMS	9.14			sema	2	tests/verilog-a/ch09_system_tasks/reject_clog2_real.va	$clog2 requires an integer or vector argument	9.14				
+E0893	unsup-AMS-9.14a	unsup_analog_clog2_cannot_recover_wide	unsup	error	AMS	9.14			sema	3	tests/verilog-a/ch09_system_tasks/reject_clog2_wide_arithmetic.va	analog $clog2 cannot recover this wide operand's high bits	9.14				
+E0894	AMS-A.8.2c	omitted_argument_element_has_no	rule	error	AMS	A.8.2			sema	2	tests/verilog-a/annex_a_syntax/pattern_empty_element_rejected.va	an omitted argument or element has no value here	A.8.2				
+W0853	unsup-AMS-9.17.3a	unsup_limit_not_applied_call	unsup	warning	AMS	9.17.3			codegen	6	tests/spice/limit_pnjlimds_dangling_returns_probe.va	$limit is not applied at this call	9.17.3				
+W0854	unsup-AMS-9.17.3b	unsup_limit_seed_not_applied_here	unsup	warning	AMS	9.17.3			codegen	1	tests/spice/limit_seed_explicit_beats_default.va	$limit seed is not applied here	9.17.3				
+E0823	unsup-AMS-9.16a	unsup_simprobe_name_known_only_run	unsup	error	AMS	9.16			sema	1	tests/verilog-a/ch09_system_tasks/reject_simprobe_runtime_name.va	$simprobe name known only at run time, with no fallback	9.16				
+E1099	unsup-osdi-reject-step	unsup_osdi_reject_step	unsup	error				osdi	codegen	0		`--emit-osdi` cannot carry `$vera_reject_step`		lrm-empty: OSDI 0.4 has no reject-step callback; slug key			
+W1098	unsup-AMS-4.6.4.6a	unsup_osdi_emit_osdi_reports_correlated	unsup	warning	AMS	4.6.4.6		osdi	codegen	0		`--emit-osdi` reports correlated noise rows as independent sources	4.6.4.6				
+W1051	unsup-AMS-4.5.7a	unsup_absdelay_history_thinned_cover_delay	unsup	warning	AMS	4.5.7			run	0		absdelay history thinned to cover its delay	4.5.7				
+E0825	AMS-9.4.3c	flag_format_conversion_has_no	rule	error	AMS	9.4.3			run	1	tests/verilog-a/ch09_system_tasks/hash_flag_without_alternative_form_rejected.va	'#' flag on a format conversion that has no alternative form	9.4.3				
+E0826	AMS-9.4.2a	flag_width_precision_written	rule	error	AMS	9.4.2			run	2	tests/verilog-a/ch09_system_tasks/percent_escape_with_width_rejected.va	a flag, width or precision written on `%%`	9.4.2		quote-in-clause scan points at 9.4.3		
+E0827	AMS-9.4.7a	c_format_flag_digital_context	rule	error	AMS	9.4.7			run	1	tests/verilog/17_system_tasks/c_flag_on_integer_rejected.v	a C format flag on a digital-context conversion that is not a real one	9.4.7		quote-in-clause scan points at V2005 17.1.1.2		
+E0828	limit-format-width	limit_format_width	limit	error	AMS	9.4.3			sema	1	tests/verilog-a/ch09_system_tasks/format_field_past_its_limit_rejected.va	a format field width or precision past VerA's limit	9.4.3				
+E0829	unsup-AMS-9.2a	unsup_system_function_not_run_vera	unsup	error	AMS	9.2			sema	1	tests/verilog-ams/digital/vams_digital_temperature_refused.v	system function not run by VerA's digital engine	9.2				

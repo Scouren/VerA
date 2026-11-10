@@ -31,6 +31,7 @@ const stamps = @import("stamps.zig");
 const state = @import("state.zig");
 const calls = @import("calls.zig");
 const say = @import("say.zig");
+const ops = @import("ops.zig");
 const Device = Air.Device;
 const Real = Function.Real;
 
@@ -67,6 +68,8 @@ ddx_reads: Liveness.Mask = 0,
 /// Per §9.21.1 snapshot site (a `$table_model` call's `site - 1`): its
 /// sample count, the length of `Instance.table_<k>` (`state.plan`).
 table_len: []u32 = &.{},
+/// §4.5 the operator call sites (`ops.plan`).
+op_sites: []const ops.Site = &.{},
 
 /// A parameter with no `given__` bit.
 pub const no_bit: u32 = std.math.maxInt(u32);
@@ -94,7 +97,7 @@ const fast =
     \\    const f = @call(.always_inline, core, .{ S.Fast, .optimized, D.zProbe(S.Fast, x), model, inst, sim });
     \\    const info = @typeInfo(Core(S)).@"struct";
     \\    var out: Core(S) = undefined;
-    \\    inline for (info.field_names, info.field_types) |name, T| @field(out, name) = if (T == i64) @field(f, name) else S.fromFast(@field(f, name));
+    \\    inline for (info.field_names, info.field_types) |name, T| @field(out, name) = if (T == i64 or T == f64) @field(f, name) else S.fromFast(@field(f, name));
     \\    return out;
     \\}
     \\
@@ -148,6 +151,7 @@ pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     const p = try stamps.plan(dg);
     try dg.givenBits();
     try state.plan(dg);
+    try ops.plan(dg);
 
     // The body first: its uses decide `core`'s signature.
     var body: std.Io.Writer.Allocating = .init(dg.arena);
@@ -178,6 +182,7 @@ pub fn genReturn(dg: *DeclGen, f: *Function) Error!void {
     for (d.charge_sites.items(.slot), 0..) |slot, k| try dg.print(f.w, " .c{d} = s{d},", .{ k, @backingInt(slot) });
     for (dg.held_field, 0..) |h, i| if (h != null) try dg.print(f.w, " .h{d} = s{d},", .{ i, i });
     for (d.limit_slots.items(.slot), 0..) |slot, k| try dg.print(f.w, " .l{d} = s{d},", .{ k, @backingInt(slot) });
+    try ops.genReturn(dg, f.w);
     try dg.print(f.w, " }};", .{});
 }
 
@@ -375,7 +380,7 @@ fn genCore(dg: *DeclGen, w: *std.Io.Writer, uses: Function.Uses, body: []const u
     var reals = d.charge_sites.len;
     for (dg.held_field, 0..) |h, i| reals += @intFromBool(h != null and dg.air.instructions.items(.data)[i].ty == InternPool.Index.real_type);
     for (d.contributions.items(.resist)) |slot| reals += @intFromBool(dg.live.assigned[@backingInt(slot)]);
-    reals += d.limit_slots.len;
+    reals += d.limit_slots.len + dg.op_sites.len;
     try dg.print(w, "\nfn Core(comptime S: type) type {{\n    {s}return struct {{", .{if (reals == 0) "_ = S;\n    " else ""});
     for (d.contributions.items(.resist), 0..) |slot, k| if (dg.live.assigned[@backingInt(slot)]) try dg.print(w, " r{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
     for (d.charge_sites.items(.slot), 0..) |slot, k| try dg.print(w, " c{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
@@ -383,15 +388,19 @@ fn genCore(dg: *DeclGen, w: *std.Io.Writer, uses: Function.Uses, body: []const u
         if (dg.air.instructions.items(.data)[i].ty == InternPool.Index.real_type) try dg.print(w, " h{d}: F.zOf(S, 0x{x}),", .{ i, dg.live.masks[i] }) else try dg.print(w, " h{d}: i64,", .{i});
     };
     for (d.limit_slots.items(.slot), 0..) |slot, k| try dg.print(w, " l{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
+    try ops.genCoreFields(dg, w);
     try dg.print(w, " }};\n}}\n", .{});
     // §9.21.1 every evaluation starts from the snapshots an accepted point kept.
     const tables = dg.table_len.len != 0;
-    try dg.print(w, "\n/// The whole analog body, once per evaluation.\nfn core(comptime S: type, comptime mode: std.builtin.FloatMode, {s}: D.zX(S), {s}: *const Model, {s}: InstancePtr, {s}: contract.SimState) Core(S) {{\n    @setFloatMode(mode);{s}{s}\n}}\n", .{
+    var decls: std.Io.Writer.Allocating = .init(dg.arena);
+    try ops.genDecls(dg, &decls.writer);
+    try dg.print(w, "\n/// The whole analog body, once per evaluation.\nfn core(comptime S: type, comptime mode: std.builtin.FloatMode, {s}: D.zX(S), {s}: *const Model, {s}: InstancePtr, {s}: contract.SimState) Core(S) {{\n    @setFloatMode(mode);{s}{s}{s}\n}}\n", .{
         if (uses.x) "x" else "_",
         if (uses.model) "model" else "_",
         if (uses.inst or tables) "inst" else "_",
         if (uses.sim) "sim" else "_",
         if (tables) "\n    inst.table_ready = inst.table_kept;" else "",
+        decls.written(),
         body,
     });
     const guards_opt = try dg.box();

@@ -19,6 +19,7 @@ const SysFn = @import("vams").SysFn;
 const DeclGen = @import("DeclGen.zig");
 const Function = @import("Function.zig");
 const state = @import("state.zig");
+const ops = @import("ops.zig");
 const Liveness = @import("Liveness.zig");
 const Real = Function.Real;
 const Ref = Air.Inst.Ref;
@@ -174,6 +175,11 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Ref
         },
         // §9.21 a table lookup (`K.table.zTable`), the old `emitTable`.
         .@"$table_model" => try table(f, inst, args),
+        // §4.5.5/§4.5.8-§4.5.10 an operator over its `Instance` state (`ops.zig`).
+        .transition => try ops.gen(f, inst, .transition, args),
+        .slew => try ops.gen(f, inst, .slew, args),
+        .idtmod => try ops.gen(f, inst, .idtmod, args),
+        .last_crossing => try ops.gen(f, inst, .last_crossing, args),
         else => {
             // rw-lower's `display$phase` guards a print's operands: `core`
             // drops prints, so it answers 0, and `say` 1. By name, so this

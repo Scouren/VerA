@@ -154,9 +154,10 @@ pub fn maskOf(l: Liveness, ref: Inst.Ref) Mask {
 
 /// Whether an instruction runs for what it does, not for its value: control,
 /// an assignment, a call that changes what a later evaluation sees (a §9.13
-/// draw, a §9.5 file task). A §9.4 print or §9.7 control task runs in the
-/// device's display phase, and an operator's history moves in
-/// `updateState`, so neither runs in `core` for its own sake.
+/// draw, a §9.5 file task, a §4.5 operator `ops.zig` keeps, whose input
+/// `updateState` reads from `core` even where only a print reads its
+/// value). A §9.4 print or §9.7 control task runs in the device's display
+/// phase, so it does not run in `core` for its own sake.
 pub fn effect(air: Air, tag: Inst.Tag, data: Inst.Data) bool {
     return switch (tag) {
         .block, .loop, .cond_br, .br, .repeat, .ret, .assign => true,
@@ -164,7 +165,9 @@ pub fn effect(air: Air, tag: Inst.Tag, data: Inst.Data) bool {
             const callee = air.extraData(Air.Call, data.ty_pl.payload).data.callee;
             // A user system task (§12, no `SysFn` row) runs in the display phase too.
             if (callee > std.math.maxInt(@typeInfo(SysFn.Tag).@"enum".tag_type)) return false;
-            return switch (SysFn.get(@fromBackingInt(@intCast(callee))).family) {
+            const fn_tag: SysFn.Tag = @fromBackingInt(@intCast(callee));
+            if (fn_tag == .transition or fn_tag == .slew or fn_tag == .idtmod or fn_tag == .last_crossing) return true;
+            return switch (SysFn.get(fn_tag).family) {
                 .random, .file_out, .file_func => true,
                 else => false, // else: a value, or a task of another phase
             };

@@ -34,8 +34,6 @@ verilog-a/ch04_expressions/filter_null_zeros_argument.va codegen: a call of `lap
 verilog-a/ch04_expressions/idt_assert_release_resumes.va codegen: a call of `idt$hold`
 verilog-a/ch04_expressions/idt_hold_revert.va codegen: a call of `idt$hold`
 verilog-a/ch04_expressions/idt_reset_rejected.va codegen: a call of `idt$hold`
-verilog-a/ch04_expressions/idtmod_ic_forces_dc_solution.va codegen: a call of `idtmod`
-verilog-a/ch04_expressions/idtmod_offset_window_negative_integrand.va codegen: a call of `idtmod`
 verilog-a/ch04_expressions/laplace_ac_response.va codegen: a call of `laplace_nd`
 verilog-a/ch04_expressions/laplace_filters.va codegen: a call of `laplace_zp`
 verilog-a/ch04_expressions/laplace_nd_dc_gain.va codegen: a call of `laplace_nd`
@@ -47,21 +45,7 @@ verilog-a/ch04_expressions/laplace_transcendental_coefficient.va codegen: a call
 verilog-a/ch04_expressions/laplace_zd_conjugate_zeros.va codegen: a call of `laplace_zd`
 verilog-a/ch04_expressions/laplace_zp_dynamic_pole_sampled.va codegen: a call of `laplace_zp`
 verilog-a/ch04_expressions/laplace_zp_lrm_example.va codegen: a call of `laplace_zp`
-verilog-a/ch04_expressions/last_crossing.va codegen: a call of `last_crossing`
-verilog-a/ch04_expressions/last_crossing_in_creating_step.va codegen: a call of `last_crossing`
-verilog-a/ch04_expressions/operator_under_constant_condition.va codegen: a call of `transition`
 verilog-a/ch04_expressions/rc_88_operator_outside_event.va codegen: a call of `cross`
-verilog-a/ch04_expressions/rollback_a04_rollback_ops.va codegen: a call of `slew`
-verilog-a/ch04_expressions/slew.va codegen: a call of `slew`
-verilog-a/ch04_expressions/slew_small_signal.va codegen: a call of `slew`
-verilog-a/ch04_expressions/transition.va codegen: a call of `transition`
-verilog-a/ch04_expressions/transition_interrupted_falling_higher.va codegen: a call of `transition`
-verilog-a/ch04_expressions/transition_interrupted_falling_lower.va codegen: a call of `transition`
-verilog-a/ch04_expressions/transition_interrupted_rising.va codegen: a call of `transition`
-verilog-a/ch04_expressions/transition_interrupted_rising_higher.va codegen: a call of `transition`
-verilog-a/ch04_expressions/transition_resolution.va codegen: a call of `transition`
-verilog-a/ch04_expressions/transition_simulator_default.va codegen: a call of `transition`
-verilog-a/ch04_expressions/transition_transport_delay.va codegen: a call of `transition`
 verilog-a/ch04_expressions/z_transform_filters.va codegen: a call of `zi_nd`
 verilog-a/ch04_expressions/zi_ac_response.va codegen: a call of `zi_nd`
 verilog-a/ch04_expressions/zi_dc_gains.va codegen: a call of `zi_zp`
@@ -173,7 +157,6 @@ verilog-a/ch09_system_tasks/simparam_newton_tolerances_host_written.va codegen: 
 verilog-a/ch09_system_tasks/test_plusargs.va codegen: a call of `$test$plusargs`
 verilog-a/ch09_system_tasks/top_port_connected_controls_ddt.va codegen: a call of `$port_connected`
 verilog-a/ch09_system_tasks/value_plusargs.va codegen: a call of `$value$plusargs`
-verilog-a/ch10_directives/default_transition_ramp.va codegen: a call of `transition`
 verilog-a/combined/optional_port_environment.va codegen: a call of `$port_connected`
 verilog-a/combined/optional_port_hierarchy.va codegen: a call of `$port_connected`
 verilog-a/combined/parameter_binding_environment.va codegen: a call of `$port_connected`
@@ -183,9 +166,6 @@ verilog-a/exhaustive/timer_breakpoint_one_shot.va codegen: a call of `timer`
 verilog-a/exhaustive/timer_breakpoint_periodic.va codegen: a call of `timer`
 verilog-a/exhaustive/zi_sample_hold.va codegen: a call of `zi_nd`
 verilog-ams/ch03_data_types/operator_equation_tolerances.va codegen: a call of `idt$hold`
-verilog-ams/ch04_expressions/slew_small_signal.va codegen: a call of `slew`
-verilog-ams/ch04_expressions/transition_resolution.va codegen: a call of `transition`
-verilog-ams/ch04_expressions/transition_simulator_default.va codegen: a call of `transition`
 verilog-ams/ch05_analog_behavior/analog_initial.va codegen: a call of `analog$initial`
 verilog-ams/ch05_analog_behavior/timer_body_clog2_controls.va codegen: a call of `timer`
 verilog-ams/ch05_analog_behavior/timer_body_controls.va codegen: a call of `timer`
@@ -303,7 +283,6 @@ verilog-a/ch09_system_tasks/limit_user_function.va the new device does not build
 verilog-a/ch09_system_tasks/limit_user_function_multiple_sites.va the new device does not build: n21.zig:303: unused function parameter
 verilog-a/ch09_system_tasks/limit_user_function_previous_iterate.va the new device does not build: n22.zig:177: unused function parameter
 verilog-a/ch09_system_tasks/limit_with_derivative.va the new device does not build: n0.zig:260: unused function parameter
-verilog-a/ch09_system_tasks/port_connected_controls_analog_operator.va codegen: a call of `transition`
 verilog-a/ch09_system_tasks/simprobe_string_parameter_name_resolves.va codegen: a call of a user function (callee 4294967295)
 verilog-a/ch09_system_tasks/status_ops.va codegen: a call of `analog$initial`
 verilog-a/ch09_system_tasks/table_capture_rejected_step_recaptures.va codegen: a call of `above`
@@ -429,8 +408,6 @@ verilog-ams/ch09_system_tasks/diagnostic_info_initial.va codegen: a call of `ana
 verilog-ams/ch09_system_tasks/driver_strength_next_strength_type.va codegen: a flow contribution to a potential source's branch
 verilog-ams/ch09_system_tasks/finish_in_analog_initial_skips_simulation.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/receiver_segregation_ignored_without_driver_value.va codegen: a flow contribution to a potential source's branch
-verilog-a/annex_g_change_history/transition_fall_time_binding.va codegen: a call of `transition`
-verilog-a/annex_g_change_history/transition_time_tolerance.va codegen: a call of `transition`
 verilog-a/ch02_lexical/octal_escape_377_largest_byte.va codegen: a real operand that is not a number
 verilog-a/ch02_lexical/octal_escape_boundaries.va codegen: a real operand that is not a number
 verilog-a/ch02_lexical/string_bytes_above_7f.va codegen: a real operand that is not a number
@@ -444,21 +421,12 @@ verilog-a/ch04_expressions/absdelay_initial_output_is_input_at_zero.va codegen: 
 verilog-a/ch04_expressions/absdelay_linear_interpolation.va codegen: a call of `absdelay`
 verilog-a/ch04_expressions/absdelay_maxdelay_sizes_history.va codegen: a call of `absdelay`
 verilog-a/ch04_expressions/dynamic_constant_argument_resampled_per_analysis.va codegen: a call of `absdelay`
-verilog-a/ch04_expressions/idtmod_one_argument_starts_at_zero.va codegen: a call of `idtmod`
 verilog-a/ch04_expressions/laplace_nd_pole_at_origin.va codegen: a call of `laplace_nd`
-verilog-a/ch04_expressions/slew_small_signal_transfer.va codegen: a call of `slew`
-verilog-a/ch04_expressions/transition_default_td_and_fall_time.va codegen: a call of `transition`
 verilog-a/ch04_expressions/zi_nd_dynamic_coefficient_sampled.va codegen: a call of `zi_nd`
 verilog-a/ch05_analog_behavior/simparam_str_hierarchy_names.va codegen: a call of `$simparam$str`
-verilog-a/ch10_directives/default_transition.va codegen: a call of `transition`
-verilog-a/ch10_directives/default_transition_rise_only_sets_fall.va codegen: a call of `transition`
-verilog-a/ch10_directives/default_transition_supersedes.va codegen: a call of `transition`
-verilog-a/ch10_directives/transition_arguments_override_default.va codegen: a call of `transition`
-verilog-a/ch10_directives/transition_without_default.va codegen: a call of `transition`
 verilog-a/exhaustive/absdelay.va codegen: a call of `absdelay`
-verilog-a/exhaustive/last_crossing_direction.va codegen: a call of `last_crossing`
-verilog-a/exhaustive/slew.va codegen: a call of `slew`
-verilog-a/exhaustive/transition.va codegen: a call of `transition`
+verilog-a/annex_g_change_history/analog_function_keyword.va point 0: display record value 9: old 5e-1, versioned 1e0
+verilog-a/ch03_data_types/derived_nature_from_discipline.va point 0: display record value 5: old 1e-5, versioned 1e-6
 verilog-a/ch03_data_types/dynamic_multidim_guards.va point 0: display record value 13: old 9.6e1, versioned 0e0
 verilog-a/ch03_data_types/vera_scratch_uninit_tape.va point 0: display record value 21: old 9e0, new 0e0
 verilog-a/ch04_expressions/abs.va point 0: display record value 9: old 0e0, new -0e0

@@ -587,6 +587,8 @@ fn genCall(f: *Function, inst: Inst.Index, data: Inst.Data) Error!void {
     try f.print("const v{d} = ", .{@backingInt(inst)});
     try calls.gen(f, inst, tag, args);
     try f.print(";", .{});
+    // An effect whose value nothing reads (an operator only a print reads).
+    if (!used) try f.print(" _ = v{d};", .{@backingInt(inst)});
 }
 
 /// Writes `M.<name>` over one scalar type at mask `m` (`F.zL(S, m)`), each

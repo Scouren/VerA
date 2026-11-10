@@ -399,6 +399,12 @@ test "IEEE 1364-2005 §12.2.1 a one-name defparam naming nothing is E0901, one r
     try expectCodes("module m; m1 n(); endmodule module m1; parameter p = 2; defparam m.n.p = 1; endmodule", v, &.{});
 }
 
+test "§6.4.1 a paramset statement reaches out of module only to a localparam (E0907)" {
+    const src = "module base; parameter real k = 0; endmodule\nmodule lib; parameter real tox = 3; localparam real lox = 4; endmodule\n";
+    try expectCodes(src ++ "paramset ps base; parameter real w = 1; .k = lib.tox * w; endparamset\nmodule top; ps u(); endmodule", .{}, &.{.E0907});
+    try expectCodes(src ++ "paramset ps base; parameter real w = 1; .k = lib.lox * w; endparamset\nmodule top; ps u(); endmodule", .{}, &.{});
+}
+
 test "Annex F.2.1 step 3 an out-of-context declaration overrides a net's discipline: twice for one segment is E0902, an incompatible override E0375" {
     const prelude =
         \\nature V; units = "V"; access = V; endnature

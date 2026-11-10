@@ -508,7 +508,7 @@ fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i:
         const params = vir.list(Inst.Arg, in.params);
         // §2.6.2: a scale factor is a real literal's, and a digital delay
         // is no real.
-        if (in.flags.scaled) try s.fail(.E0247, file, i.toRef(), "a scaled literal in `{s}`'s UDP delay", .{vir.string(in.target)});
+        if (in.flags.scaled) try s.failRule(.{ .part = .scaled }, .E0247, file, i.toRef(), "a scaled literal in `{s}`'s UDP delay", .{vir.string(in.target)});
         if (params.len > 2 or (params.len != 0 and params[0].name != .empty))
             try s.failRule(.{ .rule = .udp_delay }, .E0239, file, i.toRef(), "`{s} #(…) {s}`: {d} value(s)", .{ vir.string(in.target), vir.string(in.name), params.len })
         else

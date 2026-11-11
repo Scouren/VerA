@@ -105,13 +105,16 @@ pub fn genBody(f: *Function, body: []const Inst.Index) Error!void {
 /// derived parameter's default, which reads only `arg`s, constants, pure
 /// operations, a `block`/`cond_br`/`br` (§4.2.12's ternary, `&&`/`||`,
 /// rendered as a labelled block, each nested body its own statement list)
-/// and a `$simparam` of a `calls.zig` `host_params` name (W11, R17).
+/// and a `$simparam` of any name but `"iteration"`/`"dt"` (W11, R17).
 /// Returns how many `const` it wrote.
 pub fn genTree(f: *Function, ref: Ref) Error!u32 {
     const root = ref.toIndex() orelse return 0;
     const rendered = try f.dg.arena.alloc(bool, f.dg.air.instructions.len);
     @memset(rendered, false);
     var n: u32 = 0;
+    const seen = try f.dg.arena.alloc(bool, f.dg.air.instructions.len);
+    @memset(seen, false);
+    try hoistArgs(f, root, seen, rendered, &n);
     try treeInst(f, root, rendered, &n);
     return n;
 }
@@ -187,6 +190,50 @@ pub fn kernel(f: *Function, m: Liveness.Mask, name: []const u8, ops: []const Ref
 }
 
 // ---- private ----
+
+/// `genTree`'s own pre-pass: every `arg` instruction `i` can reach is
+/// rendered here, outside any `block`/`cond_br`, before `treeInst` walks
+/// the tree for real. A row's derive reads another row (its own `arg`,
+/// `s.param_args`'s one Air instruction per row, shared by every read of
+/// that parameter or localparam, never one per occurrence) from wherever
+/// the expression names it; two of `||`'s/`&&`'s alternatives can each
+/// name the same one (`dependent_control_rg.va`'s `ok`: both of `||`'s
+/// right-hand alternatives read `r`). `treeInst`'s own `rendered`-gated
+/// walk would otherwise declare it inside whichever branch's `{}` it
+/// reaches first, leaving a later, sibling branch's read of the same
+/// instruction an undeclared identifier. `seen` is this walk's own
+/// dedup (never `rendered`: a non-`arg` instruction it only looks
+/// through must still be rendered for real, in place, by `treeInst`).
+fn hoistArgs(f: *Function, i: Inst.Index, seen: []bool, rendered: []bool, n: *u32) Error!void {
+    const idx = @backingInt(i);
+    if (seen[idx]) return;
+    seen[idx] = true;
+    const air = f.dg.air;
+    const tag = air.instructions.items(.tag)[idx];
+    const data = air.instructions.items(.data)[idx];
+    if (tag == .arg) {
+        rendered[idx] = true;
+        try f.line();
+        try f.print("const v{d} = ", .{idx});
+        try f.genValue(i, tag, data);
+        try f.print(";", .{});
+        n.* += 1;
+        return;
+    }
+    if (tag == .block) {
+        const x = air.extraData(Air.Block, data.ty_pl.payload);
+        for (air.body(x.end, x.data.body_len)) |bi| try hoistArgs(f, bi, seen, rendered, n);
+        return;
+    }
+    var ops: Liveness.Operands = .{};
+    ops.collect(air.*, tag, data);
+    for (ops.slice()) |o| if (o.toIndex()) |oi| try hoistArgs(f, oi, seen, rendered, n);
+    if (tag == .cond_br) {
+        const x = air.extraData(Air.CondBr, data.pl_op.payload);
+        for (air.body(x.end, x.data.then_body_len)) |bi| try hoistArgs(f, bi, seen, rendered, n);
+        for (air.body(x.end + x.data.then_body_len, x.data.else_body_len)) |bi| try hoistArgs(f, bi, seen, rendered, n);
+    }
+}
 
 /// `genTree`'s own recursive renderer (never `genInst`/`genBody`: those
 /// gate a value's `const v<i> = ...;` on `live.used`, computed for `core`

@@ -8,7 +8,8 @@
 //! `Compilation.outputs`.
 //!
 //! Cites: VAMS-2023 §10 (`include, `define), annex E.2 (the netlist);
-//! IEEE 1364-2005 §13.4.1 (the units' order), §28 (`--protect-keys`).
+//! IEEE 1364-2005 §13.4.1 (the units' order), §13.2/§13.5.1/§13.7.1
+//! (library maps, `-L`, the search order), §28 (`--protect-keys`).
 //!
 //! Contents:
 //! - `pub fn readInputs(comp: *Compilation) !bool`
@@ -28,6 +29,7 @@ const InternPool = @import("intern_pool");
 const bench = @import("codegen").bench;
 const Compilation = @import("../Compilation.zig");
 const errors = @import("errors.zig");
+const libmap = @import("libmap.zig");
 const Zcu = sema.Zcu;
 
 /// Most file requests one reader raises before the compilation gives up
@@ -40,19 +42,32 @@ const netlist_unit = "spice_netlist.vams";
 
 /// Reads every input and the `--protect-keys` file. A source that cannot
 /// be read is the old driver's line and status: 2 for the compiled one,
-/// 1 for a `.v` library unit after it.
+/// 1 for a `.v` library unit after it. IEEE 1364-2005 §13.2: with a
+/// `--libmap` or `-L`, `libraries` places every path and resolves the
+/// search order between the first path and the rest, as the old driver
+/// read them in that order too.
 pub fn readInputs(comp: *Compilation) !bool {
     const c = comp.config;
     assert(c.paths.len != 0);
-    if (c.libmaps.len != 0 or c.search.len != 0) {
-        try notBuilt(comp, .libmap, "--libmap and -L (IEEE 1364-2005 §13.2 library maps)");
-        return false;
+    switch (try comp.read(c.paths[0])) {
+        .bytes => {},
+        .failed => |e| {
+            try readFailed(comp, c.paths[0], e);
+            comp.outputs.status = 2;
+            return false;
+        },
     }
-    for (c.paths, 0..) |p, k| switch (try comp.read(p)) {
+    if (c.libmaps.len != 0 or c.search.len != 0) {
+        if (!try libraries(comp)) {
+            comp.outputs.status = 1;
+            return false;
+        }
+    }
+    for (c.paths[1..]) |p| switch (try comp.read(p)) {
         .bytes => {},
         .failed => |e| {
             try readFailed(comp, p, e);
-            comp.outputs.status = if (k == 0) 2 else 1;
+            comp.outputs.status = 1;
             return false;
         },
     };
@@ -180,6 +195,7 @@ pub fn semaTop(comp: *Compilation) !bool {
     for (comp.units.items) |*u| {
         if (u.vir.diag.failed()) return false;
         const file = try comp.zcu.addFile(comp.config.paths[0], u.vir, u.builtins);
+        if (comp.unit_libs.len != 0) try assignLibraries(comp, file, u);
         for (u.vir.decls()[0..u.builtins], 0..) |d, k| if (d.kind == .module and std.mem.eql(u8, declSource(comp, u, d), netlist_unit))
             try netlist.append(comp.arena(), .{ .file = file, .index = @fromBackingInt(@intCast(k)) });
     }
@@ -227,6 +243,61 @@ pub fn notBuilt(comp: *Compilation, b: Compilation.Backend, what: []const u8) !v
 
 // ---- private ----
 
+/// IEEE 1364-2005 §13.2: runs the library-map reader over `config.libmaps`
+/// (`comp.libmap` holds its output either way, so a refusal is reported by
+/// `errors`), places each `config.paths[k]` (§13.2.1.1, E0244 on a tie),
+/// checks each `-L` name (§13.7.1, E0244 on an unknown one), then interns
+/// `comp.unit_libs` and `comp.lib_order` (§13.5.1) and appends A.1.1's
+/// `-incdir` lists to the include path (every unit gets every library's,
+/// the old `ponytail:` carried forward: per-library paths need
+/// `Compilation.Unit` to carry its own library).
+fn libraries(comp: *Compilation) !bool {
+    const c = comp.config;
+    var r: libmap.Reader = .init(comp.arena(), c.libmaps);
+    while (try r.run()) |req| switch (req) {
+        .file => |want| try r.answer(switch (try comp.read(want.path)) {
+            .failed => |e| .{ .unreadable = e },
+            .bytes => |b| switch (try comp.realPath(want.path)) {
+                .failed => |e| .{ .unresolvable = e },
+                .path => |real| .{ .file = .{ .bytes = b, .real = real } },
+            },
+        }),
+    };
+    const map = r.output();
+    comp.libmap = map;
+    if (map.refusal != null) return false;
+    const ip = &comp.zcu.intern_pool;
+    const unit_libs = try comp.arena().alloc(InternPool.String, c.paths.len);
+    for (unit_libs, c.paths) |*ul, p| {
+        const real = switch (try comp.realPath(p)) {
+            .path => |real| real,
+            .failed => |e| {
+                try comp.outputs.err.print(comp.arena(), "error: cannot read `{s}`: {t}\n", .{ p, e });
+                return false;
+            },
+        };
+        const name = switch (map.libraryOf(real)) {
+            .lib => |l| l,
+            .ambiguous => |two| {
+                try comp.wip.add(.parse, .E0244, .none, "`{s}` matches file path specifications of libraries `{s}` and `{s}` (IEEE 1364-2005 §13.2.1.1)", .{ p, two[0], two[1] });
+                return false;
+            },
+        };
+        ul.* = try ip.getString(comp.gpa, name);
+    }
+    for (c.search) |l| if (map.declares(l) == null and !std.mem.eql(u8, l, "work")) {
+        try comp.wip.add(.parse, .E0244, .none, "-L {s}: no library map declares library `{s}` (IEEE 1364-2005 §13.7.1)", .{ l, l });
+        return false;
+    };
+    const order_names = if (c.search.len != 0) c.search else try map.order(comp.arena());
+    const lib_order = try comp.arena().alloc(InternPool.String, order_names.len);
+    for (lib_order, order_names) |*lo, n| lo.* = try ip.getString(comp.gpa, n);
+    comp.unit_libs = unit_libs;
+    comp.lib_order = lib_order;
+    if (map.incdirs.len != 0) comp.pp.options.include_dirs = try std.mem.concat(comp.arena(), []const u8, &.{ comp.pp.options.include_dirs, map.incdirs });
+    return true;
+}
+
 fn astgenUnit(comp: *Compilation, unit: u32) Allocator.Error!?void {
     const gpa = comp.gpa;
     const u = &comp.units.items[unit];
@@ -259,12 +330,42 @@ fn builtinModules(comp: *const Compilation, u: *const Compilation.Unit) u32 {
     return n;
 }
 
+/// The preprocessed-text offset of declaration `d` of `u`'s main token
+/// (its `module`/`paramset`/... keyword).
+fn declStart(u: *const Compilation.Unit, d: vams.Vir.Decl) u32 {
+    const data = u.vir.instructions.items(.data)[@backingInt(d.inst)];
+    return u.tree.tokenStart(u.tree.nodeMainToken(data.pl_node.src_node));
+}
+
 /// The name of the file declaration `d` of `u` was written in.
 fn declSource(comp: *const Compilation, u: *const Compilation.Unit, d: vams.Vir.Decl) []const u8 {
     const out = comp.pp.output();
-    const data = u.vir.instructions.items(.data)[@backingInt(d.inst)];
-    const at = u.tree.tokenStart(u.tree.nodeMainToken(data.pl_node.src_node));
+    const at = declStart(u, d);
     return out.files[@backingInt(out.resolve(at).file)].name;
+}
+
+/// IEEE 1364-2005 §13.2.1.1/§13.5.1: places every decl of `file` from
+/// `u.builtins` on (a shipped primitive carries no library) into
+/// `zcu.decl_lib`, keyed by the command-line unit its main token's offset
+/// falls in (the partition point of `pp.output().unit_starts`), and sets
+/// `zcu.lib_order`. Mirrors the old `lib/sim/digital/bind.zig:41
+/// libraries` (`unitOf(more_starts, main_tok)`).
+fn assignLibraries(comp: *Compilation, file: sema.Zcu.File.Index, u: *const Compilation.Unit) Allocator.Error!void {
+    assert(comp.unit_libs.len == comp.config.paths.len);
+    const out = comp.pp.output();
+    assert(out.unit_starts.len + 1 == comp.unit_libs.len);
+    const zcu = &comp.zcu;
+    zcu.lib_order = comp.lib_order;
+    const decls = u.vir.decls();
+    for (decls[u.builtins..], u.builtins..) |d, k| {
+        const offset = declStart(u, d);
+        const unit = std.sort.partitionPoint(u32, out.unit_starts, offset, unitStartAtOrBefore);
+        try zcu.decl_lib.put(comp.gpa, .{ .file = file, .index = @fromBackingInt(@intCast(k)) }, comp.unit_libs[unit]);
+    }
+}
+
+fn unitStartAtOrBefore(offset: u32, start: u32) bool {
+    return start <= offset;
 }
 
 /// The `//! spice CARD` lines of `source`, each card verbatim (a leading

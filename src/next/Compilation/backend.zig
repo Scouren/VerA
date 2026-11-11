@@ -128,7 +128,6 @@ pub fn codegen(comp: *Compilation, b: Compilation.Backend) !?Job {
         .rtlil => return rtlilText(comp),
         .digital_device => return digitalDevice(comp),
         .digital_exe => return digitalExe(comp),
-        .libmap => unreachable, // Refused before preprocessing.
         .digital_lowering => unreachable, // A stage, not a backend: `semaDigital` names it.
     }
     const an = &comp.analysis.?;

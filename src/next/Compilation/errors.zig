@@ -1,9 +1,10 @@
 //! The errors job (lib/TODO.md §3, Zig's `Compilation.getAllErrorsAlloc`):
 //! every stage's diagnostics in, one `Diag` bundle out, each location moved
 //! from the stage's own text (the preprocessed text, a Vir instruction, a
-//! netlist file) to the original file the user wrote, then sorted in
-//! source order by `Wip.toOwnedBundle`. The file table it indexes is
-//! `sources`: the preprocessor's files, then the netlist's.
+//! netlist file, a library map) to the original file the user wrote, then
+//! sorted in source order by `Wip.toOwnedBundle`. The file table it
+//! indexes is `sources`: the preprocessor's files, then the netlist's,
+//! then the library maps' (IEEE 1364-2005 §13.2, read before preprocessing).
 //!
 //! Cites no LRM clause: the stages cite theirs.
 //!
@@ -22,6 +23,7 @@ const Compilation = @import("../Compilation.zig");
 const Diag = vams.Diag;
 const Inst = vams.Vir.Inst;
 const legacy = @import("legacy.zig");
+const libmap = @import("libmap.zig");
 
 /// Every diagnostic of `comp`, relocated and sorted; owned by the caller.
 pub fn bundle(comp: *Compilation) Allocator.Error!Diag {
@@ -40,6 +42,11 @@ pub fn bundle(comp: *Compilation) Allocator.Error!Diag {
         try b.emit();
     }
     if (comp.netlist) |*n| try n.output().report(&w, @fromBackingInt(pp_files));
+    const net_files: u32 = if (comp.netlist) |*n| @intCast(n.output().files.len) else 0;
+    // IEEE 1364-2005 §13.2: the library-map step runs before preprocessing,
+    // so on a refusal `out.files` and the netlist's are both empty and the
+    // map files start at index 0.
+    if (comp.libmap) |m| try m.report(&w, @fromBackingInt(pp_files + net_files));
     for (comp.units.items) |*u| {
         if (u.tree.errors.len != 0) {
             var pw: Diag.Wip = .init(comp.gpa);
@@ -89,10 +96,12 @@ pub fn sources(comp: *Compilation) Allocator.Error![]const Diag.Source {
     const a = comp.arena();
     const out = comp.pp.output();
     const net: []const vams.spice.File = if (comp.netlist) |*n| n.output().files else &.{};
-    const list = try a.alloc(Diag.Source, out.files.len + net.len);
+    const map: []const libmap.File = if (comp.libmap) |m| m.files else &.{};
+    const list = try a.alloc(Diag.Source, out.files.len + net.len + map.len);
     for (list[0..out.files.len], out.files) |*s, f| s.* = .{ .name = f.name, .text = f.source, .line_starts = try Diag.lineStarts(a, f.source) };
-    for (list[out.files.len..], net) |*s, f| s.* = .{ .name = f.name, .text = f.text, .line_starts = try Diag.lineStarts(a, f.text) };
-    assert(list.len == out.files.len + net.len);
+    for (list[out.files.len..][0..net.len], net) |*s, f| s.* = .{ .name = f.name, .text = f.text, .line_starts = try Diag.lineStarts(a, f.text) };
+    for (list[out.files.len + net.len ..], map) |*s, f| s.* = .{ .name = f.name, .text = f.text, .line_starts = try Diag.lineStarts(a, f.text) };
+    assert(list.len == out.files.len + net.len + map.len);
     return list;
 }
 

@@ -551,14 +551,14 @@ Departures:
 
 - **Q7.** `lib/contract/gm` (1,906 lines) is still `RefOptions.math`'s default; deleting it makes the installed contract depend on Gompute
   Recommendation: keep gm through 0.30.0; move the default to `std_kernels.math` in a contract change agreed with ESPice
-  Decision: Keep gm through 0.30.0; move the default in a contract change agreed with ESPice.
-  Sync (user, 2026-11-11): `gm` stays, but computes what Gompute computes. Every function where the
-  two differ (known: `cosh`, `sinh`, `log10`, 1 ulp apart, Gompute correctly rounded; diff-kernels
-  lists the rest) takes Gompute's algorithm into `gm`, so the contract's reference family, the old
-  folds and the rewrite's devices give the same bits. Oracle: `gm` vs Gompute bit for bit over
-  diff-kernels' corpus and the f128 reference; a remaining difference is listed by name with both
-  ulp bounds. Device compile time is checked unchanged (`gm` stays self-contained, no Gompute
-  import). Wave 4.
+  Decision (revised by the user, 2026-11-11): `gm` and `gm/` are deleted; Gompute provides all
+  device math. `asinh`, `acosh`, `atanh` and `atan2` move from `lib/std/kernels/math.zig` into
+  Gompute (a new tag, pinned by commit and hash in `build.zig.zon` and `flake.nix`), and every `gm`
+  user (`RefOptions.math`'s default, `family_check`, the old kernel text, `prove`, `Air/interp`,
+  `lib/kernels`, `ulp_tests`) takes Gompute's `math`. The installed contract ships Gompute's math
+  files beside itself. Oracle: diff-kernels' f128 reference (each function within Gompute's
+  documented ulps), fold == device, host/NVPTX/AMDGCN rounding alike (`kernels-targets`); device
+  build time measured before and after on the largest models and reported.
 
 - **Q8.** E1100 wording table (`src/next/Compilation/legacy.zig`) keeps old codes on the 1364 route
   Recommendation: keep at the switch (byte-identical); dropping it means editing the suite (user's repo), user's call after

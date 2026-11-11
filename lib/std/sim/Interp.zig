@@ -166,6 +166,13 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
         // §10.3 a disabled subroutine's activations return at once.
         if (s.unwind != null) return;
         since = tidy(scratch, since);
+        // Dispatched per compiled run, not per instruction: the bitset is
+        // tested before the call, so an uncompiled design pays no indirect
+        // call at all.
+        if (s.native) |native| if (bitSet(s.native_pcs, pc)) {
+            if (try native(s, scratch, &pc)) return;
+            assert(!bitSet(s.native_pcs, pc)); // native stops only at an uncompiled pc.
+        };
         const a = scratch.allocator();
         const d = datas[pc];
         switch (tags[pc]) {
@@ -364,6 +371,12 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
 }
 
 // ---- private ----
+
+/// Bit `pc` of a `State.native_pcs` bitset (one `u64` word per 64 pcs).
+fn bitSet(bits: []const u64, pc: u32) bool {
+    assert(pc / 64 < bits.len);
+    return bits[pc / 64] & (@as(u64, 1) << @intCast(pc % 64)) != 0;
+}
 
 /// Counts one step on `scratch`, resetting it every `tidy_every`.
 fn tidy(scratch: *std.heap.ArenaAllocator, since: u32) u32 {

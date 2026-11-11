@@ -4,6 +4,11 @@
 # interpreter), and BEFORE, another `vera-next`, when given. Each binary is
 # built ReleaseFast; the time is the median of N wall-clock runs. Every
 # binary's stdout must equal old vera's, or the row says so.
+# `new`'s own row also splits into the digital-next native step (default)
+# against the interpreter alone (VERA_INTERPRET=1), the vbackends Q4 ship
+# gate's "native/interpreted" ratio, plus each binary's own `--emit-exe`
+# build wall time (the gate's "build time <= 1.15x today's", BEFORE being
+# today's when given).
 # The designs: zig-out/bench/{lfsr,cpu}.v (written below), and four from the
 # corpus with their test loops lengthened and their dumps and per-step
 # prints removed: ivtest's pic.v (a PIC16C5x CPU running TEST9.ROM), the
@@ -86,22 +91,38 @@ sed -e 's/MAX_TRIALS = 10;/MAX_TRIALS = 20000;/' -e 's/\$display ("%0d \* %0d/if
 sed -e 's/repeat (25)/repeat (4000)/' "$C/ivtest/contrib/div16.v" > "$B/div16.v"
 
 med() { sort -n | awk '{a[NR]=$1} END {print a[int((NR+1)/2)]}'; }
-build() { "$1" --emit-exe --optimize=ReleaseFast --work-dir "$B/w/$2" "$3" 2>/dev/null | tail -1; }
+# Prints "<binary path> <build seconds>"; the caller splits on the space.
+build() {
+  local t0 t1 bin
+  t0=$(date +%s.%N)
+  bin=$("$1" --emit-exe --optimize=ReleaseFast --work-dir "$B/w/$2" "$3" 2>/dev/null | tail -1)
+  t1=$(date +%s.%N)
+  echo "$bin $(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.3f", b-a}')"
+}
 # stdout without the `$finish at` line, whose byte offset old vera counts differently.
 out() { grep -v "^\$finish at" | md5sum; }
 timeit() { for _ in $(seq "$N"); do /usr/bin/env time -f %e "$1" 2>&1 >/dev/null | tail -1; done | med; }
+ratio() { awk -v a="$1" -v b="$2" 'BEGIN{printf "%.3f", a/b}'; }
 cd "$B"
+ratios=()
 for s in lfsr cpu pic des mult16 div16; do
-  old=$(build "$R/zig-out/bin/vera" old "$s.v")
-  new=$(build "$R/zig-out/bin/vera-next" new "$s.v")
+  read -r old oldbt <<<"$(build "$R/zig-out/bin/vera" old "$s.v")"
+  read -r new newbt <<<"$(build "$R/zig-out/bin/vera-next" new "$s.v")"
   [ -x "$old" ] && [ -x "$new" ] || { echo "$s: build failed (old '$old', new '$new')"; continue; }
   o=$("$old" 2>/dev/null | out)
   [ "$o" = "$("$new" 2>/dev/null | out)" ] || echo "$s: new stdout differs from old"
-  line="$s: old native $(timeit "$old")s, interpreted $(timeit "$new")s"
+  native_t=$(timeit "$new")
+  interp_t=$(VERA_INTERPRET=1 timeit "$new")
+  r=$(ratio "$interp_t" "$native_t")
+  ratios+=("$r")
+  line="$s: native ${native_t}s, interpreted ${interp_t}s (x${r}), build ${newbt}s"
   if [ -n "$BEFORE" ]; then
-    before=$(build "$BEFORE" before "$s.v")
+    read -r before beforebt <<<"$(build "$BEFORE" before "$s.v")"
     [ "$o" = "$("$before" 2>/dev/null | out)" ] || echo "$s: before stdout differs from old"
-    line="$line, before $(timeit "$before")s"
+    line="$line, before build ${beforebt}s (x$(ratio "$newbt" "$beforebt") of before)"
   fi
   echo "$line (median of $N)"
 done
+if [ "${#ratios[@]}" -gt 0 ]; then
+  printf '%s\n' "${ratios[@]}" | awk '{s+=log($1); n++} END {if (n>0) printf "geomean native/interpreted: x%.3f over %d designs\n", exp(s/n), n}'
+fi

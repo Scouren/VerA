@@ -21,6 +21,7 @@ const Allocator = std.mem.Allocator;
 const std_sim = @import("std_sim");
 const Diag = @import("vams").Diag;
 const contract = @import("contract");
+const native_step = @import("digital_next/native.zig");
 
 /// One port of the top module, in port-list order, as the device reads it.
 pub const Port = struct {
@@ -132,7 +133,8 @@ pub fn writeDevice(w: *std.Io.Writer, arena: Allocator, program: *const std_sim.
 /// Writes the executable's root for `program` to `w`: `vera_digital` (the
 /// Program as `std_sim.serial` bytes; `sources`, the files a diagnostic
 /// points into; `sites`, each timing check's W1199 location; the event
-/// `budget`) and `std_sim.exe.main`. Asserts one site per timing check.
+/// `budget`), the design's compiled instructions (`native.zig`), and
+/// `std_sim.exe.main`. Asserts one site per timing check.
 pub fn writeExe(w: *std.Io.Writer, arena: Allocator, program: *const std_sim.Program, sources: []const std_sim.exe.Source, sites: []const Diag.Loc, budget: u64) (Allocator.Error || std.Io.Writer.Error)!void {
     assert(sites.len == program.checks.len);
     var bytes: std.Io.Writer.Allocating = .init(arena);
@@ -151,7 +153,14 @@ pub fn writeExe(w: *std.Io.Writer, arena: Allocator, program: *const std_sim.Pro
     for (sources) |s| try w.print("        .{{ .name = \"{f}\", .text = \"{f}\" }},\n", .{ std.zig.fmtString(s.name), std.zig.fmtString(s.text) });
     try w.writeAll("    },\n    .sites = &.{\n");
     for (sites) |l| try w.print("        .{{ .file = @enumFromInt({d}), .start = {d}, .end = {d} }},\n", .{ @backingInt(l.file), l.start, l.end });
-    try w.print("    }},\n    .budget = {d},\n}};\n", .{budget});
+    var native: std.Io.Writer.Allocating = .init(arena);
+    const compiled = try native_step.write(&native.writer, arena, program);
+    try w.print("    }},\n    .budget = {d},\n{s}}};\n", .{ budget, if (compiled) "    .native = &native,\n    .native_pcs = &native_pcs,\n" else "" });
+    try w.writeAll(native.written());
+}
+
+test {
+    _ = native_step;
 }
 
 test writeExe {

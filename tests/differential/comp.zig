@@ -21,6 +21,10 @@
 //! each against its own list (`tests/differential/<name>.xfail`) and
 //! rulings (`<name>.rulings`); a `--check` ruling's tiebreaker runs the
 //! device the new side builds (`comp/device.zig`).
+//! `diff-native` (list `native`) is no comparison with `vera`: each `.v`
+//! fixture's `--emit-exe` binary runs twice, as built (its native step) and
+//! with `VERA_INTERPRET=1` (the interpreter alone), and the two runs must
+//! agree byte for byte (docs/rewrite/digital.md step 2).
 //! No LRM clause: this checks VerA's rewrite against VerA.
 //!
 //! Contents: tests only.
@@ -62,6 +66,8 @@ const Shared = struct {
     outcomes: []Outcome,
     next: std.atomic.Value(u32) = .init(0),
     env: *const std.process.Environ.Map,
+    /// `env` with `VERA_INTERPRET=1`: diff-native's interpreter-only run.
+    env_interp: *const std.process.Environ.Map,
     work: []const u8,
     exe_old: []const u8,
     exe_new: []const u8,
@@ -78,6 +84,11 @@ const Shared = struct {
 /// `--protect-keys`, no IEEE 1364 macro-text warning), and the new side
 /// follows the front end `--run` uses.
 const front_end_ruling = "front end:";
+
+/// `one`'s fixtures prefix this on a `rel` that names a file under
+/// `tests/differential/native/` (`addGenerated`) instead of the fixture
+/// root: `fixture.argv` cannot build its path.
+const gen_prefix = "native-gen/";
 
 // ---- private ----
 
@@ -97,11 +108,16 @@ fn runAll() !void {
         } else false;
         if (hit) try picked.append(arena, f);
     }
+    if (comptime std.mem.eql(u8, v_run.name, "native")) try addGenerated(arena, io, &picked);
     const env = try arena.create(std.process.Environ.Map);
     env.* = try std.testing.environ.createMap(arena);
     // One directory per run: the four runs go in parallel under `rewrite`.
     const work = try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", "comp-work-" ++ v_run.name });
     try env.put("ZIG_LOCAL_CACHE_DIR", try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", "comp-zig-cache" }));
+    const env_interp = try arena.create(std.process.Environ.Map);
+    env_interp.* = try std.testing.environ.createMap(arena);
+    try env_interp.put("ZIG_LOCAL_CACHE_DIR", env.get("ZIG_LOCAL_CACHE_DIR").?);
+    try env_interp.put("VERA_INTERPRET", "1");
     const outcomes = try arena.alloc(Outcome, picked.items.len);
     @memset(outcomes, .pending);
     var shared: Shared = .{
@@ -109,6 +125,7 @@ fn runAll() !void {
         .fixtures = picked.items,
         .outcomes = outcomes,
         .env = env,
+        .env_interp = env_interp,
         .work = work,
         // Absolute: each child runs in a directory of its own.
         .exe_old = try Io.Dir.cwd().realPathFileAlloc(io, options.vera, arena),
@@ -124,6 +141,31 @@ fn runAll() !void {
     Io.Dir.cwd().deleteTree(io, work) catch {};
     const secs = @divTrunc(t0.durationTo(Io.Clock.awake.now(io)).toNanoseconds(), std.time.ns_per_s);
     try report(arena, io, picked.items, outcomes, @intCast(secs));
+}
+
+/// diff-native's own fixtures (`tools/gen_native_v.py`'s checked-in `.v`
+/// files, the oracle-set hole fixtures rarely hit): every `.v` under
+/// `tests/differential/native/`, appended to `picked` with `rel` prefixed
+/// `gen_prefix` so `one` resolves its path there, not under the fixture
+/// root. A missing directory is nothing to add.
+fn addGenerated(arena: Allocator, io: Io, picked: *std.ArrayList(Fixture)) !void {
+    const dir_path = try std.fs.path.join(arena, &.{ options.repo_root, "tests/differential/native" });
+    var dir = Io.Dir.cwd().openDir(io, dir_path, .{ .iterate = true }) catch |e| switch (e) {
+        error.FileNotFound => return,
+        else => return e,
+    };
+    defer dir.close(io);
+    var walker = try dir.walk(arena);
+    defer walker.deinit();
+    while (try walker.next(io)) |e| {
+        if (e.kind != .file or !std.mem.endsWith(u8, e.path, ".v")) continue;
+        var alts = std.mem.splitScalar(u8, options.filter, '|');
+        const hit = while (alts.next()) |alt| {
+            if (std.mem.find(u8, e.path, alt) != null) break true;
+        } else false;
+        if (!hit) continue;
+        try picked.append(arena, .{ .rel = try std.fmt.allocPrint(arena, gen_prefix ++ "{s}", .{e.path}), .lang = .verilog, .compile_only = false, .reject = false });
+    }
 }
 
 fn worker(s: *Shared) void {
@@ -157,10 +199,24 @@ fn worker(s: *Shared) void {
 fn one(arena: Allocator, s: *Shared, k: u32) !Outcome {
     const f = s.fixtures[k];
     if (f.lang == .vpi) return .{ .not_built = "vpi" };
+    const w_new = try std.fmt.allocPrint(arena, "{s}/{d}-n", .{ s.work, k });
+    if (comptime std.mem.eql(u8, v_run.name, "native")) {
+        const args: []const []const u8 = if (std.mem.startsWith(u8, f.rel, gen_prefix))
+            &.{ "--emit-exe", try std.fmt.allocPrint(arena, "{s}/tests/differential/native/{s}", .{ options.repo_root, f.rel[gen_prefix.len..] }) }
+        else gen: {
+            const a = try arena.dupe([]const u8, try fixture.argv(arena, f, options.fixture_root));
+            a[0] = v_run.flag;
+            break :gen a;
+        };
+        // The interpreter's run is the oracle ("old"), the native one "new".
+        const both = try judge.runTwice(arena, s.io, s.exe_new, args, w_new, s.env, s.env_interp);
+        if (judge.notBuilt(both[0])) |b| return .{ .not_built = b };
+        const why = (try judge.compare(arena, both[1], both[0], true)) orelse return .agree;
+        return .{ .differ = .{ .owner = "native", .why = why } };
+    }
     const args = try arena.dupe([]const u8, try fixture.argv(arena, f, options.fixture_root));
     if (v_run.flag.len != 0) args[0] = v_run.flag;
     const exec = std.mem.eql(u8, v_run.flag, "--emit-exe");
-    const w_new = try std.fmt.allocPrint(arena, "{s}/{d}-n", .{ s.work, k });
     var new = try judge.run(arena, s.io, s.exe_new, args, w_new, s.env, exec);
     if (judge.notBuilt(new)) |b| return .{ .not_built = b };
     if (k % s.j1_every == 0) {

@@ -80,17 +80,24 @@ const Gen = struct {
                 const c = p.extraData(Program.Case, d.a);
                 const tys = p.exprs.items(.ty);
                 if (!small.fits(tys[c.scrutinee]) or c.arms.len == 0) return false;
+                var any_labels = false;
                 for (p.list(c.arms)) |arm_at| for (p.list(p.extraData(Program.Arm, arm_at).labels)) |label| {
                     if (!small.fits(tys[label]) or tys[label].width != tys[c.scrutinee].width) return false;
+                    any_labels = true;
                 };
                 try w.print("        {d} => {{\n            const v: V = ", .{pc});
                 try g.expr(c.scrutinee, 0);
+                try w.writeAll(";\n");
                 // A.6.7: a bare `default` is an arm with no labels (every
-                // other arm's labels may be empty too, on a fixture that
-                // never compares), so the label loop below may read `v`
-                // zero times; `_ = v` marks it used without re-evaluating
-                // or discarding whatever `g.expr` already emitted.
-                try w.writeAll(";\n            _ = v;\n");
+                // arm's labels may be empty, on a fixture that never
+                // compares), so the label loop below reads `v` zero times;
+                // `_ = v` marks it used without re-evaluating or
+                // discarding whatever `g.expr` already emitted. A `_ = v`
+                // when some arm does have a label is a *different* Zig
+                // error ("pointless discard of local constant": the loop
+                // below reads `v` right after), so this discard is only
+                // ever the first.
+                if (!any_labels) try w.writeAll("            _ = v;\n");
                 // §9.5: equal planes bit for bit; §9.5.1 the wildcards.
                 const wild = switch (c.kind) {
                     .normal => "0",
@@ -444,4 +451,38 @@ test "case_select: a bare default (zero labels) still reads its scrutinee" {
     defer tree.deinit(a);
     try t.expectEqual(@as(usize, 0), tree.errors.len);
     try t.expect(std.mem.find(u8, text, "_ = v;") != null);
+}
+
+test "case_select: a labeled arm reads its scrutinee without a spurious discard" {
+    // Regression: an unconditional `_ = v;` (the first cut of the fix
+    // above) makes Zig's AstGen fail every *ordinary* `case` instead —
+    // "pointless discard of local constant" wherever a label follows and
+    // reads `v`, which is every arm with at least one label. This slipped
+    // past both `diff-native` (its own oracle hole: a failed build
+    // compared only against itself, `judge.buildFailed`) and this file's
+    // own `case_default_only` test (zero labels, so the discard is never
+    // spurious there) until the full corpus run named it on every
+    // checked-in `native-gen/gen_*.v` fixture.
+    const t = std.testing;
+    var arena: std.heap.ArenaAllocator = .init(t.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var b: std_sim.Builder = .init(a);
+    const ty = Program.Ty.int(8, false);
+    const scrutinee = try b.int(ty, 1);
+    const dispatch = try b.inst(.case_select, 0, 0, 0);
+    const label = try b.int(ty, 1);
+    const target = try b.inst(.stop, 0, 0, 0);
+    const arm = try b.extraOf(Program.Arm{ .labels = try b.listOf(&.{label}), .target = target });
+    const case = try b.extraOf(Program.Case{ .kind = .normal, .scrutinee = scrutinee, .arms = try b.listOf(&.{arm}), .fallback = target });
+    b.setInst(dispatch, .case_select, case, 0);
+    const p = b.finish();
+    var aw: std.Io.Writer.Allocating = .init(a);
+    try t.expect(try write(&aw.writer, a, &p));
+    const text = try a.dupeSentinel(u8, aw.written(), 0);
+    var tree = try std.zig.Ast.parse(a, text, .{});
+    defer tree.deinit(a);
+    try t.expectEqual(@as(usize, 0), tree.errors.len);
+    try t.expect(std.mem.find(u8, text, "_ = v;") == null);
+    try t.expect(std.mem.find(u8, text, "if (((v.v ^ l.v)") != null);
 }

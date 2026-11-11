@@ -137,6 +137,10 @@ pub fn task(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error
         _ = try userCall(s, b, name, args, null);
         return;
     };
+    // §9.7.3 (D2-L): `$error` in `analog initial` is a plain display (it
+    // does not stop that body), but marks the run so decl.zig's guard,
+    // right after the body, can stop the simulation past initialization.
+    if (tag == .@"$error" and b.analog_initial) try markInitError(s, b);
     const info = SysFn.get(tag);
     if (try refuseContext(s, b, tag, src)) return;
     switch (info.family) {
@@ -208,6 +212,18 @@ pub fn finishDisplays(s: *Sema, b: *Block) Allocator.Error!void {
 
 // ---- private ----
 
+/// §9.7.3 (D2-L): lazily allocates `s.init_error` (zeroed once, at the
+/// main body's entry) and sets it to 1. A design with no `$error` in an
+/// `analog initial` body pays for neither the slot nor decl.zig's guard.
+fn markInitError(s: *Sema, b: *Block) Allocator.Error!void {
+    if (s.init_error == .none) {
+        const slot = try decl.addAlloc(s, .integer);
+        s.init_error = .fromIndex(slot);
+        try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = s.init_error, .rhs = .fromIntern(.zero) } } }));
+    }
+    _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = s.init_error, .rhs = .fromIntern(.one) } } });
+}
+
 /// §6.3.6/§9.18 Table 9-29 a hierarchical system parameter read in an
 /// instance under the top: the host's value (`host`, the top's) composed
 /// with what the instances between them specify (a product for the flips
@@ -222,11 +238,11 @@ fn hierRead(s: *Sema, b: *Block, k: @import("../Zcu.zig").SystemParam, host: Ref
     const ip = &zcu.intern_pool;
     const here = switch (ip.indexToKey(hiers[@backingInt(b.unit.instance)].get(k))) {
         .float => |f| f,
-        else => return host, // else: a value that did not fold (E0890 was raised)
+        else => return host,
     };
     const at_top = switch (ip.indexToKey(hiers[@backingInt(top)].get(k))) {
         .float => |f| f,
-        else => return host, // else: as above
+        else => return host,
     };
     return switch (k) {
         .mfactor, .hflip, .vflip => expr.binOp(s, b, .fmul, host, .fromIntern(try decl.intern(s, .{ .real = here / at_top }))),

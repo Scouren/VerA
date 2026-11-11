@@ -122,6 +122,13 @@ inlining: std.ArrayList(Inst.Index) = .empty,
 /// §3.4.7 the card row an `aliasparam` of each hierarchical system
 /// parameter made on the root (param.zig); the root's reads read it.
 sys_alias: std.EnumArray(Zcu.SystemParam, ?Air.Device.Param.Index) = .initFill(null),
+/// §9.7.3 (D2-L) the slot `$error` in an `analog initial` body sets, read
+/// right after that body by a guarded synthetic `$fatal` (decl.zig,
+/// syscall.zig): `.none` for a design with no such `$error`, which then
+/// pays for neither the slot nor the guard. A sentinel, not `?Air.Inst.Index`:
+/// `Air.Inst.Index` has no spare bit for one, so an optional of it costs a
+/// second field; `Air.Inst.Ref` already reserves `.none`.
+init_error: Air.Inst.Ref = .none,
 /// §1.3.1 every access read: its quantity and node pair, in order
 /// (contrib.zig's `checkProbes`).
 branch_reads: std.ArrayList(struct { access: Air.Device.Access, hi: Air.Device.Node.Index, lo: Air.Device.Node.Index, file: Zcu.File.Index, src: Inst.Ref }) = .empty,

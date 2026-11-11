@@ -173,6 +173,115 @@ test "a backend that is not built is named, with not_built_status" {
     try std.testing.expect(std.mem.find(u8, comp.outputs.err.items, "not built") != null);
 }
 
+test "W0650 names each unit and points at its access call" {
+    // Oracle: the old driver's exact headline (tests/differential/comp.xfail,
+    // e.g. spice/instance_override_beats_the_model_card.va: "unit 0 —
+    // I(a,b) — compiles with @setFloatMode(.strict)") and
+    // src/Sema/locate.zig's rule that a call locates at its callee's name:
+    // each unit names its own `I(hi,lo)` and points at "I", never the other
+    // unit's and never `.none` (research/airpasses.md T1's bug: both were
+    // empty, and Diag.Wip's (code,file,start) dedupe then collapsed the two
+    // warnings into one).
+    const gpa = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var paths: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer paths.deinit();
+    const src =
+        \\`include "disciplines.vams"
+        \\module m(p, n, a, b);
+        \\  inout p, n, a, b;
+        \\  electrical p, n, a, b;
+        \\  parameter real r = 1.0;
+        \\  analog begin
+        \\    I(p, n) <+ V(p, n) / r;
+        \\    I(a, b) <+ V(a, b) / r;
+        \\  end
+        \\endmodule
+        \\
+    ;
+    const comp = try compileText(paths.allocator(), &tmp, "m.va", src, .{ .target = .zig });
+    defer comp.destroy();
+    var errors = try comp.getAllErrors();
+    defer errors.deinit(gpa);
+
+    var w0650: [2]vams.Diag.MessageIndex = undefined;
+    var n: usize = 0;
+    for (errors.messages()) |i| {
+        if (errors.message(i).tag.code != .W0650) continue;
+        if (n < w0650.len) w0650[n] = i;
+        n += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 2), n);
+
+    const want = [_][]const u8{ "I(p,n)", "I(a,b)" };
+    for (w0650, want) |i, headline| {
+        const m = errors.message(i);
+        try std.testing.expect(std.mem.indexOf(u8, errors.string(m.msg), headline) != null);
+        try std.testing.expect(!m.loc.isNone());
+        try std.testing.expectEqualStrings("I", src[m.loc.start..m.loc.end]);
+        const lbls = errors.labels(i);
+        // Old (`message.valueSpan`) always resolves a real span for a
+        // computed culprit (never the no-location `.point` fallback): a
+        // `<+` statement's resist/react sum must have its own source, not
+        // `.none` (research/airpasses.md T1's `contrib.zig` bug, caught
+        // only by diff-comp, not by the text check below, since naming
+        // does not need a location: `s.expr_src` was never scoped for
+        // `contribute()`, so every sum it built inherited a stale, usually
+        // `.none`, source).
+        try std.testing.expect(lbls.len != 0);
+        const body = if (m.point != .none) errors.string(m.point) else errors.string(lbls[0].text);
+        try std.testing.expect(std.mem.indexOf(u8, body, "an expression of parameter `r`") != null);
+    }
+    try std.testing.expect(errors.message(w0650[0]).loc.start != errors.message(w0650[1]).loc.start);
+}
+
+test "W0650's probe culprit names the node, through probe_names" {
+    // Oracle: Who.format's `.probe` arm ("a probe of node `{s}`") reading
+    // `Float.Input.probe_names`, which `air_passes.run` fills from
+    // `Air.Device.nodeName`; `--unknown-bound=inf` forces the probe past
+    // `Float.default_unknown_bound` so a bare probe (no parameter in the
+    // expression to blame instead) is the one unbounded leaf. `V(p)`
+    // (ground-relative, one argument) gives one probe; `V(p, n)` lowers to
+    // `fsub(probe(p), probe(n))` and `unboundedLeaf`'s stack pops the rhs
+    // first, so a two-terminal probe would name `n`, not `p`.
+    const gpa = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var paths: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer paths.deinit();
+    const src =
+        \\`include "disciplines.vams"
+        \\module m(p, n);
+        \\  inout p, n;
+        \\  electrical p, n;
+        \\  analog I(p, n) <+ V(p);
+        \\endmodule
+        \\
+    ;
+    const comp = try compileText(paths.allocator(), &tmp, "m.va", src, .{ .target = .zig, .unknown_bound = std.math.inf(f64) });
+    defer comp.destroy();
+    var errors = try comp.getAllErrors();
+    defer errors.deinit(gpa);
+
+    var found: ?vams.Diag.MessageIndex = null;
+    var n: usize = 0;
+    for (errors.messages()) |i| {
+        if (errors.message(i).tag.code != .W0650) continue;
+        found = i;
+        n += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 1), n);
+    const m = errors.message(found.?);
+    try std.testing.expect(std.mem.indexOf(u8, errors.string(m.msg), "I(p,n)") != null);
+
+    const lbls = errors.labels(found.?);
+    // Same regression as above: a real label, never the `.point` fallback.
+    try std.testing.expect(lbls.len != 0);
+    const body = if (m.point != .none) errors.string(m.point) else errors.string(lbls[0].text);
+    try std.testing.expect(std.mem.indexOf(u8, body, "a probe of node `p`") != null);
+}
+
 test "every --check scratch directory is its own, under -o's directory" {
     // Oracle: lib/TODO.md §12 (ESPice's race): two invocations never share
     // a scratch path, and it is never a fixed name.

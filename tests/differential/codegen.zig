@@ -210,7 +210,12 @@ fn runAll() !void {
 
     const work = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "zig-out", "codegen-work" });
     var slots: [jobs]link.Server = undefined;
-    var q: link.Queue = .init(&slots);
+    // Two exclusive one-slot queues over the same slots (R8,
+    // research/builds.md): `runBatch` threads one side per queue instead of
+    // one shared `Queue`, since `Queue.run`'s `started`/`waited` counters
+    // are local to one call and two concurrent calls sharing one `Queue`
+    // would race on the same `Server`.
+    var qs = [2]link.Queue{ .init(slots[0..1]), .init(slots[1..2]) };
     var at: usize = 0;
     var batch: u32 = 0;
     while (at < ready.items.len) : (batch += 1) {
@@ -228,7 +233,7 @@ fn runAll() !void {
         }
         const group = ready.items[at..end];
         at = end;
-        try runBatch(gpa, arena, io, &q, work, batch, group, &tally, &whys);
+        try runBatch(gpa, arena, io, &qs, work, batch, group, &tally, &whys);
     }
     if (!options.codegen_keep) Io.Dir.cwd().deleteTree(io, work) catch {};
 
@@ -309,7 +314,7 @@ fn cacheEntries(io: Io, cache_dir: ?[]const u8) u32 {
 /// Builds one library of `group`'s old and new devices, loads it, and
 /// compares each fixture's two at `points` points; a disagreement goes to
 /// `whys`.
-fn runBatch(gpa: Allocator, arena: Allocator, io: Io, q: *link.Queue, work: []const u8, batch: u32, group: []const Ready, tally: *Tally, whys: *std.StringArrayHashMapUnmanaged([]const u8)) !void {
+fn runBatch(gpa: Allocator, arena: Allocator, io: Io, qs: *[2]link.Queue, work: []const u8, batch: u32, group: []const Ready, tally: *Tally, whys: *std.StringArrayHashMapUnmanaged([]const u8)) !void {
     tally.compared += @intCast(group.len);
     const dir = try arena.print("{s}/b{d}", .{ work, batch });
     try Io.Dir.cwd().createDirPath(io, dir);
@@ -332,74 +337,81 @@ fn runBatch(gpa: Allocator, arena: Allocator, io: Io, q: *link.Queue, work: []co
     const left = try arena.alloc(bool, group.len);
     @memset(left, true);
     for (0..group.len + 1) |attempt| {
-        // One library per side, so each side's build time is its own.
+        // One library per side, so each side's build time is its own. R8
+        // (research/builds.md): each side builds on its own thread, with
+        // its own exclusive one-slot queue (`qs`), so the slot that used
+        // to sit idle through the other side's whole build now spends that
+        // time on it instead. All shared-state mutation (`tally`, `whys`,
+        // `left`, `blame`) stays below, single-threaded, after both join.
         var paths: [2][]const u8 = undefined;
-        var failed = false;
-        for ([2][]const u8{ "o", "n" }, &paths, [2]*u64{ &tally.old_ns, &tally.new_ns }) |side, *path, ns| {
-            var mods: std.ArrayList(link.Module) = .empty;
-            try mods.appendSlice(arena, &.{
-                .{ .name = "contract", .root = contract },
-                .{ .name = "gompute_math", .root = options.gompute_math },
-                .{ .name = "std_kernels", .root = kernels, .deps = &.{ "contract", "gompute_math" } },
-                .{ .name = "dyn", .root = dyn, .deps = &.{ "contract", "std_kernels" } },
-            });
-            var devices: Io.Writer.Allocating = .init(arena);
-            var names: Io.Writer.Allocating = .init(arena);
-            // One `u64` row-skip mask per device (research/codegen.md T0d):
-            // `sides.zig` computed it from the fixture's Air, old, new and
-            // versioned share it since it names rows, not a pipeline.
-            var fd_skip: Io.Writer.Allocating = .init(arena);
-            // The biggest device still in this build, for the slowest-five
-            // summary (R3, research/builds.md); updated alongside the
-            // membership check this loop already makes.
-            var biggest: usize = 0;
-            var biggest_rel: []const u8 = "";
-            for (left, group, 0..) |l, r, k| if (l) {
-                const len = if (side[0] == 'o') r.old.len else r.new.len;
-                if (len > biggest) {
-                    biggest = len;
-                    biggest_rel = r.rel;
-                }
-                for ([2]u8{ side[0], 'v' }) |c| {
-                    // The versioned device rides in the new side's library.
-                    if (c == 'v' and (side[0] == 'o' or r.ver == null)) continue;
-                    const name = try arena.print("{c}{d}", .{ c, k });
-                    try mods.append(arena, .{ .name = name, .root = try arena.print("{s}/{s}.zig", .{ dir, name }), .deps = if (c == 'o') &.{"contract"} else &.{ "contract", "std_kernels" } });
-                    try devices.writer.print(" @import(\"{s}\"),", .{name});
-                    try names.writer.print(" \"{s}\",", .{name});
-                    try fd_skip.writer.print(" 0x{x},", .{r.card.fd_skip});
-                }
-            };
-            if (names.written().len == 0) return;
-            const bundle = try arena.print("pub const devices = .{{{s} }};\npub const names = .{{{s} }};\npub const fd_skip = .{{{s} }};\n", .{ devices.written(), names.written(), fd_skip.written() });
-            const f: link.File = .{ .kind = .so, .work_dir = dir, .name = try arena.print("cg{d}{s}", .{ attempt, side }), .optimize = .fast, .backend = .llvm, .modules = mods.items, .split = .whole, .cache_dir = options.codegen_cache };
-            const t0 = Io.Clock.awake.now(io);
-            // `flush` reports a hit and a miss the same way (`Artifact.ok`,
-            // no build spawned either): the cache directory's entry count is
-            // the only signal outside `link.File` (R2, research/builds.md).
-            const before = cacheEntries(io, options.codegen_cache);
-            var built = try f.flush(gpa, io, q, .{ .text = bundle }, 1);
-            defer built.deinit(gpa);
-            const elapsed_ns: u64 = @intCast(t0.durationTo(Io.Clock.awake.now(io)).toNanoseconds());
-            ns.* += elapsed_ns;
-            try tally.slow.append(arena, .{ .rel = biggest_rel, .bytes = biggest, .ms = elapsed_ns / std.time.ns_per_ms });
-            if (built == .ok and options.codegen_cache != null) {
-                if (cacheEntries(io, options.codegen_cache) == before) tally.cache_hits += 1 else tally.cache_misses += 1;
+        var builds: [2]SideBuild = .{ .{}, .{} };
+        // R2's hit/miss signal (`cacheEntries`'s directory-entry count) is
+        // read once bracketing both builds, not around each one: reading it
+        // around each side while they build at once would blame one side's
+        // hit on the other's concurrent miss into the same cache_dir.
+        const cache_before = cacheEntries(io, options.codegen_cache);
+        {
+            var threads: [2]std.Thread = undefined;
+            for ([2][]const u8{ "o", "n" }, &threads, &builds, 0..) |side, *t, *s, i| {
+                t.* = try std.Thread.spawn(.{}, buildSide, .{ gpa, io, &qs[i], dir, contract, kernels, dyn, attempt, side, left, group, options.codegen_cache, s });
             }
-            switch (built) {
-                .ok => |lp| path.* = try arena.dupe(u8, lp),
-                .failed => |rep| {
-                    if (!try blame(arena, rep, group, left, whys)) {
-                        var text: Io.Writer.Allocating = .init(arena);
-                        try rep.renderToWriter(.{}, &text.writer);
-                        for (group, left) |r, l| if (l) try whys.put(arena, r.rel, try arena.print("the batch does not build: {s}", .{text.written()}));
-                        return;
-                    }
-                    failed = true;
-                    break;
-                },
-            }
+            for (threads) |t| t.join();
         }
+        for (builds) |s| if (s.err) |e| return e;
+        // Both builds share one `left`/`group`, so one side finding nothing
+        // left to build means the other did too (R8 preserves R2's return,
+        // just checked after both join instead of mid-loop).
+        if (builds[0].empty or builds[1].empty) return;
+        if (options.codegen_cache != null) {
+            const cache_after = cacheEntries(io, options.codegen_cache);
+            var ok_count: u32 = 0;
+            if (builds[0].built == .ok) ok_count += 1;
+            if (builds[1].built == .ok) ok_count += 1;
+            const new_entries = cache_after -| cache_before;
+            const misses = @min(new_entries, ok_count);
+            tally.cache_misses += misses;
+            tally.cache_hits += ok_count - misses;
+        }
+        tally.old_ns += builds[0].elapsed_ns;
+        tally.new_ns += builds[1].elapsed_ns;
+        try tally.slow.append(arena, .{ .rel = builds[0].biggest_rel, .bytes = builds[0].biggest, .ms = builds[0].elapsed_ns / std.time.ns_per_ms });
+        try tally.slow.append(arena, .{ .rel = builds[1].biggest_rel, .bytes = builds[1].biggest, .ms = builds[1].elapsed_ns / std.time.ns_per_ms });
+        // Old first, same as the serial loop's iteration order: when old
+        // fails and is not attributable to a device, the whole batch fails
+        // off its report alone and new's result (already built, same as
+        // old used to sometimes build for nothing when new alone failed)
+        // is discarded unread, exactly as the serial `break` discarded it.
+        var failed = false;
+        switch (builds[0].built) {
+            .ok => |lp| paths[0] = try arena.dupe(u8, lp),
+            .failed => |rep| {
+                if (!try blame(arena, rep, group, left, whys)) {
+                    var text: Io.Writer.Allocating = .init(arena);
+                    try rep.renderToWriter(.{}, &text.writer);
+                    for (group, left) |r, l| if (l) try whys.put(arena, r.rel, try arena.print("the batch does not build: {s}", .{text.written()}));
+                    builds[0].built.deinit(gpa);
+                    builds[1].built.deinit(gpa);
+                    return;
+                }
+                failed = true;
+            },
+        }
+        if (!failed) switch (builds[1].built) {
+            .ok => |lp| paths[1] = try arena.dupe(u8, lp),
+            .failed => |rep| {
+                if (!try blame(arena, rep, group, left, whys)) {
+                    var text: Io.Writer.Allocating = .init(arena);
+                    try rep.renderToWriter(.{}, &text.writer);
+                    for (group, left) |r, l| if (l) try whys.put(arena, r.rel, try arena.print("the batch does not build: {s}", .{text.written()}));
+                    builds[0].built.deinit(gpa);
+                    builds[1].built.deinit(gpa);
+                    return;
+                }
+                failed = true;
+            },
+        };
+        builds[0].built.deinit(gpa);
+        builds[1].built.deinit(gpa);
         if (failed) continue;
         var libs = [2]DynLib{ try DynLib.open(paths[0]), try DynLib.open(paths[1]) };
         defer for (&libs) |*lib| lib.close();
@@ -423,6 +435,86 @@ fn runBatch(gpa: Allocator, arena: Allocator, io: Io, q: *link.Queue, work: []co
         };
         return;
     }
+}
+
+/// One thread's half of an attempt (R8, research/builds.md): `empty` is
+/// `runBatch`'s "nothing left to build" return, `err` a Zig error (not a
+/// compiler report, which `built` carries), and otherwise `built`,
+/// `elapsed_ns`, `biggest` and `biggest_rel` are exactly what the old
+/// serial loop body computed inline. `runBatch` reads these only after
+/// `std.Thread.join`, so no lock guards them: each thread writes only its
+/// own `*SideBuild`, never the other's.
+const SideBuild = struct {
+    err: ?anyerror = null,
+    empty: bool = false,
+    built: link.File.Artifact = undefined,
+    elapsed_ns: u64 = 0,
+    biggest: usize = 0,
+    biggest_rel: []const u8 = "",
+};
+
+/// `std.Thread.spawn`'s entry point: `buildOne`, with its error folded into
+/// `result` instead of printed and dropped (`std.Thread`'s own handling of
+/// an `!void` thread function).
+fn buildSide(gpa: Allocator, io: Io, q: *link.Queue, dir: []const u8, contract: []const u8, kernels: []const u8, dyn: []const u8, attempt: usize, side: []const u8, left: []const bool, group: []const Ready, cache_dir: ?[]const u8, result: *SideBuild) void {
+    buildOne(gpa, io, q, dir, contract, kernels, dyn, attempt, side, left, group, cache_dir, result) catch |e| {
+        result.err = e;
+    };
+}
+
+/// Builds `side`'s library of `group`'s devices still `left`, on `arena`'s
+/// own thread-local arena (an `ArenaAllocator` is not thread-safe, and two
+/// sides build at once): the same work the serial loop used to do inline,
+/// split out so it can run on either side of `std.Thread.spawn`.
+fn buildOne(gpa: Allocator, io: Io, q: *link.Queue, dir: []const u8, contract: []const u8, kernels: []const u8, dyn: []const u8, attempt: usize, side: []const u8, left: []const bool, group: []const Ready, cache_dir: ?[]const u8, result: *SideBuild) !void {
+    var arena_state: std.heap.ArenaAllocator = .init(std.heap.smp_allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    var mods: std.ArrayList(link.Module) = .empty;
+    try mods.appendSlice(arena, &.{
+        .{ .name = "contract", .root = contract },
+        .{ .name = "gompute_math", .root = options.gompute_math },
+        .{ .name = "std_kernels", .root = kernels, .deps = &.{ "contract", "gompute_math" } },
+        .{ .name = "dyn", .root = dyn, .deps = &.{ "contract", "std_kernels" } },
+    });
+    var devices: Io.Writer.Allocating = .init(arena);
+    var names: Io.Writer.Allocating = .init(arena);
+    // One `u64` row-skip mask per device (research/codegen.md T0d):
+    // `sides.zig` computed it from the fixture's Air, old, new and
+    // versioned share it since it names rows, not a pipeline.
+    var fd_skip: Io.Writer.Allocating = .init(arena);
+    // The biggest device still in this build, for the slowest-five summary
+    // (R3, research/builds.md); updated alongside the membership check this
+    // loop already makes.
+    var biggest: usize = 0;
+    var biggest_rel: []const u8 = "";
+    for (left, group, 0..) |l, r, k| if (l) {
+        const len = if (side[0] == 'o') r.old.len else r.new.len;
+        if (len > biggest) {
+            biggest = len;
+            biggest_rel = r.rel;
+        }
+        for ([2]u8{ side[0], 'v' }) |c| {
+            // The versioned device rides in the new side's library.
+            if (c == 'v' and (side[0] == 'o' or r.ver == null)) continue;
+            const name = try arena.print("{c}{d}", .{ c, k });
+            try mods.append(arena, .{ .name = name, .root = try arena.print("{s}/{s}.zig", .{ dir, name }), .deps = if (c == 'o') &.{"contract"} else &.{ "contract", "std_kernels" } });
+            try devices.writer.print(" @import(\"{s}\"),", .{name});
+            try names.writer.print(" \"{s}\",", .{name});
+            try fd_skip.writer.print(" 0x{x},", .{r.card.fd_skip});
+        }
+    };
+    if (names.written().len == 0) {
+        result.empty = true;
+        return;
+    }
+    const bundle = try arena.print("pub const devices = .{{{s} }};\npub const names = .{{{s} }};\npub const fd_skip = .{{{s} }};\n", .{ devices.written(), names.written(), fd_skip.written() });
+    const f: link.File = .{ .kind = .so, .work_dir = dir, .name = try arena.print("cg{d}{s}", .{ attempt, side }), .optimize = .fast, .backend = .llvm, .modules = mods.items, .split = .whole, .cache_dir = cache_dir };
+    const t0 = Io.Clock.awake.now(io);
+    result.built = try f.flush(gpa, io, q, .{ .text = bundle }, 1);
+    result.elapsed_ns = @intCast(t0.durationTo(Io.Clock.awake.now(io)).toNanoseconds());
+    result.biggest = biggest;
+    result.biggest_rel = biggest_rel;
 }
 
 /// Records each device the compiler's report names (`o<k>.zig`/`n<k>.zig`)

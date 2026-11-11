@@ -313,6 +313,11 @@ deletes `o/` entries and manifests not used in N days, keeping the cache under a
 every agent hits when the disk fills. Cost: about 30 lines. Risk: a light build running during
 collection (light steps take no slot); collect while no `zig` runs. Oracle: the size after
 collection is under budget and the gate stays green.
+Outcome: landed as a byte-budget collector (`tools/cache-budget.sh`), run from `tools/build-slot.sh`
+after every heavy slot. Measured on a full gate from an empty cache at b1b9da86 (`test`,
+`diff-comp`, `diff-rtlil`, `diff-digital-exe`, `diff-digital-device`, `diff-native`, all exit 0):
+`.zig-cache` 17 GB (the 80 GiB budget holds about four such gates), global cache 1.8 GB (under its
+20 GiB budget).
 
 **R7. Drop `-fincremental` from one-shot library children.** `src/link/File.zig:373`: pass it
 only to a child that receives more than one update (none does today). Leave the frozen

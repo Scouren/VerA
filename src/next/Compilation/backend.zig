@@ -14,7 +14,6 @@
 //!
 //! Contents:
 //! - `pub fn semaAnalog(comp: *Compilation) !bool`
-//! - `pub fn airPasses(comp: *Compilation) !bool`
 //! - `pub fn analogBackend(comp: *Compilation) !?Job`
 //! - `pub fn codegen(comp: *Compilation, b: Compilation.Backend) !?Job`
 //! - `pub fn link(comp: *Compilation, task: @FieldType(Job, "link")) !?Job`
@@ -28,7 +27,6 @@ const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const vams = @import("vams");
 const sema = @import("sema");
-const Air = @import("air");
 const codegen_mod = @import("codegen");
 const link_mod = @import("link");
 const std_sim = @import("std_sim");
@@ -83,27 +81,6 @@ pub fn semaAnalog(comp: *Compilation) !bool {
         };
     }
     return true;
-}
-
-/// The float verdict over codegen's roots (§11.9), each parameter's
-/// ranges its box; a §4.3.2 error stops here.
-pub fn airPasses(comp: *Compilation) !bool {
-    const an = &comp.analysis.?;
-    const a = comp.arena();
-    const roots = try codegen_mod.floatRoots(a, &an.air, &an.device);
-    const params = try a.alloc(Air.Float.Param, an.device.params.len);
-    for (params, 0..) |*p, k| p.* = .{ .ranges = try floatRanges(a, an.device.paramRanges(@fromBackingInt(@intCast(k)))) };
-    // Where each instruction's diagnostic points: the expression Sema
-    // lowered it from.
-    const locs = try a.alloc(vams.Diag.Loc, an.srcs.len);
-    for (locs, an.srcs) |*l, s| l.* = if (s.src == .none) .none else errors.instLoc(comp.pp.output(), &comp.units.items[@backingInt(s.file)], s.src);
-    comp.float = try Air.Float.analyze(comp.gpa, an.air, &comp.zcu.intern_pool, .{
-        .params = params,
-        .roots = roots,
-        .locs = locs,
-        .unknown_bound = comp.config.unknown_bound,
-    }, &comp.wip);
-    return !comp.wip.failed();
 }
 
 /// The backend the target names (`--lint` stops here).
@@ -601,15 +578,4 @@ fn checkTop(comp: *Compilation) !bool {
         return false;
     };
     return true;
-}
-
-/// A parameter's `Device` ranges as `Float` reads them; a bound that does
-/// not fold proves nothing.
-fn floatRanges(a: Allocator, ranges: []const Air.Device.Range) ![]const Air.Interval.Range {
-    var out: std.ArrayList(Air.Interval.Range) = .empty;
-    for (ranges) |r| {
-        if (r.strings) continue;
-        try out.append(a, .{ .kind = if (r.exclude) .exclude else .from, .lo = r.lo, .hi = r.hi, .lo_inclusive = r.lo_closed, .hi_inclusive = r.hi_closed });
-    }
-    return out.items;
 }

@@ -364,7 +364,9 @@ fn opNode(s: *Sema, b: *const Block, op: []const u8) Allocator.Error!Node.Index 
 /// contribution on (`n`, ground) whose resistive part is `f` (the unknown
 /// itself before the operator runs) and whose charge is `q`.
 fn stampOpRow(s: *Sema, b: *Block, n: Node.Index, f: Ref, q: Ref, q_neg: bool) Allocator.Error!void {
-    const row = try contrib.rowOf(s, b, .{ .access = .flow, .branch = .unnamed, .hi = n, .lo = .ground, .neg = false });
+    // W0650's headline points at the operator call being lowered
+    // (`expr.lower` sets `expr_src` for it): the old `idt`/`ddt` token.
+    const row = try contrib.rowOf(s, b, .{ .access = .flow, .branch = .unnamed, .hi = n, .lo = .ground, .neg = false }, s.expr_src);
     const slots = s.device.contributions.get(@backingInt(row));
     // At entry: the unknown and the flag, so a row whose operator does not
     // run still pins it.

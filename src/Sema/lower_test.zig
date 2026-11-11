@@ -622,3 +622,68 @@ test "§9.16 a `$simprobe` name a string variable holds is known only at run tim
         \\endmodule
     , .E0823);
 }
+
+test "§6.5.2.2 the two declarations of a port carry identical ranges once folded" {
+    // The clause's own pair of examples.
+    var ok = try lower(
+        \\module m(a);
+        \\  input [0:3] a;
+        \\  electrical [0:4-1] a;
+        \\  analog I(a[0]) <+ V(a[0]);
+        \\endmodule
+    );
+    defer ok.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{}, ok.codes);
+    try expectCode(
+        \\module m(a);
+        \\  input [3:0] a;
+        \\  electrical [0:3] a;
+        \\  analog I(a[0]) <+ V(a[0]);
+        \\endmodule
+    , .E0350);
+}
+
+test "§6.5.7.1/IEEE 1364-2005 §12.3.9.2 a vector child port binds positionally, msb to msb, across a concatenated connection" {
+    // The child's `v[1]` binds `s1` and `v[0]` binds `s0`: a reversed
+    // concatenation or bit order would swap which row each contribution
+    // lands on. (A branch's own row is canonicalized to its lower-index
+    // node first, §1.3.1.2's "reversed spelling" test above: `p` (node 0)
+    // leads both rows here, not the written `V(v[k], c)` order.)
+    try expectTables(
+        \\module parent(p);
+        \\  inout p; electrical p;
+        \\  electrical s1, s0;
+        \\  child u({s1, s0}, p);
+        \\endmodule
+        \\module child(v, c);
+        \\  inout [1:0] v; inout c;
+        \\  electrical [1:0] v; electrical c;
+        \\  analog begin
+        \\    V(v[1], c) <+ 0.5;
+        \\    V(v[0], c) <+ 0.25;
+        \\  end
+        \\endmodule
+    ,
+        \\node p net
+        \\node s1 net
+        \\node s0 net
+        \\contrib potential p s1
+        \\contrib potential p s0
+        \\
+    );
+}
+
+test "§6.5.7.1 a vector child port connected to a narrower net is E0925, not a crash" {
+    try expectCode(
+        \\module parent(p);
+        \\  inout p; electrical p;
+        \\  electrical s0;
+        \\  child u(s0, p);
+        \\endmodule
+        \\module child(v, c);
+        \\  inout [1:0] v; inout c;
+        \\  electrical [1:0] v; electrical c;
+        \\  analog V(v[1], c) <+ 0.5;
+        \\endmodule
+    , .E0925);
+}

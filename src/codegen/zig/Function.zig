@@ -18,7 +18,8 @@
 //! - `pub const Real = struct { x }` (`format`): a real constant as Zig source
 //! - `pub fn genBody(f: *Function, body: []const Air.Inst.Index) DeclGen.Error!void`
 //! - `pub fn genTree`, `pub fn valueOf`: a derived parameter's default
-//! - `pub fn real`, `pub fn int`, `pub fn isIntRef`, `pub fn isInt`, `pub fn line`, `pub fn print`: what `calls.zig` writes with
+//! - `pub fn real`, `pub fn int`, `pub fn isIntRef`, `pub fn isInt`, `pub fn line`, `pub fn print`, `pub fn kernel`: what `calls.zig` writes with
+//! - `pub const Phase`: which body is written
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -29,7 +30,6 @@ const DeclGen = @import("DeclGen.zig");
 const Liveness = @import("Liveness.zig");
 const Ident = @import("Ident.zig");
 const calls = @import("calls.zig");
-const say = @import("say.zig");
 const Inst = Air.Inst;
 const Ref = Inst.Ref;
 const Error = DeclGen.Error;
@@ -193,6 +193,19 @@ pub fn print(f: *Function, comptime fmt: []const u8, args: anytype) Error!void {
     f.w.print(fmt, args) catch return error.OutOfMemory;
 }
 
+/// Writes `M.<name>` over one scalar type at mask `m` (`F.zL(S, m)`), each
+/// operand widened to it.
+pub fn kernel(f: *Function, m: Liveness.Mask, name: []const u8, ops: []const Ref) Error!void {
+    assert(ops.len == 1 or ops.len == 2);
+    try f.print("F.zLu(S, 0x{x}, M.{s}(F.zL(S, 0x{x})", .{ m, name, m });
+    for (ops) |o| {
+        try f.print(", F.zLw(S, 0x{x}, ", .{m});
+        try f.real(o);
+        try f.print(")", .{});
+    }
+    try f.print("))", .{});
+}
+
 // ---- private ----
 
 fn genInst(f: *Function, inst: Inst.Index) Error!void {
@@ -282,7 +295,7 @@ fn genInst(f: *Function, inst: Inst.Index) Error!void {
             try f.line();
             try f.dg.genReturn(f);
         },
-        .call => try f.genCall(inst, data),
+        .call => try calls.genCall(f, inst, data),
         // An array version is its slot's storage, written in place: a fresh
         // one is the mask's reset (`assignArray`), a load names the storage.
         .anew => {},
@@ -558,50 +571,6 @@ fn genValue(f: *Function, inst: Inst.Index, tag: Inst.Tag, data: Inst.Data) Erro
         .anew, .store => unreachable, // `genInst` writes them as statements
         else => unreachable, // else: the control tags, `alloc`, `assign` and `call` are statements (`genInst`)
     }
-}
-
-/// A `call`: a system function's value, or a task (a statement).
-fn genCall(f: *Function, inst: Inst.Index, data: Inst.Data) Error!void {
-    const air = f.dg.air;
-    const x = air.extraData(Air.Call, data.ty_pl.payload);
-    const args: []const Ref = @ptrCast(air.extra[x.end..][0..x.data.args_len]);
-    const used = f.dg.live.used[@backingInt(inst)];
-    const max_tag = std.math.maxInt(@typeInfo(vams.SysFn.Tag).@"enum".tag_type);
-    if (x.data.callee > max_tag) return if (used) f.dg.fail("a call of a user function (callee {d})", .{x.data.callee});
-    const tag: vams.SysFn.Tag = @fromBackingInt(@intCast(x.data.callee));
-    const info = vams.SysFn.get(tag);
-    switch (info.family) {
-        // §9.4/§9.7 a print or a simulation control task is not part of a
-        // residual: the device's display phase runs it.
-        .display, .simctl => {
-            if (used) return f.dg.fail("the value of `{s}`", .{@tagName(tag)});
-            if (f.phase == .say) try say.record(f, inst);
-            return;
-        },
-        else => {}, // else: a value, by tag below
-    }
-    if (!used and !Liveness.effect(air.*, .call, data)) return;
-    // A task with no value (a §9.5 file task) has no spelling here yet.
-    if (air.typeOfIndex(f.dg.ip, inst) == .none) return f.dg.fail("the task `{s}`", .{@tagName(tag)});
-    try f.line();
-    try f.print("const v{d} = ", .{@backingInt(inst)});
-    try calls.gen(f, inst, tag, args);
-    try f.print(";", .{});
-    // An effect whose value nothing reads (an operator only a print reads).
-    if (!used) try f.print(" _ = v{d};", .{@backingInt(inst)});
-}
-
-/// Writes `M.<name>` over one scalar type at mask `m` (`F.zL(S, m)`), each
-/// operand widened to it.
-pub fn kernel(f: *Function, m: Liveness.Mask, name: []const u8, ops: []const Ref) Error!void {
-    assert(ops.len == 1 or ops.len == 2);
-    try f.print("F.zLu(S, 0x{x}, M.{s}(F.zL(S, 0x{x})", .{ m, name, m });
-    for (ops) |o| {
-        try f.print(", F.zLw(S, 0x{x}, ", .{m});
-        try f.real(o);
-        try f.print(")", .{});
-    }
-    try f.print("))", .{});
 }
 
 /// Writes `head a mid b tail` over a `bin_op`'s integer operands.

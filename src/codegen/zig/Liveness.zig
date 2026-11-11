@@ -166,7 +166,7 @@ pub fn effect(air: Air, tag: Inst.Tag, data: Inst.Data) bool {
             // A user system task (§12, no `SysFn` row) runs in the display phase too.
             if (callee > std.math.maxInt(@typeInfo(SysFn.Tag).@"enum".tag_type)) return false;
             const fn_tag: SysFn.Tag = @fromBackingInt(@intCast(callee));
-            if (fn_tag == .transition or fn_tag == .slew or fn_tag == .idtmod or fn_tag == .last_crossing) return true;
+            if (fn_tag == .transition or fn_tag == .slew or fn_tag == .idtmod or fn_tag == .last_crossing or fn_tag == .absdelay) return true;
             return switch (SysFn.get(fn_tag).family) {
                 .random, .file_out, .file_func => true,
                 else => false, // else: a value, or a task of another phase

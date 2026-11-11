@@ -8,6 +8,7 @@
 //! §9.11, §9.14, §9.15, §9.18, §9.19, §9.21; IEEE 1364-2005 §17.8, §17.11.1.
 //!
 //! Contents:
+//! - `pub fn genCall(f: *Function, inst: Air.Inst.Index, data: Air.Inst.Data) DeclGen.Error!void`
 //! - `pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Air.Inst.Ref) DeclGen.Error!void`
 //! - `pub const host_params`: the §9.15 parameters a host writes into `Model`
 
@@ -21,6 +22,7 @@ const Function = @import("Function.zig");
 const state = @import("state.zig");
 const ops = @import("ops.zig");
 const Liveness = @import("Liveness.zig");
+const say = @import("say.zig");
 const Real = Function.Real;
 const Ref = Air.Inst.Ref;
 const Error = DeclGen.Error;
@@ -35,6 +37,40 @@ pub const host_params = [_]struct { name: []const u8, field: []const u8, default
     .{ .name = "gmin", .field = "gmin__", .default = 1e-12 },
     .{ .name = "sourceScaleFactor", .field = "source_scale__", .default = 1.0 },
 };
+
+/// The analysis names `analysis()` recognises (§4.6.1).
+const analysis_names = [_][]const u8{ "static", "ic", "nodeset", "dc", "tran", "ac", "noise" };
+
+/// A `call`: a system function's value, or a task (a statement).
+pub fn genCall(f: *Function, inst: Air.Inst.Index, data: Air.Inst.Data) Error!void {
+    const air = f.dg.air;
+    const x = air.extraData(Air.Call, data.ty_pl.payload);
+    const args: []const Ref = @ptrCast(air.extra[x.end..][0..x.data.args_len]);
+    const used = f.dg.live.used[@backingInt(inst)];
+    const max_tag = std.math.maxInt(@typeInfo(SysFn.Tag).@"enum".tag_type);
+    if (x.data.callee > max_tag) return if (used) f.dg.fail("a call of a user function (callee {d})", .{x.data.callee});
+    const tag: SysFn.Tag = @fromBackingInt(@intCast(x.data.callee));
+    const info = SysFn.get(tag);
+    switch (info.family) {
+        // §9.4/§9.7 a print or a simulation control task is not part of a
+        // residual: the device's display phase runs it.
+        .display, .simctl => {
+            if (used) return f.dg.fail("the value of `{s}`", .{@tagName(tag)});
+            if (f.phase == .say) try say.record(f, inst);
+            return;
+        },
+        else => {}, // else: a value, by tag below
+    }
+    if (!used and !Liveness.effect(air.*, .call, data)) return;
+    // A task with no value (a §9.5 file task) has no spelling here yet.
+    if (air.typeOfIndex(f.dg.ip, inst) == .none) return f.dg.fail("the task `{s}`", .{@tagName(tag)});
+    try f.line();
+    try f.print("const v{d} = ", .{@backingInt(inst)});
+    try gen(f, inst, tag, args);
+    try f.print(";", .{});
+    // An effect whose value nothing reads (an operator only a print reads).
+    if (!used) try f.print(" _ = v{d};", .{@backingInt(inst)});
+}
 
 /// Writes call `inst`'s value: a family value for a real result, an `i64`
 /// for an integer. Fails on a callee this backend does not spell yet.
@@ -180,6 +216,7 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Ref
         .slew => try ops.gen(f, inst, .slew, args),
         .idtmod => try ops.gen(f, inst, .idtmod, args),
         .last_crossing => try ops.gen(f, inst, .last_crossing, args),
+        .absdelay => try ops.gen(f, inst, .absdelay, args),
         else => {
             // rw-lower's `display$phase` guards a print's operands: `core`
             // drops prints, so it answers 0, and `say` 1. By name, so this
@@ -193,9 +230,6 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Ref
 }
 
 // ---- private ----
-
-/// The analysis names `analysis()` recognises (§4.6.1).
-const analysis_names = [_][]const u8{ "static", "ic", "nodeset", "dc", "tran", "ac", "noise" };
 
 /// Opens a 0/1 value: an `i64` or a real `S.con`.
 fn open(f: *Function, int: bool) Error!void {

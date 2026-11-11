@@ -11,9 +11,12 @@
 //! the largest error relative to its row's scale (the largest magnitude of
 //! the row's value and lanes at that point), which stays meaningful where
 //! a lane cancels to near zero and its ulp count does not.
-//! The check: no device is slower versioned (with `Fast`) than strict by
-//! more than `noise` on the medians, since codegen versions only the
-//! bodies where fast-math pays (DeclGen's `transcendental`).
+//! The check: no device that versions (its fast body moved some bits) runs
+//! slower versioned (with `Fast`) than strict past the noise, on the least
+//! of the runs (the stable statistic on a shared machine). The noise is
+//! measured in the same run: strict timed twice, and the threshold is
+//! `noise_min` or twice that spread, whichever is larger. A device codegen
+//! did not version runs the same code twice and only reports.
 //! No LRM clause: a measurement held to a rule of thumb, not to the LRM.
 //!
 //! Contents: `main` only; the family decls `NoFast(S)` re-exports (`V`,
@@ -28,17 +31,16 @@ const devices = .{ @import("diode"), @import("mosfet"), @import("abs"), @import(
 const versioned = .{ @import("diode_v"), @import("mosfet_v"), @import("abs_v"), @import("tanh_amp_v"), @import("mos_exp_v") };
 const points = 4096;
 const reps = 101;
-/// How much slower than strict a versioned device's median may run: the
-/// spread of the strict medians run to run on a quiet machine.
-const noise = 0.03;
+/// The least threshold a versioned device's slowdown is held to.
+const noise_min = 0.03;
 
 pub fn main(init: std.process.Init) !void {
     std.debug.print("ns per eval, median (least) of {d} runs x {d} points\n", .{ reps, points });
-    std.debug.print("{s:<8} {s:>16} {s:>16} {s:>16} {s:>7} {s:>6} {s:>9} {s:>9}\n", .{ "device", "strict", "versioned", "versioned+Fast", "gain", "moved", "max ulps", "max rel" });
+    std.debug.print("{s:<8} {s:>16} {s:>16} {s:>16} {s:>7} {s:>6} {s:>6} {s:>9} {s:>9}\n", .{ "device", "strict", "versioned", "versioned+Fast", "gain", "noise", "moved", "max ulps", "max rel" });
     var slower: u32 = 0;
     inline for (devices, versioned, names) |D, Dv, name| slower += @intFromBool(try bench(D, Dv, name, init.io));
     if (slower != 0) {
-        std.debug.print("bench-fast: {d} device(s) slower versioned than strict past {d}%\n", .{ slower, noise * 100 });
+        std.debug.print("bench-fast: {d} versioned device(s) slower than strict past the noise\n", .{slower});
         return error.VersionedSlower;
     }
 }
@@ -46,7 +48,7 @@ pub fn main(init: std.process.Init) !void {
 // ---- private ----
 
 /// Times device `D` and its versioned twin `Dv`; returns whether the
-/// versioned one ran slower than `noise` allows.
+/// versioned one ran slower than the measured noise allows.
 fn bench(comptime D: type, comptime Dv: type, name: []const u8, io: std.Io) !bool {
     const n = contract.nU(D);
     const S = contract.RefFamily(f64, &std.simd.iota(u8, n), .{ .math = math });
@@ -88,21 +90,25 @@ fn bench(comptime D: type, comptime Dv: type, name: []const u8, io: std.Io) !boo
         ulps = @max(ulps, apart);
         moved += @intFromBool(apart != 0);
     }
-    var t: [3][reps]u64 = undefined;
+    // Row 3 is strict again: the noise floor.
+    var t: [4][reps]u64 = undefined;
     for (0..reps) |r| {
         t[0][r] = try timeEval(D, S, &xs, &m, &inst, sim, io);
         t[1][r] = try timeEval(Dv, S0, &xs, mv, &instv, sim, io);
         t[2][r] = try timeEval(Dv, S, &xs, mv, &instv, sim, io);
+        t[3][r] = try timeEval(D, S, &xs, &m, &inst, sim, io);
     }
-    var med: [3]f64 = undefined;
-    var least: [3]f64 = undefined;
+    var med: [4]f64 = undefined;
+    var least: [4]f64 = undefined;
     for (&t, &med, &least) |*row, *md, *ls| {
         std.mem.sort(u64, row, {}, std.sort.asc(u64));
         md.* = @as(f64, @floatFromInt(row[reps / 2])) / points;
         ls.* = @as(f64, @floatFromInt(row[0])) / points;
     }
-    std.debug.print("{s:<8} {d:>7.2} ({d:>6.2}) {d:>7.2} ({d:>6.2}) {d:>7.2} ({d:>6.2}) {d:>6.1}% {d:>6} {d:>9} {e:>9.2}\n", .{ name, med[0], least[0], med[1], least[1], med[2], least[2], (med[0] - med[2]) / med[0] * 100.0, moved, ulps, rel });
-    return med[2] > med[0] * (1.0 + noise);
+    const spread = @abs(least[3] - least[0]) / @min(least[0], least[3]);
+    const threshold = @max(noise_min, 2.0 * spread);
+    std.debug.print("{s:<8} {d:>7.2} ({d:>6.2}) {d:>7.2} ({d:>6.2}) {d:>7.2} ({d:>6.2}) {d:>6.1}% {d:>5.1}% {d:>6} {d:>9} {e:>9.2}\n", .{ name, med[0], least[0], med[1], least[1], med[2], least[2], (least[0] - least[2]) / least[0] * 100.0, spread * 100.0, moved, ulps, rel });
+    return moved != 0 and least[2] > least[0] * (1.0 + threshold);
 }
 
 /// Family `S` without its `Fast` trait.

@@ -1,6 +1,7 @@
 //! The codegen module's spec examples: a small module lowered by Sema, its
-//! device written by the Zig backend, and the text checked: it parses as
-//! Zig (`std.zig.Ast`), and it has the shape the spec names (no kernel
+//! device written by the Zig backend, and the text checked: it passes
+//! `std.zig.AstGen` (no unused local or parameter: what a build would
+//! refuse first), and it has the shape the spec names (no kernel
 //! text, the versioned unit's entry check). The behaviour oracle is
 //! `tests/differential/codegen.zig`, which builds and runs the devices.
 //!
@@ -56,8 +57,10 @@ fn emitWith(gpa: std.mem.Allocator, comptime body: []const u8, strict: bool) !co
     return codegen.generate(gpa, .zig, .{ .air = &a.air, .ip = &zcu.intern_pool, .device = &a.device, .verdict = &f.verdict }, .{ .strict = strict });
 }
 
-/// Fails unless `text` parses as a Zig file.
-fn expectParses(gpa: std.mem.Allocator, text: []const u8) !void {
+/// Fails unless `text` parses as a Zig file and passes `std.zig.AstGen`:
+/// the per-file checks a build makes first (an unused local or parameter,
+/// a discarded value, a shadowed name), without building the device.
+fn expectAstGen(gpa: std.mem.Allocator, text: []const u8) !void {
     const z = try gpa.dupeSentinel(u8, text, 0);
     defer gpa.free(z);
     var tree = try std.zig.Ast.parse(gpa, z, .{});
@@ -66,6 +69,19 @@ fn expectParses(gpa: std.mem.Allocator, text: []const u8) !void {
         std.debug.print("{s}\n", .{text});
         return error.DeviceDoesNotParse;
     }
+    var zir = try std.zig.AstGen.generate(gpa, tree);
+    defer zir.deinit(gpa);
+    if (!zir.hasCompileErrors()) return;
+    var wip: std.zig.ErrorBundle.Wip = try .init(gpa);
+    defer wip.deinit();
+    try wip.addZirErrorMessages(zir, tree, z, "device.zig");
+    var eb = try wip.toOwnedBundle("");
+    defer eb.deinit(gpa);
+    var out: std.Io.Writer.Allocating = .init(gpa);
+    defer out.deinit();
+    try eb.renderToWriter(.{}, &out.writer);
+    std.debug.print("{s}\n{s}", .{ text, out.written() });
+    return error.DeviceFailsAstGen;
 }
 
 test "a diode and its junction charge: the device parses and imports its kernels" {
@@ -87,7 +103,7 @@ test "a diode and its junction charge: the device parses and imports its kernels
     );
     defer r.deinit(gpa);
     const text = r.ok.text;
-    try expectParses(gpa, text);
+    try expectAstGen(gpa, text);
     try std.testing.expect(std.mem.find(u8, text, "@import(\"std_kernels\")") != null);
     // No kernel text: no device-local transcendental.
     try std.testing.expect(std.mem.find(u8, text, "fn zLog10") == null);
@@ -128,12 +144,32 @@ test "a print's operands are dead in the residual and live in `say`" {
         \\endmodule
     );
     defer r.deinit(gpa);
-    try expectParses(gpa, r.ok.text);
+    try expectAstGen(gpa, r.ok.text);
     const at = std.mem.find(u8, r.ok.text, "pub fn say(").?;
     try std.testing.expect(std.mem.find(u8, r.ok.text[0..at], ".exp()") == null);
     try std.testing.expect(std.mem.find(u8, r.ok.text[at..], ".exp()") != null);
     try std.testing.expect(std.mem.find(u8, r.ok.text[at..], "out.put(0, &.{") != null);
     try std.testing.expect(std.mem.find(u8, r.ok.text, ".fmt = \"%g\\n\"") != null);
+}
+
+test "§4.5.8 an operator only a print reads still runs in the residual, its value discarded" {
+    // `transition` keeps state between points, so `core` evaluates it even
+    // though only `say` reads the value: AstGen refuses the local unless
+    // it is discarded (red-checked: dropping `calls.zig`'s `_ = v` fails
+    // here, as a device without it fails to build).
+    const gpa = std.testing.allocator;
+    var r = try emit(gpa,
+        \\module d(a, c);
+        \\  inout a, c;
+        \\  electrical a, c;
+        \\  analog begin
+        \\    $strobe("%g", transition(V(a, c), 0, 1n));
+        \\    I(a, c) <+ V(a, c);
+        \\  end
+        \\endmodule
+    );
+    defer r.deinit(gpa);
+    try expectAstGen(gpa, r.ok.text);
 }
 
 test "§11.10 the bsource stack: no memset, a one-word reset, every read behind its written bit" {
@@ -149,7 +185,7 @@ test "§11.10 the bsource stack: no memset, a one-word reset, every read behind 
     var r = try codegen.generate(gpa, .zig, .{ .air = &e.air, .ip = &ip, .device = &e.device }, .{ .strict = true });
     defer r.deinit(gpa);
     const text = r.ok.text;
-    try expectParses(gpa, text);
+    try expectAstGen(gpa, text);
     for ([_][]const u8{ "@memset", "@splat(" }) |zeroing| try std.testing.expect(std.mem.find(u8, text, zeroing) == null);
     try std.testing.expect(std.mem.find(u8, text, "[16]F.zOf(S, 0x3) = undefined") != null);
     try std.testing.expectEqual(@as(usize, 1), std.mem.count(u8, text, "_m = 0;"));
@@ -174,7 +210,7 @@ test "§11.9 a versioned unit: the box checked at entry, the fast body inside it
     var r = try emitWith(gpa, src, false);
     defer r.deinit(gpa);
     const text = r.ok.text;
-    try expectParses(gpa, text);
+    try expectAstGen(gpa, text);
     for ([_][]const u8{
         "zIn(x[0], -1e1, false, 1e1, false, false)",
         "zIn(x[1], -1e1, false, 1e1, false, false)",
@@ -191,6 +227,7 @@ test "§11.9 a versioned unit: the box checked at entry, the fast body inside it
     // Forced strict: one body, no check.
     var s = try emitWith(gpa, src, true);
     defer s.deinit(gpa);
+    try expectAstGen(gpa, s.ok.text);
     try std.testing.expect(std.mem.find(u8, s.ok.text, "zIn(") == null);
     try std.testing.expect(std.mem.find(u8, s.ok.text, ".optimized") == null);
 }
@@ -209,7 +246,7 @@ test "§11.9 a polynomial body is not versioned: its entry check costs more than
     ;
     var r = try emitWith(gpa, src, false);
     defer r.deinit(gpa);
-    try expectParses(gpa, r.ok.text);
+    try expectAstGen(gpa, r.ok.text);
     try std.testing.expect(std.mem.find(u8, r.ok.text, "zIn(") == null);
     try std.testing.expect(std.mem.find(u8, r.ok.text, ".optimized") == null);
 }

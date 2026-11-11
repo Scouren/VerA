@@ -8,6 +8,7 @@
 //! Contents:
 //! - `pub const Card = struct`, `pub const New = union(enum)`
 //! - `pub fn old(gpa: Allocator, arena: Allocator, path: []const u8, source: []const u8, include: []const []const u8) !?[]const u8`
+//! - `pub fn picked(rel: []const u8, filter: []const u8) bool`
 //! - `pub fn new(gpa: Allocator, arena: Allocator, io: Io, path: []const u8, source: []const u8, include: []const []const u8) !New`
 
 const std = @import("std");
@@ -23,6 +24,7 @@ const diag = @import("diag");
 const vera = @import("vera");
 const Zcu = sema.Zcu;
 const Sema = sema.Sema;
+const events = vams.Preprocessor.events;
 
 /// The real parameters a point may move, each near its default inside its
 /// §3.4.2 ranges, and the unknown count.
@@ -93,7 +95,10 @@ pub fn new(gpa: Allocator, arena: Allocator, io: Io, path: []const u8, source: [
     var tree = try vams.Ast.parse(gpa, text, .{ .keywords = .vams_2023 });
     defer tree.deinit(gpa);
     if (tree.errors.len != 0) return .refused;
-    var vir = try vams.AstGen.generate(gpa, &tree, .{});
+    // The old preprocessor's directives, as the new AstGen reads them
+    // (diff-lower does the same): an `unconnected_drive fixture otherwise
+    // lowers different unknowns.
+    var vir = try vams.AstGen.generate(gpa, &tree, .{ .directives = try directives(arena, pp.directives) });
     defer vir.deinit(gpa);
     var zcu: Zcu = try .init(gpa);
     defer zcu.deinit();
@@ -162,7 +167,51 @@ pub fn new(gpa: Allocator, arena: Allocator, io: Io, path: []const u8, source: [
     }
 }
 
+/// Whether fixture path `rel` holds one of `filter`'s `|`-separated
+/// substrings; an empty filter picks every fixture.
+pub fn picked(rel: []const u8, filter: []const u8) bool {
+    if (filter.len == 0) return true;
+    var it = std.mem.splitScalar(u8, filter, '|');
+    while (it.next()) |part| if (part.len != 0 and std.mem.find(u8, rel, part) != null) return true;
+    return false;
+}
+
 // ---- private ----
+
+/// `src`, the old preprocessor's §10.2/§10.3 and IEEE 1364 §19 directive
+/// events, in the new `events.Directives` shape (each region's value by
+/// name).
+fn directives(arena: Allocator, src: anytype) !events.Directives {
+    const disciplines = try arena.alloc(events.DefaultDiscipline, src.disciplines.len);
+    for (src.disciplines, disciplines) |e, *d| d.* = .{
+        .at = e.at,
+        .qualifier = if (e.qualifier) |q| std.meta.stringToEnum(events.Qualifier, @tagName(q)).? else null,
+        .discipline = e.discipline,
+    };
+    return .{
+        .disciplines = disciplines,
+        .transitions = try regions(?f64, arena, src.transitions),
+        .timescales = try regions(?events.Timescale, arena, src.timescales),
+        .nettypes = try regions(events.NetType, arena, src.nettypes),
+        .cells = try regions(bool, arena, src.cells),
+        .drives = try regions(events.Drive, arena, src.drives),
+    };
+}
+
+/// One list of old regions as `events.Region(T)`: an enum by its tag's
+/// name, a timescale field by field, any other value as it is.
+fn regions(comptime T: type, arena: Allocator, src: anytype) ![]const events.Region(T) {
+    const out = try arena.alloc(events.Region(T), src.len);
+    for (src, out) |e, *r| r.* = .{
+        .at = e.at,
+        .value = switch (@typeInfo(T)) {
+            .@"enum" => std.meta.stringToEnum(T, @tagName(e.value)).?,
+            .optional => |o| if (o.child == f64) e.value else if (e.value) |t| events.Timescale{ .unit = t.unit, .precision = t.precision } else null,
+            else => e.value, // else: a bool
+        },
+    };
+    return out;
+}
 
 /// The box the device's versioned unit checks, read off the verdict as the
 /// spec states it (§11.9: every root `.optimized`, the union of their

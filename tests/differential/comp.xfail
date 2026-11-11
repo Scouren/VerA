@@ -1410,7 +1410,6 @@ verilog-ams/ch06_hierarchy/digital_port_expression_actual.va rw-lower (analog lo
 verilog-ams/ch06_hierarchy/generate_block_event_declaration.va rw-lower (analog lowering): stderr: line 10: old `  t = 2.000000e-8  dt = 1.000000e-8`, new `  t = 3.000000e-8  dt = 2.000000e-8`
 verilog-ams/ch06_hierarchy/generate_block_gate.va rw-codegen (run): stderr: line 26: old `warning[W0252]: gate primitive accepted, and it computes nothing: `and` primitive`, new ``
 verilog-ams/ch06_hierarchy/genvar_set_to_x_rejected.va rw-lower (analog lowering): exit status old 1, new 0
-verilog-ams/ch06_hierarchy/hierarchical_analog_probes_from_digital.va not built: backend exe
 verilog-ams/ch06_hierarchy/net_variable_same_name_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: §6.8: one identifier declares one item in a scope — the earlier declaration is unreachable`, new `   = help: run `vera --explain E0362` for a detailed explanation`
 verilog-ams/ch06_hierarchy/real_valued_wreal_port.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/a2d_case_equality_over_x_and_z.va rw-lower (analog lowering): exit status old 0, new 1

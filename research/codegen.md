@@ -602,3 +602,29 @@ Each emitted Instance/State struct keeps the existing `comptime assert(@sizeOf(.
 **Q8. C3: the 6 comp fixtures with no known cause.**
 - Recommendation: T0a runs them once and routes each to its owner.
 - Decision: Yes: T0a runs them once and routes each to its owner.
+
+## Added at wave 1 (lead)
+
+- **T0d — the FD Jacobian check's precondition, by construct.** The 7 lines
+  w1-codegen's T0b opened on the *old* device (`ddx`, `ddx_flow_column_in_eval`,
+  `ddx_vera_nodiff_assignment`, `duplicate_attribute_last_value_wins`,
+  `conversion_functions`, `realtobits`, `modulo_real_dynamic_zero`) are not
+  rulings: both devices agree bit for bit, so neither side is wrong. A central
+  difference is no oracle for a row whose Jacobian VerA defines by rule rather
+  than as the limit (`ddx`, `vera_nodiff`, the integer conversions,
+  `$realtobits`, `%`/`fmod`). `dyn.zig` skips the FD check for a root that
+  holds one of those ops (a table of Air tags, not a fixture list), and the
+  check still runs on every smooth root. Red first: drop the table and the 7
+  lines come back; a planted Jacobian fault on a smooth row of one of these
+  fixtures still goes red. Files: `tests/differential/codegen/dyn.zig`,
+  `codegen.xfail`.
+- **T36 — `$bound_step` (VAMS §9.17.2).** T0b's `bound_step` compare opened 6
+  lines: the new device never writes it, and no task covered it. Owner:
+  codegen (the `calls.zig` arm and the state slot), oracle: T0b's compare.
+- **C3 owners** (from T0a's runs; the judge assigns comp owners, so these are
+  routing notes): alias card writes (3) are Sema's `Air.Device` aliases plus the
+  bench; `spice_binned_model_selects_by_l_and_w` is the bench's card route;
+  `vcvs_inside_a_spice_subcircuit` is codegen (refused construct + empty W0650
+  unit name, untraced); `noise_table_file_name_parameter` is Sema's
+  `noise_table` file resolution.
+

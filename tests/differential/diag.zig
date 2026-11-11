@@ -42,7 +42,7 @@ const vams = @import("vams");
 const diag = @import("diag");
 const vera = @import("vera");
 const frontend = @import("frontend");
-const rewrite_options = @import("rewrite_options");
+const repo_env = @import("repo_env");
 const settle = @import("settle.zig");
 const Diag = vams.Diag;
 
@@ -543,10 +543,10 @@ test "diff-diag: the old compiler's diagnostics on the reject and warn fixtures 
     var run_arena: std.heap.ArenaAllocator = .init(gpa);
     defer run_arena.deinit();
     const ra = run_arena.allocator();
-    const root = rewrite_options.fixture_root;
+    const root = repo_env.fixtureRoot();
     const fixtures = try collect(ra, io, root);
-    const xfail = try readXfail(ra, io, try std.fs.path.join(ra, &.{ rewrite_options.repo_root, "tests/differential/diag.xfail" }));
-    var rulings = try settle.Rulings.read(ra, io, rewrite_options.repo_root, "diag");
+    const xfail = try readXfail(ra, io, try std.fs.path.join(ra, &.{ repo_env.repoRoot(), "tests/differential/diag.xfail" }));
+    var rulings = try settle.Rulings.read(ra, io, repo_env.repoRoot(), "diag");
 
     var fixture_arena: std.heap.ArenaAllocator = .init(gpa);
     defer fixture_arena.deinit();

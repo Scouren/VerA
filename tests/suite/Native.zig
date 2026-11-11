@@ -152,7 +152,7 @@ pub fn vcdDiff(arena: Allocator, io: Io, w: *Io.Writer, case: []const u8, work: 
         try w.print("FAIL {s}: the executable wrote no `{s}`\n", .{ case, v.produced });
         return false;
     };
-    const dir = std.fs.path.dirname(try arena.print("{s}/{s}.v", .{ options.fixture_root, case })).?;
+    const dir = std.fs.path.dirname(try arena.print("{s}/{s}.v", .{ options.fixtureRoot(), case })).?;
     const want_text = try Io.Dir.cwd().readFileAlloc(io, try std.fs.path.join(arena, &.{ dir, v.golden }), arena, .limited(1 << 24));
     const got = try digital.vcdTokens(arena, got_text);
     const want = try digital.vcdTokens(arena, want_text);
@@ -196,7 +196,7 @@ fn nativeVerdict(arena: Allocator, io: Io, vera_exe: []const u8, flags: []const 
     var v = try nativeCase(arena, io, vera_exe, flags, snapshot, case, &detail.writer);
     if (v.pass) {
         try w.print("FAIL {s}: XPASS — marked xfail, but VerA now does what the fixture says.\n" ++
-            "  Delete its `//! xfail` line or its row in {s}.\n", .{ case, harness.xfail_list });
+            "  Delete its `//! xfail` line or its row in {s}.\n", .{ case, try harness.xfailList(arena) });
         v.pass = false;
         return v;
     }
@@ -209,7 +209,7 @@ fn nativeVerdict(arena: Allocator, io: Io, vera_exe: []const u8, flags: []const 
 /// --emit-exe` (the shared elaboration) or from the executable at run time;
 /// either way its stderr is judged, the build's and the run's together.
 fn nativeCase(arena: Allocator, io: Io, vera_exe: []const u8, flags: []const []const u8, snapshot: bool, case: []const u8, w: *Io.Writer) !NativeVerdict {
-    const src = try arena.print("{s}/{s}.v", .{ options.fixture_root, case });
+    const src = try arena.print("{s}/{s}.v", .{ options.fixtureRoot(), case });
     const source = try Io.Dir.cwd().readFileAlloc(io, src, arena, .limited(1 << 20));
     const work = try arena.print("native/{s}", .{case});
     try Io.Dir.cwd().createDirPath(io, work);
@@ -263,7 +263,7 @@ fn nativeCase(arena: Allocator, io: Io, vera_exe: []const u8, flags: []const []c
         if (digital.rejectionMatches(source, ran.exit, stderr)) {
             // A rejection with a transcript (`devices.digitalCase`): the run
             // went on after the error, and printed this.
-            const golden = try arena.print("{s}/{s}.expected.txt", .{ options.fixture_root, case });
+            const golden = try arena.print("{s}/{s}.expected.txt", .{ options.fixtureRoot(), case });
             const want = Io.Dir.cwd().readFileAlloc(io, golden, arena, .limited(1 << 20)) catch
                 return .{ .pass = true, .fallback = fallback, .state = state };
             const same = if (two_state) try twoStateDiff(w, case, want, ran.stdout) else try devices.diff(w, case, want, ran.stdout);
@@ -281,7 +281,7 @@ fn nativeCase(arena: Allocator, io: Io, vera_exe: []const u8, flags: []const []c
         return .{ .pass = false, .fallback = fallback, .state = state };
     }
     if (digital.vcdExpectation(source)) |v| return .{ .pass = try vcdDiff(arena, io, w, case, work, v, two_state), .fallback = fallback, .state = state };
-    const want = try Io.Dir.cwd().readFileAlloc(io, try arena.print("{s}/{s}.expected.txt", .{ options.fixture_root, case }), arena, .limited(1 << 20));
+    const want = try Io.Dir.cwd().readFileAlloc(io, try arena.print("{s}/{s}.expected.txt", .{ options.fixtureRoot(), case }), arena, .limited(1 << 20));
     if (two_state) return .{ .pass = try twoStateDiff(w, case, want, ran.stdout), .fallback = fallback, .state = state };
     return .{ .pass = try devices.diff(w, case, want, ran.stdout), .fallback = fallback, .state = state };
 }

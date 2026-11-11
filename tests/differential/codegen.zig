@@ -46,6 +46,7 @@ const Allocator = std.mem.Allocator;
 const link = @import("link");
 const DynLib = @import("dynlib").DynLib;
 const options = @import("rewrite_options");
+const repo_env = @import("repo_env");
 const sides = @import("codegen/sides.zig");
 const ulps = @import("codegen/ulps.zig");
 
@@ -156,7 +157,7 @@ fn runAll() !void {
     var tally: Tally = .{};
     var whys: std.StringArrayHashMapUnmanaged([]const u8) = .empty;
     var ready: std.ArrayList(Ready) = .empty;
-    const include = options.fixture_root ++ "/include";
+    const include = try std.fs.path.join(arena, &.{ repo_env.fixtureRoot(), "include" });
     for (try collect(arena, io)) |rel| {
         if (!sides.picked(rel, filter)) continue;
         tally.fixtures += 1;
@@ -164,7 +165,7 @@ fn runAll() !void {
             tally.lower_listed += 1;
             continue;
         }
-        const path = try std.fs.path.join(arena, &.{ options.fixture_root, rel });
+        const path = try std.fs.path.join(arena, &.{ repo_env.fixtureRoot(), rel });
         const dirs = [_][]const u8{ std.fs.path.dirname(path).?, include };
         const source = try Io.Dir.cwd().readFileAlloc(io, path, arena, .limited(1 << 26));
         const old = (try sides.old(gpa, arena, path, source, &dirs)) orelse {
@@ -182,7 +183,7 @@ fn runAll() !void {
         }
     }
 
-    const work = try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", "codegen-work" });
+    const work = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "zig-out", "codegen-work" });
     var slots: [jobs]link.Server = undefined;
     var q: link.Queue = .init(&slots);
     var at: usize = 0;
@@ -250,9 +251,9 @@ fn runBatch(gpa: Allocator, arena: Allocator, io: Io, q: *link.Queue, work: []co
     const dir = try arena.print("{s}/b{d}", .{ work, batch });
     try Io.Dir.cwd().createDirPath(io, dir);
     defer if (!options.codegen_keep) Io.Dir.cwd().deleteTree(io, dir) catch {};
-    const contract = try std.fs.path.join(arena, &.{ options.repo_root, "lib", "contract.zig" });
-    const kernels = try std.fs.path.join(arena, &.{ options.repo_root, "lib", "std", "kernels.zig" });
-    const dyn = try std.fs.path.join(arena, &.{ options.repo_root, "tests", "differential", "codegen", "dyn.zig" });
+    const contract = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "lib", "contract.zig" });
+    const kernels = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "lib", "std", "kernels.zig" });
+    const dyn = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "tests", "differential", "codegen", "dyn.zig" });
     var index: Io.Writer.Allocating = .init(arena);
     for (group, 0..) |r, k| {
         for ([3][]const u8{ "o", "n", "v" }, [3]?[]const u8{ r.old, r.new, r.ver }) |side, text| if (text) |t|
@@ -634,7 +635,7 @@ fn admits(x: f64, ranges: []const @import("air").Device.Range) bool {
 /// The fixture paths a list file names (`<path> <reason>` lines, `#`
 /// comments).
 fn readList(arena: Allocator, io: Io, rel: []const u8) !std.StringHashMapUnmanaged(void) {
-    const path = try std.fs.path.join(arena, &.{ options.repo_root, rel });
+    const path = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), rel });
     const text = try Io.Dir.cwd().readFileAlloc(io, path, arena, .limited(1 << 22));
     var set: std.StringHashMapUnmanaged(void) = .empty;
     var lines = std.mem.splitScalar(u8, text, '\n');
@@ -648,7 +649,7 @@ fn readList(arena: Allocator, io: Io, rel: []const u8) !std.StringHashMapUnmanag
 
 /// Every `.va`/`.vams` fixture path relative to the fixture root, sorted.
 fn collect(arena: Allocator, io: Io) ![]const []const u8 {
-    var dir = try Io.Dir.cwd().openDir(io, options.fixture_root, .{ .iterate = true });
+    var dir = try Io.Dir.cwd().openDir(io, repo_env.fixtureRoot(), .{ .iterate = true });
     defer dir.close(io);
     var walker = try dir.walk(arena);
     defer walker.deinit();

@@ -52,6 +52,7 @@ const analog = @import("analog");
 const ir = @import("ir");
 const OldInterp = @import("old_interp");
 const options = @import("rewrite_options");
+const repo_env = @import("repo_env");
 const Zcu = sema.Zcu;
 const Sema = sema.Sema;
 const Mir = ir.Mir;
@@ -105,7 +106,7 @@ fn runAll() !void {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const xfail_path = try std.fs.path.join(arena, &.{ options.repo_root, "tests/differential/lower.xfail" });
+    const xfail_path = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "tests/differential/lower.xfail" });
     const xfail_text = try Io.Dir.cwd().readFileAlloc(io, xfail_path, arena, .limited(1 << 22));
     var xfail: std.StringHashMapUnmanaged([]const u8) = .empty;
     var lines = std.mem.splitScalar(u8, xfail_text, '\n');
@@ -115,7 +116,7 @@ fn runAll() !void {
         try xfail.put(arena, line[0..sp], line[sp + 1 ..]);
     }
     const dump = options.lower_dump;
-    var rulings = try settle.Rulings.read(arena, io, options.repo_root, "lower");
+    var rulings = try settle.Rulings.read(arena, io, repo_env.repoRoot(), "lower");
     const drops = try elabDrops(arena, io);
 
     const fixtures = try collect(arena, io);
@@ -184,7 +185,7 @@ fn runAll() !void {
 
 /// Every `.va`/`.vams` fixture path relative to the fixture root, sorted.
 fn collect(arena: std.mem.Allocator, io: Io) ![]const []const u8 {
-    var dir = try Io.Dir.cwd().openDir(io, options.fixture_root, .{ .iterate = true });
+    var dir = try Io.Dir.cwd().openDir(io, repo_env.fixtureRoot(), .{ .iterate = true });
     defer dir.close(io);
     var walker = try dir.walk(arena);
     defer walker.deinit();
@@ -213,7 +214,7 @@ fn dumped(rel: []const u8, dump: []const u8) bool {
 /// `elab.rulings`' `drops` rows by fixture: the instance paths the new
 /// tree omits, less the top module's segment, as the old rows name them.
 fn elabDrops(arena: std.mem.Allocator, io: Io) !std.StringHashMapUnmanaged([]const []const u8) {
-    const r = try settle.Rulings.read(arena, io, options.repo_root, "elab");
+    const r = try settle.Rulings.read(arena, io, repo_env.repoRoot(), "elab");
     var out: std.StringHashMapUnmanaged([]const []const u8) = .empty;
     for (r.map.keys(), r.map.values()) |path, ruling| {
         const rest = std.mem.cutPrefix(u8, ruling.expected, "drops ") orelse continue;
@@ -231,9 +232,9 @@ fn elabDrops(arena: std.mem.Allocator, io: Io) !std.StringHashMapUnmanaged([]con
 /// One fixture's verdict; a disagreement `rulings` settles is `.ruled`.
 /// `dropped` are the instance paths elaboration's rulings drop.
 fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, show: bool, rulings: *settle.Rulings, dropped: []const []const u8) !Outcome {
-    const path = try std.fs.path.join(arena, &.{ options.fixture_root, rel });
+    const path = try std.fs.path.join(arena, &.{ repo_env.fixtureRoot(), rel });
     const dir = std.fs.path.dirname(path).?;
-    const include = options.fixture_root ++ "/include";
+    const include = try std.fs.path.join(arena, &.{ repo_env.fixtureRoot(), "include" });
     const source = try Io.Dir.cwd().readFileAlloc(io, path, arena, .limited(1 << 26));
     const bag = try arena.create(diag.Bag);
     bag.* = .init(arena);

@@ -15,7 +15,7 @@ const ZigAst = std.zig.Ast;
 const Ast = @import("frontend").Ast;
 const Mir = @import("ir").Mir;
 const op = @import("ir").op;
-const repo_root = @import("repo_options").repo_root;
+const repoRoot = @import("repo_options").repoRoot;
 
 /// The boundary enums, read from the real types so the registry cannot drift.
 /// A switch is attributed to the FIRST entry whose fields cover all its prong
@@ -158,7 +158,7 @@ test "every `else` over a boundary enum is written out or annotated" {
     defer file_state.deinit();
     var found: usize = 0;
     for ([_][]const u8{ "lib", "src" }) |sub| {
-        const abs = try std.fs.path.join(arena, &.{ repo_root, sub });
+        const abs = try std.fs.path.join(arena, &.{ repoRoot(), sub });
         var dir = try Io.Dir.cwd().openDir(io, abs, .{ .iterate = true });
         defer dir.close(io);
         var w = try dir.walk(arena);
@@ -183,7 +183,7 @@ test "no OS API outside the allowlisted module" {
     const io = std.testing.io;
 
     var found: usize = 0;
-    const root = try Io.Dir.cwd().openDir(io, repo_root, .{});
+    const root = try Io.Dir.cwd().openDir(io, repoRoot(), .{});
     for ([_][]const u8{ "lib", "src" }) |sub| {
         var dir = try root.openDir(io, sub, .{ .iterate = true });
         defer dir.close(io);

@@ -12,6 +12,7 @@
 const std = @import("std");
 const Io = std.Io;
 const options = @import("comp_options");
+const repo_env = @import("repo_env");
 const yosys = @import("comp/yosys.zig");
 
 // ---- private ----
@@ -42,12 +43,12 @@ test "rtlil-equiv: vera-next's RTLIL of tests/rtlil is Yosys-equivalent to vera'
     defer arena_state.deinit();
     const a = arena_state.allocator();
     const io = std.testing.io;
-    const work = try std.fs.path.join(a, &.{ options.repo_root, "zig-out", "rtlil-equiv" });
+    const work = try std.fs.path.join(a, &.{ repo_env.repoRoot(), "zig-out", "rtlil-equiv" });
     const old_exe = try Io.Dir.cwd().realPathFileAlloc(io, options.vera, a);
     const new_exe = try Io.Dir.cwd().realPathFileAlloc(io, options.vera_next, a);
     var failed: u32 = 0;
     for ([_][]const u8{ "counter", "fold_1364", "null_ports" }) |stem| {
-        const src = try std.fmt.allocPrint(a, "{s}/tests/rtlil/{s}.v", .{ options.repo_root, stem });
+        const src = try std.fmt.allocPrint(a, "{s}/tests/rtlil/{s}.v", .{ repo_env.repoRoot(), stem });
         const old = try emit(a, io, old_exe, src);
         const new = try emit(a, io, new_exe, src);
         if (try yosys.equivalent(a, io, options.yosys, work, old, new)) |why| {

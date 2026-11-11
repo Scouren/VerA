@@ -5,7 +5,7 @@
 //! `Fixtures.zig` re-exports all four for the runners.
 //!
 //! Contents:
-//! - `pub const xfail_list`
+//! - `pub fn xfailList(arena: std.mem.Allocator) ![]const u8`
 //! - `pub fn listedXfail(arena: std.mem.Allocator, io: Io, root: []const u8, path: []const u8) !?[]const u8`
 //! - `pub fn collect(arena: std.mem.Allocator, io: Io, root: []const u8, dirs: []const []const u8, filter: ?[]const u8) ![]const Fixture`
 //! - `pub fn hasDirective(source: []const u8) bool`
@@ -24,16 +24,18 @@ const Fixture = Fixtures.Fixture;
 /// one path a line, relative to the suite root (`tests/verilog/16_sdf/x.v`),
 /// the reason after `#`; a line starting `#` is a comment. A fixture listed
 /// here is judged exactly as if it carried `//! xfail <reason>`.
-pub const xfail_list = options.repo_root ++ "/tests/suite.xfail";
+pub fn xfailList(arena: std.mem.Allocator) ![]const u8 {
+    return std.fs.path.join(arena, &.{ options.repoRoot(), "tests/suite.xfail" });
+}
 
-/// The reason `xfail_list` gives the fixture at `path` under `root` (the
+/// The reason `xfailList` gives the fixture at `path` under `root` (the
 /// suite's `tests/`, so the key is `path` relative to `root`'s parent): ""
 /// for a bare line, null when it is not listed. Read per call: the file is a
 /// few lines, and a run's workers then share nothing.
 pub fn listedXfail(arena: std.mem.Allocator, io: Io, root: []const u8, path: []const u8) !?[]const u8 {
     const suite_root = std.fs.path.dirname(root) orelse return null;
     if (!std.mem.startsWith(u8, path, suite_root)) return null;
-    const text = Io.Dir.cwd().readFileAlloc(io, xfail_list, arena, .limited(1 << 20)) catch |err| switch (err) {
+    const text = Io.Dir.cwd().readFileAlloc(io, try xfailList(arena), arena, .limited(1 << 20)) catch |err| switch (err) {
         error.FileNotFound => return null,
         else => return err,
     };

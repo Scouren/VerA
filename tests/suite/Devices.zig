@@ -110,7 +110,8 @@ pub fn run(init: std.process.Init, vera_exe: []const u8, args: *Args, dirs: []co
     // fixture paths are absolute already; the executable is made so.
     const exe = try Io.Dir.cwd().realPathFileAlloc(io, vera_exe, gpa);
     defer gpa.free(exe);
-    const scratch = options.work_root ++ "/devices";
+    const scratch = try std.fs.path.join(gpa, &.{ options.workRoot(), "devices" });
+    defer gpa.free(scratch);
     try Io.Dir.cwd().createDirPath(io, scratch);
     var scratch_dir = try Io.Dir.cwd().openDir(io, scratch, .{});
     defer scratch_dir.close(io);
@@ -158,10 +159,10 @@ pub fn diff(w: *Io.Writer, what: []const u8, want: []const u8, got: []const u8) 
 /// A case's xfail reason: its own `//! xfail` line, else its
 /// `harness.xfail_list` row; null when it has neither.
 pub fn xfailOf(arena: Allocator, io: Io, case: []const u8) !?[]const u8 {
-    const src = try arena.print("{s}/{s}.v", .{ options.fixture_root, case });
+    const src = try arena.print("{s}/{s}.v", .{ options.fixtureRoot(), case });
     const source = try Io.Dir.cwd().readFileAlloc(io, src, arena, .limited(1 << 20));
     if (digital.xfailReason(source)) |why| return why;
-    return harness.listedXfail(arena, io, options.fixture_root, src);
+    return harness.listedXfail(arena, io, options.fixtureRoot(), src);
 }
 
 // ---- private ----
@@ -176,7 +177,7 @@ fn digitalCases(gpa: Allocator, io: Io, dirs: []const []const u8) ![]const []con
         list.deinit(gpa);
     }
     for (dirs) |sub| {
-        const root = try std.fs.path.join(gpa, &.{ options.fixture_root, sub });
+        const root = try std.fs.path.join(gpa, &.{ options.fixtureRoot(), sub });
         defer gpa.free(root);
         var dir = try Io.Dir.cwd().openDir(io, root, .{ .iterate = true });
         defer dir.close(io);
@@ -215,7 +216,7 @@ fn digitalVerdict(arena: Allocator, io: Io, vera_exe: []const u8, case: []const 
     var detail: Io.Writer.Allocating = .init(arena);
     if (try digitalCase(arena, io, vera_exe, case, &detail.writer)) {
         try w.print("FAIL {s}: XPASS — marked xfail, but VerA now does what the fixture says.\n" ++
-            "  Delete its `//! xfail` line or its row in {s}.\n", .{ case, harness.xfail_list });
+            "  Delete its `//! xfail` line or its row in {s}.\n", .{ case, try harness.xfailList(arena) });
         return .fail;
     }
     try w.print("XFAIL {s}: known: {s}\n", .{ case, xfail });
@@ -223,7 +224,7 @@ fn digitalVerdict(arena: Allocator, io: Io, vera_exe: []const u8, case: []const 
 }
 
 fn digitalCase(arena: Allocator, io: Io, vera_exe: []const u8, case: []const u8, w: *Io.Writer) !bool {
-    const src = try arena.print("{s}/{s}.v", .{ options.fixture_root, case });
+    const src = try arena.print("{s}/{s}.v", .{ options.fixtureRoot(), case });
     const source = try Io.Dir.cwd().readFileAlloc(io, src, arena, .limited(1 << 20));
     const argv = try std.mem.concat(arena, []const u8, &.{ &.{ vera_exe, "--run", src }, try digital.runnerArgs(arena, source, std.fs.path.dirname(src).?) });
     // A §18 dump case's evidence is the file its run writes, in a directory
@@ -247,13 +248,13 @@ fn digitalCase(arena: Allocator, io: Io, vera_exe: []const u8, case: []const u8,
         }
         // A run-time error that does not end the run (IEEE 1364-2005
         // §17.2.9's terminated load) also pins what the run printed.
-        const golden = try arena.print("{s}/{s}.expected.txt", .{ options.fixture_root, case });
+        const golden = try arena.print("{s}/{s}.expected.txt", .{ options.fixtureRoot(), case });
         const want = Io.Dir.cwd().readFileAlloc(io, golden, arena, .limited(1 << 20)) catch return true;
         return diff(w, case, want, r.stdout);
     }
     const want = try Io.Dir.cwd().readFileAlloc(
         io,
-        try arena.print("{s}/{s}.expected.txt", .{ options.fixture_root, case }),
+        try arena.print("{s}/{s}.expected.txt", .{ options.fixtureRoot(), case }),
         arena,
         .limited(1 << 20),
     );

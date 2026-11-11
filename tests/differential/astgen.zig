@@ -29,7 +29,7 @@ const vams = @import("vams");
 const frontend = @import("frontend");
 const diag = @import("diag");
 const vera = @import("vera");
-const options = @import("rewrite_options");
+const options = @import("repo_env");
 const settle = @import("settle.zig");
 const Vir = vams.Vir;
 
@@ -70,7 +70,7 @@ fn runAll() !void {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const xfail_path = try std.fs.path.join(arena, &.{ options.repo_root, "tests/differential/astgen.xfail" });
+    const xfail_path = try std.fs.path.join(arena, &.{ options.repoRoot(), "tests/differential/astgen.xfail" });
     const xfail_text = try Io.Dir.cwd().readFileAlloc(io, xfail_path, arena, .limited(1 << 20));
     var xfail: std.StringHashMapUnmanaged([]const u8) = .empty;
     var lines = std.mem.splitScalar(u8, xfail_text, '\n');
@@ -80,7 +80,7 @@ fn runAll() !void {
         try xfail.put(arena, line[0..sp], line[sp + 1 ..]);
     }
 
-    var rulings = try settle.Rulings.read(arena, io, options.repo_root, "astgen");
+    var rulings = try settle.Rulings.read(arena, io, options.repoRoot(), "astgen");
     var later: settle.Later = .{ .arena = arena };
     const fixtures = try collect(arena, io);
     var tally: Tally = .{};
@@ -141,7 +141,7 @@ fn runAll() !void {
 
 /// Every fixture path relative to the fixture root, sorted.
 fn collect(arena: std.mem.Allocator, io: Io) ![]const []const u8 {
-    var dir = try Io.Dir.cwd().openDir(io, options.fixture_root, .{ .iterate = true });
+    var dir = try Io.Dir.cwd().openDir(io, options.fixtureRoot(), .{ .iterate = true });
     defer dir.close(io);
     var walker = try dir.walk(arena);
     defer walker.deinit();
@@ -166,9 +166,9 @@ fn collect(arena: std.mem.Allocator, io: Io) ![]const []const u8 {
 /// settled by a ruling in `rulings` or not at all.
 fn checkFixture(arena: std.mem.Allocator, keep: std.mem.Allocator, io: Io, rel: []const u8, jobs: *std.ArrayList(Job), rulings: *settle.Rulings, later: *settle.Later) !Outcome {
     const gpa = std.heap.smp_allocator;
-    const path = try std.fs.path.join(arena, &.{ options.fixture_root, rel });
+    const path = try std.fs.path.join(arena, &.{ options.fixtureRoot(), rel });
     const dir = std.fs.path.dirname(path).?;
-    const include = options.fixture_root ++ "/include";
+    const include = try std.fs.path.join(arena, &.{ options.fixtureRoot(), "include" });
     const digital = std.mem.eql(u8, std.fs.path.extension(rel), ".v");
     const source = try Io.Dir.cwd().readFileAlloc(io, path, arena, .limited(1 << 26));
     const bag = try arena.create(diag.Bag);

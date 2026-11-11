@@ -173,7 +173,8 @@ pub fn run(init: std.process.Init, vera_exe: []const u8, count: u32) !u8 {
     defer w.flush() catch {};
     const exe = try Io.Dir.cwd().realPathFileAlloc(io, vera_exe, gpa);
     defer gpa.free(exe);
-    const work = options.work_root ++ "/fuzz";
+    const work = try std.fs.path.join(gpa, &.{ options.workRoot(), "fuzz" });
+    defer gpa.free(work);
     try Io.Dir.cwd().createDirPath(io, work);
     var arena_state: std.heap.ArenaAllocator = .init(gpa);
     defer arena_state.deinit();

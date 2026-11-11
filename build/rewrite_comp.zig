@@ -14,8 +14,8 @@ const common = @import("common.zig");
 const Build = std.Build;
 const Graph = common.Graph;
 const byName = common.byName;
-const pathFromRoot = common.pathFromRoot;
 const testRun = common.testRun;
+const setSuiteEnv = common.setSuiteEnv;
 
 pub fn add(g: Graph, all: *Build.Step) void {
     const b = g.b;
@@ -28,10 +28,12 @@ pub fn add(g: Graph, all: *Build.Step) void {
     b.step("test-vera-next", "Run vera-next's driver tests (src/next/main.zig, cli/, lsp)").dependOn(&cli_tests.step);
     all.dependOn(&cli_tests.step);
 
+    // `fixture_root`/`repo_root` are not compiled in (R5, research/builds.md):
+    // `tests/differential/repo_env.zig` reads them from the environment,
+    // which `setSuiteEnv` sets on every Run step below that needs them.
+    const repo_env = g.m.make("tests/differential/repo_env.zig", &.{});
     // diff-comp: both drivers over the corpus, as child processes.
     const o = b.addOptions();
-    o.addOption([]const u8, "fixture_root", pathFromRoot(b, "tests/conformance/tests"));
-    o.addOption([]const u8, "repo_root", pathFromRoot(b, "."));
     o.addOptionPath("vera", g.exe.getEmittedBin());
     o.addOptionPath("vera_next", next.getEmittedBin());
     o.addOption([]const u8, "filter", b.option([]const u8, "comp-filter", "diff-comp: only the fixtures whose path holds this (`|` between alternatives)") orelse "");
@@ -57,7 +59,9 @@ pub fn add(g: Graph, all: *Build.Step) void {
         const mod = g.m.make("tests/differential/comp.zig", &.{.{ .name = "vams", .module = byName(g.mods, "vams") }});
         mod.addOptions("comp_options", o);
         mod.addOptions("v_options", vo);
+        mod.addImport("repo_env", repo_env);
         const r = testRun(b, run_row.step, mod, g.runner, g.results_dir);
+        setSuiteEnv(b, r);
         r.has_side_effects = true; // Reads the fixture tree and runs both drivers.
         b.step(run_row.step, run_row.what).dependOn(&r.step);
         // diff-rtlil's tiebreaker needs Yosys (`nix develop .#external`):
@@ -68,7 +72,9 @@ pub fn add(g: Graph, all: *Build.Step) void {
     // rtlil-equiv: diff-rtlil's Yosys tiebreaker on its canary and on tests/rtlil.
     const eq_mod = g.m.make("tests/differential/rtlil_equiv.zig", &.{});
     eq_mod.addOptions("comp_options", o);
+    eq_mod.addImport("repo_env", repo_env);
     const eq = testRun(b, "rtlil-equiv", eq_mod, g.runner, g.results_dir);
+    setSuiteEnv(b, eq);
     eq.has_side_effects = true; // Runs both drivers and Yosys.
     b.step("rtlil-equiv", "tests/rtlil through vera and vera-next --emit-rtlil, held equivalent by Yosys (required: `nix develop .#external`), and a planted fault caught").dependOn(&eq.step);
     // Needs Yosys: the README's external gate line runs it, not `rewrite`.

@@ -40,15 +40,15 @@ pub fn run(init: std.process.Init, args: *Args) !u8 {
     defer w.flush() catch {};
 
     // One object path, reused: the loop is sequential and nothing reads it.
-    const work = options.work_root ++ "/vpi-fixtures";
+    const work = try std.fs.path.join(arena_state.allocator(), &.{ options.workRoot(), "vpi-fixtures" });
     Io.Dir.cwd().createDirPath(io, work) catch {};
     const obj = try std.fs.path.join(arena_state.allocator(), &.{ work, "fixture.o" });
-    const vpi_include = options.vpi_include;
+    const vpi_include = options.vpiInclude();
 
     var ran: usize = 0;
     var failed: usize = 0;
     for (vpi_dirs) |sub| {
-        const dir_path = try std.fs.path.join(gpa, &.{ options.fixture_root, sub });
+        const dir_path = try std.fs.path.join(gpa, &.{ options.fixtureRoot(), sub });
         defer gpa.free(dir_path);
         var dir = Io.Dir.cwd().openDir(io, dir_path, .{ .iterate = true }) catch continue;
         defer dir.close(io);
@@ -74,9 +74,9 @@ pub fn run(init: std.process.Init, args: *Args) !u8 {
             // that warning. The flags are `vpi_app.c`'s, so no fixture passes
             // here that the acceptance test's flags would refuse.
             const r = child.capture(pa, io, &.{
-                options.zig_exe, "cc",     "-std=c99", "-Wall", "-Werror",
-                "-c",            "-o",     obj,        "-I",    vpi_include,
-                "-I",            dir_path, src,
+                options.zigExe(), "cc",     "-std=c99", "-Wall", "-Werror",
+                "-c",             "-o",     obj,        "-I",    vpi_include,
+                "-I",             dir_path, src,
             }) catch |e| {
                 try w.print("FAIL {s}: could not run the C compiler: {s}\n", .{ name, @errorName(e) });
                 failed += 1;

@@ -110,12 +110,14 @@ pub fn verifyRejected(
 ///   `GeneratedCompileError` — codegen deliberately emitted `@compileError`.
 pub fn compileFixture(gpa: std.mem.Allocator, f: Fixture, source: []const u8, d: tb.Spec) !Outcome {
     var diags: vera.diag.Bag = .init(gpa);
+    const include_dir = try harness.includeDir(gpa);
+    defer gpa.free(include_dir);
     // Codegen too (not only the analysis `--lint` runs): some fixtures are
     // rejected by codegen emitting `@compileError`, which the analysis would
     // never see.
     var result = vera.analyze(gpa, source, .{
         .file_name = f.path,
-        .include_dirs = &.{ f.dir(), harness.include_dir },
+        .include_dirs = &.{ f.dir(), include_dir },
         // The suite's convention: a source includes the annex D files it uses.
         .require_std_includes = true,
         // Annex E.2: the fixture's `//! spice` cards, read as a netlist.

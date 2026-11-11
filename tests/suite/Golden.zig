@@ -81,7 +81,7 @@ const Pool = struct {
 
     /// One fixture's files (the header lists them): `vera --emit-zig`, then
     /// the in-process kinds. The include path is the suite's `include/`
-    /// (`harness.include_dir`) and the fixture's own directory. Only an I/O failure of the snapshot
+    /// (`harness.includeDir`) and the fixture's own directory. Only an I/O failure of the snapshot
     /// itself is returned; a kind's own failure is its `error=` file.
     fn one(pool: *Pool, rel: []const u8) !void {
         var arena_state: std.heap.ArenaAllocator = .init(pool.gpa);
@@ -93,7 +93,7 @@ const Pool = struct {
         const txt = try std.mem.concat(arena, u8, &.{ base, ".txt" });
         const err = try std.mem.concat(arena, u8, &.{ base, ".stderr" });
         try Io.Dir.cwd().createDirPath(io, std.fs.path.dirname(txt).?);
-        const includes: []const []const u8 = &.{ harness.include_dir, std.fs.path.dirname(src).? };
+        const includes: []const []const u8 = &.{ try harness.includeDir(arena), std.fs.path.dirname(src).? };
 
         try pool.emit(arena, src, "--emit-zig", txt, err);
 
@@ -142,11 +142,11 @@ const Pool = struct {
             defer err_file.close(io);
             var child = try std.process.spawn(io, .{
                 .argv = &.{
-                    pool.vera,                  flag,                "--color=never",
-                    "-I",                       harness.include_dir, "-I",
+                    pool.vera,                  flag,                          "--color=never",
+                    "-I",                       try harness.includeDir(arena), "-I",
                     std.fs.path.dirname(src).?, src,
                 },
-                .cwd = .{ .path = options.repo_root },
+                .cwd = .{ .path = options.repoRoot() },
                 .stdin = .ignore,
                 .stdout = .{ .file = out_file },
                 .stderr = .{ .file = err_file },
@@ -190,7 +190,7 @@ pub fn run(init: std.process.Init, vera_exe: []const u8, args: *Args) !u8 {
     const w = &stderr.interface;
     defer w.flush() catch {};
 
-    const store = try std.fs.path.join(arena, &.{ options.repo_root, ".zig-cache", "vera-golden" });
+    const store = try std.fs.path.join(arena, &.{ options.repoRoot(), ".zig-cache", "vera-golden" });
     const word = args.next() orelse {
         try w.writeAll("usage: zig build suite -- golden <tag> | diff [<a> <b>]\n");
         return 2;
@@ -304,16 +304,16 @@ fn program(arena: Allocator, io: Io, src: []const u8, includes: []const []const 
 /// decks), relative to the root, then `own_dirs`'; those holding `filter`.
 fn fixtureList(arena: Allocator, io: Io, filter: ?[]const u8) ![]const []const u8 {
     var list: std.ArrayList([]const u8) = .empty;
-    try walkInto(arena, io, &list, options.fixture_root, "", filter);
-    for (own_dirs) |sub| try walkInto(arena, io, &list, try std.fs.path.join(arena, &.{ options.repo_root, "tests", sub }), try std.mem.concat(arena, u8, &.{ own_prefix, sub, "/" }), filter);
+    try walkInto(arena, io, &list, options.fixtureRoot(), "", filter);
+    for (own_dirs) |sub| try walkInto(arena, io, &list, try std.fs.path.join(arena, &.{ options.repoRoot(), "tests", sub }), try std.mem.concat(arena, u8, &.{ own_prefix, sub, "/" }), filter);
     std.mem.sort([]const u8, list.items, {}, harness.strLess);
     return list.items;
 }
 
 /// The source a snapshot path `rel` (`fixtureList`'s) names.
 fn sourceOf(arena: Allocator, rel: []const u8) ![]const u8 {
-    if (std.mem.startsWith(u8, rel, own_prefix)) return std.fs.path.join(arena, &.{ options.repo_root, "tests", rel[own_prefix.len..] });
-    return std.fs.path.join(arena, &.{ options.fixture_root, rel });
+    if (std.mem.startsWith(u8, rel, own_prefix)) return std.fs.path.join(arena, &.{ options.repoRoot(), "tests", rel[own_prefix.len..] });
+    return std.fs.path.join(arena, &.{ options.fixtureRoot(), rel });
 }
 
 /// Appends `prefix` ++ each `.va` and `.v` path under `root` but its

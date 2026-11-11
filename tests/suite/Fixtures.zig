@@ -17,7 +17,7 @@
 //! the list of them is the checked-in marker list, compared by name.
 //!
 //! Contents:
-//! - `pub const include_dir`
+//! - `pub fn includeDir(arena: std.mem.Allocator) ![]const u8`
 //! - `pub const Fixture = struct`
 //! - `pub fn Fixture.stem(f: Fixture) []const u8`
 //! - `pub fn Fixture.dir(f: Fixture) []const u8`
@@ -58,14 +58,18 @@ const Io = std.Io;
 pub const ams_dirs = [_][]const u8{ "verilog-a", "verilog-ams", "spice", Devices.ieee1364_dir };
 
 /// `check.vh` and `erfc.vh`: the include dir of every compile, after the
-/// fixture's own directory.
-pub const include_dir = options.fixture_root ++ "/include";
+/// fixture's own directory. A function, not a `const`: `fixtureRoot()` is
+/// read from the environment at run time (R5, research/builds.md), not
+/// compiled in, so this joins at run time too.
+pub fn includeDir(arena: std.mem.Allocator) ![]const u8 {
+    return std.fs.path.join(arena, &.{ options.fixtureRoot(), "include" });
+}
 
 /// The fixture walk and VerA's xfail list (`Walk.zig`), for the runners.
 pub const collect = Walk.collect;
 pub const hasDirective = Walk.hasDirective;
 pub const listedXfail = Walk.listedXfail;
-pub const xfail_list = Walk.xfail_list;
+pub const xfailList = Walk.xfailList;
 
 /// Everything one fixture needs, all with the same lifetime (the arena
 /// `collect` was given). One row per collected fixture; the stem and the
@@ -153,8 +157,10 @@ pub const Compiler = struct {
 /// Every suite knob, parsed once by `tests/suite.zig` and shared by all the
 /// compilers in a run, so a head-to-head never walks two fixture sets.
 pub const Config = struct {
-    /// The fixture tree to walk: its `ams_dirs`.
-    root: []const u8 = options.fixture_root,
+    /// The fixture tree to walk: its `ams_dirs`. Set by `init()`: the
+    /// default is read at run time (`options.fixtureRoot()`), so it cannot
+    /// be a struct-field default (comptime-only).
+    root: []const u8,
     /// A plain substring over the whole path.
     filter: ?[]const u8 = null,
     strict: bool = false,
@@ -174,9 +180,10 @@ pub const Config = struct {
     /// compared against.
     batch: bool = true,
 
-    /// Returns the defaults, with `jobs` from `defaultJobs`.
+    /// Returns the defaults, with `jobs` from `defaultJobs` and `root` from
+    /// `options.fixtureRoot()`.
     pub fn init() Config {
-        return .{ .jobs = defaultJobs() };
+        return .{ .jobs = defaultJobs(), .root = options.fixtureRoot() };
     }
 };
 
@@ -657,7 +664,7 @@ fn decide(
                         "  fixture says it must. Delete its `//! xfail` line or its row in\n" ++
                         "  {s}: the limitation is fixed, and a marker outliving it hides the\n" ++
                         "  next regression.\n",
-                    .{ f.path, compiler.name, xfail_list },
+                    .{ f.path, compiler.name, try xfailList(arena) },
                 );
                 return .fail;
             }
@@ -699,12 +706,12 @@ fn judgeVcd(arena: std.mem.Allocator, io: Io, compiler: Compiler, f: Fixture, wa
     };
     // Absolute, because the run's working directory is not this one.
     const exe = try Io.Dir.cwd().realPathFileAlloc(io, given, arena);
-    const dir = try std.fs.path.join(arena, &.{ options.work_root, "vcd", f.slug });
+    const dir = try std.fs.path.join(arena, &.{ options.workRoot(), "vcd", f.slug });
     try Io.Dir.cwd().createDirPath(io, dir);
     const produced = try std.fs.path.join(arena, &.{ dir, want.produced });
     Io.Dir.cwd().deleteFile(io, produced) catch {};
     const r = try std.process.run(arena, io, .{
-        .argv = &.{ exe, "--run", "-I", include_dir, "-I", f.dir(), f.path },
+        .argv = &.{ exe, "--run", "-I", try includeDir(arena), "-I", f.dir(), f.path },
         .cwd = .{ .path = dir },
     });
     if (r.term != .exited or r.term.exited != 0) {

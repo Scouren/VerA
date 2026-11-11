@@ -18,11 +18,11 @@ const Graph = common.Graph;
 const byName = common.byName;
 const globFiles = common.globFiles;
 const pathFromRoot = common.pathFromRoot;
-const checkoutWorkDir = common.checkoutWorkDir;
 const testRun = common.testRun;
 const testRoot = common.testRoot;
 const cliExe = common.cliExe;
 const defineModules = common.defineModules;
+const dropNixTmpKeys = common.dropNixTmpKeys;
 
 /// What later phases build on: the fixture runner and the `check` step.
 pub const Added = struct { suite_exe: *Build.Step.Compile, check: *Build.Step };
@@ -69,10 +69,15 @@ pub fn add(g: Graph, ams: bool) Added {
     all_step.dependOn(&other_exe.step);
 
     const all_mod = m.make("tests/unit.zig", mods);
-    const repo = b.addOptions();
-    repo.addOption([]const u8, "repo_root", pathFromRoot(b, "."));
-    all_mod.addOptions("repo_options", repo);
+    // `repo_options.repoRoot()` reads the environment instead of a compiled-in
+    // option (R5, research/builds.md): a baked-in absolute path made this
+    // root's compile worktree-specific (F6), missing the shared `.zig-cache`
+    // even at the same commit. `VERA_REPO_ROOT` is this Run step's own, not
+    // cloned from `nix develop`'s, so dropNixTmpKeys keeps it cacheable.
+    all_mod.addImport("repo_options", m.make("tests/repo_options.zig", &.{}));
     const all_run = testRun(b, "test_all", all_mod, runner, results_dir);
+    all_run.setEnvironmentVariable("VERA_REPO_ROOT", pathFromRoot(b, "."));
+    dropNixTmpKeys(all_run);
     // Reads the tree at test time: every file it can reach is an input, so a
     // no-op build reuses the result (globFiles re-runs configure for new files).
     for ([_][]const u8{ "lib", "src", "tools", "tests", "docs" }) |dir| {
@@ -121,13 +126,6 @@ pub fn add(g: Graph, ams: bool) Added {
         b.step("test-printf", "Hold zCReal and the contract's formatC to glibc's snprintf (tests/printf_reference.zig) only").dependOn(&printf_run.step);
     }
 
-    const o = b.addOptions();
-    o.addOption([]const u8, "fixture_root", pathFromRoot(b, "tests/conformance/tests"));
-    o.addOption([]const u8, "repo_root", pathFromRoot(b, "."));
-    o.addOption([]const u8, "work_root", checkoutWorkDir(b, "vera-suite"));
-    o.addOption([]const u8, "contract", pathFromRoot(b, "lib/contract.zig"));
-    o.addOption([]const u8, "vpi_include", pathFromRoot(b, "src/vpi"));
-    o.addOption([]const u8, "zig_exe", b.graph.zig_exe);
     const suite_mod = m.make("tests/suite.zig", &.{
         .{ .name = "vera", .module = vera },
         .{ .name = "frontend", .module = byName(mods, "frontend") },
@@ -136,7 +134,10 @@ pub fn add(g: Graph, ams: bool) Added {
         .{ .name = "sim", .module = sim },
         .{ .name = "digital", .module = byName(mods, "digital") },
     });
-    suite_mod.addOptions("suite_options", o);
+    // `suite_options`'s paths are read from the environment at run time,
+    // not compiled in (R5, research/builds.md: see tests/suite_options.zig
+    // and common.setSuiteEnv); the import stays the same name.
+    suite_mod.addImport("suite_options", m.make("tests/suite_options.zig", &.{}));
     const suite_exe = b.addExecutable(.{ .name = "vera-suite", .root_module = suite_mod });
     // Generated inputs through every pass (tests/generators.zig).
     const gen_mod = m.make("tests/generators.zig", &.{
@@ -159,6 +160,7 @@ pub fn add(g: Graph, ams: bool) Added {
     all_step.dependOn(&suite_exe.step);
     const suite_run = testRun(b, "suite", suite_mod, runner, results_dir);
     suite_run.has_side_effects = true; // reads tests/conformance at test time
+    common.setSuiteEnv(b, suite_run);
     test_step.dependOn(&suite_run.step);
     b.step("test-suite", "Run the fixture runner's own tests (tests/suite.zig) only").dependOn(&suite_run.step);
 

@@ -217,21 +217,23 @@ pub fn parseEventExpr(p: *Parse) Error!Node.Index {
 }
 
 /// An argument list `( [arg] {, [arg]} )`, cursor on the `(`; an omitted
-/// argument is a none slot (`empty_argument` in a `user` call), and
-/// `< net >` (§5.4.3) a `port_branch`.
+/// argument is a none slot in a system call, and a fatal `empty_argument`
+/// in a `user` call (A.8.2 takes no `_or_null` slot there; the error
+/// abandons this call, as the old parser's `failAt` did), and `< net >`
+/// (§5.4.3) a `port_branch`.
 pub fn parseCallArgs(p: *Parse, user: bool) Error!Node.SubRange {
     _ = try p.expect(.l_paren);
     const top = p.scratch.items.len;
     defer p.scratch.shrinkRetainingCapacity(top);
     if (p.tokenTag(p.tok_i) == .r_paren) {
-        if (user) try p.warn(.empty_argument);
+        if (user) return p.fail(.empty_argument);
         p.tok_i += 1;
         return p.spanFrom(top);
     }
     while (true) {
         switch (p.tokenTag(p.tok_i)) {
             .comma, .r_paren => {
-                if (user) try p.warn(.empty_argument);
+                if (user) return p.fail(.empty_argument);
                 try p.pushOpt(.none);
             },
             .angle_bracket_left => {

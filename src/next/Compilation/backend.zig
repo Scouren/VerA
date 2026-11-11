@@ -133,7 +133,7 @@ pub fn codegen(comp: *Compilation, b: Compilation.Backend) !?Job {
     }
     const an = &comp.analysis.?;
     // §8: the mixed runner needs the digital half Sema lowers beside it.
-    if (b == .exe and an.mixed and digitalOf(an) == null) return notBuilt(comp, b, "the mixed-signal testbench (VAMS §8, a design with a digital half)");
+    if (b == .exe and an.mixed and an.digital == null) return notBuilt(comp, b, "the mixed-signal testbench (VAMS §8, a design with a digital half)");
     var r = try codegen_mod.generate(comp.gpa, .zig, .{
         .air = &an.air,
         .ip = &comp.zcu.intern_pool,
@@ -463,10 +463,14 @@ fn testbench(comp: *Compilation) !?Job {
     var facts = try bench.facts(a, &an.device);
     facts.validate_contract = c.validate_contract;
     if (an.mixed) {
-        const low = digitalOf(an).?;
+        const low = &an.digital.?;
         const names = try a.alloc(bench.Digital.Name, low.names.len);
         for (names, low.names) |*n, x| n.* = .{ .path = x.path, .slot = x.slot, .real = x.ty.real };
-        facts.mixed = try bench.digital(a, &low.program, names);
+        var unresolved: []const u8 = "";
+        facts.mixed = bench.digital(a, &low.program, names, &an.device, &comp.zcu.intern_pool, &unresolved) catch |e| {
+            if (e == error.UnknownProbe) try comp.wip.add(.lower, .E0901, .none, "`{s}` names no net or branch in the elaborated design", .{unresolved});
+            return if (e == error.UnknownProbe) null else error.OutOfMemory;
+        };
     }
     var runner: Io.Writer.Allocating = .init(a);
     bench.writeRunner(&runner.writer, std.fs.path.stem(c.paths[0]), &spec.bench, facts) catch |e| switch (e) {
@@ -529,12 +533,6 @@ fn shapeCards(comp: *Compilation) Allocator.Error!bool {
     if (all.items.len == comp.config.overrides.len) return false;
     comp.config.overrides = all.items;
     return true;
-}
-
-/// The analysis' lowered digital half (`Analysis.digital`), or null when
-/// the digital lowering does not express it yet.
-fn digitalOf(an: *const sema.Sema.Analysis) ?*const sema.digital.Lowered {
-    return if (an.digital) |*d| d else null;
 }
 
 fn refuse(comp: *Compilation, status: u8, line: []const u8) !?Job {

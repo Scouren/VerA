@@ -7,7 +7,7 @@
 //!
 //! Contents:
 //! - `pub const points_max: u32`
-//! - `pub const Config = struct`, `pub const Digital = struct` (`Digital.Name`)
+//! - `pub const Config = struct`, `pub const Digital = struct` (`Digital.Name`, `Digital.Probe`)
 //! - `pub const Bench = struct`, `pub const Binding = struct`, `pub const Sweep = struct`, `pub const LimitCase = struct`
 //! - `pub const Analysis = enum`, `pub const Print = enum`
 //! - `pub const NoiseWant = struct` (`Interp`, `Corr`, `needsPoint`), `pub const AcWant = struct` (`needsPoint`), `pub const AcDynWant = struct`
@@ -43,13 +43,20 @@ pub const Config = struct {
 
 /// A mixed design's digital half as the runner embeds it: the
 /// `std_sim.Program` as `std_sim.serial` bytes, and each named digital value
-/// (`path`, spelled as the device's card row of it, `n` or `u.clk`).
+/// (`path`, spelled as the device's card row of it, `n` or `u.clk`), and
+/// each VAMS §7.3.6.3 probe terminal the program names, resolved.
 pub const Digital = struct {
     program: []const u8,
     names: []const Name,
+    /// One row per distinct probe terminal name in `program`; every name
+    /// its probes read has one (`codegen.bench.digital` checks).
+    probes: []const Probe = &.{},
 
     /// One named digital value: its path, its slot, whether it is a `real`.
     pub const Name = struct { path: []const u8, slot: u32, real: bool };
+    /// A probe terminal (`name` as the program spells it, `u.sense`) and
+    /// the unknowns its potential is `x[hi] - x[lo]` of; null is ground.
+    pub const Probe = struct { name: []const u8, hi: ?u32, lo: ?u32 };
 };
 
 /// What a runner renders: the card, the operating points, and the device

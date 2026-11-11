@@ -284,16 +284,32 @@ fn actualOf(l: *Lower, child: u32, port: Inst.Index) Error!Inst.Ref {
     return zcu.ports.items(.actual)[rows.start + pos];
 }
 
-/// A probe terminal's name as the source writes it.
+/// A probe terminal's name as the source writes it: a simple name, or a
+/// §6.7.1 hierarchical one with its parts joined by `.` (`u.sense`).
 fn terminal(l: *Lower, r: Inst.Ref) Error!Program.List {
     const vir = l.virOf(l.frame);
-    const i = r.toIndex() orelse return l.refuse("an omitted probe terminal");
-    const name = switch (Lower.tag(vir, i)) {
-        .decl_ref => vir.string(decl.nameOf(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl)),
-        .str_ref => vir.string(vir.instructions.items(.data)[@backingInt(i)].str_tok.start),
-        else => return l.refuse("a probe terminal that is no simple name"), // ponytail: lib/sim/digital also takes a hierarchical one
+    var parts: std.ArrayList([]const u8) = .empty;
+    var at = r;
+    // Each `.field` is one part, the leaf first; the head is a name.
+    const head = while (true) {
+        const i = at.toIndex() orelse return l.refuse("an omitted probe terminal");
+        assert(parts.items.len <= vir.instructions.len); // a chain visits each instruction once
+        switch (Lower.tag(vir, i)) {
+            .decl_ref => break vir.string(decl.nameOf(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl)),
+            .str_ref => break vir.string(vir.instructions.items(.data)[@backingInt(i)].str_tok.start),
+            .field => {
+                const f = Lower.payload(vir, Inst.Field, i);
+                try parts.append(l.a, vir.string(f.name));
+                at = f.operand;
+            },
+            .elem => return l.refuse("a probe terminal of an instance array element"),
+            else => return l.refuse("a probe terminal that is no name"), // else: a terminal is a net or branch name
+        }
     };
-    const s = try l.b.string(name);
+    try parts.append(l.a, head);
+    std.mem.reverse([]const u8, parts.items);
+    assert(parts.items.len != 0);
+    const s = try l.b.string(try std.mem.join(l.a, ".", parts.items));
     return .{ .start = s.start, .len = s.len };
 }
 

@@ -255,6 +255,33 @@ test "§7.3.5 an analog event in a digital event control: one monitor row, its e
     try std.testing.expectEqual(m.event, p.list(p.extraData(Program.List, waits))[0]);
 }
 
+test "VAMS §7.3.6.3 a hierarchical probe terminal lowers to its dotted name" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const lowered = try lowerSource(arena_state.allocator(), prelude ++
+        \\module child; electrical p, g; ground g; branch (p, g) sense; analog V(sense) <+ 2.0; endmodule
+        \\module mx; child u(); real r;
+        \\  initial begin r = V(u.p); r = V(u.sense); end
+        \\endmodule
+        \\
+    , true);
+    const p = &lowered.program;
+    // Oracle: the source text. §6.7.1 a hierarchical name's parts joined
+    // by `.`, in source order, the one-argument form (`b` empty).
+    var names: [2][]const u8 = undefined;
+    var n: usize = 0;
+    for (p.exprs.items(.tag), p.exprs.items(.data)) |t, d| if (t == .probe) {
+        const probe = p.extraData(Program.Probe, d.a);
+        try std.testing.expectEqual(@as(u32, 0), probe.b.len);
+        try std.testing.expect(n < names.len);
+        names[n] = p.str(probe.a);
+        n += 1;
+    };
+    try std.testing.expectEqual(@as(usize, 2), n);
+    try std.testing.expectEqualStrings("u.p", names[0]);
+    try std.testing.expectEqualStrings("u.sense", names[1]);
+}
+
 test "§7.3 the mixed host's names: each variable and net by its path below the root, as Sema's card rows spell it" {
     var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
     defer arena_state.deinit();

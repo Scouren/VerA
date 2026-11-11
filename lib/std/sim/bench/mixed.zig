@@ -22,7 +22,6 @@ const retryUnsupported = @import("step.zig").retryUnsupported;
 const set = @import("solve.zig").set;
 const solve = @import("solve.zig").solve;
 const stepPost = @import("step.zig").stepPost;
-const u_names = @import("report.zig").u_names;
 const spec = @import("spec.zig");
 const sim = @import("../../sim.zig");
 const run_part = @import("run.zig");
@@ -126,6 +125,13 @@ const input_ports = blk: {
     break :blk out;
 };
 
+/// Each VAMS §7.3.6.3 probe terminal by the name the program spells it.
+const probes = std.StaticStringMap(spec.Digital.Probe).initComptime(blk: {
+    var kvs: [digital.probes.len]struct { []const u8, spec.Digital.Probe } = undefined;
+    for (digital.probes, &kvs) |p, *kv| kv.* = .{ p.name, p };
+    break :blk kvs;
+});
+
 /// The runner's `main`: `run`, on a big-stack thread when the device needs one.
 pub fn main(init: std.process.Init.Minimal) void {
     if (comptime hub.big_stack) return hub.bigStack(init);
@@ -195,15 +201,17 @@ fn mixedInput(dig: *sim.State, p: Name) f64 {
     return @floatFromInt(i);
 }
 
-/// The potential of terminal `n1` (minus `n2`) in `x`; a name that is no
-/// unknown of the device is ground.
+/// The potential of terminal `n1` (minus `n2`) in `x`.
 fn potential(x: *const [n_u]f64, n1: []const u8, n2: ?[]const u8) f64 {
-    return nodeValue(x, n1) - if (n2) |m| nodeValue(x, m) else 0.0;
+    return terminal(x, n1) - if (n2) |m| terminal(x, m) else 0.0;
 }
 
-fn nodeValue(x: *const [n_u]f64, name: []const u8) f64 {
-    for (u_names, 0..) |u, i| if (std.mem.eql(u8, u, name)) return x[i];
-    return 0.0;
+/// Probe terminal `name`'s potential: its unknowns as codegen resolved
+/// them (`Digital.probes`), which name every terminal the program probes.
+fn terminal(x: *const [n_u]f64, name: []const u8) f64 {
+    const p = probes.get(name) orelse unreachable; // codegen.bench.digital resolves every probe terminal
+    const hi = if (p.hi) |i| x[i] else 0.0;
+    return hi - if (p.lo) |i| x[i] else 0.0;
 }
 
 fn setField(model: *D.Model, comptime field: []const u8, v: anytype) void {

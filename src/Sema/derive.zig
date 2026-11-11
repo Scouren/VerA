@@ -67,8 +67,9 @@ pub fn expression(s: *Sema, unit: *Unit, row: Device.Param.Index, value: Vir.Bod
 /// lowered whole, one after another in source order, so each one's own
 /// instructions sit contiguously between the one before it and itself
 /// (`elementBody`). Every row stays at its folded default when `value` is
-/// not a pattern (every element unfolded) or its element count disagrees
-/// with `rows`' (a shape the parser already refused).
+/// not a pattern (every element unfolded), its element count disagrees
+/// with `rows`' (a shape the parser already refused), or the element is a
+/// §3.6.3.2 hole (`'{1.0, , 3.0}`, lowered as `.none`: nothing to re-derive).
 pub fn array(s: *Sema, unit: *Unit, rows: []const Device.Param.Index, value: Vir.Body) Allocator.Error!void {
     const vir = unit.vir;
     const insts = vir.body(value);
@@ -78,7 +79,10 @@ pub fn array(s: *Sema, unit: *Unit, rows: []const Device.Param.Index, value: Vir
     const refs = vir.list(Inst.Ref, decl.payloadOf(vir, Inst.Refs, last));
     if (refs.len != rows.len) return;
     var start: u32 = 0;
-    for (rows, refs) |row, r| try expression(s, unit, row, elementBody(vir, value, &start, r));
+    for (rows, refs) |row, r| {
+        if (r == .none) continue; // a hole: no element written here to re-derive from.
+        try expression(s, unit, row, elementBody(vir, value, &start, r));
+    }
 }
 
 /// The derive of every row of child `unit` (and of its paramset's), after

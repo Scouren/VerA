@@ -4,7 +4,10 @@
 //! its plain folded value, set once `expression`/`array` could render it
 //! (W11/W12/T38). The oracle over the corpus is
 //! `tests/differential/codegen.zig`; `research/codegen.md`'s T5-W12 and
-//! T38 name these two planted faults.
+//! T38 name these two planted faults. The third test is `diff-lower`'s own
+//! find, past T38's narrow oracle: a §3.6.3.2 hole (E0894 for a parameter,
+//! annex_a_syntax/pattern_empty_element_rejected.va) panicked `array`'s
+//! `elementBody`, which assumed every pattern element is a real instruction.
 //!
 //! Contents: tests only.
 
@@ -95,4 +98,21 @@ test "T38: an array parameter's dependent element re-derives, same as a scalar's
         \\  analog I(p) <+ values[1] * V(p);
         \\endmodule
     , "values[0]"));
+}
+
+test "T38 regression: a §3.6.3.2 pattern hole in a parameter array does not crash array()" {
+    // `pattern_empty_element_rejected.va`'s own shape: a hole has no value
+    // for a parameter (A.8.1 derives none; only a bus nodeset reads one).
+    // The old `src/analog` pipeline's shape.zig raises E0894 for this; the
+    // new Sema pipeline under test here does not yet (a separate, pre-
+    // existing gap — not this fix's concern). What matters here: AstGen
+    // lowers the hole `.none`, and `array()` must leave that row at its
+    // folded default rather than index through a missing instruction.
+    try std.testing.expect(!try hasDerive(
+        \\module m(p, n);
+        \\  inout p, n; electrical p, n;
+        \\  parameter real a[0:2] = '{1.0, , 3.0};
+        \\  analog I(p, n) <+ a[1] * V(p, n);
+        \\endmodule
+    , "a[1]"));
 }

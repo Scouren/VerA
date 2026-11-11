@@ -235,6 +235,7 @@
               pkgs.verilator
               pkgs.ngspice
               pkgs.python3
+              pkgs.poppler_utils # pdftotext, for tools/diag_gaps.py's ledger (research/diagcodes.md A1)
               conform
             ]
             ++ lib.optional (system != "x86_64-darwin") pkgs.yosys

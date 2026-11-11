@@ -33,6 +33,7 @@ verilog-a/ch03_data_types/dynamic_multidim_order.va codes: old {}, new E0313,E05
 verilog-a/ch03_data_types/dynamic_multidim_parameter_index.va codes: old {}, new E0512 (E0512: an array of more than 8 dimensions)
 verilog-a/ch03_data_types/dynamic_multidim_scope.va tables row 4: old `held inner.a`, new `limit_slots 0` (a named block's array with a declaration initializer, written in the block)
 verilog-a/ch03_data_types/forward_parameter_reference.va codes: old E0314, new {}
+verilog-a/ch03_data_types/integer_conversion_saturates.va tables row 2: old `param big integer = 1e300`, new `param big integer = ?` (both wrong: §4.2.1.1 saturates to 2147483647; T10 I3/I4 folds it, so no ruling)
 verilog-a/ch03_data_types/integer_parameter_precision_conditional.va values: display 0 operand 2: old width 64, new 32 (an untyped card-settable parameter copying a 64-bit one: the old side prints it at the source width, the new side at `integer` (format.declSize, VD-089))
 verilog-a/ch03_data_types/integer_parameter_precision_derive.va tables row 0: old `param literal_quotient integer = 0`, new `param literal_quotient integer = ?`
 verilog-a/ch03_data_types/integer_parameter_precision_host.va values: display 1 operand 2: old width 64, new 32 (an untyped card-settable parameter copying a 64-bit one: the old side prints it at the source width, the new side at `integer` (format.declSize, VD-089))

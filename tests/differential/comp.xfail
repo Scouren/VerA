@@ -153,7 +153,6 @@ verilog-a/ch02_lexical/octal_escape_above_377_rejected.va rw-comp (parse): stder
 verilog-a/ch02_lexical/octal_escape_boundaries.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch02_lexical/real_underscores.va rw-zero (air passes) message: stderr: line 8: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,gnd) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — c
 verilog-a/ch02_lexical/reject_2_6_space_between_apostrophe_and_base.va rw-comp (parse) location: stderr: line 5: old `   |         ^`, new `   |         ^^`
-verilog-a/ch02_lexical/size_truncation_and_padding.va rw-lower (analog lowering): stderr: line 10: old `zero padding preserves all sixteen bits in a concatenation got=  65541 want=      65541 ok=1`, new `zero padding preserves all sixteen bits in a concatenation got=      65541 want=      65541 ok=1`
 verilog-a/ch02_lexical/standard_attributes_on_declarations.va rw-zero (air passes) message: stderr: line 14: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — co
 verilog-a/ch02_lexical/string_bytes_above_7f.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch02_lexical/string_escapes.va rw-codegen (codegen): exit status old 0, new 1
@@ -981,7 +980,6 @@ verilog-a/ch09_system_tasks/ceil.va rw-zero (air passes) message: stderr: line 1
 verilog-a/ch09_system_tasks/clog2.va rw-lower (analog lowering): stderr: line 13: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — compiles with @setFloatMode(.strict)`
 verilog-a/ch09_system_tasks/clog2_nested_contexts.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch09_system_tasks/clog2_unsigned_width.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch09_system_tasks/conversion_constant_expressions.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch09_system_tasks/conversion_functions.va rw-zero (air passes) message: stderr: line 9: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — com
 verilog-a/ch09_system_tasks/cos.va rw-zero (air passes) message: stderr: line 12: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch09_system_tasks/cosh.va rw-zero (air passes) message: stderr: line 14: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``

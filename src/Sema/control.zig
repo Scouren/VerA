@@ -87,7 +87,13 @@ pub fn ifElse(s: *Sema, b: *Block, cond: Air.Inst.Ref, then_b: *Block, else_b: *
 }
 
 /// Adds every instruction `i` reads as an operand to `out` (its payload's
-/// `Ref` and `List(Ref)` fields; a body is not an operand).
+/// `Ref` and `List(Ref)` fields, including a `concat`/`pattern` whose whole
+/// payload is a bare `List(Ref)` (§4.2.12, §4.2.14); a body is not an
+/// operand). `discrete.analogReads`, `discrete.constant`, `held`, `digital`
+/// and `reactive` all walk operands through this, so a payload shape missed
+/// here is missed everywhere: an unlisted `.call` reads as an unused task
+/// enable (`body`), and an unlisted flow read evaluates before retention
+/// (§5.6.1.2).
 pub fn operands(a: Allocator, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void {
     const data = vir.instructions.items(.data)[@backingInt(i)];
     switch (vir.instructions.items(.tag)[@backingInt(i)]) {
@@ -97,6 +103,13 @@ pub fn operands(a: Allocator, vir: *const Vir, i: Inst.Index, out: *std.AutoHash
                 const P = Inst.Payload(t);
                 if (P == void) return;
                 const p = vir.extraData(P, data.pl_node.payload_index);
+                // §4.2.12/§4.2.14 a concat or pattern's whole payload is the
+                // `Refs` list (`Inst.Payload`'s `.concat, .pattern => Refs`):
+                // there is no wrapping struct field to find it through.
+                if (P == Vir.List(Inst.Ref)) {
+                    for (vir.list(Inst.Ref, p)) |r| if (r.toIndex()) |o| try out.put(a, o, {});
+                    return;
+                }
                 inline for (@typeInfo(P).@"struct".field_names) |name| {
                     const F = @FieldType(P, name);
                     if (F == Inst.Ref) {

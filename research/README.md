@@ -20,6 +20,10 @@ the plan's tasks in order and never redecide a `Decision:`.
 
 ## Decisions that bind several plans
 
+- **Models (user, 2026-11-11).** Implementation agents run on Sonnet; research
+  agents (a question the plans do not answer, an LRM reading, a rule fitted to
+  fixtures) run on Fable. A rule the lead derived from fixtures alone goes to
+  research before an implementer takes it (T39 -> `conversion.md`).
 - **No file-length cap (user, overrides every plan).** The 500-code-line rule
   is dropped from AGENTS.md and `tools/check_style.py`. A plan task that
   splits a file only to meet that count is skipped; a split that names a

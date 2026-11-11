@@ -659,3 +659,5 @@ Each emitted Instance/State struct keeps the existing `comptime assert(@sizeOf(.
   ruling). T10's `eval.toInteger` saturates every out-of-range value. The fold and the run-time
   derive path must apply the same rule. Oracle: both fixtures' own `CHECKI`s, diff-codegen and
   diff-comp on both; red first.
+  **On hold:** the rule above is the lead's fit to two fixtures; `research/conversion.md`
+  (Fable) settles it from the LRM, the old side and the suite before anyone implements.

@@ -29,7 +29,7 @@
 //! - the bsource stack (`codegen.examples.stack`) against `Air.interp`, and
 //!   the contract's hosts (`tests/host`) on the new devices of their
 //!   fixtures (build/rewrite.zig's `codegenHosts`).
-//! `-Dcodegen-filter=<substring>` runs only the fixtures whose path holds it;
+//! `-Dcodegen-filter=<a|b|...>` runs only the fixtures whose path holds one of them;
 //! `-Dcodegen-keep` keeps the devices (`zig-out/codegen-work/b<k>/{o,n}<j>.zig`).
 //! No LRM clause: this checks VerA's rewrite against VerA.
 //!
@@ -122,6 +122,16 @@ const SiteFn = *const fn (u32, *usize) callconv(.c) ?[*]const u8;
 /// The f64s of display records one point may write.
 const say_cap = 1 << 14;
 
+/// A probe: evaluate the points from `start` to `point`, then only `side`.
+const Probe = struct { point: u32, side: u2 };
+
+/// What a forked child ended with: its counts and why, or the last record
+/// before a signal stopped it.
+const ChildRun = union(enum) {
+    done: struct { counts: Counts, why: ?[]const u8 },
+    stopped: struct { rec: u32, status: u32 },
+};
+
 // ---- private ----
 
 fn run(result: *anyerror!void) void {
@@ -143,7 +153,7 @@ fn runAll() !void {
     var ready: std.ArrayList(Ready) = .empty;
     const include = options.fixture_root ++ "/include";
     for (try collect(arena, io)) |rel| {
-        if (filter.len != 0 and std.mem.find(u8, rel, filter) == null) continue;
+        if (!picked(rel, filter)) continue;
         tally.fixtures += 1;
         if (lower_listed.contains(rel)) {
             tally.lower_listed += 1;
@@ -193,7 +203,7 @@ fn runAll() !void {
     var it = xfail.iterator();
     while (it.next()) |e| {
         const rel = e.key_ptr.*;
-        if (filter.len != 0 and std.mem.find(u8, rel, filter) == null) continue;
+        if (!picked(rel, filter)) continue;
         if (whys.contains(rel)) continue;
         tally.failed += 1;
         const agreed = for (ready.items) |r| {
@@ -387,14 +397,6 @@ fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver
     unreachable; // every rerun adds a distinct point below `points`
 }
 
-/// A probe: evaluate the points from `start` to `point`, then only `side`.
-const Probe = struct { point: u32, side: u2 };
-
-const ChildRun = union(enum) {
-    done: struct { counts: Counts, why: ?[]const u8 },
-    stopped: struct { rec: u32, status: u32 },
-};
-
 /// Runs `compare` in a forked child. The child writes a `u32` record
 /// before each call (point << 2 | side), then `done`, its counts and the
 /// why; a child that dies leaves its last record.
@@ -542,12 +544,12 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?Ru
         // through every point, so a print never hides a wrong Jacobian.
         // ponytail: a child that stops later loses it; the resumed child
         // finds it again only past the stop.
-        if (say_why == null) for (1..sides_n) |s| {
+        if (say_why == null) sides: for (1..sides_n) |s| {
             const a = says[0][0..say_lens[0]];
             const b = says[s][0..say_lens[s]];
             if (a.len != b.len) {
                 say_why = try arena.print("point {d}: the old device recorded {d} display values, the {s} {d}", .{ p, a.len, if (s == 1) "new" else "versioned", b.len });
-                break;
+                break :sides;
             }
             for (a, b, 0..) |va, vb, i| {
                 if (ulps.sameBits(va, vb)) continue;
@@ -555,7 +557,7 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?Ru
                 if (libm and apart <= libm_ulps) continue;
                 if (s == 2 and inside and apart <= fast_ulps) continue;
                 say_why = try arena.print("point {d}: display record value {d}: old {e}, {s} {e}", .{ p, i, va, if (s == 1) "new" else "versioned", vb });
-                break;
+                break :sides;
             }
         };
         counts[0] += 1;
@@ -578,6 +580,15 @@ fn sitesDiffer(arena: Allocator, old: SiteFn, new: SiteFn) !?[]const u8 {
         if (a == null or b == null) return try arena.print("the display sites differ in number: {s} has site {d}", .{ if (a != null) "only the old" else "only the new", i });
         if (!std.mem.eql(u8, a.?[0..la], b.?[0..lb])) return try arena.print("display site {d}: old format \"{f}\", new \"{f}\"", .{ i, std.zig.fmtString(a.?[0..la]), std.zig.fmtString(b.?[0..lb]) });
     }
+}
+
+/// Whether fixture path `rel` holds one of `filter`'s `|`-separated
+/// substrings; an empty filter picks every fixture.
+fn picked(rel: []const u8, filter: []const u8) bool {
+    if (filter.len == 0) return true;
+    var it = std.mem.splitScalar(u8, filter, '|');
+    while (it.next()) |part| if (part.len != 0 and std.mem.find(u8, rel, part) != null) return true;
+    return false;
 }
 
 /// Whether every guard of `box` admits the point (`Float.Guard.admits`, the
@@ -707,4 +718,37 @@ test "§11.10 the bsource stack device (a written-element mask, no memset) compu
         try std.testing.expectEqual(x[1], jp[0]);
         try std.testing.expectEqual(x[0] + 1, jp[1]);
     }
+}
+
+test "compare: a display difference only the strict new device makes is named new, not versioned" {
+    // Oracle: the sides by construction. Old records 1, new and versioned
+    // both 2: the first side to differ is new, and a later side must not
+    // overwrite the reason (red-checked: an unlabelled `break` in the say
+    // loop reads "versioned").
+    const Fake = struct {
+        fn side(comptime v: f64) RunFn {
+            return struct {
+                fn f(_: [*]const [*:0]const u8, _: [*]const f64, _: u32, _: [*]const f64, _: u32, _: f64, _: u32, out: [*]f64, len: u32, say: [*]f64, _: u32, say_len: *u32) callconv(.c) i32 {
+                    @memset(out[0..len], 0);
+                    say[0] = v;
+                    say_len.* = 1;
+                    return 0;
+                }
+            }.f;
+        }
+    };
+    var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena.deinit();
+    const box = [_]@import("air").Float.Guard{.{ .iv = .{ .lo = -10, .hi = 10 }, .index = 0, .leaf = .probe }};
+    const r: Ready = .{ .rel = "fake.va", .old = "", .new = "", .ver = "", .card = .{ .names = &.{}, .defaults = &.{}, .ranges = &.{}, .n_u = 1, .box = &box } };
+    var counts: Counts = @splat(0);
+    const why = try compare(arena.allocator(), r, Fake.side(1), Fake.side(2), Fake.side(2), -1, &counts, &.{}, 0, null);
+    try std.testing.expectEqualStrings("point 0: display record value 0: old 1e0, new 2e0", why.?);
+}
+
+test "picked: a `|`-separated filter picks a path holding any of its parts" {
+    try std.testing.expect(picked("ch04/abs.va", ""));
+    try std.testing.expect(picked("ch04/abs.va", "cosh|abs"));
+    try std.testing.expect(!picked("ch04/abs.va", "cosh|fmod"));
+    try std.testing.expect(!picked("ch04/abs.va", "|"));
 }

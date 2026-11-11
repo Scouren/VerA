@@ -168,31 +168,31 @@ pub fn new(gpa: Allocator, arena: Allocator, io: Io, path: []const u8, source: [
 
 // ---- private ----
 
-/// `old`, the old preprocessor's §10.2/§10.3 and IEEE 1364 §19 directive
+/// `src`, the old preprocessor's §10.2/§10.3 and IEEE 1364 §19 directive
 /// events, in the new `events.Directives` shape (each region's value by
 /// name).
-fn directives(arena: Allocator, old: anytype) !events.Directives {
-    const disciplines = try arena.alloc(events.DefaultDiscipline, old.disciplines.len);
-    for (old.disciplines, disciplines) |e, *d| d.* = .{
+fn directives(arena: Allocator, src: anytype) !events.Directives {
+    const disciplines = try arena.alloc(events.DefaultDiscipline, src.disciplines.len);
+    for (src.disciplines, disciplines) |e, *d| d.* = .{
         .at = e.at,
         .qualifier = if (e.qualifier) |q| std.meta.stringToEnum(events.Qualifier, @tagName(q)).? else null,
         .discipline = e.discipline,
     };
     return .{
         .disciplines = disciplines,
-        .transitions = try regions(?f64, arena, old.transitions),
-        .timescales = try regions(?events.Timescale, arena, old.timescales),
-        .nettypes = try regions(events.NetType, arena, old.nettypes),
-        .cells = try regions(bool, arena, old.cells),
-        .drives = try regions(events.Drive, arena, old.drives),
+        .transitions = try regions(?f64, arena, src.transitions),
+        .timescales = try regions(?events.Timescale, arena, src.timescales),
+        .nettypes = try regions(events.NetType, arena, src.nettypes),
+        .cells = try regions(bool, arena, src.cells),
+        .drives = try regions(events.Drive, arena, src.drives),
     };
 }
 
 /// One list of old regions as `events.Region(T)`: an enum by its tag's
 /// name, a timescale field by field, any other value as it is.
-fn regions(comptime T: type, arena: Allocator, old: anytype) ![]const events.Region(T) {
-    const out = try arena.alloc(events.Region(T), old.len);
-    for (old, out) |e, *r| r.* = .{
+fn regions(comptime T: type, arena: Allocator, src: anytype) ![]const events.Region(T) {
+    const out = try arena.alloc(events.Region(T), src.len);
+    for (src, out) |e, *r| r.* = .{
         .at = e.at,
         .value = switch (@typeInfo(T)) {
             .@"enum" => std.meta.stringToEnum(T, @tagName(e.value)).?,

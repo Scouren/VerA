@@ -220,7 +220,7 @@ fn setField(model: *D.Model, comptime field: []const u8, v: anytype) void {
 
 /// The digital half stopped: its run-time error, then the run's own.
 fn mixedFail(dig: *const sim.State, e: anyerror) noreturn {
-    if (dig.failure) |f| std.debug.print("{s}\n", .{f});
+    if (dig.failure) |f| std.debug.print("{s}\n", .{f.text});
     std.debug.print("FAIL {s}: the digital half did not run: {t}\n", .{ hub.title, e });
     std.process.exit(1);
 }

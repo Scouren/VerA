@@ -298,13 +298,7 @@ fn digitalExe(comp: *Compilation) !?Job {
     try codegen_mod.digital_next.writeExe(&root.writer, a, &comp.lowered.?.program, sources, try checkSites(comp), c.event_budget);
     const slots = try a.alloc(link_mod.Server, c.thread_limit);
     var q: link_mod.Queue = .init(slots);
-    const tree = std.fs.path.dirname(std.fs.path.dirname(c.contract.?) orelse ".") orelse ".";
-    const mods = [_]link_mod.Module{
-        .{ .name = "std_sim", .root = try std.fs.path.join(a, &.{ tree, "lib", "std", "sim.zig" }), .deps = &.{ "kernels", "contract", "vams" } },
-        .{ .name = "kernels", .root = try std.fs.path.join(a, &.{ tree, "lib", "kernels", "root.zig" }), .deps = &.{"contract"} },
-        .{ .name = "contract", .root = c.contract.? },
-        .{ .name = "vams", .root = try std.fs.path.join(a, &.{ tree, "lib", "std", "vams.zig" }) },
-    };
+    const mods = [_]link_mod.Module{.{ .name = "contract", .root = c.contract.? }} ++ try simModules(a, c.contract.?);
     const f: link_mod.File = .{ .kind = .exe, .work_dir = c.work_dir orelse ".zig-cache/vera-tb", .name = std.fs.path.stem(c.paths[0]), .optimize = c.optimize, .modules = &mods, .zig_exe = c.zig_exe, .debug_info = c.debug_info, .out_path = c.out_path };
     var built = link_mod.buildExe(f, comp.gpa, comp.io, &q, null, root.written()) catch |e| {
         try comp.outputs.err.print(a, "error: {s}: building the executable failed: {t}\n", .{ c.paths[0], e });
@@ -412,13 +406,19 @@ fn deviceModules(comp: *Compilation) ![]const link_mod.Module {
     const contract = comp.config.contract.?;
     const engine = try engineModules(a, contract);
     if (comp.lowered == null) return a.dupe(link_mod.Module, &engine);
+    return a.dupe(link_mod.Module, &([_]link_mod.Module{engine[0]} ++ try simModules(a, contract)));
+}
+
+/// `std_sim` and the modules it imports besides `contract`, from the VerA
+/// tree `contract` sits in. Every build that links `std_sim` takes this one
+/// list, so an import `std_sim` gains reaches each of them.
+fn simModules(a: Allocator, contract: []const u8) ![3]link_mod.Module {
     const tree = std.fs.path.dirname(std.fs.path.dirname(contract) orelse ".") orelse ".";
-    return a.dupe(link_mod.Module, &[_]link_mod.Module{
-        engine[0],
+    return .{
         .{ .name = "std_sim", .root = try std.fs.path.join(a, &.{ tree, "lib", "std", "sim.zig" }), .deps = &.{ "kernels", "contract", "vams" } },
         .{ .name = "kernels", .root = try std.fs.path.join(a, &.{ tree, "lib", "kernels", "root.zig" }), .deps = &.{"contract"} },
         .{ .name = "vams", .root = try std.fs.path.join(a, &.{ tree, "lib", "std", "vams.zig" }) },
-    });
+    };
 }
 
 /// Each timing check's W1199 site (`Lowered.check_sites`), relocated to
@@ -482,13 +482,8 @@ fn testbench(comp: *Compilation) !?Job {
     const slots = try a.alloc(link_mod.Server, c.thread_limit);
     var q: link_mod.Queue = .init(slots);
     const engine = try engineModules(a, c.contract.?);
-    // The runner is `std_sim.bench` (and the old `kernels` `std_sim`
-    // imports), from the same tree as the contract.
-    const tree = std.fs.path.dirname(std.fs.path.dirname(c.contract.?) orelse ".") orelse ".";
-    const sim_mods = engine ++ [_]link_mod.Module{
-        .{ .name = "std_sim", .root = try std.fs.path.join(a, &.{ tree, "lib", "std", "sim.zig" }), .deps = &.{ "kernels", "contract" } },
-        .{ .name = "kernels", .root = try std.fs.path.join(a, &.{ tree, "lib", "kernels", "root.zig" }), .deps = &.{"contract"} },
-    };
+    // The runner is `std_sim.bench`, from the same tree as the contract.
+    const sim_mods = engine ++ try simModules(a, c.contract.?);
     const top = comp.zcu.intern_pool.stringToSlice(comp.zcu.instances.items(.name)[0]);
     const f: link_mod.File = .{ .kind = .exe, .work_dir = c.work_dir orelse ".zig-cache/vera-tb", .name = top, .optimize = c.optimize, .modules = &sim_mods, .zig_exe = c.zig_exe, .debug_info = c.debug_info, .out_path = c.out_path };
     var built = link_mod.buildExe(f, comp.gpa, comp.io, &q, comp.device.?.text, runner.written()) catch |e| {

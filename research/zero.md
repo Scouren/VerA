@@ -62,6 +62,7 @@ Not yet planned anywhere (each named in its area section with its files):
 | TF: §9.5 file I/O in a device (`files.zig`; runtime and Sema exist) | 82 | codegen |
 | T10b `$clog2` codes, T12b operator under a constant condition, T36 §3.13 redeclaration codes, T29b run-time `$simprobe` name, T2b held write in a timer body | 14 + 6 + 5 + 2 + 1 | lowering |
 | TU masks past 64 unknowns (the code's own ponytail note), TE §3.4.4 card range at run time | 3 + 2 | codegen |
+| The codegen half of lowering T33 (abstol, nodeset, desc per node) and T34 (`genDerive`): wrong numbers, no codegen.md task | 10 + 2 | codegen, for lowering's wave 1 |
 | dlower T2b: W1150/W1153 that `--run` never prints (and an oracle hole in diff-sim) | 4 | digital |
 | Routing only: W0251/W0252/W0253/W0259/E0207 run-stage lines the judge blames on codegen | 14 | frontend or dlower |
 | Attribution first (one `--run`, `-Dlower-dump` or `-Dcodegen-why` each) | 34 | lowering 25, codegen 9 |

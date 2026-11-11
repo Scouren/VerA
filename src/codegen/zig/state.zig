@@ -55,7 +55,8 @@ pub fn genInstanceFields(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
     for (0..dg.device.limit_slots.len) |k| w.print("    limiter_previous__{d}: f64 = 0.0,\n", .{k}) catch return error.OutOfMemory;
     for (dg.table_len, 0..) |n, k| w.print("    table_{d}: [{d}]f64 = @splat(0.0),\n", .{ k, n }) catch return error.OutOfMemory;
     if (dg.table_len.len != 0) w.print("    table_ready: [{0d}]bool = @splat(false),\n    table_kept: [{0d}]bool = @splat(false),\n", .{dg.table_len.len}) catch return error.OutOfMemory;
-    for (try ops.fields(dg)) |o| w.print("    {s}: f64 = {s},\n", .{ o.name, o.default }) catch return error.OutOfMemory;
+    for (try ops.fields(dg)) |o| w.print("    {s}: {s} = {s},\n", .{ o.name, o.ty, o.default }) catch return error.OutOfMemory;
+    try ops.genInstance(dg, w);
     for (dg.held_field, 0..) |field, i| if (field) |f| {
         w.print("    {s}: {s} = ", .{ f, typeName(dg, i) }) catch return error.OutOfMemory;
         try writeInit(dg, w, i);
@@ -84,7 +85,8 @@ pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
     try p(w, "\n/// §5.10 the held values as last committed (`stateCtl`).\npub const State = struct {{\n", .{});
     if (tables) try p(w, "    table_kept: [{d}]bool = @splat(false),\n", .{dg.table_len.len});
     for (0..limits) |k| try p(w, "    limiter_previous__{d}: f64 = 0.0,\n", .{k});
-    for (opf) |o| try p(w, "    {s}: f64 = {s},\n", .{ o.name, o.default });
+    for (opf) |o| try p(w, "    {s}: {s} = {s},\n", .{ o.name, o.ty, o.default });
+    try ops.genState(dg, w);
     for (dg.held_field, 0..) |field, i| if (field) |f| {
         try p(w, "    {s}: {s} = ", .{ f, typeName(dg, i) });
         try writeInit(dg, w, i);
@@ -111,11 +113,14 @@ pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
     for (dg.held_field) |field| if (field) |f| try p(w, "            state.{s} = inst.{s};\n", .{ f, f });
     for (0..limits) |k| try p(w, "            state.limiter_previous__{0d} = inst.limiter_previous__{0d};\n", .{k});
     for (opf) |o| try p(w, "            state.{0s} = inst.{0s};\n", .{o.name});
+    try ops.genCommit(dg, w);
     try p(w, "        }},\n        .revert => {{\n", .{});
+    try ops.genRevertPre(dg, w);
     if (tables) try p(w, "            inst.table_kept = state.table_kept;\n            inst.table_ready = inst.table_kept;\n", .{});
     for (dg.held_field) |field| if (field) |f| try p(w, "            inst.{s} = state.{s};\n", .{ f, f });
     for (0..limits) |k| try p(w, "            inst.limiter_previous__{0d} = state.limiter_previous__{0d};\n", .{k});
     for (opf) |o| try p(w, "            inst.{0s} = state.{0s};\n", .{o.name});
+    try ops.genRevertPost(dg, w);
     try p(w, "        }},\n    }}\n    return false;\n}}\n\npub const state_class: contract.StateClass = .history;\n", .{});
     if (limits == 0) return;
     // §9.17.3 after each Newton iterate, each `$limit` slot's value is the

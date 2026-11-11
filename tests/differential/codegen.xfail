@@ -3,7 +3,6 @@
 # each: the fixture path under tests/conformance/tests, then why. A listed
 # fixture that agrees fails the run until its line goes.
 netlist/hdl/a09_absdelay_accepted_only.assets/a09_cross_rejector.va codegen: a call of `cross`
-netlist/hdl/a09_absdelay_accepted_only.assets/a09_delayed_ramp.va codegen: a call of `absdelay`
 netlist/hdl/a09_abstime_per_attempt.assets/a09_cross_rejector.va codegen: a call of `cross`
 netlist/hdl/a09_analog_initial_once.assets/a09_cross_rejector.va codegen: a call of `cross`
 netlist/hdl/a09_analog_initial_once.assets/a09_initial_once.va codegen: a call of `analog$initial`
@@ -24,12 +23,6 @@ verilog-a/ch03_data_types/dependent_control_unknown_local.va codegen: parameter 
 verilog-a/ch03_data_types/integer_parameter_precision_control.va codegen: a call of `absdelay`
 verilog-a/ch03_data_types/natureless_domainless_port_compatibility.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch03_data_types/operator_equation_tolerances.va codegen: a call of `idt$hold`
-verilog-a/ch04_expressions/absdelay.va codegen: a call of `absdelay`
-verilog-a/ch04_expressions/absdelay_ac_phase.va codegen: a call of `absdelay`
-verilog-a/ch04_expressions/absdelay_history_beyond_capacity.va codegen: a call of `absdelay`
-verilog-a/ch04_expressions/absdelay_maxdelay_substitution.va codegen: a call of `absdelay`
-verilog-a/ch04_expressions/absdelay_td_frozen_without_maxdelay.va codegen: a call of `absdelay`
-verilog-a/ch04_expressions/absdelay_vera_interp_linear.va codegen: a call of `absdelay`
 verilog-a/ch04_expressions/filter_null_zeros_argument.va codegen: a call of `laplace_zp`
 verilog-a/ch04_expressions/idt_assert_release_resumes.va codegen: a call of `idt$hold`
 verilog-a/ch04_expressions/idt_hold_revert.va codegen: a call of `idt$hold`
@@ -249,7 +242,6 @@ verilog-a/ch04_expressions/spice_noise_series_resistor.va the new device does no
 verilog-a/ch04_expressions/spice_noise_shared_pair.va the new device does not build: n14.zig:62: unused local constant
 verilog-a/ch04_expressions/status_site_beside_noise.va the new device does not build: n18.zig:72: unused local constant
 verilog-a/ch04_expressions/white_noise_topology.va the new device does not build: n9.zig:63: unused local constant
-verilog-a/ch05_analog_behavior/absdelay_short_delay.va codegen: a call of `absdelay`
 verilog-a/ch05_analog_behavior/analog_signals_nets_branches_contributions.va codegen: a §5.6.7 indirect contribution
 verilog-a/ch05_analog_behavior/child_named_branch_potential_and_flow_access.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch05_analog_behavior/held_array_element_between_events.va codegen: a call of `timer`
@@ -415,16 +407,10 @@ verilog-a/ch02_lexical/string_escapes.va codegen: a real operand that is not a n
 verilog-a/ch02_lexical/string_literal_tab_positions.va codegen: a real operand that is not a number
 verilog-a/ch02_lexical/string_whitespace_significant.va codegen: a real operand that is not a number
 verilog-a/ch02_lexical/undefined_escape_keeps_character.va codegen: a real operand that is not a number
-verilog-a/ch04_expressions/absdelay_dynamic_maxdelay_sampled.va codegen: a call of `absdelay`
-verilog-a/ch04_expressions/absdelay_history_past_capacity.va codegen: a call of `absdelay`
-verilog-a/ch04_expressions/absdelay_initial_output_is_input_at_zero.va codegen: a call of `absdelay`
-verilog-a/ch04_expressions/absdelay_linear_interpolation.va codegen: a call of `absdelay`
-verilog-a/ch04_expressions/absdelay_maxdelay_sizes_history.va codegen: a call of `absdelay`
 verilog-a/ch04_expressions/dynamic_constant_argument_resampled_per_analysis.va codegen: a call of `absdelay`
 verilog-a/ch04_expressions/laplace_nd_pole_at_origin.va codegen: a call of `laplace_nd`
 verilog-a/ch04_expressions/zi_nd_dynamic_coefficient_sampled.va codegen: a call of `zi_nd`
 verilog-a/ch05_analog_behavior/simparam_str_hierarchy_names.va codegen: a call of `$simparam$str`
-verilog-a/exhaustive/absdelay.va codegen: a call of `absdelay`
 verilog-a/ch03_data_types/dynamic_multidim_guards.va point 0: display record value 13: old 9.6e1, versioned 0e0
 verilog-a/ch03_data_types/vera_scratch_uninit_tape.va point 0: display record value 21: old 9e0, new 0e0
 verilog-a/ch04_expressions/abs.va point 0: display record value 9: old 0e0, new -0e0

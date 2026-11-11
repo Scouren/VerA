@@ -1,5 +1,6 @@
 //! §4.5 the stateful analog operators as the device's state: each call
-//! site of `transition`, `slew`, `idtmod` or `last_crossing` owns
+//! site of `transition`, `slew`, `idtmod`, `last_crossing` or `absdelay`
+//! (`ops/delay.zig`: its ring) owns
 //! `Instance` fields (`op<k>__<slot>`, the old `op_zig.zig` rows), `core`
 //! evaluates it from them and returns its
 //! input and control values (`o<k>`, `o<k>c<j>`), and `updateState` advances
@@ -14,13 +15,15 @@
 //! (`default_transition`, which Air does not carry yet: 0).
 //!
 //! Contents:
-//! - `pub const Kind = enum { transition, slew, idtmod, last_crossing }`, `pub const Site = struct { call, kind }`
-//! - `pub const Field = struct { name, default }`
+//! - `pub const Kind = enum { transition, slew, idtmod, last_crossing, absdelay }`, `pub const Site = struct { call, kind, delay }`
+//! - `pub const Field = struct { name, ty, default }`
 //! - `pub fn plan(dg: *DeclGen) DeclGen.Error!void`
 //! - `pub fn fields(dg: *const DeclGen) DeclGen.Error![]const Field`
 //! - `pub fn genCoreFields`, `pub fn genDecls`, `pub fn genReturn`: `core`'s side
 //! - `pub fn gen(f: *Function, inst: Air.Inst.Index, kind: Kind, args: []const Air.Inst.Ref) DeclGen.Error!void`
 //! - `pub fn genAccept(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void`
+//! - `pub fn genInstance`, `pub fn genState`, `pub fn genCommit`, `pub fn genRevertPre`, `pub fn genRevertPost`: what `state.zig` adds past the fields
+//! - `pub fn value(f: *Function, args: []const Air.Inst.Ref, i: usize, dflt: []const u8) DeclGen.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -28,17 +31,18 @@ const Air = @import("air");
 const SysFn = @import("vams").SysFn;
 const DeclGen = @import("DeclGen.zig");
 const Function = @import("Function.zig");
+const delay = @import("ops/delay.zig");
 const Ref = Air.Inst.Ref;
 const Error = DeclGen.Error;
 
 /// The operators this file spells.
-pub const Kind = enum { transition, slew, idtmod, last_crossing };
+pub const Kind = enum { transition, slew, idtmod, last_crossing, absdelay };
 
 /// One operator call site, in `Air` order: its index is `k` in its names.
-pub const Site = struct { call: Air.Inst.Index, kind: Kind };
+pub const Site = struct { call: Air.Inst.Index, kind: Kind, delay: delay.Delay = .{} };
 
 /// One `f64` `Instance` field the operators own, and its default.
-pub const Field = struct { name: []const u8, default: []const u8 };
+pub const Field = struct { name: []const u8, ty: []const u8 = "f64", default: []const u8 = "0.0" };
 
 /// One field an operator owns: `op<k>__<name>`, at `default`.
 const Slot = struct { name: []const u8, default: []const u8 = "0.0" };
@@ -56,9 +60,12 @@ pub fn plan(dg: *DeclGen) Error!void {
             .slew => .slew,
             .idtmod => .idtmod,
             .last_crossing => .last_crossing,
+            .absdelay => .absdelay,
             else => continue, // else: not an operator this file spells
         };
-        try sites.append(dg.arena, .{ .call = @fromBackingInt(@intCast(i)), .kind = kind });
+        const x = air.extraData(Air.Call, data.ty_pl.payload);
+        const args: []const Ref = @ptrCast(air.extra[x.end..][0..x.data.args_len]);
+        try sites.append(dg.arena, .{ .call = @fromBackingInt(@intCast(i)), .kind = kind, .delay = if (kind == .absdelay) delay.plan(dg, args) else .{} });
     }
     dg.op_sites = sites.items;
     assert(dg.op_sites.len <= air.instructions.len);
@@ -68,9 +75,10 @@ pub fn plan(dg: *DeclGen) Error!void {
 /// there is one: what `Instance` declares and `stateCtl` keeps.
 pub fn fields(dg: *const DeclGen) Error![]const Field {
     var out: std.ArrayList(Field) = .empty;
-    for (dg.op_sites, 0..) |s, k| for (slots(s.kind)) |slot| {
-        try out.append(dg.arena, .{ .name = try std.fmt.allocPrint(dg.arena, "op{d}__{s}", .{ k, slot.name }), .default = slot.default });
-    };
+    for (dg.op_sites, 0..) |s, k| {
+        if (s.kind == .absdelay) try delay.fields(@constCast(dg), k, s.delay, &out);
+        for (slots(s.kind)) |slot| try out.append(dg.arena, .{ .name = try std.fmt.allocPrint(dg.arena, "op{d}__{s}", .{ k, slot.name }), .default = slot.default });
+    }
     if (out.items.len != 0) try out.append(dg.arena, .{ .name = "t_prev__", .default = "0.0" });
     assert(out.items.len == 0 or dg.op_sites.len != 0);
     return out.items;
@@ -124,17 +132,24 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, kind: Kind, args: []const Ref) Er
             try f.print(";", .{});
         }
     }
-    try f.print(" break :op{d} F.zLu(S, 0x{x}, K.ops.{s}(F.zL(S, 0x{x}), F.zLw(S, 0x{x}, ", .{ k, m, switch (kind) {
-        .transition => "zTransition",
-        .slew => "zSlew",
-        .idtmod => "zIdtmod",
-        .last_crossing => "zLastCross",
-    }, m, m });
+    if (kind == .absdelay) return delay.genEval(f, k, dg.op_sites[k].delay, args, m);
+    try f.print(" break :op{d} F.zLu(S, 0x{x}, K.ops.{s}(F.zL(S, 0x{x}), F.zLw(S, 0x{x}, ", .{
+        k, m,
+        switch (kind) {
+            .transition => "zTransition",
+            .slew => "zSlew",
+            .idtmod => "zIdtmod",
+            .last_crossing => "zLastCross",
+            .absdelay => unreachable, // `delay.genEval`
+        },
+        m, m,
+    });
     try f.real(args[0]);
     switch (kind) {
         .transition => try f.print("), inst.op{0d}__from, inst.op{0d}__to, inst.op{0d}__t0, sim.t, sim.dt, ", .{k}),
         .slew => try f.print("), inst.op{d}__prev, sim.dt, ", .{k}),
         .idtmod => try f.print("), inst.op{d}__acc, sim.dt, ", .{k}),
+        .absdelay => unreachable, // `delay.genEval`
         // §4.5.10 a crossing since the last accepted point is the last one;
         // `sim.dt > 0` is the seeding rule `updateState` keeps too.
         .last_crossing => {
@@ -159,7 +174,9 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, kind: Kind, args: []const Ref) Er
 /// `updateState`'s operator steps, reading `core`'s `m` and `dt`.
 pub fn genAccept(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     if (dg.op_sites.len == 0) return;
-    try dg.print(w, "    const dt = sim.t - inst.t_prev__;\n", .{});
+    try dg.print(w, "    const dt = sim.t - inst.t_prev__;\n    _ = &dt;\n", .{});
+    // §9.17.2 reset first: a bound last step set must not bind this one.
+    if (delays(dg)) try dg.print(w, "    inst.bound_step = std.math.inf(f64);\n", .{});
     for (dg.op_sites, 0..) |s, k| switch (s.kind) {
         // §4.5.8 the accepted input arms or readjusts the excursion.
         .transition => try dg.print(w, "    K.ops.zTransStep(m.o{0d}.val(), &inst.op{0d}__from, &inst.op{0d}__to, &inst.op{0d}__t0, sim.t, dt, m.o{0d}c0, m.o{0d}c1, m.o{0d}c2);\n", .{k}),
@@ -174,11 +191,58 @@ pub fn genAccept(dg: *DeclGen, w: *std.Io.Writer) Error!void {
             \\    inst.op{0d}__prev = m.o{0d}.val();
             \\
         , .{k}),
+        .absdelay => try delay.genAccept(dg, w, k, s.delay),
     };
     try dg.print(w, "    inst.t_prev__ = sim.t;\n", .{});
 }
 
+/// `Instance`'s fields past `fields`: the rings, and `bound_step` (§9.17.2,
+/// the host reads it after an accepted step) when a ring bounds it.
+pub fn genInstance(dg: *DeclGen, w: *std.Io.Writer) Error!void {
+    for (dg.op_sites, 0..) |s, k| if (s.kind == .absdelay) try delay.genRing(dg, w, k, s.delay);
+    if (delays(dg)) try dg.print(w, "    bound_step: f64 = std.math.inf(f64),\n", .{});
+}
+
+/// `State`'s fields past `fields`.
+pub fn genState(dg: *DeclGen, w: *std.Io.Writer) Error!void {
+    for (dg.op_sites, 0..) |s, k| if (s.kind == .absdelay) try delay.genState(dg, w, k);
+}
+
+/// `stateCtl(.commit)`'s lines past the field copies.
+pub fn genCommit(dg: *DeclGen, w: *std.Io.Writer) Error!void {
+    for (dg.op_sites, 0..) |s, k| if (s.kind == .absdelay) try delay.genCommit(dg, w, k, s.delay);
+}
+
+/// `stateCtl(.revert)`'s lines before the field copies.
+pub fn genRevertPre(dg: *DeclGen, w: *std.Io.Writer) Error!void {
+    for (dg.op_sites, 0..) |s, k| if (s.kind == .absdelay) try delay.genRevertPre(dg, w, k);
+}
+
+/// `stateCtl(.revert)`'s lines after the field copies.
+pub fn genRevertPost(dg: *DeclGen, w: *std.Io.Writer) Error!void {
+    for (dg.op_sites, 0..) |s, k| if (s.kind == .absdelay) try delay.genRevertPost(dg, w, k);
+}
+
+/// Writes argument `i` as an `f64`, or `dflt` when the call has none.
+pub fn value(f: *Function, args: []const Ref, i: usize, dflt: []const u8) Error!void {
+    if (i >= args.len or args[i] == .none) return f.print("{s}", .{dflt});
+    if (f.isIntRef(args[i])) {
+        try f.print("@as(f64, @floatFromInt(", .{});
+        try f.int(args[i]);
+        return f.print("))", .{});
+    }
+    try f.print("(", .{});
+    try f.real(args[i]);
+    try f.print(").val()", .{});
+}
+
 // ---- private ----
+
+/// Whether some site is an `absdelay`.
+fn delays(dg: *const DeclGen) bool {
+    for (dg.op_sites) |s| if (s.kind == .absdelay) return true;
+    return false;
+}
 
 fn slots(kind: Kind) []const Slot {
     return switch (kind) {
@@ -190,6 +254,8 @@ fn slots(kind: Kind) []const Slot {
         .idtmod => &.{.{ .name = "acc" }},
         // §4.5.10 the last accepted input, and the crossing time (-1: none yet).
         .last_crossing => &.{ .{ .name = "prev" }, .{ .name = "t_last", .default = "-1.0" } },
+        // `delay.fields`: its shape is the call's.
+        .absdelay => &.{},
     };
 }
 
@@ -199,7 +265,7 @@ fn slots(kind: Kind) []const Slot {
 fn controls(kind: Kind) usize {
     return switch (kind) {
         .transition, .idtmod => 3,
-        .slew => 2,
+        .slew, .absdelay => 2,
         .last_crossing => 1,
     };
 }
@@ -228,18 +294,7 @@ fn control(f: *Function, kind: Kind, args: []const Ref, j: usize) Error!void {
         .slew => if (j == 0) try value(f, args, 1, "1e300") else if (args.len > 2) try value(f, args, 2, "0.0") else try value(f, args, 1, "1e300"),
         .idtmod => try value(f, args, j + 1, "0.0"),
         .last_crossing => try value(f, args, 1, "0.0"),
+        // §4.5.7 td and maxdelay, as written.
+        .absdelay => try value(f, args, j + 1, "0.0"),
     }
-}
-
-/// Writes argument `i` as an `f64`, or `dflt` when the call has none.
-fn value(f: *Function, args: []const Ref, i: usize, dflt: []const u8) Error!void {
-    if (i >= args.len or args[i] == .none) return f.print("{s}", .{dflt});
-    if (f.isIntRef(args[i])) {
-        try f.print("@as(f64, @floatFromInt(", .{});
-        try f.int(args[i]);
-        return f.print("))", .{});
-    }
-    try f.print("(", .{});
-    try f.real(args[i]);
-    try f.print(").val()", .{});
 }

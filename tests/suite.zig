@@ -20,7 +20,7 @@
 //! `tools/report.py` parses the `pass fail unasserted xfail` row `Suite`
 //! prints: that row's text is frozen.
 //!
-//! The fixtures are the VAMS Conformance Suite's `tests/` (`suite_options.fixture_root`,
+//! The fixtures are the VAMS Conformance Suite's `tests/` (`suite_options.fixtureRoot()`,
 //! the submodule `tests/conformance`): `verilog-a/`, `verilog-ams/` (its `digital/`
 //! the digital-context cases), `spice/`, `verilog/` (IEEE 1364-2005) and `include/`
 //! (`check.vh`); its `netlist/` is ESPice's. Every path a verdict prints is relative

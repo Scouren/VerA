@@ -194,6 +194,13 @@ pub fn flush(f: File, gpa: Allocator, io: Io, q: *Queue, device: Output, generat
     // the same key waits for this one's library instead of building it too.
     const stored: ?*Stored = if (f.cache_dir != null and f.engine == null) try cacheOpen(gpa, io, arena, f, device, split) else null;
     defer if (stored) |s| s.close(io);
+    // A hit whose entry is gone (R2b, research/builds.md): `stale` names it
+    // so the rebuild below re-populates that exact digest instead of
+    // leaving every later flush of the same key to repeat this miss
+    // forever. `s.hit` itself stays non-null, so `cacheStore` (built for a
+    // genuine miss's own digest and manifest write, asserts `s.hit ==
+    // null`) is never the one that heals it.
+    var stale: ?[]const u8 = null;
     if (stored) |s| if (s.hit) |src| {
         const dst = try generationPath(gpa, f, generation);
         errdefer gpa.free(dst);
@@ -201,7 +208,10 @@ pub fn flush(f: File, gpa: Allocator, io: Io, q: *Queue, device: Output, generat
         // An entry gone from under its manifest is rebuilt.
         if (Io.Dir.cwd().copyFile(src, .cwd(), dst, io, .{})) {
             return .{ .ok = dst };
-        } else |_| gpa.free(dst);
+        } else |_| {
+            gpa.free(dst);
+            stale = src;
+        }
     };
 
     const tasks = try plan(arena, split, device.setup_chunks);
@@ -246,7 +256,14 @@ pub fn flush(f: File, gpa: Allocator, io: Io, q: *Queue, device: Output, generat
     Io.Dir.cwd().copyFile(lib, .cwd(), dst, io, .{}) catch return error.NoArtifact;
     // A cache that cannot be written costs a later flush a compile, never
     // this one its library.
-    if (stored) |s| if (s.hit == null) cacheStore(s, arena, io, f, done, lib);
+    if (stale) |src| {
+        // The digest did not change (same inputs as the hit `cacheOpen`
+        // found): the manifest already names it correctly, so the fresh
+        // library just heals that one entry, no manifest write. Gives up
+        // silently on any failure, same as `cacheStore`.
+        Io.Dir.cwd().createDirPath(io, std.fs.path.dirname(src).?) catch {};
+        Io.Dir.cwd().copyFile(lib, .cwd(), src, io, .{}) catch {};
+    } else if (stored) |s| if (s.hit == null) cacheStore(s, arena, io, f, done, lib);
     assert(std.mem.startsWith(u8, dst, f.work_dir));
     return .{ .ok = dst };
 }

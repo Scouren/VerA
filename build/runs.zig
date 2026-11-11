@@ -33,6 +33,7 @@ pub fn add(g: Graph, suite_exe: *Build.Step.Compile, check: *Build.Step, espice_
     // No expectExitCode: a stdio check makes a Run cacheable, and the inputs are read at run time.
     const suite_run_all = b.addRunArtifact(suite_exe);
     suite_run_all.addArtifactArg2(exe, .{});
+    common.setSuiteEnv(b, suite_run_all);
     suite_run_all.addPassthruArgs();
     b.step("suite", "The fixture runner: `-- ams` (strict AMS), `-- devices` (digital transcripts), `-- ieee1364`, `-- vpi` (C fixtures, compile only), `-- golden <tag>|diff [a b]`; no mode: every fixture, timed (-Doptimize=ReleaseFast)").dependOn(&suite_run_all.step);
 
@@ -46,12 +47,12 @@ pub fn add(g: Graph, suite_exe: *Build.Step.Compile, check: *Build.Step, espice_
     const spice_run = b.addRunArtifact(suite_exe);
     spice_run.addArtifactArg2(exe, .{});
     spice_run.addArg("spice");
+    common.setSuiteEnv(b, spice_run);
     // espice compiles the decks' `.hdl` models at run time, with this build's Zig,
     // into its own cache (keyed on the model, its includes and the espice
     // binary), kept under this tree's cache rather than ~/.cache/espice.
     spice_run.setEnvironmentVariable("ZIG", b.graph.zig_exe);
     spice_run.setEnvironmentVariable("ESPICE_CACHE", b.fmt("{s}/espice", .{checkoutWorkDir(b, "vera-suite")}));
-    dropNixTmpKeys(spice_run);
     if (espice_path) |path| {
         spice_run.addArg(b.fmt("--espice={s}", .{path}));
         test_spice.dependOn(&spice_run.step);
@@ -161,6 +162,7 @@ pub fn add(g: Graph, suite_exe: *Build.Step.Compile, check: *Build.Step, espice_
     const canary = b.addRunArtifact(suite_exe);
     canary.addArtifactArg2(exe, .{});
     canary.addArg("canary");
+    common.setSuiteEnv(b, canary);
     canary.expectExitCode(0);
     canary.has_side_effects = true;
     test_step.dependOn(&canary.step);

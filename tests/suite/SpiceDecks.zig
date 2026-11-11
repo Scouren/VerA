@@ -93,7 +93,7 @@ pub fn run(init: std.process.Init, vera_exe: []const u8, args: *Args) !u8 {
     defer decks.deinit(gpa);
     for (harness.ams_dirs) |sub| {
         const pa = arena_state.allocator();
-        var root = Io.Dir.cwd().openDir(io, try std.fs.path.join(pa, &.{ options.fixture_root, sub }), .{ .iterate = true }) catch |err| switch (err) {
+        var root = Io.Dir.cwd().openDir(io, try std.fs.path.join(pa, &.{ options.fixtureRoot(), sub }), .{ .iterate = true }) catch |err| switch (err) {
             error.FileNotFound => continue,
             else => return err,
         };
@@ -121,7 +121,7 @@ pub fn run(init: std.process.Init, vera_exe: []const u8, args: *Args) !u8 {
             results.writer.print("{s}\tspice.test.{s}\n", .{ status, rel }) catch @panic("OOM");
         };
         const pa = arena_state.allocator();
-        const path = try std.fs.path.join(pa, &.{ options.fixture_root, rel });
+        const path = try std.fs.path.join(pa, &.{ options.fixtureRoot(), rel });
         const dir_path = std.fs.path.dirname(path) orelse ".";
         const name = std.fs.path.basename(rel);
         var bad = false;
@@ -157,8 +157,8 @@ pub fn run(init: std.process.Init, vera_exe: []const u8, args: *Args) !u8 {
             //    include dirs: `check.vh` is in the suite's `include/` and the
             //    model's siblings are beside it.
             const r = child.capture(pa, io, &.{
-                vera_exe, "--check",           "--contract", options.contract,
-                "-I",     harness.include_dir, "-I",         dir_path,
+                vera_exe, "--check",                  "--contract", options.contract(),
+                "-I",     try harness.includeDir(pa), "-I",         dir_path,
                 model,
             }) catch |e| {
                 try w.print("FAIL {s}: could not run vera: {s}\n", .{ name, @errorName(e) });
@@ -246,7 +246,7 @@ fn execute(
     analysis: ?[]const u8,
     oracle_text: []const u8,
 ) !Verdict {
-    const work = try std.fs.path.join(arena, &.{ options.work_root, "spice", stem });
+    const work = try std.fs.path.join(arena, &.{ options.workRoot(), "spice", stem });
     // An earlier run's `<stem>.csv.2` would be read as this run's second plot.
     try Io.Dir.cwd().deleteTree(io, work);
     try Io.Dir.cwd().createDirPath(io, work);
@@ -254,7 +254,7 @@ fn execute(
     // `-I`: the models `include "check.vh"` from the suite's `include/`, as
     // the `vera --check` half is told; espice searches a model's own
     // directory and each `-I` for its `.hdl` includes.
-    const argv = try std.mem.concat(arena, []const u8, &.{ &.{ espice, "--format=csv", "-r", out, "-I", harness.include_dir }, espice_args, &.{deck} });
+    const argv = try std.mem.concat(arena, []const u8, &.{ &.{ espice, "--format=csv", "-r", out, "-I", try harness.includeDir(arena) }, espice_args, &.{deck} });
     // From the deck's directory, as `.hdl` paths are written relative to it;
     // `deck` and `out` are absolute.
     const r = child.captureIn(arena, io, argv, dir_path) catch |e|

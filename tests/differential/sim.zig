@@ -33,7 +33,7 @@ const frontend = @import("frontend");
 const vams = @import("vams");
 const sema = @import("sema");
 const InternPool = @import("intern_pool");
-const rewrite_options = @import("rewrite_options");
+const repo_env = @import("repo_env");
 const digital = sim.digital;
 const Zcu = sema.Zcu;
 
@@ -614,12 +614,12 @@ test "diff-sim: Sema's digital Program runs every .v fixture as lib/sim/digital 
     defer run_arena.deinit();
     const ra = run_arena.allocator();
     // Absolute: each run changes the working directory.
-    const root = try std.Io.Dir.cwd().realPathFileAlloc(io, rewrite_options.fixture_root, ra);
+    const root = try std.Io.Dir.cwd().realPathFileAlloc(io, repo_env.fixtureRoot(), ra);
 
     const fixtures = try collect(ra, io, root);
-    const xfail_path = try std.fs.path.join(ra, &.{ rewrite_options.repo_root, "tests/differential/sim.xfail" });
+    const xfail_path = try std.fs.path.join(ra, &.{ repo_env.repoRoot(), "tests/differential/sim.xfail" });
     const xfail = try readXfail(ra, io, xfail_path);
-    const rulings_path = try std.fs.path.join(ra, &.{ rewrite_options.repo_root, "tests/differential/sim.rulings" });
+    const rulings_path = try std.fs.path.join(ra, &.{ repo_env.repoRoot(), "tests/differential/sim.rulings" });
     const rulings = try readXfail(ra, io, rulings_path);
 
     var fixture_arena: std.heap.ArenaAllocator = .init(gpa);

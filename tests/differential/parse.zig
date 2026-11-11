@@ -21,7 +21,7 @@ const Io = std.Io;
 const vams = @import("vams");
 const frontend = @import("frontend");
 const diag = @import("diag");
-const options = @import("rewrite_options");
+const options = @import("repo_env");
 const settle = @import("settle.zig");
 const OldTag = frontend.token.Tag;
 const NewTag = vams.Token.Tag;
@@ -139,7 +139,7 @@ fn runAll() !void {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const xfail_path = try std.fs.path.join(arena, &.{ options.repo_root, "tests/differential/parse.xfail" });
+    const xfail_path = try std.fs.path.join(arena, &.{ options.repoRoot(), "tests/differential/parse.xfail" });
     const xfail_text = try Io.Dir.cwd().readFileAlloc(io, xfail_path, arena, .limited(1 << 20));
     var xfail: std.StringHashMapUnmanaged([]const u8) = .empty;
     var lines = std.mem.splitScalar(u8, xfail_text, '\n');
@@ -190,7 +190,7 @@ fn runAll() !void {
 
 /// Every fixture path relative to the fixture root, sorted.
 fn collect(arena: std.mem.Allocator, io: Io) ![]const []const u8 {
-    var dir = try Io.Dir.cwd().openDir(io, options.fixture_root, .{ .iterate = true });
+    var dir = try Io.Dir.cwd().openDir(io, options.fixtureRoot(), .{ .iterate = true });
     defer dir.close(io);
     var walker = try dir.walk(arena);
     defer walker.deinit();
@@ -212,14 +212,15 @@ fn collect(arena: std.mem.Allocator, io: Io) ![]const []const u8 {
 /// Null when the old preprocessor refuses the fixture; else the verdict. An
 /// old refusal by a later stage's codes alone counts them in `later`.
 fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, later: *settle.Later) !?Verdict {
-    const path = try std.fs.path.join(arena, &.{ options.fixture_root, rel });
+    const path = try std.fs.path.join(arena, &.{ options.fixtureRoot(), rel });
     const digital = std.mem.eql(u8, std.fs.path.extension(rel), ".v");
     const source = try Io.Dir.cwd().readFileAlloc(io, path, arena, .limited(1 << 26));
     const bag = try arena.create(diag.Bag);
     bag.* = .init(arena);
     var files: frontend.Files = .init(io, arena);
+    const include = try std.fs.path.join(arena, &.{ options.fixtureRoot(), "include" });
     const pp = frontend.preprocessor.process(arena, source, .{
-        .include_dirs = &.{ std.fs.path.dirname(path).?, options.fixture_root ++ "/include" },
+        .include_dirs = &.{ std.fs.path.dirname(path).?, include },
         .file_name = path,
         .std_defs = !digital,
         .spice_primitives = !digital,

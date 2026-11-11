@@ -22,7 +22,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const vams = @import("vams");
 const frontend = @import("frontend");
-const rewrite_options = @import("rewrite_options");
+const repo_env = @import("repo_env");
 const spice = vams.spice;
 const old = frontend.spice_cards;
 const readText = frontend.preprocessor.readText;
@@ -302,7 +302,7 @@ test "diff-spice: the vams SPICE reader agrees with spice_cards.synthesize on ev
     var run_arena: std.heap.ArenaAllocator = .init(gpa);
     defer run_arena.deinit();
     const ra = run_arena.allocator();
-    const tests_root = try std.fs.path.join(ra, &.{ rewrite_options.repo_root, "tests" });
+    const tests_root = try std.fs.path.join(ra, &.{ repo_env.repoRoot(), "tests" });
 
     var cases: std.ArrayList(Case) = .empty;
     try cases.appendSlice(ra, try collect(ra, io, tests_root));

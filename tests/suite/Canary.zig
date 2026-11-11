@@ -33,7 +33,7 @@ pub fn run(init: std.process.Init) !u8 {
     const w = &stderr.interface;
     defer w.flush() catch {};
 
-    const root = options.repo_root ++ "/tests/canary";
+    const root = try std.fs.path.join(arena, &.{ options.repoRoot(), "tests/canary" });
     const table = try Io.Dir.cwd().readFileAlloc(io, try std.fs.path.join(arena, &.{ root, "EXPECT.tsv" }), arena, .limited(1 << 16));
     const rows = try parse(arena, table);
 

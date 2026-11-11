@@ -24,6 +24,7 @@ const link = @import("link");
 const zigbuild = @import("zigbuild");
 const DynLib = @import("dynlib").DynLib;
 const options = @import("rewrite_options");
+const repo_env = @import("repo_env");
 
 /// The parallel job count, against 1. Each child holds a whole device's
 /// analysis; the machine is shared.
@@ -119,8 +120,8 @@ const Allowed = struct { id: []const u8, line: u32, seen: bool = false };
 /// or a stand-in contract (`k = 2.0`) and dyn written under `base`.
 fn modules(arena: Allocator, io: Io, base: []const u8, dyn: Dyn) ![]const link.Module {
     if (dyn == .osdi) return arena.dupe(link.Module, &.{
-        .{ .name = "contract", .root = try std.fs.path.join(arena, &.{ options.repo_root, "lib", "contract.zig" }) },
-        .{ .name = "dyn", .root = try std.fs.path.join(arena, &.{ options.repo_root, "lib", "osdi_dyn.zig" }), .deps = &.{"contract"} },
+        .{ .name = "contract", .root = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "lib", "contract.zig" }) },
+        .{ .name = "dyn", .root = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "lib", "osdi_dyn.zig" }), .deps = &.{"contract"} },
     });
     const dir = try arena.print("{s}/mods-{t}", .{ base, dyn });
     try Io.Dir.cwd().createDirPath(io, dir);

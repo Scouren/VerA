@@ -157,11 +157,12 @@ pub fn report(gpa: Allocator, io: Io, arena: Allocator, w: *Io.Writer) !u8 {
         "# {s}: NOT the shipping number (~8x slow). Re-run with -Doptimize=ReleaseFast.\n",
         .{mode},
     );
+    const gen_work = try std.fs.path.join(arena, &.{ options.workRoot(), "benchmark/gen" });
     for (std.enums.values(Axis)) |axis| {
         for (sweep) |n| {
             const src = try genSource(arena, axis, n);
             for (std.enums.values(Phase)) |p| {
-                const s = try measure(gpa, io, p, src, options.work_root ++ "/benchmark/gen");
+                const s = try measure(gpa, io, p, src, gen_work);
                 try emit(w, @tagName(axis), n, p, s);
             }
             try w.flush();
@@ -345,7 +346,8 @@ test "a second writeTree writes no bytes" {
     var device = try result.generate(gpa, .{}, null);
     defer device.deinit(gpa);
 
-    const work = options.work_root ++ "/benchmark/rewrite-selftest";
+    const work = try std.fs.path.join(gpa, &.{ options.workRoot(), "benchmark/rewrite-selftest" });
+    defer gpa.free(work);
     _ = try rewrite(io, gpa, device.output, work);
     try std.testing.expectEqual(@as(usize, 0), try rewrite(io, gpa, device.output, work));
 }

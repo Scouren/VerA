@@ -29,6 +29,7 @@ const Graph = common.Graph;
 const byName = common.byName;
 const pathFromRoot = common.pathFromRoot;
 const testRun = common.testRun;
+const setSuiteEnv = common.setSuiteEnv;
 /// `vera-next`, `diff-comp` and `conformance-next` (docs/rewrite/comp.md).
 const comp = @import("rewrite_comp.zig");
 
@@ -40,9 +41,13 @@ pub fn add(g: Graph) void {
     for ([_][]const u8{ "vams", "intern_pool", "air", "link", "std_sim", "sema", "std_kernels", "codegen", "comp" }) |name| {
         all.dependOn(&b.top_level_steps.get(b.fmt("test-{s}", .{name})).?.step);
     }
+    // `fixture_root`/`repo_root` are not here (R5, research/builds.md): a
+    // worktree-specific absolute path baked in by `addOption` misses the
+    // shared cache in every other worktree. `repo_env.zig` reads them from
+    // the environment at run time; `setSuiteEnv` sets it on every diff Run
+    // step below.
+    const repo_env = g.m.make("tests/differential/repo_env.zig", &.{});
     const o = b.addOptions();
-    o.addOption([]const u8, "fixture_root", pathFromRoot(b, "tests/conformance/tests"));
-    o.addOption([]const u8, "repo_root", pathFromRoot(b, "."));
     o.addOption([]const u8, "lower_dump", b.option([]const u8, "lower-dump", "diff-lower: print both sides' tables of the fixtures whose path holds this") orelse "");
     // The merge tier runs a generated-program oracle at a size inside its
     // budget; the nightly passes `-Dfull-oracles` for the whole sweep.
@@ -50,6 +55,14 @@ pub fn add(g: Graph) void {
     o.addOption([]const u8, "codegen_filter", b.option([]const u8, "codegen-filter", "diff-codegen: only the fixtures whose path holds one of these `|`-separated substrings") orelse "");
     o.addOption(bool, "codegen_keep", b.option(bool, "codegen-keep", "diff-codegen: keep the built devices under zig-out/codegen-work") orelse false);
     o.addOption(bool, "codegen_why", b.option(bool, "codegen-why", "diff-codegen: print why each fixture codegen.xfail names still differs") orelse false);
+    // R2, research/builds.md: a directory per Zig store path (the flake's
+    // `ZIG_GLOBAL_CACHE_DIR`), not this worktree's, so unlike the R5 fields
+    // above this one is safe to compile in: every worktree on that store
+    // path gets the same string and so the same cache key. Null (the
+    // variable unset, outside `nix develop`) leaves every batch uncached,
+    // today's behaviour.
+    const default_codegen_cache = if (b.graph.environ_map.get("ZIG_GLOBAL_CACHE_DIR")) |dir| b.fmt("{s}/vera-codegen", .{dir}) else null;
+    o.addOption(?[]const u8, "codegen_cache", b.option([]const u8, "codegen-cache", "diff-codegen: the built libraries' cache directory (default $ZIG_GLOBAL_CACHE_DIR/vera-codegen)") orelse default_codegen_cache);
     // diff-codegen builds devices that import std_kernels, which imports Gompute's math.
     o.addOptionPath("gompute_math", b.dependency("gompute", .{}).module("math").root_source_file.?);
     // `libc`: the root loads libraries (`dynlib` needs glibc on Linux).
@@ -80,8 +93,6 @@ pub fn add(g: Graph) void {
         if (d.libc and g.m.target.result.os.tag == .linux) mod.link_libc = true;
         const opts = if (d.emit_zig.len == 0) o else emitted: {
             const own = b.addOptions();
-            own.addOption([]const u8, "fixture_root", pathFromRoot(b, "tests/conformance/tests"));
-            own.addOption([]const u8, "repo_root", pathFromRoot(b, "."));
             const wf = b.addWriteFiles();
             for (d.emit_zig) |va| {
                 const run = b.addRunArtifact(g.exe);
@@ -97,8 +108,10 @@ pub fn add(g: Graph) void {
             break :emitted own;
         };
         mod.addOptions("rewrite_options", opts);
+        mod.addImport("repo_env", repo_env);
         if (std.mem.eql(u8, d.step, "diff-codegen")) mod.addImport("scratch_device", scratchDevice(g));
         const r = testRun(b, d.step, mod, g.runner, g.results_dir);
+        setSuiteEnv(b, r);
         // Reads the fixture tree at run time.
         r.has_side_effects = true;
         const step = b.step(d.step, d.what);

@@ -16,8 +16,12 @@ const std = @import("std");
 const vera = @import("vera");
 
 /// `check.vh` lives here; every fixture below includes nothing else but the
-/// built-in annex D files.
-const include_dirs: []const []const u8 = &.{@import("repo_options").repo_root ++ "/tests/conformance/tests/include"};
+/// built-in annex D files. `repoRoot()` is read from the environment at run
+/// time (R5, research/builds.md), so this joins at run time too, instead of
+/// a comptime `++`.
+fn includeDirs(gpa: std.mem.Allocator) ![1][]const u8 {
+    return .{try std.fs.path.join(gpa, &.{ @import("repo_options").repoRoot(), "tests/conformance/tests/include" })};
+}
 
 /// How far a compile goes: the analysis (`--lint`), or through codegen too.
 const Target = enum { lint, build };
@@ -54,10 +58,12 @@ const no_grow: std.mem.Allocator = .{ .ptr = undefined, .vtable = &.{
 // ---- private ----
 
 fn compileOne(gpa: std.mem.Allocator, src: []const u8, target: Target) !void {
+    const include_dirs = try includeDirs(gpa);
+    defer gpa.free(include_dirs[0]);
     var bag: vera.diag.Bag = .init(gpa);
     defer bag.deinit(gpa);
     var res = try vera.analyze(gpa, src, .{
-        .include_dirs = include_dirs,
+        .include_dirs = &include_dirs,
         // `.emit` is the fixture testbench's mode, so `.build` reaches display codegen too.
         .display = if (target == .build) .emit else .drop,
     }, &bag);

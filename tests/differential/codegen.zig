@@ -46,13 +46,19 @@ const Allocator = std.mem.Allocator;
 const link = @import("link");
 const DynLib = @import("dynlib").DynLib;
 const options = @import("rewrite_options");
+const repo_env = @import("repo_env");
 const sides = @import("codegen/sides.zig");
 const ulps = @import("codegen/ulps.zig");
 
 /// Seeded points per fixture.
 const points = 1000;
-/// Fixtures per library: each `zig` child analyses them all.
-const batch_max = 24;
+/// Fixtures per library, on average: each `zig` child analyses them all.
+/// Batches are cut by `hash(rel) % batch_target == 0` (R2,
+/// research/builds.md), not position, so a fixture joining or leaving the
+/// corpus changes only the one batch it falls in, not every batch after it;
+/// `batch_cap` bounds the rare long gap between two such cuts.
+const batch_target = 24;
+const batch_cap = 48;
 /// Parallel `zig` children (the machine is shared).
 const jobs = 2;
 
@@ -110,6 +116,10 @@ const Tally = struct {
     new_ns: u64 = 0,
     optimized: u32 = 0,
     roots: u32 = 0,
+    /// R2, research/builds.md: `options.codegen_cache`'s hits and misses
+    /// (`cacheEntries`), one per side per batch; both 0 when it is unset.
+    cache_hits: u32 = 0,
+    cache_misses: u32 = 0,
 };
 
 /// One versioned fixture's measured fast-math bound.
@@ -156,7 +166,7 @@ fn runAll() !void {
     var tally: Tally = .{};
     var whys: std.StringArrayHashMapUnmanaged([]const u8) = .empty;
     var ready: std.ArrayList(Ready) = .empty;
-    const include = options.fixture_root ++ "/include";
+    const include = try std.fs.path.join(arena, &.{ repo_env.fixtureRoot(), "include" });
     for (try collect(arena, io)) |rel| {
         if (!sides.picked(rel, filter)) continue;
         tally.fixtures += 1;
@@ -164,7 +174,7 @@ fn runAll() !void {
             tally.lower_listed += 1;
             continue;
         }
-        const path = try std.fs.path.join(arena, &.{ options.fixture_root, rel });
+        const path = try std.fs.path.join(arena, &.{ repo_env.fixtureRoot(), rel });
         const dirs = [_][]const u8{ std.fs.path.dirname(path).?, include };
         const source = try Io.Dir.cwd().readFileAlloc(io, path, arena, .limited(1 << 26));
         const old = (try sides.old(gpa, arena, path, source, &dirs)) orelse {
@@ -182,14 +192,22 @@ fn runAll() !void {
         }
     }
 
-    const work = try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", "codegen-work" });
+    const work = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "zig-out", "codegen-work" });
     var slots: [jobs]link.Server = undefined;
     var q: link.Queue = .init(&slots);
     var at: usize = 0;
     var batch: u32 = 0;
     while (at < ready.items.len) : (batch += 1) {
-        const group = ready.items[at..@min(at + batch_max, ready.items.len)];
-        at += group.len;
+        // The next cut is the first fixture after `at` whose own hash says
+        // so, never a fixed offset (R2, research/builds.md): adding or
+        // removing a fixture elsewhere leaves every other batch's members,
+        // and so its cache key, exactly as they were.
+        var end = at + 1;
+        while (end < ready.items.len and end - at < batch_cap) : (end += 1) {
+            if (std.hash.Wyhash.hash(0, ready.items[end].rel) % batch_target == 0) break;
+        }
+        const group = ready.items[at..end];
+        at = end;
         try runBatch(gpa, arena, io, &q, work, batch, group, &tally, &whys);
     }
     if (!options.codegen_keep) Io.Dir.cwd().deleteTree(io, work) catch {};
@@ -219,9 +237,10 @@ fn runAll() !void {
     tally.agreed = tally.compared - countCompared(&whys, ready.items);
     // The measured fast-math bound per versioned fixture that moved.
     for (tally.ulps.items) |u| if (u.value != 0 or u.lane != 0) try out.writer.print("ulps {d} values, {d} lanes: {s}\n", .{ u.value, u.lane, u.rel });
-    std.debug.print("{s}diff-codegen: {d} fixtures ({d} named in lower.xfail, {d} the old side refused, {d} the new side refused), {d} built and compared at {d} points ({d} evaluations bit for bit, {d} values within the libm ulp bound), {d} agree, {d} in codegen.xfail, {d} failures; device text old {d} B, new {d} B (median per device old {d} B, new {d} B); build old {d} ms, new {d} ms; roots .optimized {d}/{d}; versioned units: {d} points inside the box (at most {d} ulps apart), {d} outside (bit for bit); {d} points where every side stopped alike\n", .{
-        out.written(),   tally.fixtures,  tally.lower_listed,                   tally.old_refused,                    tally.new_refused,                 tally.compared,                    points,          tally.points, tally.values_libm, tally.agreed,    tally.xfailed, tally.failed,
-        tally.old_bytes, tally.new_bytes, try median(arena, ready.items, .old), try median(arena, ready.items, .new), tally.old_ns / std.time.ns_per_ms, tally.new_ns / std.time.ns_per_ms, tally.optimized, tally.roots,  tally.inside,      tally.fast_ulps, tally.outside, tally.stops,
+    std.debug.print("{s}diff-codegen: {d} fixtures ({d} named in lower.xfail, {d} the old side refused, {d} the new side refused), {d} built and compared at {d} points ({d} evaluations bit for bit, {d} values within the libm ulp bound), {d} agree, {d} in codegen.xfail, {d} failures; device text old {d} B, new {d} B (median per device old {d} B, new {d} B); build old {d} ms, new {d} ms; roots .optimized {d}/{d}; versioned units: {d} points inside the box (at most {d} ulps apart), {d} outside (bit for bit); {d} points where every side stopped alike; library cache {d} hit, {d} miss\n", .{
+        out.written(),    tally.fixtures,     tally.lower_listed,                   tally.old_refused,                    tally.new_refused,                 tally.compared,                    points,          tally.points, tally.values_libm, tally.agreed,    tally.xfailed, tally.failed,
+        tally.old_bytes,  tally.new_bytes,    try median(arena, ready.items, .old), try median(arena, ready.items, .new), tally.old_ns / std.time.ns_per_ms, tally.new_ns / std.time.ns_per_ms, tally.optimized, tally.roots,  tally.inside,      tally.fast_ulps, tally.outside, tally.stops,
+        tally.cache_hits, tally.cache_misses,
     });
     if (tally.failed != 0) return error.DiffCodegenFailed;
 }
@@ -242,6 +261,24 @@ fn countCompared(whys: *const std.StringArrayHashMapUnmanaged([]const u8), ready
     return n;
 }
 
+/// How many digest directories `cache_dir`'s `o/` holds, or 0 when there is
+/// no cache (`cache_dir` null) or it cannot be read. `link.File.flush`
+/// returns `Artifact.ok` alike on a hit (a copy, nothing built) and a miss
+/// (a build, then stored); this count's change around one `flush` call is
+/// the only hit/miss signal outside it (R2, research/builds.md), without
+/// widening `flush`'s own signature for every one of its callers.
+fn cacheEntries(io: Io, cache_dir: ?[]const u8) u32 {
+    const base = cache_dir orelse return 0;
+    const path = std.fmt.allocPrint(std.heap.page_allocator, "{s}/o", .{base}) catch return 0;
+    defer std.heap.page_allocator.free(path);
+    var dir = Io.Dir.cwd().openDir(io, path, .{ .iterate = true }) catch return 0;
+    defer dir.close(io);
+    var n: u32 = 0;
+    var it = dir.iterate();
+    while (it.next(io) catch null) |_| n += 1;
+    return n;
+}
+
 /// Builds one library of `group`'s old and new devices, loads it, and
 /// compares each fixture's two at `points` points; a disagreement goes to
 /// `whys`.
@@ -250,9 +287,9 @@ fn runBatch(gpa: Allocator, arena: Allocator, io: Io, q: *link.Queue, work: []co
     const dir = try arena.print("{s}/b{d}", .{ work, batch });
     try Io.Dir.cwd().createDirPath(io, dir);
     defer if (!options.codegen_keep) Io.Dir.cwd().deleteTree(io, dir) catch {};
-    const contract = try std.fs.path.join(arena, &.{ options.repo_root, "lib", "contract.zig" });
-    const kernels = try std.fs.path.join(arena, &.{ options.repo_root, "lib", "std", "kernels.zig" });
-    const dyn = try std.fs.path.join(arena, &.{ options.repo_root, "tests", "differential", "codegen", "dyn.zig" });
+    const contract = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "lib", "contract.zig" });
+    const kernels = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "lib", "std", "kernels.zig" });
+    const dyn = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "tests", "differential", "codegen", "dyn.zig" });
     var index: Io.Writer.Allocating = .init(arena);
     for (group, 0..) |r, k| {
         for ([3][]const u8{ "o", "n", "v" }, [3]?[]const u8{ r.old, r.new, r.ver }) |side, text| if (text) |t|
@@ -296,11 +333,18 @@ fn runBatch(gpa: Allocator, arena: Allocator, io: Io, q: *link.Queue, work: []co
             };
             if (names.written().len == 0) return;
             const bundle = try arena.print("pub const devices = .{{{s} }};\npub const names = .{{{s} }};\npub const fd_skip = .{{{s} }};\n", .{ devices.written(), names.written(), fd_skip.written() });
-            const f: link.File = .{ .kind = .so, .work_dir = dir, .name = try arena.print("cg{d}{s}", .{ attempt, side }), .optimize = .fast, .backend = .llvm, .modules = mods.items, .split = .whole };
+            const f: link.File = .{ .kind = .so, .work_dir = dir, .name = try arena.print("cg{d}{s}", .{ attempt, side }), .optimize = .fast, .backend = .llvm, .modules = mods.items, .split = .whole, .cache_dir = options.codegen_cache };
             const t0 = Io.Clock.awake.now(io);
+            // `flush` reports a hit and a miss the same way (`Artifact.ok`,
+            // no build spawned either): the cache directory's entry count is
+            // the only signal outside `link.File` (R2, research/builds.md).
+            const before = cacheEntries(io, options.codegen_cache);
             var built = try f.flush(gpa, io, q, .{ .text = bundle }, 1);
             defer built.deinit(gpa);
             ns.* += @intCast(t0.durationTo(Io.Clock.awake.now(io)).toNanoseconds());
+            if (built == .ok and options.codegen_cache != null) {
+                if (cacheEntries(io, options.codegen_cache) == before) tally.cache_hits += 1 else tally.cache_misses += 1;
+            }
             switch (built) {
                 .ok => |lp| path.* = try arena.dupe(u8, lp),
                 .failed => |rep| {
@@ -634,7 +678,7 @@ fn admits(x: f64, ranges: []const @import("air").Device.Range) bool {
 /// The fixture paths a list file names (`<path> <reason>` lines, `#`
 /// comments).
 fn readList(arena: Allocator, io: Io, rel: []const u8) !std.StringHashMapUnmanaged(void) {
-    const path = try std.fs.path.join(arena, &.{ options.repo_root, rel });
+    const path = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), rel });
     const text = try Io.Dir.cwd().readFileAlloc(io, path, arena, .limited(1 << 22));
     var set: std.StringHashMapUnmanaged(void) = .empty;
     var lines = std.mem.splitScalar(u8, text, '\n');
@@ -648,7 +692,7 @@ fn readList(arena: Allocator, io: Io, rel: []const u8) !std.StringHashMapUnmanag
 
 /// Every `.va`/`.vams` fixture path relative to the fixture root, sorted.
 fn collect(arena: Allocator, io: Io) ![]const []const u8 {
-    var dir = try Io.Dir.cwd().openDir(io, options.fixture_root, .{ .iterate = true });
+    var dir = try Io.Dir.cwd().openDir(io, repo_env.fixtureRoot(), .{ .iterate = true });
     defer dir.close(io);
     var walker = try dir.walk(arena);
     defer walker.deinit();

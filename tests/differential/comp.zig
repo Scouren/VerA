@@ -33,6 +33,7 @@ const std = @import("std");
 const Io = std.Io;
 const Allocator = std.mem.Allocator;
 const options = @import("comp_options");
+const repo_env = @import("repo_env");
 /// Which run this is: `flag` replaces a `.v` fixture's `--run`/`--elab`
 /// ("" for diff-comp itself) and `name` is its xfail list's.
 const v_run = @import("v_options");
@@ -104,7 +105,7 @@ fn runAll() !void {
     var arena_state: std.heap.ArenaAllocator = .init(gpa);
     defer arena_state.deinit();
     const arena = arena_state.allocator();
-    const all = try fixture.collect(arena, io, options.fixture_root);
+    const all = try fixture.collect(arena, io, repo_env.fixtureRoot());
     var picked: std.ArrayList(Fixture) = .empty;
     for (all) |f| {
         if (v_run.flag.len != 0 and f.lang != .verilog) continue;
@@ -118,8 +119,8 @@ fn runAll() !void {
     const env = try arena.create(std.process.Environ.Map);
     env.* = try std.testing.environ.createMap(arena);
     // One directory per run: the four runs go in parallel under `rewrite`.
-    const work = try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", "comp-work-" ++ v_run.name });
-    try env.put("ZIG_LOCAL_CACHE_DIR", try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", "comp-zig-cache" }));
+    const work = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "zig-out", "comp-work-" ++ v_run.name });
+    try env.put("ZIG_LOCAL_CACHE_DIR", try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "zig-out", "comp-zig-cache" }));
     const env_interp = try arena.create(std.process.Environ.Map);
     env_interp.* = try std.testing.environ.createMap(arena);
     try env_interp.put("ZIG_LOCAL_CACHE_DIR", env.get("ZIG_LOCAL_CACHE_DIR").?);
@@ -155,7 +156,7 @@ fn runAll() !void {
 /// `gen_prefix` so `one` resolves its path there, not under the fixture
 /// root. A missing directory is nothing to add.
 fn addGenerated(arena: Allocator, io: Io, picked: *std.ArrayList(Fixture)) !void {
-    const dir_path = try std.fs.path.join(arena, &.{ options.repo_root, "tests/differential/native" });
+    const dir_path = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "tests/differential/native" });
     var dir = Io.Dir.cwd().openDir(io, dir_path, .{ .iterate = true }) catch |e| switch (e) {
         error.FileNotFound => return,
         else => return e,
@@ -208,9 +209,9 @@ fn one(arena: Allocator, s: *Shared, k: u32) !Outcome {
     const w_new = try std.fmt.allocPrint(arena, "{s}/{d}-n", .{ s.work, k });
     if (comptime std.mem.eql(u8, v_run.name, "native")) {
         const args: []const []const u8 = if (std.mem.startsWith(u8, f.rel, gen_prefix))
-            &.{ "--emit-exe", try std.fmt.allocPrint(arena, "{s}/tests/differential/native/{s}", .{ options.repo_root, f.rel[gen_prefix.len..] }) }
+            &.{ "--emit-exe", try std.fmt.allocPrint(arena, "{s}/tests/differential/native/{s}", .{ repo_env.repoRoot(), f.rel[gen_prefix.len..] }) }
         else gen: {
-            const a = try arena.dupe([]const u8, try fixture.argv(arena, f, options.fixture_root));
+            const a = try arena.dupe([]const u8, try fixture.argv(arena, f, repo_env.fixtureRoot()));
             a[0] = v_run.flag;
             break :gen a;
         };
@@ -224,7 +225,7 @@ fn one(arena: Allocator, s: *Shared, k: u32) !Outcome {
         const why = (try judge.compare(arena, both[1], both[0], true)) orelse return .agree;
         return .{ .differ = .{ .owner = "native", .why = why } };
     }
-    const args = try arena.dupe([]const u8, try fixture.argv(arena, f, options.fixture_root));
+    const args = try arena.dupe([]const u8, try fixture.argv(arena, f, repo_env.fixtureRoot()));
     if (v_run.flag.len != 0) args[0] = v_run.flag;
     const exec = std.mem.eql(u8, v_run.flag, "--emit-exe");
     var new = try judge.run(arena, s.io, s.exe_new, args, w_new, s.env, exec);
@@ -238,7 +239,7 @@ fn one(arena: Allocator, s: *Shared, k: u32) !Outcome {
     var old = try judge.run(arena, s.io, s.exe_old, args, w_old, s.env, exec);
     // Paths under the fixture root read the same on both sides; the
     // reasons `comp.xfail` keeps name them relative, whatever checkout ran.
-    const root = options.fixture_root ++ "/";
+    const root = try std.fmt.allocPrint(arena, "{s}/", .{repo_env.fixtureRoot()});
     old.stderr = try std.mem.replaceOwned(u8, arena, old.stderr, root, "");
     new.stderr = try std.mem.replaceOwned(u8, arena, new.stderr, root, "");
     const why = (try judge.compare(arena, old, new, f.lang == .verilog)) orelse return .agree;
@@ -325,7 +326,7 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
             try out.writer.print("STALE {s}: " ++ v_run.name ++ ".xfail names a fixture that is not in the corpus\n", .{rel.*});
         }
     }
-    if (options.rebaseline) try Io.Dir.cwd().writeFile(io, .{ .sub_path = try std.fs.path.join(arena, &.{ options.repo_root, "zig-out", v_run.name ++ ".xfail.new" }), .data = new_list.written() });
+    if (options.rebaseline) try Io.Dir.cwd().writeFile(io, .{ .sub_path = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "zig-out", v_run.name ++ ".xfail.new" }), .data = new_list.written() });
     var owners: Io.Writer.Allocating = .init(arena);
     for (by_owner.keys(), by_owner.values()) |k, v| try owners.writer.print("  {d} {s}\n", .{ v, k });
     std.debug.print("{s}" ++ v_run.name ++ ": {d} fixtures in {d} s: {d} agree ({d} by Yosys equivalence), {d} ruled (old-side bugs), {d} need a backend vera-next has not got, {d} differ; {d} in " ++ v_run.name ++ ".xfail, {d} failures. By owner:\n{s}", .{ out.written(), fixtures.len, secs, t.agree, t.equivalent, t.ruled, t.not_built, t.differ, t.listed, t.failed, owners.written() });
@@ -341,7 +342,7 @@ fn tiebreak(arena: Allocator, io: Io, f: Fixture, new: judge.Run) !bool {
     if (new.status != 0) return false;
     if (f.compile_only) return true;
     const stem = f.rel[0 .. f.rel.len - std.fs.path.extension(f.rel).len];
-    const gold_path = try std.fmt.allocPrint(arena, "{s}/{s}.expected.txt", .{ options.fixture_root, stem });
+    const gold_path = try std.fmt.allocPrint(arena, "{s}/{s}.expected.txt", .{ repo_env.fixtureRoot(), stem });
     const gold = Io.Dir.cwd().readFileAlloc(io, gold_path, arena, .limited(1 << 24)) catch return false;
     return std.mem.eql(u8, gold, new.stdout);
 }
@@ -354,14 +355,14 @@ fn tiebreak(arena: Allocator, io: Io, f: Fixture, new: judge.Run) !bool {
 fn deviceTiebreak(arena: Allocator, s: *Shared, f: Fixture, new: judge.Run, args: []const []const u8, work: []const u8) !?[]const u8 {
     if (f.reject and new.status >= 1 and new.status <= 125) return null;
     if (new.status != 0) return "the new side builds no device";
-    return device.agrees(arena, s.io, s.env, s.exe_new, options.repo_root, args, work, f.reject);
+    return device.agrees(arena, s.io, s.env, s.exe_new, repo_env.repoRoot(), args, work, f.reject);
 }
 
 /// The tiebreaker of a `front_end_ruling`: old `vera` on the fixture's own
 /// `--run` line reports the preprocessor's diagnostics (codes E01xx/W01xx)
 /// the new side does, in order. Null when it holds, else why not.
 fn frontEndTiebreak(arena: Allocator, s: *Shared, f: Fixture, new: judge.Run, work: []const u8) !?[]const u8 {
-    const run_args = try fixture.argv(arena, f, options.fixture_root);
+    const run_args = try fixture.argv(arena, f, repo_env.fixtureRoot());
     const ref = try judge.run(arena, s.io, s.exe_old, run_args, work, s.env, false);
     const want = try preprocessCodes(arena, ref.stderr);
     const got = try preprocessCodes(arena, new.stderr);
@@ -377,7 +378,7 @@ fn frontEndTiebreak(arena: Allocator, s: *Shared, f: Fixture, new: judge.Run, wo
 fn remarkRuling(arena: Allocator, io: Io, f: Fixture, old: judge.Run, new: judge.Run) !?[]const u8 {
     if (try judge.remarkTiebreak(arena, old, new, f.rel)) |why| return why;
     const stem = f.rel[0 .. f.rel.len - std.fs.path.extension(f.rel).len];
-    const gold_path = try std.fmt.allocPrint(arena, "{s}/{s}.expected.txt", .{ options.fixture_root, stem });
+    const gold_path = try std.fmt.allocPrint(arena, "{s}/{s}.expected.txt", .{ repo_env.fixtureRoot(), stem });
     const gold = Io.Dir.cwd().readFileAlloc(io, gold_path, arena, .limited(1 << 24)) catch null;
     const want = gold orelse old.stdout;
     if (!std.mem.eql(u8, want, new.stdout)) return "stdout does not meet the fixture's own transcript";
@@ -401,7 +402,7 @@ fn preprocessCodes(arena: Allocator, stderr: []const u8) ![]const u8 {
 /// The run's rulings (`<name>.rulings`): `<path> <clause and reason>`
 /// lines, `#` comments.
 fn readRulings(arena: Allocator, io: Io) !std.StringHashMapUnmanaged([]const u8) {
-    const path = try std.fs.path.join(arena, &.{ options.repo_root, "tests/differential/" ++ v_run.name ++ ".rulings" });
+    const path = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), "tests/differential/" ++ v_run.name ++ ".rulings" });
     const text = Io.Dir.cwd().readFileAlloc(io, path, arena, .limited(1 << 22)) catch |e| switch (e) {
         error.FileNotFound => return .empty,
         else => return e,
@@ -428,7 +429,7 @@ fn oneLine(arena: Allocator, l: []const u8) ![]const u8 {
 /// The fixture paths a list file names (`<path> <reason>` lines, `#`
 /// comments).
 fn readList(arena: Allocator, io: Io, rel: []const u8) !std.StringHashMapUnmanaged([]const u8) {
-    const path = try std.fs.path.join(arena, &.{ options.repo_root, rel });
+    const path = try std.fs.path.join(arena, &.{ repo_env.repoRoot(), rel });
     const text = Io.Dir.cwd().readFileAlloc(io, path, arena, .limited(1 << 24)) catch |e| switch (e) {
         error.FileNotFound => return .empty,
         else => return e,

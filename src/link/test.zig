@@ -326,6 +326,70 @@ test "cache_dir: an edit to a file a module root imports misses the cache" {
     }
 }
 
+test "cache_dir: a hit whose library file is gone rebuilds and heals the entry" {
+    // Regression (R2b, research/builds.md): a stale hit (the manifest says
+    // hit; the `o/<digest>` entry underneath is gone, an evicted cache)
+    // rebuilt a correct library but never re-stored it -- `cacheStore` only
+    // ran when `s.hit == null` -- so the entry stayed missing and every
+    // later flush of the same key repeated the same wasted rebuild
+    // forever, never healing. `flush` now re-populates that exact digest's
+    // entry from the rebuild.
+    const gpa = std.testing.allocator;
+    const io = std.testing.io;
+    var arena: std.heap.ArenaAllocator = .init(gpa);
+    defer arena.deinit();
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var slots: [1]Server = undefined;
+    var q: Queue = .init(&slots);
+    const base = try arena.allocator().print(".zig-cache/tmp/{s}", .{tmp.sub_path});
+    const mods = try standIns(arena.allocator(), tmp, "mods", "pub const k: f64 = 2.0;\n", plain_dyn);
+    const cache = try std.fs.path.join(arena.allocator(), &.{ base, "cache" });
+    const objects = try std.fs.path.join(arena.allocator(), &.{ cache, "o" });
+    const dev = "pub fn eval(x: f64) callconv(.c) f64 { return x * @import(\"contract\").k; }\n";
+    const marker = "not a library";
+
+    for ([_][]const u8{ "w1", "w2", "w3" }, 0..) |w, i| {
+        if (i == 1) {
+            // Simulate an evicted cache: delete flush 1's one entry.
+            var odir = try Io.Dir.cwd().openDir(io, objects, .{ .iterate = true });
+            defer odir.close(io);
+            var it = odir.iterate();
+            var name: ?[]const u8 = null;
+            while (try it.next(io)) |e| name = e.name;
+            try odir.deleteTree(io, name.?);
+        }
+        const wd = try std.fs.path.join(arena.allocator(), &.{ base, w });
+        const f: File = .{ .kind = .so, .work_dir = wd, .name = "healdev", .optimize = .debug, .backend = .self_hosted, .modules = &mods, .cache_dir = cache };
+        var r = try f.flush(gpa, io, &q, .{ .text = dev }, 1);
+        defer r.deinit(gpa);
+        const path = try expectOk(io, r);
+        // flush 1 fills the cache; flush 2's entry was just deleted, so it
+        // must fall back to a real, correct rebuild.
+        if (i < 2) try std.testing.expectEqual(@as(f64, 6.0), try callEval(path, 3.0));
+
+        // Exactly one `o/` entry after every flush: 1 fills it, 2 heals it
+        // back (the oracle: a forced miss must not leave the cache empty),
+        // 3 leaves it as found.
+        var odir = try Io.Dir.cwd().openDir(io, objects, .{ .iterate = true });
+        defer odir.close(io);
+        var it = odir.iterate();
+        var n: usize = 0;
+        var name: ?[]const u8 = null;
+        while (try it.next(io)) |e| : (n += 1) name = e.name;
+        try std.testing.expectEqual(@as(usize, 1), n);
+
+        if (i == 1) {
+            // A marker only a hit's copy can publish: flush 3 must find it.
+            try odir.writeFile(io, .{ .sub_path = try std.fs.path.join(arena.allocator(), &.{ name.?, testLib("healdev") }), .data = marker });
+        } else if (i == 2) {
+            const bytes = try Io.Dir.cwd().readFileAlloc(io, path, gpa, .unlimited);
+            defer gpa.free(bytes);
+            try std.testing.expectEqualSlices(u8, marker, bytes);
+        }
+    }
+}
+
 test "buildEngine reuses its object only while every key component is unchanged" {
     const gpa = std.testing.allocator;
     const io = std.testing.io;

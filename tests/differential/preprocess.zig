@@ -18,7 +18,7 @@ const Allocator = std.mem.Allocator;
 const vams = @import("vams");
 const frontend = @import("frontend");
 const diag = @import("diag");
-const rewrite_options = @import("rewrite_options");
+const repo_env = @import("repo_env");
 const Preprocessor = vams.Preprocessor;
 const old_pp = frontend.preprocessor;
 
@@ -230,10 +230,10 @@ test "diff-pp: the vams Preprocessor agrees with lib/frontend's on every fixture
     var run_arena: std.heap.ArenaAllocator = .init(gpa);
     defer run_arena.deinit();
     const ra = run_arena.allocator();
-    const root = rewrite_options.fixture_root;
+    const root = repo_env.fixtureRoot();
 
     const fixtures = try collect(ra, io, root);
-    const xfail_path = try std.fs.path.join(ra, &.{ rewrite_options.repo_root, "tests/differential/preprocess.xfail" });
+    const xfail_path = try std.fs.path.join(ra, &.{ repo_env.repoRoot(), "tests/differential/preprocess.xfail" });
     const xfail = try readXfail(ra, io, xfail_path);
 
     var fixture_arena: std.heap.ArenaAllocator = .init(gpa);

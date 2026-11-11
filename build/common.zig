@@ -14,6 +14,7 @@
 //! - `pub fn testRoot(b: *Build, mod: Import) *Module`
 //! - `pub fn testRun(b: *Build, name: []const u8, mod: *Module, runner: Build.Step.Compile.TestRunner, results_dir: ?[]const u8) *Run`
 //! - `pub fn dropNixTmpKeys(r: *Run) void`
+//! - `pub fn setSuiteEnv(b: *Build, r: *Run) void`
 //! - `pub fn recordResults(b: *Build, run: *Run, dir: []const u8, name: []const u8, contents: []const u8) *Build.Step`
 //! - `pub fn globFiles(b: *Build, dir: []const u8, suffix: []const u8) []const []const u8`
 //! - `pub fn configText(b: *Build, path: []const u8) []const u8`
@@ -204,6 +205,28 @@ pub fn testRun(b: *Build, name: []const u8, mod: *Module, runner: Build.Step.Com
 /// not re-clone.
 pub fn dropNixTmpKeys(r: *Run) void {
     for ([_][]const u8{ "NIX_BUILD_TOP", "TMPDIR", "TMP", "TEMP", "TEMPDIR" }) |k| r.removeEnvironmentVariable(k);
+}
+
+/// Every run of `suite_exe` (`vera-suite`, `build/unit.zig`'s `Added`) needs
+/// these: `tests/suite_options.zig`'s `fixtureRoot`/`repoRoot`/`workRoot`/
+/// `contract`/`vpiInclude`/`zigExe` read them at run time instead of a
+/// compiled-in absolute path (R5, research/builds.md), so this Run step
+/// must set them whether it runs the suite directly (`suite`, `test-spice`,
+/// the `test` tier's canary, `build/runs.zig`) or through zrunner
+/// (`test-suite`, `build/unit.zig`). Every `diff-*` test of
+/// `build/rewrite.zig` and `build/rewrite_comp.zig` needs the same two
+/// (`tests/differential/repo_env.zig`'s `fixtureRoot`/`repoRoot`) for the
+/// same reason, and calls this rather than carry a near-duplicate: the
+/// four extra keys cost it nothing it reads. Call once per Run step; it
+/// calls `dropNixTmpKeys` itself.
+pub fn setSuiteEnv(b: *Build, r: *Run) void {
+    r.setEnvironmentVariable("VERA_FIXTURE_ROOT", pathFromRoot(b, "tests/conformance/tests"));
+    r.setEnvironmentVariable("VERA_REPO_ROOT", pathFromRoot(b, "."));
+    r.setEnvironmentVariable("VERA_WORK_ROOT", checkoutWorkDir(b, "vera-suite"));
+    r.setEnvironmentVariable("VERA_CONTRACT", pathFromRoot(b, "lib/contract.zig"));
+    r.setEnvironmentVariable("VERA_VPI_INCLUDE", pathFromRoot(b, "src/vpi"));
+    r.setEnvironmentVariable("VERA_ZIG_EXE", b.graph.zig_exe);
+    dropNixTmpKeys(r);
 }
 
 /// Publish C application results only after its checked execution succeeds.

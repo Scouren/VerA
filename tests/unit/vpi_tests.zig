@@ -1371,7 +1371,9 @@ test "every vpi_user.h constant the Zig side spells has the header's value" {
     const gpa = std.testing.allocator;
     var macros: std.StringHashMapUnmanaged(c_int) = .empty;
     defer macros.deinit(gpa);
-    const header = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, @import("repo_options").repo_root ++ "/src/vpi/vpi_user.h", gpa, .unlimited);
+    const header_path = try std.fs.path.join(gpa, &.{ @import("repo_options").repoRoot(), "src/vpi/vpi_user.h" });
+    defer gpa.free(header_path);
+    const header = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, header_path, gpa, .unlimited);
     defer gpa.free(header);
     var lines = std.mem.splitScalar(u8, header, '\n');
     while (lines.next()) |line| {

@@ -11,6 +11,7 @@ const Devices = @import("Devices.zig");
 const Golden = @import("Golden.zig");
 const SpiceDecks = @import("SpiceDecks.zig");
 const SizeSweep = @import("SizeSweep.zig");
+const suite_options = @import("suite_options");
 const std = @import("std");
 const tb = @import("exe");
 const Io = std.Io;
@@ -53,6 +54,10 @@ const fixture_reps = if (@import("builtin").mode == .fast) 5 else 1;
 ///
 /// Returns the process exit code.
 pub fn main(init: std.process.Init) !u8 {
+    // `suite_options`'s paths are read from the environment (R5,
+    // research/builds.md); `std.testing.environ` does not exist in this
+    // executable, so give it this process's own first.
+    suite_options.setEnviron(init.minimal.environ);
     var args = try init.minimal.args.iterateAllocator(init.gpa);
     defer args.deinit();
     _ = args.skip();

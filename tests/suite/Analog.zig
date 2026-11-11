@@ -116,10 +116,10 @@ const Pool = struct {
         if (c.n < 2) return; // one member gains nothing over its own build
         const cfg = pool.ctx.cfg;
         const built = try zigbuild.buildBatch(pool.gpa, pool.io, staged[0..c.n], .{
-            .work_dir = try arena.print("{s}/torture-batch/{d}", .{ options.work_root, k }),
-            .contract = options.contract,
+            .work_dir = try arena.print("{s}/torture-batch/{d}", .{ options.workRoot(), k }),
+            .contract = options.contract(),
             .name = "batch",
-            .zig_exe = options.zig_exe,
+            .zig_exe = options.zigExe(),
             .optimize = cfg.fixture_opt,
             .backend = cfg.fixture_backend,
             .strip = true,
@@ -142,7 +142,7 @@ const posix = struct {
         var arena_state: std.heap.ArenaAllocator = .init(gpa);
         defer arena_state.deinit();
         const arena = arena_state.allocator();
-        const work = options.work_root ++ "/batch-selftest";
+        const work = try std.fs.path.join(arena, &.{ options.workRoot(), "batch-selftest" });
         // Prints its device's tag and the plusargs it was handed.
         const runner =
             \\const std = @import("std");
@@ -161,9 +161,9 @@ const posix = struct {
         for (&staged, &dirs, tags) |*s, *dir, tag| {
             dir.* = try std.fs.path.join(arena, &.{ work, tag });
             const device = if (std.mem.eql(u8, tag, "broken")) "pub const tag = 1 +;\n" else try arena.print("pub const tag = \"{s}\";\n", .{tag});
-            s.* = try zigbuild.stage(arena, io, device, runner, .{ .work_dir = dir.*, .contract = options.contract, .name = tag, .zig_exe = options.zig_exe });
+            s.* = try zigbuild.stage(arena, io, device, runner, .{ .work_dir = dir.*, .contract = options.contract(), .name = tag, .zig_exe = options.zigExe() });
         }
-        const opts: zigbuild.BuildOptions = .{ .work_dir = work ++ "/batch", .contract = options.contract, .name = "batch", .zig_exe = options.zig_exe, .strip = true };
+        const opts: zigbuild.BuildOptions = .{ .work_dir = try std.fs.path.join(arena, &.{ work, "batch" }), .contract = options.contract(), .name = "batch", .zig_exe = options.zigExe(), .strip = true };
 
         const built = try zigbuild.buildBatch(gpa, io, staged[0..2], opts);
         defer built.deinit(gpa);
@@ -350,7 +350,7 @@ fn runAndCheck(
 
     var opts: vera.Config = .{
         .file_name = f.path,
-        .include_dirs = &.{ f.dir(), harness.include_dir },
+        .include_dirs = &.{ f.dir(), try harness.includeDir(arena) },
         .require_std_includes = true,
         .lint = levels,
         .display = if (d.harness.display_record) .record else .emit,
@@ -417,17 +417,17 @@ fn runAndCheck(
     // fixtures may declare the same module name AND share a file name, and a
     // shared scratch would race them onto one `device.zig`.
     const work = try std.fs.path.join(arena, &.{
-        options.work_root,
+        options.workRoot(),
         "torture",
         std.fs.path.basename(f.root),
         f.slug,
     });
     const build_opts: zigbuild.BuildOptions = .{
         .work_dir = work,
-        .contract = options.contract,
+        .contract = options.contract(),
         .name = result.mir.name,
         .mixed = facts.mixed != null,
-        .zig_exe = options.zig_exe,
+        .zig_exe = options.zigExe(),
         .optimize = cfg.fixture_opt,
         .backend = cfg.fixture_backend,
         .strip = true,
@@ -661,16 +661,16 @@ test "declared check count rejects missing and duplicated observations" {
         \\endmodule
     ;
     const fixture: Fixture = .{
-        .path = suite.fixture_root ++ "/check_count_oracle.va",
-        .root = suite.fixture_root,
+        .path = try std.fs.path.join(arena, &.{ suite.fixtureRoot(), "check_count_oracle.va" }),
+        .root = suite.fixtureRoot(),
         .slug = "harness_check_count_selftest",
     };
-    const missing = try runAndCheck(gpa, std.testing.io, arena, &.{ .cfg = &.{} }, fixture, source, .{ .harness = .{ .expected_checks = 2 } }, &report.writer, null);
+    const missing = try runAndCheck(gpa, std.testing.io, arena, &.{ .cfg = &.{ .root = "" } }, fixture, source, .{ .harness = .{ .expected_checks = 2 } }, &report.writer, null);
     try std.testing.expect(missing == .unmet);
     try std.testing.expect(std.mem.find(u8, report.written(), "observed 1 assertion(s), expected exactly 2") != null);
-    const complete = try runAndCheck(gpa, std.testing.io, arena, &.{ .cfg = &.{} }, fixture, source, .{ .harness = .{ .expected_checks = 1 } }, &report.writer, null);
+    const complete = try runAndCheck(gpa, std.testing.io, arena, &.{ .cfg = &.{ .root = "" } }, fixture, source, .{ .harness = .{ .expected_checks = 1 } }, &report.writer, null);
     try std.testing.expect(complete == .met);
-    const duplicated = try runAndCheck(gpa, std.testing.io, arena, &.{ .cfg = &.{} }, fixture, source, .{
+    const duplicated = try runAndCheck(gpa, std.testing.io, arena, &.{ .cfg = &.{ .root = "" } }, fixture, source, .{
         .bench = .{ .times_s = &.{ 0.0, 1e-9 } },
         .harness = .{ .expected_checks = 1 },
     }, &report.writer, null);
@@ -696,14 +696,14 @@ test "a fatal exit after a passing assertion must be explicitly expected" {
         \\endmodule
     ;
     const fixture: Fixture = .{
-        .path = suite.fixture_root ++ "/exit_oracle.va",
-        .root = suite.fixture_root,
+        .path = try std.fs.path.join(arena, &.{ suite.fixtureRoot(), "exit_oracle.va" }),
+        .root = suite.fixtureRoot(),
         .slug = "harness_exit_status_selftest",
     };
-    const unexpected = try runAndCheck(gpa, std.testing.io, arena, &.{ .cfg = &.{} }, fixture, source, .{}, &report.writer, null);
+    const unexpected = try runAndCheck(gpa, std.testing.io, arena, &.{ .cfg = &.{ .root = "" } }, fixture, source, .{}, &report.writer, null);
     try std.testing.expect(unexpected == .unmet);
     try std.testing.expect(std.mem.find(u8, report.written(), "exit 1, expected 0") != null);
-    const expected = try runAndCheck(gpa, std.testing.io, arena, &.{ .cfg = &.{} }, fixture, source, .{ .harness = .{ .expected_exit = 1 } }, &report.writer, null);
+    const expected = try runAndCheck(gpa, std.testing.io, arena, &.{ .cfg = &.{ .root = "" } }, fixture, source, .{ .harness = .{ .expected_exit = 1 } }, &report.writer, null);
     try std.testing.expect(expected == .met);
 }
 

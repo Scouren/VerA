@@ -490,7 +490,11 @@ fn configRoots(s: *Sema, roots: *std.ArrayList(Zcu.Decl)) Allocator.Error!bool {
         return roots.items.len != 0;
     }
     for (root.vir.list(Vir.String, root.c.design)) |cell| {
-        const m = zcu.modules.get(try zcu.intern_pool.getString(s.gpa, cellOf(root.vir.string(cell)))) orelse continue;
+        const text = root.vir.string(cell);
+        const m = zcu.modules.get(try zcu.intern_pool.getString(s.gpa, cellOf(text))) orelse {
+            try library.designCellMissing(s, root, text);
+            continue;
+        };
         try roots.append(s.arena, m);
     }
     for (root.vir.list(Vir.String, root.c.rules)) |r| {

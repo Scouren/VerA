@@ -105,6 +105,7 @@ modules still import old `kernels` (`src/Sema/{eval_1364,eval_1364_fn,format}.zi
 | P10 | install `share/vera/kernels*` + `gompute/`; flake smoke; `nofast_host` | smoke without the gompute files → fails | §5 downstream proxy |
 | P11 | every `notBuilt` prong → coded refusal or deleted | a fixture forcing the RTLIL unsupported shape still exits 126 → must exit 1 with the code | rule 6 |
 | P12 | ESPice API parity: `Config.int_systfs` + `tests/downstream/espice.zig` | the downstream test with `int_systfs` dropped → wrong value/code | §5 |
+| P13 | `src/codegen/zig` emits `field_use` and `limit_sim_reads` (#134), the old backend's `src/codegen/device/codegen/field_use.zig` and `cg_limit.zig` facts, so switching does not drop a contract fact ESPice's N6 limit stage reads | a device built by the new backend with `field_use`/`limit_sim_reads` left undeclared → `contract.fieldUse`/`limitSimReads` fall back to the all-read superset, which the #134 perturbation oracle (`tests/host/a04_idt_hold_revert_host.zig`) cannot then distinguish from a real read | the new backend is at contract parity with the old one on #134's facts before G0 |
 
 ### The switch series (after G0; branch `switch` off `refactor`, one commit per row)
 

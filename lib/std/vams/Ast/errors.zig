@@ -44,6 +44,7 @@ pub fn code(tag: Ast.Error.Tag) Diag.Code {
         .unmatched_end_keywords => .E0136,
         .directive_inside_design_element => .E0202,
         .null_statement => .E0219,
+        .outside_verilog_a => .E0250,
         .scale_factor_in_delay => .E0247,
         .empty_step_event_list => .E0220,
         .begin_at_module_scope => .E0221,
@@ -111,6 +112,7 @@ fn one(tree: *const Ast, e: Ast.Error, w: *Diag.Wip) Allocator.Error!void {
         .begin_at_module_scope => b.msg("found {s}", .{found(tree, tok)}),
         .library_text_in_source => b.msg("`{s}` is a library_description, and this file is source_text", .{std.mem.trimStart(u8, text, "`")}),
         .specify_outside_module => b.msg("a specify block outside a module (§14.1)", .{}),
+        .outside_verilog_a => b.msg("`{s}` under --sim=verilogA", .{text}),
         .driver_update_outside_connect_module => {
             b.msg("`driver_update` in a module that is not a connect module", .{});
             b.note("§9.22: \"Driver access functions can only be called from connect modules\", and driver_update \"is used in combination with the driver access functions\"", .{});
@@ -169,13 +171,14 @@ fn refined(tree: *const Ast, e: Ast.Error, loc: Diag.Loc, w: *Diag.Wip) Allocato
             break :blk x;
         },
         // §2.6: a number the new tokenizer ends early (`4af`, `4'b101f`,
-        // `8'`) is one bad literal to the old lexer, reported at its start.
+        // `8'`) is one bad literal to the old lexer, reported at its start
+        // and underlining the old lexer's first token: the number token.
         .expected_token => if (tok > 0 and prev == .number_literal and tree.tokenStart(tok) == endOfPrev(tree, tok) and
             ((tag == .identifier and hexLetter(tree.tokenSlice(tok)[0]) and std.mem.findScalar(u8, tree.tokenSlice(tok - 1), '.') == null) or (tag == .invalid and tree.source[tree.tokenStart(tok)] == '\'')))
         blk: {
             const at = tree.tokenStart(tok - 1);
             const end = tree.tokenStart(tok) + @as(u32, @intCast(tree.tokenSlice(tok).len));
-            var x = w.build(.parse, if (tag == .invalid) .E0131 else .E0133, .{ .file = .root, .start = at, .end = end });
+            var x = w.build(.parse, if (tag == .invalid) .E0131 else .E0133, .{ .file = .root, .start = at, .end = tree.tokenStart(tok) });
             x.msg("`{s}`", .{tree.source[at..end]});
             break :blk x;
         } else return false,

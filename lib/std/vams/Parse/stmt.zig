@@ -82,7 +82,11 @@ pub fn parseStmtIn(p: *Parse, mode: Mode) Error!Node.Index {
         },
         .keyword_begin, .keyword_fork => return parseBlock(p, mode == .event),
         .keyword_if => return parseIf(p, false),
-        .keyword_case, .keyword_casex, .keyword_casez => return parseCase(p, false),
+        .keyword_case, .keyword_casex, .keyword_casez => {
+            // Annex C.7: "casex and casez are not supported in Verilog-A".
+            if (p.verilog_a and p.tokenTag(tok) != .keyword_case) try p.warn(.outside_verilog_a);
+            return parseCase(p, false);
+        },
         .keyword_for => return parseFor(p, false),
         .at_sign => {
             p.tok_i += 1;
@@ -197,10 +201,11 @@ pub fn parseHierName(p: *Parse) Error!Node.Index {
 
 // ---- private ----
 
-/// Whether the parse's language is Verilog-AMS, whose A.6.4 analog
-/// statements have no null alternative.
+/// Whether the statement is Verilog-AMS's A.6.4 analog statement, which
+/// has no null alternative: a Verilog-AMS language, outside a discrete
+/// (IEEE 1364) context.
 fn analogGrammar(p: *const Parse) bool {
-    return @backingInt(p.language) >= @backingInt(Parse.KeywordSet.vams_2_3);
+    return !p.discrete and @backingInt(p.language) >= @backingInt(Parse.KeywordSet.vams_2_3);
 }
 
 fn body(p: *Parse, comptime generate: bool) Error!Node.Index {
@@ -248,6 +253,9 @@ fn parseBlock(p: *Parse, event: bool) Error!Node.Index {
             .keyword_parameter, .keyword_localparam, .keyword_integer, .keyword_real, .keyword_string, .keyword_realtime, .keyword_time, .keyword_reg, .keyword_event => {},
             else => break,
         }
+        // An IEEE 1364 design abandons the item there, and recovery reads
+        // the block's rest as module items, as the old digital parse did.
+        if (!named and p.ieee1364) return p.failAt(.decl_in_unnamed_block, past);
         if (!named) try p.warnAt(.decl_in_unnamed_block, past);
         _ = try p.skipAttributes();
         try p.push(try decl.parseBlockDecl(p));

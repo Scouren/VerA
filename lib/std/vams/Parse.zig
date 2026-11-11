@@ -24,6 +24,7 @@
 //! - `pub fn skipAttributes(p: *Parse) Allocator.Error!bool`, `pub fn pastAttributes(p: *const Parse) TokenIndex`
 //! - `pub fn recoverItem(p: *Parse, before: TokenIndex) void`
 //! - `pub fn vamsWordUnder1364(p: *const Parse, i: TokenIndex) bool`
+//! - `pub fn refuseDigital(p: *Parse, i: TokenIndex) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -71,6 +72,11 @@ in_paramset: bool,
 discrete: bool,
 /// Inside a §7.6 `connectmodule`, where §9.22 admits `driver_update`.
 connect_module: bool,
+/// `ParseOptions.verilog_a`: annex C's subset.
+verilog_a: bool,
+/// `ParseOptions.discrete`: the whole text is an IEEE 1364 design, whose
+/// unnamed-block declaration abandons the module item (A.6.3).
+ieee1364: bool,
 
 /// `ParseError`: the diagnostic is in `errors` and the caller recovers.
 pub const Error = error{ParseError} || Allocator.Error;
@@ -107,6 +113,8 @@ pub fn run(gpa: Allocator, source: [:0]const u8, tokens: Ast.TokenList.Slice, op
         .in_paramset = false,
         .discrete = options.discrete or @backingInt(options.keywords) < @backingInt(KeywordSet.vams_2_3),
         .connect_module = false,
+        .verilog_a = options.verilog_a,
+        .ieee1364 = options.discrete,
     };
     defer p.errors.deinit(gpa);
     defer p.nodes.deinit(gpa);
@@ -327,6 +335,23 @@ pub fn vamsWordUnder1364(p: *const Parse, i: TokenIndex) bool {
     return p.tokenTag(i).isKeyword() and !keywords.reservedUnder(p.tokenText(i), p.language);
 }
 
+/// Under `verilog_a`, warns `outside_verilog_a` when token `i` opens a
+/// description or module item annex C removes from Verilog-A (C.7 "No
+/// digital behavior or events", C.9 and C.16's mixed-signal descriptions,
+/// C.4's `wreal`). Called where descriptions and module items dispatch;
+/// C.5's operators and C.7's `casex`/`casez` are judged where they parse.
+pub fn refuseDigital(p: *Parse, i: TokenIndex) Allocator.Error!void {
+    if (!p.verilog_a) return;
+    switch (p.tokenTag(i)) {
+        .keyword_connectmodule, .keyword_connectrules, .keyword_initial, .keyword_always, .keyword_assign, .keyword_reg, .keyword_function, .keyword_tran, .keyword_rtran, .keyword_and, .keyword_nand, .keyword_or, .keyword_nor, .keyword_xor, .keyword_xnor, .keyword_buf, .keyword_not, .keyword_bufif0, .keyword_bufif1, .keyword_notif0, .keyword_notif1 => {},
+        // The IEEE 1364 words annex B reserves, and C.4's `wreal`.
+        .keyword_primitive, .keyword_config, .keyword_library, .keyword_task, .keyword_specify, .keyword_specparam, .keyword_pullup, .keyword_pulldown, .keyword_wreal => {},
+        .keyword_cmos, .keyword_rcmos, .keyword_nmos, .keyword_pmos, .keyword_rnmos, .keyword_rpmos, .keyword_tranif0, .keyword_tranif1, .keyword_rtranif0, .keyword_rtranif1 => {},
+        else => return, // else: every other opener is in the subset, or judged where it parses
+    }
+    try p.warnAt(.outside_verilog_a, i);
+}
+
 // ---- private ----
 
 /// A.1.2 `source_text ::= { description }`, with the §10.6 directives
@@ -344,6 +369,7 @@ fn parseRoot(p: *Parse) Allocator.Error!void {
         }
         const before = p.tok_i;
         if (p.vamsWordUnder1364(before)) try p.warnSite(.vams_construct_under_1364, .vams_under_language, before, @backingInt(p.language));
+        try p.refuseDigital(before);
         const node = parseDescription(p) catch |e| switch (e) {
             error.OutOfMemory => return error.OutOfMemory,
             error.ParseError => {

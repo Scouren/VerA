@@ -80,6 +80,10 @@ pub const ParseOptions = struct {
     /// An IEEE 1364 design (a `.v`, the old digital route) under any
     /// language: statements are A.6's, as under a 1364 set.
     discrete: bool = false,
+    /// Annex C's Verilog-A subset (`--sim=verilogA`): a digital or
+    /// mixed-signal construct is `outside_verilog_a` (E0250), reported at its
+    /// first token and then parsed anyway.
+    verilog_a: bool = false,
 };
 
 /// One row of the node table, 13 bytes SoA: what it is, the token it is
@@ -604,6 +608,9 @@ pub const Error = struct {
         directive_inside_design_element,
         /// A Verilog-AMS design element or module item under a 1364 set.
         vams_construct_under_1364,
+        /// Annex C: a construct outside the Verilog-A subset, under
+        /// `ParseOptions.verilog_a`.
+        outside_verilog_a,
         /// A.1.1's library_text in source_text.
         library_text_in_source,
         /// IEEE 1364-2005 §14.1: a specify block outside a module.

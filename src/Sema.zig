@@ -34,6 +34,7 @@ const netlist = @import("Sema/netlist.zig");
 const walk = @import("Sema/walk.zig");
 const paramset = @import("Sema/paramset.zig");
 const checks = @import("Sema/checks.zig");
+const subset = @import("Sema/subset.zig");
 const connect = @import("Sema/connect.zig");
 const defparam = @import("Sema/defparam.zig");
 const library = @import("Sema/library.zig");
@@ -140,6 +141,10 @@ pub const Config = struct {
     /// past an ordered list's parameters are ignored with W1161, as
     /// iverilog and lib/sim/digital do, instead of refused (E0907).
     ieee1364: bool = false,
+    /// Annex C's Verilog-A subset (`--sim=verilogA`): a use of a discrete
+    /// discipline is E0250 (`Sema/subset.zig`), and nothing elaborates
+    /// after one.
+    verilog_a: bool = false,
 
     /// Which uninstantiated modules elaborate. A device has one root
     /// (VAMS §6.2.2: the first such module); a simulation has every one
@@ -339,6 +344,11 @@ pub fn elaborate(zcu: *Zcu, config: Config) Allocator.Error!void {
     var s: Sema = .{ .zcu = zcu, .gpa = zcu.gpa, .arena = arena_state.allocator(), .config = config };
     try netlist.shadows(&s);
     try namespace(&s);
+    if (config.verilog_a) {
+        const before = zcu.failed.len;
+        try subset.run(&s);
+        if (zcu.failed.len != before) return;
+    }
     try checks.run(&s);
     const roots = try pickRoots(&s);
     const waiting = try walk.run(&s, roots);

@@ -59,6 +59,8 @@ pub fn climb(p: *Parse, lhs: Node.Index, min_prec: u8) Error!Node.Index {
         const prec = binaryPrec(tag) orelse return result;
         if (prec < min_prec) return result;
         const op = p.tok_i;
+        // Annex C.5: Verilog-A has no case equality.
+        if (p.verilog_a and (tag == .equal_equal_equal or tag == .bang_equal_equal)) try p.warn(.outside_verilog_a);
         p.tok_i += 1;
         _ = try p.skipAttributes(); // A.8.3: an operator's attribute suffix
         const rhs = try climb(p, try parseUnary(p), prec + 1);

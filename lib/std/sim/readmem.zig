@@ -1,7 +1,8 @@
 //! IEEE 1364-2005 §17.2.9 `$readmemb`/`$readmemh`: a memory file's bytes in,
 //! words stored into an unpacked array's element slots out. A malformed or
-//! unreadable file ends the load with a warning (`State.warnings`) and the
-//! run goes on; words already stored stay (VD-134).
+//! unreadable file ends the load with a coded warning (`State.warn`,
+//! W1150/W1156/W1157) and the run goes on; words already stored stay
+//! (VD-134).
 //! Cites: IEEE 1364-2005 §3.5.1, §17.2.9; docs/specification/Vague_Decisions.md
 //! VD-040, VD-041, VD-134.
 //!

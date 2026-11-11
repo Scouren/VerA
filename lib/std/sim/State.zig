@@ -12,6 +12,7 @@
 //! - `pub const Susp = struct`, `pub const Act = struct`, `pub const Term = struct`
 //! - `pub const Hold = struct`, `pub const Monitor = struct`, `pub const PathEdge = struct`
 //! - `pub const default_budget: u64`, `pub const default_depth: u32`
+//! - `pub const Native = *const fn (*State, *std.heap.ArenaAllocator, *u32) Error!bool`
 //! - `pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!State`
 //! - `pub fn fail(s: *State, comptime f: []const u8, args: anytype) Error`
 //! - `pub fn netOf(s: *const State, slot: u32) ?u32`
@@ -155,6 +156,14 @@ pub const Monitor = struct {
 /// 256 MiB stack held a few times more; `recursion_past_1024` needs 5,001).
 pub const default_depth: u32 = 20_000;
 
+/// A design's instructions compiled to machine code (`--emit-exe`'s
+/// native step): `Interp.runFrom` calls it when `native_pcs` marks the
+/// current pc compiled. It runs what it compiled from `pc` on, leaves
+/// `pc` at the first instruction it did not, and returns false to have
+/// the interpreter run that one; true when the process returned (a §10.3
+/// disable unwound it).
+pub const Native = *const fn (*State, *std.heap.ArenaAllocator, *u32) Error!bool;
+
 /// Events at one tick (and untimed loop passes) before a zero-delay loop
 /// is refused by name.
 pub const default_budget: u64 = 10_000_000;
@@ -270,6 +279,11 @@ path_changed: []bool,
 scratch: std.heap.ArenaAllocator,
 /// VAMS §7.3, §8.5 the link to an analog solver of a mixed run.
 analog: analog_link.Link = .{},
+/// The executable's compiled instructions, when it has them.
+native: ?Native = null,
+/// One bit per `Program.insts` pc (`native.zig`'s bitset), set iff
+/// `native` has a compiled prong for it; read only when `native != null`.
+native_pcs: []const u64 = &.{},
 
 const State = @This();
 

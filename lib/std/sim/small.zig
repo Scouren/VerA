@@ -13,6 +13,8 @@
 //! - `pub fn literal(planes: *[2]u64, v: V, ty: Program.Ty) Literal`
 //! - `pub fn truthOf(v: V, width: u32) Bit`
 //! - `pub fn indexOf(v: V, ty: Ty) ?i128`
+//! - `pub fn mask(w: u32) u64`, `pub fn signExtend(word: u64, from: u32) u64`
+//! - `pub fn resize(x: V, from: u32, to: u32, signed: bool) V`, `pub fn scalarIn(b: Bit, ty: Ty) V`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -231,14 +233,14 @@ pub fn indexOf(v: V, ty: Ty) ?i128 {
     return if (ty.signed) @as(i64, @bitCast(signExtend(v.v, ty.width))) else v.v;
 }
 
-// ---- private ----
-
-fn mask(w: u32) u64 {
+/// The low `w` bits set, `w` in 1..64.
+pub fn mask(w: u32) u64 {
     assert(w >= 1 and w <= 64);
     return if (w == 64) std.math.maxInt(u64) else (@as(u64, 1) << @intCast(w)) - 1;
 }
 
-fn signExtend(word: u64, from: u32) u64 {
+/// `word`'s low `from` bits, sign-extended to 64.
+pub fn signExtend(word: u64, from: u32) u64 {
     if (from == 64) return word;
     const sh: u6 = @intCast(64 - from);
     return @bitCast(@as(i64, @bitCast(word << sh)) >> sh);
@@ -246,15 +248,18 @@ fn signExtend(word: u64, from: u32) u64 {
 
 /// `logic.normalize`: `x` (`from` bits) in `to` bits, extended by the
 /// target's signedness, x and z included, or truncated.
-fn resize(x: V, from: u32, to: u32, signed: bool) V {
+pub fn resize(x: V, from: u32, to: u32, signed: bool) V {
     if (to <= from or !signed) return .{ .v = x.v & mask(to), .x = x.x & mask(to) };
     return .{ .v = signExtend(x.v & mask(from), from) & mask(to), .x = signExtend(x.x & mask(from), from) & mask(to) };
 }
 
-fn scalarIn(b: Bit, ty: Ty) V {
+/// One bit `b` as a value of type `ty`, extended by its signedness.
+pub fn scalarIn(b: Bit, ty: Ty) V {
     const bits: u2 = @backingInt(b);
     return resize(.{ .v = bits & 1, .x = bits >> 1 }, 1, ty.width, ty.signed);
 }
+
+// ---- private ----
 
 fn ofLiteral(l: Literal) V {
     assert(l.width <= 64);

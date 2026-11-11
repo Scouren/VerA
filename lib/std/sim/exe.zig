@@ -31,6 +31,11 @@ pub const Config = struct {
     sites: []const Diag.Loc,
     /// Events at one time step before a zero-delay loop is refused.
     budget: u64 = State.default_budget,
+    /// The design's instructions compiled (`State.native`), or none: the
+    /// interpreter runs every one.
+    native: ?State.Native = null,
+    /// `native`'s bitset (`State.native_pcs`); empty when `native` is null.
+    native_pcs: []const u64 = &.{},
 };
 
 /// One source file: its name as a diagnostic prints it, and its text.
@@ -70,10 +75,14 @@ pub fn report(s: *const State, result: State.Error!void, wip: *Diag.Wip, sites: 
 
 /// The executable's `main`: the run of the root's `vera_digital`, its
 /// transcript on stdout, its diagnostics on stderr; 1 when one is an error.
+/// A non-empty `VERA_INTERPRET` in the environment runs it without
+/// `Config.native`.
 pub fn main(init: std.process.Init.Minimal) u8 {
-    _ = init;
-    const cfg: Config = @import("root").vera_digital;
+    var cfg: Config = @import("root").vera_digital;
     const gpa = std.heap.smp_allocator;
+    // The native step's oracle (`diff-native`) and its benchmark run the
+    // same binary through the interpreter alone.
+    if (init.environ.containsUnempty(gpa, "VERA_INTERPRET") catch false) cfg.native = null;
     var threaded: std.Io.Threaded = .init(gpa, .{});
     defer threaded.deinit();
     const io = threaded.io();
@@ -102,6 +111,11 @@ fn go(arena: std.mem.Allocator, io: std.Io, cfg: Config, out: *std.Io.Writer, er
         error.OutOfMemory, error.WriteFailed => |x| return x,
     };
     s.budget = cfg.budget;
+    if (cfg.native) |native| {
+        assert(cfg.native_pcs.len == @divCeil(p.insts.len, 64));
+        s.native = native;
+        s.native_pcs = cfg.native_pcs;
+    }
     s.io = io;
     const result = run(&s);
     var wip: Diag.Wip = .init(arena);

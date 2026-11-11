@@ -79,7 +79,12 @@ the plan's tasks in order and never redecide a `Decision:`.
 ## Waiting on the user
 
 - Pushing the conformance-submodule branch: fixture flips (diagcodes A5),
-  stale headers (lower Q7), native markers (vbackends Q3).
+  stale headers (lower Q7), native markers (vbackends Q3),
+  `integer_conversion_saturates.va` rewritten and renamed `integer_conversion_low32.va`
+  (conversion Q1/Q8, approved), `vera/ledger/OBLIGATIONS-1364.tsv` (diagcodes A1, staged
+  outside the submodule).
+- Gompute: PR #5 (asinh/acosh/atanh/atan2, 2.1.0) waits on CI, blocked by the account's
+  billing lock; the `v2.1.0` tag waits until every pending Gompute PR is merged (user).
 - Filing GitHub issues for the changelog (switchover Q1).
 - The AGENTS.md Layout rewrite at C7 (switchover Q10).
 - Dropping the E1100 wording table after the switch (switchover Q8).

@@ -442,7 +442,6 @@ verilog-a/ch04_expressions/last_crossing_directions.va rw-lower (analog lowering
 verilog-a/ch04_expressions/less_equal.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/less_than.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/limexp.va rw-zero (air passes) message: stderr: line 14: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — co
-verilog-a/ch04_expressions/ln1p_domain_rejected.va rw-zero (air passes): exit status old 1, new 0
 verilog-a/ch04_expressions/ln_string_operand_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch04_expressions/ln_string_operand_rejected.va:25:16`, new `  --> verilog-a/ch04_expressions/ln_string_operand_rejected.va:25:13`
 verilog-a/ch04_expressions/logical_and.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/logical_equal.va rw-lower (analog lowering): exit status old 0, new 1
@@ -500,7 +499,6 @@ verilog-a/ch04_expressions/port_access_lhs_rejected.va rw-lower (analog lowering
 verilog-a/ch04_expressions/port_access_wrong_discipline_rejected.va rw-lower (analog lowering): exit status old 1, new 0
 verilog-a/ch04_expressions/pow.va rw-zero (air passes) message: stderr: line 15: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch04_expressions/pow_even_exponent_accepted.va rw-zero (air passes) message: stderr: line 8: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — com
-verilog-a/ch04_expressions/pow_negative_base_fractional_exponent_rejected.va rw-zero (air passes): exit status old 1, new 0
 verilog-a/ch04_expressions/pow_negative_base_runtime_exponent.va rw-zero (air passes) message: stderr: line 14: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,q) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — co
 verilog-a/ch04_expressions/pow_parameter_derivative.va rw-zero (air passes) message: stderr: line 24: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — co
 verilog-a/ch04_expressions/power_operator.va rw-zero (air passes) message: stderr: line 12: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
@@ -526,7 +524,6 @@ verilog-a/ch04_expressions/replication_lhs_rejected.va rw-lower (analog lowering
 verilog-a/ch04_expressions/replication_negative_count_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0327]: concatenation operand has no bit width: a replication constant shall be non-negative, got -1`, new `error[E0327]: concatenation operand has no bit width: a replication constant shall be non-negative`
 verilog-a/ch04_expressions/replication_real_count.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch04_expressions/replication_real_count_negative_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0327]: concatenation operand has no bit width: a replication constant shall be non-negative, got -2`, new `error[E0327]: concatenation operand has no bit width: a replication constant shall be non-negative`
-verilog-a/ch04_expressions/replication_zero_alone_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0326]: empty concatenation`, new `error[E0326]: empty concatenation: every operand has zero width`
 verilog-a/ch04_expressions/replication_zero_effect.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/rollback_a04_rollback_ops.va rw-zero (air passes) message: stderr: line 26: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — co
 verilog-a/ch04_expressions/runtime_ln1p_domain_rejected.va rw-zero (air passes): stderr: line 2: old `error[E0603]: LRM 4.3.2: ln1p() input value is outside the valid range x > -1: -1`, new `thread panic: division by zero`
@@ -546,12 +543,10 @@ verilog-a/ch04_expressions/small_signal_linearization.va rw-codegen (codegen): e
 verilog-a/ch04_expressions/spice_noise_rc_white.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch04_expressions/spice_noise_series_resistor.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch04_expressions/spice_noise_shared_pair.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch04_expressions/standard_math_domain_rejected.va rw-zero (air passes): stderr: line 1: old `error[E0602]: argument of ln/log must be positive: ln() is the constant -1 with known range [-1:-1]`, new `=== standard_math_domain_rejected ===`
 verilog-a/ch04_expressions/standard_math_system.va rw-zero (air passes) message: stderr: line 13: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch04_expressions/standard_math_traditional.va rw-zero (air passes) message: stderr: line 16: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch04_expressions/status_site_beside_noise.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch04_expressions/tan.va rw-zero (air passes) message: stderr: line 13: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — co
-verilog-a/ch04_expressions/transcendental_domain_rejected.va rw-zero (air passes): stderr: line 1: old `error[E0605]: argument of asin/acos must be within [-1, 1]: asin() is the constant 2 with known range [2:2]`, new `=== transcendental_domain_rejected ===`
 verilog-a/ch04_expressions/transcendental_domain_runtime_error.va rw-zero (air passes): exit status old 1, new 0
 verilog-a/ch04_expressions/transcendental_math.va rw-zero (air passes) message: stderr: line 12: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — co
 verilog-a/ch04_expressions/transition.va rw-zero (air passes) location: exit status old 0, new 1

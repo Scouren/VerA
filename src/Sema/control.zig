@@ -28,6 +28,7 @@ const expr = @import("expr.zig");
 const contrib = @import("contrib.zig");
 const syscall = @import("syscall.zig");
 const op = @import("op.zig");
+const condbr = @import("condbr.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Block = Sema.Block;
@@ -229,10 +230,10 @@ fn stmt(s: *Sema, b: *Block, i: Inst.Index, tag: Inst.Tag) Allocator.Error!void 
     if (banned) |what| if (try @import("timepoint.zig").refuse(s, b, src, what)) return;
     switch (tag) {
         .block => try block(s, b, decl.payloadOf(vir, Inst.Block, i)),
-        .condbr => try condbr(s, b, decl.payloadOf(vir, Inst.CondBr, i)),
+        .condbr => try condbr.lower(s, b, decl.payloadOf(vir, Inst.CondBr, i)),
         .case => try @import("case.zig").lower(s, b, decl.payloadOf(vir, Inst.Case, i)),
-        .loop => try loop(s, b, decl.payloadOf(vir, Inst.Loop, i)),
-        .repeat => try repeat(s, b, decl.payloadOf(vir, Inst.Repeat, i)),
+        .loop => try condbr.loop(s, b, decl.payloadOf(vir, Inst.Loop, i)),
+        .repeat => try condbr.repeat(s, b, decl.payloadOf(vir, Inst.Repeat, i)),
         .store => {
             const x = decl.payloadOf(vir, Inst.Bin, i);
             try assignTo(s, b, x.lhs, try expr.lower(s, b, x.rhs), src);
@@ -266,7 +267,7 @@ fn stmt(s: *Sema, b: *Block, i: Inst.Index, tag: Inst.Tag) Allocator.Error!void 
         .param => try @import("variable.zig").localParam(s, b.unit, i),
         .event, .ps_override, .aliasparam => {},
         .event_wait => try eventWait(s, b, decl.payloadOf(vir, Inst.EventWait, i), src),
-        .contrib_indirect => try contrib.indirect(s, b, decl.payloadOf(vir, Inst.Triple, i), src),
+        .contrib_indirect => try @import("indirect.zig").lower(s, b, decl.payloadOf(vir, Inst.Triple, i), src),
         .trigger => try trigger(s, b, vir.instructions.items(.data)[@backingInt(i)].un_node.operand, src),
         .disable => try disable(s, b, vir.instructions.items(.data)[@backingInt(i)].un_node.operand, src),
         .store_nb, .proc_assign, .force, .store_timed, .store_nb_timed, .deassign, .release, .wait, .delay => try s.fail(.E0512, unit.file, src, "`{t}` is not lowered by Sema yet", .{tag}),
@@ -471,84 +472,4 @@ fn local(s: *Sema, b: *Block, i: Inst.Index) Allocator.Error!void {
     if (b.path.len != 0) try s.block_locals.put(s.arena, try std.fmt.allocPrint(s.arena, "{s}{s}{s}", .{ b.unit.prefix, b.path, vir.string(v.name) }), .{ .alloc = slot, .ty = ty });
     // §5.3.2 a held local of a named block is named by the block path.
     if (b.path.len != 0 and b.unit.held.contains(first)) try @import("variable.zig").addHeld(s, try std.fmt.allocPrint(s.arena, "{s}{s}{s}", .{ b.unit.prefix, b.path, vir.string(v.name) }), b.unit.binds.get(first).?, .undef);
-}
-
-/// §5.8.1 `if (c) a else b`.
-fn condbr(s: *Sema, b: *Block, x: Inst.CondBr) Allocator.Error!void {
-    const c = try expr.toBool(s, b, try expr.lower(s, b, x.cond));
-    const rt: u32 = @intFromBool(!op.isStatic(s, c, 0));
-    var then_b = b.child();
-    then_b.conditional += 1;
-    then_b.runtime += rt;
-    try body(s, &then_b, x.then);
-    var else_b = b.child();
-    else_b.conditional += 1;
-    else_b.runtime += rt;
-    try body(s, &else_b, x.@"else");
-    try ifElse(s, b, c, &then_b, &else_b);
-}
-
-/// §5.9.3/§5.9.4 `while (c) s` and `for (i; c; step) s` (the init is the
-/// statement before): `block { loop { c; cond_br(c, { block { s }; step;
-/// repeat }, { br out }) } }`.
-fn loop(s: *Sema, b: *Block, x: Inst.Loop) Allocator.Error!void {
-    const vir = b.unit.vir;
-    const exit = try s.air.addInst(s.gpa, .{ .tag = .block, .data = undefined });
-    const lp = try s.air.addInst(s.gpa, .{ .tag = .loop, .data = undefined });
-    const cont = try s.air.addInst(s.gpa, .{ .tag = .block, .data = undefined });
-    var head = b.child();
-    head.conditional += 1;
-    head.runtime += 1;
-    const cond_insts = vir.body(x.cond);
-    const c: Air.Inst.Ref = if (cond_insts.len == 0) .fromIntern(.one) else try expr.toBool(s, &head, try expr.lower(s, &head, cond_insts[cond_insts.len - 1].toRef()));
-    var inner = head.child();
-    inner.loop = .{ .exit = exit, .cont = cont };
-    try body(s, &inner, x.body);
-    try br(s, &inner, cont, .none);
-    try s.air.setBody(s.gpa, cont, .none, inner.insts.items);
-    var go = head.child();
-    try go.insts.append(s.arena, cont);
-    try body(s, &go, x.step);
-    const again = try s.air.addInst(s.gpa, .{ .tag = .repeat, .data = .{ .repeat = .{ .loop_inst = lp } } });
-    try go.insts.append(s.arena, again);
-    var stop = head.child();
-    try br(s, &stop, exit, .none);
-    const cb = try s.air.addCondBr(s.gpa, c, go.insts.items, stop.insts.items);
-    try head.insts.append(s.arena, cb);
-    try s.air.setBody(s.gpa, lp, .none, head.insts.items);
-    try s.air.setBody(s.gpa, exit, .none, &.{lp});
-    try b.insts.append(s.arena, exit);
-}
-
-/// §5.9.1 `repeat (n) s`: `n` once, then a loop over a counter slot.
-fn repeat(s: *Sema, b: *Block, x: Inst.Repeat) Allocator.Error!void {
-    const n = try expr.coerce(s, b, try expr.lower(s, b, x.count), .integer);
-    const counter = try decl.addAlloc(s, .integer);
-    _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(counter), .rhs = n } } });
-    const exit = try s.air.addInst(s.gpa, .{ .tag = .block, .data = undefined });
-    const lp = try s.air.addInst(s.gpa, .{ .tag = .loop, .data = undefined });
-    const cont = try s.air.addInst(s.gpa, .{ .tag = .block, .data = undefined });
-    var head = b.child();
-    head.conditional += 1;
-    const k = try s.addInst(&head, .{ .tag = .load, .data = .{ .un_op = .fromIndex(counter) } });
-    const c = try s.addInst(&head, .{ .tag = .igt, .data = .{ .bin_op = .{ .lhs = k, .rhs = .fromIntern(.zero) } } });
-    var inner = head.child();
-    inner.loop = .{ .exit = exit, .cont = cont };
-    try body(s, &inner, x.body);
-    try br(s, &inner, cont, .none);
-    try s.air.setBody(s.gpa, cont, .none, inner.insts.items);
-    var go = head.child();
-    try go.insts.append(s.arena, cont);
-    const k1 = try s.addInst(&go, .{ .tag = .load, .data = .{ .un_op = .fromIndex(counter) } });
-    const dec = try s.addInst(&go, .{ .tag = .isub, .data = .{ .bin_op = .{ .lhs = k1, .rhs = .fromIntern(.one) } } });
-    _ = try s.addInst(&go, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(counter), .rhs = dec } } });
-    const again = try s.air.addInst(s.gpa, .{ .tag = .repeat, .data = .{ .repeat = .{ .loop_inst = lp } } });
-    try go.insts.append(s.arena, again);
-    var stop = head.child();
-    try br(s, &stop, exit, .none);
-    const cb = try s.air.addCondBr(s.gpa, c, go.insts.items, stop.insts.items);
-    try head.insts.append(s.arena, cb);
-    try s.air.setBody(s.gpa, lp, .none, head.insts.items);
-    try s.air.setBody(s.gpa, exit, .none, &.{lp});
-    try b.insts.append(s.arena, exit);
 }

@@ -29,6 +29,7 @@ const Sema = @import("../Sema.zig");
 const decl = @import("decl.zig");
 const expr = @import("expr.zig");
 const contrib = @import("contrib.zig");
+const access = @import("access.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const SysFn = vams.SysFn;
@@ -187,7 +188,7 @@ pub fn noise(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
     // §6.3.6 a noise contribution's power is multiplied by $mfactor on a
     // flow (whose `<+` multiplies the amplitude by it) and divided by it on
     // a potential: the amplitude over sqrt($mfactor). `ac_stim` is no noise.
-    const m = @import("contrib.zig").mfactorOf(s, b.unit);
+    const m = @import("mfactor.zig").mfactorOf(s, b.unit);
     if (tag == .ac_stim or m == 1) return .{ .ref = r, .ty = .real };
     const mc: Ref = .fromIntern(try decl.intern(s, .{ .real = m }));
     const root = try expr.binOp(s, b, .pow, mc, .fromIntern(try decl.intern(s, .{ .real = 0.5 })));
@@ -278,11 +279,11 @@ fn abstolSlot(tag: SysFn.Tag) ?usize {
 /// the flow it names was never read (f cannot depend on it).
 fn ddx(s: *Sema, b: *Block, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
     const f = try expr.coerce(s, b, try expr.lower(s, b, args[0]), .real);
-    const access = (try contrib.accessCall(s, b.unit, args[1])) orelse {
+    const acall = (try access.accessCall(s, b.unit, args[1])) orelse {
         try s.fail(.E0504, b.unit.file, src, "", .{});
         return expr.poison;
     };
-    const t = (try contrib.target(s, b, access.name, access.args, src)) orelse return expr.poison;
+    const t = (try access.target(s, b, acall.name, acall.args, src)) orelse return expr.poison;
     // §4.5.14: the potential of a scalar net or the flow through a branch;
     // `V(p, n)` is two unknowns.
     if (t.access == .potential and t.lo != .ground) {
@@ -300,7 +301,7 @@ fn ddx(s: *Sema, b: *Block, args: []const Inst.Ref, src: Inst.Ref) Allocator.Err
 /// §4.5.3 `ddt(x)` outside a contribution's linear spine.
 fn ddt(s: *Sema, b: *Block, x: Ref) Allocator.Error!Ref {
     const n = try opNode(s, b, "ddt");
-    const v = try contrib.probe(s, n);
+    const v = try access.probe(s, n);
     try stampOpRow(s, b, n, v, x, true);
     return v;
 }
@@ -309,7 +310,7 @@ fn ddt(s: *Sema, b: *Block, x: Ref) Allocator.Error!Ref {
 fn idt(s: *Sema, b: *Block, vals: []const Ref) Allocator.Error!Ref {
     const x = vals[0];
     const n = try opNode(s, b, "idt");
-    const v = try contrib.probe(s, n);
+    const v = try access.probe(s, n);
     const ic: ?Ref = if (vals.len > 1) vals[1] else if (!readsUnknown(s, x, 0)) .fromIntern(.zero_real) else null;
     const hold: ?Ref = if (vals.len > 2) try expr.binOp(s, b, .fne, vals[2], .fromIntern(.zero_real)) else null;
     var f = try expr.unOp(s, b, .fneg, x);
@@ -367,7 +368,7 @@ fn stampOpRow(s: *Sema, b: *Block, n: Node.Index, f: Ref, q: Ref, q_neg: bool) A
     const slots = s.device.contributions.get(@backingInt(row));
     // At entry: the unknown and the flag, so a row whose operator does not
     // run still pins it.
-    try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slots.resist), .rhs = try contrib.probe(s, n) } } }));
+    try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slots.resist), .rhs = try access.probe(s, n) } } }));
     try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slots.wrote), .rhs = .fromIntern(.one_real) } } }));
     _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slots.resist), .rhs = f } } });
     const react = if (q_neg) try expr.unOp(s, b, .fneg, q) else q;

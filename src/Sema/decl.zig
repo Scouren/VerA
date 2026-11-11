@@ -37,12 +37,12 @@ const Zcu = @import("../Zcu.zig");
 const eval = @import("eval.zig");
 const control = @import("control.zig");
 const syscall = @import("syscall.zig");
-const contrib = @import("contrib.zig");
 const held = @import("held.zig");
 const param = @import("param.zig");
 const discrete = @import("discrete.zig");
 const variable = @import("variable.zig");
 const net = @import("net.zig");
+const portbind = @import("portbind.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Device = Air.Device;
@@ -99,19 +99,19 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     try @import("nature.zig").check(s);
     try units(s);
     if (s.units.items.len == 0) return finish(s, &.{});
-    try contrib.loadDisciplines(s);
+    try @import("access.zig").loadDisciplines(s);
     for (s.units.items) |*u| try discrete.mark(s, u);
     for (s.units.items) |*u| try @import("discrete_check.zig").check(s, u);
     try net.ports(s, &s.units.items[0]);
     s.device.num_ports = @intCast(s.device.nodes.len);
     for (s.units.items) |*u| try net.nets(s, u);
-    for (s.units.items[1..]) |*u| try net.bindChildPorts(s, u);
+    for (s.units.items[1..]) |*u| try portbind.bindChildPorts(s, u);
     try net.signalFlowPorts(s);
-    try net.bindBridges(s);
+    try portbind.bindBridges(s);
     for (s.units.items) |*u| try param.declare(s, u);
     for (s.units.items) |*u| try discrete.declare(s, u);
     for (s.units.items[1..]) |*u| try @import("derive.zig").child(s, u);
-    for (s.units.items) |*u| try branches(s, u);
+    for (s.units.items) |*u| try @import("branch.zig").declare(s, u);
     for (s.units.items) |*u| try held.mark(s, u);
     for (s.units.items) |*u| try @import("attr.zig").check(s, u);
     for (s.units.items) |*u| try variable.declare(s, u);
@@ -401,50 +401,4 @@ fn lastStore(vir: *const Vir, b: Vir.Body) ?Inst.Bin {
     const last = insts[insts.len - 1];
     if (vir.instructions.items(.tag)[@backingInt(last)] != .store) return null;
     return payloadOf(vir, Inst.Bin, last);
-}
-
-/// §3.12 the instance's named branches, in declaration order.
-fn branches(s: *Sema, unit: *Unit) Allocator.Error!void {
-    const vir = unit.vir;
-    for (vir.body(unit.module.body)) |i| {
-        if (vir.instructions.items(.tag)[@backingInt(i)] != .branch) continue;
-        const br = payloadOf(vir, Inst.Branch, i);
-        if (portOfBody(unit, br.hi)) |p| {
-            try unit.binds.put(s.arena, canonical(vir, i), .{ .port = p });
-            continue;
-        }
-        const hi = nodeOfBody(unit, br.hi) orelse continue;
-        const lo = if (br.lo.len == 0) Node.Index.ground else nodeOfBody(unit, br.lo) orelse continue;
-        try s.device.branches.append(s.gpa, .{
-            .name = try s.zcu.intern_pool.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, vir.string(br.name) })),
-            .hi = hi,
-            .lo = lo,
-            .instance = rowInstance(unit.instance),
-        });
-        try unit.binds.put(s.arena, canonical(vir, i), .{ .branch = @fromBackingInt(@intCast(s.device.branches.len)) });
-    }
-}
-
-/// The port node a §3.12.1 terminal body names (`<p>`), or null.
-fn portOfBody(unit: *const Unit, b: Vir.Body) ?Node.Index {
-    const vir = unit.vir;
-    const insts = vir.body(b);
-    if (insts.len == 0) return null;
-    const last = insts[insts.len - 1];
-    if (vir.instructions.items(.tag)[@backingInt(last)] != .port_branch) return null;
-    const o = vir.instructions.items(.data)[@backingInt(last)].un_node.operand.toIndex() orelse return null;
-    if (vir.instructions.items(.tag)[@backingInt(o)] != .decl_ref) return null;
-    const bind = unit.binds.get(canonical(vir, vir.instructions.items(.data)[@backingInt(o)].decl_tok.decl)) orelse return null;
-    return if (bind == .node) bind.node else null;
-}
-
-/// The node a terminal body names (a scalar net), or null.
-fn nodeOfBody(unit: *const Unit, b: Vir.Body) ?Node.Index {
-    const vir = unit.vir;
-    const insts = vir.body(b);
-    if (insts.len == 0) return null;
-    const last = insts[insts.len - 1];
-    if (vir.instructions.items(.tag)[@backingInt(last)] != .decl_ref) return null;
-    const bind = unit.binds.get(canonical(vir, vir.instructions.items(.data)[@backingInt(last)].decl_tok.decl)) orelse return null;
-    return if (bind == .node) bind.node else null;
 }

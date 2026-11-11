@@ -30,7 +30,7 @@ const fold = @import("std_kernels").fold;
 const sema_fold = @import("fold.zig");
 const Sema = @import("../Sema.zig");
 const decl = @import("decl.zig");
-const contrib = @import("contrib.zig");
+const access = @import("access.zig");
 const syscall = @import("syscall.zig");
 const control = @import("control.zig");
 const array = @import("array.zig");
@@ -426,7 +426,7 @@ fn callExpr(s: *Sema, b: *Block, c: Inst.Call, src: Inst.Ref) Allocator.Error!Va
     switch (vir.instructions.items(.tag)[@backingInt(callee)]) {
         .str_ref => {
             const name = vir.string(vir.instructions.items(.data)[@backingInt(callee)].str_tok.start);
-            if (try contrib.accessOf(s, b, name)) |_| return contrib.access(s, b, name, vir.list(Inst.Ref, c.args), src);
+            if (try access.accessOf(s, b, name)) |_| return access.access(s, b, name, vir.list(Inst.Ref, c.args), src);
             return refuse(s, b, src, name);
         },
         .decl_ref => {

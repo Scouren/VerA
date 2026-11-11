@@ -570,3 +570,55 @@ test "§7.3.1/A.2.7 a variable only a task writes is digital-owned: a card row t
     try std.testing.expectEqualSlices(Diag.Code, &.{}, o.codes);
     try std.testing.expect(std.mem.find(u8, o.tables, "param level\n") != null);
 }
+
+test "§4.2.13 a sized concatenation prints at its operands' summed width, unsigned" {
+    var o = try lower(
+        \\module m(p); inout p; electrical p;
+        \\  analog begin $strobe("%d", {4'h1, 16'h5}); I(p) <+ V(p); end
+        \\endmodule
+    );
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{}, o.codes);
+    // 4 + 16 bits (IEEE 1364 §5.5.1: a concatenation is unsigned).
+    const air = &o.analysis.?.air;
+    const ip = &o.zcu.intern_pool;
+    var widths: u32 = 0;
+    for (air.instructions.items(.tag), air.instructions.items(.data)) |t, d| {
+        if (t != .call) continue;
+        const x = air.extraData(Air.Call, d.ty_pl.payload);
+        if (x.data.callee != @backingInt(vams.SysFn.Tag.@"display$width")) continue;
+        const args: []const Air.Inst.Ref = @ptrCast(air.extra[x.end..][0..x.data.args_len]);
+        try std.testing.expectEqual(@as(usize, 3), args.len);
+        try std.testing.expectEqual(@as(i64, 20), ip.indexToKey(args[1].toInterned().?).int.storage.small);
+        try std.testing.expectEqual(@as(i64, 0), ip.indexToKey(args[2].toInterned().?).int.storage.small);
+        widths += 1;
+    }
+    try std.testing.expectEqual(@as(u32, 1), widths);
+}
+
+test "§4.2.1.1/§9.11 `$rtoi` truncates toward zero and `$itor` converts, folded in a constant" {
+    var o = try lower(
+        \\module m(p); inout p; electrical p;
+        \\  localparam integer a = $rtoi(1.75), b = $rtoi(-1.75);
+        \\  localparam real c = $itor(-2147483647);
+        \\  (* vera_note = $rtoi(2.5) *) real x;
+        \\  analog I(p) <+ (a * 100 + b + c / 2147483647.0) * V(p);
+        \\endmodule
+    );
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{}, o.codes);
+    // 1 * 100 - 1 - 1, exact in binary.
+    try std.testing.expectEqual(@as(f64, 98), try o.value(0, 0, &.{1.0}));
+}
+
+test "§9.16 a `$simprobe` name a string variable holds is known only at run time: E0823, fallback or not" {
+    try expectCode(
+        \\module m(p); inout p; electrical p; string nm; real got;
+        \\  analog begin
+        \\    nm = (V(p) > 0.0) ? "u_a" : "u_b";
+        \\    got = $simprobe(nm, "gain", -1.0);
+        \\    I(p) <+ got * V(p);
+        \\  end
+        \\endmodule
+    , .E0823);
+}

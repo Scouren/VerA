@@ -3,7 +3,8 @@
 //! `lowerSimprobe` and `elab/paramset.zig`'s `paramsetStatements`): a
 //! sibling of the caller's instance is looked up by its flat name, and its
 //! parameter or output variable read; a name that resolves to nothing is
-//! the fallback, else E0817. A paramset instance's statements run after
+//! the fallback, else E0817; a name known only at run time is E0823
+//! (VD-030), fallback or not. A paramset instance's statements run after
 //! its module's analog blocks, each paramset variable a slot; a described
 //! one is the instance's output variable, an undescribed one hides the
 //! module's variable of its name.
@@ -84,8 +85,12 @@ pub fn lower(s: *Sema, b: *Block, args: []const Inst.Ref, src: Inst.Ref) Allocat
     }
     const inst = try decl.foldRef(s, unit, args[0]);
     const param = try decl.foldRef(s, unit, args[1]);
-    if (inst == null or param == null or inst.? != .str or param.? != .str)
-        return refuse(s, b, src, "a `$simprobe` name known only at run time");
+    // §9.16 a string variable's name is known only when the probe runs;
+    // VerA resolves names at compile time (VD-030), so it refuses one.
+    if (inst == null or param == null or inst.? != .str or param.? != .str) {
+        try s.fail(.E0823, unit.file, src, "this `$simprobe` name has no value until the analog block runs; spell it as a string literal or a string parameter", .{});
+        return expr.poison;
+    }
     const path = try std.fmt.allocPrint(s.arena, "{s}{s}.{s}", .{ parentPrefix(unit.prefix), inst.?.str, param.?.str });
     if (try resolve(s, b, path)) |v| return v;
     if (args.len >= 3 and args[2] != .none) return expr.lower(s, b, args[2]);

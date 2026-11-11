@@ -34,7 +34,7 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
     const ip = &zcu.intern_pool;
     const vir = unit.vir;
     const elems = ip.indexToKey(zcu.instances.items(.params)[@backingInt(unit.instance)]).aggregate.elems;
-    try paramsetRows(s, unit);
+    try @import("param_paramset.zig").rows(s, unit);
     var at: usize = 0;
     // The root's rows whose default reads a parameter.
     var derived: std.ArrayList(struct { Device.Param.Index, Vir.Body }) = .empty;
@@ -72,7 +72,7 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
         try unit.binds.put(s.arena, decl.canonical(vir, i), .{ .param = row });
         try checkRange(s, unit, i, p, elems[at]);
         try checkType(s, unit, i, p);
-        if (try stateRead(s, unit, p.value)) |what| try s.fail(.E0363, unit.file, i.toRef(), "`{s}` reads `{s}`", .{ vir.string(p.name), what });
+        if (try @import("param_check.zig").stateRead(s, unit, p.value)) |what| try s.fail(.E0363, unit.file, i.toRef(), "`{s}` reads `{s}`", .{ vir.string(p.name), what });
         if (unit.prefix.len == 0) try derived.append(s.arena, .{ row, p.value });
     };
     assert(s.param_args.items.len == s.device.params.len);
@@ -126,118 +126,6 @@ fn systemAlias(s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
     try s.prologue.append(s.arena, arg);
     try s.param_args.append(s.arena, .{ .ref = .fromIndex(arg), .ty = .real });
     s.sys_alias.set(k, row);
-}
-
-/// §6.4.1 a paramset instance's own parameters (the selected paramset's,
-/// folded at its level): local rows `u.<paramset>.<name>` with their
-/// ranges, ahead of the module's, as the old flattener names them. No
-/// statement of the module reads one.
-fn paramsetRows(s: *Sema, unit: *Unit) Allocator.Error!void {
-    const zcu = s.zcu;
-    const ip = &zcu.intern_pool;
-    const k = @backingInt(unit.instance);
-    const ps = zcu.instances.items(.paramset)[k];
-    const own = zcu.instances.items(.paramset_params)[k];
-    if (std.meta.eql(ps, Zcu.Decl.none) or own == .none) return;
-    const vir = zcu.fileVir(ps.file);
-    const row = zcu.declRow(ps);
-    const decl_ps = decl.payloadOf(vir, Inst.Paramset, row.inst);
-    const values = ip.indexToKey(own).aggregate.elems;
-    // The paramset's scope: its own declarations bound to their rows.
-    const scope = try s.arena.create(Unit);
-    scope.* = .{ .instance = unit.instance, .file = ps.file, .vir = vir, .module = unit.module, .prefix = unit.prefix, .owner = unit };
-    unit.paramset = scope;
-    var env: eval.Env = try .init(s.gpa, s.arena, ip, vir, &.{});
-    defer env.deinit();
-    var at: usize = 0;
-    for (vir.body(decl_ps.body)) |i| {
-        if (vir.instructions.items(.tag)[@backingInt(i)] != .param) continue;
-        defer at += 1;
-        const p = decl.payloadOf(vir, Inst.Param, i);
-        const ty: Device.Param.Type = switch (p.flags.storage) {
-            .real, .realtime => .real,
-            .integer, .time => .integer,
-            .string => .string,
-            .none, .reg => if (p.range.len != 0) .integer else .unspecified,
-        };
-        const ranges_start: u32 = @intCast(s.device.ranges.items.len);
-        for (vir.list(Inst.ValueRange, p.ranges)) |r| {
-            const lo = try boundIn(&env, vir, r.lo);
-            const hi = if (r.flags.interval) try boundIn(&env, vir, r.hi) else lo;
-            try s.device.ranges.append(s.gpa, .{
-                .exclude = r.flags.exclude,
-                .lo = if (r.flags.set) null else lo,
-                .hi = if (r.flags.set) null else hi,
-                .lo_closed = if (r.flags.interval) r.flags.lo_closed else true,
-                .hi_closed = if (r.flags.interval) r.flags.hi_closed else true,
-                .strings = r.flags.set,
-            });
-        }
-        const value: InternPool.Index = if (at < values.len) values[at] else .undef;
-        const r: Device.Param.Index = @fromBackingInt(@intCast(s.device.params.len));
-        try s.device.params.append(s.gpa, .{
-            .name = try ip.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}{s}.{s}", .{ unit.prefix, vir.string(row.name), vir.string(p.name) })),
-            .ty = if (ty != .unspecified) ty else switch (ip.indexToKey(value)) {
-                .int => .integer,
-                .str => .string,
-                else => .real, // else: a real, or a value that did not fold
-            },
-            .local = true,
-            .default = value,
-            .ranges_start = ranges_start,
-            .ranges_len = @intCast(s.device.ranges.items.len - ranges_start),
-            .instance = decl.rowInstance(unit.instance),
-            .derive = .none,
-        });
-        const vty: Sema.Ty = switch (ip.indexToKey(value)) {
-            .float => .real,
-            .str => .string,
-            else => if (ty == .real) .real else .integer, // else: an integer, or an unfoldable value read as the declared type
-        };
-        const arg = try s.air.addInst(s.gpa, .{ .tag = .arg, .data = .{ .ty_index = .{ .ty = decl.typeIndex(vty), .index = @backingInt(r) } } });
-        try s.prologue.append(s.arena, arg);
-        try s.param_args.append(s.arena, .{ .ref = .fromIndex(arg), .ty = vty });
-        try scope.binds.put(s.arena, decl.canonical(vir, i), .{ .param = r });
-    }
-}
-
-/// A range bound of the paramset's file when it reads no name.
-fn boundIn(env: *eval.Env, vir: *const Vir, b: Vir.Body) Allocator.Error!?f64 {
-    for (vir.body(b)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .decl_ref, .str_ref, .call_sys, .call => return null,
-        else => {}, // else: a literal or an operator over literals
-    };
-    const c = (try env.body(b)) orelse return null;
-    if (c == .str) return null;
-    const x = c.asReal();
-    return if (std.math.isNan(x)) null else x;
-}
-
-/// §3.4 a default is a constant expression over "constant numbers and
-/// previously defined parameters": the first read in `b` of the operating
-/// point or the simulation state (an access, an analog operator, a noise
-/// source, an event, `$abstime` and the like, a module variable), or null.
-fn stateRead(s: *Sema, unit: *Unit, b: Vir.Body) Allocator.Error!?[]const u8 {
-    const vir = unit.vir;
-    for (vir.body(b)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .call => if (try @import("contrib.zig").accessCall(s, unit, i.toRef())) |a| return a.name,
-        .call_sys => {
-            const name = vir.string(decl.payloadOf(vir, Inst.SysCall, i).name);
-            const t = vams.SysFn.Tag.fromName(name) orelse continue;
-            switch (vams.SysFn.get(t).family) {
-                .analog_op, .event => return name,
-                else => {}, // else: by name below
-            }
-            for ([_][]const u8{ "$abstime", "$realtime", "$temperature", "$vt", "$random", "$arandom", "analysis" }) |n| if (std.mem.eql(u8, n, name)) return name;
-            if (std.mem.startsWith(u8, name, "$dist_") or std.mem.startsWith(u8, name, "$rdist_")) return name;
-        },
-        .decl_ref => {
-            const d = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl);
-            if (vir.instructions.items(.tag)[@backingInt(d)] == .variable) return vir.string(decl.nameOf(vir, d));
-        },
-        else => {}, // else: an operator over its operands, walked in the body
-    };
-    return null;
 }
 
 /// Appends one card row named `name` (under the unit's prefix) of value

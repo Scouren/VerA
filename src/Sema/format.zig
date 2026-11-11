@@ -210,6 +210,9 @@ fn intSize(s: *Sema, unit: *Unit, r: Inst.Ref, depth: u32) Allocator.Error!?IntS
         },
         .decl_ref => declSize(s, unit, decl.canonical(vir, data.decl_tok.decl)),
         .call_sys => if (std.mem.eql(u8, vir.string(decl.payloadOf(vir, Inst.SysCall, i).name), "$realtobits")) .{ .bits = 64, .signed = false } else integer,
+        // §4.2.13 a concatenation of sized constants is as wide as its
+        // operands together, and unsigned (IEEE 1364 §5.5.1).
+        .concat, .replicate => if (try @import("bits.zig").width(s, unit, i)) |w| (if (w >= 1 and w <= 64) .{ .bits = @intCast(w), .signed = false } else integer) else integer,
         else => integer, // else: a call, a select: §7.3.1's or §3.2's `integer`
     };
 }

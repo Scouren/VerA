@@ -16,6 +16,7 @@
 //! Contents:
 //! - `pub const Why = enum`
 //! - `pub fn mark(s: *Sema, unit: *Unit) Allocator.Error!void`
+//! - `pub const depth_max: u32`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -23,12 +24,16 @@ const Allocator = std.mem.Allocator;
 const vams = @import("vams");
 const Sema = @import("../Sema.zig");
 const decl = @import("decl.zig");
+const held_writes = @import("held_writes.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Unit = Sema.Unit;
 
 /// Why a variable is held.
 pub const Why = enum(u8) { event, retained, unless_invariant };
+
+/// The deepest statement nesting the walks follow.
+pub const depth_max: u32 = 1 << 12;
 
 /// The per-variable facts of the walk.
 const Marks = packed struct(u8) {
@@ -42,9 +47,6 @@ const Marks = packed struct(u8) {
     initial: bool = false,
     _: u2 = 0,
 };
-
-/// The deepest statement nesting the walks follow.
-const depth_max: u32 = 1 << 12;
 
 /// The most elements an array's definite assignment is tracked for, one
 /// each (the lowering's own cap, `decl.array_cells_max`).
@@ -128,7 +130,7 @@ const Walk = struct {
                 const x = decl.payloadOf(vir, Inst.Bin, i);
                 try w.read(x.rhs, 0);
                 try w.subscripts(x.lhs);
-                if (target(vir, x.lhs)) |t| {
+                if (held_writes.target(vir, x.lhs)) |t| {
                     try w.write(t.var_);
                     if (t.whole) try w.def(.{ .var_ = t.var_ }) else if (try w.elemOf(x.lhs)) |k| try w.def(.{ .var_ = t.var_, .elem = k });
                 }
@@ -240,7 +242,7 @@ const Walk = struct {
                 // Written but not defined, as in the old walk (whose
                 // `stmtEdges` sees a task's arguments only as reads): a
                 // later read is exposed, so the destination is held.
-                if (target(vir, a)) |t| try w.write(t.var_);
+                if (held_writes.target(vir, a)) |t| try w.write(t.var_);
             }
             return;
         };
@@ -251,7 +253,7 @@ const Walk = struct {
             return;
         }
         // An element at constant subscripts reads that element alone.
-        if (tag == .elem) if (target(vir, r)) |t| {
+        if (tag == .elem) if (held_writes.target(vir, r)) |t| {
             try w.subscripts(r);
             if (!try w.defined(t.var_, try w.elemOf(r))) try w.exposed(t.var_);
             return;
@@ -348,9 +350,6 @@ const Walk = struct {
     }
 };
 
-/// The variable an assignment writes, and whether it writes all of it.
-const Target = struct { var_: Inst.Index, whole: bool };
-
 /// Fills `unit.held` with every held variable of the instance's analog
 /// blocks, keyed by its declaration's first instruction.
 pub fn mark(s: *Sema, unit: *Unit) Allocator.Error!void {
@@ -359,7 +358,7 @@ pub fn mark(s: *Sema, unit: *Unit) Allocator.Error!void {
     for (vir.body(unit.module.body)) |i| {
         const tag = vir.instructions.items(.tag)[@backingInt(i)];
         if (tag != .analog and tag != .analog_initial) continue;
-        try eventWrites(s, unit, decl.payloadOf(vir, Inst.Process, i).body, false, 0);
+        try held_writes.eventWrites(s, unit, decl.payloadOf(vir, Inst.Process, i).body, false, 0);
     }
     var w: Walk = .{ .s = s, .unit = unit };
     for (vir.body(unit.module.body)) |i| {
@@ -399,54 +398,6 @@ fn writtenFrom(vir: *const Vir, i: Inst.Index) ?usize {
         .{ "$ferror", 1 },
     });
     return table.get(name);
-}
-
-fn target(vir: *const Vir, r: Inst.Ref) ?Target {
-    var at = r;
-    var whole = true;
-    for (0..depth_max) |_| {
-        const i = at.toIndex() orelse return null;
-        switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-            .decl_ref => {
-                const k = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl);
-                if (vir.instructions.items(.tag)[@backingInt(k)] != .variable) return null;
-                return .{ .var_ = k, .whole = whole };
-            },
-            .elem, .slice, .slice_up, .slice_down => {
-                whole = false;
-                at = if (vir.instructions.items(.tag)[@backingInt(i)] == .elem) decl.payloadOf(vir, Inst.Bin, i).lhs else decl.payloadOf(vir, Inst.Triple, i).a;
-            },
-            else => return null, // else: no variable is written
-        }
-    }
-    return null;
-}
-
-/// Every write inside an `@(...)` body is held (`event`).
-fn eventWrites(s: *Sema, unit: *Unit, b: Vir.Body, in_event: bool, depth: u32) Allocator.Error!void {
-    if (depth > depth_max) return;
-    const vir = unit.vir;
-    for (vir.body(b)) |i| {
-        const tag = vir.instructions.items(.tag)[@backingInt(i)];
-        switch (tag) {
-            .store, .store_nb => if (in_event) if (target(vir, decl.payloadOf(vir, Inst.Bin, i).lhs)) |t| try unit.held.put(s.arena, t.var_, .event),
-            .block => try eventWrites(s, unit, decl.payloadOf(vir, Inst.Block, i).body, in_event, depth + 1),
-            .condbr => {
-                const x = decl.payloadOf(vir, Inst.CondBr, i);
-                try eventWrites(s, unit, x.then, in_event, depth + 1);
-                try eventWrites(s, unit, x.@"else", in_event, depth + 1);
-            },
-            .case => for (vir.list(Inst.Arm, decl.payloadOf(vir, Inst.Case, i).arms)) |arm| try eventWrites(s, unit, arm.body, in_event, depth + 1),
-            .loop => {
-                const x = decl.payloadOf(vir, Inst.Loop, i);
-                try eventWrites(s, unit, x.body, in_event, depth + 1);
-                try eventWrites(s, unit, x.step, in_event, depth + 1);
-            },
-            .repeat => try eventWrites(s, unit, decl.payloadOf(vir, Inst.Repeat, i).body, in_event, depth + 1),
-            .event_wait => try eventWrites(s, unit, decl.payloadOf(vir, Inst.EventWait, i).body, true, depth + 1),
-            else => {}, // else: no other statement holds a body
-        }
-    }
 }
 
 /// Every instruction `i` reads as an operand (control.zig's walk).

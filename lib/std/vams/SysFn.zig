@@ -16,8 +16,10 @@
 //! Contents:
 //! - `pub const Tag = enum(u8)` (`fromName`)
 //! - `pub const Ty`, `pub const Arity` (`exactly`, `admits`), `pub const Family`, `pub const Context`, `pub const Math`
+//! - `pub const no_arg`, `pub const Writes = packed struct(u8)` (`has`)
 //! - `pub const Info = struct`
 //! - `pub const foreign: std.StaticStringMap(Context)`
+//! - `pub const reserved: std.StaticStringMap(void)`
 //! - `pub const table: std.EnumArray(Tag, Info)`
 //! - `pub fn get(tag: Tag) *const Info`
 //! - `pub const simparam_names`, `pub const simparam_str_names`
@@ -296,6 +298,23 @@ pub const Context = enum(u8) { both, analog, digital, connect };
 /// §4.3 the math functions a call computes, one per Table 4-14/4-15 row.
 pub const Math = enum(u8) { sqrt, exp, expm1, ln, ln1p, log10, pow, hypot, floor, ceil, abs, min, max, sin, cos, tan, asin, acos, atan, atan2, sinh, cosh, tanh, asinh, acosh, atanh };
 
+/// The argument position that names no argument (`Writes.first`, `Info.fd`).
+pub const no_arg: u7 = std.math.maxInt(u7);
+
+/// The arguments a call writes back to its caller's variables (§9.5.3,
+/// §9.5.4, §9.12, §9.13 seeds): argument `first`, and with `rest` every
+/// argument after it too. `first == no_arg` writes none.
+pub const Writes = packed struct(u8) {
+    first: u7 = no_arg,
+    rest: bool = false,
+
+    /// Whether argument `i` is a destination.
+    pub fn has(w: Writes, i: usize) bool {
+        assert(w.first != no_arg or !w.rest);
+        return w.first != no_arg and (i == w.first or (w.rest and i > w.first));
+    }
+};
+
 /// One row of `table`.
 pub const Info = struct {
     ty: Ty,
@@ -304,6 +323,11 @@ pub const Info = struct {
     context: Context = .both,
     /// The §4.3 function a `math` row computes.
     math: ?Math = null,
+    /// The arguments the call writes.
+    writes: Writes = .{},
+    /// §9.5.1/§9.5.2 the position of the descriptor argument, "a 32-bit
+    /// integer" (E0888 otherwise), or `no_arg`.
+    fd: u7 = no_arg,
 };
 
 /// The calls of the other contexts no row names, by spelling: §9.2 Tables
@@ -328,6 +352,25 @@ pub const foreign = std.StaticStringMap(Context).initComptime(pairs(.digital, &.
     "$driver_count", "$receiver_count",    "$driver_state",         "$driver_strength",
     "$driver_delay", "$driver_next_state", "$driver_next_strength", "$driver_type",
 }));
+
+/// The `$` spellings the old lowering minted for its own rewrites
+/// (`src/ir/callee.zig` `Callee.synthetic`, `$held_int` through
+/// `$systf$out`): no source may call one (E1014), though none has a `Tag`.
+pub const reserved = std.StaticStringMap(void).initComptime(.{
+    .{"$held_int"},             .{"$held_real"},     .{"$held_str"},           .{"$tp_hit"},
+    .{"$tp_int"},               .{"$tp_real"},       .{"$wide"},               .{"$wide$int"},
+    .{"$held_wide"},            .{"$tp_wide"},       .{"$limit$old"},          .{"$limit$uf"},
+    .{"$idx"},                  .{"$idx$int"},       .{"$idx$str"},            .{"$display$width"},
+    .{"$monitor$arm"},          .{"$fgets$str"},     .{"$ferror$str"},         .{"$fscanf$int"},
+    .{"$fscanf$real"},          .{"$fscanf$str"},    .{"$sscanf$int"},         .{"$sscanf$real"},
+    .{"$sscanf$str"},           .{"$sformat$rt"},    .{"$plusarg$str"},        .{"$str$cat"},
+    .{"$str$repeat"},           .{"$rng$auto"},      .{"$rng$check"},          .{"$rng$rand"},
+    .{"$rng$rand_next"},        .{"$rng$i_uniform"}, .{"$rng$i_uniform_next"}, .{"$rng$uniform"},
+    .{"$rng$uniform_next"},     .{"$rng$normal"},    .{"$rng$normal_next"},    .{"$rng$exponential"},
+    .{"$rng$exponential_next"}, .{"$rng$poisson"},   .{"$rng$poisson_next"},   .{"$rng$chi_square"},
+    .{"$rng$chi_square_next"},  .{"$rng$t"},         .{"$rng$t_next"},         .{"$rng$erlang"},
+    .{"$rng$erlang_next"},      .{"$systf$out"},
+});
 
 /// Per-tag facts, total over `Tag`.
 pub const table = std.EnumArray(Tag, Info).init(.{
@@ -403,7 +446,7 @@ pub const table = std.EnumArray(Tag, Info).init(.{
     .@"$analog_node_alias" = query(.int, .exactly(2)),
     .@"$analog_port_alias" = query(.int, .exactly(2)),
     .@"$test$plusargs" = query(.int, .exactly(1)),
-    .@"$value$plusargs" = query(.int, .exactly(2)),
+    .@"$value$plusargs" = .{ .ty = .int, .args = .exactly(2), .family = .query, .writes = .{ .first = 1 } },
     .@"$xposition" = query(.real, .exactly(0)),
     .@"$yposition" = query(.real, .exactly(0)),
     .@"$angle" = query(.real, .exactly(0)),
@@ -461,23 +504,23 @@ pub const table = std.EnumArray(Tag, Info).init(.{
     .@"$finish" = .{ .ty = .none, .args = .{ .max = 1 }, .family = .simctl },
     .@"$stop" = .{ .ty = .none, .args = .{ .max = 1 }, .family = .simctl },
     .@"$fopen" = .{ .ty = .int, .args = .{ .min = 1, .max = 2 }, .family = .file_func },
-    .@"$fclose" = .{ .ty = .none, .args = .exactly(1), .family = .file_out },
-    .@"$fflush" = .{ .ty = .none, .args = .{ .max = 1 }, .family = .file_out },
+    .@"$fclose" = .{ .ty = .none, .args = .exactly(1), .family = .file_out, .fd = 0 },
+    .@"$fflush" = .{ .ty = .none, .args = .{ .max = 1 }, .family = .file_out, .fd = 0 },
     .@"$fdisplay" = file_out,
     .@"$fwrite" = file_out,
     .@"$fstrobe" = file_out,
     .@"$fmonitor" = file_out,
     .@"$fdebug" = file_out,
-    .@"$fgets" = .{ .ty = .int, .args = .exactly(2), .family = .file_func },
-    .@"$fscanf" = .{ .ty = .int, .args = .{ .min = 2 }, .family = .file_func },
-    .@"$ftell" = .{ .ty = .int, .args = .exactly(1), .family = .file_func },
-    .@"$fseek" = .{ .ty = .int, .args = .exactly(3), .family = .file_func },
-    .@"$rewind" = .{ .ty = .int, .args = .exactly(1), .family = .file_func },
-    .@"$ferror" = .{ .ty = .int, .args = .exactly(2), .family = .file_func },
-    .@"$feof" = .{ .ty = .int, .args = .exactly(1), .family = .file_func },
-    .@"$sformat" = .{ .ty = .none, .args = .{ .min = 2 }, .family = .string },
-    .@"$swrite" = .{ .ty = .none, .args = .{ .min = 1 }, .family = .string },
-    .@"$sscanf" = .{ .ty = .int, .args = .{ .min = 2 }, .family = .string },
+    .@"$fgets" = .{ .ty = .int, .args = .exactly(2), .family = .file_func, .writes = .{ .first = 0 }, .fd = 1 },
+    .@"$fscanf" = .{ .ty = .int, .args = .{ .min = 2 }, .family = .file_func, .writes = .{ .first = 2, .rest = true }, .fd = 0 },
+    .@"$ftell" = .{ .ty = .int, .args = .exactly(1), .family = .file_func, .fd = 0 },
+    .@"$fseek" = .{ .ty = .int, .args = .exactly(3), .family = .file_func, .fd = 0 },
+    .@"$rewind" = .{ .ty = .int, .args = .exactly(1), .family = .file_func, .fd = 0 },
+    .@"$ferror" = .{ .ty = .int, .args = .exactly(2), .family = .file_func, .writes = .{ .first = 1, .rest = true }, .fd = 0 },
+    .@"$feof" = .{ .ty = .int, .args = .exactly(1), .family = .file_func, .fd = 0 },
+    .@"$sformat" = .{ .ty = .none, .args = .{ .min = 2 }, .family = .string, .writes = .{ .first = 0 } },
+    .@"$swrite" = .{ .ty = .none, .args = .{ .min = 1 }, .family = .string, .writes = .{ .first = 0 } },
+    .@"$sscanf" = .{ .ty = .int, .args = .{ .min = 2 }, .family = .string, .writes = .{ .first = 2, .rest = true } },
     .@"$random" = random(.int, .{ .max = 2 }),
     .@"$arandom" = random(.int, .{ .max = 3 }),
     .@"$dist_uniform" = random(.int, .{ .min = 3, .max = 4 }),
@@ -527,7 +570,7 @@ pub const simparam_str_names = std.StaticStringMap(void).initComptime(.{
 
 const display: Info = .{ .ty = .none, .family = .display };
 
-const file_out: Info = .{ .ty = .none, .args = .{ .min = 1 }, .family = .file_out };
+const file_out: Info = .{ .ty = .none, .args = .{ .min = 1 }, .family = .file_out, .fd = 0 };
 
 /// Returns `tag`'s row.
 pub fn get(tag: Tag) *const Info {
@@ -565,18 +608,23 @@ fn convert(ty: Ty) Info {
 }
 
 fn random(ty: Ty, args: Arity) Info {
-    return .{ .ty = ty, .args = args, .family = .random };
+    return .{ .ty = ty, .args = args, .family = .random, .writes = .{ .first = 0 } };
 }
 
 // Every row agrees with its family: a math row names its function, and
-// only a math row does; an arity's bounds are ordered.
+// only a math row does; only a §9.5 row has a descriptor; a written or
+// descriptor argument is one the arity admits.
 comptime {
     @setEvalBranchQuota(20_000);
     assert(@sizeOf(Tag) == 1);
+    assert(@sizeOf(Writes) == 1);
     for (std.enums.values(Tag)) |t| {
         const info = table.get(t);
         assert(info.args.min <= info.args.max);
         assert((info.family == .math) == (info.math != null));
+        assert(info.fd == no_arg or info.family == .file_out or info.family == .file_func);
+        assert(info.fd == no_arg or info.fd < info.args.max);
+        assert(info.writes.first == no_arg or info.writes.first < info.args.max);
     }
 }
 
@@ -589,4 +637,31 @@ test "fromName: a listed spelling is its tag, any other is a user system functio
     try std.testing.expectEqual(Math.log10, get(.@"$log10").math.?);
     try std.testing.expect(get(.@"$strobe").args.admits(7));
     try std.testing.expect(!get(.sqrt).args.admits(2));
+}
+
+test "Writes and fd: the old held walk's and callee table's positions" {
+    // Oracle: `src/Sema/held.zig` `writtenFrom` and `src/ir/callee_table.zig`
+    // `.fd`, copied as data (lib/std/vams imports neither).
+    const writes = [_]struct { Tag, u7 }{
+        .{ .@"$sformat", 0 },        .{ .@"$swrite", 0 }, .{ .@"$fgets", 0 },  .{ .@"$sscanf", 2 },
+        .{ .@"$fscanf", 2 },         .{ .@"$ferror", 1 }, .{ .@"$random", 0 }, .{ .@"$rdist_t", 0 },
+        .{ .@"$value$plusargs", 1 },
+    };
+    for (writes) |w| {
+        try std.testing.expect(get(w[0]).writes.has(w[1]));
+        if (w[1] > 0) try std.testing.expect(!get(w[0]).writes.has(w[1] - 1));
+    }
+    try std.testing.expect(get(.@"$sscanf").writes.has(9));
+    try std.testing.expect(!get(.@"$fgets").writes.has(1));
+    try std.testing.expect(!get(.@"$display").writes.has(0));
+    try std.testing.expectEqual(@as(u7, 1), get(.@"$fgets").fd);
+    try std.testing.expectEqual(@as(u7, 0), get(.@"$fwrite").fd);
+    try std.testing.expectEqual(@as(u7, 0), get(.@"$ferror").fd);
+    try std.testing.expectEqual(no_arg, get(.@"$fopen").fd);
+    try std.testing.expectEqual(no_arg, get(.@"$sscanf").fd);
+    try std.testing.expect(reserved.has("$held_real"));
+    try std.testing.expect(reserved.has("$display$width"));
+    try std.testing.expect(!reserved.has("$display"));
+    try std.testing.expectEqual(@as(usize, 50), reserved.keys().len);
+    for (reserved.keys()) |k| try std.testing.expectEqual(@as(?Tag, null), Tag.fromName(k));
 }

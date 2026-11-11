@@ -13,8 +13,9 @@
     `updateState`/`acceptQ` (`w_update`) or `stateCtl` (`w_commit`) writes
     it. A host that recorded a linearization can key it on the fields with
     `res` or `jac` only, and re-read the charge on a hit: a field that
-    feeds only the charges (a path latch rewritten on every accepted step)
-    then no longer invalidates the recording.
+    feeds only the charges then no longer invalidates the recording (BSIM4's
+    ten `pb__*`/`pq__*` path latches are `q` and `w_commit` only, while a
+    latch multiplied by a voltage, as in MOS2, also carries `jac`).
   - `limit_sim_reads`: which `SimState` fields (`t`, `dt`, `iteration`)
     `limit` reads, as `sim_reads` does for `eval`, `q` and `evalQ`.
   Both are supersets: a device without them reads as every bit set, so an

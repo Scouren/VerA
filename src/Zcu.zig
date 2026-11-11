@@ -242,8 +242,13 @@ pub const Hier = std.EnumArray(SystemParam, InternPool.Index);
 pub const Defparam = struct { instance: Instance.Index, name: InternPool.String };
 
 /// A §6.3.1 defparam as written: its `defparam` instruction `src` of file
-/// `file`, and the hierarchical path of the instance writing it.
-pub const DefparamSource = struct { file: File.Index, src: Vir.Inst.Ref, writer: InternPool.String };
+/// `file`, the hierarchical path of the instance writing it (`writer`), and
+/// that instance itself (`writer_instance`). `derive.zig` re-derives the
+/// row this targets by re-lowering `src`'s right-hand side in
+/// `writer_instance`'s own scope (Zig's Sema keeps the ZIR instruction and
+/// re-analyses it rather than a pre-folded value): a host override of a
+/// parameter the defparam's expression reads then still reaches the row.
+pub const DefparamSource = struct { file: File.Index, src: Vir.Inst.Ref, writer: InternPool.String, writer_instance: Instance.Index };
 
 /// A net of an instance, by name.
 pub const NetKey = struct { instance: Instance.Index, net: InternPool.String };

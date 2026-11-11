@@ -641,3 +641,12 @@ Each emitted Instance/State struct keeps the existing `comptime assert(@sizeOf(.
   re-analyses it; it does not store a pre-folded value), and `derive.zig:125`
   re-derives the row through `expression(s, writer_unit, row, body)` instead of
   skipping it. Files: `src/Zcu.zig`, `src/Sema/defparam.zig`, `src/Sema/derive.zig`.
+- **T38 — array parameters are never re-derived (wrong number, found by w3-codegen).**
+  `dependent_control_host.va`: `parameter integer values[2:1] = '{choice ? 11 : 13, both ? 29 : 31};`
+  folds once at the defaults and a host override of `first`/`second` leaves
+  `values[1]` at 31 where the old device gives 29 (point 4). `derive.zig`'s
+  `rowOf()` returns a row only for `bind == .param`; `scope()`/`child()` skip an
+  array bind, so no array-parameter row enters the derive pipeline. Fix: give
+  each array-parameter element a derive row the same way a scalar gets one.
+  Oracle: diff-codegen bit for bit on `dependent_control_host.va`. Wave 4, same
+  agent as T5-W12 (both in `src/Sema/derive.zig`).

@@ -5,13 +5,8 @@
 # transcript difference. A listed fixture that agrees fails the run until its
 # line goes.
 verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v old run failed (E1100: §3.8: an attribute value must be a constant expression), new run completed
-verilog/03_lexical_conventions/escaped_system_task_rejected.v lowering: a hierarchical task or function name
-verilog/05_expressions/native_wide_index_bound_limit.v lowering: a constant expression Sema/eval.zig does not fold (an x/z bit, past 64 bits, a select or a call)
-verilog/10_tasks_functions/constant_function_hierarchical_rejected.v old run failed (E1100: §10.4.5: a function called during elaboration is a constant function, and it contains a hierarchical reference), new run completed
 verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v old run failed (E1100: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element it is in), new run completed
 verilog/12_hierarchy/defparam_across_generate_instances_rejected.v old run failed (E1100: §12.2.1: a defparam inside `somename[0]` cannot change a parameter outside the generate block instance or array element it is in), new run completed
-verilog/12_hierarchy/port_width_mismatch_vams_rejected.v old run failed (E1100: §6.5.7.1: the sizes of the port and the net connected to it shall match), new run completed
-verilog/12_hierarchy/unnamed_block_referenced_rejected.v old run failed (E1100: undeclared instance in a hierarchical reference), new run completed
 verilog/13_configuration/cell_not_in_its_library_rejected.v old run failed (E1100: undeclared module in instantiation: library `gateLib` holds no cell `top`), new run completed
 verilog/13_configuration/config_in_map_rejected.v a `//@` line the cli refuses
 verilog/13_configuration/design_cell_missing_rejected.v old run failed (E1100: undeclared module in instantiation: library `work` holds no cell `missing`), new run completed
@@ -20,9 +15,5 @@ verilog/13_configuration/library_without_path_rejected.v a `//@` line the cli re
 verilog/13_configuration/source_text_in_map_rejected.v a `//@` line the cli refuses
 verilog/13_configuration/two_libraries_match_rejected.v a `//@` line the cli refuses
 verilog/13_configuration/undeclared_library_rejected.v old run failed (E1100: undeclared module in instantiation: no library of the search order (nosuch) holds cell `adder`), new run completed
-verilog/18_vcd/dumpports_duplicate_scope_rejected.v old run failed (E1100: §18.3.1: each $dumpports scope shall be unique), new run completed
-verilog/18_vcd/dumpports_variable_scope_rejected.v old run failed (E1100: §18.3.1: a $dumpports scope is a module instance: only modules are allowed, not variables), new run completed
-verilog/19_compiler_directives/timescale_inside_module_rejected.v old run failed (E1100: §19.8: a `timescale directive is written outside a module definition, not inside one), new run completed
 verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v a `//@` line the cli refuses
 verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v a `//@` line the cli refuses
-verilog-ams/digital/vams_digital_temperature_refused.v lowering: the system function `$temperature`

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run `zig build` for one worktree under the machine-wide build slots (AGENTS.md, Building with
 # many agents). A corpus step (diff-*, rewrite, test-comp, test-unit, bench-*, suite, ...) peaks
-# near 7.5 GB and takes one of two slots, at -j2 unless the caller passes -j. `check` and
+# near 7.5 GB and takes one of two slots, at -j2 unless the caller passes -j. `check`, `check-<module>` and
 # `test-<module>` (1-2 GB) run at once. Usage: tools/build-slot.sh <worktree> <zig build args...>
 set -u
 wt=$1; shift
@@ -10,7 +10,7 @@ light=1 jobs=-j2
 for a in "$@"; do
   case $a in
     -j*) jobs= ;;
-    -*|check|test-sema|test-vams|test-air|test-std_sim|test-std_kernels|test-intern_pool|test-link|test-codegen) ;;
+    -*|check|check-*|test-sema|test-vams|test-air|test-std_sim|test-std_kernels|test-intern_pool|test-link|test-codegen) ;;
     *) light=0 ;;
   esac
 done

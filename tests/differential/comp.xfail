@@ -172,7 +172,6 @@ verilog-a/ch03_data_types/ddt_nature_undeclared_rejected.va rw-lower (analog low
 verilog-a/ch03_data_types/ddt_nature_unrelated_to_default_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch03_data_types/ddt_nature_unrelated_to_default_rejected.va:58:5`, new `  --> verilog-a/ch03_data_types/ddt_nature_unrelated_to_default_rejected.va:57:1`
 verilog-a/ch03_data_types/ddt_nature_unrelated_to_explicit_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch03_data_types/ddt_nature_unrelated_to_explicit_rejected.va:36:5`, new `  --> verilog-a/ch03_data_types/ddt_nature_unrelated_to_explicit_rejected.va:35:1`
 verilog-a/ch03_data_types/dependent_control_clog2.va rw-lower (analog lowering): stderr: line 4: old `§6.3.4 size follows the overridden amount: $clog2(5) got=          3 want=          3 ok=1`, new `§6.3.4 size follows the overridden amount: $clog2(5) got=          1 want=          3 ok=0`
-verilog-a/ch03_data_types/dependent_control_host.va rw-lower (analog lowering): stderr: line 3: old `both changed from false to true got=          1 want=          1 ok=1`, new `both changed from false to true got=          0 want=          1 ok=0`
 verilog-a/ch03_data_types/dependent_control_unknown_local.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch03_data_types/derived_access_immutable.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch03_data_types/derived_access_immutable.va:16:44`, new `  --> verilog-a/ch03_data_types/derived_access_immutable.va:16:1`
 verilog-a/ch03_data_types/derived_units_immutable.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch03_data_types/derived_units_immutable.va:14:42`, new `  --> verilog-a/ch03_data_types/derived_units_immutable.va:14:1`
@@ -1650,25 +1649,9 @@ verilog/09_behavioral_modeling/forever_without_timing_rejected.v rw-dlower (digi
 verilog/09_behavioral_modeling/zero_delay_always_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/09_behavioral_modeling/zero_delay_always_rejected.v:14:1`, new `  = note: LRM 8.5`
 verilog/10_tasks_functions/recursion_without_end_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: nesting here exhausts the 1987 MiB stack VerA reserved for it`, new `error[E1100]: digital source execution failed: §10.4.2: subroutine calls nested past 20000 activations`
 verilog/11_scheduling/zero_delay_loop_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/11_scheduling/zero_delay_loop_rejected.v:16:1`, new `  = note: LRM 8.5`
-verilog/13_configuration/cell_not_in_its_library_rejected.v not built: backend libmap
-verilog/13_configuration/cfg1_default_liblist.v not built: backend libmap
-verilog/13_configuration/cfg2_gate_first.v not built: backend libmap
-verilog/13_configuration/cfg3_cell_use.v not built: backend libmap
-verilog/13_configuration/cfg4_instance_liblist.v not built: backend libmap
-verilog/13_configuration/cfg6_hierarchical.v not built: backend libmap
-verilog/13_configuration/command_line_search_order.v not built: backend libmap
-verilog/13_configuration/config_in_map_rejected.v not built: backend libmap
-verilog/13_configuration/config_overrides_command_line.v not built: backend libmap
-verilog/13_configuration/default_search_order.v not built: backend libmap
+verilog/13_configuration/cell_not_in_its_library_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/design_cell_missing_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/design_names_config_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/13_configuration/include_map.v not built: backend libmap
-verilog/13_configuration/library_without_path_rejected.v not built: backend libmap
-verilog/13_configuration/parent_library_by_map.v not built: backend libmap
-verilog/13_configuration/resolution_order.v not built: backend libmap
-verilog/13_configuration/source_text_in_map_rejected.v not built: backend libmap
-verilog/13_configuration/two_libraries_match_rejected.v not built: backend libmap
-verilog/13_configuration/undeclared_library_rejected.v not built: backend libmap
 verilog/15_timing_checks/conditions.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$setup` in b_15_6_conditions.u: timestamp event at 20, timecheck event at 22`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/fullskew_checks_both_orders.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$fullskew` in fullskew_checks_both_orders.forward: timestamp event at 10, timecheck event at 13`, new `warning[W1199]: timing violation: a timing check reported a violation`
 verilog/15_timing_checks/hold.v rw-dlower (run) message: stderr: line 1: old `warning[W1199]: timing violation: `$hold` in b_15_2_2_hold.u: timestamp event at 10, timecheck event at 10`, new `warning[W1199]: timing violation: a timing check reported a violation`
@@ -1730,10 +1713,6 @@ verilog/17_system_tasks/sformat_excess_argument_warning.v rw-dlower (run) locati
 verilog/17_system_tasks/stop_suspends.v rw-dlower (digital lowering): stderr: line 1: old `$stop at tick 1, verilog/17_system_tasks/stop_suspends.v byte 107`, new `$stop at tick 1, verilog/17_system_tasks/stop_suspends.v byte 797`
 verilog/18_vcd/dumpports_same_file_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/18_vcd/dumpports_same_file_rejected.v:28:19`, new `  = note: LRM 8.5`
 verilog/18_vcd/dumpvars_later_time_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/18_vcd/dumpvars_later_time_rejected.v:11:8`, new `  = note: LRM 8.5`
-verilog/A_formal_syntax/b_A_1_1_incdir.v not built: backend libmap
-verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v not built: backend libmap
-verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v not built: backend libmap
-verilog/A_formal_syntax/b_A_1_1_library_text.v not built: backend libmap
 verilog/pli/analog_attributes.c not built: backend vpi
 verilog/pli/argument_handle_delays_evaluation.c not built: backend vpi
 verilog/pli/argument_handle_delays_evaluation.v not built: backend vpi

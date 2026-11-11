@@ -326,22 +326,20 @@ pub const Task = union(enum) {
 functions the device runs, so the fold oracle *is* the kernel. **Downstream:** ESPice must install
 `share/vera/kernels/` beside `contract/` (a pinned-consumer change; CONTRIBUTING's pin policy applies).
 
-**Emit LLVM directly?** Not first; later, as a second backend behind `codegen.zig`, never a replacement.
-- No libLLVM link needed: `zig cc -O2 -c t.ll` with the pinned toolchain compiles hand-written IR
-  (verified), and `std.zig.llvm.Builder` (pure-Zig bitcode writer, ~20k lines in std) is what Zig's own
-  `src/codegen/llvm.zig` uses.
-- "Lose Zig-specific optimizations" is mostly false: in ReleaseFast Zig's optimizer *is* LLVM.
-- Real gains: per-instruction fast-math flags (`nnan ninf contract`), finer than `@setFloatMode` per
-  scope, so the float verdict can relax per op; `DILocation` debug info that points at `.va` lines
-  (step through Verilog-A in gdb — the biggest debugging win available); no Zig analysis of the
-  generated text (compile time; unmeasured).
-- Real losses: Debug safety checks in generated devices (bounds, overflow, `unreachable`), readable
-  Zig goldens, free use of `lib/std/{kernels,contract,sim}` (they become a linked object with
-  hand-declared signatures).
-- Order: one Air + `codegen.zig` dispatch first (Zig itself keeps `codegen/c.zig` and `codegen/llvm.zig`
-  side by side over one Air); keep the Zig-text backend as the oracle; add `codegen/llvm/`; run both
-  over the conformance suite; switch the default only on measured numbers (`zig build-obj` time per
-  device vs `zig cc` on `.ll`, device speed with per-op flags).
+**Emit LLVM directly?** No. Decision (user, 2026-11-11): VerA emits Zig only; `codegen/zig` is
+the one device backend and there is no `codegen/llvm/`. The facts that decided it
+(research/builds.md):
+- A device build's time is LLVM's, and an LLVM backend still runs LLVM. A diff-codegen batch
+  (24 devices, 1.05 MB) spends 0.95-1.49 s of 1.38-1.94 s in LLVM emission; the 9.7 MB device
+  spends about 1,200 s optimising one function against 6.7 s of Zig front end. The fix is the
+  device's shape (codegen T40), which no backend choice gives.
+- Devices are generic over the host's `comptime S` (§7 above); LLVM IR is not, so the contract
+  would become a C ABI with `kernels`, `contract` and `sim` as a linked object: a consumer break.
+- Debug devices keep Zig's safety checks and the self-hosted backend (5.6× faster than LLVM in
+  Debug, a third of the memory).
+- Given up: per-instruction fast-math flags (`nnan ninf` without `contract`/`reassoc`; Zig's
+  `@setFloatMode(.optimized)` sets all four per scope) and `DILocation` pointing at `.va` lines.
+  Revisit only with a measurement that shows either worth a second backend.
 
 ## 8. The digital side and VPI
 
@@ -406,7 +404,7 @@ emitted text + full diagnostic stream). **B** = re-baselined goldens, held by co
 | 9 | Kernels as a shipped module/object; device text loses ~31 KB each; per-part objects | B (device text changes) + ESPice coordination | medium |
 | 10 | Structured Air (`prove` step B); delete the relooper | B | large |
 | 11 | One runtime `sim.State`; `vpi.Table` emitter; translate-c for `vpi_user.h` | G for run transcripts, B for VPI layout | large |
-| 12 | Optional `codegen/llvm/` behind the dispatch, compared against the Zig-text backend | differential, both backends | later |
+| 12 | ~~Optional `codegen/llvm/`~~ dropped (user, 2026-11-11: Zig only; §7) | — | — |
 
 Steps 1-3 change no data shapes and can start now. 5 must precede 6 (fusing removes the reason
 for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
@@ -447,7 +445,8 @@ for cloning; Vir then adds caching). 7 depends on 5. 10 depends on 8.
    input box it assumed, and codegen emits a **versioned unit** (an entry check of the box, then
    the fast-math body, else the strict body), so the fast path's precondition is checked. Per-op
    flags (`nnan`/`ninf` without `contract`/`reassoc`, which change rounding against `gm`'s
-   cross-target determinism) wait for the LLVM backend. A deliberate behaviour change: devices
+   cross-target determinism) have no route: Zig's `@setFloatMode` sets all four per scope, and
+   there is no LLVM backend (§7, user 2026-11-11). A deliberate behaviour change: devices
    re-baselined with §11.3's. The old pipeline keeps the unsound rule until the switch-over.
    Spec: `docs/rewrite/float-guard.md`.
    **Measured (2026-11-06, `zig build bench-fast`).** `@setFloatMode` reaches only its own

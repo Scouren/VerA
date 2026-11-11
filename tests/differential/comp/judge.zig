@@ -16,7 +16,8 @@
 //! - `pub fn run(arena: Allocator, io: Io, exe: []const u8, args: []const []const u8, work: []const u8, env: *const std.process.Environ.Map, exec: bool) !Run`
 //! - `pub fn runTwice(arena: Allocator, io: Io, exe: []const u8, args: []const []const u8, work: []const u8, env: *const std.process.Environ.Map, again: *const std.process.Environ.Map) ![2]Run`
 //! - `pub fn compare(arena: Allocator, old: Run, new: Run, digital: bool) !?[]const u8`
-//! - `pub fn notBuilt(new: Run) ?[]const u8`
+//! - `pub fn notBuilt(arena: Allocator, new: Run) !?[]const u8`
+//! - `pub fn buildFailed(new: Run) ?[]const u8`
 //! - `pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool) ![]const u8`
 
 const std = @import("std");
@@ -99,12 +100,28 @@ pub fn runTwice(arena: Allocator, io: Io, exe: []const u8, args: []const []const
     return runWith(arena, io, exe, args, work, env, true, again);
 }
 
-/// The backend `vera-next` named as not built (exit status 126), or null.
-pub fn notBuilt(new: Run) ?[]const u8 {
+/// "not built: " and the reason (`Outcome.not_built`'s text): the backend
+/// `vera-next` named (exit status 126), or null.
+pub fn notBuilt(arena: Allocator, new: Run) !?[]const u8 {
     if (new.status != not_built_status) return null;
-    const at = std.mem.find(u8, new.stderr, "(backend `") orelse return "driver";
+    const at = std.mem.find(u8, new.stderr, "(backend `") orelse return "backend driver";
     const rest = new.stderr[at + "(backend `".len ..];
-    return rest[0 .. std.mem.findScalar(u8, rest, '`') orelse rest.len];
+    const name = rest[0 .. std.mem.findScalar(u8, rest, '`') orelse rest.len];
+    return try std.fmt.allocPrint(arena, "backend {s}", .{name});
+}
+
+/// A `--emit-exe` build that failed after accepting the design: the
+/// driver's own "is an engine bug" marker (`next/Compilation/backend.zig`'s
+/// "the generated executable does not compile — this is an engine bug, not
+/// a problem with the design"), never a design-level refusal (a `//!
+/// reject` fixture's status is never this marker). Distinct from
+/// `notBuilt`'s status-126 "no backend": this build genuinely broke, and
+/// `runWith`'s same-binary-twice path (`runTwice`) duplicates one failed
+/// build into both runs, so it must never be left to compare as `agree`
+/// against itself.
+pub fn buildFailed(new: Run) ?[]const u8 {
+    if (std.mem.find(u8, new.stderr, "is an engine bug") == null) return null;
+    return "the generated executable does not compile (engine bug)";
 }
 
 /// Null when the runs agree on everything compared, else the first
@@ -429,6 +446,20 @@ test "owner: W0650 presence alone names no stage (J1); a code after the banner i
     const old: Run = .{ .status = 1, .stdout = "", .stderr = "warning[W0650]: x\n\n=== t ===\nerror[E0601]: y\n\n", .files = &.{} };
     const new: Run = .{ .status = 0, .stdout = "", .stderr = "=== t ===\n", .files = &.{} };
     try std.testing.expectEqualStrings("rw-codegen (run)", try owner(arena.allocator(), old, new, false));
+}
+
+test "buildFailed: the engine-bug marker is a failure, a clean run and a design refusal are not" {
+    // Oracle: the exact marker `next/Compilation/backend.zig` prints when
+    // `--emit-exe`'s generated executable fails to compile (grammar_
+    // nullable_statement.v's regression, exit status old 0 new 1, slipped
+    // past diff-native's agree-with-itself `@splat`); a plain design
+    // refusal's stderr never contains it.
+    const broken: Run = .{ .status = 1, .stdout = "", .stderr = "error: x.v: the generated executable does not compile — this is an engine bug, not a problem with the design:\nx.tb.zig:1:1: error: unused local constant\n", .files = &.{} };
+    try std.testing.expect(buildFailed(broken) != null);
+    const ok: Run = .{ .status = 0, .stdout = "/tmp/x\n", .stderr = "", .files = &.{} };
+    try std.testing.expect(buildFailed(ok) == null);
+    const refused: Run = .{ .status = 1, .stdout = "", .stderr = "error[E1234]: the design does something the LRM forbids\n", .files = &.{} };
+    try std.testing.expect(buildFailed(refused) == null);
 }
 
 test "dropped: a missing note line is not the display phase's" {

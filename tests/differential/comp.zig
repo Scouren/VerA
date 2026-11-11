@@ -198,7 +198,7 @@ fn worker(s: *Shared) void {
 /// it cannot build costs the old side nothing).
 fn one(arena: Allocator, s: *Shared, k: u32) !Outcome {
     const f = s.fixtures[k];
-    if (f.lang == .vpi) return .{ .not_built = "vpi" };
+    if (f.lang == .vpi) return .{ .not_built = "backend vpi" };
     const w_new = try std.fmt.allocPrint(arena, "{s}/{d}-n", .{ s.work, k });
     if (comptime std.mem.eql(u8, v_run.name, "native")) {
         const args: []const []const u8 = if (std.mem.startsWith(u8, f.rel, gen_prefix))
@@ -210,7 +210,11 @@ fn one(arena: Allocator, s: *Shared, k: u32) !Outcome {
         };
         // The interpreter's run is the oracle ("old"), the native one "new".
         const both = try judge.runTwice(arena, s.io, s.exe_new, args, w_new, s.env, s.env_interp);
-        if (judge.notBuilt(both[0])) |b| return .{ .not_built = b };
+        if (try judge.notBuilt(arena, both[0])) |b| return .{ .not_built = b };
+        // `runTwice`'s same-binary-twice path never ran when the build
+        // itself failed: both halves are one failed build, duplicated, and
+        // would otherwise `compare` as agreeing with itself.
+        if (judge.buildFailed(both[0])) |b| return .{ .not_built = b };
         const why = (try judge.compare(arena, both[1], both[0], true)) orelse return .agree;
         return .{ .differ = .{ .owner = "native", .why = why } };
     }
@@ -218,7 +222,7 @@ fn one(arena: Allocator, s: *Shared, k: u32) !Outcome {
     if (v_run.flag.len != 0) args[0] = v_run.flag;
     const exec = std.mem.eql(u8, v_run.flag, "--emit-exe");
     var new = try judge.run(arena, s.io, s.exe_new, args, w_new, s.env, exec);
-    if (judge.notBuilt(new)) |b| return .{ .not_built = b };
+    if (try judge.notBuilt(arena, new)) |b| return .{ .not_built = b };
     if (k % s.j1_every == 0) {
         const one_job = try std.mem.concat(arena, []const u8, &.{ &.{"--jobs=1"}, args });
         const again = try judge.run(arena, s.io, s.exe_new, one_job, w_new, s.env, exec);
@@ -266,7 +270,7 @@ fn report(arena: Allocator, io: Io, fixtures: []const Fixture, outcomes: []const
         const line: ?[]const u8 = switch (o) {
             .pending => unreachable, // Every worker finished its fixtures.
             .agree, .equivalent => null,
-            .not_built => |b| try std.fmt.allocPrint(arena, "not built: backend {s}", .{b}),
+            .not_built => |b| try std.fmt.allocPrint(arena, "not built: {s}", .{b}),
             .differ => |d| try std.fmt.allocPrint(arena, "{s}: {s}", .{ d.owner, d.why }),
             .nondeterministic => |w| try std.fmt.allocPrint(arena, "rw-comp (determinism): -j1 and -jN differ: {s}", .{w}),
             .ruled => unreachable, // Counted above.

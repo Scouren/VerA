@@ -18,7 +18,8 @@
 //! Cites no LRM clause: each code's catalogue row cites its own.
 //!
 //! Contents:
-//! - catalogue: `Code`, `Info`, `info`, `Severity` (`word`), `severityOf`
+//! - catalogue: `Code`, `Info`, `info`, `Severity` (`word`), `severityOf`,
+//!   `Spec` (`Kind`, `Standard`), `spec`, `Lookup`, `lookup`, `keyHasPrefix`
 //! - levels: `Level`, `Levels`
 //! - rows: `Stage`, `File`, `Loc` (`none`, `isNone`), `String`,
 //!   `MessageIndex`, `Header`, `Message` (`Tag`), `Label`, `Note` (`Kind`),
@@ -53,6 +54,19 @@ pub const Code = code.Code;
 pub const Info = code.Info;
 /// Returns a code's catalogue row with one indexed load.
 pub const info = code.info;
+/// Error or warning: what a kept diagnostic does to the compilation.
+pub const Severity = code.Severity;
+/// A code's clause key, kind (`Spec.Kind`), standard (`Spec.Standard`),
+/// clause and aliases.
+pub const Spec = code.Spec;
+/// Returns a code's `Spec` with one indexed load.
+pub const spec = code.spec;
+/// What a spelling from outside names: one code or a group.
+pub const Lookup = code.Lookup;
+/// Resolves a clause key or an E/W name to its code.
+pub const lookup = code.lookup;
+/// Returns true when a code's key starts with a prefix on a clause boundary.
+pub const keyHasPrefix = code.keyHasPrefix;
 
 /// What the user asked to do with a code: `--allow=`/`--warn=`/`--deny=`/
 /// `--forbid=`.
@@ -81,21 +95,6 @@ pub const didYouMean = suggest.didYouMean;
 pub const Nearest = suggest.Nearest;
 /// Longest name `editDistance` measures.
 pub const name_len_max = suggest.name_len_max;
-
-/// How a kept diagnostic affects the compilation: an `err` fails it. The
-/// code's first letter (`severityOf`), unless `--deny` promotes a warning.
-pub const Severity = enum(u1) {
-    err,
-    warning,
-
-    /// Returns the rendered word, also the JSON `level`.
-    pub fn word(self: Severity) []const u8 {
-        return switch (self) {
-            .err => "error",
-            .warning => "warning",
-        };
-    }
-};
 
 /// Which stage reported a diagnostic: the JSON `stage`. `run` is raised
 /// while a design runs, after it compiled, so the "could not compile"
@@ -224,13 +223,10 @@ comptime {
 
 const Diag = @This();
 
-/// Returns the severity the code's first letter carries (`W` a warning,
-/// `E` an error), so a code cannot change severity without changing name.
+/// Returns the catalogue row's severity, which the comptime check ties to
+/// the code's first letter (`W` a warning, `E` an error).
 pub fn severityOf(c: Code) Severity {
-    const name = @tagName(c);
-    assert(name.len == 5);
-    assert(name[0] == 'E' or name[0] == 'W');
-    return if (name[0] == 'W') .warning else .err;
+    return code.spec(c).severity;
 }
 
 /// Frees a bundle `Wip.toOwnedBundle` returned, with the same `gpa`.

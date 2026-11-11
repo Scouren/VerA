@@ -329,6 +329,53 @@ test "every citation is a clause, an annex, or an IEEE 1364-2005 clause; every c
     }
 }
 
+test "lookup: every code resolves by its name and by its key, round trip" {
+    for (std.enums.values(Code)) |c| {
+        try testing.expectEqual(Diag.Lookup{ .one = c }, Diag.lookup(@tagName(c)).?);
+        try testing.expectEqual(Diag.Lookup{ .one = c }, Diag.lookup(Diag.spec(c).key).?);
+        try testing.expect(Diag.keyHasPrefix(c, Diag.spec(c).key));
+    }
+    try testing.expect(Diag.lookup("e0415") == null);
+    try testing.expect(Diag.lookup("AMS-5.6.7.2") == null);
+    try testing.expect(Diag.lookup("") == null);
+}
+
+test "spec: rows as research/diagcodes-map.tsv gives them (§4.1 corrections included)" {
+    const s = Diag.spec(.E0415);
+    try testing.expectEqualStrings("AMS-5.6.7.2b", s.key);
+    try testing.expectEqual(Diag.Spec.Kind.rule, s.kind);
+    try testing.expectEqual(Diag.Spec.Standard.ams, s.std);
+    try testing.expectEqualStrings("5.6.7.2", s.clause);
+    try testing.expectEqualStrings("E0415", s.aliases[0]);
+    // E0101: `ifdef is IEEE 1364-2005 19.4, not AMS 10.5 (`lrm` keeps 10.5 until C6b).
+    try testing.expectEqual(Diag.Spec.Standard.v2005, Diag.spec(.E0101).std);
+    try testing.expectEqualStrings("19.4", Diag.spec(.E0101).clause);
+    try testing.expectEqualStrings("10.5", Diag.info(.E0101).lrm);
+    try testing.expectEqualStrings("AMS-A.4.1", Diag.spec(.E0246).also);
+    const w = Diag.spec(.W0650);
+    try testing.expectEqualStrings("lint-unproven-finite", w.key);
+    try testing.expectEqual(Diag.Severity.warning, w.severity);
+    const r = Diag.spec(.E0114);
+    try testing.expectEqual(Diag.Spec.Kind.retired, r.kind);
+    try testing.expectEqualStrings("E0114", r.key);
+    try testing.expectEqual(@as(usize, 0), r.aliases.len);
+    try testing.expectEqualStrings("unsup-osdi-reject-step", Diag.spec(.E1099).key);
+    try testing.expectEqual(Diag.Spec.Standard.none, Diag.spec(.E1099).std);
+}
+
+test "keyHasPrefix: a prefix matches on a clause boundary only" {
+    try testing.expect(Diag.keyHasPrefix(.E0415, "AMS-5.6"));
+    try testing.expect(Diag.keyHasPrefix(.E0415, "AMS-5.6.7.2"));
+    try testing.expect(Diag.keyHasPrefix(.E0415, "AMS-"));
+    try testing.expect(Diag.keyHasPrefix(.E0415, ""));
+    try testing.expect(!Diag.keyHasPrefix(.E0415, "AMS-5.6.7.2c"));
+    // E0115 is AMS-10.4f: `AMS-1` stops inside the number 10.
+    try testing.expect(Diag.keyHasPrefix(.E0115, "AMS-10"));
+    try testing.expect(Diag.keyHasPrefix(.E0115, "AMS-10."));
+    try testing.expect(!Diag.keyHasPrefix(.E0115, "AMS-1"));
+    try testing.expect(Diag.keyHasPrefix(.E1099, "unsup-"));
+}
+
 test "did you mean: transpositions are one edit, ties break on spelling" {
     try testing.expectEqual(@as(usize, 1), Diag.editDistance("abc", "acb", 4));
     try testing.expect(Diag.editDistance("abc", "zzzzzz", 2) > 2);

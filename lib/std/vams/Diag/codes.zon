@@ -6,12 +6,25 @@
 // its explain naming what replaced it. `Diag.zig` reifies `Code` from the
 // keys and fails the build on a malformed row.
 //
+// Each row's identity (research/diagcodes.md §3; rendered from C6b on):
+// `key`, the clause key (`AMS-5.6.7.2b`, `unsup-AMS-5.10.3.3a`,
+// `limit-files`; a retired row's key is its own name); `tag`, the
+// snake_case name source will use; `kind` (`Diag.Kind`); `std` and
+// `clause`, the clause it enforces or refuses, omitted when it has none;
+// optional `also`, a second clause (`AMS-A.4.1`); `severity = .warning`
+// on a W row. `code.zig` checks the key against its kind's grammar.
+//
 // Each row: `title`, the headline after `error[E0313]: ` (a lowercase noun
 // phrase, no trailing period); `lrm`, the clause it enforces (empty for an
 // engine limit); `explain`, the `--explain` prose, pre-wrapped at 76
 // columns and printed verbatim.
 .{
     .E0101 = .{
+        .key = "V2005-19.4a",
+        .tag = "unterminated_ifdef",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.4",
         .title = "unterminated `ifdef",
         .lrm = "10.5",
         .explain =
@@ -25,6 +38,11 @@
         ,
     },
     .E0102 = .{
+        .key = "AMS-2.4a",
+        .tag = "unterminated_block_comment",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "2.4",
         .title = "unterminated block comment",
         .lrm = "2.4",
         .explain =
@@ -37,6 +55,11 @@
         ,
     },
     .E0103 = .{
+        .key = "AMS-10a",
+        .tag = "expected_directive_macro_name_after",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10",
         .title = "expected a directive or macro name after '`'",
         .lrm = "10",
         .explain =
@@ -47,6 +70,11 @@
         ,
     },
     .E0104 = .{
+        .key = "V2005-19.4b",
+        .tag = "conditional_directive_requires_macro_name",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.4",
         .title = "conditional directive requires a macro name",
         .lrm = "10.5",
         .explain =
@@ -59,6 +87,11 @@
         ,
     },
     .E0105 = .{
+        .key = "V2005-19.4c",
+        .tag = "else_elsif_without_ifdef",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.4",
         .title = "`else / `elsif without `ifdef",
         .lrm = "10.5",
         .explain =
@@ -68,6 +101,11 @@
         ,
     },
     .E0106 = .{
+        .key = "V2005-19.4d",
+        .tag = "else_elsif_after_else",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.4",
         .title = "`else / `elsif after `else",
         .lrm = "10.5",
         .explain =
@@ -76,6 +114,11 @@
         ,
     },
     .E0107 = .{
+        .key = "V2005-19.4e",
+        .tag = "elsif_requires_macro_name",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.4",
         .title = "`elsif requires a macro name",
         .lrm = "10.5",
         .explain =
@@ -84,6 +127,11 @@
         ,
     },
     .E0108 = .{
+        .key = "V2005-19.4f",
+        .tag = "endif_without_ifdef",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.4",
         .title = "`endif without `ifdef",
         .lrm = "10.5",
         .explain =
@@ -93,6 +141,11 @@
         ,
     },
     .E0109 = .{
+        .key = "AMS-10.4a",
+        .tag = "define_requires_macro_name",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.4",
         .title = "`define requires a macro name",
         .lrm = "10.4",
         .explain =
@@ -107,6 +160,11 @@
         ,
     },
     .E0110 = .{
+        .key = "AMS-10.4b",
+        .tag = "malformed_formal_argument_list_define",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.4",
         .title = "malformed formal argument list for `define",
         .lrm = "10.4",
         .explain =
@@ -116,6 +174,11 @@
         ,
     },
     .E0111 = .{
+        .key = "AMS-10.4c",
+        .tag = "unterminated_formal_argument_list_define",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.4",
         .title = "unterminated formal argument list for `define",
         .lrm = "10.4",
         .explain =
@@ -126,6 +189,11 @@
         ,
     },
     .E0112 = .{
+        .key = "AMS-10.4d",
+        .tag = "expected_define_argument_list",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.4",
         .title = "expected ',' or ')' in `define argument list",
         .lrm = "10.4",
         .explain =
@@ -134,6 +202,11 @@
         ,
     },
     .E0113 = .{
+        .key = "AMS-10.4e",
+        .tag = "undef_requires_macro_name",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.4",
         .title = "`undef requires a macro name",
         .lrm = "10.4",
         .explain =
@@ -145,6 +218,9 @@
         ,
     },
     .E0114 = .{
+        .key = "E0114",
+        .tag = "E0114",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -155,6 +231,11 @@
         ,
     },
     .E0115 = .{
+        .key = "AMS-10.4f",
+        .tag = "undefined_macro",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.4",
         .title = "undefined macro",
         .lrm = "10.4",
         .explain =
@@ -172,6 +253,11 @@
         ,
     },
     .E0116 = .{
+        .key = "AMS-10.4g",
+        .tag = "function_like_macro_used_without",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.4",
         .title = "function-like macro used without an argument list",
         .lrm = "10.4",
         .explain =
@@ -181,6 +267,11 @@
         ,
     },
     .E0117 = .{
+        .key = "AMS-10.4h",
+        .tag = "macro_argument_count_mismatch",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.4",
         .title = "macro argument count mismatch",
         .lrm = "10.4",
         .explain =
@@ -191,6 +282,11 @@
         ,
     },
     .E0118 = .{
+        .key = "AMS-10.4i",
+        .tag = "recursive_macro_expansion",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.4",
         .title = "recursive macro expansion",
         .lrm = "10.4",
         .explain =
@@ -203,6 +299,11 @@
         ,
     },
     .E0119 = .{
+        .key = "limit-include-depth",
+        .tag = "limit_include_depth",
+        .kind = .limit,
+        .std = .ams,
+        .clause = "10.4",
         .title = "macro or `include nesting deeper than memory allows",
         .lrm = "10.4",
         .explain =
@@ -219,6 +320,11 @@
         ,
     },
     .E0120 = .{
+        .key = "AMS-10.4j",
+        .tag = "unterminated_macro_argument_list",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.4",
         .title = "unterminated macro argument list",
         .lrm = "10.4",
         .explain =
@@ -228,6 +334,11 @@
         ,
     },
     .E0121 = .{
+        .key = "V2005-19.5a",
+        .tag = "include_requires_file_name",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.5",
         .title = "`include requires a file name",
         .lrm = "10.3",
         .explain =
@@ -237,6 +348,11 @@
         ,
     },
     .E0122 = .{
+        .key = "V2005-19.5b",
+        .tag = "include_file_name_must_quoted",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.5",
         .title = "`include file name must be quoted",
         .lrm = "10.3",
         .explain =
@@ -247,6 +363,11 @@
         ,
     },
     .E0123 = .{
+        .key = "V2005-19.5c",
+        .tag = "unterminated_include_file_name",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.5",
         .title = "unterminated `include file name",
         .lrm = "10.3",
         .explain =
@@ -256,11 +377,21 @@
         ,
     },
     .E0124 = .{
+        .key = "V2005-19.5d",
+        .tag = "empty_include_file_name",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.5",
         .title = "empty `include file name",
         .lrm = "10.3",
         .explain = "`include \"\" names no file.",
     },
     .E0125 = .{
+        .key = "V2005-19.5e",
+        .tag = "include_cycle",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.5",
         .title = "`include cycle",
         .lrm = "10.3",
         .explain =
@@ -284,6 +415,11 @@
         ,
     },
     .E0126 = .{
+        .key = "V2005-19.5f",
+        .tag = "cannot_find_include_file",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.5",
         .title = "cannot find include file",
         .lrm = "10.3",
         .explain =
@@ -300,6 +436,11 @@
         ,
     },
     .E0127 = .{
+        .key = "AMS-10.2a",
+        .tag = "malformed_default_discipline_qualifier",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.2",
         .title = "malformed `default_discipline qualifier",
         .lrm = "10.2",
         .explain =
@@ -319,6 +460,11 @@
         ,
     },
     .E0128 = .{
+        .key = "V2005-19.7a",
+        .tag = "malformed_line_directive",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.7",
         .title = "malformed `line directive",
         .lrm = "10.7",
         .explain =
@@ -335,6 +481,11 @@
         ,
     },
     .E0129 = .{
+        .key = "AMS-10.3a",
+        .tag = "malformed_default_transition_directive",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.3",
         .title = "malformed `default_transition directive",
         .lrm = "10.3",
         .explain =
@@ -357,6 +508,11 @@
         ,
     },
     .E0130 = .{
+        .key = "AMS-2.6.1a",
+        .tag = "literal_requires_digital_value_support",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "2.6.1",
         .title = "literal requires digital value support in the execution backend",
         .lrm = "2.6.1",
         .explain =
@@ -376,6 +532,11 @@
         ,
     },
     .E0131 = .{
+        .key = "AMS-2.6.1b",
+        .tag = "expected_numeric_base_after_apostrophe",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "2.6.1",
         .title = "expected a numeric base after the apostrophe",
         .lrm = "2.6.1",
         .explain =
@@ -386,6 +547,11 @@
         ,
     },
     .E0132 = .{
+        .key = "AMS-2.6.1c",
+        .tag = "expected_numeric_digit_after_base",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "2.6.1",
         .title = "expected a numeric digit after the base",
         .lrm = "2.6.1",
         .explain =
@@ -398,6 +564,11 @@
         ,
     },
     .E0133 = .{
+        .key = "AMS-2.6a",
+        .tag = "invalid_number_literal",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "2.6",
         .title = "invalid number literal",
         .lrm = "2.6",
         .explain =
@@ -415,6 +586,9 @@
         ,
     },
     .E0134 = .{
+        .key = "E0134",
+        .tag = "E0134",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -425,6 +599,11 @@
         ,
     },
     .E0135 = .{
+        .key = "AMS-10.6a",
+        .tag = "unsupported_keyword_set",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.6",
         .title = "unsupported keyword set",
         .lrm = "10.6",
         .explain =
@@ -435,6 +614,11 @@
         ,
     },
     .E0136 = .{
+        .key = "AMS-10.6b",
+        .tag = "end_keywords_without_begin_keywords",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.6",
         .title = "`end_keywords without `begin_keywords",
         .lrm = "10.6",
         .explain =
@@ -443,6 +627,9 @@
         ,
     },
     .E0137 = .{
+        .key = "E0137",
+        .tag = "E0137",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -453,6 +640,11 @@
         ,
     },
     .E0138 = .{
+        .key = "AMS-2.7a",
+        .tag = "string_literal_may_not_span",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "2.7",
         .title = "a string literal may not span lines",
         .lrm = "2.7",
         .explain =
@@ -474,6 +666,11 @@
         ,
     },
     .E0139 = .{
+        .key = "AMS-10.4k",
+        .tag = "macro_text_may_not_begin",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.4",
         .title = "macro text may not begin with __VAMS_",
         .lrm = "10.4",
         .explain =
@@ -492,6 +689,11 @@
         ,
     },
     .E0140 = .{
+        .key = "V2005-19.2a",
+        .tag = "default_nettype_takes_net_type",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.2",
         .title = "`default_nettype takes one net type",
         .lrm = "10.1",
         .explain =
@@ -517,6 +719,11 @@
         ,
     },
     .E0141 = .{
+        .key = "V2005-19.9a",
+        .tag = "unconnected_drive_takes_pull0_pull1",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.9",
         .title = "`unconnected_drive takes pull0 or pull1",
         .lrm = "10.1",
         .explain =
@@ -533,6 +740,11 @@
         ,
     },
     .E0142 = .{
+        .key = "V2005-19.8a",
+        .tag = "malformed_timescale",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.8",
         .title = "malformed `timescale",
         .lrm = "10.1",
         .explain =
@@ -556,6 +768,11 @@
         ,
     },
     .E0143 = .{
+        .key = "AMS-10.4l",
+        .tag = "compiler_directive_cannot_macro_name",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.4",
         .title = "a compiler directive cannot be a macro name",
         .lrm = "10.4",
         .explain =
@@ -570,6 +787,11 @@
         ,
     },
     .E0144 = .{
+        .key = "V2005-19.5g",
+        .tag = "text_after_include_file_name",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.5",
         .title = "text after the `include file name",
         .lrm = "10.1",
         .explain =
@@ -584,6 +806,11 @@
         ,
     },
     .E0145 = .{
+        .key = "AMS-10.4m",
+        .tag = "macro_text_splits_string_literal",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.4",
         .title = "macro text splits a string literal",
         .lrm = "10.4",
         .explain =
@@ -600,6 +827,11 @@
         ,
     },
     .E0146 = .{
+        .key = "unsup-V2005-28a",
+        .tag = "unsup_protected_envelope_vera_cannot_process",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "28",
         .title = "a protected envelope VerA cannot process",
         .lrm = "IEEE 1364-2005 28",
         .explain =
@@ -630,6 +862,11 @@
         ,
     },
     .E0147 = .{
+        .key = "V2005-19.10a",
+        .tag = "pragma_requires_pragma_name",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.10",
         .title = "`pragma requires a pragma name",
         .lrm = "IEEE 1364-2005 19.10",
         .explain =
@@ -642,6 +879,11 @@
         ,
     },
     .E0148 = .{
+        .key = "AMS-2.7b",
+        .tag = "octal_escape_above_377",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "2.7",
         .title = "octal escape is above \\377",
         .lrm = "2.7",
         .explain =
@@ -657,6 +899,12 @@
         ,
     },
     .W0149 = .{
+        .key = "lint-escape",
+        .tag = "lint_escape",
+        .kind = .lint,
+        .std = .ams,
+        .clause = "2.7",
+        .severity = .warning,
         .title = "escape is not in Table 2-2",
         .lrm = "2.7",
         .explain =
@@ -671,6 +919,11 @@
         ,
     },
     .E0150 = .{
+        .key = "limit-text-bytes",
+        .tag = "limit_text_bytes",
+        .kind = .limit,
+        .std = .ams,
+        .clause = "10.4",
         .title = "preprocessed text larger than 4294967295 bytes",
         .lrm = "10.4",
         .explain =
@@ -686,6 +939,12 @@
         ,
     },
     .W0151 = .{
+        .key = "lint-sv-macro-text",
+        .tag = "lint_sv_macro_text",
+        .kind = .lint,
+        .std = .ams,
+        .clause = "10.4",
+        .severity = .warning,
         .title = "IEEE 1800 macro text in an IEEE 1364 unit",
         .lrm = "10.4",
         .explain =
@@ -703,6 +962,11 @@
         ,
     },
     .E0152 = .{
+        .key = "V2005-28.2a",
+        .tag = "no_key_protected_envelope",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "28.2",
         .title = "no key for a protected envelope",
         .lrm = "IEEE 1364-2005 28.2",
         .explain =
@@ -720,6 +984,11 @@
         ,
     },
     .E0153 = .{
+        .key = "V2005-28.2b",
+        .tag = "protected_envelope_does_not_decrypt",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "28.2",
         .title = "a protected envelope does not decrypt",
         .lrm = "IEEE 1364-2005 28.2",
         .explain =
@@ -731,6 +1000,9 @@
         ,
     },
     .E0154 = .{
+        .key = "limit-files",
+        .tag = "limit_files",
+        .kind = .limit,
         .title = "more than 65535 source files",
         .lrm = "",
         .explain =
@@ -745,6 +1017,11 @@
         ,
     },
     .E0201 = .{
+        .key = "AMS-A-a",
+        .tag = "construct_not_supported_subset",
+        .kind = .syntax,
+        .std = .ams,
+        .clause = "A",
         .title = "construct is not in the supported subset",
         .lrm = "A.1.2",
         .explain =
@@ -762,6 +1039,11 @@
         ,
     },
     .E0202 = .{
+        .key = "AMS-10.6c",
+        .tag = "directive_only_legal_outside_design",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.6",
         .title = "directive is only legal outside a design element",
         .lrm = "10.6",
         .explain =
@@ -778,6 +1060,9 @@
         ,
     },
     .E0203 = .{
+        .key = "E0203",
+        .tag = "E0203",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -792,6 +1077,9 @@
         ,
     },
     .E0204 = .{
+        .key = "E0204",
+        .tag = "E0204",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -809,6 +1097,11 @@
         ,
     },
     .E0205 = .{
+        .key = "unsup-AMS-A.1.4a",
+        .tag = "unsupported_module_item",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "A.1.4",
         .title = "unsupported module item",
         .lrm = "A.1.4",
         .explain =
@@ -823,6 +1116,11 @@
         ,
     },
     .E0206 = .{
+        .key = "AMS-6.5.1a",
+        .tag = "identifier_not_port_module",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.5.1",
         .title = "identifier is not a port of this module",
         .lrm = "6.5.1",
         .explain =
@@ -835,6 +1133,11 @@
         ,
     },
     .E0207 = .{
+        .key = "AMS-A-b",
+        .tag = "unexpected_token",
+        .kind = .syntax,
+        .std = .ams,
+        .clause = "A",
         .title = "unexpected token",
         .lrm = "A.1.2",
         .explain =
@@ -853,6 +1156,11 @@
         ,
     },
     .E0208 = .{
+        .key = "AMS-A-c",
+        .tag = "expected_identifier",
+        .kind = .syntax,
+        .std = .ams,
+        .clause = "A",
         .title = "expected an identifier",
         .lrm = "2.8",
         .explain =
@@ -866,6 +1174,11 @@
         ,
     },
     .E0209 = .{
+        .key = "AMS-A-d",
+        .tag = "expected_expression",
+        .kind = .syntax,
+        .std = .ams,
+        .clause = "A",
         .title = "expected an expression",
         .lrm = "A.8.3",
         .explain =
@@ -875,11 +1188,21 @@
         ,
     },
     .E0210 = .{
+        .key = "AMS-A-e",
+        .tag = "expected",
+        .kind = .syntax,
+        .std = .ams,
+        .clause = "A",
         .title = "expected ')'",
         .lrm = "A.8.3",
         .explain = "A parenthesised group or argument list is not closed.",
     },
     .E0211 = .{
+        .key = "AMS-3.6.2.1a",
+        .tag = "expected_potential_flow",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.2.1",
         .title = "expected 'potential' or 'flow'",
         .lrm = "3.6.2.1",
         .explain =
@@ -895,6 +1218,11 @@
         ,
     },
     .E0212 = .{
+        .key = "AMS-3.6.2.2a",
+        .tag = "expected_continuous_discrete",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.2.2",
         .title = "expected 'continuous' or 'discrete'",
         .lrm = "3.6.2.2",
         .explain =
@@ -907,6 +1235,11 @@
         ,
     },
     .E0213 = .{
+        .key = "AMS-3.6.2a",
+        .tag = "expected_discipline_item",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.2",
         .title = "expected a discipline item",
         .lrm = "3.6.2",
         .explain =
@@ -917,6 +1250,11 @@
         ,
     },
     .E0214 = .{
+        .key = "AMS-5.6a",
+        .tag = "expected_2",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.6",
         .title = "expected '<+' or '='",
         .lrm = "5.6",
         .explain =
@@ -928,6 +1266,9 @@
         ,
     },
     .E0215 = .{
+        .key = "E0215",
+        .tag = "E0215",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -946,6 +1287,11 @@
         ,
     },
     .E0216 = .{
+        .key = "AMS-4.2.13a",
+        .tag = "concatenation_operand_has_no_bit",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.2.13",
         .title = "concatenation operand has no bit width",
         .lrm = "4.2.13",
         .explain =
@@ -957,6 +1303,11 @@
         ,
     },
     .E0217 = .{
+        .key = "AMS-4.2.13b",
+        .tag = "concatenation_wider_integer",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.2.13",
         .title = "concatenation is wider than an integer",
         .lrm = "3.2.1",
         .explain =
@@ -966,6 +1317,11 @@
         ,
     },
     .E0218 = .{
+        .key = "AMS-6.2a",
+        .tag = "port_redeclared_module_body",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.2",
         .title = "port redeclared in the module body",
         .lrm = "6.2",
         .explain =
@@ -989,6 +1345,11 @@
         ,
     },
     .E0219 = .{
+        .key = "AMS-A.6.4a",
+        .tag = "null_statement_not_analog_statement",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.6.4",
         .title = "a null statement is not an analog statement",
         .lrm = "A.6.4",
         .explain =
@@ -1015,6 +1376,11 @@
         ,
     },
     .E0220 = .{
+        .key = "AMS-A.6.5a",
+        .tag = "empty_analysis_list_step_event",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.6.5",
         .title = "empty analysis list on a step event",
         .lrm = "A.6.5",
         .explain =
@@ -1037,6 +1403,11 @@
         ,
     },
     .E0221 = .{
+        .key = "AMS-6.6a",
+        .tag = "generate_block_not_module_item",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.6",
         .title = "a generate block is not a module item",
         .lrm = "6.6",
         .explain =
@@ -1063,6 +1434,11 @@
         ,
     },
     .E0222 = .{
+        .key = "AMS-7.3.1a",
+        .tag = "discrete_bit_grouping_wider_31",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "7.3.1",
         .title = "discrete bit grouping wider than 31 bits",
         .lrm = "7.3.1",
         .explain =
@@ -1081,6 +1457,11 @@
         ,
     },
     .E0223 = .{
+        .key = "AMS-4.2.14a",
+        .tag = "replication_count_assignment_pattern_not",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.2.14",
         .title = "replication count in an assignment pattern is not a non-negative constant",
         .lrm = "4.2.14",
         .explain =
@@ -1098,6 +1479,11 @@
         ,
     },
     .E0224 = .{
+        .key = "AMS-4.7.1a",
+        .tag = "analog_function_declares_no_formal",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.7.1",
         .title = "an analog function declares no formal argument",
         .lrm = "4.7.1",
         .explain =
@@ -1111,6 +1497,11 @@
         ,
     },
     .E0225 = .{
+        .key = "AMS-4.7.1b",
+        .tag = "analog_function_formal_argument_has",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.7.1",
         .title = "an analog function formal argument has no data type",
         .lrm = "4.7.1",
         .explain =
@@ -1134,6 +1525,11 @@
         ,
     },
     .E0226 = .{
+        .key = "AMS-4.7.1c",
+        .tag = "named_block_not_allowed_analog",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.7.1",
         .title = "a named block is not allowed in an analog function",
         .lrm = "4.7.1",
         .explain =
@@ -1151,6 +1547,11 @@
         ,
     },
     .E0227 = .{
+        .key = "AMS-4.7.2.2a",
+        .tag = "return_statement_analog_function_specifies",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.7.2.2",
         .title = "a return statement in an analog function specifies no expression",
         .lrm = "4.7.2.2",
         .explain =
@@ -1170,6 +1571,11 @@
         ,
     },
     .E0228 = .{
+        .key = "AMS-6.6b",
+        .tag = "generate_region_inside_another_generate",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.6",
         .title = "a generate region inside another generate region",
         .lrm = "6.6",
         .explain =
@@ -1190,6 +1596,11 @@
         ,
     },
     .E0229 = .{
+        .key = "AMS-6.6c",
+        .tag = "parameter_declaration_inside_generate_region",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.6",
         .title = "a parameter declaration inside a generate region or block",
         .lrm = "6.6",
         .explain =
@@ -1213,6 +1624,11 @@
         ,
     },
     .E0230 = .{
+        .key = "AMS-6.6.1a",
+        .tag = "generate_block_name_collides_another",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.6.1",
         .title = "a generate block name collides with another declaration",
         .lrm = "6.6.1",
         .explain =
@@ -1246,6 +1662,11 @@
         ,
     },
     .E0231 = .{
+        .key = "AMS-A.9.3a",
+        .tag = "hierarchical_index_not_constant_expression",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.9.3",
         .title = "hierarchical index is not a constant expression",
         .lrm = "A.9.3",
         .explain =
@@ -1264,6 +1685,11 @@
         ,
     },
     .E0232 = .{
+        .key = "AMS-A.1.1a",
+        .tag = "library_map_text_source_file",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.1.1",
         .title = "library map text in a source file",
         .lrm = "A.1.1",
         .explain =
@@ -1293,6 +1719,11 @@
         ,
     },
     .E0233 = .{
+        .key = "AMS-A.5.3a",
+        .tag = "udp_table_symbol_outside_alphabet",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.5.3",
         .title = "a UDP table symbol is outside the alphabet its column admits",
         .lrm = "A.5.3",
         .explain =
@@ -1316,6 +1747,11 @@
         ,
     },
     .E0234 = .{
+        .key = "AMS-A.5.3b",
+        .tag = "udp_table_does_not_derive",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.5.3",
         .title = "a UDP table does not derive from one udp_body",
         .lrm = "A.5.3",
         .explain =
@@ -1343,6 +1779,11 @@
         ,
     },
     .E0235 = .{
+        .key = "unsup-AMS-6.6.2a",
+        .tag = "unsup_not_supported_inside_generate_block",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "6.6.2",
         .title = "not supported inside a generate block",
         .lrm = "6.6.2",
         .explain =
@@ -1375,6 +1816,11 @@
         ,
     },
     .E0236 = .{
+        .key = "V2005-19.6a",
+        .tag = "resetall_inside_module",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "19.6",
         .title = "`resetall inside a module",
         .lrm = "10.1",
         .explain =
@@ -1387,6 +1833,11 @@
         ,
     },
     .E0237 = .{
+        .key = "AMS-6.4.1a",
+        .tag = "paramset_statement_uses_what_6",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.4.1",
         .title = "a paramset statement uses what 6.4.1 forbids",
         .lrm = "6.4.1",
         .explain =
@@ -1406,6 +1857,11 @@
         ,
     },
     .E0238 = .{
+        .key = "AMS-A.4.2a",
+        .tag = "loop_generate_s_index_not",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.4.2",
         .title = "a loop generate's index is not a genvar",
         .lrm = "A.4.2",
         .explain =
@@ -1423,6 +1879,11 @@
         ,
     },
     .E0239 = .{
+        .key = "AMS-A.5.4a",
+        .tag = "udp_instance_s_delay_delay2",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.5.4",
         .title = "a UDP instance's delay is more than a delay2",
         .lrm = "A.5.4",
         .explain =
@@ -1441,6 +1902,11 @@
         ,
     },
     .E0240 = .{
+        .key = "AMS-A-f",
+        .tag = "not_module_item",
+        .kind = .syntax,
+        .std = .ams,
+        .clause = "A",
         .title = "not a module item",
         .lrm = "A.1.4",
         .explain =
@@ -1458,6 +1924,9 @@
         ,
     },
     .E0241 = .{
+        .key = "limit-nesting",
+        .tag = "limit_nesting",
+        .kind = .limit,
         .title = "nested deeper than memory allows",
         .lrm = "",
         .explain =
@@ -1478,6 +1947,11 @@
         ,
     },
     .E0242 = .{
+        .key = "AMS-10.6d",
+        .tag = "verilog_ams_construct_under_ieee",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "10.6",
         .title = "a Verilog-AMS construct under an IEEE 1364 language",
         .lrm = "10.6",
         .explain =
@@ -1502,6 +1976,11 @@
         ,
     },
     .E0243 = .{
+        .key = "V2005-13.3a",
+        .tag = "configuration_rule_ieee_1364_2005",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "13.3",
         .title = "a configuration rule IEEE 1364-2005 §13.3 forbids",
         .lrm = "IEEE 1364-2005 13.3",
         .explain =
@@ -1526,6 +2005,11 @@
         ,
     },
     .E0244 = .{
+        .key = "V2005-13.2a",
+        .tag = "library_map_refused",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "13.2",
         .title = "library map refused",
         .lrm = "IEEE 1364-2005 13.2",
         .explain =
@@ -1551,6 +2035,11 @@
         ,
     },
     .E0245 = .{
+        .key = "V2005-14.2a",
+        .tag = "specify_block_breaks_clause_14",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "14.2",
         .title = "a specify block breaks a clause 14 rule",
         .lrm = "IEEE 1364-2005 14.2",
         .explain =
@@ -1575,6 +2064,12 @@
         ,
     },
     .E0246 = .{
+        .key = "AMS-A.1.3a",
+        .tag = "invalid_module_parameter_list",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.1.3",
+        .also = "AMS-A.4.1",
         .title = "invalid module parameter list",
         .lrm = "A.1.3 / A.4.1",
         .explain =
@@ -1592,6 +2087,11 @@
         ,
     },
     .E0247 = .{
+        .key = "AMS-2.6.2a",
+        .tag = "scale_factor_digital_delay",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "2.6.2",
         .title = "a scale factor in a digital delay",
         .lrm = "2.6.2",
         .explain =
@@ -1607,6 +2107,11 @@
         ,
     },
     .E0248 = .{
+        .key = "V2005-8.1.4a",
+        .tag = "udp_table_gives_input_combination",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "8.1.4",
         .title = "a UDP table gives one input combination two outputs",
         .lrm = "IEEE 1364-2005 8.1.4",
         .explain =
@@ -1629,6 +2134,11 @@
         ,
     },
     .E0249 = .{
+        .key = "AMS-A.6.3a",
+        .tag = "fork_join_block_analog_block",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.6.3",
         .title = "a fork-join block in an analog block",
         .lrm = "A.6.3",
         .explain =
@@ -1643,6 +2153,11 @@
         ,
     },
     .E0250 = .{
+        .key = "AMS-C.7a",
+        .tag = "construct_outside_verilog_subset",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "C.7",
         .title = "a construct outside the Verilog-A subset",
         .lrm = "C.7",
         .explain =
@@ -1666,6 +2181,11 @@
         ,
     },
     .E0254 = .{
+        .key = "AMS-A.6.5b",
+        .tag = "delay_control_analog_block",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.6.5",
         .title = "a delay control in an analog block",
         .lrm = "A.6.5",
         .explain =
@@ -1681,6 +2201,11 @@
         ,
     },
     .E0255 = .{
+        .key = "AMS-A.6.5c",
+        .tag = "wait_statement_analog_block",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.6.5",
         .title = "a wait statement in an analog block",
         .lrm = "A.6.5",
         .explain =
@@ -1694,6 +2219,11 @@
         ,
     },
     .E0256 = .{
+        .key = "AMS-A.6.8a",
+        .tag = "forever_loop_analog_block",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.6.8",
         .title = "a forever loop in an analog block",
         .lrm = "A.6.8",
         .explain =
@@ -1708,6 +2238,11 @@
         ,
     },
     .E0257 = .{
+        .key = "AMS-A.2.1.3a",
+        .tag = "charge_strength_net_not_trireg",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.2.1.3",
         .title = "a charge strength on a net that is not a trireg",
         .lrm = "A.2.1.3",
         .explain =
@@ -1721,6 +2256,11 @@
         ,
     },
     .E0258 = .{
+        .key = "AMS-A.6.2a",
+        .tag = "procedural_continuous_assignment_analog_block",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.6.2",
         .title = "a procedural continuous assignment in an analog block",
         .lrm = "A.6.2",
         .explain =
@@ -1735,6 +2275,11 @@
         ,
     },
     .E0295 = .{
+        .key = "AMS-A.8.4a",
+        .tag = "min_typ_max_expression_not",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.8.4",
         .title = "a min:typ:max expression is not an analog expression",
         .lrm = "A.8.4",
         .explain =
@@ -1756,6 +2301,11 @@
         ,
     },
     .E0296 = .{
+        .key = "AMS-A.6.8b",
+        .tag = "forever_loop_needs_statement_not",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.6.8",
         .title = "a forever loop needs a statement, not a null statement",
         .lrm = "A.6.8",
         .explain =
@@ -1777,6 +2327,11 @@
         ,
     },
     .E0297 = .{
+        .key = "AMS-A.1.9a",
+        .tag = "paramset_declares_no_item",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.1.9",
         .title = "paramset declares no item",
         .lrm = "A.1.9",
         .explain =
@@ -1792,6 +2347,11 @@
         ,
     },
     .E0289 = .{
+        .key = "AMS-A.8.2a",
+        .tag = "function_call_has_empty_argument",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.8.2",
         .title = "a function call has an empty argument",
         .lrm = "A.8.2",
         .explain =
@@ -1817,6 +2377,11 @@
         ,
     },
     .E0290 = .{
+        .key = "AMS-A.6.3b",
+        .tag = "declaration_unnamed_block",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.6.3",
         .title = "a declaration in an unnamed block",
         .lrm = "A.6.3",
         .explain =
@@ -1841,6 +2406,11 @@
         ,
     },
     .E0291 = .{
+        .key = "AMS-A.2.6a",
+        .tag = "analog_function_s_direction_declaration",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.2.6",
         .title = "an analog function's direction declaration carries a data type",
         .lrm = "A.2.6",
         .explain =
@@ -1866,6 +2436,11 @@
         ,
     },
     .E0292 = .{
+        .key = "AMS-A.2.1.3b",
+        .tag = "net_declaration_mixes_initialized_plain",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.2.1.3",
         .title = "a net declaration mixes initialized and plain names",
         .lrm = "A.2.1.3",
         .explain =
@@ -1887,6 +2462,11 @@
         ,
     },
     .E0293 = .{
+        .key = "AMS-A.4.1a",
+        .tag = "module_instance_has_no_instance",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.4.1",
         .title = "a module instance has no instance name",
         .lrm = "A.4.1",
         .explain =
@@ -1906,6 +2486,12 @@
         ,
     },
     .W0250 = .{
+        .key = "unsup-AMS-A.3.1a",
+        .tag = "unsup_switch_primitive_accepted_stamps_nothing",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "A.3.1",
+        .severity = .warning,
         .title = "switch primitive accepted, and it stamps nothing",
         .lrm = "A.3.1",
         .explain =
@@ -1952,6 +2538,12 @@
         ,
     },
     .W0251 = .{
+        .key = "unsup-AMS-A.7.1a",
+        .tag = "unsup_specify_block_read_part_all",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "A.7.1",
+        .severity = .warning,
         .title = "specify block read, and part or all of it is not modelled",
         .lrm = "A.7.1",
         .explain =
@@ -2003,6 +2595,12 @@
         ,
     },
     .W0252 = .{
+        .key = "unsup-AMS-A.3.1b",
+        .tag = "unsup_gate_primitive_accepted_computes_nothing",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "A.3.1",
+        .severity = .warning,
         .title = "gate primitive accepted, and it computes nothing",
         .lrm = "A.3.1",
         .explain =
@@ -2042,6 +2640,12 @@
         ,
     },
     .W0253 = .{
+        .key = "unsup-AMS-A.1.5a",
+        .tag = "unsup_configuration_read_nothing_binds_through",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "A.1.5",
+        .severity = .warning,
         .title = "configuration read, and nothing binds through it",
         .lrm = "A.1.5",
         .explain =
@@ -2072,6 +2676,12 @@
         ,
     },
     .W0259 = .{
+        .key = "lint-math-name",
+        .tag = "lint_math_name",
+        .kind = .lint,
+        .std = .ams,
+        .clause = "10.6",
+        .severity = .warning,
         .title = "a VAMS-2023 math function name declared as a function",
         .lrm = "10.6",
         .explain =
@@ -2092,6 +2702,9 @@
         ,
     },
     .E0301 = .{
+        .key = "E0301",
+        .tag = "E0301",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -2107,6 +2720,9 @@
         ,
     },
     .E0302 = .{
+        .key = "E0302",
+        .tag = "E0302",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -2122,6 +2738,11 @@
         ,
     },
     .E0303 = .{
+        .key = "AMS-3.4.7a",
+        .tag = "aliasparam_target_not_parameter",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.4.7",
         .title = "aliasparam target is not a parameter",
         .lrm = "3.4.7",
         .explain =
@@ -2135,6 +2756,9 @@
         ,
     },
     .E0304 = .{
+        .key = "E0304",
+        .tag = "E0304",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -2151,6 +2775,9 @@
         ,
     },
     .E0305 = .{
+        .key = "E0305",
+        .tag = "E0305",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -2167,6 +2794,11 @@
         ,
     },
     .E0306 = .{
+        .key = "AMS-3.12a",
+        .tag = "expected_net_identifier",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.12",
         .title = "expected a net identifier",
         .lrm = "3.12",
         .explain =
@@ -2179,6 +2811,11 @@
         ,
     },
     .E0307 = .{
+        .key = "AMS-3.2a",
+        .tag = "array_has_no_declared_dimensions",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.2",
         .title = "array has no declared dimensions",
         .lrm = "3.2",
         .explain =
@@ -2188,6 +2825,11 @@
         ,
     },
     .E0308 = .{
+        .key = "AMS-3.2b",
+        .tag = "array_bound_not_constant_expression",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.2",
         .title = "array bound is not a constant expression",
         .lrm = "3.2",
         .explain =
@@ -2198,6 +2840,11 @@
         ,
     },
     .E0309 = .{
+        .key = "AMS-3.2c",
+        .tag = "identifier_not_array",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.2",
         .title = "identifier is not an array",
         .lrm = "3.2",
         .explain =
@@ -2206,6 +2853,11 @@
         ,
     },
     .E0310 = .{
+        .key = "AMS-3.2d",
+        .tag = "array_index_out_bounds",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.2",
         .title = "array index is out of bounds",
         .lrm = "3.2",
         .explain =
@@ -2216,6 +2868,11 @@
         ,
     },
     .E0311 = .{
+        .key = "AMS-3.2e",
+        .tag = "array_index_not_constant_expression",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.2",
         .title = "array index is not a constant expression",
         .lrm = "3.2",
         .explain =
@@ -2229,6 +2886,11 @@
         ,
     },
     .E0312 = .{
+        .key = "AMS-3.4a",
+        .tag = "cannot_assign_parameter",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.4",
         .title = "cannot assign to a parameter",
         .lrm = "3.4",
         .explain =
@@ -2240,6 +2902,11 @@
         ,
     },
     .E0313 = .{
+        .key = "AMS-6.8a",
+        .tag = "unknown_variable",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.8",
         .title = "unknown variable",
         .lrm = "6.8",
         .explain =
@@ -2249,6 +2916,11 @@
         ,
     },
     .E0314 = .{
+        .key = "AMS-6.8b",
+        .tag = "unknown_identifier",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.8",
         .title = "unknown identifier",
         .lrm = "6.8",
         .explain =
@@ -2257,6 +2929,11 @@
         ,
     },
     .E0315 = .{
+        .key = "AMS-4.4a",
+        .tag = "net_must_read_through_access",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.4",
         .title = "net must be read through an access function",
         .lrm = "4.4",
         .explain =
@@ -2272,6 +2949,11 @@
         ,
     },
     .E0316 = .{
+        .key = "AMS-5.7a",
+        .tag = "unsupported_assignment_target",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.7",
         .title = "unsupported assignment target",
         .lrm = "5.7",
         .explain =
@@ -2286,6 +2968,11 @@
         ,
     },
     .E0317 = .{
+        .key = "AMS-5.7b",
+        .tag = "concatenation_not_assignment_target",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.7",
         .title = "a concatenation is not an assignment target",
         .lrm = "5.7",
         .explain =
@@ -2298,6 +2985,11 @@
         ,
     },
     .E0318 = .{
+        .key = "AMS-4.2.9a",
+        .tag = "bitwise_operator_requires_integer_operands",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.2.9",
         .title = "bitwise operator requires integer operands",
         .lrm = "4.2.9",
         .explain =
@@ -2311,6 +3003,11 @@
         ,
     },
     .E0319 = .{
+        .key = "AMS-4.2.10a",
+        .tag = "reduction_operator_requires_integer_operand",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.2.10",
         .title = "reduction operator requires an integer operand",
         .lrm = "4.2.10",
         .explain =
@@ -2319,6 +3016,11 @@
         ,
     },
     .E0320 = .{
+        .key = "AMS-4.2.10b",
+        .tag = "xor_reductions_cannot_used_inside",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.2.10",
         .title = "xor reductions cannot be used inside the analog block",
         .lrm = "4.2.10",
         .explain =
@@ -2330,6 +3032,11 @@
         ,
     },
     .E0321 = .{
+        .key = "AMS-3.3a",
+        .tag = "arithmetic_string_operand",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.3",
         .title = "arithmetic on a string operand",
         .lrm = "3.3",
         .explain =
@@ -2349,6 +3056,11 @@
         ,
     },
     .E0322 = .{
+        .key = "AMS-4.2.9b",
+        .tag = "bitwise_shift_operators_require_integer",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.2.9",
         .title = "bitwise and shift operators require integer operands",
         .lrm = "4.2.9",
         .explain =
@@ -2357,6 +3069,9 @@
         ,
     },
     .E0323 = .{
+        .key = "E0323",
+        .tag = "E0323",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -2370,6 +3085,11 @@
         ,
     },
     .E0324 = .{
+        .key = "AMS-4.2.11a",
+        .tag = "arithmetic_shifts_cannot_used_analog",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.2.11",
         .title = "arithmetic shifts cannot be used in an analog block",
         .lrm = "4.2.11",
         .explain =
@@ -2379,6 +3099,9 @@
         ,
     },
     .E0325 = .{
+        .key = "E0325",
+        .tag = "E0325",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -2389,11 +3112,21 @@
         ,
     },
     .E0326 = .{
+        .key = "AMS-4.2.13c",
+        .tag = "empty_concatenation",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.2.13",
         .title = "empty concatenation",
         .lrm = "4.2.13",
         .explain = "`{}` has no operands, so it has no width and no value.",
     },
     .E0327 = .{
+        .key = "AMS-4.2.13d",
+        .tag = "concatenation_operand_has_no_bit_2",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.2.13",
         .title = "concatenation operand has no bit width",
         .lrm = "4.2.13",
         .explain =
@@ -2407,6 +3140,9 @@
         ,
     },
     .E0328 = .{
+        .key = "E0328",
+        .tag = "E0328",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -2419,6 +3155,11 @@
         ,
     },
     .E0329 = .{
+        .key = "AMS-7.3.1b",
+        .tag = "select_operand_analog_context_cannot",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "7.3.1",
         .title = "a select or operand the analog context cannot size",
         .lrm = "7.3.1",
         .explain =
@@ -2438,6 +3179,11 @@
         ,
     },
     .E0330 = .{
+        .key = "AMS-3.2f",
+        .tag = "unsupported_index_expression",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.2",
         .title = "unsupported index expression",
         .lrm = "3.2",
         .explain =
@@ -2448,6 +3194,11 @@
         ,
     },
     .E0331 = .{
+        .key = "AMS-3.4.7b",
+        .tag = "aliasparam_name_already_parameter",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.4.7",
         .title = "aliasparam name is already a parameter",
         .lrm = "3.4.7",
         .explain =
@@ -2471,6 +3222,11 @@
         ,
     },
     .E0332 = .{
+        .key = "AMS-3.6.1.2a",
+        .tag = "base_nature_missing_required_attribute",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.1.2",
         .title = "base nature is missing a required attribute",
         .lrm = "3.6.1.2",
         .explain =
@@ -2490,6 +3246,11 @@
         ,
     },
     .E0333 = .{
+        .key = "AMS-3.6.1.2b",
+        .tag = "derived_nature_redefines_units",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.1.2",
         .title = "derived nature redefines `units`",
         .lrm = "3.6.1.2",
         .explain =
@@ -2507,6 +3268,11 @@
         ,
     },
     .E0334 = .{
+        .key = "AMS-3.6.1.2c",
+        .tag = "derived_nature_changes_access",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.1.2",
         .title = "derived nature changes `access`",
         .lrm = "3.6.1.2",
         .explain =
@@ -2521,6 +3287,11 @@
         ,
     },
     .E0335 = .{
+        .key = "AMS-3.13.2a",
+        .tag = "two_base_natures_share_access",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.13.2",
         .title = "two base natures share an access function",
         .lrm = "3.13.2",
         .explain =
@@ -2535,6 +3306,11 @@
         ,
     },
     .E0336 = .{
+        .key = "AMS-3.13.1a",
+        .tag = "identifier_already_declared_nature_discipline",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.13.1",
         .title = "identifier is already declared as a nature or a discipline",
         .lrm = "3.13.1",
         .explain =
@@ -2550,6 +3326,11 @@
         ,
     },
     .E0337 = .{
+        .key = "AMS-3.6.3a",
+        .tag = "net_has_no_declared_discipline",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.3",
         .title = "net has no declared discipline",
         .lrm = "3.6.3",
         .explain =
@@ -2568,6 +3349,11 @@
         ,
     },
     .E0338 = .{
+        .key = "AMS-3.6.2.1b",
+        .tag = "conservative_discipline_binds_nature_both",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.2.1",
         .title = "conservative discipline binds one nature to both halves",
         .lrm = "3.6.2.1",
         .explain =
@@ -2581,6 +3367,11 @@
         ,
     },
     .E0339 = .{
+        .key = "AMS-3.6.2.2b",
+        .tag = "domain_discrete_discipline_binds_nature",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.2.2",
         .title = "`domain discrete` on a discipline that binds a nature",
         .lrm = "3.6.2.2",
         .explain =
@@ -2594,6 +3385,11 @@
         ,
     },
     .E0340 = .{
+        .key = "AMS-3.6.1.2d",
+        .tag = "nature_attribute_value_wrong_form",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.1.2",
         .title = "nature attribute value of the wrong form",
         .lrm = "3.6.1.2",
         .explain =
@@ -2613,6 +3409,11 @@
         ,
     },
     .E0341 = .{
+        .key = "AMS-3.6.1.2e",
+        .tag = "idt_nature_does_not_name",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.1.2",
         .title = "`idt_nature` does not name a related nature",
         .lrm = "3.6.1.2",
         .explain =
@@ -2630,6 +3431,11 @@
         ,
     },
     .E0342 = .{
+        .key = "AMS-3.13.1b",
+        .tag = "nature_discipline_already_declared",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.13.1",
         .title = "nature or discipline is already declared",
         .lrm = "3.13.1",
         .explain =
@@ -2645,6 +3451,11 @@
         ,
     },
     .E0343 = .{
+        .key = "AMS-3.6.1.3a",
+        .tag = "duplicate_user_defined_nature_attribute",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.1.3",
         .title = "duplicate user-defined nature attribute",
         .lrm = "3.6.1.3",
         .explain =
@@ -2657,6 +3468,11 @@
         ,
     },
     .E0344 = .{
+        .key = "AMS-3.6.4a",
+        .tag = "ground_net_not_continuous_discipline",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.4",
         .title = "`ground` net is not of a continuous discipline",
         .lrm = "3.6.4",
         .explain =
@@ -2670,6 +3486,11 @@
         ,
     },
     .E0345 = .{
+        .key = "AMS-3.4.1a",
+        .tag = "parameter_initializer_type_conflicts_parameter",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.4.1",
         .title = "parameter initializer type conflicts with the parameter's type",
         .lrm = "3.4.1",
         .explain =
@@ -2689,6 +3510,11 @@
         ,
     },
     .E0346 = .{
+        .key = "AMS-3.4.1b",
+        .tag = "array_string_parameter_needs_explicit",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.4.1",
         .title = "array or string parameter needs an explicit type",
         .lrm = "3.4.1",
         .explain =
@@ -2712,6 +3538,11 @@
         ,
     },
     .E0347 = .{
+        .key = "AMS-3.4.2a",
+        .tag = "value_range_bounds_wrong_order",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.4.2",
         .title = "value range bounds are in the wrong order",
         .lrm = "3.4.2",
         .explain =
@@ -2726,6 +3557,11 @@
         ,
     },
     .E0348 = .{
+        .key = "AMS-4.2.10c",
+        .tag = "reduction_operators_cannot_used_inside",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.2.10",
         .title = "reduction operators cannot be used inside the analog block",
         .lrm = "4.2.10",
         .explain =
@@ -2744,6 +3580,11 @@
         ,
     },
     .E0349 = .{
+        .key = "AMS-3.4b",
+        .tag = "array_parameter_initialiser_not_assignment",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.4",
         .title = "array parameter initialiser is not an assignment pattern",
         .lrm = "3.4",
         .explain =
@@ -2763,6 +3604,11 @@
         ,
     },
     .E0350 = .{
+        .key = "AMS-6.5.2.2a",
+        .tag = "two_declarations_vector_port_give",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.5.2.2",
         .title = "the two declarations of a vector port give different ranges",
         .lrm = "6.5.2.2",
         .explain =
@@ -2782,6 +3628,11 @@
         ,
     },
     .E0351 = .{
+        .key = "AMS-5.5.2a",
+        .tag = "not_element_vector_net",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.5.2",
         .title = "not an element of a vector net",
         .lrm = "5.5.2",
         .explain =
@@ -2802,6 +3653,11 @@
         ,
     },
     .E0352 = .{
+        .key = "AMS-3.6.3b",
+        .tag = "vector_index_not_constant_inside",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.3",
         .title = "vector index is not a constant inside the declared range",
         .lrm = "3.6.3",
         .explain =
@@ -2818,6 +3674,11 @@
         ,
     },
     .E0353 = .{
+        .key = "AMS-3.12b",
+        .tag = "branch_terminals_vectors_different_sizes",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.12",
         .title = "branch terminals are vectors of different sizes",
         .lrm = "3.12",
         .explain =
@@ -2833,6 +3694,11 @@
         ,
     },
     .E0354 = .{
+        .key = "AMS-3.3b",
+        .tag = "string_value_cannot_assigned_numeric",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.3",
         .title = "a string value cannot be assigned to a numeric variable",
         .lrm = "3.3",
         .explain =
@@ -2859,6 +3725,11 @@
         ,
     },
     .E0355 = .{
+        .key = "AMS-3.11.1a",
+        .tag = "incompatible_disciplines",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.11.1",
         .title = "incompatible disciplines",
         .lrm = "3.11.1",
         .explain =
@@ -2893,6 +3764,11 @@
         ,
     },
     .E0356 = .{
+        .key = "AMS-3.2g",
+        .tag = "wrong_number_array_subscripts",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.2",
         .title = "wrong number of array subscripts",
         .lrm = "3.2",
         .explain =
@@ -2908,6 +3784,11 @@
         ,
     },
     .E0357 = .{
+        .key = "AMS-2.9a",
+        .tag = "illegal_attribute_value",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "2.9",
         .title = "illegal attribute value",
         .lrm = "2.9",
         .explain =
@@ -2935,6 +3816,11 @@
         ,
     },
     .E0358 = .{
+        .key = "AMS-2.9.2a",
+        .tag = "standard_attribute_value_outside_domain",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "2.9.2",
         .title = "standard attribute value is outside its domain",
         .lrm = "2.9.2",
         .explain =
@@ -2960,6 +3846,11 @@
         ,
     },
     .E0359 = .{
+        .key = "AMS-5.5.3a",
+        .tag = "nature_attribute_reference_has_no",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.5.3",
         .title = "nature attribute reference has no constant value",
         .lrm = "5.5.3",
         .explain =
@@ -2982,6 +3873,11 @@
         ,
     },
     .E0360 = .{
+        .key = "AMS-1.3.4.1a",
+        .tag = "signal_flow_discipline_inout_port",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "1.3.4.1",
         .title = "signal-flow discipline on an `inout` port",
         .lrm = "1.3.4.1",
         .explain =
@@ -3005,6 +3901,11 @@
         ,
     },
     .E0361 = .{
+        .key = "AMS-3.4.2b",
+        .tag = "overridden_parameter_value_outside_range",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.4.2",
         .title = "overridden parameter value is outside its range",
         .lrm = "3.4.2",
         .explain =
@@ -3026,6 +3927,11 @@
         ,
     },
     .E0362 = .{
+        .key = "AMS-6.8c",
+        .tag = "identifier_declared_twice_scope",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.8",
         .title = "identifier is declared twice in one scope",
         .lrm = "6.8",
         .explain =
@@ -3046,6 +3952,11 @@
         ,
     },
     .E0363 = .{
+        .key = "AMS-3.4c",
+        .tag = "parameter_default_not_constant_expression",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.4",
         .title = "parameter default is not a constant expression",
         .lrm = "3.4",
         .explain =
@@ -3070,6 +3981,9 @@
         ,
     },
     .E0364 = .{
+        .key = "E0364",
+        .tag = "E0364",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -3082,6 +3996,11 @@
         ,
     },
     .E0365 = .{
+        .key = "AMS-3.6.3.2a",
+        .tag = "net_initializer_not_constant_expression",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.3.2",
         .title = "net initializer is not a constant expression",
         .lrm = "3.6.3.2",
         .explain =
@@ -3099,6 +4018,11 @@
         ,
     },
     .E0366 = .{
+        .key = "AMS-3.6.3.2b",
+        .tag = "net_non_continuous_discipline_has",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.3.2",
         .title = "net of a non-continuous discipline has an initializer",
         .lrm = "3.6.3.2",
         .explain =
@@ -3115,6 +4039,11 @@
         ,
     },
     .E0367 = .{
+        .key = "AMS-3.6.5a",
+        .tag = "implicit_net_under_default_nettype",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.5",
         .title = "implicit net under `default_nettype none",
         .lrm = "3.6.5",
         .explain =
@@ -3143,6 +4072,11 @@
         ,
     },
     .E0368 = .{
+        .key = "AMS-4.2.1.1a",
+        .tag = "real_value_no_integer_conversion",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.2.1.1",
         .title = "real value with no integer conversion",
         .lrm = "4.2.1.1",
         .explain =
@@ -3164,6 +4098,11 @@
         ,
     },
     .E0369 = .{
+        .key = "AMS-4.2.1a",
+        .tag = "case_equality_real_operand",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.2.1",
         .title = "case equality on a real operand",
         .lrm = "4.2.1",
         .explain =
@@ -3177,6 +4116,11 @@
         ,
     },
     .E0370 = .{
+        .key = "AMS-3.6.2.5a",
+        .tag = "discipline_overrides_attribute_no_bound",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.2.5",
         .title = "discipline overrides an attribute of no bound nature",
         .lrm = "3.6.2.5",
         .explain =
@@ -3200,6 +4144,11 @@
         ,
     },
     .E0371 = .{
+        .key = "AMS-3.6.3c",
+        .tag = "net_declared_undeclared_discipline",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.3",
         .title = "net declared with an undeclared discipline",
         .lrm = "3.6.3",
         .explain =
@@ -3225,6 +4174,11 @@
         ,
     },
     .E0372 = .{
+        .key = "AMS-3.12.1a",
+        .tag = "port_branch_names_net_not",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.12.1",
         .title = "port branch names a net that is not a port",
         .lrm = "3.12.1",
         .explain =
@@ -3239,6 +4193,11 @@
         ,
     },
     .E0373 = .{
+        .key = "AMS-3.4.7c",
+        .tag = "aliasparam_name_used_expression",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.4.7",
         .title = "aliasparam name used in an expression",
         .lrm = "3.4.7",
         .explain =
@@ -3251,6 +4210,11 @@
         ,
     },
     .E0374 = .{
+        .key = "AMS-3.6.1.2f",
+        .tag = "ddt_nature_does_not_name",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.1.2",
         .title = "`ddt_nature` does not name a related nature",
         .lrm = "3.6.1.2",
         .explain =
@@ -3269,6 +4233,11 @@
         ,
     },
     .E0375 = .{
+        .key = "AMS-3.6.2b",
+        .tag = "incompatible_hierarchical_discipline_override",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.2",
         .title = "incompatible hierarchical discipline override",
         .lrm = "3.6.2",
         .explain =
@@ -3292,6 +4261,11 @@
         ,
     },
     .E0376 = .{
+        .key = "AMS-6.5.2.2b",
+        .tag = "port_has_no_direction_declaration",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.5.2.2",
         .title = "port has no direction declaration",
         .lrm = "6.5.2.2",
         .explain =
@@ -3310,6 +4284,11 @@
         ,
     },
     .E0377 = .{
+        .key = "AMS-3.4.2c",
+        .tag = "model_card_parameter_value_outside",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.4.2",
         .title = "a model-card parameter value is outside its range",
         .lrm = "3.4.2",
         .explain =
@@ -3334,6 +4313,11 @@
         ,
     },
     .E0378 = .{
+        .key = "AMS-3.6.2.1c",
+        .tag = "discipline_binds_undeclared_nature",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.2.1",
         .title = "discipline binds an undeclared nature",
         .lrm = "3.6.2.1",
         .explain =
@@ -3352,6 +4336,11 @@
         ,
     },
     .E0401 = .{
+        .key = "AMS-A.6.4b",
+        .tag = "disable_not_analog_statement",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.6.4",
         .title = "`disable` is not an analog statement",
         .lrm = "A.6.4",
         .explain =
@@ -3365,6 +4354,11 @@
         ,
     },
     .E0402 = .{
+        .key = "AMS-A.6.5d",
+        .tag = "disable_does_not_name_block",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.6.5",
         .title = "`disable` does not name a block",
         .lrm = "A.6.5",
         .explain =
@@ -3375,6 +4369,11 @@
         ,
     },
     .E0403 = .{
+        .key = "AMS-4.7.1d",
+        .tag = "return_outside_analog_function",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.7.1",
         .title = "`return` outside an analog function",
         .lrm = "4.7.1",
         .explain =
@@ -3384,6 +4383,11 @@
         ,
     },
     .E0404 = .{
+        .key = "AMS-5.9a",
+        .tag = "break_continue_outside_loop",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.9",
         .title = "`break` or `continue` outside a loop",
         .lrm = "5.9",
         .explain =
@@ -3392,6 +4396,11 @@
         ,
     },
     .E0405 = .{
+        .key = "AMS-5.2.1a",
+        .tag = "contribution_not_allowed_context",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.2.1",
         .title = "contribution is not allowed in this context",
         .lrm = "5.2.1",
         .explain =
@@ -3404,6 +4413,11 @@
         ,
     },
     .E0406 = .{
+        .key = "AMS-5.10a",
+        .tag = "contribution_inside_event_statement",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.10",
         .title = "contribution inside an event statement",
         .lrm = "5.10",
         .explain =
@@ -3415,6 +4429,11 @@
         ,
     },
     .E0407 = .{
+        .key = "AMS-5.4.3a",
+        .tag = "port_access_function_cannot_contribution",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.4.3",
         .title = "port access function cannot be a contribution target",
         .lrm = "5.4.3",
         .explain =
@@ -3427,6 +4446,11 @@
         ,
     },
     .E0408 = .{
+        .key = "AMS-5.6b",
+        .tag = "contribution_target_must_branch_access",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.6",
         .title = "contribution target must be a branch access",
         .lrm = "5.6",
         .explain =
@@ -3440,6 +4464,11 @@
         ,
     },
     .E0409 = .{
+        .key = "AMS-5.6.7.2a",
+        .tag = "branch_already_indirectly_assigned",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.6.7.2",
         .title = "branch is already indirectly assigned",
         .lrm = "5.6.7.2",
         .explain =
@@ -3452,6 +4481,11 @@
         ,
     },
     .E0410 = .{
+        .key = "AMS-5.2.1b",
+        .tag = "indirect_contribution_not_allowed_context",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.2.1",
         .title = "indirect contribution is not allowed in this context",
         .lrm = "5.2.1",
         .explain =
@@ -3461,6 +4495,11 @@
         ,
     },
     .E0411 = .{
+        .key = "AMS-5.10b",
+        .tag = "indirect_contribution_inside_event_statement",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.10",
         .title = "indirect contribution inside an event statement",
         .lrm = "5.10",
         .explain =
@@ -3469,6 +4508,11 @@
         ,
     },
     .E0412 = .{
+        .key = "AMS-5.6.7a",
+        .tag = "indirect_contribution_conditional_loop",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.6.7",
         .title = "indirect contribution in a conditional or loop",
         .lrm = "5.6.7",
         .explain =
@@ -3484,6 +4528,11 @@
         ,
     },
     .E0413 = .{
+        .key = "AMS-5.6.7b",
+        .tag = "indirect_contribution_target_must_branch",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.6.7",
         .title = "indirect contribution target must be a branch access",
         .lrm = "5.6.7",
         .explain =
@@ -3493,6 +4542,11 @@
         ,
     },
     .E0414 = .{
+        .key = "AMS-5.6.7c",
+        .tag = "invalid_left_side_indirect_contribution",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.6.7",
         .title = "invalid left side of '==' in an indirect contribution",
         .lrm = "5.6.7",
         .explain =
@@ -3505,11 +4559,19 @@
         ,
     },
     .E0415 = .{
+        .key = "AMS-5.6.7.2b",
+        .tag = "branch_already_has_direct_contribution",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.6.7.2",
         .title = "branch already has a direct contribution",
         .lrm = "5.6.7.2",
         .explain = "The mirror image of E0409 — see that code.",
     },
     .E0416 = .{
+        .key = "E0416",
+        .tag = "E0416",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -3521,6 +4583,11 @@
         ,
     },
     .E0417 = .{
+        .key = "AMS-6.6.1b",
+        .tag = "genvar_loop_bound_not_constant",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.6.1",
         .title = "genvar loop bound is not a constant expression",
         .lrm = "6.6.1",
         .explain =
@@ -3533,11 +4600,21 @@
         ,
     },
     .E0418 = .{
+        .key = "AMS-6.6.1c",
+        .tag = "genvar_loop_condition_not_constant",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.6.1",
         .title = "genvar loop condition is not a constant expression",
         .lrm = "6.6.1",
         .explain = "See E0417.",
     },
     .E0419 = .{
+        .key = "AMS-6.6.1d",
+        .tag = "genvar_loop_step_not_constant",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.6.1",
         .title = "genvar loop step is not a constant expression",
         .lrm = "6.6.1",
         .explain =
@@ -3547,6 +4624,11 @@
         ,
     },
     .E0420 = .{
+        .key = "AMS-6.6.1e",
+        .tag = "genvar_loop_did_not_terminate",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.6.1",
         .title = "genvar loop did not terminate",
         .lrm = "6.6.1",
         .explain =
@@ -3566,6 +4648,11 @@
         ,
     },
     .E0421 = .{
+        .key = "AMS-4.7.1e",
+        .tag = "access_function_not_allowed_context",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.7.1",
         .title = "access function is not allowed in this context",
         .lrm = "4.7.2",
         .explain =
@@ -3578,6 +4665,11 @@
         ,
     },
     .E0422 = .{
+        .key = "AMS-4.5.15a",
+        .tag = "analog_operator_not_allowed_context",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.5.15",
         .title = "analog operator is not allowed in this context",
         .lrm = "4.5.15",
         .explain =
@@ -3592,6 +4684,11 @@
         ,
     },
     .E0423 = .{
+        .key = "AMS-5.4.2.1a",
+        .tag = "both_quantities_probe_branch_read",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.4.2.1",
         .title = "both quantities of a probe branch are read",
         .lrm = "5.4.2.1",
         .explain =
@@ -3611,6 +4708,11 @@
         ,
     },
     .E0424 = .{
+        .key = "AMS-7.3.2.1a",
+        .tag = "special_floating_point_value_reaches",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "7.3.2.1",
         .title = "a special floating point value reaches a branch",
         .lrm = "7.3.2.1",
         .explain =
@@ -3633,6 +4735,11 @@
         ,
     },
     .E0425 = .{
+        .key = "AMS-1.3.4.1b",
+        .tag = "contribution_input_signal_flow_port",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "1.3.4.1",
         .title = "contribution to an `input` signal-flow port",
         .lrm = "1.3.4.1",
         .explain =
@@ -3656,6 +4763,11 @@
         ,
     },
     .E0426 = .{
+        .key = "AMS-5.9b",
+        .tag = "contribution_inside_runtime_loop",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.9",
         .title = "contribution inside a runtime loop",
         .lrm = "5.9",
         .explain =
@@ -3674,6 +4786,11 @@
         ,
     },
     .E0427 = .{
+        .key = "AMS-5.8.3a",
+        .tag = "default_arm_case_statement",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.8.3",
         .title = "more than one `default` arm in a case statement",
         .lrm = "5.8.3",
         .explain =
@@ -3686,6 +4803,11 @@
         ,
     },
     .E0428 = .{
+        .key = "AMS-6.6d",
+        .tag = "generate_scheme_not_constant_expression",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.6",
         .title = "a generate scheme is not a constant expression",
         .lrm = "6.6",
         .explain =
@@ -3711,6 +4833,11 @@
         ,
     },
     .E0429 = .{
+        .key = "AMS-5.7c",
+        .tag = "incompatible_array_assignment",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.7",
         .title = "incompatible array assignment",
         .lrm = "5.7",
         .explain =
@@ -3739,6 +4866,11 @@
         ,
     },
     .E0430 = .{
+        .key = "AMS-4.7.3a",
+        .tag = "analog_function_called_outside_analog",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.7.3",
         .title = "analog function called outside the analog context",
         .lrm = "4.7.3",
         .explain =
@@ -3760,6 +4892,11 @@
         ,
     },
     .E0431 = .{
+        .key = "AMS-5.2.1c",
+        .tag = "digital_value_read_from_analog",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.2.1",
         .title = "digital value read from an analog initial block",
         .lrm = "5.2.1",
         .explain =
@@ -3780,6 +4917,11 @@
         ,
     },
     .E0432 = .{
+        .key = "AMS-7.2.2a",
+        .tag = "variable_assigned_both_contexts",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "7.2.2",
         .title = "variable assigned in both contexts",
         .lrm = "7.2.2",
         .explain =
@@ -3800,6 +4942,11 @@
         ,
     },
     .E0433 = .{
+        .key = "AMS-7.2.2b",
+        .tag = "statement_initial_block_not_constant",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "7.2.2",
         .title = "statement in an initial block is not a constant assignment",
         .lrm = "7.2.2",
         .explain =
@@ -3823,6 +4970,11 @@
         ,
     },
     .E0434 = .{
+        .key = "AMS-A.6.4c",
+        .tag = "not_analog_statement",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.6.4",
         .title = "`->` is not an analog statement",
         .lrm = "A.6.4",
         .explain =
@@ -3841,6 +4993,11 @@
         ,
     },
     .E0435 = .{
+        .key = "AMS-7.3a",
+        .tag = "continuous_net_cannot_written_from",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "7.3",
         .title = "a continuous net cannot be written from a discrete context",
         .lrm = "7.3",
         .explain =
@@ -3871,6 +5028,11 @@
         ,
     },
     .E0436 = .{
+        .key = "AMS-7.3.7a",
+        .tag = "digital_function_cannot_called_from",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "7.3.7",
         .title = "a digital function cannot be called from the analog context",
         .lrm = "7.3.7",
         .explain =
@@ -3898,6 +5060,11 @@
         ,
     },
     .E0437 = .{
+        .key = "unsup-AMS-8.5a",
+        .tag = "unsup_discrete_process_needs_mixed_signal",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "8.5",
         .title = "this discrete process needs a mixed-signal kernel feature VerA does not implement",
         .lrm = "8.5",
         .explain =
@@ -3916,6 +5083,11 @@
         ,
     },
     .E0438 = .{
+        .key = "AMS-A.6.1a",
+        .tag = "continuous_assignment_drives_net_not",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.6.1",
         .title = "a continuous assignment drives a net, not a variable",
         .lrm = "A.6.1",
         .explain =
@@ -3931,6 +5103,11 @@
         ,
     },
     .E0439 = .{
+        .key = "AMS-5.6.8.2a",
+        .tag = "hierarchical_contribution_changes_branch_into",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.6.8.2",
         .title = "hierarchical contribution changes the branch into a switch branch",
         .lrm = "5.6.8.2",
         .explain =
@@ -3948,6 +5125,11 @@
         ,
     },
     .E0440 = .{
+        .key = "AMS-5.11a",
+        .tag = "break_continue_inside_analog_loop",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.11",
         .title = "`break` or `continue` inside an analog for loop",
         .lrm = "5.11",
         .explain =
@@ -3962,6 +5144,11 @@
         ,
     },
     .E0477 = .{
+        .key = "AMS-5.6.8.1a",
+        .tag = "contributions_from_two_module_instances",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.6.8.1",
         .title = "contributions from two module instances close a loop of potential sources",
         .lrm = "5.6.8.1",
         .explain =
@@ -3985,6 +5172,11 @@
         ,
     },
     .E0501 = .{
+        .key = "AMS-3.6.1.2g",
+        .tag = "unknown_access_function",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.6.1.2",
         .title = "unknown access function",
         .lrm = "3.6.1.2",
         .explain =
@@ -3999,11 +5191,19 @@
         ,
     },
     .E0502 = .{
+        .key = "AMS-4.5.3a",
+        .tag = "ddt_requires_argument",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.5.3",
         .title = "ddt() requires an argument",
         .lrm = "4.5.3",
         .explain = "`ddt(expr)` differentiates its operand with respect to time.",
     },
     .E0503 = .{
+        .key = "E0503",
+        .tag = "E0503",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -4015,6 +5215,11 @@
         ,
     },
     .E0504 = .{
+        .key = "AMS-4.5.6a",
+        .tag = "ddx_second_argument_must_access",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.5.6",
         .title = "ddx() second argument must be an access function",
         .lrm = "4.5.6",
         .explain =
@@ -4024,6 +5229,11 @@
         ,
     },
     .E0505 = .{
+        .key = "AMS-4.5.14a",
+        .tag = "analog_operator_does_not_accept",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.5.14",
         .title = "analog operator does not accept an empty argument",
         .lrm = "4.5.14",
         .explain =
@@ -4032,6 +5242,11 @@
         ,
     },
     .E0506 = .{
+        .key = "AMS-4.3a",
+        .tag = "wrong_number_arguments_math_function",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.3",
         .title = "wrong number of arguments to a math function or analog operator",
         .lrm = "4.3",
         .explain =
@@ -4043,6 +5258,11 @@
         ,
     },
     .E0507 = .{
+        .key = "AMS-5.4.3b",
+        .tag = "port_access_function_must_flow",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.4.3",
         .title = "port access function must be a flow access",
         .lrm = "5.4.3",
         .explain =
@@ -4055,6 +5275,11 @@
         ,
     },
     .E0508 = .{
+        .key = "AMS-5.4.3c",
+        .tag = "port_access_function_names_net",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.4.3",
         .title = "port access function names a net that is not a port",
         .lrm = "5.4.3",
         .explain =
@@ -4063,6 +5288,11 @@
         ,
     },
     .E0509 = .{
+        .key = "AMS-4.2.14b",
+        .tag = "assignment_pattern_only_legal_where",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.2.14",
         .title = "assignment pattern is only legal where an array is expected",
         .lrm = "4.5.11",
         .explain =
@@ -4080,6 +5310,11 @@
         ,
     },
     .E0510 = .{
+        .key = "AMS-4.7.3b",
+        .tag = "recursive_analog_function",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.7.3",
         .title = "recursive analog function",
         .lrm = "4.7.1",
         .explain =
@@ -4091,6 +5326,11 @@
         ,
     },
     .E0511 = .{
+        .key = "AMS-4.7.3c",
+        .tag = "wrong_number_arguments_analog_function",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.7.3",
         .title = "wrong number of arguments to an analog function",
         .lrm = "4.7.2",
         .explain =
@@ -4099,6 +5339,11 @@
         ,
     },
     .E0512 = .{
+        .key = "AMS-4.7a",
+        .tag = "unknown_function",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.7",
         .title = "unknown function",
         .lrm = "4.7",
         .explain =
@@ -4108,6 +5353,11 @@
         ,
     },
     .E0513 = .{
+        .key = "AMS-5.10.3.4a",
+        .tag = "absdelta_only_allowed_initial_always",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.10.3.4",
         .title = "absdelta() is only allowed in an initial or always block",
         .lrm = "5.10.3.4",
         .explain =
@@ -4126,6 +5376,11 @@
         ,
     },
     .E0514 = .{
+        .key = "AMS-5.8.1a",
+        .tag = "analog_operator_under_condition_can",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.8.1",
         .title = "analog operator under a condition that can change during the solve",
         .lrm = "5.8.1",
         .explain =
@@ -4171,6 +5426,11 @@
         ,
     },
     .E0515 = .{
+        .key = "AMS-4.5a",
+        .tag = "analog_operator_control_argument_not",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.5",
         .title = "analog operator control argument is not a constant or parameter expression",
         .lrm = "4.5",
         .explain =
@@ -4204,6 +5464,11 @@
         ,
     },
     .E0516 = .{
+        .key = "AMS-4.5b",
+        .tag = "analog_operator_argument_outside_range",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.5",
         .title = "analog operator argument is outside the range the LRM allows",
         .lrm = "4.5",
         .explain =
@@ -4238,6 +5503,11 @@
         ,
     },
     .E0517 = .{
+        .key = "AMS-5.10.3a",
+        .tag = "monitored_event_argument_wrong_type",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.10.3",
         .title = "monitored event argument is the wrong type or out of range",
         .lrm = "5.10.3",
         .explain =
@@ -4274,6 +5544,11 @@
         ,
     },
     .E0518 = .{
+        .key = "AMS-4.5.12a",
+        .tag = "zero_transition_time_z_filter",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.5.12",
         .title = "a zero-transition-time Z-filter cannot be contributed to a branch",
         .lrm = "4.5.12",
         .explain =
@@ -4298,6 +5573,11 @@
         ,
     },
     .E0519 = .{
+        .key = "AMS-4.6.4.3a",
+        .tag = "noise_table_not_usable_frequency",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.6.4.3",
         .title = "noise table is not a usable (frequency, power) table",
         .lrm = "4.6.4.3",
         .explain =
@@ -4341,6 +5621,11 @@
         ,
     },
     .E0520 = .{
+        .key = "AMS-4.6.4a",
+        .tag = "noise_generator_has_no_branch",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.6.4",
         .title = "noise generator has no branch to sit on",
         .lrm = "4.6.4",
         .explain =
@@ -4364,6 +5649,11 @@
         ,
     },
     .E0521 = .{
+        .key = "AMS-A.8.2b",
+        .tag = "ac_stim_analysis_name_not",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.8.2",
         .title = "ac_stim analysis name is not a string literal",
         .lrm = "A.8.2",
         .explain =
@@ -4381,6 +5671,11 @@
         ,
     },
     .E0522 = .{
+        .key = "AMS-4.6.4.2a",
+        .tag = "flicker_noise_requires_exponent",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.6.4.2",
         .title = "flicker_noise requires an exponent",
         .lrm = "4.6.4.2",
         .explain =
@@ -4396,6 +5691,11 @@
         ,
     },
     .E0523 = .{
+        .key = "VERA-lte-a",
+        .tag = "vera_lte_needs_constant_value",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "lte",
         .title = "vera_lte needs a constant value",
         .lrm = "2.9",
         .explain =
@@ -4414,6 +5714,11 @@
         ,
     },
     .E0524 = .{
+        .key = "VERA-interp-a",
+        .tag = "vera_interp_1_2",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "interp",
         .title = "vera_interp is 1 or 2",
         .lrm = "2.9",
         .explain =
@@ -4431,6 +5736,11 @@
         ,
     },
     .E0525 = .{
+        .key = "VERA-nodiff-a",
+        .tag = "vera_nodiff_needs_constant_value",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "nodiff",
         .title = "vera_nodiff needs a constant value",
         .lrm = "2.9",
         .explain =
@@ -4448,6 +5758,11 @@
         ,
     },
     .E0526 = .{
+        .key = "VERA-nodiff-b",
+        .tag = "vera_nodiff_covers_contribution",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "nodiff",
         .title = "vera_nodiff covers a contribution",
         .lrm = "2.9",
         .explain =
@@ -4461,6 +5776,11 @@
         ,
     },
     .E0527 = .{
+        .key = "VERA-limit_seed-a",
+        .tag = "limit_seed_reads_solution",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "limit_seed",
         .title = "$limit seed reads the solution",
         .lrm = "9.17.3",
         .explain =
@@ -4477,6 +5797,11 @@
         ,
     },
     .E0528 = .{
+        .key = "unsup-AMS-5.10.3.3a",
+        .tag = "unsup_changed_timer_control_would_repeat",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "5.10.3.3",
         .title = "changed timer control would repeat a side-effecting call",
         .lrm = "5.10.3.3",
         .explain =
@@ -4495,6 +5820,11 @@
         ,
     },
     .E0529 = .{
+        .key = "VERA-timepoint-a",
+        .tag = "vera_timepoint_needs_constant_value",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "timepoint",
         .title = "vera_timepoint needs a constant value",
         .lrm = "2.9",
         .explain =
@@ -4512,6 +5842,11 @@
         ,
     },
     .E0530 = .{
+        .key = "VERA-timepoint-b",
+        .tag = "not_allowed_vera_timepoint_statement",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "timepoint",
         .title = "not allowed in a vera_timepoint statement",
         .lrm = "2.9",
         .explain =
@@ -4531,6 +5866,11 @@
         ,
     },
     .E0531 = .{
+        .key = "VERA-timepoint-c",
+        .tag = "vera_timepoint_statement_reads_value",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "timepoint",
         .title = "vera_timepoint statement reads a value that moves between iterations",
         .lrm = "2.9",
         .explain =
@@ -4547,6 +5887,11 @@
         ,
     },
     .E0532 = .{
+        .key = "VERA-timepoint-d",
+        .tag = "vera_timepoint_statement_runs_once",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "timepoint",
         .title = "vera_timepoint statement runs more than once per evaluation",
         .lrm = "2.9",
         .explain =
@@ -4563,6 +5908,11 @@
         ,
     },
     .E0533 = .{
+        .key = "VERA-reject_step-a",
+        .tag = "vera_reject_step_outside_analog",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "reject_step",
         .title = "$vera_reject_step outside an analog block",
         .lrm = "2.8.3",
         .explain =
@@ -4581,6 +5931,11 @@
         ,
     },
     .E0534 = .{
+        .key = "VERA-scratch-a",
+        .tag = "vera_scratch_needs_constant_value",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "scratch",
         .title = "vera_scratch needs a constant value",
         .lrm = "2.9",
         .explain =
@@ -4598,6 +5953,11 @@
         ,
     },
     .E0535 = .{
+        .key = "VERA-scratch-b",
+        .tag = "vera_scratch_decorates_something_other",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "scratch",
         .title = "vera_scratch decorates something other than a variable",
         .lrm = "2.9",
         .explain =
@@ -4611,6 +5971,11 @@
         ,
     },
     .E0536 = .{
+        .key = "VERA-scratch-c",
+        .tag = "vera_scratch_variable_carries_value",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "scratch",
         .title = "vera_scratch variable carries a value between evaluations",
         .lrm = "5.10",
         .explain =
@@ -4627,6 +5992,11 @@
         ,
     },
     .E0537 = .{
+        .key = "VERA-scratch-d",
+        .tag = "vera_scratch_variable_written_digital",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "scratch",
         .title = "vera_scratch variable is written by a digital process",
         .lrm = "7.2.2",
         .explain =
@@ -4643,6 +6013,11 @@
         ,
     },
     .E0538 = .{
+        .key = "VERA-scratch-e",
+        .tag = "vera_scratch_string_value_not",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "scratch",
         .title = "vera_scratch string value is not \"uninit\"",
         .lrm = "2.9",
         .explain =
@@ -4658,6 +6033,11 @@
         ,
     },
     .E0539 = .{
+        .key = "VERA-scratch-f",
+        .tag = "vera_scratch_uninit_variable_has",
+        .kind = .rule,
+        .std = .vera,
+        .clause = "scratch",
         .title = "vera_scratch = \"uninit\" variable has an initializer",
         .lrm = "2.9",
         .explain =
@@ -4672,6 +6052,11 @@
         ,
     },
     .E0540 = .{
+        .key = "AMS-4.5.11a",
+        .tag = "filter_root_coefficient_vector_violates",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.5.11",
         .title = "filter root or coefficient vector violates a Laplace or Z-transform filter rule",
         .lrm = "4.5.11",
         .explain =
@@ -4692,6 +6077,11 @@
         ,
     },
     .E0572 = .{
+        .key = "AMS-4.5.1a",
+        .tag = "filter_coefficient_argument_not_array",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.5.1",
         .title = "filter coefficient argument is not an array",
         .lrm = "4.5.1",
         .explain =
@@ -4715,6 +6105,11 @@
         ,
     },
     .E0573 = .{
+        .key = "AMS-4.6.4b",
+        .tag = "noise_source_label_not_string",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.6.4",
         .title = "noise source label is not a string",
         .lrm = "4.6.4",
         .explain =
@@ -4732,6 +6127,11 @@
         ,
     },
     .E0574 = .{
+        .key = "AMS-4.6.1a",
+        .tag = "analysis_argument_not_quoted_analysis",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.6.1",
         .title = "analysis() argument is not a quoted analysis name",
         .lrm = "4.6.1",
         .explain =
@@ -4746,6 +6146,11 @@
         ,
     },
     .E0601 = .{
+        .key = "AMS-4.2.4a",
+        .tag = "zero_divisor",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.2.4",
         .title = "zero divisor",
         .lrm = "4.2.4",
         .explain =
@@ -4776,6 +6181,11 @@
         ,
     },
     .E0602 = .{
+        .key = "AMS-4.3.1a",
+        .tag = "argument_ln_log_must_positive",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.3.1",
         .title = "argument of ln/log must be positive",
         .lrm = "4.3.1",
         .explain =
@@ -4800,6 +6210,11 @@
         ,
     },
     .E0603 = .{
+        .key = "AMS-4.3.1b",
+        .tag = "argument_ln1p_must_greater_1",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.3.1",
         .title = "argument of ln1p must be greater than -1",
         .lrm = "4.3.1",
         .explain =
@@ -4808,6 +6223,11 @@
         ,
     },
     .E0604 = .{
+        .key = "AMS-4.3.1c",
+        .tag = "argument_sqrt_must_non_negative",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.3.1",
         .title = "argument of sqrt must be non-negative",
         .lrm = "4.3.1",
         .explain =
@@ -4818,6 +6238,11 @@
         ,
     },
     .E0605 = .{
+        .key = "AMS-4.3.2a",
+        .tag = "argument_asin_acos_must_within",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.3.2",
         .title = "argument of asin/acos must be within [-1, 1]",
         .lrm = "4.3.2",
         .explain =
@@ -4827,6 +6252,11 @@
         ,
     },
     .E0606 = .{
+        .key = "AMS-4.3.2b",
+        .tag = "argument_atanh_must_within_1",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.3.2",
         .title = "argument of atanh must be within (-1, 1)",
         .lrm = "4.3.2",
         .explain =
@@ -4836,6 +6266,11 @@
         ,
     },
     .E0607 = .{
+        .key = "AMS-4.3.2c",
+        .tag = "argument_acosh_must_least_1",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.3.2",
         .title = "argument of acosh must be at least 1",
         .lrm = "4.3.2",
         .explain =
@@ -4844,6 +6279,9 @@
         ,
     },
     .E0608 = .{
+        .key = "E0608",
+        .tag = "E0608",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -4864,6 +6302,11 @@
         ,
     },
     .E0609 = .{
+        .key = "AMS-4.3.1d",
+        .tag = "pow_arguments_violate_sign_rule",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "4.3.1",
         .title = "pow() arguments violate the sign rule",
         .lrm = "4.3.1",
         .explain =
@@ -4880,6 +6323,12 @@
         ,
     },
     .W0650 = .{
+        .key = "lint-unproven-finite",
+        .tag = "lint_unproven_finite",
+        .kind = .lint,
+        .std = .ams,
+        .clause = "4.3",
+        .severity = .warning,
         .title = "unit is not provably finite, so it compiles in strict float mode",
         .lrm = "4.3",
         .explain =
@@ -4930,6 +6379,12 @@
         ,
     },
     .W0651 = .{
+        .key = "lint-range-infinity",
+        .tag = "lint_range_infinity",
+        .kind = .lint,
+        .std = .ams,
+        .clause = "3.4.2",
+        .severity = .warning,
         .title = "parameter range admits infinity",
         .lrm = "3.4.2",
         .explain =
@@ -4948,6 +6403,10 @@
         ,
     },
     .W0652 = .{
+        .key = "W0652",
+        .tag = "W0652",
+        .kind = .retired,
+        .severity = .warning,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -4959,6 +6418,12 @@
         ,
     },
     .W0653 = .{
+        .key = "lint-divisor-maybe-zero",
+        .tag = "lint_divisor_maybe_zero",
+        .kind = .lint,
+        .std = .ams,
+        .clause = "4.2.4",
+        .severity = .warning,
         .title = "integer division by a divisor that may be zero",
         .lrm = "4.2.4",
         .explain =
@@ -4987,6 +6452,11 @@
         ,
     },
     .E0701 = .{
+        .key = "AMS-5.10c",
+        .tag = "event_expression_outside",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.10",
         .title = "event expression outside '@()'",
         .lrm = "5.10",
         .explain =
@@ -4998,6 +6468,11 @@
         ,
     },
     .E0702 = .{
+        .key = "AMS-5.2.1d",
+        .tag = "event_control_not_allowed_context",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.2.1",
         .title = "event control is not allowed in this context",
         .lrm = "5.2.1",
         .explain =
@@ -5007,6 +6482,11 @@
         ,
     },
     .E0703 = .{
+        .key = "AMS-5.10d",
+        .tag = "nested_event_control_statement",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.10",
         .title = "nested event control statement",
         .lrm = "5.10",
         .explain =
@@ -5018,6 +6498,11 @@
         ,
     },
     .E0704 = .{
+        .key = "AMS-5.10.1a",
+        .tag = "posedge_negedge_digital_only",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.10.1",
         .title = "posedge/negedge is digital-only",
         .lrm = "5.10.1",
         .explain =
@@ -5031,6 +6516,11 @@
         ,
     },
     .E0705 = .{
+        .key = "AMS-5.10.4a",
+        .tag = "not_declared_named_event",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.10.4",
         .title = "not a declared named event",
         .lrm = "5.10.4",
         .explain =
@@ -5046,6 +6536,11 @@
         ,
     },
     .E0706 = .{
+        .key = "unsup-AMS-5.10a",
+        .tag = "unsupported_event_expression",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "5.10",
         .title = "unsupported event expression",
         .lrm = "5.10",
         .explain =
@@ -5054,6 +6549,11 @@
         ,
     },
     .E0707 = .{
+        .key = "AMS-5.8a",
+        .tag = "event_control_statement_under_runtime",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.8",
         .title = "event control statement under a runtime condition or in a loop",
         .lrm = "5.8",
         .explain =
@@ -5088,6 +6588,11 @@
         ,
     },
     .E0708 = .{
+        .key = "AMS-5.10e",
+        .tag = "initial_step_final_step_digital",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "5.10",
         .title = "initial_step or final_step in the digital context",
         .lrm = "5.10",
         .explain =
@@ -5103,6 +6608,12 @@
         ,
     },
     .W0750 = .{
+        .key = "unsup-AMS-5.10.3a",
+        .tag = "unsup_event_fires_testbench_s_fixed",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "5.10.3",
+        .severity = .warning,
         .title = "event fires on the testbench's fixed time grid, not at its own time",
         .lrm = "5.10.3",
         .explain =
@@ -5127,6 +6638,9 @@
         ,
     },
     .E0801 = .{
+        .key = "E0801",
+        .tag = "E0801",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -5149,11 +6663,21 @@
         ,
     },
     .E0802 = .{
+        .key = "AMS-9.17.2a",
+        .tag = "bound_step_takes_exactly_argument",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.17.2",
         .title = "$bound_step takes exactly one argument",
         .lrm = "9.17.2",
         .explain = "`$bound_step(max_step)` — one real expression.",
     },
     .E0803 = .{
+        .key = "AMS-9.17.2b",
+        .tag = "bound_step_argument_must_non",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.17.2",
         .title = "$bound_step argument must be non-negative",
         .lrm = "9.17.2",
         .explain =
@@ -5162,6 +6686,11 @@
         ,
     },
     .E0804 = .{
+        .key = "AMS-9.17.1a",
+        .tag = "discontinuity_takes_most_argument",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.17.1",
         .title = "$discontinuity takes at most one argument",
         .lrm = "9.17.1",
         .explain =
@@ -5171,6 +6700,11 @@
         ,
     },
     .E0805 = .{
+        .key = "AMS-9.17.1b",
+        .tag = "discontinuity_argument_not_constant_expression",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.17.1",
         .title = "$discontinuity argument is not a constant expression",
         .lrm = "9.17.1",
         .explain =
@@ -5179,6 +6713,11 @@
         ,
     },
     .E0806 = .{
+        .key = "AMS-9.2a",
+        .tag = "system_task_not_supported_analog",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.2",
         .title = "system task is not supported in the analog context",
         .lrm = "9.2",
         .explain =
@@ -5221,6 +6760,11 @@
         ,
     },
     .E0807 = .{
+        .key = "AMS-9.7.2a",
+        .tag = "stop_shall_not_used_within",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.7.2",
         .title = "$stop shall not be used within an analog initial block",
         .lrm = "9.7.2",
         .explain =
@@ -5236,6 +6780,11 @@
         ,
     },
     .E0808 = .{
+        .key = "AMS-G.1a",
+        .tag = "retired_verilog_v1_0_spelling",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "G.1",
         .title = "retired Verilog-A v1.0 spelling",
         .lrm = "G.1",
         .explain =
@@ -5252,6 +6801,11 @@
         ,
     },
     .E0809 = .{
+        .key = "AMS-9.17.3a",
+        .tag = "limit_missing_argument_algorithm_requires",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.17.3",
         .title = "$limit is missing an argument its algorithm requires",
         .lrm = "9.17.3",
         .explain =
@@ -5272,6 +6826,11 @@
         ,
     },
     .E0810 = .{
+        .key = "AMS-9.4.3a",
+        .tag = "not_enough_arguments_format_specifiers",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.4.3",
         .title = "not enough arguments for the format specifiers",
         .lrm = "9.4.3",
         .explain =
@@ -5294,6 +6853,11 @@
         ,
     },
     .E0811 = .{
+        .key = "AMS-9.15a",
+        .tag = "simulation_parameter_not_known",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.15",
         .title = "simulation parameter is not known",
         .lrm = "9.15",
         .explain =
@@ -5332,6 +6896,11 @@
         ,
     },
     .E0812 = .{
+        .key = "AMS-9.20a",
+        .tag = "invalid_use_node_alias_system",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.20",
         .title = "invalid use of a node alias system function",
         .lrm = "9.20",
         .explain =
@@ -5375,6 +6944,11 @@
         ,
     },
     .E0813 = .{
+        .key = "AMS-9.5.3a",
+        .tag = "invalid_argument_string_formatting_scanning",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.5.3",
         .title = "invalid argument to a string formatting or scanning task",
         .lrm = "9.5.3",
         .explain =
@@ -5404,6 +6978,11 @@
         ,
     },
     .E0814 = .{
+        .key = "AMS-9.17.3b",
+        .tag = "limit_limiter_argument_not_input",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.17.3",
         .title = "a $limit limiter argument is not `input`",
         .lrm = "9.17.3",
         .explain =
@@ -5426,6 +7005,11 @@
         ,
     },
     .E0815 = .{
+        .key = "AMS-9.21a",
+        .tag = "table_model_data_source_control",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.21",
         .title = "$table_model data source or control string",
         .lrm = "9.21",
         .explain =
@@ -5459,6 +7043,11 @@
         ,
     },
     .E0816 = .{
+        .key = "AMS-9.13a",
+        .tag = "invalid_distribution_argument",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.13",
         .title = "a $9.13 probabilistic distribution argument",
         .lrm = "9.13",
         .explain =
@@ -5495,6 +7084,11 @@
         ,
     },
     .E0817 = .{
+        .key = "AMS-9.16a",
+        .tag = "simprobe_resolves_nothing_has_no",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.16",
         .title = "$simprobe resolves to nothing and has no fallback",
         .lrm = "9.16",
         .explain =
@@ -5519,6 +7113,11 @@
         ,
     },
     .E0818 = .{
+        .key = "AMS-9.22a",
+        .tag = "driver_access_function_outside_connect",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.22",
         .title = "driver access function outside a connect module",
         .lrm = "9.22",
         .explain =
@@ -5552,6 +7151,11 @@
         ,
     },
     .E0819 = .{
+        .key = "AMS-9.4.3b",
+        .tag = "format_conversion_does_not_match",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.4.3",
         .title = "format conversion does not match the operand's type",
         .lrm = "9.4.3",
         .explain =
@@ -5585,6 +7189,12 @@
         ,
     },
     .W0850 = .{
+        .key = "unsup-AMS-9.4a",
+        .tag = "unsup_task_dropped_device_does_not",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "9.4",
+        .severity = .warning,
         .title = "task dropped: a device does not print and has no file table",
         .lrm = "9.4",
         .explain =
@@ -5642,6 +7252,12 @@
         ,
     },
     .W0852 = .{
+        .key = "lint-vpi-sysfn",
+        .tag = "lint_vpi_sysfn",
+        .kind = .lint,
+        .std = .ams,
+        .clause = "2.8.3",
+        .severity = .warning,
         .title = "unregistered system function is left to a VPI host",
         .lrm = "12.32.3",
         .explain =
@@ -5688,6 +7304,11 @@
         ,
     },
     .E0901 = .{
+        .key = "AMS-6.7a",
+        .tag = "hierarchical_name_names_nothing_elaborated",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.7",
         .title = "hierarchical name names nothing in the elaborated design",
         .lrm = "6.7",
         .explain =
@@ -5714,6 +7335,11 @@
         ,
     },
     .E0902 = .{
+        .key = "AMS-7.4.4a",
+        .tag = "discipline_declaration_net",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "7.4.4",
         .title = "more than one discipline declaration for one net",
         .lrm = "7.4.4",
         .explain =
@@ -5737,6 +7363,11 @@
         ,
     },
     .E0903 = .{
+        .key = "AMS-F.2.1a",
+        .tag = "unknown_discipline_net_mixed_port",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "F.2.1",
         .title = "unknown discipline on a net with a mixed-port connection",
         .lrm = "F.2.1",
         .explain =
@@ -5767,6 +7398,11 @@
         ,
     },
     .E0904 = .{
+        .key = "AMS-6.2.2a",
+        .tag = "instance_names_no_module",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.2.2",
         .title = "instance names no module",
         .lrm = "6.2.2",
         .explain =
@@ -5780,6 +7416,11 @@
         ,
     },
     .E0905 = .{
+        .key = "AMS-6.2.2b",
+        .tag = "recursive_module_instantiation",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.2.2",
         .title = "recursive module instantiation",
         .lrm = "6.2.2",
         .explain =
@@ -5795,6 +7436,11 @@
         ,
     },
     .E0906 = .{
+        .key = "AMS-6.2.2c",
+        .tag = "port_connections_do_not_match",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.2.2",
         .title = "port connections do not match the module's ports",
         .lrm = "6.2.2",
         .explain =
@@ -5809,6 +7455,11 @@
         ,
     },
     .E0907 = .{
+        .key = "AMS-6.3a",
+        .tag = "override_names_no_parameter_module",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.3",
         .title = "override names no parameter of the module",
         .lrm = "6.3",
         .explain =
@@ -5830,6 +7481,12 @@
         ,
     },
     .E0908 = .{
+        .key = "AMS-6.3.3a",
+        .tag = "parameter_overridden_once",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.3.3",
+        .also = "AMS-3.4.7",
         .title = "a parameter is overridden more than once",
         .lrm = "6.3.3 / 3.4.7",
         .explain =
@@ -5844,6 +7501,11 @@
         ,
     },
     .E0909 = .{
+        .key = "AMS-6.2.2d",
+        .tag = "instance_array_range_not_elaboration",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.2.2",
         .title = "instance array range is not an elaboration-time constant",
         .lrm = "6.2.2",
         .explain =
@@ -5857,6 +7519,11 @@
         ,
     },
     .E0910 = .{
+        .key = "AMS-6.7.1a",
+        .tag = "analog_variable_accessed_hierarchically",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.7.1",
         .title = "analog variable accessed hierarchically",
         .lrm = "6.7.1",
         .explain =
@@ -5876,6 +7543,11 @@
         ,
     },
     .E0911 = .{
+        .key = "AMS-6.4.2a",
+        .tag = "no_paramset_admits_instance_s",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.4.2",
         .title = "no paramset admits this instance's parameter values",
         .lrm = "6.4.2",
         .explain =
@@ -5900,6 +7572,11 @@
         ,
     },
     .E0912 = .{
+        .key = "AMS-6.3.6a",
+        .tag = "flow_contribution_scaled_mfactor_twice",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.3.6",
         .title = "flow contribution scaled by $mfactor twice",
         .lrm = "6.3.6",
         .explain =
@@ -5924,6 +7601,9 @@
         ,
     },
     .E0913 = .{
+        .key = "E0913",
+        .tag = "E0913",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -5936,6 +7616,11 @@
         ,
     },
     .E0914 = .{
+        .key = "AMS-6.4.2b",
+        .tag = "paramset_still_applicable",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.4.2",
         .title = "more than one paramset is still applicable",
         .lrm = "6.4.2",
         .explain =
@@ -5965,6 +7650,11 @@
         ,
     },
     .E0915 = .{
+        .key = "AMS-7.7.1a",
+        .tag = "connect_insertion_names_no_connect",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "7.7.1",
         .title = "connect insertion names no connect module",
         .lrm = "7.7.1",
         .explain =
@@ -5986,6 +7676,11 @@
         ,
     },
     .E0916 = .{
+        .key = "AMS-7.7.2a",
+        .tag = "connect_resolution_names_no_discipline",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "7.7.2",
         .title = "connect resolution names no discipline",
         .lrm = "7.7.2",
         .explain =
@@ -6005,6 +7700,11 @@
         ,
     },
     .E0917 = .{
+        .key = "AMS-7.7.2b",
+        .tag = "disciplines_excluded_connect_resolution_share",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "7.7.2",
         .title = "disciplines excluded by a connect resolution share a net",
         .lrm = "7.7.2",
         .explain =
@@ -6028,6 +7728,11 @@
         ,
     },
     .E1001 = .{
+        .key = "AMS-6.2b",
+        .tag = "source_contains_no_module_declaration",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.2",
         .title = "source contains no module declaration",
         .lrm = "6.2",
         .explain =
@@ -6053,6 +7758,9 @@
         ,
     },
     .E1002 = .{
+        .key = "E1002",
+        .tag = "E1002",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -6074,6 +7782,9 @@
         ,
     },
     .E1003 = .{
+        .key = "E1003",
+        .tag = "E1003",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -6087,6 +7798,11 @@
         ,
     },
     .E1004 = .{
+        .key = "unsup-AMS-6.3.4a",
+        .tag = "unsupported_dependent_parameter_expression",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "6.3.4",
         .title = "unsupported dependent parameter expression",
         .lrm = "6.3.4",
         .explain =
@@ -6101,6 +7817,9 @@
         ,
     },
     .E1010 = .{
+        .key = "E1010",
+        .tag = "E1010",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -6112,6 +7831,9 @@
         ,
     },
     .E1011 = .{
+        .key = "limit-text-buffer",
+        .tag = "limit_text_buffer",
+        .kind = .limit,
         .title = "text exceeds the buffer sized for it",
         .lrm = "",
         .explain =
@@ -6142,6 +7864,9 @@
         ,
     },
     .E1012 = .{
+        .key = "E1012",
+        .tag = "E1012",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -6153,6 +7878,9 @@
         ,
     },
     .E1013 = .{
+        .key = "limit-file-bytes",
+        .tag = "limit_file_bytes",
+        .kind = .limit,
         .title = "a file is larger than VerA reads",
         .lrm = "",
         .explain =
@@ -6171,6 +7899,9 @@
         ,
     },
     .E1014 = .{
+        .key = "limit-reserved-sysfn",
+        .tag = "limit_reserved_sysfn",
+        .kind = .limit,
         .title = "a system function name VerA reserves",
         .lrm = "",
         .explain =
@@ -6186,6 +7917,9 @@
         ,
     },
     .E1015 = .{
+        .key = "limit-rows",
+        .tag = "limit_rows",
+        .kind = .limit,
         .title = "more nets and unknowns than a 32-bit row index holds",
         .lrm = "",
         .explain =
@@ -6200,6 +7934,9 @@
         ,
     },
     .E1016 = .{
+        .key = "limit-array-elements",
+        .tag = "limit_array_elements",
+        .kind = .limit,
         .title = "an array or assignment pattern has more elements than a 32-bit index holds",
         .lrm = "",
         .explain =
@@ -6213,6 +7950,9 @@
         ,
     },
     .E1017 = .{
+        .key = "E1017",
+        .tag = "E1017",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -6223,6 +7963,9 @@
         ,
     },
     .E1018 = .{
+        .key = "E1018",
+        .tag = "E1018",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -6234,6 +7977,9 @@
         ,
     },
     .E1019 = .{
+        .key = "limit-literal-bits",
+        .tag = "limit_literal_bits",
+        .kind = .limit,
         .title = "a number literal's size exceeds 4294967295 bits",
         .lrm = "",
         .explain =
@@ -6249,6 +7995,9 @@
         ,
     },
     .E1020 = .{
+        .key = "ice-codegen-call",
+        .tag = "ice_codegen_call",
+        .kind = .ice,
         .title = "the code generator met a call it cannot render",
         .lrm = "",
         .explain =
@@ -6262,6 +8011,9 @@
         ,
     },
     .E1021 = .{
+        .key = "limit-call-operands",
+        .tag = "limit_call_operands",
+        .kind = .limit,
         .title = "a call has more operands than its 24-bit count holds",
         .lrm = "",
         .explain =
@@ -6275,6 +8027,9 @@
         ,
     },
     .E1022 = .{
+        .key = "limit-status-sites",
+        .tag = "limit_status_sites",
+        .kind = .limit,
         .title = "a device has more `$fatal` and `$error` sites than its status code holds",
         .lrm = "",
         .explain =
@@ -6288,11 +8043,21 @@
         ,
     },
     .E1100 = .{
+        .key = "unsup-AMS-8.5b",
+        .tag = "unsup_digital_source_execution_failed",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "8.5",
         .title = "digital source execution failed",
         .lrm = "8.5",
         .explain = "The digital executor supports a documented subset of source processes. Unsupported forms are diagnosed before simulation; timing and capacity failures stop execution explicitly. This does not make legal unsupported Verilog-AMS forms illegal.",
     },
     .E1101 = .{
+        .key = "unsup-V2005-4.1a",
+        .tag = "unsup_design_refused_under_two_state",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "4.1",
         .title = "design refused under --two-state",
         .lrm = "IEEE 1364-2005 4.1",
         .explain =
@@ -6315,6 +8080,11 @@
         ,
     },
     .E1102 = .{
+        .key = "unsup-V2005-17.2.10a",
+        .tag = "unsup_sdf_file_annotator_cannot_read",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "17.2.10",
         .title = "an SDF file the annotator cannot read",
         .lrm = "IEEE 1364-2005 17.2.10",
         .explain =
@@ -6332,6 +8102,12 @@
         ,
     },
     .W1105 = .{
+        .key = "unsup-V2005-16.2a",
+        .tag = "unsup_sdf_construct_annotator_does_not",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "16.2",
+        .severity = .warning,
         .title = "an SDF construct the annotator does not apply",
         .lrm = "IEEE 1364-2005 16.2",
         .explain =
@@ -6345,6 +8121,11 @@
         ,
     },
     .E1103 = .{
+        .key = "unsup-AMS-7.8a",
+        .tag = "unsup_design_cannot_contract_device",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "7.8",
         .title = "design cannot be a contract device",
         .lrm = "7.8",
         .explain =
@@ -6369,6 +8150,9 @@
         ,
     },
     .E1104 = .{
+        .key = "unsup-systemverilog",
+        .tag = "unsup_systemverilog",
+        .kind = .unsup,
         .title = "a SystemVerilog source is not supported",
         .lrm = "",
         .explain =
@@ -6381,6 +8165,11 @@
         ,
     },
     .E1147 = .{
+        .key = "unsup-V2005-15.5a",
+        .tag = "unsup_timing_check_argument_digital_engine",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "15.5",
         .title = "a timing check argument the digital engine cannot bind",
         .lrm = "IEEE 1364-2005 15.5",
         .explain =
@@ -6404,6 +8193,11 @@
         ,
     },
     .E1148 = .{
+        .key = "V2005-15.1a",
+        .tag = "timing_check_limit_not_non",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "15.1",
         .title = "a timing check limit that is not a non-negative constant",
         .lrm = "IEEE 1364-2005 15.1",
         .explain =
@@ -6419,6 +8213,11 @@
         ,
     },
     .E1149 = .{
+        .key = "unsup-V2005-15a",
+        .tag = "unsup_timing_check_vera_s_digital",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "15",
         .title = "a timing check VerA's digital engine does not evaluate",
         .lrm = "IEEE 1364-2005 15",
         .explain =
@@ -6438,16 +8237,34 @@
         ,
     },
     .W1150 = .{
+        .key = "V2005-17.2.9a",
+        .tag = "memory_file_word_count_mismatch",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "17.2.9",
+        .severity = .warning,
         .title = "memory file word count mismatch",
         .lrm = "IEEE 1364-2005 17.2.9",
         .explain = "Without address specifications in the memory file, a data-word count different from the requested load range requires a warning. Available words are loaded within the range; missing words leave existing memory contents unchanged. This warning does not refuse the load.",
     },
     .W1151 = .{
+        .key = "V2005-17.9.2a",
+        .tag = "probabilistic_distribution_argument_not_positive",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "17.9.2",
+        .severity = .warning,
         .title = "probabilistic distribution argument not positive",
         .lrm = "IEEE 1364-2005 17.9.2",
         .explain = "The mean of $dist_exponential, $dist_poisson and $dist_erlang, the degree of freedom of $dist_chi_square and $dist_t, and the k_stage of $dist_erlang shall be greater than 0. The 17.9.3 reference listing prints a warning for such a call and returns 0 without drawing, so the seed argument is not written.",
     },
     .W1152 = .{
+        .key = "V2005-13.2.1.1a",
+        .tag = "two_cells_name_library",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "13.2.1.1",
+        .severity = .warning,
         .title = "two cells with one name in one library",
         .lrm = "IEEE 1364-2005 13.2.1.1",
         .explain =
@@ -6461,31 +8278,67 @@
         ,
     },
     .W1153 = .{
+        .key = "lint-format-pairs",
+        .tag = "lint_format_pairs",
+        .kind = .lint,
+        .std = .v2005,
+        .clause = "17.2.3",
+        .severity = .warning,
         .title = "format specifiers and arguments do not pair up",
         .lrm = "IEEE 1364-2005 17.2.3",
         .explain = "The arguments after $sformat's format are consumed by its format specifiers. If not enough arguments are supplied for the specifiers, or too many are supplied, the application shall issue a warning and continue execution: the variable receives the text formatted so far.",
     },
     .W1154 = .{
+        .key = "lint-file-not-written",
+        .tag = "lint_file_not_written",
+        .kind = .lint,
+        .std = .v2005,
+        .clause = "17.2.1",
+        .severity = .warning,
         .title = "file output not written",
         .lrm = "IEEE 1364-2005 17.2.1",
         .explain = "$fclose closes the channels a descriptor names and does not allow any further output to them. A $fdisplay or $fwrite whose descriptor names only closed channels, or a file opened only for reading, writes nothing; $ferror reports the error. The simulation continues.",
     },
     .W1155 = .{
+        .key = "lint-tick-1s",
+        .tag = "lint_tick_1s",
+        .kind = .lint,
+        .std = .v2005,
+        .clause = "19.8",
+        .severity = .warning,
         .title = "device digital tick is 1 s",
         .lrm = "IEEE 1364-2005 19.8",
         .explain = "A design with no `timescale directive runs at the simulator's default time unit and precision, which for VerA is 1 s. A contract device built from it delivers every analog-to-digital event at a whole second and schedules every delay in seconds, which an analog host rarely means. Add a `timescale directive (for example `timescale 1ns/1ps) to the design.",
     },
     .W1156 = .{
+        .key = "V2005-17.2.9b",
+        .tag = "memory_file_address_outside_memory",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "17.2.9",
+        .severity = .warning,
         .title = "memory file address outside the memory",
         .lrm = "IEEE 1364-2005 17.2.9",
         .explain = "A `$readmemb`/`$readmemh` call with no start or finish argument met an `@` address outside the memory's declared range. The clause's error for an address outside the load range applies only when the task gives addresses, so VerA does not stop the load: the words at addresses outside the memory are skipped, and loading continues at the next in-range address. The warning names the first such address (specification/Vague_Decisions.md VD-040).",
     },
     .W1157 = .{
+        .key = "lint-readmem-stopped",
+        .tag = "lint_readmem_stopped",
+        .kind = .lint,
+        .std = .v2005,
+        .clause = "17.2.9",
+        .severity = .warning,
         .title = "a $readmem load terminated",
         .lrm = "IEEE 1364-2005 17.2.9",
         .explain = "A `$readmemb`/`$readmemh` load could not go on: a file address outside the start..finish range the task gives (§17.2.9: \"an error message is issued, and the load operation is terminated\"), a word or `@` address that is not a number in the task's radix (the file \"shall contain only\" white space, comments and such numbers), a file that cannot be opened or read, a file name with an x or z bit, a start or finish address that is x, z or outside the memory. VerA issues this message and stops that load: the words loaded before it stay, none after it is loaded, and the simulation goes on. The run's exit status is untouched, as iverilog's is (specification/Vague_Decisions.md VD-134). With no start or finish argument an address outside the memory is W1156 instead.",
     },
     .W1160 = .{
+        .key = "V2005-12.3.10a",
+        .tag = "dissimilar_net_types_joined_through",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "12.3.10",
+        .severity = .warning,
         .title = "dissimilar net types joined through a port",
         .lrm = "IEEE 1364-2005 12.3.10",
         .explain =
@@ -6499,16 +8352,34 @@
         ,
     },
     .W1161 = .{
+        .key = "lint-extra-ordered-params",
+        .tag = "lint_extra_ordered_params",
+        .kind = .lint,
+        .std = .v2005,
+        .clause = "12.2.2.1",
+        .severity = .warning,
         .title = "extra ordered parameter values ignored",
         .lrm = "IEEE 1364-2005 12.2.2.1",
         .explain = "A module instance's parameter value assignment by ordered list gives more values than the module has parameters (local parameters are not in the list). §12.2.2.1 says what the list's order follows and that it may be shorter, not what a longer one means; VerA ignores the values past the last parameter and warns, as iverilog does (specification/Vague_Decisions.md VD-139).",
     },
     .W1162 = .{
+        .key = "V2005-15.5.1a",
+        .tag = "negative_timing_check_limits_cannot",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "15.5.1",
+        .severity = .warning,
         .title = "negative timing check limits that cannot all be met",
         .lrm = "IEEE 1364-2005 15.5.1",
         .explain = "With --negative-timing, $setuphold and $recrem take negative limits through delayed copies of their signals, one delay per signal per instance, chosen so every adjusted limit is non-negative. A set of limits whose windows contradict each other (a setup and hold summing below zero around a cycle of signals) has no such delays. §15.5.1: \"the problem shall be resolved by changing the smallest negative limit value to 0\"; VerA does that, warns once per change, and solves again.",
     },
     .W1199 = .{
+        .key = "V2005-15.2a",
+        .tag = "timing_violation",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "15.2",
+        .severity = .warning,
         .title = "timing violation",
         .lrm = "IEEE 1364-2005 15.2",
         .explain =
@@ -6530,6 +8401,11 @@
         ,
     },
     .E1200 = .{
+        .key = "unsup-AMS-7a",
+        .tag = "unsup_rtlil_analog_mixed_signal_description",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "7",
         .title = "an analog or mixed-signal description --emit-rtlil does not lower",
         .lrm = "",
         .explain =
@@ -6540,6 +8416,11 @@
         ,
     },
     .E1201 = .{
+        .key = "unsup-V2005-8a",
+        .tag = "unsup_rtlil_user_defined_primitive",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "8",
         .title = "a user-defined primitive --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 8",
         .explain =
@@ -6551,6 +8432,11 @@
         ,
     },
     .E1202 = .{
+        .key = "unsup-AMS-5.2a",
+        .tag = "unsup_rtlil_analog_block",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "5.2",
         .title = "an analog block --emit-rtlil does not lower",
         .lrm = "",
         .explain =
@@ -6560,6 +8446,11 @@
         ,
     },
     .E1203 = .{
+        .key = "unsup-AMS-7.8b",
+        .tag = "unsup_rtlil_connect_module",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "7.8",
         .title = "a connect module --emit-rtlil does not lower",
         .lrm = "7.8",
         .explain =
@@ -6569,6 +8460,11 @@
         ,
     },
     .E1204 = .{
+        .key = "unsup-V2005-12.4a",
+        .tag = "unsup_rtlil_generate_construct",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "12.4",
         .title = "a generate construct --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 12.4",
         .explain =
@@ -6579,6 +8475,11 @@
         ,
     },
     .E1205 = .{
+        .key = "unsup-V2005-12.2.1a",
+        .tag = "unsup_rtlil_defparam",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "12.2.1",
         .title = "a defparam --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 12.2.1",
         .explain =
@@ -6590,6 +8491,11 @@
         ,
     },
     .E1206 = .{
+        .key = "unsup-V2005-10.2a",
+        .tag = "unsup_rtlil_task",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "10.2",
         .title = "a task --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 10.2",
         .explain =
@@ -6600,6 +8506,11 @@
         ,
     },
     .E1207 = .{
+        .key = "unsup-V2005-10.4a",
+        .tag = "unsup_rtlil_function",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "10.4",
         .title = "a function --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 10.4",
         .explain =
@@ -6610,6 +8521,11 @@
         ,
     },
     .E1208 = .{
+        .key = "unsup-V2005-9.7.3a",
+        .tag = "unsup_rtlil_named_event",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.7.3",
         .title = "a named event --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 9.7.3",
         .explain =
@@ -6620,6 +8536,11 @@
         ,
     },
     .E1209 = .{
+        .key = "unsup-V2005-7.8a",
+        .tag = "unsup_rtlil_pullup_pulldown",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "7.8",
         .title = "a pullup or pulldown --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 7.8",
         .explain =
@@ -6630,6 +8551,11 @@
         ,
     },
     .E1210 = .{
+        .key = "unsup-V2005-7.5a",
+        .tag = "unsup_rtlil_switch_primitive",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "7.5",
         .title = "a switch primitive --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 7.5",
         .explain =
@@ -6640,6 +8566,11 @@
         ,
     },
     .E1211 = .{
+        .key = "unsup-AMS-3.12a",
+        .tag = "unsup_rtlil_analog_branch",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "3.12",
         .title = "an analog branch --emit-rtlil does not lower",
         .lrm = "3.12",
         .explain =
@@ -6649,6 +8580,11 @@
         ,
     },
     .E1212 = .{
+        .key = "unsup-V2005-12.3.1a",
+        .tag = "unsup_rtlil_port_expression",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "12.3.1",
         .title = "a port expression --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 12.3.1",
         .explain =
@@ -6660,6 +8596,11 @@
         ,
     },
     .E1213 = .{
+        .key = "unsup-AMS-A.1.3a",
+        .tag = "unsup_rtlil_header_port_selects_part",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "A.1.3",
         .title = "a header port that selects part of its net",
         .lrm = "A.1.3",
         .explain =
@@ -6671,6 +8612,11 @@
         ,
     },
     .E1214 = .{
+        .key = "unsup-AMS-3.7a",
+        .tag = "unsup_rtlil_wreal_port",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "3.7",
         .title = "a wreal port --emit-rtlil does not lower",
         .lrm = "3.7",
         .explain =
@@ -6680,6 +8626,11 @@
         ,
     },
     .E1215 = .{
+        .key = "unsup-AMS-3.7b",
+        .tag = "unsup_rtlil_wreal_net",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "3.7",
         .title = "a wreal net --emit-rtlil does not lower",
         .lrm = "3.7",
         .explain =
@@ -6689,6 +8640,11 @@
         ,
     },
     .E1216 = .{
+        .key = "unsup-V2005-4.9a",
+        .tag = "unsup_rtlil_net_array",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "4.9",
         .title = "a net array --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 4.9",
         .explain =
@@ -6699,6 +8655,11 @@
         ,
     },
     .E1217 = .{
+        .key = "unsup-V2005-4.9.3a",
+        .tag = "unsup_rtlil_memory",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "4.9.3",
         .title = "a memory --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 4.9.3",
         .explain =
@@ -6709,6 +8670,11 @@
         ,
     },
     .E1218 = .{
+        .key = "unsup-V2005-4.8a",
+        .tag = "unsup_rtlil_real_variable",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "4.8",
         .title = "a real variable --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 4.8",
         .explain =
@@ -6719,6 +8685,11 @@
         ,
     },
     .E1219 = .{
+        .key = "unsup-V2005-3.6a",
+        .tag = "unsup_rtlil_string_variable",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "3.6",
         .title = "a string variable --emit-rtlil does not lower",
         .lrm = "",
         .explain =
@@ -6729,6 +8700,11 @@
         ,
     },
     .E1220 = .{
+        .key = "unsup-V2005-4.3.1a",
+        .tag = "unsup_rtlil_range",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "4.3.1",
         .title = "a range --emit-rtlil cannot fold to a constant",
         .lrm = "IEEE 1364-2005 4.3.1",
         .explain =
@@ -6740,6 +8716,11 @@
         ,
     },
     .E1221 = .{
+        .key = "limit-rtlil-wire-offset",
+        .tag = "limit_rtlil_wire_offset",
+        .kind = .limit,
+        .std = .v2005,
+        .clause = "4.3.1",
         .title = "a range whose bounds do not fit RTLIL's 32-bit wire offset",
         .lrm = "IEEE 1364-2005 4.3.1",
         .explain =
@@ -6750,6 +8731,11 @@
         ,
     },
     .E1222 = .{
+        .key = "limit-rtlil-wire-width",
+        .tag = "limit_rtlil_wire_width",
+        .kind = .limit,
+        .std = .v2005,
+        .clause = "4.3.1",
         .title = "a range wider than RTLIL's 2^31 - 1 bits",
         .lrm = "IEEE 1364-2005 4.3.1",
         .explain =
@@ -6760,6 +8746,11 @@
         ,
     },
     .E1223 = .{
+        .key = "unsup-V2005-12.2a",
+        .tag = "unsup_rtlil_parameter_default",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "12.2",
         .title = "a parameter default --emit-rtlil cannot fold to a constant",
         .lrm = "IEEE 1364-2005 12.2",
         .explain =
@@ -6772,6 +8763,11 @@
         ,
     },
     .E1224 = .{
+        .key = "V2005-4.5a",
+        .tag = "name_not_declared_module",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "4.5",
         .title = "a name not declared in its module",
         .lrm = "IEEE 1364-2005 4.5",
         .explain =
@@ -6783,6 +8779,11 @@
         ,
     },
     .E1225 = .{
+        .key = "unsup-V2005-3.5.2a",
+        .tag = "unsup_rtlil_real_literal",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "3.5.2",
         .title = "a real literal --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 3.5.2",
         .explain =
@@ -6794,6 +8795,11 @@
         ,
     },
     .E1226 = .{
+        .key = "unsup-V2005-3.6b",
+        .tag = "unsup_rtlil_string_literal",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "3.6",
         .title = "a string literal --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 3.6",
         .explain =
@@ -6804,6 +8810,11 @@
         ,
     },
     .E1227 = .{
+        .key = "unsup-V2005-12.5a",
+        .tag = "unsup_rtlil_hierarchical_reference",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "12.5",
         .title = "a hierarchical reference --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 12.5",
         .explain =
@@ -6815,6 +8826,11 @@
         ,
     },
     .E1228 = .{
+        .key = "unsup-V2005-10.4b",
+        .tag = "unsup_rtlil_function_call",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "10.4",
         .title = "a function call --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 10.4",
         .explain =
@@ -6825,6 +8841,11 @@
         ,
     },
     .E1229 = .{
+        .key = "unsup-V2005-5a",
+        .tag = "unsup_rtlil_expression_no_synthesizable_design",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "5",
         .title = "an expression no synthesizable design has here",
         .lrm = "IEEE 1364-2005 5",
         .explain =
@@ -6835,6 +8856,11 @@
         ,
     },
     .E1230 = .{
+        .key = "unsup-V2005-17a",
+        .tag = "unsup_rtlil_system_function",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "17",
         .title = "a system function --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 17",
         .explain =
@@ -6845,6 +8871,11 @@
         ,
     },
     .E1231 = .{
+        .key = "unsup-V2005-17.11.1a",
+        .tag = "unsup_rtlil_clog2_non_constant",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "17.11.1",
         .title = "a `$clog2` of a non-constant",
         .lrm = "IEEE 1364-2005 17.11.1",
         .explain =
@@ -6855,6 +8886,11 @@
         ,
     },
     .E1232 = .{
+        .key = "unsup-V2005-12.2b",
+        .tag = "unsup_rtlil_real_parameter_read_expression",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "12.2",
         .title = "a real parameter read in an expression",
         .lrm = "IEEE 1364-2005 12.2",
         .explain =
@@ -6865,6 +8901,11 @@
         ,
     },
     .E1233 = .{
+        .key = "unsup-V2005-5.1.14a",
+        .tag = "unsup_rtlil_replication_count",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "5.1.14",
         .title = "a replication count --emit-rtlil cannot fold to a constant",
         .lrm = "IEEE 1364-2005 5.1.14",
         .explain =
@@ -6875,6 +8916,11 @@
         ,
     },
     .E1234 = .{
+        .key = "V2005-5.1.14a",
+        .tag = "replication_count_zero_negative",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "5.1.14",
         .title = "a replication count that is zero or negative",
         .lrm = "IEEE 1364-2005 5.1.14",
         .explain =
@@ -6885,6 +8931,11 @@
         ,
     },
     .E1235 = .{
+        .key = "limit-rtlil-replication",
+        .tag = "limit_rtlil_replication",
+        .kind = .limit,
+        .std = .v2005,
+        .clause = "5.1.14",
         .title = "a replication wider than --emit-rtlil's constant limit",
         .lrm = "IEEE 1364-2005 5.1.14",
         .explain =
@@ -6895,6 +8946,11 @@
         ,
     },
     .E1236 = .{
+        .key = "unsup-V2005-5.2.1a",
+        .tag = "unsup_rtlil_part_select_bound",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "5.2.1",
         .title = "a part-select bound --emit-rtlil cannot fold to a constant",
         .lrm = "IEEE 1364-2005 5.2.1",
         .explain =
@@ -6905,6 +8961,11 @@
         ,
     },
     .E1237 = .{
+        .key = "unsup-V2005-5.2.1b",
+        .tag = "unsup_rtlil_indexed_part_select_width",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "5.2.1",
         .title = "an indexed part-select width --emit-rtlil cannot fold to a constant",
         .lrm = "IEEE 1364-2005 5.2.1",
         .explain =
@@ -6915,6 +8976,11 @@
         ,
     },
     .E1238 = .{
+        .key = "V2005-5.2.1a",
+        .tag = "indexed_part_select_width_zero",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "5.2.1",
         .title = "an indexed part-select width that is zero or negative",
         .lrm = "IEEE 1364-2005 5.2.1",
         .explain =
@@ -6925,6 +8991,11 @@
         ,
     },
     .E1239 = .{
+        .key = "unsup-V2005-5.2.1c",
+        .tag = "unsup_rtlil_indexed_part_select_variable",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "5.2.1",
         .title = "an indexed part-select with a variable base",
         .lrm = "IEEE 1364-2005 5.2.1",
         .explain =
@@ -6935,6 +9006,11 @@
         ,
     },
     .E1240 = .{
+        .key = "V2005-5.2.1b",
+        .tag = "select_something_not_declared_name",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "5.2.1",
         .title = "a select of something that is not a declared name",
         .lrm = "IEEE 1364-2005 5.2.1",
         .explain =
@@ -6945,6 +9021,11 @@
         ,
     },
     .E1241 = .{
+        .key = "unsup-V2005-5.2.1d",
+        .tag = "unsup_rtlil_select_parameter",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "5.2.1",
         .title = "a select of a parameter",
         .lrm = "IEEE 1364-2005 5.2.1",
         .explain =
@@ -6955,6 +9036,11 @@
         ,
     },
     .E1242 = .{
+        .key = "unsup-V2005-5.2.1e",
+        .tag = "unsup_rtlil_variable_bit_select_ascending",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "5.2.1",
         .title = "a variable bit select of an ascending vector",
         .lrm = "IEEE 1364-2005 5.2.1",
         .explain =
@@ -6965,6 +9051,11 @@
         ,
     },
     .E1243 = .{
+        .key = "unsup-V2005-5.2.1f",
+        .tag = "unsup_rtlil_constant_select_outside_declared",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "5.2.1",
         .title = "a constant select outside the declared range",
         .lrm = "IEEE 1364-2005 5.2.1",
         .explain =
@@ -6975,6 +9066,11 @@
         ,
     },
     .E1244 = .{
+        .key = "AMS-A.8.5a",
+        .tag = "assignment_target_not_declared_name",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.8.5",
         .title = "an assignment target that is not a declared name",
         .lrm = "A.8.5",
         .explain =
@@ -6985,6 +9081,11 @@
         ,
     },
     .E1245 = .{
+        .key = "AMS-A.8.5b",
+        .tag = "assignment_target_not_name_select",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.8.5",
         .title = "an assignment target that is not a name, a select or a concatenation",
         .lrm = "A.8.5",
         .explain =
@@ -6995,6 +9096,11 @@
         ,
     },
     .E1246 = .{
+        .key = "V2005-4.10a",
+        .tag = "assignment_parameter",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "4.10",
         .title = "an assignment to a parameter",
         .lrm = "IEEE 1364-2005 4.10",
         .explain =
@@ -7005,6 +9111,11 @@
         ,
     },
     .E1247 = .{
+        .key = "V2005-9.2a",
+        .tag = "procedural_assignment_net",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "9.2",
         .title = "a procedural assignment to a net",
         .lrm = "IEEE 1364-2005 9.2",
         .explain =
@@ -7015,6 +9126,11 @@
         ,
     },
     .E1248 = .{
+        .key = "unsup-V2005-5.2.1g",
+        .tag = "unsup_rtlil_select_select_assignment_target",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "5.2.1",
         .title = "a select of a select as an assignment target",
         .lrm = "IEEE 1364-2005 5.2.1",
         .explain =
@@ -7025,6 +9141,11 @@
         ,
     },
     .E1249 = .{
+        .key = "unsup-V2005-5.2.1h",
+        .tag = "unsup_rtlil_indexed_part_select_assignment",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "5.2.1",
         .title = "an indexed part-select as an assignment target",
         .lrm = "IEEE 1364-2005 5.2.1",
         .explain =
@@ -7035,6 +9156,11 @@
         ,
     },
     .E1250 = .{
+        .key = "unsup-V2005-5.2.1i",
+        .tag = "unsup_rtlil_variable_bit_select_assignment",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "5.2.1",
         .title = "a variable bit select as an assignment target",
         .lrm = "IEEE 1364-2005 5.2.1",
         .explain =
@@ -7046,6 +9172,11 @@
         ,
     },
     .E1251 = .{
+        .key = "unsup-V2005-9.9.1a",
+        .tag = "unsup_rtlil_initial_block_not_constant",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.9.1",
         .title = "an initial block that is not constant assignments",
         .lrm = "IEEE 1364-2005 9.9.1",
         .explain =
@@ -7057,6 +9188,11 @@
         ,
     },
     .E1252 = .{
+        .key = "unsup-V2005-9.9.1b",
+        .tag = "unsup_rtlil_initial_assignment_delay_event",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.9.1",
         .title = "an initial assignment with a delay or event control",
         .lrm = "IEEE 1364-2005 9.9.1",
         .explain =
@@ -7067,6 +9203,11 @@
         ,
     },
     .E1253 = .{
+        .key = "unsup-V2005-9.9.1c",
+        .tag = "unsup_rtlil_initial_assignment_select",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.9.1",
         .title = "an initial assignment to a select",
         .lrm = "IEEE 1364-2005 9.9.1",
         .explain =
@@ -7077,6 +9218,11 @@
         ,
     },
     .E1254 = .{
+        .key = "unsup-V2005-9.9.1d",
+        .tag = "unsup_rtlil_initial_value",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.9.1",
         .title = "an initial value --emit-rtlil cannot fold to a constant",
         .lrm = "IEEE 1364-2005 9.9.1",
         .explain =
@@ -7087,6 +9233,11 @@
         ,
     },
     .E1255 = .{
+        .key = "unsup-V2005-9.8a",
+        .tag = "unsup_rtlil_block_local_declarations",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.8",
         .title = "a block with local declarations",
         .lrm = "IEEE 1364-2005 9.8",
         .explain =
@@ -7097,6 +9248,11 @@
         ,
     },
     .E1256 = .{
+        .key = "unsup-V2005-9.8.2a",
+        .tag = "unsup_rtlil_fork_join_block",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.8.2",
         .title = "a fork-join block --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 9.8.2",
         .explain =
@@ -7107,6 +9263,11 @@
         ,
     },
     .E1257 = .{
+        .key = "unsup-V2005-9.9.2a",
+        .tag = "unsup_rtlil_always_block_without_event",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.9.2",
         .title = "an always block without an event control",
         .lrm = "IEEE 1364-2005 9.9.2",
         .explain =
@@ -7117,6 +9278,11 @@
         ,
     },
     .E1258 = .{
+        .key = "unsup-V2005-9.7a",
+        .tag = "unsup_rtlil_always_block_waits_delay",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.7",
         .title = "an always block that waits on a delay or a level",
         .lrm = "IEEE 1364-2005 9.7",
         .explain =
@@ -7127,6 +9293,11 @@
         ,
     },
     .E1259 = .{
+        .key = "unsup-V2005-9.7.2a",
+        .tag = "unsup_rtlil_event_control_mixing_edges",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.7.2",
         .title = "an event control mixing edges and levels",
         .lrm = "IEEE 1364-2005 9.7.2",
         .explain =
@@ -7137,6 +9308,11 @@
         ,
     },
     .E1260 = .{
+        .key = "unsup-V2005-9.7.7a",
+        .tag = "unsup_rtlil_intra_assignment_delay_event",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.7.7",
         .title = "an intra-assignment delay or event control",
         .lrm = "IEEE 1364-2005 9.7.7",
         .explain =
@@ -7147,6 +9323,11 @@
         ,
     },
     .E1261 = .{
+        .key = "unsup-V2005-9.3a",
+        .tag = "unsup_rtlil_procedural_continuous_assignment",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.3",
         .title = "a procedural continuous assignment",
         .lrm = "IEEE 1364-2005 9.3",
         .explain =
@@ -7158,6 +9339,11 @@
         ,
     },
     .E1262 = .{
+        .key = "unsup-V2005-9.5.1a",
+        .tag = "unsup_rtlil_casex_casez",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.5.1",
         .title = "a casex or casez --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 9.5.1",
         .explain =
@@ -7168,6 +9354,11 @@
         ,
     },
     .E1263 = .{
+        .key = "unsup-V2005-9.6a",
+        .tag = "unsup_rtlil_loop",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.6",
         .title = "a loop --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 9.6",
         .explain =
@@ -7178,6 +9369,11 @@
         ,
     },
     .E1264 = .{
+        .key = "unsup-V2005-9.7b",
+        .tag = "unsup_rtlil_nested_event_delay_control",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.7",
         .title = "a nested event or delay control",
         .lrm = "IEEE 1364-2005 9.7",
         .explain =
@@ -7188,6 +9384,11 @@
         ,
     },
     .E1265 = .{
+        .key = "unsup-V2005-9.7.3b",
+        .tag = "unsup_rtlil_event_trigger",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "9.7.3",
         .title = "an event trigger --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 9.7.3",
         .explain =
@@ -7198,6 +9399,11 @@
         ,
     },
     .E1266 = .{
+        .key = "unsup-V2005-10.3a",
+        .tag = "unsup_rtlil_disable_statement",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "10.3",
         .title = "a disable statement --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 10.3",
         .explain =
@@ -7208,6 +9414,11 @@
         ,
     },
     .E1267 = .{
+        .key = "unsup-AMS-A.6.5a",
+        .tag = "unsup_rtlil_jump_statement",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "A.6.5",
         .title = "a jump statement --emit-rtlil does not lower",
         .lrm = "A.6.5",
         .explain =
@@ -7218,6 +9429,11 @@
         ,
     },
     .E1268 = .{
+        .key = "unsup-AMS-5.6a",
+        .tag = "unsup_rtlil_analog_contribution",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "5.6",
         .title = "an analog contribution --emit-rtlil does not lower",
         .lrm = "5.6",
         .explain =
@@ -7227,6 +9443,11 @@
         ,
     },
     .E1269 = .{
+        .key = "unsup-V2005-7.1.5a",
+        .tag = "unsup_rtlil_array_gate_instances",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "7.1.5",
         .title = "an array of gate instances --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 7.1.5",
         .explain =
@@ -7237,6 +9458,11 @@
         ,
     },
     .E1270 = .{
+        .key = "unsup-V2005-12.1.2a",
+        .tag = "unsup_rtlil_array_module_instances",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "12.1.2",
         .title = "an array of module instances --emit-rtlil does not lower",
         .lrm = "IEEE 1364-2005 12.1.2",
         .explain =
@@ -7247,6 +9473,11 @@
         ,
     },
     .E1271 = .{
+        .key = "unsup-V2005-12.2.2.1a",
+        .tag = "unsup_rtlil_ordered_parameter_override_module",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "12.2.2.1",
         .title = "an ordered parameter override of a module this source does not declare",
         .lrm = "IEEE 1364-2005 12.2.2.1",
         .explain =
@@ -7258,6 +9489,11 @@
         ,
     },
     .E1272 = .{
+        .key = "V2005-12.2.2.1a",
+        .tag = "ordered_parameter_overrides_module_declares",
+        .kind = .rule,
+        .std = .v2005,
+        .clause = "12.2.2.1",
         .title = "more ordered parameter overrides than the module declares",
         .lrm = "IEEE 1364-2005 12.2.2.1",
         .explain =
@@ -7268,6 +9504,11 @@
         ,
     },
     .E1273 = .{
+        .key = "unsup-V2005-12.2.2a",
+        .tag = "unsup_rtlil_parameter_override",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "12.2.2",
         .title = "a parameter override --emit-rtlil cannot fold to an integer",
         .lrm = "IEEE 1364-2005 12.2.2",
         .explain =
@@ -7278,6 +9519,11 @@
         ,
     },
     .E1274 = .{
+        .key = "unsup-V2005-12.3.6a",
+        .tag = "unsup_rtlil_ordered_port_connection_module",
+        .kind = .unsup,
+        .std = .v2005,
+        .clause = "12.3.6",
         .title = "an ordered port connection to a module this source does not declare",
         .lrm = "IEEE 1364-2005 12.3.6",
         .explain =
@@ -7289,6 +9535,9 @@
         ,
     },
     .E1275 = .{
+        .key = "limit-rtlil-const-width",
+        .tag = "limit_rtlil_const_width",
+        .kind = .limit,
         .title = "a constant wider than --emit-rtlil's fold limit",
         .lrm = "",
         .explain =
@@ -7300,6 +9549,9 @@
         ,
     },
     .E1276 = .{
+        .key = "limit-rtlil-fold-depth",
+        .tag = "limit_rtlil_fold_depth",
+        .kind = .limit,
         .title = "a constant expression nested deeper than --emit-rtlil's fold limit",
         .lrm = "",
         .explain =
@@ -7311,6 +9563,9 @@
         ,
     },
     .E1277 = .{
+        .key = "limit-rtlil-stack",
+        .tag = "limit_rtlil_stack",
+        .kind = .limit,
         .title = "nesting deeper than the stack --emit-rtlil reserved",
         .lrm = "",
         .explain =
@@ -7323,6 +9578,11 @@
         ,
     },
     .E1278 = .{
+        .key = "limit-rtlil-concat-width",
+        .tag = "limit_rtlil_concat_width",
+        .kind = .limit,
+        .std = .v2005,
+        .clause = "5.1.14",
         .title = "a concatenation wider than --emit-rtlil's constant limit",
         .lrm = "IEEE 1364-2005 5.1.14",
         .explain =
@@ -7334,6 +9594,12 @@
         ,
     },
     .W1050 = .{
+        .key = "lint-param-no-value",
+        .tag = "lint_param_no_value",
+        .kind = .lint,
+        .std = .ams,
+        .clause = "3.4.1",
+        .severity = .warning,
         .title = "parameter default has no compile-time value",
         .lrm = "3.4.1",
         .explain =
@@ -7358,11 +9624,23 @@
         ,
     },
     .W0950 = .{
+        .key = "lint-resolution-rules",
+        .tag = "lint_resolution_rules",
+        .kind = .lint,
+        .std = .ams,
+        .clause = "7.7.2.1",
+        .severity = .warning,
         .title = "multiple discipline resolution rules match",
         .lrm = "7.7.2.1",
         .explain = "The first matching rule is used. Exact matches take precedence over subset matches. Remove the ambiguity to silence this warning.",
     },
     .W0951 = .{
+        .key = "AMS-E.3.3a",
+        .tag = "verilog_ams_definition_shadows_spice",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "E.3.3",
+        .severity = .warning,
         .title = "a Verilog-AMS definition shadows a SPICE model or subcircuit",
         .lrm = "E.3.3",
         .explain =
@@ -7378,6 +9656,11 @@
         ,
     },
     .E0952 = .{
+        .key = "unsup-AMS-E.1.2a",
+        .tag = "unsup_spice_model_names_primitive_vera",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "E.1.2",
         .title = "a SPICE model names a primitive VerA does not support",
         .lrm = "E.1.2",
         .explain =
@@ -7399,6 +9682,11 @@
         ,
     },
     .E0953 = .{
+        .key = "unsup-AMS-E.2a",
+        .tag = "unsup_spice_device_card_s_model",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "E.2",
         .title = "a SPICE device card's model is a primitive with no behaviour",
         .lrm = "E.2",
         .explain =
@@ -7424,11 +9712,21 @@
         ,
     },
     .E0820 = .{
+        .key = "AMS-9.17.1c",
+        .tag = "discontinuity_degree_must_nonnegative_1",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.17.1",
         .title = "$discontinuity degree must be nonnegative or -1",
         .lrm = "9.17.1",
         .explain = "Nonnegative degrees describe a discontinuity in a derivative of the constitutive equation. The special degree -1 requests another Newton iteration; smaller degrees have no defined meaning.",
     },
     .E0821 = .{
+        .key = "AMS-9.2b",
+        .tag = "system_task_not_supported_digital",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.2",
         .title = "system task is not supported in the digital context",
         .lrm = "9.2",
         .explain =
@@ -7444,6 +9742,11 @@
         ,
     },
     .E0822 = .{
+        .key = "AMS-9.19a",
+        .tag = "binding_detection_argument_wrong_kind",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.19",
         .title = "binding detection argument is the wrong kind of name",
         .lrm = "9.19",
         .explain =
@@ -7457,6 +9760,11 @@
         ,
     },
     .E0824 = .{
+        .key = "AMS-9.7.3a",
+        .tag = "fatal_finish_number_not_0",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.7.3",
         .title = "$fatal finish_number is not 0, 1 or 2",
         .lrm = "9.7.3",
         .explain =
@@ -7474,6 +9782,11 @@
         ,
     },
     .E0918 = .{
+        .key = "AMS-6.5.3a",
+        .tag = "wreal_net_has_driver",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.5.3",
         .title = "a wreal net has more than one driver",
         .lrm = "6.5.3",
         .explain =
@@ -7492,6 +9805,11 @@
         ,
     },
     .E0919 = .{
+        .key = "AMS-3.7a",
+        .tag = "wreal_net_connected_incompatible_net",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.7",
         .title = "a wreal net is connected to an incompatible net type",
         .lrm = "3.7",
         .explain =
@@ -7509,6 +9827,9 @@
         ,
     },
     .E0920 = .{
+        .key = "E0920",
+        .tag = "E0920",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -7522,6 +9843,11 @@
         ,
     },
     .E0921 = .{
+        .key = "AMS-3.4.4a",
+        .tag = "parameter_array_value_not_size",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.4.4",
         .title = "parameter array value is not the size its range declares",
         .lrm = "3.4.4",
         .explain =
@@ -7543,6 +9869,11 @@
         ,
     },
     .E0922 = .{
+        .key = "AMS-7.8.4a",
+        .tag = "mixed_port_matches_connect_statement",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "7.8.4",
         .title = "a mixed port matches more than one connect statement",
         .lrm = "7.8.4",
         .explain =
@@ -7561,6 +9892,11 @@
         ,
     },
     .E0923 = .{
+        .key = "AMS-7.8a",
+        .tag = "connect_statement_s_disciplines_not",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "7.8",
         .title = "a connect statement's disciplines are not one discrete and one continuous",
         .lrm = "7.8",
         .explain =
@@ -7576,6 +9912,11 @@
         ,
     },
     .E0924 = .{
+        .key = "AMS-6.7.1b",
+        .tag = "parameter_declaration_makes_out_module",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.7.1",
         .title = "parameter declaration makes an out-of-module reference",
         .lrm = "6.7.1",
         .explain =
@@ -7592,6 +9933,11 @@
         ,
     },
     .E0925 = .{
+        .key = "AMS-6.5.7.1a",
+        .tag = "port_connected_net_differ_width",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.5.7.1",
         .title = "port and connected net differ in width",
         .lrm = "6.5.7.1",
         .explain =
@@ -7609,6 +9955,11 @@
         ,
     },
     .E0926 = .{
+        .key = "AMS-6.4a",
+        .tag = "defparam_paramset_instance_hierarchy",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.4",
         .title = "defparam in a paramset instance hierarchy",
         .lrm = "6.4",
         .explain =
@@ -7625,6 +9976,11 @@
         ,
     },
     .E0927 = .{
+        .key = "AMS-7.8.4b",
+        .tag = "mixed_port_matches_no_connect",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "7.8.4",
         .title = "a mixed port matches no connect statement",
         .lrm = "7.8.4",
         .explain =
@@ -7645,6 +10001,11 @@
         ,
     },
     .E0928 = .{
+        .key = "unsup-AMS-E.1.2b",
+        .tag = "unsup_spice_card_inside_subckt_outside",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "E.1.2",
         .title = "a SPICE card inside a .SUBCKT is outside VerA's SPICE subset",
         .lrm = "E.1.2",
         .explain =
@@ -7670,6 +10031,11 @@
         ,
     },
     .E0929 = .{
+        .key = "unsup-AMS-7.8.4a",
+        .tag = "unsup_mixed_port_s_connect_module",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "7.8.4",
         .title = "a mixed port's connect module cannot be inserted",
         .lrm = "7.8.4",
         .explain =
@@ -7701,6 +10067,9 @@
         ,
     },
     .E0930 = .{
+        .key = "E0930",
+        .tag = "E0930",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -7712,6 +10081,11 @@
         ,
     },
     .E0960 = .{
+        .key = "AMS-3.9a",
+        .tag = "digital_primitive_continuous_net_no",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "3.9",
         .title = "a digital primitive on a continuous net with no default discipline",
         .lrm = "3.9",
         .explain =
@@ -7739,6 +10113,11 @@
         ,
     },
     .E0982 = .{
+        .key = "AMS-7.6a",
+        .tag = "connect_module_port_directions_not",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "7.6",
         .title = "connect module port directions are not a Table 7-2 combination",
         .lrm = "7.6",
         .explain =
@@ -7761,6 +10140,11 @@
         ,
     },
     .E0997 = .{
+        .key = "unsup-AMS-5.4.3a",
+        .tag = "unsup_hierarchical_port_access_vera_cannot",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "5.4.3",
         .title = "a hierarchical port access VerA cannot sum",
         .lrm = "5.4.3",
         .explain =
@@ -7788,6 +10172,11 @@
         ,
     },
     .E0998 = .{
+        .key = "AMS-6.6.2a",
+        .tag = "hierarchical_name_reaches_into_unnamed",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.6.2",
         .title = "a hierarchical name reaches into an unnamed generate block",
         .lrm = "6.6.2",
         .explain =
@@ -7807,6 +10196,11 @@
         ,
     },
     .E0482 = .{
+        .key = "AMS-A.6.2b",
+        .tag = "procedural_assignment_writes_variable_not",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.6.2",
         .title = "a procedural assignment writes a variable, not a net",
         .lrm = "A.6.2",
         .explain =
@@ -7829,6 +10223,11 @@
         ,
     },
     .E0483 = .{
+        .key = "AMS-A.3.3a",
+        .tag = "switch_terminal_net_not_variable",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.3.3",
         .title = "a switch terminal is a net, not a variable",
         .lrm = "A.3.3",
         .explain =
@@ -7848,6 +10247,11 @@
         ,
     },
     .E0484 = .{
+        .key = "AMS-8.5.1a",
+        .tag = "a2d_event_must_analog_event",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "8.5.1",
         .title = "an A2D event must be an analog event control",
         .lrm = "8.5.1",
         .explain =
@@ -7875,6 +10279,9 @@
         ,
     },
     .E0485 = .{
+        .key = "E0485",
+        .tag = "E0485",
+        .kind = .retired,
         .title = "(retired)",
         .lrm = "",
         .explain =
@@ -7887,6 +10294,11 @@
         ,
     },
     .E0486 = .{
+        .key = "AMS-6.6.1f",
+        .tag = "genvar_set_x_z",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "6.6.1",
         .title = "genvar set to x or z",
         .lrm = "6.6.1",
         .explain =
@@ -7898,6 +10310,11 @@
         ,
     },
     .E0887 = .{
+        .key = "AMS-9.5a",
+        .tag = "wrong_number_arguments_system_task",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.5",
         .title = "wrong number of arguments to a system task or function",
         .lrm = "9.5",
         .explain =
@@ -7919,6 +10336,11 @@
         ,
     },
     .E0888 = .{
+        .key = "AMS-9.5.2a",
+        .tag = "descriptor_argument_not_integer",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.5.2",
         .title = "descriptor argument is not an integer",
         .lrm = "9.5.2",
         .explain =
@@ -7934,6 +10356,11 @@
         ,
     },
     .E0889 = .{
+        .key = "AMS-9.5.1a",
+        .tag = "fopen_type_not_table_9",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.5.1",
         .title = "$fopen type is not one of Table 9-24's forms",
         .lrm = "9.5.1",
         .explain =
@@ -7946,6 +10373,11 @@
         ,
     },
     .E0890 = .{
+        .key = "AMS-9.18a",
+        .tag = "hierarchical_system_parameter_outside_allowed",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.18",
         .title = "hierarchical system parameter outside its allowed values",
         .lrm = "9.18",
         .explain =
@@ -7961,6 +10393,11 @@
         ,
     },
     .E0891 = .{
+        .key = "AMS-9.17.3c",
+        .tag = "limit_argument_not_form_syntax",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.17.3",
         .title = "$limit argument is not the form Syntax 9-12 requires",
         .lrm = "9.17.3",
         .explain =
@@ -7989,16 +10426,31 @@
         ,
     },
     .E0892 = .{
+        .key = "AMS-9.14a",
+        .tag = "clog2_requires_integer_vector_argument",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.14",
         .title = "$clog2 requires an integer or vector argument",
         .lrm = "9.14",
         .explain = "IEEE 1364-2005 §17.11.1 permits an integer or an arbitrary sized vector, interpreted as unsigned. A real operand has no integral bit width; convert it explicitly with $rtoi if truncation is intended.",
     },
     .E0893 = .{
+        .key = "unsup-AMS-9.14a",
+        .tag = "unsup_analog_clog2_cannot_recover_wide",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "9.14",
         .title = "analog $clog2 cannot recover this wide operand's high bits",
         .lrm = "9.14",
         .explain = "Inside an analog $clog2 operand, arithmetic, unary negation and shifts retain at most 32 bits per intermediate. Bitwise, conditional and comparison contexts retain at most 64 bits. Above 64 bits only exact wide literals and parameter aliases preserving their width retain proven high bits. The compiler refuses a wider intermediate rather than inventing erased bits; digital execution preserves arbitrary vector widths.",
     },
     .E0894 = .{
+        .key = "AMS-A.8.2c",
+        .tag = "omitted_argument_element_has_no",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "A.8.2",
         .title = "an omitted argument or element has no value here",
         .lrm = "A.8.2",
         .explain =
@@ -8012,6 +10464,12 @@
         ,
     },
     .W0853 = .{
+        .key = "unsup-AMS-9.17.3a",
+        .tag = "unsup_limit_not_applied_call",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "9.17.3",
+        .severity = .warning,
         .title = "$limit is not applied at this call",
         .lrm = "9.17.3",
         .explain =
@@ -8052,6 +10510,12 @@
         ,
     },
     .W0854 = .{
+        .key = "unsup-AMS-9.17.3b",
+        .tag = "unsup_limit_seed_not_applied_here",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "9.17.3",
+        .severity = .warning,
         .title = "$limit seed is not applied here",
         .lrm = "9.17.3",
         .explain =
@@ -8071,6 +10535,11 @@
         ,
     },
     .E0823 = .{
+        .key = "unsup-AMS-9.16a",
+        .tag = "unsup_simprobe_name_known_only_run",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "9.16",
         .title = "$simprobe name known only at run time, with no fallback",
         .lrm = "9.16",
         .explain =
@@ -8093,6 +10562,9 @@
         ,
     },
     .E1099 = .{
+        .key = "unsup-osdi-reject-step",
+        .tag = "unsup_osdi_reject_step",
+        .kind = .unsup,
         .title = "`--emit-osdi` cannot carry `$vera_reject_step`",
         .lrm = "",
         .explain =
@@ -8110,6 +10582,12 @@
         ,
     },
     .W1098 = .{
+        .key = "unsup-AMS-4.6.4.6a",
+        .tag = "unsup_osdi_emit_osdi_reports_correlated",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "4.6.4.6",
+        .severity = .warning,
         .title = "`--emit-osdi` reports correlated noise rows as independent sources",
         .lrm = "4.6.4.6",
         .explain =
@@ -8129,6 +10607,12 @@
         ,
     },
     .W1051 = .{
+        .key = "unsup-AMS-4.5.7a",
+        .tag = "unsup_absdelay_history_thinned_cover_delay",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "4.5.7",
+        .severity = .warning,
         .title = "absdelay history thinned to cover its delay",
         .lrm = "4.5.7",
         .explain =
@@ -8153,6 +10637,11 @@
         ,
     },
     .E0825 = .{
+        .key = "AMS-9.4.3c",
+        .tag = "flag_format_conversion_has_no",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.4.3",
         .title = "'#' flag on a format conversion that has no alternative form",
         .lrm = "9.4.3",
         .explain =
@@ -8173,6 +10662,11 @@
         ,
     },
     .E0826 = .{
+        .key = "AMS-9.4.2a",
+        .tag = "flag_width_precision_written",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.4.2",
         .title = "a flag, width or precision written on `%%`",
         .lrm = "9.4.2",
         .explain =
@@ -8192,6 +10686,11 @@
         ,
     },
     .E0827 = .{
+        .key = "AMS-9.4.7a",
+        .tag = "c_format_flag_digital_context",
+        .kind = .rule,
+        .std = .ams,
+        .clause = "9.4.7",
         .title = "a C format flag on a digital-context conversion that is not a real one",
         .lrm = "9.4.7",
         .explain =
@@ -8213,6 +10712,11 @@
         ,
     },
     .E0828 = .{
+        .key = "limit-format-width",
+        .tag = "limit_format_width",
+        .kind = .limit,
+        .std = .ams,
+        .clause = "9.4.3",
         .title = "a format field width or precision past VerA's limit",
         .lrm = "9.4.3",
         .explain =
@@ -8233,6 +10737,11 @@
         ,
     },
     .E0829 = .{
+        .key = "unsup-AMS-9.2a",
+        .tag = "unsup_system_function_not_run_vera",
+        .kind = .unsup,
+        .std = .ams,
+        .clause = "9.2",
         .title = "system function not run by VerA's digital engine",
         .lrm = "9.2",
         .explain =

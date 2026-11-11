@@ -73,3 +73,64 @@ test "§4.5.4 a rejected step leaves the idt assert offset as it was" {
 
     try step(&model, &inst, &state, 1.5e-9, 0.5e-9, bias(0.0, 8.5), 8.5);
 }
+
+// ---- #134's oracle 2: an independent perturbation check ----
+//
+// `field_use`'s contract is a superset (`sim_state.zig`'s doc): a bit CLEAR
+// means a host may trust a replay that never re-read the field, so a clear
+// bit is the one this device's own behaviour must never contradict. Named
+// before the emitter (`field_use.zig`) was written: perturb every `Instance`
+// field whose `res` bit this device reports clear, one at a time, off a
+// baseline `eval`, and the residual must come back byte-identical. Nothing
+// here recomputes `field_use`'s own scan — this is `eval` itself, the
+// independent oracle `field_use.zig`'s doc names.
+
+/// Skipped: not a float/int/bool (or a fixed array of one) `eval` could read
+/// as model data — `[]const u8`/`?*const contract.SystfHost`-style
+/// host-owned handles carry no number a residual could depend on through
+/// this device's own arithmetic.
+fn perturbable(comptime T: type) bool {
+    return switch (@typeInfo(T)) {
+        .float, .int, .bool => true,
+        .array => |a| perturbable(a.child),
+        else => false,
+    };
+}
+
+/// Changes `ptr.*` to some other value of its own type — a fixed sentinel,
+/// or its toggle when already at the sentinel (also covers `bool`, where
+/// "toggle" is the only well-defined perturbation).
+fn perturb(ptr: anytype) void {
+    const T = @TypeOf(ptr.*);
+    switch (@typeInfo(T)) {
+        .float => ptr.* = if (ptr.* == 12345.6789) 0.0 else 12345.6789,
+        .int => ptr.* = if (ptr.* == 12345) 0 else 12345,
+        .bool => ptr.* = !ptr.*,
+        .array => for (ptr) |*e| perturb(e),
+        else => unreachable,
+    }
+}
+
+test "field_use (#134): a clear `res` bit's field perturbs no residual (oracle 2)" {
+    const model: D.Model = .{};
+    var inst0: D.Instance = .{};
+    _ = D.initState(&model, &inst0);
+    const sim: contract.SimState = .{ .t = 1.0e-9, .dt = 1.0e-9, .kind = .tran };
+    const x = bias(0.0, 8.0);
+    const base = D.eval(S, &x, &model, &inst0, sim);
+    const uses = contract.fieldUse(D);
+    try std.testing.expectEqual(contract.nFields(D), uses.len);
+
+    const fields = @typeInfo(D.Instance).@"struct".fields;
+    inline for (fields, 0..) |f, i| {
+        if (!perturbable(f.type)) continue;
+        var inst = inst0;
+        perturb(&@field(inst, f.name));
+        if (uses[i].res) continue; // a set bit makes no promise either way
+        const got = D.eval(S, &x, &model, &inst, sim);
+        if (!std.mem.eql(u8, std.mem.asBytes(&base), std.mem.asBytes(&got))) {
+            std.debug.print("field_use says Instance.{s}'s res bit is clear, but perturbing it moved eval's result\n", .{f.name});
+            return error.FieldUseUnderReportsRes;
+        }
+    }
+}

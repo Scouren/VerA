@@ -74,6 +74,7 @@ verilog-a/ch05_analog_behavior/event_timer_enable.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/event_timer_one_shot.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/function_locals_have_no_lifetime.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/held_survives_an_inout_function_argument.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/held_through_output_actual_seed_and_scan.va codegen: a call of `$sscanf`
 verilog-a/ch05_analog_behavior/held_value_is_visible_before_its_event_statement.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/implicit_zero_contribution.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch05_analog_behavior/many_timers_instance_defaults.va codegen: a call of `timer`
@@ -86,8 +87,11 @@ verilog-a/ch05_analog_behavior/switch_branch.va codegen: a §5.6.1.3 potential c
 verilog-a/ch05_analog_behavior/switch_branch_solved.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch05_analog_behavior/timer_body_array_controls.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/timer_body_clog2_controls.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/timer_body_constant_effect_controls.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/timer_body_controls.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/timer_body_effect_controls.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/timer_body_function_controls.va codegen: a call of `timer`
+verilog-a/ch05_analog_behavior/timer_body_precomputed_controls.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/timer_controls.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/timer_dynamic.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/timer_dynamic_period.va codegen: a call of `timer`
@@ -111,6 +115,7 @@ verilog-a/ch08_scheduling/timer_wakeup.va codegen: a call of `timer`
 verilog-a/ch09_system_tasks/arandom.va codegen: a call of `$arandom`
 verilog-a/ch09_system_tasks/arandom_no_seed.va codegen: a call of `$arandom`
 verilog-a/ch09_system_tasks/binding_detection.va codegen: a call of `$port_connected`
+verilog-a/ch09_system_tasks/clog2_unsigned_width.va point 0: display record value 5: old 4e0, new 3.2e1
 verilog-a/ch09_system_tasks/dist_chi_square.va codegen: a call of `$dist_chi_square`
 verilog-a/ch09_system_tasks/dist_erlang.va codegen: a call of `$dist_erlang`
 verilog-a/ch09_system_tasks/dist_exponential.va codegen: a call of `$dist_exponential`
@@ -119,6 +124,18 @@ verilog-a/ch09_system_tasks/dist_poisson.va codegen: a call of `$dist_poisson`
 verilog-a/ch09_system_tasks/dist_t.va codegen: a call of `$dist_t`
 verilog-a/ch09_system_tasks/dist_uniform.va codegen: a call of `$dist_uniform`
 verilog-a/ch09_system_tasks/distribution.va codegen: a call of `$dist_normal`
+verilog-a/ch09_system_tasks/feof.va codegen: a call of `$fopen`
+verilog-a/ch09_system_tasks/ferror.va codegen: a call of `$fopen`
+verilog-a/ch09_system_tasks/fgets.va codegen: a call of `$fopen`
+verilog-a/ch09_system_tasks/fgets_on_write_only_fd_fails.va codegen: a call of `$fopen`
+verilog-a/ch09_system_tasks/file_position_status.va codegen: a call of `$fopen`
+verilog-a/ch09_system_tasks/file_read_scan.va codegen: a call of `$fopen`
+verilog-a/ch09_system_tasks/fscanf_failed_match_leaves_input.va codegen: a call of `$fopen`
+verilog-a/ch09_system_tasks/fscanf_successive_scans_on_one_line.va codegen: a call of `$fopen`
+verilog-a/ch09_system_tasks/ftell.va codegen: a call of `$fopen`
+verilog-a/ch09_system_tasks/long_record_is_not_truncated.va codegen: a call of `$fopen`
+verilog-a/ch09_system_tasks/mcd_channels_exhausted_at_bit_31.va codegen: a call of `$sformat`
+verilog-a/ch09_system_tasks/numeric_string.va codegen: a call of `$sformat`
 verilog-a/ch09_system_tasks/plusargs.va codegen: a call of `$test$plusargs`
 verilog-a/ch09_system_tasks/plusargs_prefix.va codegen: a call of `$test$plusargs`
 verilog-a/ch09_system_tasks/plusargs_value_order.va codegen: a call of `$value$plusargs`
@@ -136,15 +153,23 @@ verilog-a/ch09_system_tasks/rdist_positive_mean_at_run_time.va codegen: a call o
 verilog-a/ch09_system_tasks/rdist_t.va codegen: a call of `$rdist_t`
 verilog-a/ch09_system_tasks/rdist_zero_mean_at_run_time_is_an_error.va codegen: a call of `$rdist_exponential`
 verilog-a/ch09_system_tasks/real_distribution.va codegen: a call of `$rdist_uniform`
+verilog-a/ch09_system_tasks/rejected_iterations_leave_no_file_side_effects.va codegen: a call of `$fopen`
+verilog-a/ch09_system_tasks/rewind.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/rng_reference_large_count.va codegen: a call of `$rdist_chi_square`
 verilog-a/ch09_system_tasks/rng_short_circuit.va codegen: a call of `$rdist_exponential`
+verilog-a/ch09_system_tasks/sformat.va codegen: a call of `$sformat`
 verilog-a/ch09_system_tasks/simparam_fallback_as_parameter_default.va codegen: parameter `lo`'s default does not fold
 verilog-a/ch09_system_tasks/simparam_gmin_source_scale_host_written.va codegen: parameter `g`'s default does not fold
 verilog-a/ch09_system_tasks/simparam_minr_hicum_l2_default.va codegen: parameter `minr`'s default does not fold
 verilog-a/ch09_system_tasks/simparam_newton_tolerances_host_written.va codegen: parameter `rt`'s default does not fold
+verilog-a/ch09_system_tasks/sscanf_conversion_rules.va codegen: a call of `$sscanf`
+verilog-a/ch09_system_tasks/sscanf_engineering_and_path_codes.va codegen: a call of `$sscanf`
+verilog-a/ch09_system_tasks/swrite.va codegen: a call of `$swrite`
 verilog-a/ch09_system_tasks/test_plusargs.va codegen: a call of `$test$plusargs`
 verilog-a/ch09_system_tasks/top_port_connected_controls_ddt.va codegen: a call of `$port_connected`
 verilog-a/ch09_system_tasks/value_plusargs.va codegen: a call of `$value$plusargs`
+verilog-a/ch09_system_tasks/write_mode_path_65_opens.va codegen: a call of `$sformat`
+verilog-a/ch09_system_tasks/write_mode_reopen_appends_across_analyses.va codegen: a call of `$fopen`
 verilog-a/ch10_directives/compact_modeling_macro_implies_its_extensions.va the new device does not build: n6.zig:75: unused local constant
 verilog-a/combined/optional_port_environment.va codegen: a call of `$port_connected`
 verilog-a/combined/optional_port_hierarchy.va codegen: a call of `$port_connected`
@@ -158,8 +183,11 @@ verilog-ams/ch03_data_types/operator_equation_tolerances.va codegen: a call of `
 verilog-ams/ch05_analog_behavior/analog_initial.va codegen: a call of `analog$initial`
 verilog-ams/ch05_analog_behavior/timer_body_array_controls.va codegen: a call of `timer`
 verilog-ams/ch05_analog_behavior/timer_body_clog2_controls.va codegen: a call of `timer`
+verilog-ams/ch05_analog_behavior/timer_body_constant_effect_controls.va codegen: a call of `timer`
 verilog-ams/ch05_analog_behavior/timer_body_controls.va codegen: a call of `timer`
+verilog-ams/ch05_analog_behavior/timer_body_effect_controls.va codegen: a call of `timer`
 verilog-ams/ch05_analog_behavior/timer_body_function_controls.va codegen: a call of `timer`
+verilog-ams/ch05_analog_behavior/timer_body_precomputed_controls.va codegen: a call of `timer`
 verilog-ams/ch05_analog_behavior/timer_controls.va codegen: a call of `timer`
 verilog-ams/ch05_analog_behavior/timer_dynamic.va codegen: a call of `timer`
 verilog-ams/ch05_analog_behavior/timer_fixed.va codegen: a call of `timer`
@@ -167,7 +195,9 @@ verilog-ams/ch07_mixed_signal/analog_event.va codegen: a call of `cross`
 verilog-ams/ch07_mixed_signal/driver_state_histogram.va codegen: a flow contribution to a potential source's branch
 verilog-ams/ch07_mixed_signal/driver_update_without_resolved_change.va codegen: a flow contribution to a potential source's branch
 verilog-ams/ch08_scheduling/analog_digital_initial_order.va codegen: a call of `analog$initial`
+verilog-ams/ch08_scheduling/analog_initial_before_digital_initial.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/fatal_in_analog_initial_skips_simulation.va codegen: a call of `analog$initial`
+verilog-ams/ch09_system_tasks/fdebug_writes_in_rejected_iterations.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/port_mask.va codegen: a call of `$port_connected`
 verilog-ams/ch12_vpi_routines/analog_systf_sampler_call.va codegen: a call of a user function (callee 4294967295)
 verilog-ams/ch12_vpi_routines/cap_ramp.va codegen: a flow contribution to a potential source's branch

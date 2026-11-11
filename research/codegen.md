@@ -628,3 +628,7 @@ Each emitted Instance/State struct keeps the existing `comptime assert(@sizeOf(.
   unit name, untraced); `noise_table_file_name_parameter` is Sema's
   `noise_table` file resolution.
 
+- **T37 — `$clog2` at run time (wrong number).** `ch09_system_tasks/clog2_unsigned_width.va`
+  displays 32 where the old device displays 4 (record value 5) once lowering agrees
+  (w2-eval's T10 fixed the fold; the run-time path still takes a 32-bit width).
+  Oracle: diff-codegen bit for bit; with lower's `clog2_nested_contexts.va` comp line.

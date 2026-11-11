@@ -641,8 +641,8 @@ pub const Lower = struct {
         const tree = l.options.sources[@backingInt(l.fileOf(f))].tree;
         const data = vir.instructions.items(.data)[@backingInt(i)];
         const tok: vams.Ast.TokenIndex = switch (Inst.dataKind(tag(vir, i))) {
-            .pl_node => tree.nodeMainToken(data.pl_node.src_node),
-            .un_node => tree.nodeMainToken(data.un_node.src_node),
+            .pl_node => calleeTok(tree, data.pl_node.src_node),
+            .un_node => calleeTok(tree, data.un_node.src_node),
             .decl_tok => data.decl_tok.src_tok,
             .str_tok => data.str_tok.src_tok,
             .int, .float, .str => return 0,
@@ -711,6 +711,20 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Low
 }
 
 // ---- private ----
+
+/// A call node's own main token is its `(` (`argSite`'s doc, "a call is at
+/// its name... its node's main token is its `(`"); the old engine's parser
+/// (`frontend/parser/expr.zig`'s `parseCall`/`addCall`) sets a `.call`'s
+/// `main_tok` to the name token instead, one before the `(` when a `(`
+/// is there at all (dlower.md T3's G6: `$sdf_annotate`'s E1102, a
+/// `$dist_*` mean/degree/k_stage warning, `$dumpvars`' same-time check —
+/// every blame that is the call itself, not one argument). A parenless
+/// call's main token already is the name; only back up over an actual `(`.
+fn calleeTok(tree: *const vams.Ast, n: vams.Ast.Node.Index) vams.Ast.TokenIndex {
+    const m = tree.nodeMainToken(n);
+    if (tree.nodeTag(n) == .call and m > 0 and tree.tokenTag(m) == .l_paren) return m - 1;
+    return m;
+}
 
 fn spine(l: *Lower) Error!void {
     try gates.checkUdps(l);

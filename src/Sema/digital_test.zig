@@ -1122,7 +1122,7 @@ test "dlower T3: the first $dist_uniform call in a statement is pc_sites' blame 
     ;
     const lowered = try lowerSource1364(a, src);
     try std.testing.expect(lowered.program.insts.len > 0);
-    const want: u32 = @intCast(std.mem.indexOf(u8, src, "$dist_uniform(").? + "$dist_uniform".len);
+    const want: u32 = @intCast(std.mem.indexOf(u8, src, "$dist_uniform(").?);
     try std.testing.expectEqual(want, lowered.pc_sites[0]);
 }
 
@@ -1142,4 +1142,35 @@ test "dlower T3: a timing check's Program.Check.name is W1199's quoted text, lib
     try std.testing.expectEqual(@as(usize, 1), lowered.program.checks.len);
     const got = lowered.program.str(lowered.program.checks[0].name);
     try std.testing.expectEqualStrings("`$width` in top", got);
+}
+
+test "dlower T3: a $sdf_annotate's pc_sites blame is its own name token, not the call's `(` (sdf.zig's E1102, the old engine's own convention)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const src =
+        \\module top;
+        \\  initial $sdf_annotate("missing.sdf");
+        \\endmodule
+    ;
+    const lowered = try lowerSource1364(a, src);
+    const row = try oneTask(&lowered.program, .sdf);
+    const want: u32 = @intCast(std.mem.indexOf(u8, src, "$sdf_annotate(").?);
+    try std.testing.expectEqual(want, lowered.pc_sites[row.pc]);
+}
+
+test "dlower T3: a $dumpvars statement's pc_sites blame is its own name token, not the call's `(` (vcd.zig's run-time E1100, the old engine's own convention)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const src =
+        \\module top;
+        \\  reg r;
+        \\  initial $dumpvars(0, r);
+        \\endmodule
+    ;
+    const lowered = try lowerSource1364(a, src);
+    const row = try oneTask(&lowered.program, .dump);
+    const want: u32 = @intCast(std.mem.indexOf(u8, src, "$dumpvars(").?);
+    try std.testing.expectEqual(want, lowered.pc_sites[row.pc]);
 }

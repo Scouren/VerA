@@ -366,11 +366,44 @@ fn binary(s: *Sema, b: *Block, tag: Inst.Tag, bin: Inst.Bin, src: Inst.Ref) Allo
     }
 }
 
-/// §4.2.8 `a && b`, `a || b`: `b` runs only when `a` does not decide.
+/// §4.2.3 `a && b`, `a || b`: `b` runs only when `a` does not decide, and a
+/// short-circuited `b`'s side effects and runtime errors "shall not occur"
+/// (verbatim) — ordinary evaluation order, kept exactly as it was. Two
+/// exceptions, both narrower than "every side effect is skipped":
+/// §4.5.15, a §4.5 Table 4-19 analog operator's state "ARE EVALUATED EVERY
+/// ITERATION" (verbatim) whatever the short circuit, unlike any other side
+/// effect, because `&&`/`||` are not on §4.5.15's exemption list (only
+/// `if`/`case`/`?:` are): `b` holds one, both operands lower unconditionally
+/// into `b`'s own block and the result is a plain (never short-circuited)
+/// `&&`/`||` of their booleans. §9.13.2: a §9.13 distribution call's static
+/// signature (arity, seed type, `type_string` scope, in `dist.lower`'s
+/// unconditional half) is not relaxed by being skipped, only its value and
+/// any domain error are (`dist.lowerCall`'s `eager`-gated half) — so when
+/// `a` decides literally and `b` holds one, `b` still lowers (raising those
+/// checks) but into a block this function discards, so the call itself
+/// never runs.
 fn shortCircuit(s: *Sema, b: *Block, is_and: bool, bin: Inst.Bin) Allocator.Error!Value {
     const a = try toBool(s, b, try lower(s, b, bin.lhs));
+    if (try hasFamily(s, b.unit.vir, bin.rhs, .analog_op, 0)) {
+        const r = try toBool(s, b, try lower(s, b, bin.rhs));
+        return .{ .ref = try binOp(s, b, if (is_and) .logand else .logor, a, r), .ty = .integer };
+    }
     if (constOf(s, a)) |c| {
-        if (c.isTrue() != is_and) return .{ .ref = a, .ty = .integer };
+        if (c.isTrue() != is_and) {
+            // §9.13.2 "Skipping evaluation does not relax a call's static
+            // signature or scope" (rng_skipped_*_rejected.va): a discarded
+            // `$dist_*`/`$rdist_*` call's arity/seed/`type_string` checks
+            // still run, inside `dist.lowerCall`'s unconditional half; its
+            // `conditional += 1` only suppresses the value-domain checks
+            // (`eager`) and the call is never appended to any block, so it
+            // never runs (the seed it would draw from stays untouched).
+            if (try hasFamily(s, b.unit.vir, bin.rhs, .random, 0)) {
+                var discard = b.child();
+                discard.conditional += 1;
+                _ = try lower(s, &discard, bin.rhs);
+            }
+            return .{ .ref = a, .ty = .integer };
+        }
         return .{ .ref = try toBool(s, b, try lower(s, b, bin.rhs)), .ty = .integer };
     }
     const blk = try s.air.addInst(s.gpa, .{ .tag = .block, .data = undefined });
@@ -388,6 +421,26 @@ fn shortCircuit(s: *Sema, b: *Block, is_and: bool, bin: Inst.Bin) Allocator.Erro
     try s.air.setBody(s.gpa, blk, .integer_type, &.{cb});
     try b.insts.append(s.arena, blk);
     return .{ .ref = .fromIndex(blk), .ty = .integer };
+}
+
+/// Whether `r`'s Vir subtree calls a `SysFn.Family` of `family` — a §4.5
+/// Table 4-19 analog operator (`.analog_op`) or a §9.13 distribution
+/// (`.random`): walked through `control.operands`, so every payload shape
+/// it reaches (including a `concat`/`pattern`'s bare `Refs` list) is
+/// covered, recursing through nested `&&`/`||`/`?:` the same way. Bounded
+/// by `depth_max`, the same cap `lower` itself uses.
+fn hasFamily(s: *Sema, vir: *const Vir, r: Inst.Ref, family: vams.SysFn.Family, depth: u32) Allocator.Error!bool {
+    if (depth > depth_max) return false;
+    const i = r.toIndex() orelse return false;
+    if (vir.instructions.items(.tag)[@backingInt(i)] == .call_sys) {
+        const name = vir.string(decl.payloadOf(vir, Inst.SysCall, i).name);
+        if (vams.SysFn.Tag.fromName(name)) |tag| if (vams.SysFn.get(tag).family == family) return true;
+    }
+    var ops: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
+    try control.operands(s.arena, vir, i, &ops);
+    var it = ops.keyIterator();
+    while (it.next()) |o| if (try hasFamily(s, vir, o.*.toRef(), family, depth + 1)) return true;
+    return false;
 }
 
 /// §4.2.12 `c ? x : y`: only the arm taken runs; the result is of the two

@@ -24,9 +24,15 @@ const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Block = Sema.Block;
 
-/// §5.8.1 `if (c) a else b`.
+/// §5.8.1 `if (c) a else b`. §4.5.15's exemption lets `if`/`case`/`?:` carry
+/// an analog operator under a condition fixed for the whole analysis,
+/// because the untaken arm never runs at all (unlike `&&`/`||`, which still
+/// run both sides, Zig's comptime-known `if`): when `c` folds to a literal
+/// here, only the taken arm is lowered, in `b` itself — the untaken arm's
+/// instances, held variables and diagnostics never exist.
 pub fn lower(s: *Sema, b: *Block, x: Inst.CondBr) Allocator.Error!void {
     const c = try expr.toBool(s, b, try expr.lower(s, b, x.cond));
+    if (expr.constOf(s, c)) |k| return control.body(s, b, if (k.isTrue()) x.then else x.@"else");
     const rt: u32 = @intFromBool(!op.isStatic(s, c, 0));
     var then_b = b.child();
     then_b.conditional += 1;
@@ -71,7 +77,11 @@ pub fn loop(s: *Sema, b: *Block, x: Inst.Loop) Allocator.Error!void {
     try b.insts.append(s.arena, exit);
 }
 
-/// §5.9.1 `repeat (n) s`: `n` once, then a loop over a counter slot.
+/// §5.9.1 `repeat (n) s`: `n` once, then a loop over a counter slot. §4.5.15
+/// and §5.9 ban an analog operator in a `repeat` (and `while`/non-genvar
+/// `for`) body unconditionally, with no `analysis_or_constant` carve-out
+/// even when `n` is static: `head.runtime += 1` marks the body so (unlike
+/// `loop`'s own hardcoded bump) it was missing here.
 pub fn repeat(s: *Sema, b: *Block, x: Inst.Repeat) Allocator.Error!void {
     const n = try expr.coerce(s, b, try expr.lower(s, b, x.count), .integer);
     const counter = try decl.addAlloc(s, .integer);
@@ -81,6 +91,7 @@ pub fn repeat(s: *Sema, b: *Block, x: Inst.Repeat) Allocator.Error!void {
     const cont = try s.air.addInst(s.gpa, .{ .tag = .block, .data = undefined });
     var head = b.child();
     head.conditional += 1;
+    head.runtime += 1;
     const k = try s.addInst(&head, .{ .tag = .load, .data = .{ .un_op = .fromIndex(counter) } });
     const c = try s.addInst(&head, .{ .tag = .igt, .data = .{ .bin_op = .{ .lhs = k, .rhs = .fromIntern(.zero) } } });
     var inner = head.child();

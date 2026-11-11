@@ -57,7 +57,6 @@ verilog-a/ch03_data_types/vector_range_past_65535_elements.va codes: old {}, new
 verilog-a/ch04_expressions/13b_generic_access.va codes: old {}, new E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch04_expressions/absdelay_missing_td_rejected.va codes: old E0505, new E0506 (E0506: `absdelay` takes 2 to 3, given 1)
 verilog-a/ch04_expressions/access_bus_variable_index_rejected.va codes: old E0352, new E0512 (E0512: an access of a vector element at a run-time index)
-verilog-a/ch04_expressions/analog_operator_in_short_circuit_operand.va codes: old {}, new E0514 (E0514: `slew`)
 verilog-a/ch04_expressions/analysis_numeric_argument_rejected.va codes: old E0574, new {}
 verilog-a/ch04_expressions/array_assignment.va codes: old {}, new E0313,E0512 (E0512: a user task enable is not lowered by Sema yet)
 verilog-a/ch04_expressions/assignment_pattern_as_scalar_operand_rejected.va codes: old E0509, new E0512 (E0512: `pattern` is not lowered by Sema yet)
@@ -81,15 +80,12 @@ verilog-a/ch04_expressions/function_nonlocal_variable.va codes: old E0314, new {
 verilog-a/ch04_expressions/function_reads_genvar_rejected.va codes: old E0314, new E0426,E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch04_expressions/function_return.va codes: old {}, new E0512 (E0512: `return` with a value is not lowered by Sema yet)
 verilog-a/ch04_expressions/function_string_output_starts_empty.va Air.Verify: types at instruction 8
-verilog-a/ch04_expressions/idtmod.va codes: old {}, new E0514 (E0514: `idtmod`)
 verilog-a/ch04_expressions/laplace_zd_dc_gain.va codes: old {}, new E0505 (E0505: `laplace_zd()`)
-verilog-a/ch04_expressions/last_crossing_directions.va codes: old {}, new E0514 (E0514: `last_crossing`)
 verilog-a/ch04_expressions/noise_generator_without_branch_rejected.va codes: old {}, new E0512 (E0512: an access of a name with no node)
 verilog-a/ch04_expressions/noise_source_inside_array_pattern_argument.va codes: old {}, new E0512 (E0512: `pattern` is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_parameter_part_select.va codes: old {}, new E0512 (E0512: `slice` is not lowered by Sema yet)
 verilog-a/ch04_expressions/noise_table_part_select_out_of_range_rejected.va codes: old E0310, new E0512 (E0512: `slice` is not lowered by Sema yet)
 verilog-a/ch04_expressions/nonfinite_array_subscript_rejected.va codes: old E0310, new {}
-verilog-a/ch04_expressions/operator_in_repeat.va codes: old E0514, new {}
 verilog-a/ch04_expressions/operator_missing_mandatory_argument.va codes: old E0505, new E0506 (E0506: `ddt` takes 1 to 2, given 0)
 verilog-a/ch04_expressions/partial_slice_assignment.va codes: old {}, new E0309,E0313,E0512 (E0309: 1 subscripts for 2 dimensions)
 verilog-a/ch04_expressions/port_access_bus_genvar_index.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
@@ -117,7 +113,6 @@ verilog-a/ch05_analog_behavior/branch_flow_probe_includes_the_reactive_part.va c
 verilog-a/ch05_analog_behavior/conditional_ddt_contribution_static.va codes: old {}, new E0512,E0514 (E0514: `ddt`)
 verilog-a/ch05_analog_behavior/contribution_to_discrete_net_rejected.va codes: old E0501, new {}
 verilog-a/ch05_analog_behavior/controlled_sources.va contribution 0 resist: old 0e0, new 2.6579876889098655e0
-verilog-a/ch05_analog_behavior/cross_under_genvar_condition.va codes: old {}, new E0512,E0707 (E0512: an assignment to a name with no slot)
 verilog-a/ch05_analog_behavior/cross_used_as_a_value_rejected.va codes: old E0701, new E0512 (E0512: `cross` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/ddt_inside_array_pattern_argument.va codes: old {}, new E0512 (E0512: a user task enable is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/double_throw_switch_topology.va contribution 2 resist: old 0e0, new -1.864516840353728e-3
@@ -238,15 +233,11 @@ verilog-a/ch09_system_tasks/reject_clog2_wide_arithmetic_default.va codes: old E
 verilog-a/ch09_system_tasks/reject_clog2_wide_arithmetic.va codes: old E0893, new {}
 verilog-a/ch09_system_tasks/reject_clog2_wide_widening.va codes: old E0893, new {}
 verilog-a/ch09_system_tasks/reserved_system_function_name_rejected.va codes: old E1014, new {}
-verilog-a/ch09_system_tasks/rng_skipped_arity_rejected.va codes: old E0816, new {}
-verilog-a/ch09_system_tasks/rng_skipped_seed_rejected.va codes: old E0816, new {}
-verilog-a/ch09_system_tasks/rng_skipped_type_string_rejected.va codes: old E0816, new {}
 verilog-a/ch09_system_tasks/strobe_flow_read_inside_array_pattern_argument.va codes: old {}, new E0512 (E0512: a user task enable is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/table_snapshot_function.va codes: old {}, new E0512,E0815 (E0512: `a whole array read as a value` is not lowered by Sema yet)
 verilog-a/ch10_directives/default_nettype_crosses_a_file_boundary.va codes: old E0367, new {}
 verilog-a/ch10_directives/default_nettype_none_rejects_an_implicit_net.va codes: old E0367, new {}
 verilog-a/ch10_directives/default_nettype_none_rejects_an_undeclared_probe.va codes: old E0367, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
-verilog-a/exhaustive/idtmod.va codes: old {}, new E0514 (E0514: `idtmod`)
 verilog-ams/annex_a_syntax/digital_statements_in_initial.va values: display 0 operand 2: old width 32, new null (a discrete net read in analog: the old side prints it at `integer`, the new side marks no width (format.intSize))
 verilog-ams/annex_a_syntax/output_variable_port_written.va codes: old {}, new E0315 (E0315: a net or branch is not a value; read it through an access function)
 verilog-ams/annex_a_syntax/root_anchored_paths.va tables row 2: old `node 2 u.q net`, new `node 2 $root.root_anchored_paths.u.q net`

@@ -478,7 +478,6 @@ verilog-ams/ch09_system_tasks/input_position_restore_failure.va codegen: a call 
 verilog-ams/ch09_system_tasks/r_format_in_the_digital_context.va codegen: a call of `$fopen`
 verilog-ams/ch09_system_tasks/strobe_writes_once_per_accepted_solution.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/ungetc_cancelled_by_fseek_and_gap_reads_zero.va codegen: a call of `$fopen`
-verilog-a/ch06_hierarchy/paramset_outer_defparam_wide_card.va point 0: display record value 25: old 4e1, new 3.2e1
 
 verilog-a/ch09_system_tasks/simparam_timescale.va point 0: row 0: old -4.511869783264559e-1, new -4.511869793274559e-1
 

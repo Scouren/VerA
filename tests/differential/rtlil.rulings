@@ -49,3 +49,11 @@ verilog/28_protected_envelopes/protected_sha1_digest.v front end: IEEE 1364-2005
 verilog/A_formal_syntax/b_A_4_1_mixed_port_connections_rejected.v IEEE 1364-2005 A.4.1: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
 verilog/A_formal_syntax/b_A_5_2_two_outputs_rejected.v IEEE 1364-2005 A.5.2: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
 verilog/A_formal_syntax/b_A_5_4_udp_delay3_rejected.v IEEE 1364-2005 A.5.4: the new side rejects the design at an earlier stage than old --emit-rtlil, with the error --run gives (diff-comp agrees)
+verilog/04_data_types/type_uwire_multiple_drivers_rejected.v IEEE 1364-2005 4.6.6: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/port_width_mismatch_vams_rejected.v VAMS-2023 6.5.7.1: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/13_configuration/every_config_referenced_rejected.v IEEE 1364-2005 13.3: old --emit-rtlil built RTLIL of a design the clause rejects; the new side rejects it
+verilog/12_hierarchy/defparam_early_resolution_rejected.v IEEE 1364-2005 12.2.1: old --emit-rtlil refused it for a construct it does not lower, not for the clause; the new side rejects it at elaboration with the error --run gives
+verilog/12_hierarchy/defparam_names_nothing_rejected.v IEEE 1364-2005 12.2.1: old --emit-rtlil refused it for a construct it does not lower, not for the clause; the new side rejects it at elaboration with the error --run gives
+verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v IEEE 1364-2005 12.2.1: old --emit-rtlil refused it for a construct it does not lower, not for the clause; the new side rejects it at elaboration with the error --run gives
+verilog/13_configuration/rule_inside_other_config_rejected.v IEEE 1364-2005 13.3: old --emit-rtlil refused it for a construct it does not lower, not for the clause; the new side rejects it at elaboration with the error --run gives
+verilog/13_configuration/two_unreferenced_configs_rejected.v IEEE 1364-2005 13.3: old --emit-rtlil refused it for a construct it does not lower, not for the clause; the new side rejects it at elaboration with the error --run gives

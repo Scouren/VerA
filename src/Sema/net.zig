@@ -242,6 +242,7 @@ pub fn appendNode(s: *Sema, name: []const u8, kind: Node.Kind, of: Node.Index, d
 pub fn vectorRange(s: *Sema, unit: *Unit, first: Inst.Index) Allocator.Error!?[2]i64 {
     const vir = unit.vir;
     var found: ?[2]i64 = null;
+    var found_io = false;
     for ([_]Vir.Body{ unit.module.ports, unit.module.body }) |body| for (vir.body(body)) |i| {
         const tag = vir.instructions.items(.tag)[@backingInt(i)];
         if (tag != .net and tag != .io) continue;
@@ -255,9 +256,23 @@ pub fn vectorRange(s: *Sema, unit: *Unit, first: Inst.Index) Allocator.Error!?[2
         const msb = ((try env.ref(bin.lhs)) orelse return found).asIntExact() orelse return found;
         const lsb = ((try env.ref(bin.rhs)) orelse return found).asIntExact() orelse return found;
         if (found) |f| {
-            if (f[0] != msb or f[1] != lsb)
-                try s.fail(.E0350, unit.file, i.toRef(), "the two declarations of `{s}` give different ranges", .{vir.string(nameOf(vir, first))});
-        } else found = .{ msb, lsb };
+            if (f[0] == msb and f[1] == lsb) continue;
+            // §6.5.2.2's own shape: a direction declaration's range against a
+            // discipline declaration's. Two of the same kind (unreachable
+            // for a port today: a second same-kind declaration is E0902
+            // first) fall back to a plain pair.
+            const is_io = tag == .io;
+            if (is_io != found_io) {
+                const dir_r: [2]i64 = if (found_io) f else .{ msb, lsb };
+                const disc_r: [2]i64 = if (found_io) .{ msb, lsb } else f;
+                try s.fail(.E0350, unit.file, i.toRef(), "`{s}` is [{d}:{d}] where it is given a direction and [{d}:{d}] where it is given a discipline", .{ vir.string(nameOf(vir, first)), dir_r[0], dir_r[1], disc_r[0], disc_r[1] });
+            } else {
+                try s.fail(.E0350, unit.file, i.toRef(), "`{s}`'s declarations disagree: [{d}:{d}] against [{d}:{d}]", .{ vir.string(nameOf(vir, first)), f[0], f[1], msb, lsb });
+            }
+        } else {
+            found = .{ msb, lsb };
+            found_io = tag == .io;
+        }
     };
     return found;
 }

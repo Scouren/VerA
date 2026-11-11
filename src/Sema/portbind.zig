@@ -36,6 +36,10 @@ const payloadOf = decl.payloadOf;
 const portDecl = decl.portDecl;
 const nameOf = decl.nameOf;
 
+/// `vectorBase`'s result: the bind and the name it was declared with, so a
+/// caller's diagnostic can name it as the old `analog/node.zig` messages do.
+const VecRef = struct { v: @FieldType(Sema.Bind, "vector"), name: []const u8 };
+
 /// §6.5 a child's ports: each the node(s) its connection names in the
 /// parent; an unconnected port is a net of the child's own.
 pub fn bindChildren(s: *Sema, unit: *Unit) Allocator.Error!void {
@@ -169,7 +173,7 @@ fn bindVector(s: *Sema, unit: *Unit, pu: *Unit, first: Inst.Index, r: [2]i64, ac
             connected = true;
         } else {
             failed = true;
-            if (ok) try s.fail(.E0925, pu.file, actual, "the connection is {d} nets wide and the port it connects is {d}", .{ bits.items.len, width });
+            if (ok) try failWidth(s, pu, actual, bits.items.len, width);
         }
     }
     const at: u32 = @intCast(unit.vec_rows.items.len);
@@ -184,6 +188,25 @@ fn bindVector(s: *Sema, unit: *Unit, pu: *Unit, first: Inst.Index, r: [2]i64, ac
         try unit.vec_rows.append(s.arena, row);
     }
     try unit.binds.put(s.arena, first, .{ .vector = .{ .first = at, .len = width, .msb = r[0], .lsb = r[1] } });
+}
+
+/// §6.5.7.1 E0925: `actual`'s width disagrees with the vector port's. A
+/// plain net or port reference names itself, as the old `analog/node.zig`'s
+/// `port_widths` row does; anything else (a concatenation or a select) has
+/// no one name, so it reads as `port_concats`'s row does.
+fn failWidth(s: *Sema, pu: *Unit, actual: Inst.Ref, got: usize, want: u32) Allocator.Error!void {
+    const vir = pu.vir;
+    if (actual.toIndex()) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .decl_ref => {
+            const d = canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl);
+            return s.fail(.E0925, pu.file, actual, "`{s}` is {d} wide and the port it connects is {d}", .{ vir.string(nameOf(vir, d)), got, want });
+        },
+        .str_ref => {
+            return s.fail(.E0925, pu.file, actual, "`{s}` is {d} wide and the port it connects is {d}", .{ vir.string(vir.instructions.items(.data)[@backingInt(i)].str_tok.start), got, want });
+        },
+        else => {},
+    };
+    try s.fail(.E0925, pu.file, actual, "the connection is {d} nets wide and the port it connects is {d}", .{ got, want });
 }
 
 /// §6.5.7.1 the nodes `r` (a port connection in `pu`) names, msb first: one
@@ -224,10 +247,11 @@ fn memberNodes(s: *Sema, pu: *Unit, r: Inst.Ref, src: Inst.Ref, out: *std.ArrayL
         },
         .elem => {
             const x = payloadOf(vir, Inst.Bin, i);
-            const v = (try vectorBase(s, pu, x.lhs, src)) orelse return false;
+            const vb = (try vectorBase(s, pu, x.lhs, src)) orelse return false;
+            const v = vb.v;
             const k = ((try decl.foldRef(s, pu, x.rhs)) orelse return false).asIntExact() orelse return false;
             if (k < @min(v.msb, v.lsb) or k > @max(v.msb, v.lsb)) {
-                try s.fail(.E0352, pu.file, src, "{d} is not an element of [{d}:{d}]", .{ k, v.msb, v.lsb });
+                try s.fail(.E0352, pu.file, src, "`{s}` is [{d}:{d}], so {d} is not one of its elements", .{ vb.name, v.msb, v.lsb, k });
                 return false;
             }
             const off: u32 = @intCast(if (v.msb >= v.lsb) v.msb - k else k - v.msb);
@@ -236,7 +260,8 @@ fn memberNodes(s: *Sema, pu: *Unit, r: Inst.Ref, src: Inst.Ref, out: *std.ArrayL
         },
         .slice, .slice_up, .slice_down => |tag| {
             const t = payloadOf(vir, Inst.Triple, i);
-            const v = (try vectorBase(s, pu, t.a, src)) orelse return false;
+            const vb = (try vectorBase(s, pu, t.a, src)) orelse return false;
+            const v = vb.v;
             const decl_r: [2]i64 = .{ v.msb, v.lsb };
             const r2: [2]i64 = if (tag == .slice) blk: {
                 const m = ((try decl.foldRef(s, pu, t.b)) orelse return false).asIntExact() orelse return false;
@@ -246,13 +271,13 @@ fn memberNodes(s: *Sema, pu: *Unit, r: Inst.Ref, src: Inst.Ref, out: *std.ArrayL
                 const base = ((try decl.foldRef(s, pu, t.b)) orelse return false).asIntExact() orelse return false;
                 const w = ((try decl.foldRef(s, pu, t.c)) orelse return false).asIntExact() orelse return false;
                 if (w < 1) {
-                    try s.fail(.E0352, pu.file, src, "the indexed part-select is {d} wide", .{w});
+                    try s.fail(.E0352, pu.file, src, "the indexed part-select of `{s}` is {d} wide", .{ vb.name, w });
                     return false;
                 }
                 break :blk net.indexedRange(decl_r, base, w, tag == .slice_down);
             };
             if (!net.partOf(decl_r, r2)) {
-                try s.fail(.E0352, pu.file, src, "`[{d}:{d}]` is not a part of [{d}:{d}]", .{ r2[0], r2[1], decl_r[0], decl_r[1] });
+                try s.fail(.E0352, pu.file, src, "`{s}` is [{d}:{d}], so [{d}:{d}] is not a part of it", .{ vb.name, decl_r[0], decl_r[1], r2[0], r2[1] });
                 return false;
             }
             const n: u32 = @intCast(@abs(r2[0] - r2[1]) + 1);
@@ -269,17 +294,18 @@ fn memberNodes(s: *Sema, pu: *Unit, r: Inst.Ref, src: Inst.Ref, out: *std.ArrayL
 
 /// The §3.6.3 vector bind of `r` (a plain name) in `pu`, or null after an
 /// E0351 (no range: §5.5.2's shape shared with an access function's).
-fn vectorBase(s: *Sema, pu: *const Unit, r: Inst.Ref, src: Inst.Ref) Allocator.Error!?@FieldType(Sema.Bind, "vector") {
+fn vectorBase(s: *Sema, pu: *const Unit, r: Inst.Ref, src: Inst.Ref) Allocator.Error!?VecRef {
     const vir = pu.vir;
     const i = r.toIndex() orelse return null;
     if (vir.instructions.items(.tag)[@backingInt(i)] != .decl_ref) return null;
     const d = canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl);
+    const name = vir.string(nameOf(vir, d));
     const bind = pu.binds.get(d) orelse return null;
     if (bind != .vector) {
-        try s.fail(.E0351, pu.file, src, "`{s}` was not declared with a range", .{vir.string(nameOf(vir, d))});
+        try s.fail(.E0351, pu.file, src, "`{s}` was not declared with a range", .{name});
         return null;
     }
-    return bind.vector;
+    return .{ .v = bind.vector, .name = name };
 }
 
 fn unitOf(s: *Sema, i: Zcu.Instance.Index) ?*Unit {

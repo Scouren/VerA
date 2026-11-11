@@ -6,9 +6,10 @@
 //! Cites: VAMS-2023 §4.2, §4.2.1.1, §4.3 (Tables 4-14, 4-15).
 //!
 //! Contents:
-//! - `pub fn tag(t: Air.Inst.Tag, args: []const fold.Const) ?fold.Const`
+//! - `pub fn tag(t: Air.Inst.Tag, args: []const fold.Const) ?fold.Const`: null outside a §4.3.2 domain
 
 const std = @import("std");
+const assert = std.debug.assert;
 const Air = @import("air");
 const fold = @import("std_kernels").fold;
 
@@ -114,9 +115,15 @@ const rows = std.EnumArray(Air.Inst.Tag, FoldRow).init(.{
 });
 
 /// `t` over constant operands, as the old MIR's `opcode.fold` computes
-/// it; null when it has no value there (it is then left to run time).
+/// it; null when it has no value there (it is then left to run time). A
+/// §4.3.2 domain violation (`Air.Domain.admits`) is not folded: it is left
+/// to `Air.Float`, the one reporter of E0601-E0609, so `ln(-1.0)` is an
+/// error, not a NaN. Asserts that `args` holds one or two operands.
 pub fn tag(t: Air.Inst.Tag, args: []const fold.Const) ?fold.Const {
+    assert(args.len >= 1);
+    assert(args.len <= 2);
     for (args) |a| if (a == .str) return null;
+    if (!admitted(t, args)) return null;
     return switch (rows.get(t)) {
         .none => null,
         .to_real => .{ .real = args[0].asReal() },
@@ -133,6 +140,17 @@ pub fn tag(t: Air.Inst.Tag, args: []const fold.Const) ?fold.Const {
 
 // ---- private ----
 
+/// Whether constant `args` satisfy `t`'s domain; `y_int` as `Air.Float`'s
+/// `integral` reads a constant: an integer, or a finite whole real.
+fn admitted(t: Air.Inst.Tag, args: []const fold.Const) bool {
+    assert(args.len >= 1);
+    const x = args[0].asReal();
+    const y: f64 = if (args.len > 1) args[1].asReal() else 0;
+    const y_int = args.len > 1 and (args[1] == .int or (std.math.isFinite(y) and y == @trunc(y)));
+    if (y_int) assert(!std.math.isNan(y));
+    return Air.tag_info.getPtrConst(t).domain.admits(x, y, y_int);
+}
+
 fn as(int: bool, c: fold.Const) fold.Const {
     if (!int) return .{ .real = c.asReal() };
     return .{
@@ -147,4 +165,17 @@ fn as(int: bool, c: fold.Const) fold.Const {
 fn wrapped(wrap: bool, r: ?fold.Const) ?fold.Const {
     const c = r orelse return null;
     return if (wrap and c == .int) .{ .int = fold.wrap32(c.int) } else c;
+}
+
+test tag {
+    // §4.3.2: a constant outside the domain is left to `Air.Float`, one
+    // inside folds.
+    try std.testing.expectEqual(null, tag(.ln, &.{.{ .real = -1 }}));
+    try std.testing.expect(tag(.ln, &.{.{ .real = 1 }}) != null);
+    try std.testing.expectEqual(null, tag(.ln1p, &.{.{ .real = -2 }}));
+    try std.testing.expectEqual(null, tag(.atanh, &.{.{ .real = 1 }}));
+    try std.testing.expectEqual(null, tag(.pow, &.{ .{ .real = -2 }, .{ .real = 0.5 } }));
+    try std.testing.expect(tag(.pow, &.{ .{ .real = -2 }, .{ .int = 3 } }) != null);
+    // NaN in, NaN out is no domain error.
+    try std.testing.expect(std.math.isNan(tag(.sqrt, &.{.{ .real = std.math.nan(f64) }}).?.real));
 }

@@ -159,3 +159,24 @@ test check {
     try std.testing.expectEqual(Float.Domain.proven, check(.tan, .{ .lo = -1, .hi = 1 }, .top, false).state);
     try std.testing.expectEqual(Float.Domain.open, check(.tan, .{ .lo = 1, .hi = 2 }, .top, false).state);
 }
+
+test "Air.Domain.admits is check over points: two implementations held to each other" {
+    // Sema's constant fold asks `admits`, `Float` asks `check`: a point one
+    // admits and the other rejects is a constant accepted or refused by
+    // the wrong stage (an illegal program compiled to NaN).
+    const inf = math.inf(f64);
+    const grid = [_]f64{ 0, -0.0, 0.5, -0.5, 1, -1, 2, -2, -1 - 0x1p-52, inf, -inf, math.nan(f64), math.floatTrueMin(f64), -math.floatTrueMin(f64), math.floatMax(f64), -math.floatMax(f64) };
+    var tags: u32 = 0;
+    for (std.enums.values(Air.Inst.Tag)) |t| {
+        const dom = Air.tag_info.getPtrConst(t).domain;
+        if (dom == .all) continue;
+        tags += 1;
+        for (grid) |x| for (grid) |y| {
+            // `y_int` as `Walk.integral` reads a constant.
+            const y_int = math.isFinite(y) and y == @trunc(y);
+            const violated = check(t, .point(x), .point(y), y_int).state == .violated;
+            try std.testing.expectEqual(!violated, dom.admits(x, y, y_int));
+        };
+    }
+    try std.testing.expectEqual(14, tags); // fmod idiv imod sqrt ln ln1p log10 pow ipow tan asin acos acosh atanh
+}

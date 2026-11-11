@@ -35,7 +35,7 @@
 //! - `pub const ExtraIndex = enum(u32)`
 //! - `pub const Block`, `pub const CondBr`, `pub const Bin`, `pub const Call`: the `extra` payloads
 //! - `pub const CallFacts = struct` (`Range`): what the passes know of a callee
-//! - `pub const Class`, `pub const Scalar`, `pub const Domain`, `pub const Relation`, `pub const Info`
+//! - `pub const Class`, `pub const Scalar`, `pub const Domain` (`pub fn admits(d: Domain, x: f64, y: f64, y_int: bool) bool`), `pub const Relation`, `pub const Info`
 //! - `pub const tag_info: std.EnumArray(Inst.Tag, Info)`
 //! - `pub const nesting_max: u32`
 //! - `pub const Builder = struct` (`init`, `deinit`, `addInst`, `addUnOp`, `addBinOp`,
@@ -335,6 +335,33 @@ pub const Domain = enum(u8) {
     nonzero_divisor,
     tan_poles,
     pow_sign,
+
+    /// Returns whether the point `x` (and `y`, for a binary tag) is no
+    /// violation of `d`: the point form of `Float/domain.zig`'s `check`,
+    /// which a paired test holds it to. `y_int`: `y` is an integer value.
+    /// A NaN operand admits (NaN in, NaN out is not a §4.3.2 error); `tan`
+    /// admits every double (no double is an odd multiple of pi/2).
+    pub fn admits(d: Domain, x: f64, y: f64, y_int: bool) bool {
+        if (y_int) assert(!std.math.isNan(y));
+        // Each arm is `!(violated)`, with comparisons a NaN makes false.
+        const r = switch (d) {
+            .all, .tan_poles => true,
+            .positive => !(x <= 0),
+            .gt_neg_one => !(x <= -1),
+            .non_negative => !(x < 0),
+            .unit_closed => !(x > 1 or x < -1),
+            .unit_open => !(x >= 1 or x <= -1),
+            .ge_one => !(x < 1),
+            .nonzero_divisor => y != 0,
+            // Table 4-14 pow: a zero base under a negative exponent, a
+            // negative base under a finite fractional one.
+            .pow_sign => !((x == 0 and y < 0) or
+                (x < 0 and !y_int and std.math.isFinite(y) and y != @floor(y))),
+        };
+        if (d == .all) assert(r);
+        if (!r) assert(!std.math.isNan(x) or d == .nonzero_divisor);
+        return r;
+    }
 };
 /// `lhs REL rhs` for the twelve comparisons.
 pub const Relation = enum(u8) { lt, le, gt, ge, eq, ne };

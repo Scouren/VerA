@@ -237,7 +237,6 @@ verilog-a/ch09_system_tasks/arandom_negative_seed.va tables row 4: old `held $rn
 verilog-a/ch09_system_tasks/arandom_parameter_seed.va tables row 5: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/clog2_nested_contexts.va codes: old {}, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
 verilog-a/ch09_system_tasks/clog2_unsigned_width.va codes: old {}, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
-verilog-a/ch09_system_tasks/conversion_constant_expressions.va tables row 0: old `param cp integer = 1`, new `param cp integer = ?`
 verilog-a/ch09_system_tasks/fatal_finish_number_3_rejected.va codes: old E0824, new {}
 verilog-a/ch09_system_tasks/feof.va tables row 4: old `held text`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/ferror.va tables row 4: old `held text`, new `limit_slots 0`
@@ -455,4 +454,3 @@ verilog-ams/ch09_system_tasks/r_format_in_the_digital_context_without_argument_r
 verilog-ams/ch09_system_tasks/rng_constant_distribution_stream.va tables row 3: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-ams/ch09_system_tasks/stochastic_queue_in_digital_context.va tables row 8: old `held st`, new `limit_slots 0`
 verilog-ams/ch09_system_tasks/stop_in_analog_initial_rejected.va codes: old E0807, new {}
-verilog/pli/analog_attributes.va codes: old {}, new E0357 (E0357: `variable_attr`)

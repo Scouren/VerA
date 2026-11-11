@@ -595,3 +595,18 @@ test "§4.2.13 a sized concatenation prints at its operands' summed width, unsig
     }
     try std.testing.expectEqual(@as(u32, 1), widths);
 }
+
+test "§4.2.1.1/§9.11 `$rtoi` truncates toward zero and `$itor` converts, folded in a constant" {
+    var o = try lower(
+        \\module m(p); inout p; electrical p;
+        \\  localparam integer a = $rtoi(1.75), b = $rtoi(-1.75);
+        \\  localparam real c = $itor(-2147483647);
+        \\  (* vera_note = $rtoi(2.5) *) real x;
+        \\  analog I(p) <+ (a * 100 + b + c / 2147483647.0) * V(p);
+        \\endmodule
+    );
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{}, o.codes);
+    // 1 * 100 - 1 - 1, exact in binary.
+    try std.testing.expectEqual(@as(f64, 98), try o.value(0, 0, &.{1.0}));
+}

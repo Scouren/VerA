@@ -335,6 +335,17 @@ pub const Env = struct {
             if (args.len != 1) return null;
             return .{ .int = fold.clog2(vals[0].asIntExact() orelse return null, 32) };
         }
+        // §4.2.1.1 / §9.11: `$rtoi` truncates toward zero into §3.2's
+        // 32-bit integer (null outside it, or for NaN: a run-time question);
+        // `$itor` is the integer's real.
+        const rtoi = std.mem.eql(u8, raw, "$rtoi");
+        if (rtoi or std.mem.eql(u8, raw, "$itor")) {
+            if (args.len != 1 or vals[0] == .str) return null;
+            if (!rtoi) return .{ .real = @floatFromInt(vals[0].asIntExact() orelse return null) };
+            const t = @trunc(vals[0].asReal());
+            if (!(t >= -2147483648.0 and t <= 2147483647.0)) return null;
+            return .{ .int = @intFromFloat(t) };
+        }
         const f = fold.MathFn.fromName(if (std.mem.eql(u8, name, "log10")) "log" else name) orelse return null;
         return fold.math(f, vals[0..args.len]);
     }

@@ -659,5 +659,6 @@ Each emitted Instance/State struct keeps the existing `comptime assert(@sizeOf(.
   ruling). T10's `eval.toInteger` saturates every out-of-range value. The fold and the run-time
   derive path must apply the same rule. Oracle: both fixtures' own `CHECKI`s, diff-codegen and
   diff-comp on both; red first.
-  **On hold:** the rule above is the lead's fit to two fixtures; `research/conversion.md`
-  (Fable) settles it from the LRM, the old side and the suite before anyone implements.
+  **Superseded:** `research/conversion.md` (Q1, user: W) replaces the rule above: round, then
+  the low 32 bits at any magnitude (1e300 -> 0). Its sites C1-C7 are the task; it runs after
+  w4-derive, w4-clog2 and w4-gompute merge (it touches eval.zig, derive, lib/std/kernels).

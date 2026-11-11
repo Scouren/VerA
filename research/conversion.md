@@ -570,7 +570,7 @@ has §3.2/§5.6/§12.2 and three VerA decisions behind it, matches the digital
 runtime and OpenVAF's compiled code, and costs one fixture and one ruling
 line.
 Recommendation: W.
-Decision:
+Decision: W (user, 2026-11-11): round to nearest, ties away, then the low 32 bits two's complement at any magnitude, in every fold, parameter, derive and run-time site.
 
 **Q2. The non-finite run-time value: 0 (W, this plan), or keep `lossyCast`'s
 ±2^63 for an infinity (then wrapped to -1 / 0 by any later arithmetic)?**
@@ -578,7 +578,7 @@ Recommendation: 0, for both NaN and ±inf: it is the analog context's "x reads
 as 0" (VD-116, `Vague_Decisions.md:1332`), VD-130's `$itor(inf)` = 0, and what
 OpenVAF's compiled `lround` gives on x86-64/glibc; a constant stays a
 diagnostic (E0368/E0310/E0816).
-Decision:
+Decision: 0 for NaN and ±inf at run time; a constant stays a diagnostic (E0368/E0310/E0816).
 
 **Q3. A subscript, count or replication factor past 2^63: `fi_cast` as W
 (then `a[1e300]` is index 0, an aliasing read) or keep i64 saturation for
@@ -592,7 +592,7 @@ Recommendation: W everywhere; note the `a[1e300]` consequence in the helper's
 doc comment. If the lead wants the range check to catch it, the cheaper fix
 is in the index arithmetic (compute the offset in i64 and range-check before
 narrowing), not a second conversion.
-Decision:
+Decision: W everywhere, with the `a[1e300]` consequence in the helper's doc comment; no second conversion flavour.
 
 **Q4. `$rtoi` past 32 bits in the analog context: VD-130's low 32 bits (C6),
 or leave both sides' i64 saturation (no fixture distinguishes them today)?**
@@ -600,7 +600,7 @@ IEEE §17.8's prototype returns `integer`; §9.11 says the analog `$rtoi` is
 the IEEE function; VD-130 already decided the digital one with iverilog's
 gold. Leaving it is a second rule for one function.
 Recommendation: C6, with its fixture and `comp.rulings` line.
-Decision:
+Decision: C6: analog `$rtoi` takes VD-130's low 32 bits, with its fixture and comp.rulings line.
 
 **Q5. `$dist_*` into an integer: keep E0816 for a finite result outside
 i32 (`src/Sema/dist.zig:135`, a refusal where W would wrap)?**
@@ -608,14 +608,14 @@ It is a constant that provably overflows; refusing is a diagnostic the LRM
 permits and I pins the non-finite half. Wrapping it would make
 `$dist_uniform(seed, 0, 3000000000)` fold to a negative number silently.
 Recommendation: keep.
-Decision:
+Decision: Keep E0816.
 
 **Q6. `time` (`eval.zig:433`): 64 bits through `asIntExact` (declines past
 i64) instead of `toInteger`'s 32-bit saturation?**
 IEEE §4.8: "at least 64 bits". No analog fixture has a `time` parameter; the
 digital side has its own evaluator.
 Recommendation: yes, one line in C2.
-Decision:
+Decision: Yes: `time` goes through `asIntExact` (64 bits), one line in C2.
 
 **Q7. Add a `W`-class warning for a *constant* real whose rounded value does
 not fit `integer` (A1's `4294967297.0` would warn "keeps its low 32 bits,
@@ -628,7 +628,7 @@ so a warning on stderr needs checking against the conform harness's
 clean-stderr rule before it lands).
 Recommendation: yes, after C5, as a diagcodes task (`warn-` key under
 §4.2.1.1), not inside T39.
-Decision:
+Decision: Yes, after C5, as a diagcodes task (`warn-` key under §4.2.1.1), checked against the conform harness's clean-stderr rule first; not inside T39.
 
 **Q8. Fixture name under W: keep `integer_conversion_saturates.va` (its
 only list line is `lower.rulings:19`) or rename to
@@ -637,4 +637,4 @@ A fixture named "saturates" asserting the low 32 bits is a trap for the next
 reader; the rename touches one ruling line and the new `comp.rulings` and
 `tools/vera.xfail` lines, all written in C5 anyway.
 Recommendation: rename.
-Decision:
+Decision: Rename to `integer_conversion_low32.va` (user approved with Q1); the suite change goes with the other pending submodule changes for the user's push.

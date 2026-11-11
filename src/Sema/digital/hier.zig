@@ -103,7 +103,7 @@ fn head(l: *Lower, r: Inst.Ref, name: []const u8, index: ?i64) Error!u32 {
 /// The child scope of `s` named `name` with index `index`, or null.
 fn child(l: *Lower, s: u32, name: []const u8, index: ?i64) ?u32 {
     for (l.b.scopes.items, 0..) |sc, k| {
-        if (sc.parent != s or k == s) continue;
+        if (sc.parent != s or k == s or l.scopes.items[k].implicit) continue;
         if (!std.mem.eql(u8, text(l, sc.name), name)) continue;
         const ki: ?i64 = if (sc.index) |x| x else null;
         if (ki == index) return @intCast(k);

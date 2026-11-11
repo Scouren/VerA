@@ -211,6 +211,10 @@ pub fn declareNet(l: *Lower, f: u32, first: Inst.Index, decls: []const Inst.Inde
         // VAMS §3.7 a wreal joined to a wire or tri: one wreal net.
         const outer_wreal = l.nets.items[outer.net].kind == .wreal;
         const merging = (nk == .wreal) != outer_wreal;
+        // VAMS 2023 §6.5.7.1 "The sizes of the ports and net must match";
+        // IEEE 1364-2005 §12.3.9.2 makes the connection an assignment.
+        if (!merging and outer.ty.width != width and !l.options.std_1364)
+            return l.reject(f, first.toRef(), "§6.5.7.1: the sizes of the port and the net connected to it shall match");
         if (merging or outer.ty.width == width) {
             // A port's net declaration assignment drives the merged net.
             if (decl_net) |dn| if (dn.init.len != 0) try netOf(l, f, outer.net, nk, dn);

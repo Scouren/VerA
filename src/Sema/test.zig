@@ -480,6 +480,13 @@ test "§2.6.2 a scale factor in a UDP's delay is E0247 (each UDP instance's W025
     , .{}, &.{.E0907});
 }
 
+test "§2.6.2 the IEEE 1364 route runs a UDP's instance (no W0252: it computes something there)" {
+    try expectCodes(
+        \\primitive buf1(q, a); output q; input a; table 0 : 0; 1 : 1; endtable endprimitive
+        \\module top; wire q; buf1 #(0 ? 2u : 0.25) g(q, 1'b0); endmodule
+    , .{ .ieee1364 = true }, &.{.E0247});
+}
+
 test "§2.7.1 an escaped instance name is one path segment" {
     try expectTree(
         \\module kid; endmodule

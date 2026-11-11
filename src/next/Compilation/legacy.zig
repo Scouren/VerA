@@ -28,14 +28,7 @@ pub fn rule(w: *Diag.Wip, r: Zcu.Rule, loc: Diag.Loc, name: []const u8, nums: [2
     assert(r != .none);
     var at = loc;
     at.end = at.start;
-    var b = w.build(.lower, switch (r) {
-        .defparam_unknown => .E0907,
-        .cell_again => .W1152,
-        .param_extra => .W1161,
-        .config => .E0243,
-        .defparam_nothing => .E0901,
-        else => .E1100,
-    }, at);
+    var b = w.build(.lower, r.code(), at);
     switch (r) {
         .none => unreachable, // asserted above
         .port_count => b.msg("more port connections than the module has ports", .{}),

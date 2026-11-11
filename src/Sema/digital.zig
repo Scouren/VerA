@@ -30,6 +30,7 @@ const eval = @import("eval.zig");
 const decl = @import("digital/decl.zig");
 const decl_mod = @import("decl.zig");
 const stmt = @import("digital/stmt.zig");
+const timescale = @import("digital/timescale.zig");
 const nets = @import("digital/nets.zig");
 const time0 = @import("digital/time0.zig");
 const sub = @import("digital/sub.zig");
@@ -60,6 +61,10 @@ pub const Options = struct {
     /// ground nets are the analog solver's, skipped, where a pure IEEE 1364
     /// design refuses them.
     mixed: bool = false,
+    /// The source is IEEE 1364 (`--std=1364-*`), not VAMS: a port joined
+    /// to a net of another size is §12.3.9.2's continuous assignment, where
+    /// VAMS 2023 §6.5.7.1 refuses it.
+    std_1364: bool = false,
 };
 
 /// The program, and per timing check (`Program.checks` order) the byte of
@@ -245,6 +250,9 @@ pub const ScopeInfo = struct {
     /// An instance or generate block (queued, §9.9); not a named block,
     /// task or function.
     queued: bool,
+    /// An unnamed generate block: §12.4.3 names it `genblk<n>`, which no
+    /// hierarchical name may reach.
+    implicit: bool = false,
 };
 
 /// The lowering's state: the `Zcu` it reads, the builder it writes, and the
@@ -685,66 +693,16 @@ fn spine(l: *Lower) Error!void {
     try gates.checkUdps(l);
     if (l.zcu.instances.len == 0) {
         l.why = "digital execution found no top-level module";
-        l.why_at = moduleAt(l, firstModule(l) orelse return error.Rejected);
+        l.why_at = timescale.moduleAt(l, firstModule(l) orelse return error.Rejected);
         return error.Rejected;
     }
     // §17.2.1/§17.2.9 a relative data file is looked for beside the design.
     const pp = l.options.sources[0].pp;
     if (pp.files.len != 0) l.b.p.file_name = try l.b.string(pp.files[0].name);
-    try timeScales(l);
+    try timescale.timeScales(l);
     try decl.declare(l);
     if (l.options.mixed) try @import("digital/drivers.zig").segregate(l);
     try stmt.compileAll(l);
-}
-
-/// IEEE 1364-2005 §19.8: each module's `timescale (the last before it, or
-/// none); some modules with one and some without is an error. The design's
-/// tick is the finest precision of all of them, `s` when none is given. A
-/// mixed design's modules before its first `timescale take that one, as
-/// lib/sim/digital's `mixedTimescales` moves it to the text's start: the
-/// shipped prelude's modules come ahead of every directive the source wrote.
-fn timeScales(l: *Lower) Error!void {
-    const zcu = l.zcu;
-    const first = if (l.options.mixed) firstTimescale(l) else null;
-    var finest: i32 = 0;
-    var set: u32 = 0;
-    var total: u32 = 0;
-    var ahead = true;
-    for (0..zcu.files.len) |f| {
-        const vir = zcu.fileVir(@fromBackingInt(@intCast(f)));
-        for (vir.decls()) |d| {
-            if (d.kind != .module and d.kind != .macromodule and d.kind != .connectmodule) continue;
-            const m = Lower.payload(vir, Inst.Module, d.inst);
-            total += 1;
-            const stamp = stampOf(m, first, &ahead) orelse continue;
-            set += 1;
-            const p = try quantum(l, stamp.precision.get());
-            finest = @min(finest, @backingInt(p));
-        }
-    }
-    if (set != 0 and set != total) {
-        l.why = "§19.8: it shall be an error if some modules have a `timescale specified and others do not";
-        l.why_at = moduleAt(l, zcu.instances.items(.module)[0]);
-        return error.Rejected;
-    }
-    l.b.p.finest = finest;
-    const global: std_sim.time.Quantum = @fromBackingInt(@intCast(finest));
-    ahead = true;
-    for (0..zcu.files.len) |f| {
-        const file: Zcu.File.Index = @fromBackingInt(@intCast(f));
-        const vir = zcu.fileVir(file);
-        for (vir.decls(), 0..) |d, k| {
-            if (d.kind != .module and d.kind != .macromodule and d.kind != .connectmodule and d.kind != .primitive) continue;
-            var unit: std_sim.time.Quantum = .s;
-            var precision: std_sim.time.Quantum = .s;
-            if (d.kind != .primitive) if (stampOf(Lower.payload(vir, Inst.Module, d.inst), first, &ahead)) |stamp| {
-                unit = try quantum(l, stamp.unit.get());
-                precision = try quantum(l, stamp.precision.get());
-            };
-            const scale = std_sim.time.Scale.init(unit, precision, global) catch return l.refuse("an invalid timescale");
-            try l.module_times.put(l.a, .{ .file = file, .index = @fromBackingInt(@intCast(k)) }, .{ .scale = scale, .unit_exp = @backingInt(unit) });
-        }
-    }
 }
 
 /// The first module any file declares.
@@ -755,42 +713,4 @@ fn firstModule(l: *const Lower) ?Zcu.Decl {
             return .{ .file = file, .index = @fromBackingInt(@intCast(k)) };
     }
     return null;
-}
-
-/// The source offset of module `d`'s declaration (its main token), where
-/// lib/sim/digital reports a whole-design error.
-fn moduleAt(l: *const Lower, d: Zcu.Decl) u32 {
-    const vir = l.zcu.fileVir(d.file);
-    const tree = l.options.sources[@backingInt(d.file)].tree;
-    const n = vir.instructions.items(.data)[@backingInt(l.zcu.declRow(d).inst)].pl_node.src_node;
-    return tree.tokenStart(tree.nodeMainToken(n));
-}
-
-/// The stamp of a mixed design's first module with a `timescale.
-fn firstTimescale(l: *Lower) ?Inst.Module.Stamp {
-    assert(l.options.mixed);
-    for (0..l.zcu.files.len) |f| {
-        const vir = l.zcu.fileVir(@fromBackingInt(@intCast(f)));
-        for (vir.decls()) |d| {
-            if (d.kind != .module and d.kind != .macromodule and d.kind != .connectmodule) continue;
-            const m = Lower.payload(vir, Inst.Module, d.inst);
-            if (m.stamp.flags.has_timescale) return m.stamp;
-        }
-    }
-    return null;
-}
-
-/// Module `m`'s `timescale: its own, else `first` (a mixed design's) while
-/// no module before it had one (`ahead`, cleared at the first that does),
-/// else none.
-fn stampOf(m: Inst.Module, first: ?Inst.Module.Stamp, ahead: *bool) ?Inst.Module.Stamp {
-    if (m.stamp.flags.has_timescale) {
-        ahead.* = false;
-        return m.stamp;
-    }
-    return if (ahead.*) first else null;
-}
-
-fn quantum(l: *Lower, seconds: f64) Error!std_sim.time.Quantum {
-    return std_sim.time.Quantum.fromSeconds(seconds) catch l.refuse("an unsupported time unit");
 }

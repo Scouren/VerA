@@ -163,6 +163,33 @@ fn rejection(a: std.mem.Allocator, src: []const u8) !digital.Why {
     return error.TestExpectedError;
 }
 
+/// The rejection the IEEE 1364 route's lowering of `src` (one root, no
+/// analog half) raises; any other outcome fails.
+fn rejection1364(a: std.mem.Allocator, src: []const u8) !digital.Why {
+    var pp: vams.Preprocessor = .init(a, .{ .std_defs = false });
+    try pp.addUnit("ieee1364.v", src);
+    while (try pp.run()) |_| return error.UnexpectedInclude;
+    const out = try a.create(vams.Preprocessor.Output);
+    out.* = pp.output();
+    const text = try a.dupeSentinel(u8, out.text, 0);
+    const tree = try a.create(vams.Ast);
+    tree.* = try vams.Ast.parse(a, text, .{ .discrete = true });
+    const vir = try vams.AstGen.generate(a, tree, .{ .directives = out.directives, .ieee1364 = true });
+    var zcu: Zcu = try .init(a);
+    _ = try zcu.addFile("ieee1364.v", vir, 0);
+    try Sema.elaborate(&zcu, .{ .roots = .all, .ieee1364 = true });
+    for (zcu.failed.items(.code)) |code| if (@tagName(code)[0] == 'E') {
+        std.debug.print("elaboration refuses it: {t}\n", .{code});
+        return error.TestUnexpectedResult;
+    };
+    var why: digital.Why = .{};
+    _ = digital.lower(a, &zcu, .{ .sources = &.{.{ .tree = tree, .pp = out }} }, &why) catch |e| switch (e) {
+        error.Rejected => return why,
+        else => return e,
+    };
+    return error.TestExpectedError;
+}
+
 /// The slot `name` (its first) declares in `lowered`, or a test failure.
 fn slotNamed(lowered: *const digital.Lowered, name: []const u8) !u32 {
     for (lowered.slot_names, 0..) |n, k| if (std.mem.eql(u8, n, name)) return @intCast(k);
@@ -876,4 +903,111 @@ test "§12.2/A.1.3/§5.5 the netlist tables: each slot's scope and declared rang
     try std.testing.expect(spec[lowered.instance_spec[1]].defaults);
     try std.testing.expect(!spec[lowered.instance_spec[2]].defaults);
     try std.testing.expect(!spec[lowered.instance_spec[3]].defaults);
+}
+
+test "§10.4.5 a parameter's late value calls a function reading a name that is neither its own nor a parameter: rejected" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const why = try rejection1364(arena_state.allocator(),
+        \\module top;
+        \\  reg r;
+        \\  function integer f; input a; begin f = a + r; end endfunction
+        \\  parameter integer p = f(1);
+        \\  initial $display(p);
+        \\endmodule
+    );
+    try std.testing.expect(std.mem.indexOf(u8, why.text, "constant function") != null);
+}
+
+test "§5.2.1 a part-select bound with an x bit is rejected (native_wide_index_bound_limit)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const why = try rejection1364(arena_state.allocator(),
+        \\module top;
+        \\  localparam [3:0] m = 4'bx001;
+        \\  reg [15:0] v;
+        \\  initial v[m:0] = 1;
+        \\endmodule
+    );
+    try std.testing.expect(std.mem.indexOf(u8, why.text, "x or z") != null);
+}
+
+test "VAMS-2023 §6.5.7.1 a port and the net connected to it of different sizes is rejected (port_width_mismatch_vams)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const why = try rejection1364(arena_state.allocator(),
+        \\module m(y); output y; wire [1:0] y; endmodule
+        \\module top; wire y; m u(y); endmodule
+    );
+    try std.testing.expect(std.mem.indexOf(u8, why.text, "6.5.7.1") != null);
+}
+
+test "§19.8 a `timescale written inside a module is rejected (timescale_inside_module)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const why = try rejection1364(arena_state.allocator(),
+        \\module top;
+        \\`timescale 1ns/1ps
+        \\endmodule
+    );
+    try std.testing.expect(std.mem.indexOf(u8, why.text, "outside a module") != null);
+}
+
+test "§12.4.3 an unnamed generate block's `genblk<n>` name is unreachable by a hierarchical name" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const why = try rejection1364(arena_state.allocator(),
+        \\module top;
+        \\  if (1) begin
+        \\    wire w;
+        \\  end
+        \\  initial $display(genblk1.w);
+        \\endmodule
+    );
+    try std.testing.expect(std.mem.indexOf(u8, why.text, "undeclared instance") != null);
+}
+
+test "§3.7.3 an escaped name enabled as an undeclared task is quoted as written" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const why = try rejection1364(arena_state.allocator(),
+        \\module top;
+        \\  initial \$foo ;
+        \\endmodule
+    );
+    try std.testing.expect(std.mem.indexOf(u8, why.text, "$foo") != null);
+}
+
+test "VAMS §9.2 Table 9-12: $temperature is supported in the digital context, which VerA's digital engine does not run" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const why = try rejection1364(arena_state.allocator(),
+        \\module top;
+        \\  initial $display($temperature);
+        \\endmodule
+    );
+    try std.testing.expect(std.mem.indexOf(u8, why.text, "9-12") != null);
+}
+
+test "§18.3.1 a $dumpports scope named twice is rejected (dumpports_duplicate_scope)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const why = try rejection1364(arena_state.allocator(),
+        \\module top;
+        \\  initial $dumpports(top, top);
+        \\endmodule
+    );
+    try std.testing.expect(std.mem.indexOf(u8, why.text, "unique") != null);
+}
+
+test "§18.3.1 a $dumpports scope naming a variable is rejected (dumpports_variable_scope)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const why = try rejection1364(arena_state.allocator(),
+        \\module top;
+        \\  reg r;
+        \\  initial $dumpports(r, "f.vcd");
+        \\endmodule
+    );
+    try std.testing.expect(std.mem.indexOf(u8, why.text, "not variables") != null);
 }

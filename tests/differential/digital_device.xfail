@@ -9,19 +9,10 @@
 # A listed fixture that agrees fails the run until its line goes. Refresh:
 # -Dcomp-rebaseline writes zig-out/digital_device.xfail.new.
 verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/03_lexical_conventions/escaped_system_task_rejected.v not built: backend digital_lowering
 verilog/03_lexical_conventions/forward_reference_reg_rejected.v rw-codegen (codegen): stderr: line 1: old `error[E1103]: design cannot be a contract device: module `triage_forward_reference_reg`: a name the engine resolves only at run time`, new `error[E1100]: digital source execution failed: a name is used before its declaration`
-verilog/05_expressions/native_wide_index_bound_limit.v not built: backend digital_lowering
-verilog/08_udp/combinational_reg_rejected.v rw-dlower (digital lowering): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `comb_reg` primitive`
 verilog/08_udp/definition_inside_module_rejected.v rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `q``, new `error[E0205]: unsupported module item: found table`
-verilog/08_udp/initial_to_input_rejected.v rw-dlower (digital lowering): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `input_init` primitive`
-verilog/08_udp/multibit_initial_rejected.v rw-dlower (digital lowering): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `wide_init` primitive`
-verilog/08_udp/sequential_without_reg_rejected.v rw-dlower (digital lowering): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `latch_no_reg` primitive`
-verilog/08_udp/udp_named_terminal_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1100]: digital source execution failed: §8: a UDP instance connects its terminals by position, none left open`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `triage_pass` primitive`
-verilog/08_udp/udp_null_terminal_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1100]: digital source execution failed: §8: a UDP instance connects its terminals by position, none left open`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `mux` primitive`
 verilog/09_behavioral_modeling/unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
 verilog/09_behavioral_modeling/unnamed_fork_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
-verilog/10_tasks_functions/constant_function_hierarchical_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/defparam_across_generate_instances_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element`, new `error[E1100]: digital source execution failed: §12.2.1: a defparam insid
@@ -29,8 +20,6 @@ verilog/12_hierarchy/extra_ordered_parameter_value_ignored.v rw-dlower (run): ex
 verilog/12_hierarchy/extra_ordered_value_ignored.v rw-dlower (run): exit status old 1, new 0
 verilog/12_hierarchy/port_input_width_extends.v rw-dlower (run): exit status old 1, new 0
 verilog/12_hierarchy/port_output_width_truncates.v rw-dlower (run): exit status old 1, new 0
-verilog/12_hierarchy/port_width_mismatch_vams_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/unnamed_block_referenced_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/cell_not_in_its_library_rejected.v not built: backend libmap
 verilog/13_configuration/cfg1_default_liblist.v not built: backend libmap
 verilog/13_configuration/cfg2_gate_first.v not built: backend libmap
@@ -50,12 +39,9 @@ verilog/13_configuration/resolution_order.v not built: backend libmap
 verilog/13_configuration/source_text_in_map_rejected.v not built: backend libmap
 verilog/13_configuration/two_libraries_match_rejected.v not built: backend libmap
 verilog/13_configuration/undeclared_library_rejected.v not built: backend libmap
-verilog/18_vcd/dumpports_duplicate_scope_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/18_vcd/dumpports_same_file_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/18_vcd/dumpports_variable_scope_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/19_compiler_directives/ams_keywords_instance_names.v rw-dlower (run): exit status old 1, new 0
 verilog/19_compiler_directives/default_nettype_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^`
-verilog/19_compiler_directives/timescale_inside_module_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/19_compiler_directives/unconnected_drive_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^^^^`
 verilog/28_protected_envelopes/protected_des_base64.v rw-dlower (run): exit status old 1, new 0
 verilog/28_protected_envelopes/protected_des_uuencode.v rw-dlower (run): exit status old 1, new 0

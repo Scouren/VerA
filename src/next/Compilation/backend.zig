@@ -229,7 +229,7 @@ pub fn semaDigital(comp: *Compilation) !?Job {
     for (sources, comp.units.items) |*s, *u| s.* = .{ .tree = &u.tree, .pp = out };
     if (comp.config.target == .rtlil and try rtlilRefused(comp, out.*)) return null;
     var why: sema.digital.Why = .{};
-    comp.lowered = sema.digital.lower(comp.arena(), &comp.zcu, .{ .sources = sources }, &why) catch |e| switch (e) {
+    comp.lowered = sema.digital.lower(comp.arena(), &comp.zcu, .{ .sources = sources, .std_1364 = @backingInt(comp.config.language) < @backingInt(vams.Ast.KeywordSet.vams_2_3) }, &why) catch |e| switch (e) {
         error.Unsupported => return notBuiltFmt(comp, "the digital lowering", why.text),
         error.Rejected => {
             // A refusal before the run: a compile error, under the summary.

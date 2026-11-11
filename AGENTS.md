@@ -223,6 +223,9 @@ So:
    has known miscompilations. The script gives corpus steps one of two
    machine-wide slots at `-j2`, and runs `check` and `test-<module>` at once.
    Never start a corpus step with a bare `zig build`.
+   Pass one corpus step per call: the slot is one process, and six corpus
+   steps in one `zig build` run side by side and ran the machine out of
+   memory.
 4. **Narrow before you widen:** first `test-<module>`, then
    `diff-comp -Dcomp-filter='a|b'` on the fixtures you touched, then the
    full gate once, at the end.

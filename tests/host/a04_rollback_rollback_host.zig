@@ -58,6 +58,7 @@
 const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
+const field_use_check = @import("field_use_check.zig");
 
 const n_u = @typeInfo(D.U).@"enum".field_names.len;
 
@@ -157,4 +158,18 @@ test "§4.5.15 a revert leaves no half-advanced operator history behind" {
         // next attempt's dt negative.
         try std.testing.expectEqualDeep(accepted_state, state);
     }
+}
+
+// ---- #134's oracle 2: an independent perturbation check ----
+//
+// `field_use_check.checkClearBits`'s doc has the full rationale; every
+// `*_host.zig` fixture that evaluates a device calls it once.
+
+test "field_use (#134): slew's clear bits perturb nothing in eval/q" {
+    const model: D.Model = .{};
+    var inst0: D.Instance = .{};
+    _ = D.initState(&model, &inst0);
+    const sim: contract.SimState = .{ .t = 1.0e-9, .dt = 1.0e-9, .kind = .tran };
+    const x = bias(1.0);
+    try field_use_check.checkClearBits(S, D, &x, &model, inst0, sim);
 }

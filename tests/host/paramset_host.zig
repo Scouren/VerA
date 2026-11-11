@@ -8,6 +8,7 @@
 const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
+const field_use_check = @import("field_use_check.zig");
 const n_u = @typeInfo(D.U).@"enum".field_names.len;
 const S = contract.RefFamily(f64, &@as([n_u]u8, @splat(contract.no_lane)), .{});
 
@@ -66,4 +67,14 @@ test "an explicit integer shape uses its effective low 32 bits" {
     model.choice = 2;
     D.derive(S, &model);
     try std.testing.expectEqualStrings("choice", D.checkShape(&model).?);
+}
+
+test "field_use (#134): clear bits perturb nothing in eval" {
+    var model: D.Model = .{};
+    D.derive(S, &model);
+    if (@hasDecl(D, "setup")) D.setup(S, &model);
+    const inst0: D.Instance = .{};
+    var x: [n_u]f64 = @splat(0.0);
+    x[@backingInt(D.U.p)] = 0.5;
+    try field_use_check.checkClearBits(S, D, &x, &model, inst0, .{});
 }

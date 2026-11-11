@@ -12,6 +12,7 @@ const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
 const ptx = @import("ptx");
+const field_use_check = @import("field_use_check.zig");
 
 const n_u = @typeInfo(D.U).@"enum".field_names.len;
 const S = contract.RefFamily(f64, &.{ 0, 1 }, .{});
@@ -79,4 +80,16 @@ test "#82 eval keeps no copy of a cached history on the GPU stack" {
         std.debug.print("largest NVPTX .local depot {d} B\n", .{depot});
         return error.TestUnexpectedResult;
     }
+}
+
+test "field_use (#134): clear bits perturb nothing in eval (the cached history field)" {
+    var m: D.Model = .{};
+    if (@hasDecl(D, "derive")) D.derive(f64, &m);
+    if (@hasDecl(D, "setup")) D.setup(S0, &m);
+    var inst0: D.Instance = .{};
+    _ = D.initState(&m, &inst0);
+    if (@hasDecl(D, "setupInstance")) D.setupInstance(&m, &inst0);
+    const x: [n_u]f64 = @splat(0.0);
+    const sim: contract.SimState = .{ .t = 1.0, .dt = 0.5, .kind = .tran, .iteration = 2 };
+    try field_use_check.checkClearBits(S, D, &x, &m, inst0, sim);
 }

@@ -8,6 +8,7 @@
 const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
+const field_use_check = @import("field_use_check.zig");
 
 const n_u = contract.nU(D);
 const S0 = contract.RefFamily(f64, &@as([n_u]u8, @splat(contract.no_lane)), .{});
@@ -28,4 +29,15 @@ test "noisePsd and acStim take a *const Instance and leave it untouched" {
     // The first-call table sampled into the probe copy, not the caller's.
     try std.testing.expect(!inst.table_ready[0]);
     try std.testing.expectEqual(@as(u32, 0), inst.vera_status__);
+}
+
+test "field_use (#134): clear bits perturb nothing in eval" {
+    var m: D.Model = .{};
+    var inst0: D.Instance = .{};
+    _ = D.initState(&m, &inst0);
+    if (@hasDecl(D, "setup")) D.setup(S0, &m);
+    if (@hasDecl(D, "setupInstance")) D.setupInstance(&m, &inst0);
+    var xv: [n_u]f64 = @splat(0.0);
+    xv[@backingInt(D.U.a)] = 0.5;
+    try field_use_check.checkClearBits(S0, D, &xv, &m, inst0, .{});
 }

@@ -478,14 +478,9 @@ netlist/noise/va_noise.assets/ground_res.va point 0: noise PSD at 1 Hz, branch 0
 netlist/noise/va_noise.assets/ntab_lin.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
 netlist/noise/va_noise.assets/ntab_log.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
 netlist/noise/va_noise.assets/vseries_res.va point 0: noise PSD at 1 Hz, branch 8: old 4e-18, new 0e0
-verilog-a/ch02_lexical/duplicate_attribute_last_value_wins.va point 0: the old device's row 0 lane 0 is 1.951411553231091e1, a central difference (h 8.558588906108557e-6) 3.103778838102158e1
 verilog-a/ch04_expressions/correlated_noise.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
-verilog-a/ch04_expressions/ddx.va point 0: the old device's row 0 lane 0 is 2.589610887311155e0, a central difference (h 6.0554544523933395e-6) 5.179221774544035e0
-verilog-a/ch04_expressions/ddx_flow_column_in_eval.va point 0: the old device's row 0 lane 2 is 1e0, a central difference (h 7.2849595896926125e-6) 3.00000000012254e0
-verilog-a/ch04_expressions/ddx_vera_nodiff_assignment.va point 0: the old device's row 0 lane 0 is 3.069199822529498e-2, a central difference (h 6.0554544523933395e-6) -3.5926909919661254e-1
 verilog-a/ch04_expressions/flicker_noise_topology.va point 0: noise PSD at 1 Hz, branch 1: old 1e-20, new 0e0
 verilog-a/ch04_expressions/flicker_psd_frequency.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
-verilog-a/ch04_expressions/modulo_real_dynamic_zero.va point 309: the old device's row 0 lane 0 is 3.301e3, a central difference (h 9.405771259348332e-6) -8.04862741239994e1
 verilog-a/ch04_expressions/noise_kinds_in_ternary.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
 verilog-a/ch04_expressions/noise_source_name.va point 0: noise PSD at 1 Hz, branch 1: old 9.000000000000001e-18, new 0e0
 verilog-a/ch04_expressions/noise_table_linear_device.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
@@ -504,7 +499,5 @@ verilog-a/ch06_hierarchy/mfactor_potential_noise.va point 0: noise PSD at 1 Hz, 
 verilog-a/ch09_system_tasks/bound_step.va point 0: bound_step 0: old 5.0218266691442895e-5, new inf
 verilog-a/ch09_system_tasks/bound_step_infinite_is_no_bound.va point 0: bound_step 0: old 2e-9, new inf
 verilog-a/ch09_system_tasks/bound_step_smallest_active_wins.va point 0: bound_step 0: old 2e-9, new inf
-verilog-a/ch09_system_tasks/conversion_functions.va point 0: the old device's row 0 lane 0 is 0e0, a central difference (h 6.240414129500862e-6) 9.999999999908319e-1
 verilog-a/ch09_system_tasks/kernel_control_tasks_together.va point 0: bound_step 0: old 1e-6, new inf
-verilog-a/ch09_system_tasks/realtobits.va point 0: the old device's row 0 lane 0 is 1e0, a central difference (h 6.766304534726007e-6) -2.8823037607666688e17
 verilog-a/combined/resistor_with_directives.va point 0: bound_step 0: old 1e-6, new inf

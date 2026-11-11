@@ -281,6 +281,10 @@ fn runBatch(gpa: Allocator, arena: Allocator, io: Io, q: *link.Queue, work: []co
             });
             var devices: Io.Writer.Allocating = .init(arena);
             var names: Io.Writer.Allocating = .init(arena);
+            // One `u64` row-skip mask per device (research/codegen.md T0d):
+            // `sides.zig` computed it from the fixture's Air, old, new and
+            // versioned share it since it names rows, not a pipeline.
+            var fd_skip: Io.Writer.Allocating = .init(arena);
             for (left, group, 0..) |l, r, k| if (l) for ([2]u8{ side[0], 'v' }) |c| {
                 // The versioned device rides in the new side's library.
                 if (c == 'v' and (side[0] == 'o' or r.ver == null)) continue;
@@ -288,9 +292,10 @@ fn runBatch(gpa: Allocator, arena: Allocator, io: Io, q: *link.Queue, work: []co
                 try mods.append(arena, .{ .name = name, .root = try arena.print("{s}/{s}.zig", .{ dir, name }), .deps = if (c == 'o') &.{"contract"} else &.{ "contract", "std_kernels" } });
                 try devices.writer.print(" @import(\"{s}\"),", .{name});
                 try names.writer.print(" \"{s}\",", .{name});
+                try fd_skip.writer.print(" 0x{x},", .{r.card.fd_skip});
             };
             if (names.written().len == 0) return;
-            const bundle = try arena.print("pub const devices = .{{{s} }};\npub const names = .{{{s} }};\n", .{ devices.written(), names.written() });
+            const bundle = try arena.print("pub const devices = .{{{s} }};\npub const names = .{{{s} }};\npub const fd_skip = .{{{s} }};\n", .{ devices.written(), names.written(), fd_skip.written() });
             const f: link.File = .{ .kind = .so, .work_dir = dir, .name = try arena.print("cg{d}{s}", .{ attempt, side }), .optimize = .fast, .backend = .llvm, .modules = mods.items, .split = .whole };
             const t0 = Io.Clock.awake.now(io);
             var built = try f.flush(gpa, io, q, .{ .text = bundle }, 1);

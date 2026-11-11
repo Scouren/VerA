@@ -78,6 +78,11 @@ flow_rows: std.AutoHashMapUnmanaged([2]Air.Device.Node.Index, Air.Device.Node.In
 bridged: std.AutoHashMapUnmanaged(struct { Zcu.Instance.Index, Vir.Inst.Index }, Bridged) = .empty,
 /// §5.4.3 a port's row to its port flow unknown (access.zig).
 port_rows: std.AutoHashMapUnmanaged(Air.Device.Node.Index, Air.Device.Node.Index) = .empty,
+/// Every spelling handed to a `device.nodes` row, so `net.appendNode` can
+/// keep them unique (a net literally named `gnd` against the reference
+/// node's own spelling, §2.7). Not an identity table: two different
+/// unknowns may want one spelling.
+spellings: std.StringHashMapUnmanaged(void) = .empty,
 /// §5.6 a contribution target to its row (contrib.zig).
 contrib_rows: std.AutoHashMapUnmanaged(ContribKey, Air.Device.Contribution.Index) = .empty,
 /// Each `device.params` row's `arg` in the prologue, by row (decl.zig).

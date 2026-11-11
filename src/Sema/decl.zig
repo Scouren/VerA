@@ -106,7 +106,7 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     try net.ports(s, &s.units.items[0]);
     s.device.num_ports = @intCast(s.device.nodes.len);
     for (s.units.items) |*u| try net.nets(s, u);
-    for (s.units.items[1..]) |*u| try portbind.bindChildPorts(s, u);
+    for (s.units.items[1..]) |*u| try portbind.bindChildren(s, u);
     try net.signalFlowPorts(s);
     try portbind.bindBridges(s);
     for (s.units.items) |*u| try param.declare(s, u);

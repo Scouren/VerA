@@ -4,9 +4,7 @@ spice/spice_paramset_shadow_warning.va tables row 6: old `param chained.pmodel.g
 spice/spice_passive_primitives.va codes: old {}, new E0512 (E0512: a port access of an instance's port (`<u.p>`) is not lowered by Sema yet)
 verilog-a/annex_a_syntax/analog_function_integer_string.va Air.Verify: types at instruction 32
 verilog-a/annex_a_syntax/branch_array.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
-verilog-a/annex_a_syntax/concatenated_port.va tables row 0: old `node 0 a net port`, new `node 0 n net port`
 verilog-a/annex_a_syntax/jump_statements.va codes: old E0403, new E0512 (E0512: `return` outside a function)
-verilog-a/annex_a_syntax/null_port_connects_nothing.va tables row 1: old `node 1 	null2 net port`, new `node 1 n net port`
 verilog-a/annex_a_syntax/pattern_empty_element_rejected.va codes: old E0894, new {}
 verilog-a/annex_a_syntax/sum_chain_past_the_old_parser_limit.va codes: old {}, new E0241 (E0241: 4096 levels deep)
 verilog-a/annex_d_standard_definitions/discrete_disciplines.va codes: old E0501, new {}
@@ -127,7 +125,6 @@ verilog-a/ch05_analog_behavior/jump_outside_loop_invalid.va codes: old E0404, ne
 verilog-a/ch05_analog_behavior/monitored_event_timer_used_as_a_value_rejected.va codes: old E0701, new E0512 (E0512: `timer` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/named_block_local_by_hierarchical_name.va codes: old {}, new E0901 (E0901: `myscope.p2` names nothing in the elaborated design)
 verilog-a/ch05_analog_behavior/named_block_locals.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/net_named_gnd_is_not_ground.va tables row 3: old `node 3 flow(a,gnd)#1 branch_flow`, new `node 3 flow(a,gnd) branch_flow`
 verilog-a/ch05_analog_behavior/one_unnamed_branch_under_every_spelling.va codes: old {}, new E0408,E0512 (E0408: )
 verilog-a/ch05_analog_behavior/parallel_instances_own_unnamed_branch.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/parameter_V_with_generic_access.va codes: old {}, new E0512 (E0512: `potential` is not lowered by Sema yet)
@@ -166,14 +163,8 @@ verilog-a/ch06_hierarchy/genvar_init_self_reference_rejected.va codes: old E0417
 verilog-a/ch06_hierarchy/genvar_iteration_assigns_another_genvar_rejected.va codes: old E0419, new {}
 verilog-a/ch06_hierarchy/genvar_outside_loop_rejected.va codes: old E0314, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/hierarchical_contributions_to_named_and_unnamed_branches.va codes: old {}, new E0512 (E0512: an access of a select or a hierarchical name is not lowered by Sema yet)
-verilog-a/ch06_hierarchy/hierarchical_vector_element_access.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/hierarchy_empty_paramset_tie.va tables row 1: old `param u.audit_empty_bin.b real local = 4e0`, new `param u.audit_empty_bin.a real local = 1e0`
-verilog-a/ch06_hierarchy/hierarchy_overview_instances_and_overrides.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/implicit_net_hierarchical_reference_coerced.va codes: old {}, new E0901 (E0901: `ch6_implicit_probe_top.implicit_link` names nothing in the elaborated design)
-verilog-a/ch06_hierarchy/matching_size_concatenation_of_a_vector.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch06_hierarchy/matching_size_concatenation.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch06_hierarchy/matching_size_vector_net.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch06_hierarchy/named_port_expressions.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/nested_loop_generates_share_genvar_rejected.va codes: old E0419, new {}
 verilog-a/ch06_hierarchy/oomr_function_unsupported.va codes: old {}, new E0512 (E0512: `a call` is not lowered by Sema yet)
 verilog-a/ch06_hierarchy/oomr_in_parameter_declaration_rejected.va codes: old E0901,E0924, new {}
@@ -187,24 +178,12 @@ verilog-a/ch06_hierarchy/paramset_defparam_generated_instance_rejected.va codes:
 verilog-a/ch06_hierarchy/paramset_generate_localparam_out_of_scope_rejected.va codes: old E0314, new {}
 verilog-a/ch06_hierarchy/paramset_outer_defparam_chain.va tables row 2: old `param u.ps_chain_far_high.unused_item real local = 0e0`, new `param u.gain real local = 5e0`
 verilog-a/ch06_hierarchy/paramset_outer_defparam_forbidden_body_rejected.va codes: old E0926, new {}
-verilog-a/ch06_hierarchy/port_part_select_on_a_scalar_port_rejected.va codes: old E0925, new {}
-verilog-a/ch06_hierarchy/port_part_select_out_of_range_rejected.va codes: old E0352, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch06_hierarchy/port_part_select_reversed_rejected.va codes: old E0352, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch06_hierarchy/port_part_select_width_mismatch_rejected.va codes: old E0925, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch06_hierarchy/port_select_genvar_index.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch06_hierarchy/port_select_indexed_part_select.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch06_hierarchy/port_select_index_out_of_range_rejected.va codes: old E0352, new {}
-verilog-a/ch06_hierarchy/port_select_of_a_scalar_net_rejected.va codes: old E0351, new {}
-verilog-a/ch06_hierarchy/port_select_ordered_of_a_parent_port.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/rc_h01_paramset_chain_far_link_parameter.va tables row 2: old `param u.rc_h01p_slow.jval real local = 2e0`, new `param u.j real local = 2e0`
 verilog-a/ch06_hierarchy/reject_6_4_1_paramset_variable_assigns_parameter.va codes: old E0237, new {}
 verilog-a/ch06_hierarchy/unnamed_generate_block_external_names.va tables row 11: old `display $strobe`, new `(none)`
 verilog-a/ch06_hierarchy/unnamed_generate_instance_reference_rejected.va codes: old E0998, new {}
 verilog-a/ch06_hierarchy/unnamed_generate_reference_from_within.va codes: old {}, new E0901 (E0901: `u1.gain` names nothing in the elaborated design)
 verilog-a/ch06_hierarchy/untyped_child_port_behavioral_use_rejected.va codes: old E0337, new {}
-verilog-a/ch06_hierarchy/vector_port_matching_net_width.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch06_hierarchy/vector_port_scalar_net_width_mismatch_rejected.va codes: old E0925, new {}
-verilog-a/ch06_hierarchy/vector_ports.va codes: old E0350, new {}
 verilog-a/ch08_scheduling/continuous_variable_interpolation_host.va tables row 5: old `held $assigned.held`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/arandom_negative_seed.va tables row 4: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/arandom_parameter_seed.va tables row 5: old `held $rng.0.seed`, new `limit_slots 0`
@@ -306,7 +285,6 @@ verilog-ams/ch07_mixed_signal/merged_groups_per_connect_module.va codes: old {},
 verilog-ams/ch07_mixed_signal/named_event_from_digital_reaches_analog.va tables row 1: old `param __d2a0 integer = 0`, new `contrib flow direct br0 p gnd`
 verilog-ams/ch07_mixed_signal/nan_contribution_rejected.va codes: old E0424, new {}
 verilog-ams/ch07_mixed_signal/neg_inf_contribution_rejected.va codes: old E0424, new {}
-verilog-ams/ch07_mixed_signal/node_abstol_vector_ports.va tables row 5: old `contrib flow direct br0 a[0] gnd`, new `node 5 vector_binding.p net`
 verilog-ams/ch07_mixed_signal/onebit_dac_reads_a_discrete_wire.va values: display 0 operand 2: old width 32, new 4 (a ranged discrete net read in analog: the old side prints the Table 7-1 integer, the new side the net's own bits (format.declSize))
 verilog-ams/ch07_mixed_signal/posedge_in_an_analog_event_control.va codes: old {}, new E0704 (E0704: )
 verilog-ams/ch07_mixed_signal/prim_connect_enable_gate.va codes: old {}, new E0512 (E0512: an access of a name with no node)

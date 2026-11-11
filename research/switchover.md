@@ -552,6 +552,13 @@ Departures:
 - **Q7.** `lib/contract/gm` (1,906 lines) is still `RefOptions.math`'s default; deleting it makes the installed contract depend on Gompute
   Recommendation: keep gm through 0.30.0; move the default to `std_kernels.math` in a contract change agreed with ESPice
   Decision: Keep gm through 0.30.0; move the default in a contract change agreed with ESPice.
+  Sync (user, 2026-11-11): `gm` stays, but computes what Gompute computes. Every function where the
+  two differ (known: `cosh`, `sinh`, `log10`, 1 ulp apart, Gompute correctly rounded; diff-kernels
+  lists the rest) takes Gompute's algorithm into `gm`, so the contract's reference family, the old
+  folds and the rewrite's devices give the same bits. Oracle: `gm` vs Gompute bit for bit over
+  diff-kernels' corpus and the f128 reference; a remaining difference is listed by name with both
+  ulp bounds. Device compile time is checked unchanged (`gm` stays self-contained, no Gompute
+  import). Wave 4.
 
 - **Q8.** E1100 wording table (`src/next/Compilation/legacy.zig`) keeps old codes on the 1364 route
   Recommendation: keep at the switch (byte-identical); dropping it means editing the suite (user's repo), user's call after

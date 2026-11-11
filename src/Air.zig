@@ -294,6 +294,10 @@ pub const CallFacts = struct {
     timepoint: bool = false,
     /// The §5.2.1/§5.10.2 first-evaluation flag: `Legalize` keeps a branch on it.
     first_point: bool = false,
+    /// The callee's spelling, for messages (`` `{s}()` ``); `""` when the
+    /// caller names none (every callee past the table's end, or before
+    /// `call_facts` fills it).
+    name: []const u8 = "",
 
     /// A call's value as `Float` bounds it.
     pub const Range = enum(u8) {

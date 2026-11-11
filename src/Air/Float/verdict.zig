@@ -162,8 +162,16 @@ const Who = struct {
                 if (k < who.in.params.len and who.in.params[k].name.len != 0) return w.print("parameter `{s}`", .{who.in.params[k].name});
                 return w.print("parameter {d}", .{k});
             },
-            .probe => return w.print("a probe of unknown {d}", .{data.ty_index.index}),
-            .call => return w.writeAll("the result of a call"),
+            .probe => {
+                const k = data.ty_index.index;
+                if (k < who.in.probe_names.len and who.in.probe_names[k].len != 0) return w.print("a probe of node `{s}`", .{who.in.probe_names[k]});
+                return w.print("a probe of unknown {d}", .{k});
+            },
+            .call => {
+                const facts = callFacts(who.air, who.in, inst);
+                if (facts.name.len != 0) return w.print("the result of `{s}()`", .{facts.name});
+                return w.writeAll("the result of a call");
+            },
             else => { // else: a computed value, named by its leaf
                 const leaf = unboundedLeaf(who.air, who.f, inst) orelse return w.writeAll("a computed expression");
                 try w.writeAll("an expression of ");
@@ -369,6 +377,15 @@ fn locOf(in: Float.Input, inst: u32) Diag.Loc {
     return if (inst < in.locs.len) in.locs[inst] else .none;
 }
 
+/// `call` instruction `i`'s facts (`.{}` past `in.calls`'s end, Walk.zig's
+/// own reading of the same table).
+fn callFacts(air: Air, in: Float.Input, i: Inst.Index) Air.CallFacts {
+    const data = air.instructions.items(.data)[@backingInt(i)];
+    assert(air.instructions.items(.tag)[@backingInt(i)] == .call);
+    const x = air.extraData(Air.Call, data.ty_pl.payload);
+    return if (x.data.callee < in.calls.len) in.calls[x.data.callee] else .{};
+}
+
 /// Where whatever defined `ref` was written: a parameter's declaration, an
 /// instruction's expression, nothing for a constant.
 fn refLoc(air: Air, in: Float.Input, ref: Inst.Ref) Diag.Loc {
@@ -384,6 +401,12 @@ fn refLoc(air: Air, in: Float.Input, ref: Inst.Ref) Diag.Loc {
 fn warnNotFinite(wip: *Diag.Wip, air: Air, ip: *const InternPool, in: Float.Input, f: *const Float, unit: usize, root: Float.Root, culprit: Inst.Ref) Allocator.Error!void {
     if (!wip.enabled(.W0650)) return;
     assert(f.error_count == 0); // a rejected model warns nothing
+    // A caller that locates instructions (research/airpasses.md §0's bug
+    // class) must locate and name its roots too: `codegen.floatRoots`
+    // builds a `Root` with no name or location, left for `air_passes.run`
+    // to fill before this ever runs.
+    if (in.locs.len != 0) assert(!root.loc.isNone());
+    if (in.locs.len != 0) assert(root.name.len != 0);
     var b = wip.build(.proof, .W0650, root.loc);
     b.msg("unit {d} — {s} — compiles with @setFloatMode(.strict)", .{ unit, root.name });
     const who: Who = .{ .air = air, .ip = ip, .in = in, .f = f, .ref = culprit };
@@ -392,7 +415,16 @@ fn warnNotFinite(wip: *Diag.Wip, air: Air, ip: *const InternPool, in: Float.Inpu
     if (culprit.toIndex()) |i| switch (air.instructions.items(.tag)[@backingInt(i)]) {
         .arg => b.help("give the parameter a range that excludes infinity, e.g. `from (0:inf)`", .{}),
         .probe => b.help("a probe is bounded only by `Float.Input.unknown_bound`; give a finite one, the solver's compliance limit", .{}),
-        .call => b.help("the prover does not model this call, so its range is unknown", .{}),
+        .call => {
+            const facts = callFacts(air, in, i);
+            if (facts.range == .limexp or facts.range == .vt) {
+                b.help("constrain the operands with a range or a guard the prover can see", .{});
+            } else if (facts.name.len != 0) {
+                b.help("the prover does not model `{s}()`, so its range is unknown", .{facts.name});
+            } else {
+                b.help("the prover does not model this call, so its range is unknown", .{});
+            }
+        },
         else => b.help("constrain the operands with a range or a guard the prover can see", .{}), // else: a computed value
     };
     b.note("`.strict` is correct and spec-legal — this warning is about speed, not correctness", .{});

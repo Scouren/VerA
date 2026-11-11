@@ -26,7 +26,17 @@ fi
 while true; do
   for s in 0 1; do
     exec {fd}>"$HOME/.cache/vera-heavy.$s.lock"
-    if flock -n "$fd"; then nix develop -c zig build $jobs "$@"; exit $?; fi
+    if flock -n "$fd"; then
+      nix develop -c zig build $jobs "$@"
+      code=$?
+      # R6 (research/builds.md): checked after each slot run, while this
+      # slot is still held, so cache-budget.sh can try the other one for a
+      # stop-the-world rotation. gcache empty (no nix develop, or the
+      # variable unset) just skips the global cache and vera-codegen.
+      gcache=$(nix develop -c sh -c 'printf %s "$ZIG_GLOBAL_CACHE_DIR"' 2>/dev/null)
+      tools/cache-budget.sh "$s" "$HOME/.cache" "$(readlink -f .zig-cache 2>/dev/null || printf %s .zig-cache)" "$gcache"
+      exit $code
+    fi
     exec {fd}>&-
   done
   sleep 10

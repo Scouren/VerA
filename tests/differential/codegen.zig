@@ -120,13 +120,29 @@ const Tally = struct {
     /// (`cacheEntries`), one per side per batch; both 0 when it is unset.
     cache_hits: u32 = 0,
     cache_misses: u32 = 0,
+    /// R3, research/builds.md: every library build this run timed, oldest
+    /// first; the summary names the slowest five.
+    slow: std.ArrayList(Slow) = .empty,
 };
+
+/// One side's library build, for `Tally.slow`'s slowest five: the biggest
+/// device still in it when it was built, named so a human need not reach
+/// for `ps` to find it (R3, research/builds.md).
+const Slow = struct { rel: []const u8, bytes: usize, ms: u64 };
 
 /// One versioned fixture's measured fast-math bound.
 const Ulps = struct { rel: []const u8, value: u32, lane: u32 };
 
 /// A fixture both sides wrote a device for.
 const Ready = struct { rel: []const u8, old: []const u8, new: []const u8, ver: ?[]const u8, card: sides.Card };
+
+/// Past `link.split_min_bytes`, where LLVM's cost is close to linear in a
+/// device's bytes (R3, research/builds.md): one of these pays as much
+/// build time as dozens of ordinary fixtures and must not hold them
+/// hostage in the same batch.
+fn isGiant(r: Ready) bool {
+    return r.old.len >= link.split_min_bytes or r.new.len >= link.split_min_bytes;
+}
 
 /// The C entry `dyn.zig` exports per device.
 const RunFn = *const fn ([*]const [*:0]const u8, [*]const f64, u32, [*]const f64, u32, f64, u32, [*]f64, u32, [*]f64, u32, *u32) callconv(.c) i32;
@@ -201,10 +217,14 @@ fn runAll() !void {
         // The next cut is the first fixture after `at` whose own hash says
         // so, never a fixed offset (R2, research/builds.md): adding or
         // removing a fixture elsewhere leaves every other batch's members,
-        // and so its cache key, exactly as they were.
+        // and so its cache key, exactly as they were. A giant (R3) never
+        // shares a batch: alone when it starts one, or the cut lands right
+        // before it when it would otherwise have joined one.
         var end = at + 1;
-        while (end < ready.items.len and end - at < batch_cap) : (end += 1) {
-            if (std.hash.Wyhash.hash(0, ready.items[end].rel) % batch_target == 0) break;
+        if (!isGiant(ready.items[at])) {
+            while (end < ready.items.len and end - at < batch_cap) : (end += 1) {
+                if (isGiant(ready.items[end]) or std.hash.Wyhash.hash(0, ready.items[end].rel) % batch_target == 0) break;
+            }
         }
         const group = ready.items[at..end];
         at = end;
@@ -237,6 +257,13 @@ fn runAll() !void {
     tally.agreed = tally.compared - countCompared(&whys, ready.items);
     // The measured fast-math bound per versioned fixture that moved.
     for (tally.ulps.items) |u| if (u.value != 0 or u.lane != 0) try out.writer.print("ulps {d} values, {d} lanes: {s}\n", .{ u.value, u.lane, u.rel });
+    // The five slowest library builds, named so a giant (R3, research/builds.md) shows here, not just under `ps`.
+    std.mem.sort(Slow, tally.slow.items, {}, struct {
+        fn lessThan(_: void, a: Slow, b: Slow) bool {
+            return a.ms > b.ms;
+        }
+    }.lessThan);
+    for (tally.slow.items[0..@min(5, tally.slow.items.len)]) |s| try out.writer.print("slow {d} ms, {d} B: {s}\n", .{ s.ms, s.bytes, s.rel });
     std.debug.print("{s}diff-codegen: {d} fixtures ({d} named in lower.xfail, {d} the old side refused, {d} the new side refused), {d} built and compared at {d} points ({d} evaluations bit for bit, {d} values within the libm ulp bound), {d} agree, {d} in codegen.xfail, {d} failures; device text old {d} B, new {d} B (median per device old {d} B, new {d} B); build old {d} ms, new {d} ms; roots .optimized {d}/{d}; versioned units: {d} points inside the box (at most {d} ulps apart), {d} outside (bit for bit); {d} points where every side stopped alike; library cache {d} hit, {d} miss\n", .{
         out.written(),    tally.fixtures,     tally.lower_listed,                   tally.old_refused,                    tally.new_refused,                 tally.compared,                    points,          tally.points, tally.values_libm, tally.agreed,    tally.xfailed, tally.failed,
         tally.old_bytes,  tally.new_bytes,    try median(arena, ready.items, .old), try median(arena, ready.items, .new), tally.old_ns / std.time.ns_per_ms, tally.new_ns / std.time.ns_per_ms, tally.optimized, tally.roots,  tally.inside,      tally.fast_ulps, tally.outside, tally.stops,
@@ -322,14 +349,26 @@ fn runBatch(gpa: Allocator, arena: Allocator, io: Io, q: *link.Queue, work: []co
             // `sides.zig` computed it from the fixture's Air, old, new and
             // versioned share it since it names rows, not a pipeline.
             var fd_skip: Io.Writer.Allocating = .init(arena);
-            for (left, group, 0..) |l, r, k| if (l) for ([2]u8{ side[0], 'v' }) |c| {
-                // The versioned device rides in the new side's library.
-                if (c == 'v' and (side[0] == 'o' or r.ver == null)) continue;
-                const name = try arena.print("{c}{d}", .{ c, k });
-                try mods.append(arena, .{ .name = name, .root = try arena.print("{s}/{s}.zig", .{ dir, name }), .deps = if (c == 'o') &.{"contract"} else &.{ "contract", "std_kernels" } });
-                try devices.writer.print(" @import(\"{s}\"),", .{name});
-                try names.writer.print(" \"{s}\",", .{name});
-                try fd_skip.writer.print(" 0x{x},", .{r.card.fd_skip});
+            // The biggest device still in this build, for the slowest-five
+            // summary (R3, research/builds.md); updated alongside the
+            // membership check this loop already makes.
+            var biggest: usize = 0;
+            var biggest_rel: []const u8 = "";
+            for (left, group, 0..) |l, r, k| if (l) {
+                const len = if (side[0] == 'o') r.old.len else r.new.len;
+                if (len > biggest) {
+                    biggest = len;
+                    biggest_rel = r.rel;
+                }
+                for ([2]u8{ side[0], 'v' }) |c| {
+                    // The versioned device rides in the new side's library.
+                    if (c == 'v' and (side[0] == 'o' or r.ver == null)) continue;
+                    const name = try arena.print("{c}{d}", .{ c, k });
+                    try mods.append(arena, .{ .name = name, .root = try arena.print("{s}/{s}.zig", .{ dir, name }), .deps = if (c == 'o') &.{"contract"} else &.{ "contract", "std_kernels" } });
+                    try devices.writer.print(" @import(\"{s}\"),", .{name});
+                    try names.writer.print(" \"{s}\",", .{name});
+                    try fd_skip.writer.print(" 0x{x},", .{r.card.fd_skip});
+                }
             };
             if (names.written().len == 0) return;
             const bundle = try arena.print("pub const devices = .{{{s} }};\npub const names = .{{{s} }};\npub const fd_skip = .{{{s} }};\n", .{ devices.written(), names.written(), fd_skip.written() });
@@ -341,7 +380,9 @@ fn runBatch(gpa: Allocator, arena: Allocator, io: Io, q: *link.Queue, work: []co
             const before = cacheEntries(io, options.codegen_cache);
             var built = try f.flush(gpa, io, q, .{ .text = bundle }, 1);
             defer built.deinit(gpa);
-            ns.* += @intCast(t0.durationTo(Io.Clock.awake.now(io)).toNanoseconds());
+            const elapsed_ns: u64 = @intCast(t0.durationTo(Io.Clock.awake.now(io)).toNanoseconds());
+            ns.* += elapsed_ns;
+            try tally.slow.append(arena, .{ .rel = biggest_rel, .bytes = biggest, .ms = elapsed_ns / std.time.ns_per_ms });
             if (built == .ok and options.codegen_cache != null) {
                 if (cacheEntries(io, options.codegen_cache) == before) tally.cache_hits += 1 else tally.cache_misses += 1;
             }

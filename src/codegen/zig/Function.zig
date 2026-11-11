@@ -100,39 +100,19 @@ pub fn genBody(f: *Function, body: []const Inst.Index) Error!void {
     for (body) |inst| try f.genInst(inst);
 }
 
-/// Writes `const v<i> = ...;` for every instruction `ref` reads, itself
-/// included, in index order (an operand precedes its reader): a derived
-/// parameter's default, which reads only `arg`s, constants and pure
-/// operations. Returns how many it wrote.
+/// Writes `const v<i> = ...;` for `ref` and every instruction it reads,
+/// an operand (recursively, dedup'd by `rendered`) before its reader: a
+/// derived parameter's default, which reads only `arg`s, constants, pure
+/// operations, a `block`/`cond_br`/`br` (§4.2.12's ternary, `&&`/`||`,
+/// rendered as a labelled block, each nested body its own statement list)
+/// and a `$simparam` of a `calls.zig` `host_params` name (W11, R17).
+/// Returns how many `const` it wrote.
 pub fn genTree(f: *Function, ref: Ref) Error!u32 {
     const root = ref.toIndex() orelse return 0;
-    const air = f.dg.air;
-    const seen = try f.dg.arena.alloc(bool, air.instructions.len);
-    @memset(seen, false);
-    var stack: std.ArrayList(Inst.Index) = .empty;
-    try stack.append(f.dg.arena, root);
-    // Each instruction is pushed once, so the walk is bounded by the body.
-    while (stack.pop()) |i| {
-        if (seen[@backingInt(i)]) continue;
-        seen[@backingInt(i)] = true;
-        const tag = air.instructions.items(.tag)[@backingInt(i)];
-        switch (tag) {
-            .alloc, .load, .assign, .call, .probe, .block, .loop, .cond_br, .br, .repeat, .ret, .anew, .store, .fload, .iload, .path_prev, .path_acc => return f.dg.fail("a derived parameter default that reads `{t}`", .{tag}),
-            else => {}, // else: a value of args, constants and its operands
-        }
-        var ops: Liveness.Operands = .{};
-        ops.collect(air.*, tag, air.instructions.items(.data)[@backingInt(i)]);
-        for (ops.slice()) |o| if (o.toIndex()) |oi| try stack.append(f.dg.arena, oi);
-    }
+    const rendered = try f.dg.arena.alloc(bool, f.dg.air.instructions.len);
+    @memset(rendered, false);
     var n: u32 = 0;
-    for (seen, 0..) |s, i| if (s) {
-        const inst: Inst.Index = @fromBackingInt(@intCast(i));
-        try f.line();
-        try f.print("const v{d} = ", .{i});
-        try f.genValue(inst, air.instructions.items(.tag)[i], air.instructions.items(.data)[i]);
-        try f.print(";", .{});
-        n += 1;
-    };
+    try treeInst(f, root, rendered, &n);
     return n;
 }
 
@@ -207,6 +187,104 @@ pub fn kernel(f: *Function, m: Liveness.Mask, name: []const u8, ops: []const Ref
 }
 
 // ---- private ----
+
+/// `genTree`'s own recursive renderer (never `genInst`/`genBody`: those
+/// gate a value's `const v<i> = ...;` on `live.used`, computed for `core`
+/// alone, so a value only a derived default reads would silently come up
+/// one `const` short there). `i`'s operands and nested bodies are rendered
+/// first, deduped by `rendered` (a shared operand, e.g. `a+a`, once).
+fn treeInst(f: *Function, i: Inst.Index, rendered: []bool, n: *u32) Error!void {
+    if (rendered[@backingInt(i)]) return;
+    rendered[@backingInt(i)] = true;
+    const air = f.dg.air;
+    const idx = @backingInt(i);
+    const tag = air.instructions.items(.tag)[idx];
+    const data = air.instructions.items(.data)[idx];
+    switch (tag) {
+        .alloc, .load, .assign, .probe, .loop, .repeat, .ret, .anew, .store, .fload, .iload, .path_prev, .path_acc => return f.dg.fail("a derived parameter default that reads `{t}`", .{tag}),
+        .block => {
+            const x = air.extraData(Air.Block, data.ty_pl.payload);
+            try f.line();
+            try f.print("const v{d}: {f} = b{d}: {{", .{ idx, f.typeText(i), idx });
+            try treeBody(f, air.body(x.end, x.data.body_len), rendered, n);
+            try f.line();
+            try f.print("}};", .{});
+            n.* += 1;
+            return;
+        },
+        else => {}, // else: `ops.collect` below reads its operands by class
+    }
+    var ops: Liveness.Operands = .{};
+    ops.collect(air.*, tag, data);
+    for (ops.slice()) |o| if (o.toIndex()) |oi| try treeInst(f, oi, rendered, n);
+    switch (tag) {
+        .cond_br => {
+            const x = air.extraData(Air.CondBr, data.pl_op.payload);
+            try f.line();
+            try f.print("if (", .{});
+            try f.int(data.pl_op.operand);
+            try f.print(" != 0) {{", .{});
+            try treeBody(f, air.body(x.end, x.data.then_body_len), rendered, n);
+            try f.line();
+            try f.print("}} else {{", .{});
+            try treeBody(f, air.body(x.end + x.data.then_body_len, x.data.else_body_len), rendered, n);
+            try f.line();
+            try f.print("}}", .{});
+        },
+        .br => {
+            try f.line();
+            if (data.br.operand == .none) {
+                try f.print("break :b{d};", .{@backingInt(data.br.block_inst)});
+                return;
+            }
+            try f.print("break :b{d} ", .{@backingInt(data.br.block_inst)});
+            try f.widened(data.br.block_inst, data.br.operand);
+            try f.print(";", .{});
+        },
+        .call => {
+            const x = air.extraData(Air.Call, data.ty_pl.payload);
+            if (x.data.callee > std.math.maxInt(@typeInfo(vams.SysFn.Tag).@"enum".tag_type))
+                return f.dg.fail("a derived parameter default that calls a user function", .{});
+            const sys_tag: vams.SysFn.Tag = @fromBackingInt(@intCast(x.data.callee));
+            if (!isHostSimparam(sys_tag, ops.slice(), f.dg.ip)) return f.dg.fail("a derived parameter default that calls `{t}`", .{sys_tag});
+            try f.line();
+            try f.print("const v{d} = ", .{idx});
+            try calls.gen(f, i, sys_tag, ops.slice());
+            try f.print(";", .{});
+            n.* += 1;
+        },
+        else => {
+            try f.line();
+            try f.print("const v{d} = ", .{idx});
+            try f.genValue(i, tag, data);
+            try f.print(";", .{});
+            n.* += 1;
+        },
+    }
+}
+
+/// `body`'s statements, one indent deeper, in their own declared order
+/// (each declares before a later one in the same body reads it).
+fn treeBody(f: *Function, body: []const Inst.Index, rendered: []bool, n: *u32) Error!void {
+    assert(f.indent <= Air.nesting_max + 1);
+    f.indent += 1;
+    defer f.indent -= 1;
+    for (body) |bi| try treeInst(f, bi, rendered, n);
+}
+
+/// W11/R17: whether `tag` is `$simparam` of any name but `"iteration"` or
+/// `"dt"` (Table 9-27's two run-time ones): `calls.zig`'s `simparam`
+/// renders every other name from `model` alone, a constant, or its own
+/// (already-rendered) fallback argument — never `sim`.
+fn isHostSimparam(tag: vams.SysFn.Tag, args: []const Ref, ip: *const InternPool) bool {
+    if (tag != .@"$simparam" or args.len == 0) return false;
+    const idx = args[0].toInterned() orelse return false;
+    const name = switch (ip.indexToKey(idx)) {
+        .str => |t| ip.stringToSlice(t),
+        else => return false, // else: not a string literal
+    };
+    return !std.mem.eql(u8, name, "iteration") and !std.mem.eql(u8, name, "dt");
+}
 
 fn genInst(f: *Function, inst: Inst.Index) Error!void {
     const air = f.dg.air;

@@ -19,8 +19,10 @@ const Air = @import("air");
 const Sema = @import("../Sema.zig");
 const decl = @import("decl.zig");
 const walk = @import("walk.zig");
+const expr = @import("expr.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
+const SysFn = vams.SysFn;
 const Device = Air.Device;
 const Unit = Sema.Unit;
 
@@ -39,19 +41,13 @@ pub fn expression(s: *Sema, unit: *Unit, row: Device.Param.Index, value: Vir.Bod
     if (!reads) return;
     const failed = s.zcu.failed.len;
     var pb: Sema.Block = .{ .parent = null, .unit = unit };
-    const v = try @import("expr.zig").lower(s, &pb, insts[insts.len - 1].toRef());
+    const v = try expr.lower(s, &pb, insts[insts.len - 1].toRef());
     const want = s.param_args.items[@backingInt(row)].ty;
-    const r = try @import("expr.zig").coerce(s, &pb, v, want);
-    // Codegen renders the expression alone: arguments, constants and pure
-    // operations only.
-    const pure = for (pb.insts.items) |i| switch (s.air.instructions.items(.tag)[@backingInt(i)]) {
-        .arg, .select => {},
-        .load, .assign, .path_prev, .path_acc, .opt_barrier, .dstop, .store, .fload, .iload, .anew => break false,
-        else => |t| switch (Air.tag_info.getPtrConst(t).class) {
-            .un_op, .bin_op => {},
-            else => break false,
-        },
-    } else true;
+    const r = try expr.coerce(s, &pb, v, want);
+    // Codegen renders the expression alone: arguments, constants, pure
+    // operations, a `block`/`cond_br`/`br` (§4.2.12's ternary, `&&`/`||`)
+    // whose own bodies are pure, and a `$simparam` of a `host_params` name.
+    const pure = isPure(s, pb.insts.items, 0);
     if (s.zcu.failed.len != failed or !pure or (v.ty == .string) != (want == .string)) {
         s.zcu.failed.shrinkRetainingCapacity(failed);
         return;
@@ -125,6 +121,66 @@ fn scope(s: *Sema, target: *Unit, params: []const Inst.Index, pu: *Unit, args: [
         if (s.zcu.defparams.contains(.{ .instance = owner.instance, .name = name })) continue;
         if (g) |v| try expression(s, pu, row, v) else try expression(s, target, row, decl.payloadOf(vir, Inst.Param, p).value);
     }
+}
+
+/// W11: whether every instruction in `insts` is one `genTree` (the
+/// standalone-expression renderer) can render: an `arg`, a `select`, a
+/// pure operator, a `block`/`cond_br`/`br` whose nested bodies are
+/// (recursively) pure, or a pure `$simparam` call. Reads `s.air`'s
+/// extra array directly (the builder stage: `op.zig`'s `isStatic`,
+/// `readsUnknown` read it the same way). Bounded like every expr.zig walk.
+fn isPure(s: *Sema, insts: []const Air.Inst.Index, depth: u32) bool {
+    if (depth > expr.depth_max) return false;
+    for (insts) |i| {
+        const idx = @backingInt(i);
+        const tag = s.air.instructions.items(.tag)[idx];
+        const data = s.air.instructions.items(.data)[idx];
+        switch (tag) {
+            .arg, .select, .br => {},
+            .call => if (!isPureSimparam(s, data)) return false,
+            .block => {
+                const body_len = s.air.extra.items[data.ty_pl.payload];
+                if (!isPure(s, bodyOf(s, data.ty_pl.payload + 1, body_len), depth + 1)) return false;
+            },
+            .cond_br => {
+                const lens = s.air.extra.items[data.pl_op.payload..][0..2];
+                const then_at = data.pl_op.payload + 2;
+                if (!isPure(s, bodyOf(s, then_at, lens[0]), depth + 1)) return false;
+                if (!isPure(s, bodyOf(s, then_at + lens[0], lens[1]), depth + 1)) return false;
+            },
+            .load, .assign, .path_prev, .path_acc, .opt_barrier, .dstop, .store, .fload, .iload, .anew => return false,
+            else => switch (Air.tag_info.getPtrConst(tag).class) {
+                .un_op, .bin_op => {},
+                else => return false,
+            },
+        }
+    }
+    return true;
+}
+
+/// `s.air.extra.items[at..][0..len]`'s `u32`s read back as `Inst.Index`.
+fn bodyOf(s: *Sema, at: u32, len: u32) []const Air.Inst.Index {
+    return @ptrCast(s.air.extra.items[at..][0..len]);
+}
+
+/// Whether `data` (a `call`) is a `$simparam` of any name but `"iteration"`
+/// or `"dt"` (Table 9-27's two run-time ones): `calls.zig`'s `simparam`
+/// renders every other name from `model` alone (a `host_params` field), a
+/// constant (`"scale"`/`"shrink"`), or its own fallback argument (an
+/// unknown name) — never `sim`. A literal fallback's purity needs no
+/// extra check: it is its own entry in the same `insts` this walks.
+fn isPureSimparam(s: *Sema, data: Air.Inst.Data) bool {
+    const head = s.air.extra.items[data.ty_pl.payload..][0..2];
+    if (head[0] > std.math.maxInt(@typeInfo(SysFn.Tag).@"enum".tag_type)) return false;
+    if (@as(SysFn.Tag, @fromBackingInt(@intCast(head[0]))) != .@"$simparam") return false;
+    if (head[1] == 0) return false;
+    const arg0: Air.Inst.Ref = @fromBackingInt(@intCast(s.air.extra.items[data.ty_pl.payload + 2]));
+    const idx = arg0.toInterned() orelse return false;
+    const name = switch (s.zcu.intern_pool.indexToKey(idx)) {
+        .str => |t| s.zcu.intern_pool.stringToSlice(t),
+        else => return false,
+    };
+    return !std.mem.eql(u8, name, "iteration") and !std.mem.eql(u8, name, "dt");
 }
 
 fn rowOf(unit: *const Unit, p: Inst.Index) ?Device.Param.Index {

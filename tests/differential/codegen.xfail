@@ -158,10 +158,6 @@ verilog-a/ch09_system_tasks/rewind.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/rng_reference_large_count.va codegen: a call of `$rdist_chi_square`
 verilog-a/ch09_system_tasks/rng_short_circuit.va codegen: a call of `$rdist_exponential`
 verilog-a/ch09_system_tasks/sformat.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/simparam_fallback_as_parameter_default.va codegen: parameter `lo`'s default does not fold
-verilog-a/ch09_system_tasks/simparam_gmin_source_scale_host_written.va codegen: parameter `g`'s default does not fold
-verilog-a/ch09_system_tasks/simparam_minr_hicum_l2_default.va codegen: parameter `minr`'s default does not fold
-verilog-a/ch09_system_tasks/simparam_newton_tolerances_host_written.va codegen: parameter `rt`'s default does not fold
 verilog-a/ch09_system_tasks/sscanf_conversion_rules.va codegen: a call of `$sscanf`
 verilog-a/ch09_system_tasks/sscanf_engineering_and_path_codes.va codegen: a call of `$sscanf`
 verilog-a/ch09_system_tasks/swrite.va codegen: a call of `$swrite`
@@ -331,10 +327,8 @@ verilog-a/ch06_hierarchy/paramset_string_range_selection.va codegen: parameter `
 verilog-a/ch06_hierarchy/paramset_outer_defparam_selection_parameter.va point 0: row 0: old -4.790351634458477e0, new -5.8077535073955335e0
 verilog-a/annex_a_syntax/declarations.va codegen: a slot of type 2 (a string)
 verilog-a/annex_a_syntax/system_task_null_argument_space.va codegen: a call of `$swrite`
-verilog-a/ch03_data_types/dependent_control_host.va point 0: display record value 5: old 1e0, new 0e0
-verilog-a/ch03_data_types/dependent_control_mixed_guard.va point 0: display record value 1: old 3.1174018622019295e-1, new 1.5e0
-verilog-a/ch03_data_types/dependent_control_operators.va point 0: display record value 53: old -1.6141143544481023e-4, new 0e0
-verilog-a/ch03_data_types/dynamic_multidim_numeric.va point 0: display record value 33: old 1e1, new 0e0
+verilog-a/ch03_data_types/dependent_control_host.va point 4: display record value 33: old 2.9e1, new 3.1e1
+verilog-a/ch03_data_types/dynamic_multidim_numeric.va point 0: display record value 69: old 0e0, new 1.2e1
 verilog-a/ch03_data_types/multidimensional_strings.va codegen: a slot of type 2 (a string)
 verilog-a/ch03_data_types/parameter_types.va codegen: a call of `str$cmp`
 verilog-a/ch03_data_types/string_arrays.va codegen: a slot of type 2 (a string)
@@ -431,8 +425,6 @@ verilog-a/ch02_lexical/undefined_escape_keeps_character.va codegen: a real opera
 verilog-a/ch04_expressions/laplace_nd_pole_at_origin.va codegen: a call of `laplace_nd`
 verilog-a/ch04_expressions/zi_nd_dynamic_coefficient_sampled.va codegen: a call of `zi_nd`
 verilog-a/ch05_analog_behavior/simparam_str_hierarchy_names.va codegen: a call of `$simparam$str`
-verilog-a/ch03_data_types/dynamic_multidim_guards.va point 0: display record value 13: old 9.6e1, new 0e0
-verilog-a/ch03_data_types/vera_scratch_uninit_tape.va point 0: display record value 21: old 9e0, new 0e0
 verilog-a/ch04_expressions/abs.va point 0: display record value 9: old 0e0, new -0e0
 verilog-a/ch04_expressions/cosh.va point 0: display record value 9: old 1.543080634815244e0, new 1.5430806348152437e0
 verilog-a/ch04_expressions/hypot_fmod_extreme_magnitude.va point 0: display record value 13: old 0e0, new -0e0

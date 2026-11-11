@@ -225,9 +225,11 @@ fn narrow(s: *Sema, unit: *Unit, a: Inst.Ref, b: Inst.Ref, depth: u32) Allocator
 }
 
 /// A name's width and sign (the old `identSize`): a `reg`'s range (1 bit
-/// with none), a net's or parameter's range; a parameter with no type or
-/// range a model card can set has the card value's width, known only at
-/// run time (null, VD-089). Anything else, and a width past 64, is `integer`.
+/// with none, unless it is a §7.3.1 discrete read — `unit.discrete` — which
+/// Table 7-1 reads as `integer` when unranged), a net's or parameter's
+/// range; a parameter with no type or range a model card can set has the
+/// card value's width, known only at run time (null, VD-089). Anything
+/// else, and a width past 64, is `integer`.
 fn declSize(s: *Sema, unit: *Unit, d: Inst.Index) Allocator.Error!?IntSize {
     const vir = unit.vir;
     var w: u64 = 32;
@@ -236,6 +238,7 @@ fn declSize(s: *Sema, unit: *Unit, d: Inst.Index) Allocator.Error!?IntSize {
         .variable => {
             const v = decl.payloadOf(vir, Inst.Variable, d);
             if (v.flags.storage == .reg) {
+                if (v.range.len == 0 and std.mem.findScalar(Inst.Index, unit.discrete.items, d) != null) return integer;
                 w = if (v.range.len == 0) 1 else (try rangeWidth(s, unit, v.range)) orelse return integer;
                 signed = v.flags.signed;
             }

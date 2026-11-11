@@ -76,7 +76,13 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
             if (mode == .zero and !has_init and bind == .slot) try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(bind.slot.alloc), .rhs = .fromIntern(if (ty == .real) .zero_real else .zero) } } }));
         }
         if (unit.held.contains(first)) {
-            const init: InternPool.Index = if (start) |k| try decl.intern(s, k) else .undef;
+            // §3.2.2 a held array's initializer is the flat per-slot
+            // aggregate `state.zig`'s `writeInit` already reads by
+            // `agg.elems[k]`; a scalar's is its own folded value.
+            const init: InternPool.Index = switch (bind) {
+                .array => |a| try arrayPatternInit(s, unit, v.init, a.slots.len),
+                else => if (start) |k| try decl.intern(s, k) else .undef,
+            };
             try addHeld(s, try std.fmt.allocPrint(s.arena, "{s}{s}", .{ unit.prefix, vir.string(v.name) }), bind, init);
         } else if (has_init and bind == .slot) {
             // §3.2 a variable no evaluation leaves for the next starts each
@@ -95,6 +101,25 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
             const r = try expr.coerce(s, &eb, val, bind.slot.ty);
             _ = try s.addInst(&eb, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(bind.slot.alloc), .rhs = r } } });
             try s.entry.appendSlice(s.arena, eb.insts.items);
+        } else if (has_init and bind == .array) {
+            // §3.2.2/§3.4.4 a non-held array's `'{...}` initializer (nested,
+            // for a multi-dimensional array): one store per element, redone
+            // every evaluation, exactly as a scalar's initializer above.
+            var eb: Block = .{ .parent = null, .unit = unit };
+            const expr = @import("expr.zig");
+            var elems: std.ArrayList(Inst.Ref) = .empty;
+            const init = vir.body(v.init);
+            if (init.len != 0) try flattenPattern(vir, init[init.len - 1].toRef(), &elems, s.arena, 0);
+            // ponytail: a shape mismatch (the parser/elaborator's to refuse,
+            // not Sema's) drops the initializer rather than mis-assigning.
+            if (elems.items.len == bind.array.slots.len) {
+                for (elems.items, bind.array.slots) |el, slot| {
+                    const val = try expr.lower(s, &eb, el);
+                    const r = try expr.coerce(s, &eb, val, bind.array.ty);
+                    _ = try s.addInst(&eb, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slot), .rhs = r } } });
+                }
+                try s.entry.appendSlice(s.arena, eb.insts.items);
+            }
         }
     }
 }
@@ -144,6 +169,38 @@ pub fn addHeld(s: *Sema, name: []const u8, bind: Sema.Bind, init: InternPool.Ind
 }
 
 // ---- private ----
+
+/// Flattens a §3.4.4 assignment pattern `'{...}` (nested, for a
+/// multi-dimensional array) into its leaf element refs, in the same
+/// declaration order `array.zig`'s own flat index uses (the first-declared
+/// bound of each dimension is element 0), so `out[k]` is `arr.slots[k]`'s
+/// initializer. A non-pattern `r` is one leaf. Bounded like every other
+/// Vir walk here (`depth_max`-class recursion on input-controlled nesting).
+fn flattenPattern(vir: *const vams.Vir, r: Inst.Ref, out: *std.ArrayList(Inst.Ref), arena: Allocator, depth: u32) Allocator.Error!void {
+    if (depth > 64) return;
+    const i = r.toIndex() orelse return out.append(arena, r);
+    if (vir.instructions.items(.tag)[@backingInt(i)] != .pattern) return out.append(arena, r);
+    for (vir.list(Inst.Ref, decl.payloadOf(vir, Inst.Refs, i))) |el| try flattenPattern(vir, el, out, arena, depth + 1);
+}
+
+/// A held array's `'{...}` initializer as the flat `.aggregate`
+/// `state.zig`'s `writeInit` indexes by `agg.elems[k]`: `want` elements
+/// (the array's own slot count), each folded (`.undef` when it does not).
+/// `.undef` for an empty body or a shape `want` does not match, same as no
+/// initializer at all.
+fn arrayPatternInit(s: *Sema, unit: *Unit, init: vams.Vir.Body, want: usize) Allocator.Error!InternPool.Index {
+    const vir = unit.vir;
+    const body = vir.body(init);
+    if (body.len == 0) return .undef;
+    var refs: std.ArrayList(Inst.Ref) = .empty;
+    try flattenPattern(vir, body[body.len - 1].toRef(), &refs, s.arena, 0);
+    if (refs.items.len != want) return .undef;
+    const elems = try s.arena.alloc(InternPool.Index, refs.items.len);
+    for (refs.items, elems) |r, *e| e.* = if (try decl.foldRef(s, unit, r)) |c| try decl.intern(s, c) else .undef;
+    const agg = try s.zcu.intern_pool.get(s.gpa, .{ .aggregate = .{ .ty = .none, .elems = elems } });
+    assert(agg != .none);
+    return agg;
+}
 
 /// The bytes of `r` when it is a string literal or a concatenation of
 /// them (the old `strLitBytes`), `""` as one zero byte; else null.

@@ -17,6 +17,7 @@ the plan's tasks in order and never redecide a `Decision:`.
 | `vpi.md` | the VPI library over the new pipeline | VPI fixtures |
 | `diagcodes.md` (+ `diagcodes-map.tsv`) | spec-keyed codes, `tools/diag_gaps.py` | the gap report's gates |
 | `switchover.md` | prerequisites P1-P12, switch C1-C8 | the end of `vera` |
+| `zero.md` | the order over every plan above: each list line's type and root cause, waves, what each clears (`tools/xfail_classes.py` re-measures) | every list |
 
 ## Decisions that bind several plans
 

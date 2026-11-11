@@ -207,7 +207,6 @@ verilog-a/ch06_hierarchy/paramset_defparam_generated_instance_rejected.va codes:
 verilog-a/ch06_hierarchy/paramset_defparam_hierarchy_legal.va tables row 10: old `param valid.absent_child.bad.marker real local = 0e0`, new `param valid.present_child.good.gain real local = 3e0`
 verilog-a/ch06_hierarchy/paramset_generate_localparam_out_of_scope_rejected.va codes: old E0314, new {}
 verilog-a/ch06_hierarchy/paramset_oomr_localparam.va tables row 3: old `param u.k real local = 6e0`, new `param u.k real local = ?`
-verilog-a/ch06_hierarchy/paramset_oomr_nonlocal_parameter_rejected.va the old side refused, the new side lowered
 verilog-a/ch06_hierarchy/paramset_outer_defparam_chain.va tables row 2: old `param u.ps_chain_far_high.unused_item real local = 0e0`, new `param u.gain real local = 5e0`
 verilog-a/ch06_hierarchy/paramset_outer_defparam_forbidden_body_rejected.va codes: old E0926, new {}
 verilog-a/ch06_hierarchy/paramset_selected_after_generate.va tables row 6: old `param g1.u2.ch6_psg_sel.w real local = 1e0 from(-inf:5e0)`, new `param g2.u4.ch6_psg_sel.w real local = 1e0 from(-inf:5e0)`

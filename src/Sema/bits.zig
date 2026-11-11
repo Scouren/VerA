@@ -33,7 +33,7 @@ const Bits = struct { value: u64, width: u32 };
 pub fn fold(s: *Sema, b: *Block, i: Inst.Index, src: Inst.Ref) Allocator.Error!?Sema.Value {
     const r = (try bitsOf(s, b, i.toRef(), 0)) orelse return null;
     if (r.width == 0) {
-        try s.fail(.E0326, b.unit.file, src, "every operand has zero width", .{});
+        try s.fail(.E0326, b.unit.file, src, "", .{});
         return expr.poison;
     }
     assert(r.width <= 64);

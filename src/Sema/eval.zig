@@ -14,6 +14,7 @@
 //! - `pub const Env = struct` (`init`, `deinit`, `body`, `bodyValue`, `ref`, `param`, `named`, `systemNamed`, `toConst`, `intern`, `arraySize`, `dependsOn`)
 //! - `pub const eval_depth_max: u32`
 //! - `pub const v1364` (the IEEE 1364 mode: four-state values of any width, constant functions)
+//! - `pub fn toInteger(c: Const) ?i64`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -22,6 +23,8 @@ const vams = @import("vams");
 const InternPool = @import("intern_pool");
 const fold = @import("std_kernels").fold;
 const Zcu = @import("../Zcu.zig");
+const sign = @import("sign.zig");
+const sysfn = @import("eval_fn.zig");
 /// The IEEE 1364 mode of this evaluator (`eval_1364.zig`): four-state
 /// values of any width, sized as §5.4/§5.5 size them, and §10.4.5 constant
 /// functions. The VAMS mode (`Env.ref`) is unchanged by it.
@@ -73,6 +76,11 @@ pub const Env = struct {
     shaping: u32 = 0,
     /// The parameters a shape read (`shaping`), by declaration.
     shapes: std.AutoArrayHashMapUnmanaged(Inst.Index, void) = .empty,
+    /// §6.4.1 a paramset's out-of-module `module.localparam` reads
+    /// (C-P6/D2-M), keyed by the `field` instruction: `paramset.zig`
+    /// resolves them before the body is evaluated, since only it (not
+    /// `Env`) knows the design's module table.
+    oomrs: std.AutoHashMapUnmanaged(Inst.Index, InternPool.Index) = .empty,
 
     /// An environment over `vir` whose module-level parameters are those of
     /// `params` (bodies holding `param` instructions, in order).
@@ -101,6 +109,9 @@ pub const Env = struct {
         env.spelling.deinit(env.gpa);
         env.genvars.deinit(env.gpa);
         env.busy.deinit(env.gpa);
+        // `oomrs` is put through `env.arena` (`paramset.zig`'s caller owns
+        // it, usually `s.arena`): the same allocator frees it.
+        env.oomrs.deinit(env.arena);
         env.* = undefined;
     }
 
@@ -287,11 +298,32 @@ pub const Env = struct {
                 const a = (try env.ref(data.un_node.operand)) orelse return null;
                 return fold.unary(unaryOp(tag), a);
             },
+            // §4.2.10 a reduction: a bitwise fold over the operand's own
+            // width, which only a literal carries (I5).
+            .red_and, .red_nand, .red_or, .red_nor, .red_xor, .red_xnor => {
+                const a = (try env.ref(data.un_node.operand)) orelse return null;
+                return reduction(vir, tag, data.un_node.operand, a);
+            },
             .add, .sub, .mul, .div, .mod, .pow, .shl, .shr, .ashl, .ashr, .lt, .gt, .lte, .gte, .eq, .neq, .case_eq, .case_neq, .bit_and, .bit_or, .bit_xor, .bit_xnor, .bool_and, .bool_or => {
                 const b = env.payload(Inst.Bin, i);
-                const x = (try env.ref(b.lhs)) orelse return null;
-                const y = (try env.ref(b.rhs)) orelse return null;
-                return fold.binary(binaryOp(tag), x, y, null);
+                var x = (try env.ref(b.lhs)) orelse return null;
+                var y = (try env.ref(b.rhs)) orelse return null;
+                // §4.2.9 an unsigned operand makes a comparison unsigned
+                // (I1), the same mask-and-flip plan the Air lowering's
+                // `sign.compareOperands` applies.
+                if (x == .int and y == .int) switch (tag) {
+                    .lt, .gt, .lte, .gte, .eq, .neq, .case_eq, .case_neq => {
+                        const xy = sign.compareConsts(vir, b.lhs, b.rhs, x.int, y.int);
+                        x = .{ .int = xy[0] };
+                        y = .{ .int = xy[1] };
+                    },
+                    else => {},
+                };
+                // IEEE 1364-2005 §5.1.12 `>>>` fills from the sign bit only
+                // when the left operand is signed (I5); every other
+                // operator ignores this.
+                const lhs_signed = if (tag == .ashr) sign.signed(vir, b.lhs) else null;
+                return fold.binary(binaryOp(tag), x, y, lhs_signed);
             },
             .ternary => {
                 const t = env.payload(Inst.Triple, i);
@@ -299,11 +331,16 @@ pub const Env = struct {
                 return env.ref(if (c.isTrue()) t.b else t.c);
             },
             .mintypmax => env.ref(env.payload(Inst.Triple, i).b),
-            .call_sys => env.sysCall(env.payload(Inst.SysCall, i)),
-            // ponytail: §4.2.10 reductions, selects, concatenations, field
-            // reads and constant functions do not fold yet; each is an
-            // unfoldable value, which no fixture's instance tree reads.
-            .red_and, .red_nand, .red_or, .red_nor, .red_xor, .red_xnor, .str_ref, .field, .elem, .slice, .slice_up, .slice_down, .call, .concat, .pattern, .replicate, .pattern_repl, .port_branch => null,
+            .call_sys => sysfn.sysCall(env, env.payload(Inst.SysCall, i)),
+            // §6.4.1 a paramset's out-of-module read of a different
+            // module's local parameter (C-P6/D2-M): `paramset.zig` resolves
+            // it into `oomrs` before the body runs; any other `field` (an
+            // ordinary hierarchical read) is `hier.zig`'s, not foldable here.
+            .field => if (env.oomrs.get(i)) |v| env.toConst(v) else null,
+            // ponytail: selects, concatenations and constant functions do
+            // not fold yet; each is an unfoldable value, which no fixture's
+            // instance tree reads.
+            .str_ref, .elem, .slice, .slice_up, .slice_down, .call, .concat, .pattern, .replicate, .pattern_repl, .port_branch => null,
             .module, .nature, .discipline, .paramset, .primitive, .connectrules, .config, .port, .io, .net, .variable, .param, .aliasparam, .genvar, .event, .branch, .instance, .assign, .defparam, .analog, .analog_initial, .initial, .always, .function, .gen_for, .gen_if, .gen_case, .gen_block, .specify, .path, .timing_check, .pulse_style, .timing_event, .ps_override, .connect_resolve, .connect_insert, .block, .condbr, .case, .loop, .repeat, .wait, .delay, .event_wait, .store, .store_nb, .contrib, .proc_assign, .force, .store_timed, .store_nb_timed, .contrib_indirect, .deassign, .release, .trigger, .disable, .ret, .brk, .cont, .delay_ctl, .event_ctl, .repeat_ctl, .event_or, .posedge, .negedge, .driver_update, .step_event, .paramset_output, .range, .pulse_limits => null,
         };
     }
@@ -320,36 +357,6 @@ pub const Env = struct {
         };
     }
 
-    /// §4.3's functions and IEEE 1364-2005 §17.11's `$clog2` and math
-    /// functions; any other call has no constant value.
-    fn sysCall(env: *Env, call: Inst.SysCall) Allocator.Error!?Const {
-        assert(call.name != .empty);
-        const raw = env.vir.string(call.name);
-        const name = if (raw.len != 0 and raw[0] == '$') raw[1..] else raw;
-        const args = env.vir.list(Inst.Ref, call.args);
-        if (args.len == 0) if (Zcu.SystemParam.fromName(raw)) |k| return env.toConst(env.hier.get(k));
-        var vals: [fold.MathFn.arity_max]Const = undefined;
-        if (args.len == 0 or args.len > vals.len) return null;
-        for (args, vals[0..args.len]) |a, *v| v.* = (try env.ref(a)) orelse return null;
-        if (std.mem.eql(u8, name, "clog2")) {
-            if (args.len != 1) return null;
-            return .{ .int = fold.clog2(vals[0].asIntExact() orelse return null, 32) };
-        }
-        // §4.2.1.1 / §9.11: `$rtoi` truncates toward zero into §3.2's
-        // 32-bit integer (null outside it, or for NaN: a run-time question);
-        // `$itor` is the integer's real.
-        const rtoi = std.mem.eql(u8, raw, "$rtoi");
-        if (rtoi or std.mem.eql(u8, raw, "$itor")) {
-            if (args.len != 1 or vals[0] == .str) return null;
-            if (!rtoi) return .{ .real = @floatFromInt(vals[0].asIntExact() orelse return null) };
-            const t = @trunc(vals[0].asReal());
-            if (!(t >= -2147483648.0 and t <= 2147483647.0)) return null;
-            return .{ .int = @intFromFloat(t) };
-        }
-        const f = fold.MathFn.fromName(if (std.mem.eql(u8, name, "log10")) "log" else name) orelse return null;
-        return fold.math(f, vals[0..args.len]);
-    }
-
     /// `c` in parameter `decl`'s declared type (§3.4: `real`, `integer`,
     /// `string`) and range (IEEE 1364-2005 §12.2: truncated to its width,
     /// signed only when declared so); an untyped parameter keeps its value's
@@ -362,8 +369,14 @@ pub const Env = struct {
         const c: Const = if (value == .str and numeric) .{ .int = fold.strToInt(value.str, 64) } else value;
         const typed: Const = switch (decl.flags.storage) {
             .real, .realtime => .{ .real = c.asReal() },
-            .integer => .{ .int = fold.wrap32(c.asIntExact() orelse return null) },
-            .time => .{ .int = c.asIntExact() orelse return null },
+            // §4.2.1.1/§3.4.1 (I3/I4): an already-integer value wraps to
+            // §3.2's 32 bits exactly; a real rounds and saturates there
+            // instead of declining past `i64` (the old side keeps the
+            // unrounded real, which is the bug `integer_conversion_saturates.va`
+            // names: VerA's defined answer, where the LRM is silent, is
+            // saturation, never a crash).
+            .integer => .{ .int = fold.wrap32(toInteger(c) orelse return null) },
+            .time => .{ .int = toInteger(c) orelse return null },
             .none, .reg, .string => c,
         };
         if (decl.range.len == 0) return typed;
@@ -385,7 +398,60 @@ pub const Env = struct {
 /// The longest chain of aliasparams `originalOf` follows.
 const max_alias_chain = 64;
 
+/// §4.2.1.1/§3.4.1 (I3/I4): `c` as an integer, exact for an already-integer
+/// value, rounded to nearest (ties away from zero) and saturated at the
+/// 32-bit ceiling/floor for a real too large or small to hold (VerA's
+/// defined answer where the LRM states only the rounding and is silent past
+/// it: never UB, never a crash). Null for a NaN or an infinity, which no
+/// literal folds to, and for a string.
+pub fn toInteger(c: Const) ?i64 {
+    return switch (c) {
+        .int => |v| v,
+        .real => |r| blk: {
+            if (!std.math.isFinite(r)) break :blk null;
+            const v = @round(r);
+            if (v >= 2147483648.0) break :blk std.math.maxInt(i32);
+            if (v <= -2147483649.0) break :blk std.math.minInt(i32);
+            break :blk @intFromFloat(v);
+        },
+        .str => null,
+    };
+}
+
 // ---- private ----
+
+/// §4.2.10's reduction operators (IEEE 1364-2005 §5.1.11): "a bitwise
+/// operation on a single operand to produce a single-bit result", so the
+/// answer depends on the operand's width, which a folded `Const` does not
+/// carry. Only a literal carries one; any other operand declines (the old
+/// `lib/frontend/constfold.zig` `reduction`, ported literal for literal: §4.2.10
+/// bars these operators from the analog block, not from a parameter default).
+fn reduction(vir: *const Vir, tag: Inst.Tag, operand: Inst.Ref, a: Const) ?Const {
+    if (a != .int) return null;
+    const oi = operand.toIndex() orelse return null;
+    const data = vir.instructions.items(.data)[@backingInt(oi)];
+    const w: u32 = switch (vir.instructions.items(.tag)[@backingInt(oi)]) {
+        .int => if (std.math.cast(i32, data.int) != null or std.math.cast(u32, data.int) != null) 32 else 64,
+        .big_int => size: {
+            const b = vir.extraData(Inst.BigInt, data.pl_node.payload_index);
+            break :size if (b.size != 0) b.size else 32;
+        },
+        else => return null, // else: only a literal carries a width
+    };
+    if (w > 64) return null;
+    const mask: u64 = if (w == 64) std.math.maxInt(u64) else (@as(u64, 1) << @intCast(w)) - 1;
+    const bits: u64 = @as(u64, @bitCast(a.int)) & mask;
+    const r = switch (tag) {
+        .red_and => bits == mask,
+        .red_nand => bits != mask,
+        .red_or => bits != 0,
+        .red_nor => bits == 0,
+        .red_xor => @popCount(bits) % 2 == 1,
+        .red_xnor => @popCount(bits) % 2 == 0,
+        else => unreachable, // else: `inst` passes only the six reduction tags
+    };
+    return .{ .int = @intFromBool(r) };
+}
 
 /// The parameter a chain of aliasparams from `alias` reaches, or null (a
 /// §9.18 system parameter, a name declared nowhere, a cycle).
@@ -450,7 +516,12 @@ fn binaryOp(tag: Inst.Tag) fold.BinaryOp {
 
 /// §2.6.1 a sized or based literal's value: its digits in its radix,
 /// truncated to its size and sign-extended when signed. Null for an x, z or
-/// `?` digit or a value wider than 64 bits.
+/// `?` digit; a declared 64-bit size keeps its carrier's bit pattern
+/// outright (I2), and past 64 bits (D1-F) so does a signed literal (two's
+/// complement sign-extends consistently past any width) or an unsigned one
+/// whose low 64 bits alone already hold it (bit 63 clear) — an unsigned
+/// literal past 64 bits with bit 63 set is the one case the i64 carrier
+/// cannot tell from a negative value, so it still declines.
 fn bigInt(vir: *const Vir, b: Inst.BigInt) ?Const {
     assert(b.flags.radix != 0);
     assert(b.digits != .empty);
@@ -460,14 +531,29 @@ fn bigInt(vir: *const Vir, b: Inst.BigInt) ?Const {
     var acc: u64 = 0;
     for (digits) |ch| {
         const d = std.fmt.charToDigit(ch, radix) catch return null;
-        acc = std.math.mul(u64, acc, radix) catch return null;
-        acc = std.math.add(u64, acc, d) catch return null;
+        // D1-F: a literal needing more than 64 bits (`128'h...`) wraps
+        // mod 2^64 instead of declining; `size` below still cuts a
+        // narrower declared width down from this carrier.
+        acc = acc *% @as(u64, radix) +% @as(u64, d);
     }
     const size: u32 = if (b.size == 0) 32 else b.size;
     if (size < 64) {
         acc &= (@as(u64, 1) << @intCast(size)) - 1;
         if (b.flags.signed and acc >> @intCast(size - 1) != 0) return .{ .int = @bitCast(acc | ~((@as(u64, 1) << @intCast(size)) - 1)) };
+        return .{ .int = @intCast(acc) };
     }
-    if (size == 64 and b.flags.signed) return .{ .int = @bitCast(acc) };
-    return if (acc <= std.math.maxInt(i64)) .{ .int = @intCast(acc) } else null;
+    // I2: at exactly 64 bits the carrier's bit pattern is the value,
+    // unsigned or signed alike (`reject_clog2_wide_unsigned_carrier.va`'s
+    // neighbour `clog2_unsigned_width.va` folds `64'h8000000000000000`,
+    // not just a signed literal: there is no wider i64 to decline into).
+    if (size == 64) return .{ .int = @bitCast(acc) };
+    // D1-F: past 64 bits, a signed literal's low 64 bits are always the
+    // right truncation (two's complement sign-extends consistently, as
+    // `clog2_unsigned_width.va`'s `128'shffff...ffff` relies on). An
+    // unsigned literal whose low 64 bits alone fit (bit 63 clear) is the
+    // same value with no ambiguity. Bit 63 set past 64 declared bits is
+    // ambiguous between that bit pattern and a wider positive magnitude
+    // the carrier cannot hold: decline, as `reject_clog2_wide_unsigned_carrier.va` requires.
+    if (!b.flags.signed and acc >> 63 != 0) return null;
+    return .{ .int = @bitCast(acc) };
 }

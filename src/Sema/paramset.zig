@@ -71,6 +71,7 @@ pub fn resolve(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, target: InternPool
         const decl = payloadOf(vir, Inst.Paramset, zcu.declRow(ps).inst);
         var env: Env = try .init(s.gpa, s.arena, &zcu.intern_pool, vir, &.{decl.body});
         defer env.deinit();
+        try resolveOomrs(s, &env, vir, decl.body);
         try walk.applyGivens(s, &env, file, src, list.items[run.start..][0..run.len], false, decl.name);
         try defparam.applyDefparams(s, &env, level_dps, decl.name);
         env.hier = try walk.hierValues(s, &env, if (base) |*b| b else parent, list.items[run.start..][0..run.len], level_dps, file, src);
@@ -353,6 +354,49 @@ fn instanceName(zcu: *const Zcu, file: Zcu.File.Index, src: Inst.Ref) []const u8
     const vir = zcu.fileVir(file);
     if (vir.instructions.items(.tag)[@backingInt(i)] != .instance) return "";
     return vir.string(payloadOf(vir, Inst.Instance, i).name);
+}
+
+/// §6.4.1 (C-P6/D2-M): adds to `env.oomrs` the fold of every two-part
+/// `module.localparam` an override statement's value reads out of module
+/// (never an instance path: nothing instantiates it). `checks.paramsetReach`
+/// already raises E0907 for the same shape over a non-local parameter, so
+/// this silently skips it instead of duplicating that diagnostic.
+fn resolveOomrs(s: *Sema, env: *Env, vir: *const Vir, body: Vir.Body) Allocator.Error!void {
+    for (vir.body(body)) |i| {
+        if (vir.instructions.items(.tag)[@backingInt(i)] != .ps_override) continue;
+        for (vir.body(payloadOf(vir, Inst.Override, i).value)) |e| {
+            if (vir.instructions.items(.tag)[@backingInt(e)] != .field) continue;
+            if (try oomrDefault(s, vir, e)) |v| try env.oomrs.put(env.arena, e, v);
+        }
+    }
+}
+
+/// `.field{operand, name}` instruction `e`, when `operand` is an unresolved
+/// base naming a module (`str_ref`, never a local decl_ref) and `name` is
+/// that module's own LOCAL parameter: the module's declared default,
+/// folded in its own (empty) environment. Null for any other shape (an
+/// ordinary hierarchical read, `hier.zig`'s) or a non-local parameter
+/// (`checks.paramsetReach` already reports it).
+fn oomrDefault(s: *Sema, vir: *const Vir, e: Inst.Index) Allocator.Error!?InternPool.Index {
+    const zcu = s.zcu;
+    const f = payloadOf(vir, Inst.Field, e);
+    const head = f.operand.toIndex() orelse return null;
+    if (vir.instructions.items(.tag)[@backingInt(head)] != .str_ref) return null;
+    const mname = vir.string(vir.instructions.items(.data)[@backingInt(head)].str_tok.start);
+    const m = zcu.modules.get(try zcu.intern_pool.getString(s.gpa, mname)) orelse return null;
+    if (zcu.declRow(m).kind == .primitive) return null;
+    const mvir = zcu.fileVir(m.file);
+    const mod = payloadOf(mvir, Inst.Module, zcu.declRow(m).inst);
+    const p = for (mvir.body(mod.body)) |q| {
+        if (mvir.instructions.items(.tag)[@backingInt(q)] != .param) continue;
+        if (std.mem.eql(u8, mvir.string(payloadOf(mvir, Inst.Param, q).name), vir.string(f.name))) break q;
+    } else return null;
+    if (walk.isOverridable(mvir, p)) return null; // checks.paramsetReach already raised E0907
+    const pd = payloadOf(mvir, Inst.Param, p);
+    var penv: Env = try .init(s.gpa, s.arena, &zcu.intern_pool, mvir, &.{});
+    defer penv.deinit();
+    const c = (try penv.body(pd.value)) orelse return null;
+    return try penv.intern(c);
 }
 
 fn instanceConns(zcu: *const Zcu, file: Zcu.File.Index, src: Inst.Ref) ?struct { vir: *const Vir, list: []const Inst.Arg } {

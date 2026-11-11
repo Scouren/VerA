@@ -217,7 +217,12 @@ fn asType(s: *Sema, ty: Device.Param.Type, v: InternPool.Index, zero: bool) Allo
     if (zero) return if (ty == .integer) .zero else .zero_real;
     const c = constOfIndex(s, v) orelse return v;
     return switch (ty) {
-        .integer => decl.intern(s, .{ .int = std.math.lossyCast(i64, @round(c.asReal())) }),
+        // §4.2.1.1 (I3/I4): `eval.toInteger` rounds and saturates at the
+        // 32-bit ceiling/floor instead of `lossyCast`'s 64-bit one, so an
+        // array element saturates the same way a scalar parameter's
+        // default does (`integer_conversion_saturates.va`); a NaN or an
+        // infinity (no literal folds to one) keeps `lossyCast`'s zero.
+        .integer => decl.intern(s, .{ .int = eval.toInteger(c) orelse 0 }),
         .real => decl.intern(s, .{ .real = c.asReal() }),
         .string, .unspecified => v,
     };

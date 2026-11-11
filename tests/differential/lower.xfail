@@ -14,7 +14,6 @@ verilog-a/annex_d_standard_definitions/literal_logic_discipline.va codes: old E0
 verilog-a/annex_d_standard_definitions/unbound_nature_charge_rejected.va codes: old E0501, new E0512 (E0512: `Q` is not lowered by Sema yet)
 verilog-a/annex_g_change_history/limexp_v1_spelling_rejected.va codes: old E0808, new {}
 verilog-a/ch02_lexical/attribute_block_item_and_function_port.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
-verilog-a/ch02_lexical/long_digits_truncate.va codes: old {}, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
 verilog-a/ch02_lexical/operating_point_report_attributes.va tables row 3: old `param m real = 1e0`, new `contrib flow direct br0 p n`
 verilog-a/ch03_data_types/access_name_shadow.va codes: old {}, new E0408,E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch03_data_types/alias_identifier_collision.va codes: old E0331, new {}
@@ -25,15 +24,12 @@ verilog-a/ch03_data_types/array_past_2_20_elements.va codes: old {}, new E0512,E
 verilog-a/ch03_data_types/assignment_pattern_replication.va codes: old {}, new E0349 (E0349: initialising array parameter `steps`)
 verilog-a/ch03_data_types/assignment_pattern_variable.va codes: old {}, new E0313,E0512 (E0512: a user task enable is not lowered by Sema yet)
 verilog-a/ch03_data_types/compatible_hierarchical_override.va tables row 2: old `contrib flow direct br0 a b`, new `node 2 ca.p net`
-verilog-a/ch03_data_types/dependent_control_shift_mixed_folded.va tables row 1: old `param mixed integer local = 1`, new `param mixed integer local = 0`
-verilog-a/ch03_data_types/dependent_control_shift_mixed.va tables row 3: old `param mixed integer local = 1`, new `param mixed integer local = 0`
 verilog-a/ch03_data_types/desc_units_parameter_rows.va codes: old {}, new E0512 (E0512: `a name with no analog binding` is not lowered by Sema yet)
 verilog-a/ch03_data_types/domainless_net_behavioral.va codes: old E0501, new E0512 (E0512: an access of a name with no node)
 verilog-a/ch03_data_types/dynamic_multidim_order.va codes: old {}, new E0313,E0512 (E0512: `a whole array read as a value` is not lowered by Sema yet)
 verilog-a/ch03_data_types/dynamic_multidim_parameter_index.va codes: old {}, new E0512 (E0512: an array of more than 8 dimensions)
 verilog-a/ch03_data_types/dynamic_multidim_scope.va tables row 4: old `held inner.a`, new `limit_slots 0` (a named block's array with a declaration initializer, written in the block)
 verilog-a/ch03_data_types/forward_parameter_reference.va codes: old E0314, new {}
-verilog-a/ch03_data_types/integer_conversion_saturates.va tables row 2: old `param big integer = 1e300`, new `param big integer = ?` (both wrong: §4.2.1.1 saturates to 2147483647; T10 I3/I4 folds it, so no ruling)
 verilog-a/ch03_data_types/integer_parameter_precision_conditional.va values: display 0 operand 2: old width 64, new 32 (an untyped card-settable parameter copying a 64-bit one: the old side prints it at the source width, the new side at `integer` (format.declSize, VD-089))
 verilog-a/ch03_data_types/integer_parameter_precision_derive.va tables row 0: old `param literal_quotient integer = 0`, new `param literal_quotient integer = ?`
 verilog-a/ch03_data_types/integer_parameter_precision_host.va values: display 1 operand 2: old width 64, new 32 (an untyped card-settable parameter copying a 64-bit one: the old side prints it at the source width, the new side at `integer` (format.declSize, VD-089))
@@ -96,7 +92,6 @@ verilog-a/ch04_expressions/noise_table_part_select_out_of_range_rejected.va code
 verilog-a/ch04_expressions/nonfinite_array_subscript_rejected.va codes: old E0310, new {}
 verilog-a/ch04_expressions/operator_in_repeat.va codes: old E0514, new {}
 verilog-a/ch04_expressions/operator_missing_mandatory_argument.va codes: old E0505, new E0506 (E0506: `ddt` takes 1 to 2, given 0)
-verilog-a/ch04_expressions/parameter_reduction_and_arithmetic_shift.va tables row 2: old `param r_and integer = 1`, new `param r_and integer = ?`
 verilog-a/ch04_expressions/partial_slice_assignment.va codes: old {}, new E0309,E0313,E0512 (E0309: 1 subscripts for 2 dimensions)
 verilog-a/ch04_expressions/port_access_bus_genvar_index.va codes: old {}, new E0512 (E0512: an assignment to a name with no slot)
 verilog-a/ch04_expressions/port_access_bus_variable_index_rejected.va codes: old E0352, new E0512 (E0512: a port access of an instance's port (`<u.p>`) is not lowered by Sema yet)
@@ -111,7 +106,6 @@ verilog-a/ch04_expressions/replication_zero_effect.va codes: old {}, new E0512 (
 verilog-a/ch04_expressions/revert_ops.va tables row 34: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-a/ch04_expressions/select_on_probe_call_rejected.va codes: old E0330, new E0512 (E0512: a select of this is not lowered by Sema yet)
 verilog-a/ch04_expressions/slice_index_is_dynamic.va codes: old {}, new E0309,E0313,E0512 (E0309: 1 subscripts for 2 dimensions)
-verilog-a/ch04_expressions/wide_unsigned_compare_extends_each_operand_folded.va tables row 2: old `param f2 integer local = 1`, new `param f2 integer local = 0`
 verilog-a/ch04_expressions/z_filter_zero_transition_branch_rejected.va codes: old E0518, new {}
 verilog-a/ch05_analog_behavior/absdelta_digital_only.va codes: old E0513, new E0706 (E0706: )
 verilog-a/ch05_analog_behavior/access_function_on_whole_vector_rejected.va codes: old E0351, new E0512 (E0512: an access of a whole vector)
@@ -201,7 +195,6 @@ verilog-a/ch06_hierarchy/paramset_defparam_direct_rejected.va codes: old E0926, 
 verilog-a/ch06_hierarchy/paramset_defparam_generated_descendant_rejected.va codes: old E0926, new {}
 verilog-a/ch06_hierarchy/paramset_defparam_generated_instance_rejected.va codes: old E0926, new {}
 verilog-a/ch06_hierarchy/paramset_generate_localparam_out_of_scope_rejected.va codes: old E0314, new {}
-verilog-a/ch06_hierarchy/paramset_oomr_localparam.va tables row 3: old `param u.k real local = 6e0`, new `param u.k real local = ?`
 verilog-a/ch06_hierarchy/paramset_outer_defparam_chain.va tables row 2: old `param u.ps_chain_far_high.unused_item real local = 0e0`, new `param u.gain real local = 5e0`
 verilog-a/ch06_hierarchy/paramset_outer_defparam_forbidden_body_rejected.va codes: old E0926, new {}
 verilog-a/ch06_hierarchy/port_part_select_on_a_scalar_port_rejected.va codes: old E0925, new {}
@@ -226,7 +219,6 @@ verilog-a/ch08_scheduling/continuous_variable_interpolation_host.va tables row 5
 verilog-a/ch09_system_tasks/arandom_negative_seed.va tables row 4: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/arandom_parameter_seed.va tables row 5: old `held $rng.0.seed`, new `limit_slots 0`
 verilog-a/ch09_system_tasks/clog2_nested_contexts.va codes: old {}, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
-verilog-a/ch09_system_tasks/clog2_unsigned_width.va codes: old {}, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
 verilog-a/ch09_system_tasks/fatal_finish_number_3_rejected.va codes: old E0824, new {}
 verilog-a/ch09_system_tasks/file_output_real_descriptor_rejected.va codes: old E0888, new {}
 verilog-a/ch09_system_tasks/fopen_type_not_in_table_9_24_rejected.va codes: old E0889, new {}
@@ -240,8 +232,6 @@ verilog-a/ch09_system_tasks/geometry_top_alias_host.va tables row 0: old `param 
 verilog-a/ch09_system_tasks/limit_omitted_algorithm_rejected.va codes: old E0894, new {}
 verilog-a/ch09_system_tasks/limit_user_function_output_arg_rejected.va codes: old E0814, new E0512 (E0512: an assignment to a select is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/node_alias_outside_initial_rejected.va codes: old E0812, new E0315 (E0315: a net or branch is not a value; read it through an access function)
-verilog-a/ch09_system_tasks/numeric_string_negation_width_rejected.va codes: old E0819, new E0130 (E0130: the analog backend cannot execute this four-state or wide literal)
-verilog-a/ch09_system_tasks/numeric_string.va codes: old {}, new E0130,E0512 (E0512: a concatenation of sized integers is not lowered by Sema yet)
 verilog-a/ch09_system_tasks/param_given_variable_rejected.va codes: old E0822, new {}
 verilog-a/ch09_system_tasks/reject_clog2_real_default.va codes: old E0892, new {}
 verilog-a/ch09_system_tasks/reject_clog2_real.va codes: old E0892, new {}

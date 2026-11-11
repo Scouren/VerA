@@ -26,6 +26,8 @@ test {
     _ = Sema;
     _ = digital;
     _ = @import("Sema/eval.zig");
+    _ = @import("Sema/eval_fn.zig");
+    _ = @import("Sema/sign.zig");
     _ = @import("Sema/walk.zig");
     _ = @import("Sema/defparam.zig");
     _ = @import("Sema/paramset.zig");
@@ -54,6 +56,7 @@ test {
     _ = @import("Sema/op.zig");
     _ = @import("Sema/param.zig");
     _ = @import("Sema/array.zig");
+    _ = @import("Sema/param_test.zig");
     _ = @import("Sema/lower_test.zig");
     _ = @import("Sema/digital_test.zig");
     _ = @import("Sema/digital/sites_test.zig");

@@ -84,6 +84,7 @@ verilog-a/ch05_analog_behavior/spice_timer_steps_device.va codegen: a call of `t
 verilog-a/ch05_analog_behavior/static_switch_elision.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch05_analog_behavior/switch_branch.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch05_analog_behavior/switch_branch_solved.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch05_analog_behavior/timer_body_array_controls.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/timer_body_clog2_controls.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/timer_body_controls.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/timer_body_function_controls.va codegen: a call of `timer`
@@ -97,6 +98,8 @@ verilog-a/ch05_analog_behavior/timer_nonpositive_period_fires_once.va codegen: a
 verilog-a/ch05_analog_behavior/timer_start_rearmed_earlier.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/unassigned_switch_arm.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch06_hierarchy/defparam_unsupported.va point 0: row 0: old -1.3718699125012017e0, new -1.805058536009031e0
+verilog-a/ch06_hierarchy/generate_if_instantiates_one_arm.va the display sites differ in number: only the old has site 1
+verilog-a/ch06_hierarchy/if_generate_values_drive_paramset_selection.va the display sites differ in number: only the old has site 3
 verilog-a/ch06_hierarchy/mfactor_conditional_only.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch06_hierarchy/string_derived_parameter.va codegen: parameter `u.mode` is not a number
 verilog-a/ch08_scheduling/above_initial_event.va codegen: a call of `above`
@@ -149,6 +152,7 @@ verilog-a/ch09_system_tasks/simparam_newton_tolerances_host_written.va codegen: 
 verilog-a/ch09_system_tasks/test_plusargs.va codegen: a call of `$test$plusargs`
 verilog-a/ch09_system_tasks/top_port_connected_controls_ddt.va codegen: a call of `$port_connected`
 verilog-a/ch09_system_tasks/value_plusargs.va codegen: a call of `$value$plusargs`
+verilog-a/ch10_directives/compact_modeling_macro_implies_its_extensions.va the new device does not build: n6.zig:75: unused local constant
 verilog-a/combined/optional_port_environment.va codegen: a call of `$port_connected`
 verilog-a/combined/optional_port_hierarchy.va codegen: a call of `$port_connected`
 verilog-a/combined/parameter_binding_environment.va codegen: a call of `$port_connected`
@@ -159,6 +163,7 @@ verilog-a/exhaustive/timer_breakpoint_periodic.va codegen: a call of `timer`
 verilog-a/exhaustive/zi_sample_hold.va codegen: a call of `zi_nd`
 verilog-ams/ch03_data_types/operator_equation_tolerances.va codegen: a call of `idt$hold`
 verilog-ams/ch05_analog_behavior/analog_initial.va codegen: a call of `analog$initial`
+verilog-ams/ch05_analog_behavior/timer_body_array_controls.va codegen: a call of `timer`
 verilog-ams/ch05_analog_behavior/timer_body_clog2_controls.va codegen: a call of `timer`
 verilog-ams/ch05_analog_behavior/timer_body_controls.va codegen: a call of `timer`
 verilog-ams/ch05_analog_behavior/timer_body_function_controls.va codegen: a call of `timer`
@@ -166,6 +171,8 @@ verilog-ams/ch05_analog_behavior/timer_controls.va codegen: a call of `timer`
 verilog-ams/ch05_analog_behavior/timer_dynamic.va codegen: a call of `timer`
 verilog-ams/ch05_analog_behavior/timer_fixed.va codegen: a call of `timer`
 verilog-ams/ch07_mixed_signal/analog_event.va codegen: a call of `cross`
+verilog-ams/ch07_mixed_signal/driver_state_histogram.va codegen: a flow contribution to a potential source's branch
+verilog-ams/ch07_mixed_signal/driver_update_without_resolved_change.va codegen: a flow contribution to a potential source's branch
 verilog-ams/ch08_scheduling/analog_digital_initial_order.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/fatal_in_analog_initial_skips_simulation.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/port_mask.va codegen: a call of `$port_connected`
@@ -375,8 +382,6 @@ verilog-a/ch09_system_tasks/swrite_s_with_argument.va codegen: a call of `$swrit
 verilog-a/ch10_directives/compact_modeling_extension_set.va codegen: a call of `above`
 verilog-a/ch10_directives/file_macro_is_the_opened_path.va codegen: a slot of type 2 (a string)
 verilog-ams/annex_a_syntax/analog_initial.va codegen: a call of `analog$initial`
-verilog-ams/ch03_data_types/discrete_disciplines_compatible.va display site 0: old format "the value crosses the port between two discrete disciplines got=%11d want=%11d ok=%d\n", new "the value crosses the port between two discrete disciplines got=%d want=%11d ok=%d\n"
-verilog-ams/ch03_data_types/wire_without_discipline_is_discrete.va display site 0: old format "the always block saw the discrete net's value got=%11d want=%11d ok=%d\n", new "the always block saw the discrete net's value got=%d want=%11d ok=%d\n"
 verilog-ams/ch05_analog_behavior/analog_initial_integer.va codegen: a call of `analog$initial`
 verilog-ams/ch05_analog_behavior/analog_initial_real.va codegen: a call of `analog$initial`
 verilog-ams/ch05_analog_behavior/multiple_analog_initial_blocks_concatenate.va codegen: a call of `analog$initial`
@@ -384,7 +389,6 @@ verilog-ams/ch05_analog_behavior/timer_body_context_controls.va codegen: a call 
 verilog-ams/ch07_mixed_signal/display_binary_operand_analog.va codegen: a call of `$sformat`
 verilog-ams/ch07_mixed_signal/driver_count_excludes_connectmodule.va codegen: a flow contribution to a potential source's branch
 verilog-ams/ch07_mixed_signal/driver_delay_and_next_state.va codegen: a flow contribution to a potential source's branch
-verilog-ams/ch07_mixed_signal/onebit_dac_reads_a_discrete_wire.va display site 0: old format "Table 7-1 bit row: a 4-bit discrete net holding 4'b1010 reads as the integer 10 got=%11d want=%11d ok=%d\n", new "Table 7-1 bit row: a 4-bit discrete net holding 4'b1010 reads as the integer 10 got=%2d want=%11d ok=%d\n"
 verilog-ams/ch07_mixed_signal/receiver_count_reports_ordinary_receivers.va codegen: a flow contribution to a potential source's branch
 verilog-ams/ch07_mixed_signal/receiver_default_bypass.va codegen: a flow contribution to a potential source's branch
 verilog-ams/ch07_mixed_signal/receiver_value_set_by_connectmodule.va codegen: a flow contribution to a potential source's branch
@@ -413,12 +417,6 @@ verilog-a/ch04_expressions/cosh.va point 0: display record value 9: old 1.543080
 verilog-a/ch04_expressions/hypot_fmod_extreme_magnitude.va point 0: display record value 13: old 0e0, new -0e0
 verilog-a/exhaustive/hyperbolic.va point 0: display record value 9: old 1.543080634815244e0, new 1.5430806348152437e0
 verilog-a/exhaustive/rounding_selection.va point 0: display record value 29: old 0e0, new -0e0
-verilog-ams/annex_a_syntax/digital_statements_in_initial.va display site 0: old format "wait released at a's rise got=%10d want=%11d ok=%d\n", new "wait released at a's rise got=%d want=%11d ok=%d\n"
-verilog-ams/ch03_data_types/wand_interconnect_resolves_wired_and.va display site 0: old format "the wand interconnect resolves 1 and 0 to 0 got=%11d want=%11d ok=%d\n", new "the wand interconnect resolves 1 and 0 to 0 got=%d want=%11d ok=%d\n"
-verilog-ams/ch07_mixed_signal/ddiscrete_net_continuously_assigned.va display site 0: old format "Table 7-1: a ddiscrete bus assigned 4'b1100 reads as the integer 12 got=%11d want=%11d ok=%d\n", new "Table 7-1: a ddiscrete bus assigned 4'b1100 reads as the integer 12 got=%2d want=%11d ok=%d\n"
-verilog-ams/ch07_mixed_signal/gate_ordered_terminals.va display site 0: old format "and g1(y, a, b) with a = b = 1 drives y = 1 got=%11d want=%11d ok=%d\n", new "and g1(y, a, b) with a = b = 1 drives y = 1 got=%d want=%11d ok=%d\n"
-verilog-ams/ch08_scheduling/procedural_assign_deassign_semantics.va display site 0: old format "the assign followed its source over a procedural write, and the deassign kept its value got=%10d want=%11d ok=%d\n", new "the assign followed its source over a procedural write, and the deassign kept its value got=%d want=%11d ok=%d\n"
-verilog-ams/ch08_scheduling/procedural_continuous_semantics.va display site 0: old format "the force followed its source, and the release stopped it got=%10d want=%11d ok=%d\n", new "the force followed its source, and the release stopped it got=%d want=%11d ok=%d\n"
 netlist/hdl/veriloga_wide_ladder.assets/ladder70.va codegen: more than 64 unknowns
 verilog-a/annex_g_change_history/generate_replaced_by_analog_for.va the new device does not build: n23.zig:390: unused local constant
 verilog-a/ch03_data_types/string_comparison_in_a_constant_expression.va codegen: parameter `mode` is not a number
@@ -427,7 +425,6 @@ verilog-a/ch06_hierarchy/mfactor_scales_named_branch_flow.va codegen: a flow con
 verilog-a/ch06_hierarchy/undeclared_interconnect_port_binding.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch06_hierarchy/vector_port_past_256_unknowns.va codegen: more than 64 unknowns
 verilog-a/annex_a_syntax/parameter_declarations.va codegen: a call of `str$cmp`
-verilog-a/ch03_data_types/integer_parameter_precision_conditional.va codegen: a call of `$sformat`
 verilog-a/ch04_expressions/ddt_idt_nature_tolerance.va codegen: a call of `idt$hold`
 verilog-a/ch09_system_tasks/append_writes_at_end_of_file.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/fd_channels_past_30.va codegen: a call of `$sformat`
@@ -464,9 +461,6 @@ verilog-ams/ch09_system_tasks/input_position_restore_failure.va codegen: a call 
 verilog-ams/ch09_system_tasks/r_format_in_the_digital_context.va codegen: a call of `$fopen`
 verilog-ams/ch09_system_tasks/strobe_writes_once_per_accepted_solution.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/ungetc_cancelled_by_fseek_and_gap_reads_zero.va codegen: a call of `$fopen`
-verilog-a/ch02_lexical/size_truncation_and_padding.va display site 5: old format "zero padding preserves all sixteen bits in a concatenation got=%7d want=%11d ok=%d\n", new "zero padding preserves all sixteen bits in a concatenation got=%11d want=%11d ok=%d\n"
-verilog-a/ch03_data_types/integer_parameter_precision_host.va display site 1: old format "host override masked exactly got=%20d want=%11d ok=%d\n", new "host override masked exactly got=%11d want=%11d ok=%d\n"
-verilog-a/ch03_data_types/integer_parameter_precision_override.va display site 0: old format "override preserves64 got=%20d want=%20d ok=%d\n", new "override preserves64 got=%11d want=%20d ok=%d\n"
 verilog-a/ch06_hierarchy/paramset_outer_defparam_wide_card.va point 0: display record value 25: old 4e1, new 3.2e1
 verilog-ams/ch02_lexical/unsized_xz_extends_to_expression_size.va display site 0: old format "unsized x fills the 32-bit expression got=%11d want=%11d ok=%d\n", new "unsized x fills the 32-bit expression got=%10d want=%11d ok=%d\n"
 
@@ -508,3 +502,4 @@ verilog-a/ch09_system_tasks/conversion_functions.va point 0: the old device's ro
 verilog-a/ch09_system_tasks/kernel_control_tasks_together.va point 0: bound_step 0: old 1e-6, new inf
 verilog-a/ch09_system_tasks/realtobits.va point 0: the old device's row 0 lane 0 is 1e0, a central difference (h 6.766304534726007e-6) -2.8823037607666688e17
 verilog-a/combined/resistor_with_directives.va point 0: bound_step 0: old 1e-6, new inf
+verilog/pli/analog_attributes.va codegen: a flow contribution to a potential source's branch

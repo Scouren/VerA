@@ -2,16 +2,24 @@
 
 ## Unreleased
 
-- **A generated device now declares `field_use` and `limit_sim_reads`**: one
-  `contract.FieldUse` per `Instance` field, in declaration order, naming
-  which outputs a read of it can reach and which entry points write it
-  directly (a path latch is `q`/`w_commit` only; the field an ordinary held
-  value advances is `w_update`, never `w_commit`), and which `SimState`
-  fields `limit` reads, so a host that recorded a linearization on an
-  instance row can tell, field by field, whether it may replay it instead
-  of calling the device again. Both are text scans over the whole rendered
-  device, `sim_reads`' own technique; `limit_sim_reads` is not
-  `contract.limitReads`, the pre-existing unknown mask (#134).
+- **A host can tell which instance fields and which `SimState` fields can
+  change a device's answer** (#134). A generated device now declares two
+  more contract facts, read through `contract.fieldUse(D)` and
+  `contract.limitSimReads(D)`:
+  - `field_use`: one `contract.FieldUse` per `Instance` field, in
+    declaration order, saying whether a read of it can reach a residual
+    (`res`), a derivative (`jac`), a charge (`q`), `limit`'s result
+    (`limit`) or what `updateState`/`acceptQ` stage (`state`), and whether
+    `updateState`/`acceptQ` (`w_update`) or `stateCtl` (`w_commit`) writes
+    it. A host that recorded a linearization can key it on the fields with
+    `res` or `jac` only, and re-read the charge on a hit: a field that
+    feeds only the charges (a path latch rewritten on every accepted step)
+    then no longer invalidates the recording.
+  - `limit_sim_reads`: which `SimState` fields (`t`, `dt`, `iteration`)
+    `limit` reads, as `sim_reads` does for `eval`, `q` and `evalQ`.
+  Both are supersets: a device without them reads as every bit set, so an
+  older device stays correct, only slower. `limit_reads`/`contract.limitReads`
+  (which unknowns `limit` touches) is unchanged.
 
 ## v0.23.0 — 2026-11-02
 

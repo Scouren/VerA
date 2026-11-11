@@ -167,7 +167,16 @@ pub fn add(g: Graph, ams: bool) Added {
     for ([_]*Module{ exe.root_module, other_exe.root_module, suite_mod }) |r| {
         check.dependOn(&b.addExecutable(.{ .name = "check", .root_module = r, .use_llvm = false }).step);
     }
-    for (mods) |mod| check.dependOn(&b.addTest(.{ .name = "check", .root_module = testRoot(b, mod), .test_runner = runner, .use_llvm = false }).step);
+    for (mods) |mod| {
+        const c = b.addTest(.{ .name = "check", .root_module = testRoot(b, mod), .test_runner = runner, .use_llvm = false });
+        check.dependOn(&c.step);
+        // The edit loop watches one module's root instead of all 38 (R4,
+        // research/builds.md): `zig build check-<module> --watch
+        // -fincremental --cache-dir .zig-cache-watch` holds that root's
+        // compiler processes (0.14-0.56 GB) instead of every root's (6.4-6.5
+        // GB). The plain `check` above stays the pre-commit gate.
+        b.step(b.fmt("check-{s}", .{mod.name}), b.fmt("Type-check the {s} module root only, for the edit loop (--watch -fincremental)", .{mod.name})).dependOn(&c.step);
+    }
     for ([_]*Module{ exe.root_module, osdi_mod, all_mod, suite_mod, gen_mod }) |r| {
         check.dependOn(&b.addTest(.{ .name = "check", .root_module = r, .test_runner = runner, .use_llvm = false }).step);
     }

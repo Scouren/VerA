@@ -108,10 +108,10 @@ Binding on every change, in every project.
   `has_side_effects`. Keys hash contents, never absolute paths.
 - Cut the artifact graph where edits land: one object per generated unit,
   narrow imports for shared ones, kernels out of host graphs.
-- Zig edit loop: `zig build check --watch -fincremental`, one watch per
-  artifact across all worktrees; the result that counts comes from a plain
-  build. One global cache per toolchain store path; a worktree symlinks its
-  `.zig-cache` to the main checkout's.
+- Zig edit loop: `zig build check-<module> --watch -fincremental`, one watch
+  per module root being edited, across all worktrees; the result that
+  counts comes from a plain build. One global cache per toolchain store
+  path; a worktree symlinks its `.zig-cache` to the main checkout's.
 - Rust: flags live in `.cargo/config.toml`, never a one-off `RUSTFLAGS`;
   `check`, `build`, `test` and rust-analyzer agree on features, profile and
   target directory (rust-analyzer gets its own).
@@ -183,7 +183,7 @@ Binding on every change, in every project.
 
 - Run every `zig build` inside `nix develop -c …`. The shell gives each Zig store path its own global cache (`ZIG_GLOBAL_CACHE_DIR=~/.cache/zig-<store path>`). ESPice pins a different build of the same Zig version, so with a shared `~/.cache/zig` the two evict each other's build runner and every `zig build`, even `--help`, takes about 2 minutes. The first build in a fresh cache pays a one-time compile of about 70 s.
 - The steps are the tiers (`TESTING.md`): `check` (pre-commit: type-check and `zig fmt --check`), `test` (the merge gate's fast part), `suite -- <mode>` (the fixture runner: `ams`, `devices`, `ieee1364`, `vpi`, `golden`; no mode runs every fixture, timed), `test-spice`, `test-external` (in `nix develop .#external`), `conformance`, `fuzz`, `build-all`, and `test-<module>` for one module's tests.
-- Edit loop: keep `zig build check --watch -fincremental --cache-dir .zig-cache-watch` running (see "Building with many agents" for why the private cache dir). `check` type-checks every root without emitting or running anything, so an edit is re-checked in under a second. `test-<module>` works the same way, but each rerun costs the tests' run time.
+- Edit loop: keep `zig build check-<module> --watch -fincremental --cache-dir .zig-cache-watch` running for each module root you are editing (see "Building with many agents" for why the private cache dir and why not the full `check`). `check-<module>` type-checks only that root without emitting or running anything, so an edit is re-checked in under a second while holding one root's memory instead of every root's. `test-<module>` works the same way, but each rerun costs the tests' run time. The full `check` stays the pre-commit gate over every root.
 - After cloning, run `git submodule update --init tests/conformance`: every fixture lives in that submodule. `--recursive` adds the suite's external suites, which only `zig build conformance` runs.
 - `zig build -Dtarget=wasm32-wasi` builds `vera.wasm`. The front end and every `--emit-*` that only writes text run there; anything that spawns `zig` cannot. Size budgets are asserted with `<=` so they hold on 32-bit targets.
 - VerA does not depend on ESPice; ESPice depends on VerA. `zig build test-spice -Despice=PATH` runs the `.sp` decks on an espice it is handed (an ESPice release, a nix profile or a local build) and grades each against its oracle. That espice compiles the decks' devices with its own VerA, so the step checks compatibility with that release, not this tree; `.github/workflows/spice.yaml` imports a pinned ESPice release and runs it (disabled, by hand only, until ESPice publishes one). Without `-Despice` the step fails.
@@ -213,10 +213,14 @@ So:
 1. **Set up a worktree:** `ln -s <main>/.zig-cache <worktree>/.zig-cache`.
    Every plain build then shares the main checkout's results.
 2. **Edit loop, one per agent, in its own worktree:**
-   `nix develop -c zig build check --watch -fincremental --cache-dir .zig-cache-watch`.
-   The private `--cache-dir` keeps your incremental state from colliding
-   with other worktrees. A re-check takes under a second; a cold `check`
-   takes about 9 s. Use `test-<module>` the same way to run one module's tests.
+   `nix develop -c zig build check-<module> --watch -fincremental --cache-dir .zig-cache-watch`
+   for each module root you are editing, never the full `check`: that watch
+   alone holds all 38 roots' compiler processes resident (6.4-6.5 GB), and
+   six agents on it would need about 39 GB on a 31 GB machine. The private
+   `--cache-dir` keeps your incremental state from colliding with other
+   worktrees. A re-check takes under a second; a cold `check-<module>` holds
+   only that root's memory (0.14-0.56 GB). Use `test-<module>` the same way
+   to run one module's tests.
 3. **Everything that counts is a plain build through the slots:**
    `tools/build-slot.sh <worktree> <step> [args]`. This covers gates, list
    rebaselines and anything you report. Never run `-fincremental` here: it

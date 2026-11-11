@@ -11,8 +11,6 @@
 verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/03_lexical_conventions/forward_reference_reg_rejected.v rw-codegen (codegen): stderr: line 1: old `error[E1103]: design cannot be a contract device: module `triage_forward_reference_reg`: a name the engine resolves only at run time`, new `error[E1100]: digital source execution failed: a name is used before its declaration`
 verilog/08_udp/definition_inside_module_rejected.v rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `q``, new `error[E0205]: unsupported module item: found table`
-verilog/09_behavioral_modeling/unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
-verilog/09_behavioral_modeling/unnamed_fork_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
 verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/defparam_across_generate_instances_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element`, new `error[E1100]: digital source execution failed: §12.2.1: a defparam insid
@@ -41,8 +39,6 @@ verilog/13_configuration/two_libraries_match_rejected.v not built: backend libma
 verilog/13_configuration/undeclared_library_rejected.v not built: backend libmap
 verilog/18_vcd/dumpports_same_file_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/19_compiler_directives/ams_keywords_instance_names.v rw-dlower (run): exit status old 1, new 0
-verilog/19_compiler_directives/default_nettype_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^`
-verilog/19_compiler_directives/unconnected_drive_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^^^^`
 verilog/28_protected_envelopes/protected_des_base64.v rw-dlower (run): exit status old 1, new 0
 verilog/28_protected_envelopes/protected_des_uuencode.v rw-dlower (run): exit status old 1, new 0
 verilog/28_protected_envelopes/protected_eight_nested_envelopes.v rw-dlower (run): exit status old 1, new 0
@@ -53,6 +49,4 @@ verilog/A_formal_syntax/b_A_1_1_incdir.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_library_text.v not built: backend libmap
-verilog/A_formal_syntax/b_A_2_8_net_block_item_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found `;``, new `error: could not compile due to 1 previous error(s)`
-verilog/A_formal_syntax/b_A_6_3_unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found k`, new `error: could not compile due to 1 previous error(s)`
 verilog/B_keywords/b_B_keywords.v rw-dlower (digital lowering): exit status old 1, new 0

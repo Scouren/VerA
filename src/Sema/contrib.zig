@@ -71,6 +71,7 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
     // be contributed to using the branch contribution operator <+."
     if (indirect.on(s, t.hi, t.lo)) return s.fail(.E0409, file, src, "`({s},{s})`", .{ access.nodeName(s, t.hi), access.nodeName(s, t.lo) });
     const row = try rowOf(s, b, t);
+    try discardOpposite(s, b, t);
     var split: reactive.Split = .{};
     s.contrib_target = t;
     defer s.contrib_target = null;
@@ -116,4 +117,29 @@ pub fn rowOf(s: *Sema, b: *const Block, t: Target) Allocator.Error!Device.Contri
     });
     gop.value_ptr.* = row;
     return row;
+}
+
+// ---- private ----
+
+/// §5.6.1.3 "contributing [the other access] to a branch which already has
+/// a value retained for [this one] results in [it] being discarded and the
+/// branch being converted to a [this-access] source": when `t`'s branch
+/// already holds a row for the opposite access, opened by this same
+/// instance, every sum this `<+` would otherwise add to is stale, so its
+/// resistive and reactive sums, its retention flag and every charge site it
+/// fed are reset to 0 before this contribution accumulates into its own
+/// row. A same-access `<+` (the common case) finds no opposite row and does
+/// nothing.
+fn discardOpposite(s: *Sema, b: *Block, t: Target) Allocator.Error!void {
+    const opp: Device.Access = if (t.access == .potential) .flow else .potential;
+    const key: Sema.ContribKey = .{ .access = opp, .branch = t.branch, .hi = t.hi, .lo = t.lo };
+    const row = s.contrib_rows.get(key) orelse return;
+    if (s.device.contributions.items(.instance)[@backingInt(row)] != decl.rowInstance(b.unit.instance)) return;
+    const slots = s.device.contributions.get(@backingInt(row));
+    for ([_]Air.Inst.Index{ slots.resist, slots.react, slots.wrote }) |slot|
+        _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slot), .rhs = .fromIntern(.zero_real) } } });
+    for (s.device.charge_sites.items(.contrib), s.device.charge_sites.items(.slot)) |c, slot| {
+        if (c != row) continue;
+        _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slot), .rhs = .fromIntern(.zero_real) } } });
+    }
 }

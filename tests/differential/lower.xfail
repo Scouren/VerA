@@ -112,10 +112,8 @@ verilog-a/ch05_analog_behavior/assignment_array_mismatch_invalid.va codes: old E
 verilog-a/ch05_analog_behavior/branch_flow_probe_includes_the_reactive_part.va codes: old {}, new E0512 (E0512: a read of a reactive flow source is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/conditional_ddt_contribution_static.va codes: old {}, new E0512,E0514 (E0514: `ddt`)
 verilog-a/ch05_analog_behavior/contribution_to_discrete_net_rejected.va codes: old E0501, new {}
-verilog-a/ch05_analog_behavior/controlled_sources.va contribution 0 resist: old 0e0, new 2.6579876889098655e0
 verilog-a/ch05_analog_behavior/cross_used_as_a_value_rejected.va codes: old E0701, new E0512 (E0512: `cross` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/ddt_inside_array_pattern_argument.va codes: old {}, new E0512 (E0512: a user task enable is not lowered by Sema yet)
-verilog-a/ch05_analog_behavior/double_throw_switch_topology.va contribution 2 resist: old 0e0, new -1.864516840353728e-3
 verilog-a/ch05_analog_behavior/event_control_undeclared_event_rejected.va codes: old E0705, new E0512 (E0512: this event expression is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/generic_access.va codes: old {}, new E0408,E0512 (E0512: `potential` is not lowered by Sema yet)
 verilog-a/ch05_analog_behavior/hierarchical_contribution_closes_a_source_triangle_rejected.va codes: old E0477, new {}
@@ -150,7 +148,6 @@ verilog-a/ch05_analog_behavior/timer_changed_effectful_known_input_rejected.va c
 verilog-a/ch05_analog_behavior/timer_changed_effectful_nested_function_input_rejected.va codes: old E0528, new {}
 verilog-a/ch05_analog_behavior/timer_changed_effectful_random_function_input_rejected.va codes: old E0528, new {}
 verilog-a/ch05_analog_behavior/timer_effectful_file_leaf.va tables row 6: old `held line`, new `limit_slots 0`
-verilog-a/ch05_analog_behavior/value_retention.va contribution 0 resist: old 7e0, new 8e0
 verilog-a/ch05_analog_behavior/vector_net_index_not_constant_rejected.va codes: old E0352, new E0512 (E0512: an access of a vector element at a run-time index)
 verilog-a/ch06_hierarchy/defparam_rhs_not_constant_rejected.va codes: old E0363, new {}
 verilog-a/ch06_hierarchy/defparam_upward_collect_first.va tables row 2: old `param gt real local = 2e0`, new `param gt real = 2e0`

@@ -85,6 +85,12 @@ const Shared = struct {
 /// follows the front end `--run` uses.
 const front_end_ruling = "front end:";
 
+/// A digital_exe.rulings clause whose old side is wrong only by a native
+/// codegen build remark on stderr (T1, research/vbackends.md §2: outside
+/// the `--emit-exe` contract — exit status, stdout, diagnostics about the
+/// design, files written).
+const build_remark_ruling = "build remark:";
+
 /// `one`'s fixtures prefix this on a `rel` that names a file under
 /// `tests/differential/native/` (`addGenerated`) instead of the fixture
 /// root: `fixture.argv` cannot build its path.
@@ -246,11 +252,13 @@ fn one(arena: Allocator, s: *Shared, k: u32) !Outcome {
             try deviceTiebreak(arena, s, f, new, args, try std.fmt.allocPrint(arena, "{s}/{d}-d", .{ s.work, k }))
         else if (std.mem.startsWith(u8, clause, front_end_ruling))
             try frontEndTiebreak(arena, s, f, new, try std.fmt.allocPrint(arena, "{s}/{d}-r", .{ s.work, k }))
+        else if (std.mem.startsWith(u8, clause, build_remark_ruling))
+            try remarkRuling(arena, s.io, f, old, new)
         else if (try tiebreak(arena, s.io, f, new)) null else "the new side misses the fixture's own verdict";
         if (miss == null) return .{ .ruled = clause };
         return .{ .differ = .{ .owner = v_run.name ++ ".rulings", .why = try std.fmt.allocPrint(arena, "the ruling ({s}) does not hold: {s}; {s}", .{ clause, miss.?, why }) } };
     }
-    return .{ .differ = .{ .owner = try judge.owner(arena, old, new, f.lang == .verilog), .why = why } };
+    return .{ .differ = .{ .owner = try judge.owner(arena, old, new, f.lang == .verilog, f.rel), .why = why } };
 }
 
 /// Holds the outcomes to `comp.xfail` and `comp.rulings`, prints the
@@ -359,6 +367,21 @@ fn frontEndTiebreak(arena: Allocator, s: *Shared, f: Fixture, new: judge.Run, wo
     const got = try preprocessCodes(arena, new.stderr);
     if (std.mem.eql(u8, want, got)) return null;
     return try std.fmt.allocPrint(arena, "old --run's preprocessor reports `{s}`, the new side `{s}`", .{ want, got });
+}
+
+/// `build_remark_ruling`'s tiebreaker (T1): `judge.remarkTiebreak`'s
+/// status/files/stderr-without-the-remark agreement, then `new`'s stdout
+/// against the fixture's own transcript (its `.expected.txt` gold when it
+/// has one — README rule 3's independent tiebreaker — else `old`'s
+/// stdout). Null when it holds, else why not.
+fn remarkRuling(arena: Allocator, io: Io, f: Fixture, old: judge.Run, new: judge.Run) !?[]const u8 {
+    if (try judge.remarkTiebreak(arena, old, new, f.rel)) |why| return why;
+    const stem = f.rel[0 .. f.rel.len - std.fs.path.extension(f.rel).len];
+    const gold_path = try std.fmt.allocPrint(arena, "{s}/{s}.expected.txt", .{ options.fixture_root, stem });
+    const gold = Io.Dir.cwd().readFileAlloc(io, gold_path, arena, .limited(1 << 24)) catch null;
+    const want = gold orelse old.stdout;
+    if (!std.mem.eql(u8, want, new.stdout)) return "stdout does not meet the fixture's own transcript";
+    return null;
 }
 
 /// The `[E01xx]`/`[W01xx]` codes of `stderr`'s headlines, in order.

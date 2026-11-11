@@ -15,6 +15,14 @@ for a in "$@"; do
   esac
 done
 if [ $light = 1 ]; then nix develop -c zig build "$@"; exit $?; fi
+# A corpus step reads tests/conformance, which a worktree symlinks to the main checkout's: a list
+# graded against any other suite commit than the one HEAD pins is graded against other fixtures.
+read -r mode _ pin _ < <(git ls-tree HEAD tests/conformance)
+have=$(git -C tests/conformance rev-parse HEAD 2>/dev/null)
+if [ "${mode:-}" != 160000 ] || [ "${pin:-}" != "$have" ]; then
+  echo "build-slot: tests/conformance is at ${have:-nothing}, HEAD pins ${pin:-no submodule} (mode ${mode:-none})" >&2
+  exit 2
+fi
 while true; do
   for s in 0 1; do
     exec {fd}>"$HOME/.cache/vera-heavy.$s.lock"

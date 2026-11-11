@@ -65,7 +65,7 @@ pub fn task(s: *State, a: Allocator, at: u32) Error!void {
         },
         .vars => {
             // §18.1.2: every $dumpvars executes at one simulation time.
-            if (d.selected_at) |t| if (t != s.scheduler.now or d.started) return s.fail("§18.1.2: every $dumpvars shall execute at the same simulation time", .{});
+            if (d.selected_at) |t| if (t != s.scheduler.now or d.started) return s.fail(.E1100, "§18.1.2: every $dumpvars shall execute at the same simulation time", .{});
             d.selected_at = s.scheduler.now;
             const levels: u32 = if (c.arg == none) 0 else std.math.lossyCast(u32, (try eval.eval(s, a, c.arg)).asInt() orelse 0);
             const targets = p.list(c.targets);
@@ -139,7 +139,7 @@ pub fn preamble(w: *std.Io.Writer, io: std.Io, call: []const u8, finest: i32) st
 // ---- private ----
 
 fn fail(s: *State, comptime what: []const u8) Error {
-    return s.fail(what ++ " `{s}`", .{s.dump.name});
+    return s.fail(.E1100, what ++ " `{s}`", .{s.dump.name});
 }
 
 fn put(s: *State, bytes: []const u8) Error!void {

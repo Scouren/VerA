@@ -151,7 +151,9 @@ pub fn writeExe(w: *std.Io.Writer, arena: Allocator, program: *const std_sim.Pro
     );
     try w.print("    .program = \"{f}\",\n    .sources = &.{{\n", .{std.zig.fmtString(bytes.written())});
     for (sources) |s| try w.print("        .{{ .name = \"{f}\", .text = \"{f}\" }},\n", .{ std.zig.fmtString(s.name), std.zig.fmtString(s.text) });
-    try w.writeAll("    },\n    .sites = &.{\n");
+    // ponytail: the field is `exe.Config.check_sites`; `pc_sites` stays at
+    // its `&.{}` default here until T3 (plan-codegen) gives this a table.
+    try w.writeAll("    },\n    .check_sites = &.{\n");
     for (sites) |l| try w.print("        .{{ .file = @enumFromInt({d}), .start = {d}, .end = {d} }},\n", .{ @backingInt(l.file), l.start, l.end });
     var native: std.Io.Writer.Allocating = .init(arena);
     const compiled = try native_step.write(&native.writer, arena, program);

@@ -40,15 +40,41 @@ const Zcu = sema.Zcu;
 /// The fixture directories `suite -- devices` runs (`tests/suite/Devices.zig`).
 const dirs = [_][]const u8{ "verilog", "verilog-ams/digital" };
 
-/// One run: what the oracle compares. `sites`: the source bytes of the
+/// One run-stage diagnostic, compared by code name (old `diag.Code`'s, new
+/// `vams.Diag.Code`'s) and text, in order (G3-G6: `exe.report` used to drop
+/// these). `at` is the source byte when resolvable: a `.check`-blamed
+/// diagnostic resolves through `Lowered.check_sites`; a `.pc`-blamed one
+/// has no byte yet (`pc_sites`: T3's table), so `at` is `null` and only its
+/// code and text are compared.
+const RunDiag = struct { code: []const u8, at: ?u32, text: []const u8 };
+
+/// One elaboration-stage warning (T1(b): `zcu.failed`'s W rows), compared
+/// by code name and byte with the old bag's `.lower`-stage warnings.
+const ElabWarn = struct { code: []const u8, at: u32 };
+
+/// One run: what the oracle compares. `warnings`: every run-stage
+/// diagnostic that did not end the run, in order. `fail`: the one that did,
+/// if any (`failed` may still be true with `fail == null`: an earlier
+/// stage of this same old run failed). `sites`: the source bytes of the
 /// timing checks that reported a violation, sorted, each once.
-const Side = struct { out: []const u8, failed: bool, why: []const u8 = "", sites: []const u32 = &.{} };
+const Side = struct {
+    out: []const u8,
+    failed: bool,
+    warnings: []const RunDiag = &.{},
+    fail: ?RunDiag = null,
+    sites: []const u32 = &.{},
+};
 
 /// The new side's compile, from source: the `Program` and its check sites,
-/// or why it stopped.
+/// or why it stopped; the 1364 elaboration warnings it raised getting
+/// there (T1(b)), whichever way it stopped.
 /// `earlier`: a stage before the lowering raised an error (`Early`); `refused`: the
 /// lowering does not express the design yet (or the harness cannot run
 /// it); `rejected`: the lowering raised an error (`Why.code`).
+const CompiledNew = struct {
+    compiled: Compiled,
+    elab_warnings: []const ElabWarn = &.{},
+};
 const Compiled = union(enum) { lowered: sema.digital.Lowered, refused: []const u8, earlier: Early, rejected: sema.digital.Why };
 
 /// A refusal before the lowering: which stage and why, and the first
@@ -102,8 +128,8 @@ fn negative(source: []const u8) bool {
     return false;
 }
 
-/// `sim.xfail`: one `<path> <reason>` per line; `#` and blank lines are
-/// comments. A line without a reason is refused.
+/// `sim.xfail` or `sim.rulings`: one `<path> <reason>` per line; `#` and
+/// blank lines are comments. A line without a reason is refused.
 fn readXfail(arena: Allocator, io: std.Io, path: []const u8) !std.StringHashMapUnmanaged([]const u8) {
     var map: std.StringHashMapUnmanaged([]const u8) = .empty;
     const text = try std.Io.Dir.cwd().readFileAlloc(io, path, arena, .limited(1 << 24));
@@ -178,7 +204,7 @@ fn options(a: Allocator, io: std.Io, source: []const u8, path: []const u8) !?dig
 
 /// Preprocesses, parses, AstGens, elaborates and lowers fixture `path`
 /// (with its `//@ files` units) as the new pipeline does.
-fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, opts: digital.Options) !Compiled {
+fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, opts: digital.Options) !CompiledNew {
     // IEEE 1364-2005 §28.2 the keys, read with the vams reader.
     var keys: vams.Preprocessor.protect.Keys = .{};
     var lines = std.mem.splitScalar(u8, source, '\n');
@@ -187,7 +213,7 @@ fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, op
         const rest = std.mem.cutPrefix(u8, line, "//@ protect-keys") orelse continue;
         const file = try std.fs.path.join(a, &.{ std.fs.path.dirname(path).?, std.mem.trim(u8, rest, " \t") });
         const json = try std.Io.Dir.cwd().readFileAlloc(io, file, a, .limited(1 << 22));
-        keys = vams.Preprocessor.protect.parseKeys(a, json) catch return .{ .refused = "a key file the vams reader refuses" };
+        keys = vams.Preprocessor.protect.parseKeys(a, json) catch return .{ .compiled = .{ .refused = "a key file the vams reader refuses" } };
     }
     var pp: vams.Preprocessor = .init(a, .{
         .include_dirs = opts.include_dirs,
@@ -201,14 +227,14 @@ fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, op
     while (try pp.run()) |req| switch (req) {
         .file => |want| {
             requests += 1;
-            if (requests > 10_000) return .{ .refused = "more than 10,000 include requests" };
+            if (requests > 10_000) return .{ .compiled = .{ .refused = "more than 10,000 include requests" } };
             try pp.answer(std.Io.Dir.cwd().readFileAlloc(io, want.path, a, .limited(1 << 24)) catch null);
         },
     };
     const out = try a.create(vams.Preprocessor.Output);
     out.* = pp.output();
     if (out.failed) for (out.diagnostics) |d| if (d.code[0] == 'E')
-        return .{ .earlier = .{ .why = try a.print("the vams preprocessor refuses it ({s})", .{d.code}), .code = d.code, .at = d.start } };
+        return .{ .compiled = .{ .earlier = .{ .why = try a.print("the vams preprocessor refuses it ({s})", .{d.code}), .code = d.code, .at = d.start } } };
     const text = try a.dupeSentinel(u8, out.text, 0);
     const tree = try a.create(vams.Ast);
     tree.* = try vams.Ast.parse(a, text, .{ .keywords = std.meta.stringToEnum(vams.Ast.KeywordSet, @tagName(opts.language)).?, .discrete = true });
@@ -217,7 +243,7 @@ fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, op
         try vams.Ast.parse_errors.report(tree, &w);
         const d = try w.toOwnedBundle();
         const m = d.message(d.messages()[0]);
-        return .{ .earlier = .{ .why = try a.print("the vams parser refuses it ({t})", .{tree.errors[0].tag}), .code = @tagName(m.tag.code), .at = m.loc.start } };
+        return .{ .compiled = .{ .earlier = .{ .why = try a.print("the vams parser refuses it ({t})", .{tree.errors[0].tag}), .code = @tagName(m.tag.code), .at = m.loc.start } } };
     }
     const vir = try vams.AstGen.generate(a, tree, .{ .directives = out.directives, .ieee1364 = true });
     // `SIM_DUMP=1` with `SIM_ONLY`: the fixture's Vir on stderr.
@@ -229,26 +255,32 @@ fn compileNew(a: Allocator, io: std.Io, source: []const u8, path: []const u8, op
     for (vir.diag.messages()) |m| {
         const code = vir.diag.message(m).tag.code;
         // vera-next's IEEE 1364 route words E0376 as lib/sim/digital's E1100.
-        if (@tagName(code)[0] == 'E') return .{ .earlier = .{ .why = try a.print("AstGen refuses it ({t})", .{code}), .code = if (code == .E0376) "E1100" else @tagName(code), .at = vir.diag.message(m).loc.start } };
+        if (@tagName(code)[0] == 'E') return .{ .compiled = .{ .earlier = .{ .why = try a.print("AstGen refuses it ({t})", .{code}), .code = if (code == .E0376) "E1100" else @tagName(code), .at = vir.diag.message(m).loc.start } } };
     }
     var zcu: Zcu = try .init(a);
     const file = try zcu.addFile(path, vir, 0);
     if (std.mem.find(u8, source, "//@ libmap") != null or std.mem.find(u8, source, "//@ liblist") != null)
         try libraries(a, &zcu, file, tree, out.unit_starts, opts);
     try sema.Sema.elaborate(&zcu, .{ .roots = .all, .ieee1364 = true });
+    // T1(b): every W row is an elaboration warning, kept regardless of how
+    // this compile ends, for the old bag's `.lower`-stage warnings to be
+    // compared against (`G1`: the hole W0252 came through this way).
+    var elab_warnings: std.ArrayList(ElabWarn) = .empty;
     const zf = zcu.failed.slice();
-    for (zf.items(.code), zf.items(.src), zf.items(.rule), zf.items(.part)) |code, src, rule, part| if (@tagName(code)[0] == 'E') {
+    for (zf.items(.code), zf.items(.src), zf.items(.rule), zf.items(.part)) |code, src, rule, part| {
         // vera-next's IEEE 1364 route reports a `Rule` under lib/sim/digital's code.
         const as = @tagName(if (rule == .none) code else rule.code());
-        return .{ .earlier = .{ .why = try a.print("elaboration refuses it ({t})", .{code}), .code = as, .at = if (sema.locate.part(tree, &vir, src, part)) |span| span.bytes(tree).start else 0 } };
-    };
+        const at = if (sema.locate.part(tree, &vir, src, part)) |span| span.bytes(tree).start else 0;
+        if (@tagName(code)[0] == 'E') return .{ .compiled = .{ .earlier = .{ .why = try a.print("elaboration refuses it ({t})", .{code}), .code = as, .at = at } }, .elab_warnings = elab_warnings.items };
+        try elab_warnings.append(a, .{ .code = as, .at = at });
+    }
     var why: sema.digital.Why = .{};
     const lowered = sema.digital.lower(a, &zcu, .{ .sources = &.{.{ .tree = tree, .pp = out }}, .std_1364 = @backingInt(opts.language) < @backingInt(frontend.keyword.KeywordSet.vams_2_3) }, &why) catch |e| switch (e) {
-        error.Unsupported => return .{ .refused = try a.print("lowering: {s}", .{why.text}) },
-        error.Rejected => return .{ .rejected = why },
+        error.Unsupported => return .{ .compiled = .{ .refused = try a.print("lowering: {s}", .{why.text}) }, .elab_warnings = elab_warnings.items },
+        error.Rejected => return .{ .compiled = .{ .rejected = why }, .elab_warnings = elab_warnings.items },
         error.OutOfMemory => return e,
     };
-    return .{ .lowered = lowered };
+    return .{ .compiled = .{ .lowered = lowered }, .elab_warnings = elab_warnings.items };
 }
 
 /// §13.2.3 the library map `options` read, as Compilation hands it to the
@@ -269,9 +301,24 @@ fn libraries(a: Allocator, zcu: *Zcu, file: Zcu.File.Index, tree: *const vams.As
     zcu.lib_order = order;
 }
 
-/// Runs `p` in `std_sim`, in the working directory, with `sites` naming
-/// each timing check's source byte.
-fn runProgram(a: Allocator, io: std.Io, p: *const std_sim.Program, sites: []const u32, budget: u64) !Side {
+/// `d` resolved to a comparable `RunDiag`: a `.check` blame through
+/// `check_sites` (`Lowered.check_sites`, Sema already writes it); a `.pc`
+/// blame has no byte yet (`pc_sites`: T3's table), so `at` is `null` and
+/// only its code and text are compared.
+fn diagOf(d: std_sim.State.Diag, check_sites: []const u32) RunDiag {
+    return .{
+        .code = @tagName(d.code),
+        .at = switch (d.of) {
+            .check => check_sites[d.at],
+            .pc => null,
+        },
+        .text = d.text,
+    };
+}
+
+/// Runs `p` in `std_sim`, in the working directory, with `check_sites`
+/// naming each timing check's source byte.
+fn runProgram(a: Allocator, io: std.Io, p: *const std_sim.Program, check_sites: []const u32, budget: u64) !Side {
     var out: std.Io.Writer.Allocating = .init(a);
     var s: std_sim.State = try .init(a, p, &out.writer);
     s.budget = budget;
@@ -286,21 +333,72 @@ fn runProgram(a: Allocator, io: std.Io, p: *const std_sim.Program, sites: []cons
     t.join();
     std_sim.files.closeAll(&s);
     var violated: std.ArrayList(u32) = .empty;
-    for (s.checks, sites) |c, site| if (c.count != 0) try violated.append(a, site);
+    for (s.checks, check_sites) |c, site| if (c.count != 0) try violated.append(a, site);
     const v = try uniqueSorted(violated.items);
+    const warnings = try a.alloc(RunDiag, s.diags.items.len);
+    for (s.diags.items, warnings) |d, *w| w.* = diagOf(d, check_sites);
     result catch |e| switch (e) {
-        error.SimFailed => return .{ .out = out.written(), .failed = true, .why = s.failure.?, .sites = v },
+        error.SimFailed => return .{ .out = out.written(), .failed = true, .warnings = warnings, .fail = diagOf(s.failure.?, check_sites), .sites = v },
         error.OutOfMemory, error.WriteFailed => return e,
     };
-    return .{ .out = out.written(), .failed = false, .sites = v };
+    return .{ .out = out.written(), .failed = false, .warnings = warnings, .sites = v };
+}
+
+/// The first run-stage diagnostic that differs, old vs new, in order
+/// (code, text always; byte only when the new side resolved one): "" when
+/// every one agrees. `old`/`new` are each side's warnings with its
+/// failure (if any) appended, in the order they were raised.
+fn diagsDiffer(a: Allocator, old: []const RunDiag, new: []const RunDiag) ![]const u8 {
+    const n = @min(old.len, new.len);
+    for (old[0..n], new[0..n], 0..) |o, w, i| {
+        if (std.mem.eql(u8, o.code, w.code) and std.mem.eql(u8, o.text, w.text) and (w.at == null or w.at.? == o.at.?))
+            continue;
+        return std.fmt.allocPrint(a, "run diagnostic {d}: old {s}@{?d} \"{s}\"; new {s}@{?d} \"{s}\"", .{ i, o.code, o.at, o.text, w.code, w.at, w.text });
+    }
+    if (old.len != new.len) return std.fmt.allocPrint(a, "{d} run diagnostics old, {d} new", .{ old.len, new.len });
+    return "";
+}
+
+/// `warnings` with `fail` appended, if any: one ordered list to feed
+/// `diagsDiffer`.
+fn withFail(a: Allocator, warnings: []const RunDiag, fail: ?RunDiag) ![]const RunDiag {
+    const f = fail orelse return warnings;
+    const out = try a.alloc(RunDiag, warnings.len + 1);
+    @memcpy(out[0..warnings.len], warnings);
+    out[warnings.len] = f;
+    return out;
+}
+
+/// T1(b): the first elaboration warning that differs, old's `.lower`-stage
+/// bag entries vs the new 1364 route's `zcu.failed` W rows, by code and
+/// byte, in order: "" when every one agrees.
+fn elabWarningsDiffer(a: Allocator, old: []const ElabWarn, new: []const ElabWarn) ![]const u8 {
+    const n = @min(old.len, new.len);
+    for (old[0..n], new[0..n], 0..) |o, w, i|
+        if (!std.mem.eql(u8, o.code, w.code) or o.at != w.at)
+            return std.fmt.allocPrint(a, "elaboration warning {d}: old {s}@{d}; new {s}@{d}", .{ i, o.code, o.at, w.code, w.at });
+    if (old.len != new.len) return std.fmt.allocPrint(a, "{d} elaboration warnings old, {d} new", .{ old.len, new.len });
+    return "";
+}
+
+/// A `sim.rulings` entry holds for a `//! reject` fixture when both sides
+/// reject it under the same code (lib/sim/digital's `diag.Code` and
+/// `vams.Diag.Code` compared by name): G13's "old shape, not old truth"
+/// cases, where the wording and the blamed byte are not expected to agree.
+fn rulingHolds(reject: bool, old_code: ?[]const u8, new_code: []const u8) bool {
+    const oc = old_code orelse return false;
+    return reject and std.mem.eql(u8, oc, new_code);
 }
 
 /// Runs fixture `rel` both ways: "" when they agree, else what differs.
-fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const u8 {
+/// `ruling`: `sim.rulings` lists `rel` (`rulingHolds` decides whether it
+/// still does).
+fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8, ruling: bool) ![]const u8 {
     const path = try std.fs.path.join(a, &.{ root, rel });
     const source = try std.Io.Dir.cwd().readFileAlloc(io, path, a, .limited(1 << 22));
     const opts = try options(a, io, source, path) orelse return "a `//@` line the cli refuses";
-    const compiled = try compileNew(a, io, source, path, opts);
+    const cn = try compileNew(a, io, source, path, opts);
+    const compiled = cn.compiled;
     const reject = negative(source);
     switch (compiled) {
         .refused => |why| return why,
@@ -321,6 +419,7 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
     try std.process.setCurrentDir(io, old_dir.dir);
     var old_out: std.Io.Writer.Allocating = .init(a);
     var first: ?struct { code: diag.Code, at: u32, message: []const u8 } = null;
+    var old_lower_warnings: std.ArrayList(ElabWarn) = .empty;
     const old: Side = old: {
         var bag: diag.Bag = .init(a);
         const failed = if (digital.run(a, source, opts, &bag, &old_out.writer)) |_| bag.failed() else |e| switch (e) {
@@ -328,24 +427,47 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
             else => return e,
         };
         var sites: std.ArrayList(u32) = .empty;
+        var warnings: std.ArrayList(RunDiag) = .empty;
+        var fail: ?RunDiag = null;
         for (0..bag.count()) |k| {
             const d = bag.at(k);
             if (d.code == .W1199) try sites.append(a, d.span.start);
             if (first == null and d.severity == .err) first = .{ .code = d.code, .at = d.span.start, .message = d.message };
+            if (d.stage == .run) {
+                const rd: RunDiag = .{ .code = @tagName(d.code), .at = d.span.start, .text = d.message };
+                if (d.severity == .err) {
+                    if (fail == null) fail = rd;
+                } else try warnings.append(a, rd);
+            } else if (d.stage == .lower and d.severity == .warning) {
+                try old_lower_warnings.append(a, .{ .code = @tagName(d.code), .at = d.span.start });
+            }
         }
-        break :old .{ .out = old_out.written(), .failed = failed, .sites = try uniqueSorted(sites.items) };
+        break :old .{ .out = old_out.written(), .failed = failed, .warnings = warnings.items, .fail = fail, .sites = try uniqueSorted(sites.items) };
     };
+
+    // T1(b): the 1364 route's elaboration warnings (`zcu.failed` W rows)
+    // against the old bag's `.lower`-stage ones (G1: the hole W0252 came
+    // through this way).
+    {
+        const d = try elabWarningsDiffer(a, old_lower_warnings.items, cn.elab_warnings);
+        if (d.len != 0) return d;
+    }
+
     const lowered = switch (compiled) {
         .lowered => |l| l,
         // An earlier stage's refusal agrees only with the old run's first
-        // error: its code at its byte.
+        // error: its code at its byte, unless a `sim.rulings` entry holds
+        // (G13(a): the old resolves names lazily while running, a run
+        // failure; the new finds the same error while lowering).
         .earlier => |e| {
+            if (ruling and rulingHolds(reject, if (first) |f| @tagName(f.code) else null, e.code)) return "";
             const f = first orelse return std.fmt.allocPrint(a, "old run completed, new {s}", .{e.why});
             if (!std.mem.eql(u8, @tagName(f.code), e.code) or f.at != e.at)
                 return std.fmt.allocPrint(a, "old {t} at byte {d}: {s}; new {s} at byte {d}: {s}", .{ f.code, f.at, f.message, e.code, e.at, e.why });
             return "";
         },
         .rejected => |why| {
+            if (ruling and rulingHolds(reject, if (first) |f| @tagName(f.code) else null, @tagName(why.code))) return "";
             const f = first orelse return std.fmt.allocPrint(a, "old run completed, the new lowering raised {t} at byte {d}: {s}", .{ why.code, why.at, why.text });
             // Two code enums (lib/diag's and vams'), one catalogue: compared by name.
             if (!std.mem.eql(u8, @tagName(f.code), @tagName(why.code)) or !std.mem.endsWith(u8, f.message, why.text) or f.at != why.at)
@@ -361,7 +483,15 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
     if (old.failed and !new.failed) if (first) |f|
         return std.fmt.allocPrint(a, "old run failed ({t}: {s}), new run completed", .{ f.code, f.message });
     if (old.failed != new.failed)
-        return std.fmt.allocPrint(a, "old run {s}, new run {s} ({s})", .{ if (old.failed) "failed" else "completed", if (new.failed) "failed" else "completed", new.why });
+        return std.fmt.allocPrint(a, "old run {s}, new run {s} ({s})", .{ if (old.failed) "failed" else "completed", if (new.failed) "failed" else "completed", if (new.fail) |f| f.text else "" });
+    // G13(b)(c): a ruling settles for the same failure code, the wording
+    // and the blamed byte left uncompared (the old side's own, not what
+    // T2/T3 make the new side's).
+    if (ruling and new.fail != null and rulingHolds(reject, if (old.fail) |f| f.code else null, new.fail.?.code)) return "";
+    {
+        const d = try diagsDiffer(a, try withFail(a, old.warnings, old.fail), try withFail(a, new.warnings, new.fail));
+        if (d.len != 0) return d;
+    }
     if (!std.mem.eql(u8, old.out, new.out)) return textDiff(a, old.out, new.out);
     if (!std.mem.eql(u32, old.sites, new.sites))
         return std.fmt.allocPrint(a, "the timing checks that violated differ: old at bytes {any}, new {any}", .{ old.sites, new.sites });
@@ -372,8 +502,8 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const
 /// `compare` in a forked child (Linux): its verdict through a pipe, or the
 /// signal that ended it, so a crash is that fixture's difference and the
 /// child's memory never this process's.
-fn isolated(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]const u8 {
-    if (builtin.os.tag != .linux) return compare(a, io, root, rel);
+fn isolated(a: Allocator, io: std.Io, root: []const u8, rel: []const u8, ruling: bool) ![]const u8 {
+    if (builtin.os.tag != .linux) return compare(a, io, root, rel, ruling);
     const linux = std.os.linux;
     var fds: [2]linux.fd_t = undefined;
     if (linux.errno(linux.pipe2(&fds, .{ .CLOEXEC = true })) != .SUCCESS) return error.PipeFailed;
@@ -381,7 +511,7 @@ fn isolated(a: Allocator, io: std.Io, root: []const u8, rel: []const u8) ![]cons
     if (linux.errno(pid) != .SUCCESS) return error.ForkFailed;
     if (pid == 0) {
         _ = linux.close(fds[0]);
-        const why = compare(a, io, root, rel) catch |e| @errorName(e);
+        const why = compare(a, io, root, rel, ruling) catch |e| @errorName(e);
         var at: usize = 0;
         while (at < why.len) {
             const n = linux.write(fds[1], why[at..].ptr, why.len - at);
@@ -489,11 +619,14 @@ test "diff-sim: Sema's digital Program runs every .v fixture as lib/sim/digital 
     const fixtures = try collect(ra, io, root);
     const xfail_path = try std.fs.path.join(ra, &.{ rewrite_options.repo_root, "tests/differential/sim.xfail" });
     const xfail = try readXfail(ra, io, xfail_path);
+    const rulings_path = try std.fs.path.join(ra, &.{ rewrite_options.repo_root, "tests/differential/sim.rulings" });
+    const rulings = try readXfail(ra, io, rulings_path);
 
     var fixture_arena: std.heap.ArenaAllocator = .init(gpa);
     defer fixture_arena.deinit();
     var agreed: usize = 0;
     var listed: usize = 0;
+    var ruled: usize = 0;
     var bad: usize = 0;
     var seen: std.StringHashMapUnmanaged(void) = .empty;
     // `SIM_ONLY=<substring>`: run only the fixtures whose path holds it
@@ -504,9 +637,15 @@ test "diff-sim: Sema's digital Program runs every .v fixture as lib/sim/digital 
         _ = fixture_arena.reset(.retain_capacity);
         const a = fixture_arena.allocator();
         try seen.put(ra, rel, {});
-        const why = try isolated(a, io, root, rel);
+        const ruling = rulings.get(rel) != null;
+        const why = try isolated(a, io, root, rel, ruling);
         const reason = xfail.get(rel);
         if (why.len != 0) {
+            if (ruling) {
+                bad += 1;
+                std.debug.print("diff-sim: RULING {s} does not hold: {s}\n", .{ rel, why });
+                continue;
+            }
             if (reason) |r| {
                 listed += 1;
                 // Not a failure: the listed reason went stale, say the new one.
@@ -515,6 +654,8 @@ test "diff-sim: Sema's digital Program runs every .v fixture as lib/sim/digital 
             }
             bad += 1;
             std.debug.print("diff-sim: MISMATCH {s} {s}\n", .{ rel, why });
+        } else if (ruling) {
+            ruled += 1;
         } else if (reason) |r| {
             bad += 1;
             std.debug.print("diff-sim: XPASS {s} agrees; remove its sim.xfail line ({s})\n", .{ rel, r });
@@ -526,8 +667,13 @@ test "diff-sim: Sema's digital Program runs every .v fixture as lib/sim/digital 
             bad += 1;
             std.debug.print("diff-sim: STALE {s} is in sim.xfail but not in the corpus\n", .{k.*});
         };
+        var rit = rulings.keyIterator();
+        while (rit.next()) |k| if (!seen.contains(k.*)) {
+            bad += 1;
+            std.debug.print("diff-sim: STALE {s} is in sim.rulings but not in the corpus\n", .{k.*});
+        };
     }
-    std.debug.print("diff-sim: {d} fixtures, {d} agreed, {d} listed in sim.xfail, {d} failed\n", .{ seen.count(), agreed, listed, bad });
+    std.debug.print("diff-sim: {d} fixtures, {d} agreed, {d} listed in sim.xfail, {d} ruled by sim.rulings, {d} failed\n", .{ seen.count(), agreed, listed, ruled, bad });
     if (only.len == 0) try std.testing.expect(fixtures.len > 700);
     try std.testing.expectEqual(@as(usize, 0), bad);
 }

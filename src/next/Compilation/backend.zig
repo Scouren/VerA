@@ -262,7 +262,9 @@ pub fn runDigital(comp: *Compilation) !?Job {
     s.io = comp.io;
     const result = std_sim.exe.run(&s);
     try comp.outputs.out.appendSlice(comp.arena(), out.written());
-    try std_sim.exe.report(&s, result, &comp.wip, try checkSites(comp));
+    // ponytail: no pc_sites table yet (T3's `Sema` work); `report` falls
+    // back to `.none` locations for pc-blamed diagnostics until then.
+    try std_sim.exe.report(&s, result, &comp.wip, &.{}, try checkSites(comp));
     return null;
 }
 

@@ -56,10 +56,10 @@ pub fn task(s: *State, a: Allocator, at: u32) Error!void {
     if (c.op == .ports) {
         const dp = p.extraData(Program.DumpPorts, c.ports);
         // §18.3.1: every $dumpports executes at one simulation time.
-        if (s.ports_at) |t| if (t != s.scheduler.now) return s.fail("§18.3.1: every $dumpports shall execute at the same simulation time", .{});
+        if (s.ports_at) |t| if (t != s.scheduler.now) return s.fail(.E1100, "§18.3.1: every $dumpports shall execute at the same simulation time", .{});
         s.ports_at = s.scheduler.now;
         const name = if (dp.name_row == none) "dumpports.vcd" else (try readmem.text(a, try eval.eval(s, a, dp.name_row))) orelse return;
-        for (s.port_files.items) |f| if (std.mem.eql(u8, f.name, name)) return s.fail("§18.3.1: the same file_pathname shall not be given to two $dumpports calls", .{});
+        for (s.port_files.items) |f| if (std.mem.eql(u8, f.name, name)) return s.fail(.E1100, "§18.3.1: the same file_pathname shall not be given to two $dumpports calls", .{});
         const last = try s.arena.alloc([]u8, dp.ports.len);
         @memset(last, &.{});
         try s.port_files.append(s.arena, .{ .name = try s.arena.dupe(u8, name), .call = dp, .last = last });
@@ -102,8 +102,8 @@ pub fn tick(s: *State, a: Allocator) Error!void {
             try changes(s, a, f);
             continue;
         }
-        const io = s.io orelse return s.fail("$dumpports needs a filesystem to write `{s}`", .{f.name});
-        f.file = std.Io.Dir.cwd().createFile(io, f.name, .{}) catch return s.fail("cannot create the dump file `{s}`", .{f.name});
+        const io = s.io orelse return s.fail(.E1100, "$dumpports needs a filesystem to write `{s}`", .{f.name});
+        f.file = std.Io.Dir.cwd().createFile(io, f.name, .{}) catch return s.fail(.E1100, "cannot create the dump file `{s}`", .{f.name});
         f.started = true;
         var w: std.Io.Writer.Allocating = .init(a);
         try vcd.preamble(&w.writer, io, s.p.str(f.call.call), s.p.finest);
@@ -139,7 +139,7 @@ fn put(s: *State, f: *File, bytes: []const u8) Error!void {
         out = "$comment $dumpportslimit reached $end\n";
         f.limited = true;
     };
-    file.writePositionalAll(io, out, f.pos) catch return s.fail("cannot write the dump file `{s}`", .{f.name});
+    file.writePositionalAll(io, out, f.pos) catch return s.fail(.E1100, "cannot write the dump file `{s}`", .{f.name});
     f.pos += out.len;
 }
 

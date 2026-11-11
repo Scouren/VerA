@@ -1,7 +1,8 @@
 //! IEEE 1364-2005 §17.2.9 `$readmemb`/`$readmemh`: a memory file's bytes in,
 //! words stored into an unpacked array's element slots out. A malformed or
-//! unreadable file ends the load with a warning (`State.warnings`) and the
-//! run goes on; words already stored stay (VD-134).
+//! unreadable file ends the load with a coded warning (`State.warn`,
+//! W1150/W1156/W1157) and the run goes on; words already stored stay
+//! (VD-134).
 //! Cites: IEEE 1364-2005 §3.5.1, §17.2.9; docs/specification/Vague_Decisions.md
 //! VD-040, VD-041, VD-134.
 //!
@@ -152,14 +153,67 @@ const MemLoad = struct {
         return null;
     }
 
-    /// The file's word count differs from the load range's, with no address.
-    fn mismatch(self: *const MemLoad) bool {
+    /// The file's word count differs from the load range's, with no
+    /// address: what W1150 (`mismatch_text`) warns with.
+    fn mismatch(self: *const MemLoad) ?struct { found: u128, expected: u128 } {
         const expected: u128 = @intCast(@as(i128, self.range_high) - self.range_low + 1);
-        return !self.addressed and self.words != expected;
+        if (self.addressed or self.words == expected) return null;
+        return .{ .found = self.words, .expected = expected };
     }
+
+    /// §17.2.9: `BadAddress`, an `@` address that is not hex; `BadWord`, a
+    /// word that is not a number in the task's radix; `ReadFailed`, the
+    /// file could not be read to its end (`AddressOutOfRange` is reported
+    /// through `out_of_range_text` instead; `OutOfMemory` the caller
+    /// returns directly).
+    fn message(e: Failure) []const u8 {
+        return switch (e) {
+            error.BadAddress => "the memory file has a malformed `@` address",
+            error.AddressOutOfRange => "memory file address is outside the requested load range",
+            error.BadWord => "the memory file has a malformed data word",
+            error.ReadFailed => "the memory file cannot be read to its end",
+            error.OutOfMemory => "out of memory",
+        };
+    }
+
+    /// The W1150 text; the arguments are `found` then `expected`.
+    const mismatch_text = "memory file data word count does not match load range: found {d}, expected {d}";
+
+    /// The W1156 text; the arguments are `outside`, then `low` and `high`.
+    const outside_text = "memory file address @{x} is outside the memory's declared range [{d}:{d}]; its words are skipped";
+
+    /// The W1157 text, after `next` failed with `AddressOutOfRange`; the
+    /// arguments are the address (`at`), then `range_low` and `range_high`.
+    /// §17.2.9: "an error message is issued, and the load operation is
+    /// terminated": the load, not the run.
+    const out_of_range_text = "§17.2.9: memory file address @{x} is outside the load range [{d}:{d}] the task gives (the words before it stay loaded)";
 };
 
+/// The tail of every W1157 message.
+const load_ended = "; the $readmem load is terminated, the simulation goes on";
+
+/// §17.2.9 gives an address no x or z digit, so a bound that evaluates to
+/// one names no address.
+const unknown_bound = "a $readmem start or finish address evaluates to x or z";
+
+/// A file name held in a variable with an x or z bit names no file.
+const not_a_name = "the $readmem file name has an x or z bit, so it names no file";
+
+/// A start or finish address outside the memory's declared range: no word
+/// is loaded. The arguments are which bound, its value, then the memory's
+/// low and high.
+const outside_memory = "the $readmem {s} address {d} is outside the memory's range [{d}:{d}]";
+
+/// A memory file that cannot be opened; the argument is its name, as
+/// `std.zig.fmtString` escapes a non-printing character in it.
+const cannot_read = "the memory file \"{f}\" cannot be read";
+
 const Digit = struct { digit: u32 = 0, fill: ?logic.Bit = null };
+
+/// W1157: the load stops, the run goes on.
+fn loadEnded(s: *State, comptime why: []const u8, args: anytype) Error!void {
+    try s.warn(.W1157, why ++ load_ended, args);
+}
 
 /// The `Program.ReadMem` at `at` in `extra`, run: the file beside the
 /// design's source first, else from the working directory.
@@ -168,30 +222,31 @@ pub fn readMemory(s: *State, a: Allocator, at: u32) Error!void {
     const rm = p.extraData(Program.ReadMem, at);
     const none = @backingInt(Program.Ref.none);
     const name = if (rm.name_row == none) p.str(rm.name) else (try text(a, try eval.eval(s, a, rm.name_row))) orelse
-        return s.warn("the $readmem file name has an x or z bit, so it names no file; the $readmem load is terminated, the simulation goes on", .{});
-    const io = s.io orelse return s.warn("the memory file cannot be read", .{});
-    const file = sideFile(io, a, p.str(p.file_name), name) catch return s.warn("the memory file cannot be read", .{});
+        return loadEnded(s, not_a_name, .{});
+    const io = s.io orelse return loadEnded(s, cannot_read, .{std.zig.fmtString(name)});
+    const file = sideFile(io, a, p.str(p.file_name), name) catch return loadEnded(s, cannot_read, .{std.zig.fmtString(name)});
     defer file.close(io);
     var buf: [4096]u8 = undefined;
     var in = file.reader(io, &buf);
     const low: i64 = rm.low;
     const high: i64 = rm.high;
-    const start: ?i64 = if (rm.start == none) null else (try eval.eval(s, a, rm.start)).asInt() orelse return s.warn("a $readmem start or finish address evaluates to x or z", .{});
-    const finish: ?i64 = if (rm.finish == none) null else (try eval.eval(s, a, rm.finish)).asInt() orelse return s.warn("a $readmem start or finish address evaluates to x or z", .{});
-    for ([_]?i64{ start, finish }) |bound| if (bound) |b| if (b < low or b > high)
-        return s.warn("a $readmem address is outside the memory's range", .{});
+    const start: ?i64 = if (rm.start == none) null else (try eval.eval(s, a, rm.start)).asInt() orelse return loadEnded(s, unknown_bound, .{});
+    const finish: ?i64 = if (rm.finish == none) null else (try eval.eval(s, a, rm.finish)).asInt() orelse return loadEnded(s, unknown_bound, .{});
+    for ([_]?i64{ start, finish }, [_][]const u8{ "start", "finish" }) |bound, which| if (bound) |b| if (b < low or b > high)
+        return loadEnded(s, outside_memory, .{ which, b, low, high });
     const given: u2 = @as(u2, @intFromBool(start != null)) + @intFromBool(finish != null);
     const width = p.slots.items(.ty)[rm.base].width;
     var load: MemLoad = .init(&in.interface, rm.radix, width, low, high, given, start, finish);
     while (load.next(a) catch |e| switch (e) {
         error.OutOfMemory => return error.OutOfMemory,
-        error.AddressOutOfRange, error.BadAddress, error.BadWord, error.ReadFailed => return s.warn("the $readmem load is terminated", .{}),
+        error.AddressOutOfRange => return loadEnded(s, MemLoad.out_of_range_text, .{ load.at, load.range_low, load.range_high }),
+        else => |f| return loadEnded(s, "{s}", .{MemLoad.message(f)}),
     }) |w| {
         assert(w.index <= high - low);
         try s.store(rm.base + w.index, w.value);
     }
-    if (load.mismatch()) try s.warn("memory file data word count does not match load range", .{});
-    if (load.outside != null) try s.warn("a memory file address is outside the memory's declared range", .{});
+    if (load.mismatch()) |m| try s.warn(.W1150, MemLoad.mismatch_text, .{ m.found, m.expected });
+    if (load.outside) |o| try s.warn(.W1156, MemLoad.outside_text, .{ o, low, high });
 }
 
 /// A value read as a §3.6 string: its bytes, leading zero bytes dropped;

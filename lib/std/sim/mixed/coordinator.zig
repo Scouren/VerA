@@ -332,7 +332,7 @@ pub fn Coordinator(comptime A: type) type {
             // §7.3.6.3 "the analog value calculated for the time corresponding
             // to a real promotion of the digital time".
             const t: ?f64 = if (s.mon_eval) s.mon_time else if (s.acc == null) null else @as(f64, @floatFromInt(s.dig.scheduler.now)) * s.opts.tick;
-            return s.a.probe(t, n1, n2) catch |e| s.dig.fail("the analog solution has no V({s}{s}{s}): {t}", .{ n1, if (n2 != null) ", " else "", n2 orelse "", e });
+            return s.a.probe(t, n1, n2) catch |e| s.dig.fail(.E1100, "the analog solution has no V({s}{s}{s}): {t}", .{ n1, if (n2 != null) ", " else "", n2 orelse "", e });
         }
     };
 }

@@ -6,6 +6,7 @@
 
 const std = @import("std");
 const sim = @import("../sim.zig");
+const vams = @import("vams");
 const Builder = sim.Builder;
 const Program = sim.Program;
 const State = sim.State;
@@ -539,4 +540,82 @@ test "§3.7 pull, supply and trireg nets supply what no driver does" {
     var p = b.finish();
     n.wire(&p);
     try std.testing.expectEqualStrings("start x x 0 1 x\nzero  0 0 0 1 0\nfloat 0 1 0 1 0\n", try runOf(a, &p));
+}
+
+test "warn, fail and warnCheck record a coded diagnostic; exe.report drains diags then failure, resolved through pc_sites/check_sites" {
+    var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var b = try start(a);
+    _ = try b.inst(.stop, 0, 0, 0); // pc 0: `s.pc` when the W1150/W1199 diags are recorded.
+    _ = try b.inst(.stop, 0, 0, 0); // pc 1: `s.pc` when `fail` is called.
+    try b.starts.append(a, .{ .pc = 0 });
+    var p = b.finish();
+    p.checks = &[_]Program.Check{.{
+        .kind = .setup,
+        .ev = .{ .{}, .{} },
+        .lim = .{ 0, 0 },
+        .notifier = std.math.maxInt(u32),
+        .stamp_cond = .{},
+        .check_cond = .{},
+        .event_based = false,
+        .remain_active = false,
+        .delay = .{ 0, 0 },
+        .v = .{ 0, 0 },
+        .x = .{ 0, 0 },
+    }};
+    var out: std.Io.Writer.Allocating = .init(a);
+    var s: State = try .init(a, &p, &out.writer);
+
+    s.pc = 0;
+    try s.warn(.W1150, "memory file data word count does not match load range: found {d}, expected {d}", .{ 3, 4 });
+    try s.warnCheck(0, "timing check {d} violated: timestamp event at {d}, timecheck event at {d}", .{ 0, 1, 2 });
+    s.pc = 1;
+    const result: State.Error!void = s.fail(.E1100, "a test failure", .{});
+    try std.testing.expectError(error.SimFailed, result);
+
+    try std.testing.expectEqual(@as(usize, 2), s.diags.items.len);
+    try std.testing.expectEqual(vams.Diag.Code.W1150, s.diags.items[0].code);
+    try std.testing.expectEqual(State.Diag.Of.pc, s.diags.items[0].of);
+    try std.testing.expectEqual(@as(u32, 0), s.diags.items[0].at);
+    try std.testing.expectEqual(vams.Diag.Code.W1199, s.diags.items[1].code);
+    try std.testing.expectEqual(State.Diag.Of.check, s.diags.items[1].of);
+    try std.testing.expectEqual(@as(u32, 0), s.diags.items[1].at);
+    try std.testing.expectEqual(vams.Diag.Code.E1100, s.failure.?.code);
+    try std.testing.expectEqual(@as(u32, 1), s.failure.?.at);
+
+    // Every diag resolved through real `pc_sites`/`check_sites`: source order.
+    var wip: vams.Diag.Wip = .init(a);
+    const pc_sites = [_]vams.Diag.Loc{
+        .{ .file = .root, .start = 9, .end = 9 },
+        .{ .file = .root, .start = 40, .end = 40 },
+    };
+    const check_sites = [_]vams.Diag.Loc{.{ .file = .root, .start = 20, .end = 20 }};
+    try sim.exe.report(&s, result, &wip, &pc_sites, &check_sites);
+    var bundle = try wip.toOwnedBundle();
+    defer bundle.deinit(a);
+    try std.testing.expectEqual(@as(u32, 3), bundle.count());
+    const ms = bundle.messages();
+    try std.testing.expectEqual(vams.Diag.Code.W1150, bundle.message(ms[0]).tag.code);
+    try std.testing.expectEqual(@as(u32, 9), bundle.message(ms[0]).loc.start);
+    try std.testing.expectEqual(vams.Diag.Code.W1199, bundle.message(ms[1]).tag.code);
+    try std.testing.expectEqual(@as(u32, 20), bundle.message(ms[1]).loc.start);
+    try std.testing.expectEqual(vams.Diag.Code.E1100, bundle.message(ms[2]).tag.code);
+    try std.testing.expectEqual(@as(u32, 40), bundle.message(ms[2]).loc.start);
+
+    // No `pc_sites` yet (T3 has not written one): pc-blamed diags fall back
+    // to `.none`, tied there and broken by code (E1100 < W1150); the
+    // check-blamed one still resolves.
+    var wip2: vams.Diag.Wip = .init(a);
+    try sim.exe.report(&s, result, &wip2, &.{}, &check_sites);
+    var bundle2 = try wip2.toOwnedBundle();
+    defer bundle2.deinit(a);
+    try std.testing.expectEqual(@as(u32, 3), bundle2.count());
+    const ms2 = bundle2.messages();
+    try std.testing.expectEqual(vams.Diag.Code.E1100, bundle2.message(ms2[0]).tag.code);
+    try std.testing.expect(bundle2.message(ms2[0]).loc.isNone());
+    try std.testing.expectEqual(vams.Diag.Code.W1150, bundle2.message(ms2[1]).tag.code);
+    try std.testing.expect(bundle2.message(ms2[1]).loc.isNone());
+    try std.testing.expectEqual(vams.Diag.Code.W1199, bundle2.message(ms2[2]).tag.code);
+    try std.testing.expectEqual(@as(u32, 20), bundle2.message(ms2[2]).loc.start);
 }

@@ -85,7 +85,12 @@ const Gen = struct {
                 };
                 try w.print("        {d} => {{\n            const v: V = ", .{pc});
                 try g.expr(c.scrutinee, 0);
-                try w.writeAll(";\n");
+                // A.6.7: a bare `default` is an arm with no labels (every
+                // other arm's labels may be empty too, on a fixture that
+                // never compares), so the label loop below may read `v`
+                // zero times; `_ = v` marks it used without re-evaluating
+                // or discarding whatever `g.expr` already emitted.
+                try w.writeAll(";\n            _ = v;\n");
                 // §9.5: equal planes bit for bit; §9.5.1 the wildcards.
                 const wild = switch (c.kind) {
                     .normal => "0",
@@ -406,4 +411,37 @@ test write {
     var empty: std.Io.Writer.Allocating = .init(a);
     try t.expect(!try write(&empty.writer, a, &q));
     try t.expectEqual(@as(usize, 0), empty.written().len);
+}
+
+test "case_select: a bare default (zero labels) still reads its scrutinee" {
+    // Oracle: IEEE 1364-2005 A.6.7 allows `case (e) default ; endcase` — one
+    // arm, zero labels. The scrutinee is bound (`const v = ...`) but the
+    // label-comparison loop that would read it never runs when every arm
+    // has zero labels, so it must be read some other way or Zig's "unused
+    // local constant" fails the *generated* file, not this one: an
+    // `std.zig.Ast.parse` on `text` cannot see it, since the rule is
+    // AstGen's, not the parser's (confirmed with `zig ast-check` on a
+    // standalone `const v = 3;` with no reader: it errors; parse alone
+    // does not). This reproduces grammar_nullable_statement.v's regression
+    // (exit status old 0, new 1) at the unit level.
+    const t = std.testing;
+    var arena: std.heap.ArenaAllocator = .init(t.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var b: std_sim.Builder = .init(a);
+    const ty = Program.Ty.int(8, false);
+    const scrutinee = try b.int(ty, 1);
+    const dispatch = try b.inst(.case_select, 0, 0, 0);
+    const target = try b.inst(.stop, 0, 0, 0);
+    const arm = try b.extraOf(Program.Arm{ .labels = try b.listOf(&.{}), .target = target });
+    const case = try b.extraOf(Program.Case{ .kind = .normal, .scrutinee = scrutinee, .arms = try b.listOf(&.{arm}), .fallback = target });
+    b.setInst(dispatch, .case_select, case, 0);
+    const p = b.finish();
+    var aw: std.Io.Writer.Allocating = .init(a);
+    try t.expect(try write(&aw.writer, a, &p));
+    const text = try a.dupeSentinel(u8, aw.written(), 0);
+    var tree = try std.zig.Ast.parse(a, text, .{});
+    defer tree.deinit(a);
+    try t.expectEqual(@as(usize, 0), tree.errors.len);
+    try t.expect(std.mem.find(u8, text, "_ = v;") != null);
 }

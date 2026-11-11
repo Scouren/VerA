@@ -18,6 +18,8 @@
 //! - `pub fn systfTableError(comptime D: type) ?[]const u8`
 //! - `pub fn cardHooksError(comptime D: type) ?[]const u8`
 //! - `pub fn breakpointsError(comptime D: type) ?[]const u8`
+//! - `pub fn fieldUseError(comptime D: type) ?[]const u8`
+//! - `pub fn limitSimReadsError(comptime D: type) ?[]const u8`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -155,6 +157,26 @@ pub fn breakpointsError(comptime D: type) ?[]const u8 {
     return null;
 }
 
+/// `D.field_use`, if declared, must be `[n]contract.FieldUse` where `n` is
+/// `D.Instance`'s field count: one entry per field, in declaration order
+/// (#134).
+pub fn fieldUseError(comptime D: type) ?[]const u8 {
+    if (!@hasDecl(D, "field_use")) return null;
+    const name = @typeName(D);
+    const n = sim_state.nFields(D);
+    if (@TypeOf(D.field_use) != [n]sim_state.FieldUse)
+        return name ++ ".field_use must be [n_fields]contract.FieldUse, one per Instance field in declaration order";
+    return null;
+}
+
+/// `D.limit_sim_reads`, if declared, must be `contract.SimReads` (#134; not
+/// `D.limit_reads`, the unknown mask `masks.zig` checks).
+pub fn limitSimReadsError(comptime D: type) ?[]const u8 {
+    if (@hasDecl(D, "limit_sim_reads") and @TypeOf(D.limit_sim_reads) != sim_state.SimReads)
+        return @typeName(D) ++ ".limit_sim_reads must be contract.SimReads";
+    return null;
+}
+
 test "vpiError and cardHooksError refuse their own mistakes" {
     const testing = std.testing;
     try testing.expect(comptime vpiError(struct {
@@ -171,5 +193,29 @@ test "vpiError and cardHooksError refuse their own mistakes" {
         pub fn delays(_: *const Model) [1]f32 {
             return .{0};
         }
+    }) != null);
+}
+
+test "fieldUseError: the array length must be the Instance field count" {
+    const testing = std.testing;
+    const Right = struct {
+        pub const Instance = struct { a: f64 = 0, b: f64 = 0 };
+        pub const field_use = [2]sim_state.FieldUse{ .{}, .{} };
+    };
+    try testing.expect(comptime fieldUseError(Right) == null);
+    const Wrong = struct {
+        pub const Instance = struct { a: f64 = 0, b: f64 = 0 };
+        pub const field_use = [1]sim_state.FieldUse{.{}};
+    };
+    try testing.expect(comptime fieldUseError(Wrong) != null);
+}
+
+test "limitSimReadsError: must be contract.SimReads, not some other type" {
+    const testing = std.testing;
+    try testing.expect(comptime limitSimReadsError(struct {
+        pub const limit_sim_reads: sim_state.SimReads = .{};
+    }) == null);
+    try testing.expect(comptime limitSimReadsError(struct {
+        pub const limit_sim_reads: u64 = 0;
     }) != null);
 }

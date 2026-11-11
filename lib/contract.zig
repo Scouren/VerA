@@ -32,8 +32,9 @@
 //! - from `contract/display_records.zig`: `StatusSite`, `SaySite`, `Say`,
 //!   `SayPass`, `statusCode`, `statusSite`, `formatStatus`, `formatSay`
 //! - from `contract/sim_state.zig`: `UpdateResult`, `StateClass`, `StateCtlOp`,
-//!   `AnalysisKind`, `SimState`, `SimReads`, `Constant`, `LimitResult`,
-//!   `stateClass`, `simReads`, `InstancePtr`
+//!   `AnalysisKind`, `SimState`, `SimReads`, `Constant`, `FieldUse`,
+//!   `LimitResult`, `stateClass`, `simReads`, `limitSimReads`, `fieldUse`,
+//!   `nFields`, `InstancePtr`
 //! - from `contract/metadata.zig`: `UnknownKind`, `DeclMeta`
 //! - from `contract/noise.zig`: `NoiseGen`, `NoiseTable`, `PsdTerm`,
 //!   `sortNoiseTable`, `noiseTable`, `noiseTableAt`
@@ -126,9 +127,13 @@ pub const AnalysisKind = sim_state.AnalysisKind;
 pub const SimState = sim_state.SimState;
 pub const SimReads = sim_state.SimReads;
 pub const Constant = sim_state.Constant;
+pub const FieldUse = sim_state.FieldUse;
 pub const LimitResult = sim_state.LimitResult;
 pub const stateClass = sim_state.stateClass;
 pub const simReads = sim_state.simReads;
+pub const limitSimReads = sim_state.limitSimReads;
+pub const fieldUse = sim_state.fieldUse;
+pub const nFields = sim_state.nFields;
 pub const InstancePtr = sim_state.InstancePtr;
 pub const UnknownKind = metadata.UnknownKind;
 pub const DeclMeta = metadata.DeclMeta;
@@ -326,6 +331,26 @@ test "deriv_reads/jac_const: a linear device needs no lane, and the table is its
                 if (@backingInt(e.row) == row and @backingInt(e.col) == col) want = e.g;
             }
             try std.testing.expectEqual(want, r1[row].v - r0[row].v);
+        }
+    }
+}
+
+test "fieldUse: #134's spec example, bits asserted (oracle 1)" {
+    comptime validate(mocks.MockFieldUse);
+    const got = fieldUse(mocks.MockFieldUse);
+    try std.testing.expectEqual(7, got.len);
+    const want = mocks.MockFieldUse.field_use;
+    try std.testing.expectEqual(want, got);
+    // One field per bit, nothing else set: `fieldUse` is `D.field_use`
+    // verbatim when declared, and each entry below is exactly one bit.
+    inline for (.{
+        .{ 0, "res" },   .{ 1, "jac" },      .{ 2, "q" },        .{ 3, "limit" },
+        .{ 4, "state" }, .{ 5, "w_update" }, .{ 6, "w_commit" },
+    }) |c| {
+        inline for (@typeInfo(FieldUse).@"struct".field_names) |f| {
+            if (comptime std.mem.eql(u8, f, "_")) continue;
+            const want_bit = comptime std.mem.eql(u8, f, c[1]);
+            try std.testing.expectEqual(want_bit, @field(got[c[0]], f));
         }
     }
 }

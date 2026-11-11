@@ -17,6 +17,7 @@ const byName = common.byName;
 const globFiles = common.globFiles;
 const checkoutWorkDir = common.checkoutWorkDir;
 const testRun = common.testRun;
+const dropNixTmpKeys = common.dropNixTmpKeys;
 
 pub fn add(g: Graph, suite_exe: *Build.Step.Compile, check: *Build.Step, espice_path: ?[]const u8) void {
     const b = g.b;
@@ -50,6 +51,7 @@ pub fn add(g: Graph, suite_exe: *Build.Step.Compile, check: *Build.Step, espice_
     // binary), kept under this tree's cache rather than ~/.cache/espice.
     spice_run.setEnvironmentVariable("ZIG", b.graph.zig_exe);
     spice_run.setEnvironmentVariable("ESPICE_CACHE", b.fmt("{s}/espice", .{checkoutWorkDir(b, "vera-suite")}));
+    dropNixTmpKeys(spice_run);
     if (espice_path) |path| {
         spice_run.addArg(b.fmt("--espice={s}", .{path}));
         test_spice.dependOn(&spice_run.step);
@@ -106,6 +108,7 @@ pub fn add(g: Graph, suite_exe: *Build.Step.Compile, check: *Build.Step, espice_
     conformance_selftest.addFileArg(b.path("tools/conformance.py"));
     conformance_selftest.addArg("selftest");
     conformance_selftest.setEnvironmentVariable("PYTHONUTF8", "1");
+    dropNixTmpKeys(conformance_selftest);
     conformance_selftest.expectExitCode(0);
     conformance_selftest.has_side_effects = true; // reads the fixtures and tools/install.sh
     test_step.dependOn(&conformance_selftest.step);
@@ -150,6 +153,7 @@ pub fn add(g: Graph, suite_exe: *Build.Step.Compile, check: *Build.Step, espice_
     for (globFiles(b, "lib", "")) |f| runners.addFileInput(b.path(f));
     runners.setEnvironmentVariable("VERA_RUNNERS_ZIG", b.graph.zig_exe);
     runners.setEnvironmentVariable("VERA_RUNNERS_CACHE", b.fmt("{s}/zig-cache", .{checkoutWorkDir(b, "vera-runners")}));
+    dropNixTmpKeys(runners);
     runners.expectExitCode(0);
     test_step.dependOn(&runners.step);
     b.step("test-runners", "Compile one emitted runner per template variant (tests/runners.zig) only").dependOn(&runners.step);

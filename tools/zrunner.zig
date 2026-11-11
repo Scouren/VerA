@@ -1,6 +1,9 @@
 //! zrunner: the test runner for every module's test artifact (`zig build
-//! test`); runs the tests and prints a per-module report to stdout. Set
-//! `CLICOLOR_FORCE` for colour when the build captures the output.
+//! test`); runs the tests and prints a per-module report to stdout. Pass
+//! `--color=on` for colour when the build captures the output (an argument,
+//! not `CLICOLOR_FORCE`: a Run step that sets an environment variable
+//! hashes the whole clone of it into its cache key, research/builds.md F1);
+//! `CLICOLOR_FORCE` still works when run by hand, with no `--color=on`.
 //!
 //! Every test runs on a fresh `std.testing.allocator` and `std.testing.io`,
 //! as the stock 0.17 runner sets them up, and fails when it raises the
@@ -238,12 +241,12 @@ const FileReporter = struct {
     file_writer: std.Io.File.Writer,
     mode: std.Io.Terminal.Mode,
 
-    /// Colour follows `NO_COLOR`, `CLICOLOR_FORCE` and whether `file` is a
-    /// terminal. `buffer` must outlive the reporter.
-    pub fn init(threaded: *std.Io.Threaded, file: std.Io.File, buffer: []u8) !FileReporter {
+    /// Colour follows `NO_COLOR`, `color_force` (`--color=on`, or
+    /// `CLICOLOR_FORCE` when `main` was given no such argument) and whether
+    /// `file` is a terminal. `buffer` must outlive the reporter.
+    pub fn init(threaded: *std.Io.Threaded, file: std.Io.File, buffer: []u8, color_force: bool) !FileReporter {
         const NO_COLOR = threaded.environ.exist.NO_COLOR;
-        const CLICOLOR_FORCE = threaded.environ.exist.CLICOLOR_FORCE;
-        const mode = try std.Io.Terminal.Mode.detect(threaded.io(), file, NO_COLOR, CLICOLOR_FORCE);
+        const mode = try std.Io.Terminal.Mode.detect(threaded.io(), file, NO_COLOR, color_force);
         return .{ .file_writer = file.writerStreaming(threaded.io(), buffer), .mode = mode };
     }
 
@@ -408,12 +411,15 @@ pub fn main(init: std.process.Init.Minimal) !void {
 
     const process_name = args.next() orelse unreachable;
     var results_path: ?[]const u8 = null;
+    var color_arg = false;
     while (args.next()) |arg| {
-        if (std.mem.cutPrefix(u8, arg, "--results=")) |path| results_path = path else return error.UnknownArgument;
+        if (std.mem.cutPrefix(u8, arg, "--results=")) |path| results_path = path else if (std.mem.eql(u8, arg, "--color=on")) {
+            color_arg = true;
+        } else return error.UnknownArgument;
     }
 
     var io_buffer: [2048]u8 = undefined;
-    var reporter: FileReporter = try .init(&threaded, std.Io.File.stdout(), &io_buffer);
+    var reporter: FileReporter = try .init(&threaded, std.Io.File.stdout(), &io_buffer, color_arg or threaded.environ.exist.CLICOLOR_FORCE);
     try run(&arena, threaded.io(), init.environ, process_name, &reporter, results_path);
 }
 

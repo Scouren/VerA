@@ -1,10 +1,14 @@
-//! `vera-next --help`'s text, the old `src/cli/usage.zig`'s verbatim:
-//! every flag `cli/args.zig` reads, what it takes and its default. Printed
-//! on stdout by `--help`, on stderr by a command line that names no input.
-//! User-visible and frozen.
+//! `vera-next --help`'s text, the old `src/cli/usage.zig`'s verbatim except
+//! `--state`/`--schedule` (research/vbackends.md Q2: the .v executable has
+//! no 2-state mode, so `--state` offers only `auto|4` and `--two-state` is
+//! gone from the listing — `cli/args.zig` still recognises it to refuse it
+//! by name). Every other flag `cli/args.zig` reads, what it takes and its
+//! default. Printed on stdout by `--help`, on stderr by a command line that
+//! names no input. User-visible and frozen but for that one departure.
 //!
 //! Cites: LRM 3.4 (`--param`), 7.4.4 (`--discipline-resolution`), annex E.2
-//! (`--spice`); IEEE 1364-2005 §13.2, §13.7.1, §15.5.4, §28 (the `.v` flags).
+//! (`--spice`); IEEE 1364-2005 §3.1, §4.1 (4-state), §13.2, §13.7.1, §15.5.4,
+//! §28 (the `.v` flags).
 //!
 //! Contents:
 //! - `pub const usage_text: []const u8`
@@ -51,11 +55,10 @@ pub const usage_text =
     \\  --schedule=static|fifo  a .v executable's order of same-time events:
     \\                          combinational logic levelized (static, the
     \\                          default; IEEE 1364 §11.4.1), or the interpreter's
-    \\  --state=auto|2|4        a .v executable's logic: 4-state until no live x
-    \\                          or z is left, then 2-state, printing what 4-state
-    \\                          prints (auto, the default); every x or z is 0,
-    \\                          NOT IEEE 1364 4-state logic (2, E1101); 4-state
-    \\  --two-state             --state=2
+    \\  --state=auto|4          a .v executable's logic: IEEE 1364 §4.1 4-state
+    \\                          throughout (auto and 4 both mean this; --state=2
+    \\                          and --two-state are refused, exit 2: there is no
+    \\                          2-state mode)
     \\  --negative-timing       let a .v design's $setuphold and $recrem take
     \\                          negative limits (IEEE 1364 §15.5.4's option)
     \\  --event-budget=N        a .v design's events at one time step before a

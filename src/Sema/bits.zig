@@ -10,6 +10,7 @@
 //!
 //! Contents:
 //! - `pub fn fold(s: *Sema, b: *Block, i: Inst.Index, src: Inst.Ref) Allocator.Error!?Sema.Value`
+//! - `pub fn width(s: *Sema, unit: *Sema.Unit, i: Inst.Index) Allocator.Error!?u32`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -31,7 +32,7 @@ const Bits = struct { value: u64, width: u32 };
 /// The integer `concat`/`replicate` `i` folds to, or null when it is not
 /// all sized literals (poison after E0326).
 pub fn fold(s: *Sema, b: *Block, i: Inst.Index, src: Inst.Ref) Allocator.Error!?Sema.Value {
-    const r = (try bitsOf(s, b, i.toRef(), 0)) orelse return null;
+    const r = (try bitsOf(s, b.unit, i.toRef(), 0)) orelse return null;
     if (r.width == 0) {
         try s.fail(.E0326, b.unit.file, src, "", .{});
         return expr.poison;
@@ -42,33 +43,40 @@ pub fn fold(s: *Sema, b: *Block, i: Inst.Index, src: Inst.Ref) Allocator.Error!?
     return .{ .ref = .fromIntern(try decl.intern(s, .{ .int = @intCast(r.value) })), .ty = .integer };
 }
 
+/// The bit width of the sized concatenation `i` (its operands' widths
+/// summed, §4.2.13), or null when it is not one.
+pub fn width(s: *Sema, unit: *Sema.Unit, i: Inst.Index) Allocator.Error!?u32 {
+    const r = (try bitsOf(s, unit, i.toRef(), 0)) orelse return null;
+    return r.width;
+}
+
 // ---- private ----
 
-fn bitsOf(s: *Sema, b: *Block, r: Inst.Ref, depth: u32) Allocator.Error!?Bits {
+fn bitsOf(s: *Sema, unit: *Sema.Unit, r: Inst.Ref, depth: u32) Allocator.Error!?Bits {
     if (depth > depth_max) return null;
     const i = r.toIndex() orelse return null;
-    const vir = b.unit.vir;
+    const vir = unit.vir;
     switch (vir.instructions.items(.tag)[@backingInt(i)]) {
         .big_int => {
             const x = decl.payloadOf(vir, Inst.BigInt, i);
             if (x.size == 0 or x.size > 64) return null;
-            const c = (try decl.foldRef(s, b.unit, r)) orelse return null;
+            const c = (try decl.foldRef(s, unit, r)) orelse return null;
             const v: u64 = @bitCast(c.asIntExact() orelse return null);
             return .{ .value = if (x.size == 64) v else v & ((@as(u64, 1) << @intCast(x.size)) - 1), .width = x.size };
         },
         .concat => {
             var acc: Bits = .{ .value = 0, .width = 0 };
             for (vir.list(Inst.Ref, decl.payloadOf(vir, Inst.Refs, i))) |el| {
-                const part = (try bitsOf(s, b, el, depth + 1)) orelse return null;
+                const part = (try bitsOf(s, unit, el, depth + 1)) orelse return null;
                 acc = join(acc, part) orelse return null;
             }
             return acc;
         },
         .replicate => {
             const x = decl.payloadOf(vir, Inst.Bin, i);
-            const n = ((try decl.foldRef(s, b.unit, x.lhs)) orelse return null).asIntExact() orelse return null;
+            const n = ((try decl.foldRef(s, unit, x.lhs)) orelse return null).asIntExact() orelse return null;
             if (n < 0) return null;
-            const one = (try bitsOf(s, b, x.rhs, depth + 1)) orelse return null;
+            const one = (try bitsOf(s, unit, x.rhs, depth + 1)) orelse return null;
             var acc: Bits = .{ .value = 0, .width = 0 };
             for (0..@intCast(@min(n, 65))) |_| acc = join(acc, one) orelse return null;
             return acc;
@@ -79,8 +87,8 @@ fn bitsOf(s: *Sema, b: *Block, r: Inst.Ref, depth: u32) Allocator.Error!?Bits {
 
 /// `hi` then `lo`, or null past 64 bits.
 fn join(hi: Bits, lo: Bits) ?Bits {
-    const width = hi.width + lo.width;
-    if (width > 64) return null;
+    const w = hi.width + lo.width;
+    if (w > 64) return null;
     if (lo.width == 64) return lo;
-    return .{ .value = (hi.value << @intCast(lo.width)) | lo.value, .width = width };
+    return .{ .value = (hi.value << @intCast(lo.width)) | lo.value, .width = w };
 }

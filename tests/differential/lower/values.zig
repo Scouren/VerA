@@ -97,6 +97,8 @@ pub fn compareValues(arena: std.mem.Allocator, rel: []const u8, mir: *Mir, lw: *
     @memset(display_of, null);
     for (d.displays.items(.call), 0..) |call, k| display_of[@backingInt(call)] = @intCast(k);
     const display_args = try arena.alloc(?[]const Air.interp.Value, d.displays.len);
+    // §17.1.1.3 the width (and sign) each print operand is formatted at.
+    if (try compareWidths(arena, mir, old_display_args, &a.air, &zcu.intern_pool, d)) |why| return .{ .why = why, .tables = true };
     // A parameter's reference value, read through the old interpreter.
     // The old interpreter refuses a whole run at any call it does not
     // model; a print or task has no value a contribution reads, so each
@@ -254,6 +256,55 @@ fn compareDisplays(arena: std.mem.Allocator, rel: []const u8, old: *const OldInt
         }
     }
     return null;
+}
+
+/// The first print operand whose `display$width` record (bits, and the
+/// sign when given) differs between the sides, or null. A record only one
+/// side makes differs.
+fn compareWidths(arena: std.mem.Allocator, mir: *const Mir, old_args: []const []const Mir.Value, air: *const Air, ip: *const InternPool, d: *const Device) !?[]const u8 {
+    std.debug.assert(old_args.len == d.displays.len);
+    for (old_args, d.displays.items(.call), 0..) |oa, call, k| {
+        const x = air.extraData(Air.Call, air.instructions.items(.data)[@backingInt(call)].ty_pl.payload);
+        const na: []const Air.Inst.Ref = @ptrCast(air.extra[x.end..][0..x.data.args_len]);
+        if (oa.len != na.len) continue; // the value check reports the count
+        for (oa, na, 0..) |ov, nv, j| {
+            const old_w = oldWidth(mir, ov);
+            const new_w = newWidth(air, ip, nv);
+            if (old_w == null and new_w == null) continue;
+            if (old_w != null and new_w != null and old_w.? == new_w.?) continue;
+            return try arena.print("display {d} operand {d}: old width {?d}, new {?d}", .{ k, j, old_w, new_w });
+        }
+    }
+    return null;
+}
+
+/// The bits an old operand's `$display$width` call records, or null.
+fn oldWidth(mir: *const Mir, v: Mir.Value) ?i64 {
+    const r = mir.resolveAlias(v);
+    const inst = switch (mir.valueDef(r)) {
+        .inst_result => |i| i,
+        else => return null, // else: not a call
+    };
+    if (mir.instOp(inst) != .call) return null;
+    const c = mir.instData(inst).call;
+    if (c.callee != .@"$display$width" or c.args.len < 2) return null;
+    return switch (mir.valueDef(mir.resolveAlias(c.args[1]))) {
+        .int_const => |n| n,
+        else => null, // else: a width that is no constant
+    };
+}
+
+/// The bits a new operand's `display$width` call records, or null.
+fn newWidth(air: *const Air, ip: *const InternPool, r: Air.Inst.Ref) ?i64 {
+    const i = r.toIndex() orelse return null;
+    if (air.instructions.items(.tag)[@backingInt(i)] != .call) return null;
+    const x = air.extraData(Air.Call, air.instructions.items(.data)[@backingInt(i)].ty_pl.payload);
+    if (x.data.callee != @backingInt(vams.SysFn.Tag.@"display$width") or x.data.args_len < 2) return null;
+    const bits: Air.Inst.Ref = @fromBackingInt(air.extra[x.end + 1]);
+    return switch (ip.indexToKey(bits.toInterned() orelse return null)) {
+        .int => |n| n.storage.small,
+        else => null, // else: a width that is no constant
+    };
 }
 
 /// Whether a `rulings` row names this operand and the new side gives its value.

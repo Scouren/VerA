@@ -121,16 +121,18 @@ test "field_use (#134): a clear `res` bit's field perturbs no residual (oracle 2
     const uses = contract.fieldUse(D);
     try std.testing.expectEqual(contract.nFields(D), uses.len);
 
-    const fields = @typeInfo(D.Instance).@"struct".fields;
-    inline for (fields, 0..) |f, i| {
-        if (!perturbable(f.type)) continue;
-        var inst = inst0;
-        perturb(&@field(inst, f.name));
-        if (uses[i].res) continue; // a set bit makes no promise either way
-        const got = D.eval(S, &x, &model, &inst, sim);
-        if (!std.mem.eql(u8, std.mem.asBytes(&base), std.mem.asBytes(&got))) {
-            std.debug.print("field_use says Instance.{s}'s res bit is clear, but perturbing it moved eval's result\n", .{f.name});
-            return error.FieldUseUnderReportsRes;
+    const info = @typeInfo(D.Instance).@"struct";
+    inline for (info.field_names, info.field_types, 0..) |name, Ty, i| {
+        if (comptime perturbable(Ty)) {
+            var inst = inst0;
+            perturb(&@field(inst, name));
+            if (!uses[i].res) { // a set bit makes no promise either way
+                const got = D.eval(S, &x, &model, &inst, sim);
+                if (!std.mem.eql(u8, std.mem.asBytes(&base), std.mem.asBytes(&got))) {
+                    std.debug.print("field_use says Instance.{s}'s res bit is clear, but perturbing it moved eval's result\n", .{name});
+                    return error.FieldUseUnderReportsRes;
+                }
+            }
         }
     }
 }

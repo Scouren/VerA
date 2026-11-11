@@ -2,11 +2,14 @@
 //! `Lowered` and the new `Air.Device` in, each as the same text lines out
 //! (unknowns, parameters with their ranges, contributions, the counts of
 //! charge sites and limit slots, held variables and prints), compared row
-//! for row by the caller.
+//! for row by the caller. The old rows are read as the new side writes
+//! them: an instance's rows elaboration drops are left out, and an
+//! array's per-element held rows are one.
 //! No LRM clause: this checks VerA's rewrite against VerA.
 //!
 //! Contents:
-//! - `pub fn oldTables(arena: std.mem.Allocator, lw: *const Lowered) ![]const []const u8`
+//! - `pub fn oldTables(arena: std.mem.Allocator, lw: *const Lowered, dropped: []const []const u8) ![]const []const u8`
+//! - `pub fn keptParams(arena: std.mem.Allocator, lw: *const Lowered, dropped: []const []const u8) ![]const u32`
 //! - `pub fn newTables(arena: std.mem.Allocator, zcu: *const Zcu, d: *const Device) ![]const []const u8`
 
 const std = @import("std");
@@ -18,8 +21,11 @@ const Zcu = sema.Zcu;
 const Lowered = ir.Lowered;
 const Device = Air.Device;
 
-/// The old tables as text lines, in the format `newTables` writes.
-pub fn oldTables(arena: std.mem.Allocator, lw: *const Lowered) ![]const []const u8 {
+/// The old tables as text lines, in the format `newTables` writes, less
+/// the parameter and held rows of the instance paths in `dropped` (§6.6.2
+/// an unselected generate arm, which `elab.rulings` `drops`); an array's
+/// `held x[i][j]` rows are one `held x`, as `Device.Held` keeps it.
+pub fn oldTables(arena: std.mem.Allocator, lw: *const Lowered, dropped: []const []const u8) ![]const []const u8 {
     var out: std.ArrayList([]const u8) = .empty;
     const nodes = lw.nodes.slice();
     for (0..nodes.len) |k| {
@@ -31,7 +37,8 @@ pub fn oldTables(arena: std.mem.Allocator, lw: *const Lowered) ![]const []const 
         };
         try out.append(arena, try arena.print("node {d} {s} {t}{s}", .{ k, nodes.items(.name)[k], kind, if (k < lw.num_ports) " port" else "" }));
     }
-    for (lw.params.items) |p| {
+    for (try keptParams(arena, lw, dropped)) |k| {
+        const p = lw.params.items[k];
         const ty: Device.Param.Type = switch (p.ty) {
             .real => .real,
             .integer => .integer,
@@ -56,10 +63,24 @@ pub fn oldTables(arena: std.mem.Allocator, lw: *const Lowered) ![]const []const 
         try out.append(arena, try arena.print("contrib {t} {t} br{d} {s} {s}", .{ access, kind, @backingInt(c.br), oldNode(lw, c.hi), oldNode(lw, c.lo) }));
     }
     try out.append(arena, try arena.print("charge_sites {d}", .{lw.charge_sites.items.len}));
-    for (lw.held_vars.items) |h| try out.append(arena, try arena.print("held {s}", .{h.name}));
+    var last_held: []const u8 = "";
+    for (lw.held_vars.items) |h| {
+        const name = h.name[0 .. std.mem.findScalar(u8, h.name, '[') orelse h.name.len];
+        if (under(name, dropped) or std.mem.eql(u8, name, last_held)) continue;
+        last_held = name;
+        try out.append(arena, try arena.print("held {s}", .{name}));
+    }
     try out.append(arena, try arena.print("limit_slots {d}", .{lw.limit_slots.items.len}));
     for (lw.displays.items) |d| try out.append(arena, try arena.print("display {s}", .{d.name}));
     return out.items;
+}
+
+/// The old parameter rows `oldTables` keeps, in order: the new side's
+/// row `k` is the old row `kept[k]` when the tables agree.
+pub fn keptParams(arena: std.mem.Allocator, lw: *const Lowered, dropped: []const []const u8) ![]const u32 {
+    var kept: std.ArrayList(u32) = .empty;
+    for (lw.params.items, 0..) |p, k| if (!under(p.name, dropped)) try kept.append(arena, @intCast(k));
+    return kept.items;
 }
 
 /// The new tables as text lines.
@@ -88,6 +109,14 @@ pub fn newTables(arena: std.mem.Allocator, zcu: *const Zcu, d: *const Device) ![
 }
 
 // ---- private ----
+
+/// Whether row name `name` is inside one of the instance paths `dropped`.
+fn under(name: []const u8, dropped: []const []const u8) bool {
+    for (dropped) |inst| {
+        if (name.len > inst.len and name[inst.len] == '.' and std.mem.startsWith(u8, name, inst)) return true;
+    }
+    return false;
+}
 
 fn oldNode(lw: *const Lowered, n: Lowered.NodeId) []const u8 {
     return if (n == .ground) "gnd" else lw.nodes.items(.name)[@backingInt(n)];

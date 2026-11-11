@@ -15,7 +15,7 @@
 //!
 //! Contents:
 //! - `pub const points`, `pub const libm_ulps: u64`
-//! - `pub fn compareValues(arena: std.mem.Allocator, rel: []const u8, mir: *Mir, lw: *Lowered, zcu: *const Zcu, a: *const Sema.Analysis) !Verdict`
+//! - `pub fn compareValues(arena: std.mem.Allocator, rel: []const u8, mir: *Mir, lw: *Lowered, kept: []const u32, zcu: *const Zcu, a: *const Sema.Analysis) !Verdict`
 
 const std = @import("std");
 const vams = @import("vams");
@@ -84,8 +84,9 @@ const rulings = [_]Ruling{
 
 /// Evaluates every contribution's sums at `points` seeded points by both
 /// interpreters. Asserts the tables agree.
-pub fn compareValues(arena: std.mem.Allocator, rel: []const u8, mir: *Mir, lw: *Lowered, zcu: *const Zcu, a: *const Sema.Analysis) !Verdict {
+pub fn compareValues(arena: std.mem.Allocator, rel: []const u8, mir: *Mir, lw: *Lowered, kept: []const u32, zcu: *const Zcu, a: *const Sema.Analysis) !Verdict {
     const d = &a.device;
+    std.debug.assert(kept.len == d.params.len);
     std.debug.assert(lw.nodes.len == d.nodes.len);
     std.debug.assert(lw.contributions.items.len == d.contributions.len);
     std.debug.assert(lw.displays.items.len == d.displays.len);
@@ -122,8 +123,9 @@ pub fn compareValues(arena: std.mem.Allocator, rel: []const u8, mir: *Mir, lw: *
             .none, .file_func, .file_read => {},
         }
     }
-    const refs = try arena.alloc(Mir.Value, lw.params.items.len);
-    for (refs, 0..) |*r, k| r.* = try mir.addParamRef(arena, @intCast(k));
+    // The new side's parameter `k` is the old one `kept[k]`.
+    const refs = try arena.alloc(Mir.Value, kept.len);
+    for (refs, kept) |*r, k| r.* = try mir.addParamRef(arena, k);
     const volts = try arena.alloc(f64, lw.nodes.len);
     var refusal: Refusal = undefined;
     var old = try OldInterp.init(arena, mir, lw, volts, &refusal);
@@ -152,9 +154,10 @@ pub fn compareValues(arena: std.mem.Allocator, rel: []const u8, mir: *Mir, lw: *
     for (0..points) |_| {
         _ = scratch.reset(.retain_capacity);
         for (volts) |*x| x.* = rand.float(f64) * 4 - 2;
-        for (lw.params.items, defaults, 0..) |*p, def, k| {
-            p.folded = def;
-            const c = def orelse continue;
+        for (lw.params.items, defaults) |*p, def| p.folded = def;
+        for (kept, 0..) |o, k| {
+            const p = &lw.params.items[o];
+            const c = defaults[o] orelse continue;
             if (c != .real or p.shape) continue;
             p.folded = .{ .real = drawIn(rand, c.real, d.paramRanges(@fromBackingInt(@intCast(k)))) };
         }

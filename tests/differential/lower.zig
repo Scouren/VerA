@@ -22,10 +22,18 @@
 //!   `Air.interp`, bit for bit, NaN as NaN. A root the old interpreter
 //!   refuses (a call it does not model, an event, an array) is skipped and
 //!   counted, never compared.
+//! The old tables are read as the new side writes them: the rows of an
+//! instance `elab.rulings` `drops` (an unselected generate arm, §6.6.2)
+//! are left out, and an array's per-element held rows (`held x[0]`) are
+//! the one row `held x`.
+//! A codes or tables disagreement the LRM settles for the new side is a
+//! line of `lower.rulings` (`settle.Rulings`), whose expected result is
+//! the new side's codes, comma-separated, or its tables' difference:
+//! `-<old row>` and `+<new row>`, joined by `; `.
 //! A fixture the old front end refuses (preprocess, parse, the §3.7 and
 //! §8.1.1 rules) or the new parser refuses is skipped and counted.
-//! `zig build diff-lower -Dlower-dump=<substring>` prints both sides' tables
-//! of the fixtures whose path holds it.
+//! `zig build diff-lower -Dlower-dump='<substring>|<substring>'` prints both
+//! sides' tables of the fixtures whose path holds one of them.
 //! No LRM clause: this checks VerA's rewrite against VerA.
 //!
 //! Contents:
@@ -51,6 +59,7 @@ const Lowered = ir.Lowered;
 const Device = Air.Device;
 const values = @import("lower/values.zig");
 const tables = @import("lower/tables.zig");
+const settle = @import("settle.zig");
 /// The codes elaboration owns (`stages.zig`): diff-elab compares them, so
 /// this oracle leaves them out and demands every other.
 const elab_codes = @import("stages.zig").elab_codes;
@@ -70,11 +79,12 @@ const Tally = struct {
     skipped_old: u32 = 0,
     skipped_new: u32 = 0,
     agreed: u32 = 0,
+    ruled: u32 = 0,
     xfailed: u32 = 0,
     failed: u32 = 0,
 };
 
-const Outcome = union(enum) { old_refused, new_refused, verdict: Verdict };
+const Outcome = union(enum) { old_refused, new_refused, ruled, verdict: Verdict };
 
 /// The old side: its codes, and its tables when it lowered.
 /// The old side: its codes, and its tables when it lowered; and the
@@ -105,6 +115,8 @@ fn runAll() !void {
         try xfail.put(arena, line[0..sp], line[sp + 1 ..]);
     }
     const dump = options.lower_dump;
+    var rulings = try settle.Rulings.read(arena, io, options.repo_root, "lower");
+    const drops = try elabDrops(arena, io);
 
     const fixtures = try collect(arena, io);
     var tally: Tally = .{};
@@ -115,14 +127,24 @@ fn runAll() !void {
     defer per.deinit();
     for (fixtures) |rel| {
         _ = per.reset(.retain_capacity);
-        const show = dump.len != 0 and std.mem.find(u8, rel, dump) != null;
-        const v = switch (try checkFixture(per.allocator(), io, rel, show)) {
+        const show = dumped(rel, dump);
+        const v = switch (try checkFixture(per.allocator(), io, rel, show, &rulings, drops.get(rel) orelse &.{})) {
             .old_refused => {
                 tally.skipped_old += 1;
                 continue;
             },
             .new_refused => {
                 tally.skipped_new += 1;
+                continue;
+            },
+            .ruled => {
+                tally.compared += 1;
+                tally.ruled += 1;
+                if (xfail.get(rel) != null) {
+                    try seen.put(arena, rel, {});
+                    tally.failed += 1;
+                    try out.writer.print("XPASS {s}: settled by lower.rulings; delete its lower.xfail line\n", .{rel});
+                }
                 continue;
             },
             .verdict => |v| v,
@@ -155,7 +177,8 @@ fn runAll() !void {
         tally.failed += 1;
         try out.writer.print("STALE {s}: lower.xfail names a fixture that was not compared\n", .{k.*});
     };
-    std.debug.print("{s}diff-lower: {d} fixtures compared ({d} with agreeing tables; {d} roots, {d} values equal bit for bit, {d} within the libm ulp bound, {d} roots the old interpreter refused, {d} display operands an old-side bug in {d} fixtures), {d} agree, {d} listed in lower.xfail, {d} skipped (old front end refused), {d} skipped (new parser refused), {d} failures\n", .{ out.written(), tally.compared, tally.tables, tally.roots, tally.values, tally.values_libm, tally.roots_skipped, tally.old_bugs, tally.old_bug_fixtures, tally.agreed, tally.xfailed, tally.skipped_old, tally.skipped_new, tally.failed });
+    tally.failed += try rulings.finish(&out.writer);
+    std.debug.print("{s}diff-lower: {d} fixtures compared ({d} with agreeing tables; {d} roots, {d} values equal bit for bit, {d} within the libm ulp bound, {d} roots the old interpreter refused, {d} display operands an old-side bug in {d} fixtures), {d} agree ({d} by a ruling), {d} listed in lower.xfail, {d} skipped (old front end refused), {d} skipped (new parser refused), {d} failures\n", .{ out.written(), tally.compared, tally.tables, tally.roots, tally.values, tally.values_libm, tally.roots_skipped, tally.old_bugs, tally.old_bug_fixtures, tally.agreed + tally.ruled, tally.ruled, tally.xfailed, tally.skipped_old, tally.skipped_new, tally.failed });
     if (tally.failed != 0) return error.DiffLowerFailed;
 }
 
@@ -180,7 +203,34 @@ fn lessThan(_: void, a: []const u8, b: []const u8) bool {
     return std.mem.order(u8, a, b) == .lt;
 }
 
-fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, show: bool) !Outcome {
+/// Whether `-Dlower-dump`'s `|`-separated substrings name fixture `rel`.
+fn dumped(rel: []const u8, dump: []const u8) bool {
+    var it = std.mem.tokenizeScalar(u8, dump, '|');
+    while (it.next()) |part| if (std.mem.find(u8, rel, part) != null) return true;
+    return false;
+}
+
+/// `elab.rulings`' `drops` rows by fixture: the instance paths the new
+/// tree omits, less the top module's segment, as the old rows name them.
+fn elabDrops(arena: std.mem.Allocator, io: Io) !std.StringHashMapUnmanaged([]const []const u8) {
+    const r = try settle.Rulings.read(arena, io, options.repo_root, "elab");
+    var out: std.StringHashMapUnmanaged([]const []const u8) = .empty;
+    for (r.map.keys(), r.map.values()) |path, ruling| {
+        const rest = std.mem.cutPrefix(u8, ruling.expected, "drops ") orelse continue;
+        var list: std.ArrayList([]const u8) = .empty;
+        var it = std.mem.tokenizeScalar(u8, rest, ' ');
+        while (it.next()) |inst| {
+            const dot = std.mem.findScalar(u8, inst, '.') orelse return error.ElabDropNamesTheTop;
+            try list.append(arena, inst[dot + 1 ..]);
+        }
+        try out.put(arena, path, list.items);
+    }
+    return out;
+}
+
+/// One fixture's verdict; a disagreement `rulings` settles is `.ruled`.
+/// `dropped` are the instance paths elaboration's rulings drop.
+fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, show: bool, rulings: *settle.Rulings, dropped: []const []const u8) !Outcome {
     const path = try std.fs.path.join(arena, &.{ options.fixture_root, rel });
     const dir = std.fs.path.dirname(path).?;
     const include = options.fixture_root ++ "/include";
@@ -258,13 +308,16 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, show: bool) !
     if (show) for (zcu.failed.items(.code), zcu.failed.items(.message)) |c, m| std.debug.print("  new {t}: {s}\n", .{ c, zcu.intern_pool.stringToSlice(m) });
     if (show and analysis == null) if (old.lw) |w| {
         std.debug.print("-- old tables (the new side refused)\n", .{});
-        for (try tables.oldTables(arena, w)) |l| std.debug.print("  {s}\n", .{l});
+        for (try tables.oldTables(arena, w, dropped)) |l| std.debug.print("  {s}\n", .{l});
     };
-    if (!sameLines(old.codes, new_codes))
-        return .{ .verdict = .{ .why = try arena.print("codes: old {s}, new {s}{s}", .{ try join(arena, old.codes), try join(arena, new_codes), try firstMessage(arena, &zcu) }) } };
+    const cited = try settle.clauses(arena, source);
+    if (!sameLines(old.codes, new_codes)) {
+        const why = try arena.print("codes: old {s}, new {s}{s}", .{ try join(arena, old.codes), try join(arena, new_codes), try firstMessage(arena, &zcu) });
+        return ruled(arena, rulings, rel, cited, why, try join(arena, new_codes));
+    }
     const lw = old.lw orelse return .{ .verdict = .{ .why = if (analysis != null) "the old side refused, the new side lowered" else null } };
     const a = &(analysis orelse return .{ .verdict = .{ .why = "the old side lowered, the new side refused" } });
-    const want = try tables.oldTables(arena, lw);
+    const want = try tables.oldTables(arena, lw, dropped);
     const got = try tables.newTables(arena, &zcu, &a.device);
     if (show) {
         std.debug.print("-- old tables\n", .{});
@@ -272,10 +325,38 @@ fn checkFixture(arena: std.mem.Allocator, io: Io, rel: []const u8, show: bool) !
         std.debug.print("-- new tables\n", .{});
         for (got) |l| std.debug.print("  {s}\n", .{l});
     }
-    if (try linesDiffer(arena, want, got)) |why| return .{ .verdict = .{ .why = why } };
+    if (try linesDiffer(arena, want, got)) |why| return ruled(arena, rulings, rel, cited, why, try rowsDiffer(arena, want, got));
     if (try Air.Verify.verify(gpa, a.air, &zcu.intern_pool)) |bad|
         return .{ .verdict = .{ .why = try arena.print("Air.Verify: {t} at instruction {d}", .{ bad.rule, @backingInt(bad.inst) }) } };
-    return .{ .verdict = try values.compareValues(arena, rel, old.mir, lw, &zcu, a) };
+    return .{ .verdict = try values.compareValues(arena, rel, old.mir, lw, try tables.keptParams(arena, lw, dropped), &zcu, a) };
+}
+
+/// `why` settled by fixture `rel`'s ruling when the new side gave `got`:
+/// `.ruled`, else the verdict `why` (and why the ruling does not hold).
+fn ruled(arena: std.mem.Allocator, rulings: *settle.Rulings, rel: []const u8, cited: []const []const u8, why: []const u8, got: []const u8) !Outcome {
+    if (rulings.get(rel) == null) return .{ .verdict = .{ .why = why } };
+    const no = (try rulings.settle(arena, rel, cited, got)) orelse return .ruled;
+    return .{ .verdict = .{ .why = try arena.print("{s}; {s}", .{ why, no }) } };
+}
+
+/// What a tables ruling compares: each old row the new side lacks as
+/// `-<row>`, then each new row the old lacks as `+<row>`, joined by `; `.
+/// Rows are a multiset: a row twice on one side and once on the other is
+/// one difference.
+fn rowsDiffer(arena: std.mem.Allocator, old: []const []const u8, new: []const []const u8) ![]const u8 {
+    var parts: std.ArrayList([]const u8) = .empty;
+    for ([2][]const []const u8{ old, new }, [2][]const []const u8{ new, old }, "-+") |these, those, sign| {
+        const matched = try arena.alloc(bool, those.len);
+        @memset(matched, false);
+        outer: for (these) |row| {
+            for (those, matched) |other, *m| if (!m.* and std.mem.eql(u8, row, other)) {
+                m.* = true;
+                continue :outer;
+            };
+            try parts.append(arena, try arena.print("{c}{s}", .{ sign, row }));
+        }
+    }
+    return std.mem.join(arena, "; ", parts.items);
 }
 
 /// The first lowering failure's message, for a reader of the report.

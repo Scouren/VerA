@@ -610,3 +610,15 @@ test "§4.2.1.1/§9.11 `$rtoi` truncates toward zero and `$itor` converts, folde
     // 1 * 100 - 1 - 1, exact in binary.
     try std.testing.expectEqual(@as(f64, 98), try o.value(0, 0, &.{1.0}));
 }
+
+test "§9.16 a `$simprobe` name a string variable holds is known only at run time: E0823, fallback or not" {
+    try expectCode(
+        \\module m(p); inout p; electrical p; string nm; real got;
+        \\  analog begin
+        \\    nm = (V(p) > 0.0) ? "u_a" : "u_b";
+        \\    got = $simprobe(nm, "gain", -1.0);
+        \\    I(p) <+ got * V(p);
+        \\  end
+        \\endmodule
+    , .E0823);
+}

@@ -103,7 +103,7 @@ pub fn write(s: *State, a: Allocator, d: i64, at: u32) Error!void {
     try display.show(s, a, at, 0);
     s.out = saved;
     if (try channels(s, d, buf.written()))
-        try s.warn("no file this descriptor names is open for writing: the output is not written", .{});
+        try s.warn(.W1154, "no file this descriptor names is open for writing: the output is not written", .{});
 }
 
 /// §17.2.7 `$fclose` of the descriptor row `row`.

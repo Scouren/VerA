@@ -72,7 +72,7 @@ pub fn runUntil(s: *State, limit: u64) Error!Stop {
         }
         s.budget_used += 1;
         if (s.budget_used > s.budget)
-            return s.fail("more than {d} events at time {d}: a zero-delay loop keeps simulation time from advancing", .{ s.budget, event.time });
+            return s.fail(.E1100, "more than {d} events at time {d}: a zero-delay loop keeps simulation time from advancing", .{ s.budget, event.time });
         const row = s.rows.items[event.payload];
         const a = s.scratch.allocator();
         switch (row.item) {
@@ -139,12 +139,12 @@ pub fn delayIn(s: *State, a: Allocator, e: u32, scope: u32) Error!u64 {
     const p = s.p;
     const scale = p.times[p.scopes[scope].time].scale;
     if (p.exprs.items(.ty)[e].real)
-        return scale.realDelay(try eval.real(s, a, e)) catch |err| s.fail("digital delay cannot be represented: {t}", .{err});
+        return scale.realDelay(try eval.real(s, a, e)) catch |err| s.fail(.E1100, "digital delay cannot be represented: {t}", .{err});
     const value = try eval.eval(s, a, e);
     if (value.hasUnknown()) return 0;
-    if (value.width > 64) return s.fail("delay values wider than 64 bits are not implemented", .{});
+    if (value.width > 64) return s.fail(.E1100, "delay values wider than 64 bits are not implemented", .{});
     return (if (value.signed) scale.signedDelay(value.asInt().?) else scale.unsignedDelay(value.values()[0])) catch |err|
-        s.fail("digital delay cannot be represented: {t}", .{err});
+        s.fail(.E1100, "digital delay cannot be represented: {t}", .{err});
 }
 
 /// Runs the process at `start` until it suspends, stops or finishes.
@@ -163,6 +163,8 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
     var since: u32 = 0;
     while (true) {
         assert(pc < p.insts.len);
+        // `fail`/`warn`'s blame: the pc this dispatch is about to run.
+        s.pc = pc;
         // §10.3 a disabled subroutine's activations return at once.
         if (s.unwind != null) return;
         since = tidy(scratch, since);
@@ -391,7 +393,7 @@ fn tidy(scratch: *std.heap.ArenaAllocator, since: u32) u32 {
 fn loopIteration(s: *State) Error!void {
     s.budget_used += 1;
     if (s.budget_used > s.budget)
-        return s.fail("more than {d} loop iterations and events at time {d}: a loop with no delay keeps simulation time from advancing", .{ s.budget, s.scheduler.now });
+        return s.fail(.E1100, "more than {d} loop iterations and events at time {d}: a loop with no delay keeps simulation time from advancing", .{ s.budget, s.scheduler.now });
 }
 
 /// §10.3 `disable` of the block [start, end): every resumption into it is

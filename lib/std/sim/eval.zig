@@ -305,7 +305,7 @@ pub fn real(s: *State, a: Allocator, e: u32) Error!f64 {
         // VAMS §7.3.6.3: V(a) or V(a, b) of the analog solution, from the
         // mixed host (`analog.Link.probe`); a run with no host fails.
         .probe => blk: {
-            const probe = s.analog.probe orelse return s.fail("an analog probe needs the mixed-signal kernel", .{});
+            const probe = s.analog.probe orelse return s.fail(.E1100, "an analog probe needs the mixed-signal kernel", .{});
             const pr = p.extraData(Program.Probe, d.a);
             break :blk try probe(s.analog.probe_ctx, p.str(pr.a), if (pr.b.len == 0) null else p.str(pr.b));
         },
@@ -454,7 +454,7 @@ fn random(s: *State, a: Allocator, r: Program.Random) Error!i32 {
     const x = if (r.x != none) try long(s, a, r.x) else 0;
     const y = if (r.y != none) try long(s, a, r.y) else 0;
     const d = dist(r.dist, seed, x, y) orelse {
-        try s.warn("a $dist_ mean, degree of freedom or k_stage is not positive: the result is 0 and the seed is unchanged", .{});
+        try s.warn(.W1151, "a $dist_ mean, degree of freedom or k_stage is not positive: the result is 0 and the seed is unchanged", .{});
         return 0;
     };
     const lit = try filled(a, 64, true, .zero);

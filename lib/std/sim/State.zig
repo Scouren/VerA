@@ -8,15 +8,18 @@
 //!
 //! Contents:
 //! - `pub const Error = error{ SimFailed, OutOfMemory, WriteFailed }`
+//! - `pub const Diag = struct` (`Diag.Of`)
 //! - `pub const Pending = union(enum)`, `pub const Row = struct`
 //! - `pub const Susp = struct`, `pub const Act = struct`, `pub const Term = struct`
 //! - `pub const Hold = struct`, `pub const Monitor = struct`, `pub const PathEdge = struct`
 //! - `pub const default_budget: u64`, `pub const default_depth: u32`
+//! - `pub const diags_max: u32`, `pub const stack_size: usize`
 //! - `pub const Native = *const fn (*State, *std.heap.ArenaAllocator, *u32) Error!bool`
 //! - `pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!State`
-//! - `pub fn fail(s: *State, comptime f: []const u8, args: anytype) Error`
+//! - `pub fn fail(s: *State, code: vams.Diag.Code, comptime f: []const u8, args: anytype) Error`
 //! - `pub fn netOf(s: *const State, slot: u32) ?u32`
-//! - `pub fn warn(s: *State, comptime f: []const u8, args: anytype) Error!void`
+//! - `pub fn warn(s: *State, code: vams.Diag.Code, comptime f: []const u8, args: anytype) Error!void`
+//! - `pub fn warnCheck(s: *State, i: u32, comptime f: []const u8, args: anytype) Error!void`
 //! - `pub fn store(s: *State, slot: u32, value: Literal) Error!void`
 //! - `pub fn trigger(s: *State, slot: u32) Error!void`
 //! - `pub fn scheduleWrite(s: *State, slot: u32, sel: ?eval.Sel, value: Literal, delay: ?u64) Error!void`
@@ -38,6 +41,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
+const vams = @import("vams");
 const Program = @import("Program.zig");
 const logic = @import("logic.zig");
 const eval = @import("eval.zig");
@@ -62,6 +66,26 @@ const Handle = sched.Handle;
 /// `SimFailed`: the run stopped with a runtime error, its text in
 /// `State.failure`. `WriteFailed`: the transcript writer failed.
 pub const Error = error{ SimFailed, OutOfMemory, WriteFailed };
+
+/// One run-time diagnostic (`fail`/`warn`/`warnCheck`): its code, where it
+/// blames, and its rendered text. `exe.report` resolves `at` to a byte
+/// range through the table `of` names (`pc_sites` or `check_sites`) and
+/// drains `State.diags` (every warning, in order) then `State.failure`.
+pub const Diag = struct {
+    code: vams.Diag.Code,
+    at: u32,
+    of: Of,
+    text: []const u8,
+
+    /// What `at` indexes: an instruction's pc (`Program.insts` order) or a
+    /// check's index (`Program.checks` order).
+    pub const Of = enum(u8) { pc, check };
+};
+
+/// Most diagnostics one run keeps (`State.diags`); past it `warn` and
+/// `warnCheck` count `diags_dropped` and store nothing (`exe.report`'s
+/// `Diag.Wip` caps rendering past `vams.Diag.max_entries` anyway).
+pub const diags_max: u32 = 1 << 16;
 
 /// One scheduled event's payload, consumed whole by its dispatch.
 pub const Pending = union(enum) {
@@ -168,6 +192,10 @@ pub const Native = *const fn (*State, *std.heap.ArenaAllocator, *u32) Error!bool
 /// is refused by name.
 pub const default_budget: u64 = 10_000_000;
 
+/// The design's own thread: a 1 GiB stack, lazily committed (`exe.run`'s
+/// thread; `calls.call`'s stack-exhausted message cites it in MiB).
+pub const stack_size: usize = 1 << 30;
+
 p: *const Program,
 arena: Allocator,
 out: *std.Io.Writer,
@@ -200,9 +228,14 @@ budget: u64 = default_budget,
 budget_time: u64 = 0,
 budget_used: u64 = 0,
 /// The runtime error that ended the run (`fail`).
-failure: ?[]const u8 = null,
-/// The warnings the run raised (`warn`), in order; none ends the run.
-warnings: std.ArrayList([]const u8) = .empty,
+failure: ?Diag = null,
+/// The warnings the run raised (`warn`, `warnCheck`), in order; none ends
+/// the run. Bounded at `diags_max`; past it `diags_dropped` counts instead.
+diags: std.ArrayList(Diag) = .empty,
+diags_dropped: u32 = 0,
+/// The pc `Interp.step`'s loop is dispatching now: what `fail`/`warn`
+/// blame. Not meaningful before the first instruction dispatches.
+pc: u32 = 0,
 /// What §17.2.9 reads files through; without it a load warns and ends.
 io: ?std.Io = null,
 /// §17.6 the stochastic queues, by `q_id`.
@@ -370,10 +403,12 @@ pub fn init(arena: Allocator, p: *const Program, out: *std.Io.Writer) Error!Stat
     return s;
 }
 
-/// Ends the run with a runtime error: its text kept in `failure`.
-pub fn fail(s: *State, comptime f: []const u8, args: anytype) Error {
+/// Ends the run with a runtime error at the current pc, code `code` (its
+/// first letter asserts `E`), kept in `failure`.
+pub fn fail(s: *State, code: vams.Diag.Code, comptime f: []const u8, args: anytype) Error {
+    assert(@tagName(code)[0] == 'E');
     assert(s.failure == null);
-    s.failure = try std.fmt.allocPrint(s.arena, f, args);
+    s.failure = .{ .code = code, .at = s.pc, .of = .pc, .text = try std.fmt.allocPrint(s.arena, f, args) };
     return error.SimFailed;
 }
 
@@ -384,9 +419,20 @@ pub fn netOf(s: *const State, slot: u32) ?u32 {
     return if (n == std.math.maxInt(u32)) null else n;
 }
 
-/// Records a warning; the run goes on.
-pub fn warn(s: *State, comptime f: []const u8, args: anytype) Error!void {
-    try s.warnings.append(s.arena, try std.fmt.allocPrint(s.arena, f, args));
+/// Records a warning at the current pc, code `code` (its first letter
+/// asserts `W`); the run goes on.
+pub fn warn(s: *State, code: vams.Diag.Code, comptime f: []const u8, args: anytype) Error!void {
+    assert(@tagName(code)[0] == 'W');
+    assert(s.failure == null);
+    try s.record(code, .pc, s.pc, try std.fmt.allocPrint(s.arena, f, args));
+}
+
+/// Records check `i`'s W1199 (asserts `i < p.checks.len`): one per check,
+/// at its first violation (IEEE 1364-2005 §15.5, Table 15-13).
+pub fn warnCheck(s: *State, i: u32, comptime f: []const u8, args: anytype) Error!void {
+    assert(i < s.p.checks.len);
+    assert(s.failure == null);
+    try s.record(.W1199, .check, i, try std.fmt.allocPrint(s.arena, f, args));
 }
 
 /// Stores `value` (as wide as the slot) into `slot` and wakes what watches
@@ -621,7 +667,17 @@ fn claim(s: *State, item: Pending, planes: []const u64) Error!u32 {
 
 fn schedFail(s: *State, e: anyerror) Error {
     if (e == error.OutOfMemory) return error.OutOfMemory;
-    return s.fail("digital scheduling failure: {t}", .{e});
+    return s.fail(.E1100, "digital scheduling failure: {t}", .{e});
+}
+
+/// Appends one diagnostic to `diags`, up to `diags_max`; past it
+/// `diags_dropped` counts instead (`warn`/`warnCheck`'s shared tail).
+fn record(s: *State, code: vams.Diag.Code, of: Diag.Of, at: u32, text: []const u8) Error!void {
+    if (s.diags.items.len >= diags_max) {
+        s.diags_dropped += 1;
+        return;
+    }
+    try s.diags.append(s.arena, .{ .code = code, .at = at, .of = of, .text = text });
 }
 
 /// Resumes the continuous drivers reading `slot`, then every suspension on

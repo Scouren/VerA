@@ -42,7 +42,7 @@ const Ctx = struct {
     ts_exp: i32 = -9,
 
     fn warn(c: *Ctx, line: u32, comptime f: []const u8, args: anytype) Error!void {
-        try c.s.warn("{s}:{d}: " ++ f, .{ c.file, line } ++ args);
+        try c.s.warn(.W1105, "{s}:{d}: " ++ f, .{ c.file, line } ++ args);
     }
 
     /// `v` in the file's timescale as ticks of scope `scope`'s precision,
@@ -72,32 +72,32 @@ const positions = [12][2]Bit{
 pub fn annotate(s: *State, a: Allocator, at: u32) Error!void {
     const p = s.p;
     const call = p.extraData(Program.SdfCall, at);
-    const name = (try readmem.text(a, try eval.eval(s, a, call.name))) orelse return s.fail("$sdf_annotate's file name has x or z bits", .{});
+    const name = (try readmem.text(a, try eval.eval(s, a, call.name))) orelse return s.fail(.E1102, "$sdf_annotate's file name has x or z bits", .{});
     var c: Ctx = .{ .s = s, .a = a, .file = name };
     if (call.mtm != none) {
         const m = (try readmem.text(a, try eval.eval(s, a, call.mtm))) orelse "";
-        c.mtm = if (std.ascii.eqlIgnoreCase(m, "MINIMUM")) 0 else if (std.ascii.eqlIgnoreCase(m, "MAXIMUM")) 2 else if (std.ascii.eqlIgnoreCase(m, "TYPICAL") or std.ascii.eqlIgnoreCase(m, "TOOL_CONTROL")) 1 else return s.fail("§17.2.10: mtm_spec is \"MINIMUM\", \"TYPICAL\", \"MAXIMUM\" or \"TOOL_CONTROL\"", .{});
+        c.mtm = if (std.ascii.eqlIgnoreCase(m, "MINIMUM")) 0 else if (std.ascii.eqlIgnoreCase(m, "MAXIMUM")) 2 else if (std.ascii.eqlIgnoreCase(m, "TYPICAL") or std.ascii.eqlIgnoreCase(m, "TOOL_CONTROL")) 1 else return s.fail(.E1102, "§17.2.10: mtm_spec is \"MINIMUM\", \"TYPICAL\", \"MAXIMUM\" or \"TOOL_CONTROL\"", .{});
     }
-    const io = s.io orelse return s.fail("{s}: the SDF file cannot be read", .{name});
-    const file = readmem.sideFile(io, a, p.str(p.file_name), name) catch return s.fail("{s}: the SDF file cannot be read", .{name});
+    const io = s.io orelse return s.fail(.E1102, "{s}: the SDF file cannot be read", .{name});
+    const file = readmem.sideFile(io, a, p.str(p.file_name), name) catch return s.fail(.E1102, "{s}: the SDF file cannot be read", .{name});
     defer file.close(io);
     var buf: [4096]u8 = undefined;
     var in = file.reader(io, &buf);
     const text = in.interface.allocRemaining(a, .unlimited) catch |e| switch (e) {
         error.OutOfMemory => return error.OutOfMemory,
-        else => return s.fail("{s}: the SDF file cannot be read", .{name}),
+        else => return s.fail(.E1102, "{s}: the SDF file cannot be read", .{name}),
     };
     var line: u32 = 0;
     const top = sdf_text.parse(a, text, &line) catch |e| switch (e) {
         error.OutOfMemory => return error.OutOfMemory,
-        error.Syntax => return s.fail("{s}:{d}: not an SDF file: unbalanced parentheses or a stray token", .{ name, line }),
-        error.TooDeep => return s.fail("{s}:{d}: the SDF file nests lists deeper than {d}", .{ name, line, sdf_text.depth_max }),
+        error.Syntax => return s.fail(.E1102, "{s}:{d}: not an SDF file: unbalanced parentheses or a stray token", .{ name, line }),
+        error.TooDeep => return s.fail(.E1102, "{s}:{d}: the SDF file nests lists deeper than {d}", .{ name, line, sdf_text.depth_max }),
     };
-    if (!top.is("DELAYFILE")) return s.fail("{s}:{d}: an SDF file is one (DELAYFILE ...)", .{ name, top.line });
+    if (!top.is("DELAYFILE")) return s.fail(.E1102, "{s}:{d}: an SDF file is one (DELAYFILE ...)", .{ name, top.line });
     for (top.kids[1..]) |h| {
         if (h.is("TIMESCALE")) try timescale(&c, h) else if (h.is("DIVIDER")) {
             const d = if (h.kids.len == 2) h.kids[1].atom orelse "" else "";
-            if (d.len != 1 or (d[0] != '.' and d[0] != '/')) return s.fail("{s}:{d}: DIVIDER is . or /", .{ name, h.line });
+            if (d.len != 1 or (d[0] != '.' and d[0] != '/')) return s.fail(.E1102, "{s}:{d}: DIVIDER is . or /", .{ name, h.line });
             c.divider = d[0];
         } else if (h.is("CELL")) try cell(&c, h, call.scope);
         // else: the header entries inform and set nothing.
@@ -119,7 +119,7 @@ fn timescale(c: *Ctx, h: Node) Error!void {
         c.ts_exp = u[1];
         return;
     };
-    return c.s.fail("{s}:{d}: TIMESCALE is 1, 10 or 100 of s, ms, us, ns, ps or fs", .{ c.file, h.line });
+    return c.s.fail(.E1102, "{s}:{d}: TIMESCALE is 1, 10 or 100 of s, ms, us, ns, ps or fs", .{ c.file, h.line });
 }
 
 fn cell(c: *Ctx, h: Node, scope: u32) Error!void {
@@ -372,11 +372,11 @@ fn label(c: *Ctx, sc: u32, e: Node, increment: bool) Error!void {
 fn refold(s: *State, a: Allocator, row: u32, sc: u32) Error!u64 {
     const p = s.p;
     const scale = p.times[p.scopes[sc].time].scale;
-    if (p.exprs.items(.ty)[row].real) return scale.realDelay(try eval.real(s, a, row)) catch s.fail("digital delay cannot be represented", .{});
+    if (p.exprs.items(.ty)[row].real) return scale.realDelay(try eval.real(s, a, row)) catch s.fail(.E1102, "digital delay cannot be represented", .{});
     const v = try eval.eval(s, a, row);
-    const i = v.asInt() orelse return s.fail("a declared delay cannot contain x or z", .{});
+    const i = v.asInt() orelse return s.fail(.E1102, "a declared delay cannot contain x or z", .{});
     if (v.signed and i < 0) return 0;
-    return scale.signedDelay(i) catch s.fail("digital delay cannot be represented", .{});
+    return scale.signedDelay(i) catch s.fail(.E1102, "digital delay cannot be represented", .{});
 }
 
 fn timingCheck(c: *Ctx, sc: u32, e: Node) Error!void {

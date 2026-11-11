@@ -305,13 +305,17 @@ fn noChange(s: *State, i: u32, d: u64) Error!void {
     }
 }
 
-/// Check `i` violated between `stamp` and `check`: counted, warned, and its
-/// notifier toggled (Table 15-13: 0 -> 1, 1 -> 0, z stays, x -> 1).
+/// Check `i` violated between `stamp` and `check`: counted, warned once per
+/// check (its first violation; VD-105), and its notifier toggled (Table
+/// 15-13: 0 -> 1, 1 -> 0, z stays, x -> 1).
 fn violation(s: *State, i: u32, stamp: u64, check: u64) Error!void {
     const c = current(s, i);
     s.violations += 1;
+    const first = s.checks[i].count == 0;
     s.checks[i].count +|= 1;
-    try s.warn("timing check {d} violated: timestamp event at {d}, timecheck event at {d}", .{ i, stamp, check });
+    // T3 (Sema's `Check.name`) names the check and gives real times
+    // (`Scale.realAt`) instead of its index and raw ticks.
+    if (first) try s.warnCheck(i, "timing check {d} violated: timestamp event at {d}, timecheck event at {d}", .{ i, stamp, check });
     const at = c.notifier;
     if (at == std.math.maxInt(u32)) return;
     var tmp: std.heap.ArenaAllocator = .init(s.arena);

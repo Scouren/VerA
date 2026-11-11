@@ -37,9 +37,10 @@ pub fn call(s: *State, a: Allocator, at: u32) Error!Literal {
     const p = s.p;
     const c = p.extraData(Program.Call, at);
     const sub = p.subs[c.sub];
-    // §10.4.2 bounds no depth; this engine does (lib/TODO.md §11.2), and
-    // its caller runs it on a stack sized for `State.depth_max` frames.
-    if (s.depth == s.depth_max) return s.fail("§10.4.2: subroutine calls nested past {d} activations", .{s.depth_max});
+    // §10.4.2 bounds no depth; this engine does (lib/TODO.md §11.2), on a
+    // stack sized for `State.stack_size`: the words the fixture's `//!
+    // reject` pins, the MiB the new side's own.
+    if (s.depth == s.depth_max) return s.fail(.E1100, "nesting here exhausts the {d} MiB stack VerA reserved for it", .{State.stack_size >> 20});
     s.depth += 1;
     defer s.depth -= 1;
     const args = p.list(c.args);

@@ -10,7 +10,7 @@
 //! - `pub const Config = struct`, `pub const Source = struct`
 //! - `pub const stack_size: usize`
 //! - `pub fn run(s: *State) State.Error!void`
-//! - `pub fn report(s: *const State, result: State.Error!void, wip: *Diag.Wip, sites: []const Diag.Loc) error{ OutOfMemory, WriteFailed }!void`
+//! - `pub fn report(s: *const State, result: State.Error!void, wip: *Diag.Wip, pc_sites: []const Diag.Loc, check_sites: []const Diag.Loc) error{ OutOfMemory, WriteFailed }!void`
 //! - `pub fn main(init: std.process.Init.Minimal) u8`
 
 const std = @import("std");
@@ -27,8 +27,12 @@ pub const Config = struct {
     program: []const u8,
     /// The files the diagnostics' locations index, in their order.
     sources: []const Source,
+    /// Per `Program.insts` row, the byte its diagnostics blame; empty
+    /// until Sema writes it (`Lowered.pc_sites`): every pc-blamed
+    /// diagnostic then renders with no location.
+    pc_sites: []const Diag.Loc = &.{},
     /// Per timing check (`Program.checks` order), where its W1199 points.
-    sites: []const Diag.Loc,
+    check_sites: []const Diag.Loc,
     /// Events at one time step before a zero-delay loop is refused.
     budget: u64 = State.default_budget,
     /// The design's instructions compiled (`State.native`), or none: the
@@ -43,7 +47,7 @@ pub const Source = struct { name: []const u8, text: []const u8 };
 
 /// The run's stack: the activations nest with the design (1 GiB, lazily
 /// committed).
-pub const stack_size: usize = 1 << 30;
+pub const stack_size: usize = State.stack_size;
 
 /// Runs `s` to completion on a `stack_size` thread, then closes every file
 /// it left open (§17.2.1).
@@ -59,17 +63,29 @@ pub fn run(s: *State) State.Error!void {
     return result;
 }
 
-/// The run's diagnostics into `wip`: a W1199 at the site of each timing
-/// check that reported a violation (§15.5), and an E1100 for a run that
-/// stopped with an error.
-pub fn report(s: *const State, result: State.Error!void, wip: *Diag.Wip, sites: []const Diag.Loc) error{ OutOfMemory, WriteFailed }!void {
-    assert(sites.len == s.checks.len);
-    for (s.checks, sites) |ch, site| if (ch.count != 0) {
-        try wip.add(.run, .W1199, site, "a timing check reported a violation", .{});
-    };
+/// The run's diagnostics into `wip`: every warning `State.diags` kept, in
+/// order, then the failure that ended the run, if any (`State.failure`).
+/// Each resolves its byte range through `pc_sites` (`Diag.Of.pc`; `.none`
+/// while `pc_sites` is empty, not yet wired by Sema) or `check_sites`
+/// (`Diag.Of.check`).
+pub fn report(s: *const State, result: State.Error!void, wip: *Diag.Wip, pc_sites: []const Diag.Loc, check_sites: []const Diag.Loc) error{ OutOfMemory, WriteFailed }!void {
+    assert(pc_sites.len == 0 or pc_sites.len == s.p.insts.len);
+    assert(check_sites.len == s.p.checks.len);
+    for (s.diags.items) |d| try wip.add(.run, d.code, locOf(d, pc_sites, check_sites), "{s}", .{d.text});
     result catch |e| switch (e) {
-        error.SimFailed => try wip.add(.run, .E1100, .none, "{s}", .{s.failure.?}),
+        error.SimFailed => {
+            const f = s.failure.?;
+            try wip.add(.run, f.code, locOf(f, pc_sites, check_sites), "{s}", .{f.text});
+        },
         error.OutOfMemory, error.WriteFailed => |x| return x,
+    };
+}
+
+/// `d`'s byte range, through the table `d.of` names.
+fn locOf(d: State.Diag, pc_sites: []const Diag.Loc, check_sites: []const Diag.Loc) Diag.Loc {
+    return switch (d.of) {
+        .pc => if (pc_sites.len != 0) pc_sites[d.at] else Diag.Loc.none,
+        .check => check_sites[d.at],
     };
 }
 
@@ -119,7 +135,7 @@ fn go(arena: std.mem.Allocator, io: std.Io, cfg: Config, out: *std.Io.Writer, er
     s.io = io;
     const result = run(&s);
     var wip: Diag.Wip = .init(arena);
-    try report(&s, result, &wip, cfg.sites);
+    try report(&s, result, &wip, cfg.pc_sites, cfg.check_sites);
     var bundle = try wip.toOwnedBundle();
     if (bundle.count() != 0 or bundle.header().suppressed != 0) {
         const sources = try arena.alloc(Diag.Source, cfg.sources.len);

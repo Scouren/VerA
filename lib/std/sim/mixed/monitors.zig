@@ -105,9 +105,9 @@ pub fn Monitors(comptime Self: type) type {
                 const ttol = (try s.monArgAt(j, 2, t)) orelse 0;
                 const enable = (try s.monArgAt(j, 3, t)) orelse 1;
                 if (!(ttol >= 0))
-                    return s.dig.fail("E0517: `timer()` time_tol shall be non-negative", .{});
+                    return s.dig.fail(.E0517, "`timer()` time_tol shall be non-negative", .{});
                 if (!std.math.isFinite(enable) or enable != @round(enable))
-                    return s.dig.fail("E0517: `timer()` enable shall evaluate to an integer", .{});
+                    return s.dig.fail(.E0517, "`timer()` enable shall evaluate to an integer", .{});
                 // We choose the deadline itself, satisfying every positive
                 // tolerance and the absent/zero at-or-just-beyond default.
                 tm.next = timer.zTimerPending(start, period, t, tm.start, tm.period, tm.next);
@@ -137,9 +137,9 @@ pub fn Monitors(comptime Self: type) type {
             const etol = (try s.monArgAt(j, 3, t)) orelse 0;
             const enable = (try s.monArgAt(j, 4, t)) orelse 1;
             if (!(delta >= 0 and ttol >= 0 and etol >= 0))
-                return s.dig.fail("E0517: `absdelta()` delta and tolerances shall be non-negative", .{});
+                return s.dig.fail(.E0517, "`absdelta()` delta and tolerances shall be non-negative", .{});
             if (!std.math.isFinite(enable) or enable != @round(enable))
-                return s.dig.fail("E0517: `absdelta()` enable shall evaluate to an integer", .{});
+                return s.dig.fail(.E0517, "`absdelta()` enable shall evaluate to an integer", .{});
             return .{
                 .delta = delta,
                 .time_tol = @max(if (ttol > 0) ttol else default_time_tol, s.opts.tick),

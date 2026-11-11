@@ -173,7 +173,9 @@ fn addRow(s: *Sema, unit: *Unit, name: []const u8, p: Inst.Param, declared: Devi
 /// `c[2]`, each element's value as the declared type (an omitted one its
 /// zero); the name an array of slots set from the rows at entry. "A type of
 /// a parameter array shall be given" (E0346, read as real after); the value
-/// is an assignment pattern (E0349).
+/// is an assignment pattern (E0349). T38: the root's own rows re-derive
+/// through their own pattern element (`derive.array`), the same a scalar's
+/// does, so a host override a dependent element reads still reaches it.
 fn declareArray(s: *Sema, unit: *Unit, i: Inst.Index, p: Inst.Param, ty0: Device.Param.Type, value: InternPool.Index) Allocator.Error!void {
     const vir = unit.vir;
     const ip = &s.zcu.intern_pool;
@@ -191,6 +193,9 @@ fn declareArray(s: *Sema, unit: *Unit, i: Inst.Index, p: Inst.Param, ty0: Device
         .aggregate => |a| a.elems,
         else => &.{}, // else: no pattern folded; every element is undef
     };
+    // T38: the root's rows, msb first, for `derive.array` below (the
+    // array counterpart of `declare`'s own `derived` list for a scalar).
+    var rows: std.ArrayList(Device.Param.Index) = .empty;
     for (arr.slots, 0..) |slot, k| {
         var label: std.ArrayList(u8) = .empty;
         try label.appendSlice(s.arena, name);
@@ -208,7 +213,9 @@ fn declareArray(s: *Sema, unit: *Unit, i: Inst.Index, p: Inst.Param, ty0: Device
         const elem = try asType(s, ty, if (k < values.len) values[k] else .undef, k >= values.len and vb.len != 0);
         const row = try addRow(s, unit, label.items, p, ty, elem);
         try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slot), .rhs = s.param_args.items[@backingInt(row)].ref } } }));
+        try rows.append(s.arena, row);
     }
+    if (unit.prefix.len == 0) try @import("derive.zig").array(s, unit, rows.items, p.value);
 }
 
 /// An element's value as the declared type: §3.4.1 converts it; an

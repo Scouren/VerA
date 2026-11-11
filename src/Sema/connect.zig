@@ -535,6 +535,7 @@ fn preorder(s: *Sema) Allocator.Error!void {
     for (zcu.defparams.keys()) |*key| key.instance = @fromBackingInt(new_of[@backingInt(key.instance)]);
     try zcu.defparams.reIndex(s.gpa);
     for (zcu.defparam_sources.keys()) |*key| key.instance = @fromBackingInt(new_of[@backingInt(key.instance)]);
+    for (zcu.defparam_sources.values()) |*v| v.writer_instance = @fromBackingInt(new_of[@backingInt(v.writer_instance)]);
     try zcu.defparam_sources.reIndex(s.gpa);
     for (zcu.inserts.items(.instance), zcu.inserts.items(.bridge)) |*i, *b| {
         i.* = @fromBackingInt(new_of[@backingInt(i.*)]);

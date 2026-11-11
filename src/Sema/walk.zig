@@ -289,7 +289,7 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     for (dps) |dp| {
         const key: Zcu.Defparam = .{ .instance = index, .name = try zcu.intern_pool.getString(s.gpa, dp.name) };
         try zcu.defparams.put(s.gpa, key, dp.value);
-        try zcu.defparam_sources.put(s.gpa, key, .{ .file = dp.file, .src = dp.src, .writer = try zcu.intern_pool.getString(s.gpa, dp.writer) });
+        try zcu.defparam_sources.put(s.gpa, key, .{ .file = dp.file, .src = dp.src, .writer = try zcu.intern_pool.getString(s.gpa, dp.writer), .writer_instance = dp.writer_instance });
     }
     // A paramset is a level of Table 9-29's composition: its statements
     // specify the module's values over the paramset level's.

@@ -3,20 +3,24 @@
 //! row its value reads recomputes it. A root row's is its default; a
 //! child's, the expression that gives its value where it is written: the
 //! parent's instance override (in the parent's scope), a paramset
-//! statement (in the paramset's), else the module's own default. A row a
-//! defparam sets, or whose expression reads no row, keeps its folded value.
+//! statement (in the paramset's), a defparam's own right-hand side in the
+//! writing instance's scope (§6.3.1, W12's `reDerive`), else the module's
+//! own default. A row whose expression reads no row keeps its folded value.
 //! Cites: VAMS-2023 §3.4, §6.3, §6.3.1, §6.3.2, §6.4.1.
 //!
 //! Contents:
 //! - `pub fn expression(s: *Sema, unit: *Unit, row: Device.Param.Index, value: Vir.Body) Allocator.Error!void`
+//! - `pub fn array(s: *Sema, unit: *Unit, rows: []const Device.Param.Index, value: Vir.Body) Allocator.Error!void`
 //! - `pub fn child(s: *Sema, unit: *Unit) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const vams = @import("vams");
+const InternPool = @import("intern_pool");
 const Air = @import("air");
 const Sema = @import("../Sema.zig");
+const Zcu = @import("../Zcu.zig");
 const decl = @import("decl.zig");
 const walk = @import("walk.zig");
 const expr = @import("expr.zig");
@@ -56,6 +60,31 @@ pub fn expression(s: *Sema, unit: *Unit, row: Device.Param.Index, value: Vir.Bod
     s.device.params.items(.derive)[@backingInt(row)] = r;
 }
 
+/// T38: `rows`' elements (declaration order, msb first: `Param.declareArray`'s
+/// own), each as the matching element of the `.pattern` `value` ends in —
+/// the same re-derive a scalar row gets (`expression`), so a host override
+/// a row's own element reads still reaches it. §3.4.4's elements are
+/// lowered whole, one after another in source order, so each one's own
+/// instructions sit contiguously between the one before it and itself
+/// (`elementBody`). Every row stays at its folded default when `value` is
+/// not a pattern (every element unfolded), its element count disagrees
+/// with `rows`' (a shape the parser already refused), or the element is a
+/// §3.6.3.2 hole (`'{1.0, , 3.0}`, lowered as `.none`: nothing to re-derive).
+pub fn array(s: *Sema, unit: *Unit, rows: []const Device.Param.Index, value: Vir.Body) Allocator.Error!void {
+    const vir = unit.vir;
+    const insts = vir.body(value);
+    if (insts.len == 0) return;
+    const last = insts[insts.len - 1];
+    if (vir.instructions.items(.tag)[@backingInt(last)] != .pattern) return;
+    const refs = vir.list(Inst.Ref, decl.payloadOf(vir, Inst.Refs, last));
+    if (refs.len != rows.len) return;
+    var start: u32 = 0;
+    for (rows, refs) |row, r| {
+        if (r == .none) continue; // a hole: no element written here to re-derive from.
+        try expression(s, unit, row, elementBody(vir, value, &start, r));
+    }
+}
+
 /// The derive of every row of child `unit` (and of its paramset's), after
 /// every unit's rows exist.
 pub fn child(s: *Sema, unit: *Unit) Allocator.Error!void {
@@ -91,9 +120,23 @@ pub fn child(s: *Sema, unit: *Unit) Allocator.Error!void {
 
 // ---- private ----
 
+/// `value`'s slice from `start.*` up to and including `elem`'s own
+/// instruction; advances `start.*` past it for the next element. Asserts
+/// `elem` is a real instruction found at or after `start.*` (every array
+/// element is one, §3.4.4; `Vir.Inst.Ref.toIndex` is null only for `.none`).
+fn elementBody(vir: *const Vir, value: Vir.Body, start: *u32, elem: Inst.Ref) Vir.Body {
+    const idx = elem.toIndex().?;
+    const insts = vir.body(value);
+    const at = std.mem.findScalarPos(Inst.Index, insts, start.*, idx).?;
+    const out: Vir.Body = .{ .start = value.start + start.*, .len = @intCast(at - start.* + 1) };
+    start.* = @intCast(at + 1);
+    return out;
+}
+
 /// The rows of the declarations `params` of `target` (a module or a
 /// paramset scope): a given override in the parent `pu`'s scope, else the
-/// default in `target`'s; none for a defparam's target.
+/// default in `target`'s; a defparam's target re-derives through its own
+/// right-hand side instead (W12, `reDerive`).
 fn scope(s: *Sema, target: *Unit, params: []const Inst.Index, pu: *Unit, args: []const Inst.Arg, owner: *Unit) Allocator.Error!void {
     const vir = target.vir;
     var ordered: usize = 0;
@@ -118,9 +161,34 @@ fn scope(s: *Sema, target: *Unit, params: []const Inst.Index, pu: *Unit, args: [
     for (params, given) |p, g| {
         const row = rowOf(target, p) orelse continue;
         const name = try s.zcu.intern_pool.getString(s.gpa, vir.string(decl.payloadOf(vir, Inst.Param, p).name));
-        if (s.zcu.defparams.contains(.{ .instance = owner.instance, .name = name })) continue;
+        if (s.zcu.defparams.contains(.{ .instance = owner.instance, .name = name })) {
+            try reDerive(s, owner.instance, name, row);
+            continue;
+        }
         if (g) |v| try expression(s, pu, row, v) else try expression(s, target, row, decl.payloadOf(vir, Inst.Param, p).value);
     }
+}
+
+/// W12: row `row`, set by the defparam on `instance` named `name`
+/// (`Zcu.defparam_sources`), re-derived through that defparam's own
+/// right-hand side in the scope of the instance that wrote it (§6.3.1's
+/// own-module constant): a host override of a parameter the expression
+/// reads then still reaches `row`, where the eagerly folded value
+/// `Zcu.defparams` records is frozen at whatever the writer's parameters
+/// were at elaboration (Zig mirror: Sema keeps the ZIR instruction and
+/// re-analyses it, never a pre-folded value). Leaves `row` at its folded
+/// default — today's behaviour — when the writer's own unit is not part
+/// of this lowering, the same fallback `child` takes for an untracked
+/// parent: this pass's `s.units` covers one elaborated tree.
+fn reDerive(s: *Sema, instance: Zcu.Instance.Index, name: InternPool.String, row: Device.Param.Index) Allocator.Error!void {
+    const source = s.zcu.defparam_sources.get(.{ .instance = instance, .name = name }) orelse return;
+    const writer = for (s.units.items) |*u| {
+        if (u.instance == source.writer_instance) break u;
+    } else return;
+    const di = source.src.toIndex() orelse return;
+    assert(writer.file == source.file);
+    assert(writer.vir.instructions.items(.tag)[@backingInt(di)] == .defparam);
+    try expression(s, writer, row, decl.payloadOf(writer.vir, Inst.Assign, di).rhs);
 }
 
 /// W11: whether every instruction in `insts` is one `genTree` (the

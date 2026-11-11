@@ -57,6 +57,7 @@ test {
     _ = @import("Sema/param.zig");
     _ = @import("Sema/array.zig");
     _ = @import("Sema/param_test.zig");
+    _ = @import("Sema/derive_test.zig");
     _ = @import("Sema/lower_test.zig");
     _ = @import("Sema/digital_test.zig");
     _ = @import("Sema/digital/sites_test.zig");

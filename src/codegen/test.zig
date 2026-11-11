@@ -250,3 +250,27 @@ test "§11.9 a polynomial body is not versioned: its entry check costs more than
     try std.testing.expect(std.mem.find(u8, r.ok.text, "zIn(") == null);
     try std.testing.expect(std.mem.find(u8, r.ok.text, ".optimized") == null);
 }
+
+test "T5 regression (dependent_control_rg.va): a derived default's shared parameter read is visible to every branch that reads it" {
+    // `ok`'s `||` chain reads `r` from two different alternatives. Sema's
+    // lowering hands back the same `arg` Air instruction (one per row,
+    // `s.param_args`) every time a parameter is read, so `Function.zig`'s
+    // `genTree` meets it twice, from two different `cond_br` branches. A
+    // naive "render where first met" walk declares its `const` inside one
+    // branch's `{}`, leaving the other an undeclared identifier (`v0` in
+    // the real fixture); `expectAstGen` is the same check a real build
+    // makes first, and catches it here too.
+    const gpa = std.testing.allocator;
+    var r = try emit(gpa,
+        \\module d(a, c);
+        \\  inout a, c;
+        \\  electrical a, c;
+        \\  parameter real r = 0;
+        \\  parameter real g = 0;
+        \\  localparam integer ok = ((r > 0) && (g == 0)) || ((r > 0) && (g > 0));
+        \\  analog I(a, c) <+ ok * V(a, c);
+        \\endmodule
+    );
+    defer r.deinit(gpa);
+    try expectAstGen(gpa, r.ok.text);
+}

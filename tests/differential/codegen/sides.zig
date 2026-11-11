@@ -8,6 +8,7 @@
 //! Contents:
 //! - `pub const Card = struct`, `pub const New = union(enum)`
 //! - `pub fn old(gpa: Allocator, arena: Allocator, path: []const u8, source: []const u8, include: []const []const u8) !?[]const u8`
+//! - `pub fn picked(rel: []const u8, filter: []const u8) bool`
 //! - `pub fn new(gpa: Allocator, arena: Allocator, io: Io, path: []const u8, source: []const u8, include: []const []const u8) !New`
 
 const std = @import("std");
@@ -164,6 +165,15 @@ pub fn new(gpa: Allocator, arena: Allocator, io: Io, path: []const u8, source: [
             } };
         },
     }
+}
+
+/// Whether fixture path `rel` holds one of `filter`'s `|`-separated
+/// substrings; an empty filter picks every fixture.
+pub fn picked(rel: []const u8, filter: []const u8) bool {
+    if (filter.len == 0) return true;
+    var it = std.mem.splitScalar(u8, filter, '|');
+    while (it.next()) |part| if (part.len != 0 and std.mem.find(u8, rel, part) != null) return true;
+    return false;
 }
 
 // ---- private ----

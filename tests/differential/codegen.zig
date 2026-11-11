@@ -21,7 +21,12 @@
 //!   parameter near its default inside its ranges; a time in [0, 1 ms]):
 //!   the residual rows, their Jacobian (with `jac_const`), the reactive rows
 //!   and theirs, bit for bit (NaN as NaN), save the named libm and fast-math
-//!   ulp bounds below; the §9.4 display records `say` writes at each
+//!   ulp bounds below; after the accept, the §9.17.2 breakpoints and step
+//!   bound, and the §4.6.3/§4.6.4 AC phasors and noise PSDs per branch;
+//!   each device against itself (dyn.zig): every 7th step is first
+//!   rejected and its rows must come back bit for bit after
+//!   `stateCtl(.revert)`, and every lane must match a central difference;
+//!   the §9.4 display records `say` writes at each
 //!   accepted point and the `say_sites` formats, exactly (the old device
 //!   built `.record`); where a side stops the process (§4.2.4's zero
 //!   divisor), every side must stop there by the same signal, and the run
@@ -153,7 +158,7 @@ fn runAll() !void {
     var ready: std.ArrayList(Ready) = .empty;
     const include = options.fixture_root ++ "/include";
     for (try collect(arena, io)) |rel| {
-        if (!picked(rel, filter)) continue;
+        if (!sides.picked(rel, filter)) continue;
         tally.fixtures += 1;
         if (lower_listed.contains(rel)) {
             tally.lower_listed += 1;
@@ -203,7 +208,7 @@ fn runAll() !void {
     var it = xfail.iterator();
     while (it.next()) |e| {
         const rel = e.key_ptr.*;
-        if (!picked(rel, filter)) continue;
+        if (!sides.picked(rel, filter)) continue;
         if (whys.contains(rel)) continue;
         tally.failed += 1;
         const agreed = for (ready.items) |r| {
@@ -456,7 +461,10 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?Ru
         if (std.mem.find(u8, r.new, k) != null) break true;
     } else false;
     const n = r.card.n_u;
-    const len = 2 * n + 2 * n * n;
+    // dyn.zig's `len + extras`: the rows, Jacobians and charges, then the
+    // breakpoints, the noise PSDs at 3 frequencies and the AC phasors.
+    const rows_len = 2 * n + 2 * n * n;
+    const len = rows_len + 3 + 5 * n * n;
     const outs = [3][]f64{ try arena.alloc(f64, len), try arena.alloc(f64, len), try arena.alloc(f64, len) };
     const says = [3][]f64{ try arena.alloc(f64, say_cap), try arena.alloc(f64, say_cap), try arena.alloc(f64, say_cap) };
     var say_lens: [3]u32 = @splat(0);
@@ -517,10 +525,15 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?Ru
             const rec: u32 = @intCast(p << 2 | s);
             _ = std.os.linux.write(fd, @ptrCast(&rec), 4);
             const rc = f.?(names.ptr, vals.ptr, @intCast(vals.len), x.ptr, n, t, @intCast(p), out.ptr, @intCast(len), says[s].ptr, say_cap, &say_lens[s]);
-            if (rc != 0) return try arena.print("the {s} device's entry returned {d} (card: {s})", .{ side, rc, try std.mem.join(arena, ",", @ptrCast(r.card.names)) });
+            switch (rc) {
+                0 => {},
+                -5 => return try arena.print("point {d}: the {s} device's rejected step moved value {d}: {e} after stateCtl(.revert), {e} before the step", .{ p, side, @as(u32, @intFromFloat(out[0])), out[2], out[1] }),
+                -6 => return try arena.print("point {d}: the {s} device's {s} {d} lane {d} is {e}, a central difference (h {e}) {e}", .{ p, side, if (out[0] < @as(f64, @floatFromInt(n))) "row" else "q row", @as(u32, @intFromFloat(out[0])) % n, @as(u32, @intFromFloat(out[1])), out[2], out[4], out[3] }),
+                else => return try arena.print("the {s} device's entry returned {d} (card: {s})", .{ side, rc, try std.mem.join(arena, ",", @ptrCast(r.card.names)) }),
+            }
         }
         // §11.9 the box promises no inf or NaN on the fast body's slice.
-        if (sides_n == 3 and inside) for (outs[2], 0..) |b, i| {
+        if (sides_n == 3 and inside) for (outs[2][0..rows_len], 0..) |b, i| {
             if (!std.math.isFinite(b)) return try arena.print("point {d}: versioned value {d} is {e} inside the box", .{ p, i, b });
         };
         for (1..sides_n) |s| for (outs[0], outs[s], 0..) |a, b, i| {
@@ -530,13 +543,13 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?Ru
                 counts[1] += 1;
                 continue;
             }
-            const part, const at = if (i < n) .{ "row", i } else if (i < n + n * n) .{ "d row", i - n } else if (i < 2 * n + n * n) .{ "q row", i - n - n * n } else .{ "d q row", i - 2 * n - n * n };
+            const part, const at = if (i < n) .{ "row", i } else if (i < n + n * n) .{ "d row", i - n } else if (i < 2 * n + n * n) .{ "q row", i - n - n * n } else if (i < rows_len) .{ "d q row", i - 2 * n - n * n } else ulps.extra(i - rows_len, n);
             if (s == 2 and inside and apart <= fast_ulps) {
                 const k: usize = if (part[0] == 'd') 5 else 4;
                 counts[k] = @max(counts[k], @as(u32, @intCast(apart)));
                 continue;
             }
-            if (s == 2 and inside and @abs(a - b) <= fast_rel * ulps.rowScale(outs[0], n, i)) continue;
+            if (s == 2 and inside and i < rows_len and @abs(a - b) <= fast_rel * ulps.rowScale(outs[0], n, i)) continue;
             return try arena.print("point {d}: {s} {d}: old {e}, {s} {e}{s}", .{ p, part, at, a, if (s == 1) "new" else "versioned", b, if (s == 2 and !inside) " (outside the box: the strict body ran)" else "" });
         };
         // §9.4 the point's display records: bit for bit, save the rows'
@@ -580,15 +593,6 @@ fn sitesDiffer(arena: Allocator, old: SiteFn, new: SiteFn) !?[]const u8 {
         if (a == null or b == null) return try arena.print("the display sites differ in number: {s} has site {d}", .{ if (a != null) "only the old" else "only the new", i });
         if (!std.mem.eql(u8, a.?[0..la], b.?[0..lb])) return try arena.print("display site {d}: old format \"{f}\", new \"{f}\"", .{ i, std.zig.fmtString(a.?[0..la]), std.zig.fmtString(b.?[0..lb]) });
     }
-}
-
-/// Whether fixture path `rel` holds one of `filter`'s `|`-separated
-/// substrings; an empty filter picks every fixture.
-fn picked(rel: []const u8, filter: []const u8) bool {
-    if (filter.len == 0) return true;
-    var it = std.mem.splitScalar(u8, filter, '|');
-    while (it.next()) |part| if (part.len != 0 and std.mem.find(u8, rel, part) != null) return true;
-    return false;
 }
 
 /// Whether every guard of `box` admits the point (`Float.Guard.admits`, the
@@ -747,8 +751,8 @@ test "compare: a display difference only the strict new device makes is named ne
 }
 
 test "picked: a `|`-separated filter picks a path holding any of its parts" {
-    try std.testing.expect(picked("ch04/abs.va", ""));
-    try std.testing.expect(picked("ch04/abs.va", "cosh|abs"));
-    try std.testing.expect(!picked("ch04/abs.va", "cosh|fmod"));
-    try std.testing.expect(!picked("ch04/abs.va", "|"));
+    try std.testing.expect(sides.picked("ch04/abs.va", ""));
+    try std.testing.expect(sides.picked("ch04/abs.va", "cosh|abs"));
+    try std.testing.expect(!sides.picked("ch04/abs.va", "cosh|fmod"));
+    try std.testing.expect(!sides.picked("ch04/abs.va", "|"));
 }

@@ -6,6 +6,7 @@
 //! - `pub fn apart(a: f64, b: f64) u64`
 //! - `pub fn rowScale(out: []const f64, n: usize, i: usize) f64`
 //! - `pub fn sameBits(a: f64, b: f64) bool`
+//! - `pub fn extra(j: usize, n: usize) struct { []const u8, usize }`
 
 const std = @import("std");
 
@@ -36,4 +37,14 @@ pub fn rowScale(out: []const f64, n: usize, i: usize) f64 {
 pub fn sameBits(a: f64, b: f64) bool {
     if (std.math.isNan(a) and std.math.isNan(b)) return true;
     return @as(u64, @bitCast(a)) == @as(u64, @bitCast(b));
+}
+
+/// What value `j` past the rows of `dyn.zig`'s output is, and its index in
+/// its table (a (row, col) branch is row·n + col).
+pub fn extra(j: usize, n: usize) struct { []const u8, usize } {
+    const names = [_][]const u8{ "nextBreakpoint", "pendingBreakpoint", "bound_step" };
+    if (j < names.len) return .{ names[j], 0 };
+    const k = j - names.len;
+    const tables = [_][]const u8{ "noise PSD at 1 Hz, branch", "noise PSD at 1 kHz, branch", "noise PSD at 1 MHz, branch", "AC stimulus re, branch", "AC stimulus im, branch" };
+    return .{ tables[k / (n * n)], k % (n * n) };
 }

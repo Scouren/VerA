@@ -110,6 +110,39 @@ pub fn add(g: Graph, suite_exe: *Build.Step.Compile, check: *Build.Step, espice_
     conformance_selftest.has_side_effects = true; // reads the fixtures and tools/install.sh
     test_step.dependOn(&conformance_selftest.step);
 
+    // The diagnostic-coverage gaps (research/diagcodes.md A3): `check` diffs
+    // today's gates against tools/diag_gaps.xfail, `selftest` is the tool's
+    // own oracle (a synthetic world plus real-tree planted faults).
+    const diag_gaps_check = b.addSystemCommand(&.{"python3"});
+    diag_gaps_check.addFileArg(b.path("tools/diag_gaps.py"));
+    diag_gaps_check.addArg("check");
+    diag_gaps_check.setEnvironmentVariable("PYTHONUTF8", "1");
+    diag_gaps_check.expectExitCode(0);
+    diag_gaps_check.has_side_effects = true; // reads lib/, src/, tests/conformance and codes.zon
+    test_step.dependOn(&diag_gaps_check.step);
+
+    const diag_gaps_selftest = b.addSystemCommand(&.{"python3"});
+    diag_gaps_selftest.addFileArg(b.path("tools/diag_gaps.py"));
+    diag_gaps_selftest.addArg("selftest");
+    diag_gaps_selftest.setEnvironmentVariable("PYTHONUTF8", "1");
+    diag_gaps_selftest.expectExitCode(0);
+    diag_gaps_selftest.has_side_effects = true; // builds a synthetic tree plus plants faults in the real one
+    test_step.dependOn(&diag_gaps_selftest.step);
+
+    // Standalone: the full clause/code coverage table, for a human to read
+    // (not a gate; `check` above is the merge gate). `--tsv` writes the
+    // output argument; installed to zig-out so it is easy to find.
+    const diag_coverage = b.addSystemCommand(&.{"python3"});
+    diag_coverage.addFileArg(b.path("tools/diag_gaps.py"));
+    diag_coverage.addArg("report");
+    diag_coverage.addArg("--tsv");
+    const diag_coverage_tsv = diag_coverage.addOutputFileArg("diag_coverage.tsv");
+    diag_coverage.setEnvironmentVariable("PYTHONUTF8", "1");
+    diag_coverage.expectExitCode(0);
+    diag_coverage.has_side_effects = true; // reads lib/, src/, tests/conformance and codes.zon
+    const diag_coverage_install = b.addInstallFile(diag_coverage_tsv, "diag_coverage.tsv");
+    b.step("diag-coverage", "Write the clause/code coverage table to zig-out/diag_coverage.tsv (research/diagcodes.md A3)").dependOn(&diag_coverage_install.step);
+
     // The degenerate-argv table: every documented flag x "", "-", "=", a
     // 128 KiB value, missing, repeated, through this build's vera.
     const argv_exe = b.addExecutable(.{ .name = "vera-argv", .root_module = m.make("tests/argv.zig", &.{}) });

@@ -6,12 +6,16 @@
 //! blocks write somewhere is held too: `retained` when the exposed read
 //! reaches a later write or an `analog initial` body writes it, else
 //! `unless_invariant` (the old `prove.held.prune` may drop it after).
+//! Last, §7.3.6.4 A2D: an analog variable a digital process reads and no
+//! digital process writes (`held_writes.a2dReads`) is held too (`a2d`),
+//! whether or not the analog block itself ever reads it.
 //! The walk is the old definite-assignment walk, conservative alike: a
 //! loop or event body may not run, and after a `disable` nothing defines.
 //! §3.2.2 an array is its elements: a write at constant subscripts defines
 //! that element, and a read needs its element (or, at a run-time subscript
 //! or of the whole array, every element) defined.
-//! Cites: VAMS-2023 §3.2, §5.2.1, §5.3.2, §5.6.1.3, §5.9, §5.10, §7.3.2.
+//! Cites: VAMS-2023 §3.2, §5.2.1, §5.3.2, §5.6.1.3, §5.9, §5.10, §7.3.2,
+//! §7.3.6.4.
 //!
 //! Contents:
 //! - `pub const Why = enum`
@@ -25,12 +29,14 @@ const vams = @import("vams");
 const Sema = @import("../Sema.zig");
 const decl = @import("decl.zig");
 const held_writes = @import("held_writes.zig");
+const func = @import("func.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
+const SysFn = vams.SysFn;
 const Unit = Sema.Unit;
 
 /// Why a variable is held.
-pub const Why = enum(u8) { event, retained, unless_invariant };
+pub const Why = enum(u8) { event, retained, unless_invariant, a2d };
 
 /// The deepest statement nesting the walks follow.
 pub const depth_max: u32 = 1 << 12;
@@ -70,6 +76,12 @@ const Walk = struct {
     /// Each array variable's element count, 0 when it does not fold.
     cells: std.AutoHashMapUnmanaged(Inst.Index, u32) = .empty,
     pend_list: std.ArrayList(Key) = .empty,
+    /// Assignment targets a call inside the statement now being read wrote
+    /// (a sys-call destination, a user function's `output`/`inout` actual):
+    /// queued by `read`, applied by `flush` once the statement's reads are
+    /// done, so a write made through a call cannot be seen as already
+    /// defined by an earlier read of the same statement.
+    pending: std.ArrayList(Inst.Ref) = .empty,
     disabled: bool = false,
     in_initial: bool = false,
 
@@ -107,6 +119,19 @@ const Walk = struct {
         if (w.in_initial) m.initial = true;
     }
 
+    /// §9.5/§4.7.2.3 a write queued by `read` (a sys-call destination, or a
+    /// user function's `output`/`inout` actual): resolved and applied now
+    /// that every read of the statement has already run.
+    fn flush(w: *Walk) Allocator.Error!void {
+        const vir = w.unit.vir;
+        for (w.pending.items) |r| {
+            const t = held_writes.target(vir, r) orelse continue;
+            try w.write(t.var_);
+            if (t.whole) try w.def(.{ .var_ = t.var_ }) else if (try w.elemOf(r)) |k| try w.def(.{ .var_ = t.var_, .elem = k });
+        }
+        w.pending.clearRetainingCapacity();
+    }
+
     fn body(w: *Walk, b: Vir.Body, depth: u32) Allocator.Error!void {
         if (depth > depth_max) return;
         const vir = w.unit.vir;
@@ -117,6 +142,7 @@ const Walk = struct {
             const tag = vir.instructions.items(.tag)[@backingInt(i)];
             if ((tag == .call or tag == .call_sys) and !used.contains(i)) {
                 try w.read(i.toRef(), 0);
+                try w.flush();
                 continue;
             }
             try w.stmt(i, tag, depth);
@@ -130,26 +156,27 @@ const Walk = struct {
                 const x = decl.payloadOf(vir, Inst.Bin, i);
                 try w.read(x.rhs, 0);
                 try w.subscripts(x.lhs);
-                if (held_writes.target(vir, x.lhs)) |t| {
-                    try w.write(t.var_);
-                    if (t.whole) try w.def(.{ .var_ = t.var_ }) else if (try w.elemOf(x.lhs)) |k| try w.def(.{ .var_ = t.var_, .elem = k });
-                }
+                try w.pending.append(w.s.arena, x.lhs);
+                try w.flush();
             },
             .contrib => {
                 const x = decl.payloadOf(vir, Inst.Bin, i);
                 try w.read(x.lhs, 0);
                 try w.read(x.rhs, 0);
+                try w.flush();
             },
             .contrib_indirect => {
                 const x = decl.payloadOf(vir, Inst.Triple, i);
                 try w.read(x.a, 0);
                 try w.read(x.b, 0);
                 try w.read(x.c, 0);
+                try w.flush();
             },
             .block => try w.body(decl.payloadOf(vir, Inst.Block, i).body, depth + 1),
             .condbr => {
                 const x = decl.payloadOf(vir, Inst.CondBr, i);
                 try w.read(x.cond, 0);
+                try w.flush();
                 try w.alts(&.{ x.then, x.@"else" }, depth);
             },
             .case => {
@@ -162,6 +189,7 @@ const Walk = struct {
                     try arms.append(w.s.arena, arm.body);
                     dflt = dflt or arm.flags.default;
                 }
+                try w.flush();
                 if (!dflt) try arms.append(w.s.arena, .empty);
                 try w.alts(arms.items, depth);
             },
@@ -169,6 +197,7 @@ const Walk = struct {
                 const x = decl.payloadOf(vir, Inst.Loop, i);
                 const c = vir.body(x.cond);
                 if (c.len != 0) try w.read(c[c.len - 1].toRef(), 0);
+                try w.flush();
                 const at = w.list.items.len;
                 for (0..2) |_| {
                     try w.body(x.body, depth + 1);
@@ -179,6 +208,7 @@ const Walk = struct {
             .repeat => {
                 const x = decl.payloadOf(vir, Inst.Repeat, i);
                 try w.read(x.count, 0);
+                try w.flush();
                 const at = w.list.items.len;
                 for (0..2) |_| try w.body(x.body, depth + 1);
                 w.undo(at);
@@ -186,6 +216,7 @@ const Walk = struct {
             .event_wait => {
                 const x = decl.payloadOf(vir, Inst.EventWait, i);
                 try w.read(x.event, 0);
+                try w.flush();
                 const at = w.list.items.len;
                 try w.body(x.body, depth + 1);
                 w.undo(at);
@@ -229,20 +260,32 @@ const Walk = struct {
         if (depth > depth_max) return;
         const vir = w.unit.vir;
         const tag = vir.instructions.items(.tag)[@backingInt(i)];
-        // §9.5 a writer's destinations are written, not read.
-        if (tag == .call_sys) if (writtenFrom(vir, i)) |first| {
-            const args = vir.list(Inst.Ref, decl.payloadOf(vir, Inst.SysCall, i).args);
+        // §9.5/§9.13/§9.12 every argument is read (the old walk's
+        // `stmtEdges` sees a task's arguments only as reads, with no
+        // destination exemption), and a `SysFn.Info.writes` position is
+        // also queued: the write (`flush`) lands only once the statement's
+        // reads are done, so it cannot pre-empt a read of its own target.
+        if (tag == .call_sys) {
+            const c = decl.payloadOf(vir, Inst.SysCall, i);
+            const name = vir.string(c.name);
+            const args = vir.list(Inst.Ref, c.args);
+            const writes: SysFn.Writes = if (SysFn.Tag.fromName(name)) |t| SysFn.get(t).writes else .{};
             for (args, 0..) |a, k| {
-                const dest = k == first or (first >= 2 and k >= first);
-                if (!dest) {
-                    try w.read(a, depth + 1);
-                    continue;
-                }
-                try w.subscripts(a);
-                // Written but not defined, as in the old walk (whose
-                // `stmtEdges` sees a task's arguments only as reads): a
-                // later read is exposed, so the destination is held.
-                if (held_writes.target(vir, a)) |t| try w.write(t.var_);
+                try w.read(a, depth + 1);
+                if (writes.has(k)) try w.pending.append(w.s.arena, a);
+            }
+            return;
+        }
+        // §4.7.2.3 an `output` actual is written by the call, not read (its
+        // subscripts still are); an `inout` one is both. Either is queued.
+        if (tag == .call) if (func.calleeOf(vir, i)) |f| {
+            const formals = vir.body(decl.payloadOf(vir, Inst.Function, f).formals);
+            const args = vir.list(Inst.Ref, decl.payloadOf(vir, Inst.Call, i).args);
+            const n = @min(formals.len, args.len);
+            for (formals[0..n], args[0..n]) |formal, a| {
+                const dir = decl.payloadOf(vir, Inst.Io, formal).flags.dir;
+                if (dir == .output) try w.subscripts(a) else try w.read(a, depth + 1);
+                if (dir == .output or dir == .inout) try w.pending.append(w.s.arena, a);
             }
             return;
         };
@@ -381,24 +424,16 @@ pub fn mark(s: *Sema, unit: *Unit) Allocator.Error!void {
     it = w.marks.iterator();
     while (it.next()) |e| if (e.key_ptr.elem == Key.whole and e.value_ptr.read and (e.value_ptr.initial or unit.held.get(e.key_ptr.var_) == .event))
         try unit.carried.put(s.arena, e.key_ptr.var_, {});
+    // §7.3.6.4: a digital-read, digital-unwritten analog variable is held
+    // whether or not the analog block itself ever reads it back; a
+    // stronger reason already recorded (`.event`/`.retained`) stands.
+    for (try held_writes.a2dReads(s, unit)) |d| {
+        const gop = try unit.held.getOrPut(s.arena, d);
+        if (!gop.found_existing or gop.value_ptr.* == .unless_invariant) gop.value_ptr.* = .a2d;
+    }
 }
 
 // ---- private ----
-
-/// The first argument system call `i` writes (§9.5.3 `$sformat`/`$swrite`
-/// its destination, §9.5.4 `$fgets` its string, §9.5.4.2 `$sscanf`/`$fscanf`
-/// every argument from the third, §9.5.7 `$ferror` and §9.12
-/// `$value$plusargs` their second), or
-/// null for a call that writes none.
-fn writtenFrom(vir: *const Vir, i: Inst.Index) ?usize {
-    const name = vir.string(decl.payloadOf(vir, Inst.SysCall, i).name);
-    const table = std.StaticStringMap(usize).initComptime(.{
-        .{ "$sformat", 0 }, .{ "$swrite", 0 }, .{ "$fgets", 0 },
-        .{ "$sscanf", 2 },  .{ "$fscanf", 2 }, .{ "$value$plusargs", 1 },
-        .{ "$ferror", 1 },
-    });
-    return table.get(name);
-}
 
 /// Every instruction `i` reads as an operand (control.zig's walk).
 fn operandsOf(s: *Sema, vir: *const Vir, i: Inst.Index, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void {

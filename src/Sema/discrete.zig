@@ -12,6 +12,8 @@
 //! - `pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void`
 //! - `pub fn base(vir: *const Vir, r: Inst.Ref) ?Inst.Index`
 //! - `pub fn writes(vir: *const Vir, b: Vir.Body, out: *std.ArrayList(Inst.Index), arena: Allocator, depth: u32) Allocator.Error!void`
+//! - `pub fn isMixed(s: *Sema, unit: *Unit) Allocator.Error!bool`
+//! - private `Owned`, `Reads` (`item`, `decl.eachItem`'s visitors)
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -29,42 +31,69 @@ const Unit = Sema.Unit;
 /// The deepest statement or expression nesting the walks follow.
 const depth_max: u32 = 1 << 12;
 
+/// `mark`'s digital-owned pass: a continuous assignment's target, a
+/// discrete process's or task's writes, and (M3, §8.5.3.5) a switch-level
+/// gate instance's terminal nets, whose value the switch kernel resolves.
+const Owned = struct {
+    out: *std.ArrayList(Inst.Index),
+
+    pub fn item(o: Owned, s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
+        const vir = unit.vir;
+        switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+            .assign => {
+                const a = decl.payloadOf(vir, Inst.Assign, i);
+                const lhs = vir.body(a.lhs);
+                if (lhs.len == 0) return;
+                const t = base(vir, lhs[lhs.len - 1].toRef()) orelse return;
+                switch (vir.instructions.items(.tag)[@backingInt(t)]) {
+                    // A.6.1 a continuous assignment drives a net, never a variable.
+                    .variable => try s.fail(.E0438, unit.file, i.toRef(), "", .{}),
+                    .net => if (try continuous(s, unit, t)) try s.fail(.E0435, unit.file, i.toRef(), "`{s}` is driven by a continuous assignment", .{vir.string(decl.nameOf(vir, t))}) else try o.out.append(s.arena, t),
+                    else => try o.out.append(s.arena, t),
+                }
+            },
+            .initial, .always => try writes(vir, decl.payloadOf(vir, Inst.Process, i).body, o.out, s.arena, 0),
+            // A.2.7 a task is enabled only from the discrete context, so what its
+            // body writes is digital-owned too (every task, enabled or not).
+            .function => {
+                const f = decl.payloadOf(vir, Inst.Function, i);
+                if (f.flags.task) try writes(vir, f.body, o.out, s.arena, 0);
+            },
+            .instance => if (decl.payloadOf(vir, Inst.Instance, i).flags.kind == .gate) try switchTerminals(s, unit, i, o.out),
+            else => {}, // else: no digital process
+        }
+    }
+};
+
+/// `mark`'s analog-reads pass: every variable and net an analog block reads.
+const Reads = struct {
+    out: *std.AutoArrayHashMapUnmanaged(Inst.Index, void),
+
+    pub fn item(r: Reads, s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
+        switch (unit.vir.instructions.items(.tag)[@backingInt(i)]) {
+            .analog, .analog_initial => try analogReads(s, unit, decl.payloadOf(unit.vir, Inst.Process, i).body, r.out),
+            else => {}, // else: not an analog block
+        }
+    }
+};
+
 /// Fills `unit.discrete` with the digital-owned values the instance's
 /// analog blocks read, in the old order (continuous assignment targets,
-/// then the processes' writes, then discrete nets read by name).
+/// then the processes' writes, then discrete nets read by name). M1: a
+/// generate scheme's items are unrolled (`decl.eachItem`), not only the
+/// module's top-level ones.
 pub fn mark(s: *Sema, unit: *Unit) Allocator.Error!void {
     assert(unit.discrete.items.len == 0);
     const vir = unit.vir;
     if (!try isMixed(s, unit)) return initial(s, unit);
     s.mixed = true;
+    var env = try decl.envOf(s, unit);
+    defer env.deinit();
+    const top = unit.module.body;
     var owned: std.ArrayList(Inst.Index) = .empty;
-    for (vir.body(unit.module.body)) |i| if (vir.instructions.items(.tag)[@backingInt(i)] == .assign) {
-        const a = decl.payloadOf(vir, Inst.Assign, i);
-        const lhs = vir.body(a.lhs);
-        if (lhs.len == 0) continue;
-        const t = base(vir, lhs[lhs.len - 1].toRef()) orelse continue;
-        switch (vir.instructions.items(.tag)[@backingInt(t)]) {
-            // A.6.1 a continuous assignment drives a net, never a variable.
-            .variable => try s.fail(.E0438, unit.file, i.toRef(), "", .{}),
-            .net => if (try continuous(s, unit, t)) try s.fail(.E0435, unit.file, i.toRef(), "`{s}` is driven by a continuous assignment", .{vir.string(decl.nameOf(vir, t))}) else try owned.append(s.arena, t),
-            else => try owned.append(s.arena, t),
-        }
-    };
-    for (vir.body(unit.module.body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .initial, .always => try writes(vir, decl.payloadOf(vir, Inst.Process, i).body, &owned, s.arena, 0),
-        // A.2.7 a task is enabled only from the discrete context, so what its
-        // body writes is digital-owned too (every task, enabled or not).
-        .function => {
-            const f = decl.payloadOf(vir, Inst.Function, i);
-            if (f.flags.task) try writes(vir, f.body, &owned, s.arena, 0);
-        },
-        else => {}, // else: no digital process
-    };
+    try decl.eachItem(s, unit, &env, top, Owned{ .out = &owned }, 0);
     var reads: std.AutoArrayHashMapUnmanaged(Inst.Index, void) = .empty;
-    for (vir.body(unit.module.body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-        .analog, .analog_initial => try analogReads(s, unit, decl.payloadOf(vir, Inst.Process, i).body, &reads),
-        else => {}, // else: not an analog block
-    };
+    try decl.eachItem(s, unit, &env, top, Reads{ .out = &reads }, 0);
     // §7.3.1 a discrete net the analog block reads holds the kernel's value.
     for (reads.keys()) |d| if (vir.instructions.items(.tag)[@backingInt(d)] == .net and !try continuous(s, unit, d)) try owned.append(s.arena, d);
     for (owned.items) |d| {
@@ -158,12 +187,12 @@ pub fn writes(vir: *const Vir, b: Vir.Body, out: *std.ArrayList(Inst.Index), are
     };
 }
 
-// ---- private ----
-
 /// §7.2.2 whether the digital half runs on the mixed kernel: a continuous
 /// assignment, a `wreal` net, an `always`, an `initial` that does more than
-/// assign, or a discrete net the analog block reads by name.
-fn isMixed(s: *Sema, unit: *Unit) Allocator.Error!bool {
+/// assign, or a discrete net the analog block reads by name. `held_writes`
+/// gates `a2dReads` on this too, since a non-mixed module's variables are
+/// never digital-read.
+pub fn isMixed(s: *Sema, unit: *Unit) Allocator.Error!bool {
     const vir = unit.vir;
     for (vir.body(unit.module.body)) |i| switch (vir.instructions.items(.tag)[@backingInt(i)]) {
         .assign, .always => return true,
@@ -183,6 +212,20 @@ fn isMixed(s: *Sema, unit: *Unit) Allocator.Error!bool {
     };
     for (reads.keys()) |d| if (vir.instructions.items(.tag)[@backingInt(d)] == .net and !try continuous(s, unit, d)) return true;
     return false;
+}
+
+// ---- private ----
+
+/// §8.5.3.5 (M3): a gate-level instance's terminal nets are digital-owned,
+/// their value the switch kernel's to resolve.
+fn switchTerminals(s: *Sema, unit: *Unit, i: Inst.Index, out: *std.ArrayList(Inst.Index)) Allocator.Error!void {
+    const vir = unit.vir;
+    for (vir.list(Inst.Arg, decl.payloadOf(vir, Inst.Instance, i).conns)) |c| {
+        const value = vir.body(c.value);
+        if (value.len == 0) continue;
+        const d = base(vir, value[value.len - 1].toRef()) orelse continue;
+        if (vir.instructions.items(.tag)[@backingInt(d)] == .net) try out.append(s.arena, d);
+    }
 }
 
 /// A.6.2/§7.2.2 the old `constantShape`: whether an `initial` body is only

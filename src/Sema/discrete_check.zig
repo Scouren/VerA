@@ -28,6 +28,7 @@ const Sema = @import("../Sema.zig");
 const decl = @import("decl.zig");
 const control = @import("control.zig");
 const discrete = @import("discrete.zig");
+const func = @import("func.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const SysFn = vams.SysFn;
@@ -51,7 +52,7 @@ const Digital = struct {
                 const final = decl.payloadOf(vir, Inst.StepEvent, i).flags.final;
                 try s.fail(.E0708, file, src, "`{s}` in {s}, the digital context", .{ if (final) "final_step" else "initial_step", d.where });
             },
-            .call => if (function(vir, i)) |f| if (decl.payloadOf(vir, Inst.Function, f).flags.analog)
+            .call => if (func.calleeOf(vir, i)) |f| if (decl.payloadOf(vir, Inst.Function, f).flags.analog)
                 try s.fail(.E0430, file, src, "`{s}`: an analog function shall only be called from an analog block or from another analog function", .{vir.string(decl.payloadOf(vir, Inst.Function, f).name)}),
             .contrib, .contrib_indirect => try s.fail(.E0435, file, src, "contributed from {s}", .{d.where}),
             // A.6.2: a blocking, nonblocking or procedural `assign`/`deassign`
@@ -185,7 +186,7 @@ const Analog = struct {
         const vir = unit.vir;
         switch (vir.instructions.items(.tag)[@backingInt(i)]) {
             .store, .store_nb => try a.write(s, unit, decl.payloadOf(vir, Inst.Bin, i).lhs),
-            .call => if (function(vir, i)) |f| {
+            .call => if (func.calleeOf(vir, i)) |f| {
                 const formals = vir.body(decl.payloadOf(vir, Inst.Function, f).formals);
                 const args = vir.list(Inst.Ref, decl.payloadOf(vir, Inst.Call, i).args);
                 for (formals[0..@min(formals.len, args.len)], args[0..@min(formals.len, args.len)]) |formal, arg| {
@@ -245,14 +246,6 @@ fn walk(s: *Sema, unit: *Unit, b: Vir.Body, v: anytype, depth: u32) Allocator.Er
             },
         }
     }
-}
-
-/// The function call `i` names, or null for none of the module's.
-fn function(vir: *const Vir, i: Inst.Index) ?Inst.Index {
-    const ci = decl.payloadOf(vir, Inst.Call, i).callee.toIndex() orelse return null;
-    if (vir.instructions.items(.tag)[@backingInt(ci)] != .decl_ref) return null;
-    const f = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(ci)].decl_tok.decl);
-    return if (vir.instructions.items(.tag)[@backingInt(f)] == .function) f else null;
 }
 
 /// E0482 when procedural assignment target `lhs` is a net.
@@ -327,7 +320,7 @@ fn digitalCalls(s: *Sema, unit: *Unit, r: Inst.Ref, depth: u32) Allocator.Error!
     if (depth > depth_max) return;
     const i = r.toIndex() orelse return;
     const vir = unit.vir;
-    if (vir.instructions.items(.tag)[@backingInt(i)] == .call) if (function(vir, i)) |f| {
+    if (vir.instructions.items(.tag)[@backingInt(i)] == .call) if (func.calleeOf(vir, i)) |f| {
         if (!decl.payloadOf(vir, Inst.Function, f).flags.analog)
             try s.fail(.E0436, unit.file, r, "`{s}`", .{vir.string(decl.payloadOf(vir, Inst.Function, f).name)});
     };

@@ -17,6 +17,7 @@
 //! - `pub fn bindChildren(s: *Sema, unit: *Unit) Allocator.Error!void`
 //! - `pub fn bindBridges(s: *Sema) Allocator.Error!void`
 //! - `pub fn bridgeNets(s: *Sema, parent: Zcu.Instance.Index) Allocator.Error!void`
+//! - `Finder.item` (`decl.eachItem`'s visitor; `pub` for `foldConn`'s cross-file call)
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -27,6 +28,7 @@ const Sema = @import("../Sema.zig");
 const Zcu = @import("../Zcu.zig");
 const decl = @import("decl.zig");
 const net = @import("net.zig");
+const eval = @import("eval.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Node = Air.Device.Node;
@@ -39,6 +41,27 @@ const nameOf = decl.nameOf;
 /// `vectorBase`'s result: the bind and the name it was declared with, so a
 /// caller's diagnostic can name it as the old `analog/node.zig` messages do.
 const VecRef = struct { v: @FieldType(Sema.Bind, "vector"), name: []const u8 };
+
+/// `foldConn`'s fallback visitor: a loop generate scheme unrolls one `src`
+/// VIR node into every one of its instances (§6.6.1), so `target` alone
+/// does not pick one; `ordinal` (`target`'s `at`-th visit, 0 based) does.
+/// `decl.eachItem`'s genvars are bound in `unit.binds` only while it visits
+/// that item, so the fold runs from inside the matching callback instead of
+/// after the walk has moved on.
+const Finder = struct {
+    target: Inst.Index,
+    ordinal: u32,
+    ref: Inst.Ref,
+    at: *u32,
+    out: *?eval.Const,
+
+    pub fn item(f: Finder, s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
+        if (i != f.target) return;
+        defer f.at.* += 1;
+        if (f.at.* != f.ordinal) return;
+        f.out.* = try decl.foldRef(s, unit, f.ref);
+    }
+};
 
 /// §6.5 a child's ports: each the node(s) its connection names in the
 /// parent; an unconnected port is a net of the child's own.
@@ -127,7 +150,7 @@ fn bindChild(s: *Sema, unit: *Unit, pu: *Unit, formal: Inst.Index, actual: Inst.
             .elem, .slice, .slice_up, .slice_down, .concat => {
                 var bits: std.ArrayList(Node.Index) = .empty;
                 defer bits.deinit(s.arena);
-                const ok = try connNodes(s, pu, actual, &bits);
+                const ok = try connNodes(s, pu, unit.instance, actual, &bits);
                 if (ok and bits.items.len == 1) break :blk bits.items[0];
                 if (ok) try s.fail(.E0925, pu.file, actual, "the connection is {d} nets wide and the port it connects is scalar", .{bits.items.len});
                 break :blk .ground; // a refused connection binds the port to ground
@@ -168,7 +191,7 @@ fn bindVector(s: *Sema, unit: *Unit, pu: *Unit, first: Inst.Index, r: [2]i64, ac
     var connected = false;
     var failed = false;
     if (actual != .none) {
-        const ok = try connNodes(s, pu, actual, &bits);
+        const ok = try connNodes(s, pu, unit.instance, actual, &bits);
         if (ok and bits.items.len == width) {
             connected = true;
         } else {
@@ -209,24 +232,24 @@ fn failWidth(s: *Sema, pu: *Unit, actual: Inst.Ref, got: usize, want: u32) Alloc
     try s.fail(.E0925, pu.file, actual, "the connection is {d} nets wide and the port it connects is {d}", .{ got, want });
 }
 
-/// §6.5.7.1 the nodes `r` (a port connection in `pu`) names, msb first: one
-/// per concatenation member (`memberNodes`), or the one member itself.
-/// False after a diagnostic.
-fn connNodes(s: *Sema, pu: *Unit, r: Inst.Ref, out: *std.ArrayList(Node.Index)) Allocator.Error!bool {
+/// §6.5.7.1 the nodes `r` (a port connection in `pu`, bound for `child`)
+/// names, msb first: one per concatenation member (`memberNodes`), or the
+/// one member itself. False after a diagnostic.
+fn connNodes(s: *Sema, pu: *Unit, child: Zcu.Instance.Index, r: Inst.Ref, out: *std.ArrayList(Node.Index)) Allocator.Error!bool {
     const vir = pu.vir;
     const i = r.toIndex() orelse return false;
     if (vir.instructions.items(.tag)[@backingInt(i)] == .concat) {
         for (vir.list(Inst.Ref, payloadOf(vir, Inst.Refs, i))) |m|
-            if (!try memberNodes(s, pu, m, m, out)) return false; // stop at the first failing member
+            if (!try memberNodes(s, pu, child, m, m, out)) return false; // stop at the first failing member
         return true;
     }
-    return memberNodes(s, pu, r, r, out);
+    return memberNodes(s, pu, child, r, r, out);
 }
 
 /// One member of a port connection (or the whole connection, not a
 /// concatenation): every element of a whole vector net, one scalar net, or
 /// the elements a constant §6.5.5 select names, appended msb first.
-fn memberNodes(s: *Sema, pu: *Unit, r: Inst.Ref, src: Inst.Ref, out: *std.ArrayList(Node.Index)) Allocator.Error!bool {
+fn memberNodes(s: *Sema, pu: *Unit, child: Zcu.Instance.Index, r: Inst.Ref, src: Inst.Ref, out: *std.ArrayList(Node.Index)) Allocator.Error!bool {
     const vir = pu.vir;
     const i = r.toIndex() orelse return false;
     switch (vir.instructions.items(.tag)[@backingInt(i)]) {
@@ -249,7 +272,7 @@ fn memberNodes(s: *Sema, pu: *Unit, r: Inst.Ref, src: Inst.Ref, out: *std.ArrayL
             const x = payloadOf(vir, Inst.Bin, i);
             const vb = (try vectorBase(s, pu, x.lhs, src)) orelse return false;
             const v = vb.v;
-            const k = ((try decl.foldRef(s, pu, x.rhs)) orelse return false).asIntExact() orelse return false;
+            const k = ((try foldConn(s, pu, child, x.rhs)) orelse return false).asIntExact() orelse return false;
             if (k < @min(v.msb, v.lsb) or k > @max(v.msb, v.lsb)) {
                 try s.fail(.E0352, pu.file, src, "`{s}` is [{d}:{d}], so {d} is not one of its elements", .{ vb.name, v.msb, v.lsb, k });
                 return false;
@@ -264,12 +287,12 @@ fn memberNodes(s: *Sema, pu: *Unit, r: Inst.Ref, src: Inst.Ref, out: *std.ArrayL
             const v = vb.v;
             const decl_r: [2]i64 = .{ v.msb, v.lsb };
             const r2: [2]i64 = if (tag == .slice) blk: {
-                const m = ((try decl.foldRef(s, pu, t.b)) orelse return false).asIntExact() orelse return false;
-                const l = ((try decl.foldRef(s, pu, t.c)) orelse return false).asIntExact() orelse return false;
+                const m = ((try foldConn(s, pu, child, t.b)) orelse return false).asIntExact() orelse return false;
+                const l = ((try foldConn(s, pu, child, t.c)) orelse return false).asIntExact() orelse return false;
                 break :blk .{ m, l };
             } else blk: {
-                const base = ((try decl.foldRef(s, pu, t.b)) orelse return false).asIntExact() orelse return false;
-                const w = ((try decl.foldRef(s, pu, t.c)) orelse return false).asIntExact() orelse return false;
+                const base = ((try foldConn(s, pu, child, t.b)) orelse return false).asIntExact() orelse return false;
+                const w = ((try foldConn(s, pu, child, t.c)) orelse return false).asIntExact() orelse return false;
                 if (w < 1) {
                     try s.fail(.E0352, pu.file, src, "the indexed part-select of `{s}` is {d} wide", .{ vb.name, w });
                     return false;
@@ -306,6 +329,46 @@ fn vectorBase(s: *Sema, pu: *const Unit, r: Inst.Ref, src: Inst.Ref) Allocator.E
         return null;
     }
     return .{ .v = bind.vector, .name = name };
+}
+
+/// `r`'s constant value in `pu`, a select's index or bound (§5.5.2 "may
+/// include genvar variables"): the direct fold first, which covers every
+/// case but a genvar, since `decl.eachItem`'s `.gen_for` binds one in
+/// `unit.binds` only while its own walk visits the scheme's items and lets
+/// it go once that walk returns (`bindChildren` runs later, over every
+/// instance that walk already placed). On a genvar, a fresh walk of `pu`'s
+/// schemes places the same instances in the same order, so `child`'s own
+/// visit (`ordinalOf`'s count, since a loop scheme's one `src` node is
+/// every one of its instances) sees its genvars bound exactly as
+/// `decl.eachItem` first had them there.
+fn foldConn(s: *Sema, pu: *Unit, child: Zcu.Instance.Index, r: Inst.Ref) Allocator.Error!?eval.Const {
+    if (try decl.foldRef(s, pu, r)) |c| return c;
+    const zcu = s.zcu;
+    const target = zcu.instances.items(.src)[@backingInt(child)].toIndex() orelse return null;
+    var at: u32 = 0;
+    var found: ?eval.Const = null;
+    var env = try decl.envOf(s, pu);
+    defer env.deinit();
+    try decl.eachItem(s, pu, &env, pu.module.body, Finder{
+        .target = target,
+        .ordinal = ordinalOf(zcu, child),
+        .ref = r,
+        .at = &at,
+        .out = &found,
+    }, 0);
+    return found;
+}
+
+/// How many instances before `child` share its parent and its `src` node:
+/// a loop generate scheme's `at`-th placement of the one VIR node it
+/// unrolls (§6.6.1), 0 based.
+fn ordinalOf(zcu: *const Zcu, child: Zcu.Instance.Index) u32 {
+    const k = @backingInt(child);
+    const parent = zcu.instances.items(.parent)[k];
+    const src = zcu.instances.items(.src)[k];
+    var n: u32 = 0;
+    for (0..k) |j| n += @intFromBool(zcu.instances.items(.parent)[j] == parent and zcu.instances.items(.src)[j] == src);
+    return n;
 }
 
 fn unitOf(s: *Sema, i: Zcu.Instance.Index) ?*Unit {

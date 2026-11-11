@@ -687,3 +687,72 @@ test "§6.5.7.1 a vector child port connected to a narrower net is E0925, not a 
         \\endmodule
     , .E0925);
 }
+
+test "§5.5.2 a genvar-indexed child port connection binds each unrolled instance to its own element" {
+    // B1-G1/G2: `g[i].u`'s scalar member `r[i]` and `h[j].u`'s sub-range
+    // `q[2j+1:2j]` each name a different net per generate iteration, IEEE
+    // 1364-2005 §5.5.2's "The index must be a constant expression, though
+    // it may include genvar variables". `bindChildren` runs once every
+    // instance already exists (`decl.zig`'s spine), after the `gen_for`
+    // that unrolled them has let its genvar go (`decl.eachItem`'s own
+    // `defer`), so `foldConn`'s fallback re-walks `top`'s scheme to fold
+    // `i`/`j` as that walk first had them, one instance at a time
+    // (`ordinalOf`): every element gets its own branch, not every instance
+    // grounded onto the same one.
+    try expectTables(
+        \\module top(p);
+        \\  inout p; electrical p;
+        \\  electrical [3:0] r, q;
+        \\  genvar i, j;
+        \\  generate
+        \\    for (i = 0; i < 4; i = i + 1) begin : g
+        \\      one #(.val(0.25 * (i + 1))) u(.v(r[i]), .c(p));
+        \\    end
+        \\    for (j = 0; j < 2; j = j + 1) begin : h
+        \\      pair #(.hi(2 * j + 2), .lo(2 * j + 1)) u(.w(q[2 * j + 1:2 * j]), .c(p));
+        \\    end
+        \\  endgenerate
+        \\endmodule
+        \\module one(v, c);
+        \\  inout v, c; electrical v, c;
+        \\  parameter real val = 0.0;
+        \\  analog V(v, c) <+ val;
+        \\endmodule
+        \\module pair(w, c);
+        \\  inout [1:0] w; inout c;
+        \\  electrical [1:0] w; electrical c;
+        \\  parameter real hi = 0.0, lo = 0.0;
+        \\  analog begin
+        \\    V(w[1], c) <+ hi;
+        \\    V(w[0], c) <+ lo;
+        \\  end
+        \\endmodule
+    ,
+        \\node p net
+        \\node r[3] net
+        \\node r[2] net
+        \\node r[1] net
+        \\node r[0] net
+        \\node q[3] net
+        \\node q[2] net
+        \\node q[1] net
+        \\node q[0] net
+        \\param g[0].u.val
+        \\param g[1].u.val
+        \\param g[2].u.val
+        \\param g[3].u.val
+        \\param h[0].u.hi
+        \\param h[0].u.lo
+        \\param h[1].u.hi
+        \\param h[1].u.lo
+        \\contrib potential p r[0]
+        \\contrib potential p r[1]
+        \\contrib potential p r[2]
+        \\contrib potential p r[3]
+        \\contrib potential p q[1]
+        \\contrib potential p q[0]
+        \\contrib potential p q[3]
+        \\contrib potential p q[2]
+        \\
+    );
+}

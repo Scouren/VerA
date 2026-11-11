@@ -1174,3 +1174,23 @@ test "dlower T3: a $dumpvars statement's pc_sites blame is its own name token, n
     const want: u32 = @intCast(std.mem.indexOf(u8, src, "$dumpvars(").?);
     try std.testing.expectEqual(want, lowered.pc_sites[row.pc]);
 }
+
+test "dlower T3: a $sformat blames arg 1, the format argument, even when it is a dynamic (non-literal) variable (old's \"too few\" sub-case blames the format expression itself regardless of whether it is a literal; only \"too many\" is run-time text one static byte cannot reproduce, and the override is no worse than the default there either)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const src =
+        \\module top;
+        \\  reg [8*8:1] s, fmt;
+        \\  initial begin
+        \\    fmt = "%0d";
+        \\    $sformat(s, fmt, 1);
+        \\  end
+        \\endmodule
+    ;
+    const lowered = try lowerSource1364(a, src);
+    const row = try oneTask(&lowered.program, .swrite);
+    const call = std.mem.indexOf(u8, src, "$sformat(").?;
+    const want: u32 = @intCast(std.mem.indexOfPos(u8, src, call, "fmt").?);
+    try std.testing.expectEqual(want, lowered.pc_sites[row.pc]);
+}

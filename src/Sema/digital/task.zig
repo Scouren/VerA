@@ -158,7 +158,15 @@ pub fn task(l: *Lower, i: Inst.Index) Error!void {
             if (args.len < 2) return l.refuse("a $swrite/$sformat with no text");
             const sh: Show = if (kind == .swrite) kind.swrite else .{ .radix = .decimal, .newline = false };
             // §17.2.3 display.zig:485: W1153 (the format mismatch) blames
-            // arg 1, the format argument, not the call.
+            // arg 1, the format argument, not the call. This matches old's
+            // "too few arguments" sub-case exactly (`short`'s
+            // `sformatMismatch(self, e)` with `e = args[0]`, the format
+            // expression). old's "too many" (excess argument) sub-case
+            // instead blames the first leftover argument, a byte that is
+            // runtime-content-dependent for a non-literal format and that
+            // one static site cannot reproduce either way -- overriding or
+            // not. Keep the override unconditional: it is right for "too
+            // few" and no worse than the default for "too many".
             l.b.setSite(l.argSite(l.frame, i, 1));
             const w = try l.b.extraOf(Program.SWrite{ .show = try format.show(l, i, args[1..], sh, at, kind == .sformat), .place = try place.place(l, args[0]), .ty = try l.tyOf(try place.targetType(l, args[0])) });
             break :blk .{ .kind = .swrite, .a = w };

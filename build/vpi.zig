@@ -22,6 +22,7 @@ const globFiles = common.globFiles;
 const pathFromRoot = common.pathFromRoot;
 const checkoutWorkDir = common.checkoutWorkDir;
 const recordResults = common.recordResults;
+const dropNixTmpKeys = common.dropNixTmpKeys;
 
 /// A `.c` fixture with `//! design` (relative to the `.c`), plus its `//! stdout|stderr|xfail` lines;
 /// `//! exit 1` is a refusal, whose message is the `.expected.stderr.txt` beside it;
@@ -156,6 +157,7 @@ pub fn add(g: Graph, vpi_host: *Build.Step.Compile) void {
             _ = filed.addOutputFileArg2(b.fmt("{s}.stdout", .{std.fs.path.stem(f.c)}), .{});
             filed.setCwd(b.tmpPath());
             filed.setEnvironmentVariable("VERA_ZIG", b.graph.zig_exe);
+            dropNixTmpKeys(filed);
             if (f.protect_keys) |k| filed.setEnvironmentVariable("VERA_PROTECT_KEYS", pathFromRoot(b, k));
             filed.expectExitCode(0);
             filed.expectStdOutEqual(f.stdout);
@@ -189,6 +191,7 @@ fn vpiApp(b: *Build, target: Build.ResolvedTarget, optimize: std.lang.Optimize, 
     const run = b.addRunArtifact(app);
     run.setEnvironmentVariable("VERA_ZIG", b.graph.zig_exe);
     run.setEnvironmentVariable("VERA_VPI_WORK", checkoutWorkDir(b, "vera-vpi"));
+    dropNixTmpKeys(run);
     return run;
 }
 

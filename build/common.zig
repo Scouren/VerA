@@ -13,6 +13,7 @@
 //! - `pub fn simSources(b: *Build) *Module`
 //! - `pub fn testRoot(b: *Build, mod: Import) *Module`
 //! - `pub fn testRun(b: *Build, name: []const u8, mod: *Module, runner: Build.Step.Compile.TestRunner, results_dir: ?[]const u8) *Run`
+//! - `pub fn dropNixTmpKeys(r: *Run) void`
 //! - `pub fn recordResults(b: *Build, run: *Run, dir: []const u8, name: []const u8, contents: []const u8) *Build.Step`
 //! - `pub fn globFiles(b: *Build, dir: []const u8, suffix: []const u8) []const []const u8`
 //! - `pub fn configText(b: *Build, path: []const u8) []const u8`
@@ -167,12 +168,18 @@ pub fn testRoot(b: *Build, mod: Import) *Module {
     return twin;
 }
 
-/// CLICOLOR_FORCE keeps zrunner's report colored under the build's capture.
+/// Colour as an argument (`--color=on`, `tools/zrunner.zig` reads it), not an
+/// environment variable: a Run step that sets none keeps its environment map
+/// null, so the build runner never hashes it (F1, research/builds.md R1). A
+/// `nix develop` call otherwise clones its whole exported environment into
+/// the step on the first `setEnvironmentVariable` and hashes every key, and
+/// `NIX_BUILD_TOP`/`TMPDIR`/`TMP`/`TEMP`/`TEMPDIR` are a fresh `mktemp -d`
+/// every call, so a no-op rerun never cached.
 pub fn testRun(b: *Build, name: []const u8, mod: *Module, runner: Build.Step.Compile.TestRunner, results_dir: ?[]const u8) *Run {
     const t = b.addTest(.{ .name = name, .root_module = mod, .test_runner = runner });
     b.top_level_steps.get("build-all").?.step.dependOn(&t.step);
     const r = b.addRunArtifact(t);
-    r.setEnvironmentVariable("CLICOLOR_FORCE", "true");
+    r.addArg("--color=on");
     // A simple-mode runner gets no stdio check, and a Run without one reruns
     // every build. The exit code makes it cacheable on the binary and args;
     // a test that reads files at run time sets has_side_effects instead.
@@ -182,6 +189,21 @@ pub fn testRun(b: *Build, name: []const u8, mod: *Module, runner: Build.Step.Com
         r.has_side_effects = true;
     }
     return r;
+}
+
+/// Call right after setting a Run step's own environment variable(s): the
+/// first `setEnvironmentVariable` clones the whole build's exported
+/// environment into the step, and the build runner hashes every key and
+/// value of a Run step's map into its cache key (F1, research/builds.md
+/// R1). `nix develop` makes `NIX_BUILD_TOP`, `TMPDIR`, `TMP`, `TEMP` and
+/// `TEMPDIR` a fresh `mktemp -d` on every call and nothing else in a
+/// worktree's environment changes between calls, so dropping these five
+/// keys from the clone lets the rest of it (and the step) hit the cache
+/// across repeated `nix develop` calls. Keep calling `setEnvironmentVariable`
+/// before this: once the map exists, a later set only adds a key, it does
+/// not re-clone.
+pub fn dropNixTmpKeys(r: *Run) void {
+    for ([_][]const u8{ "NIX_BUILD_TOP", "TMPDIR", "TMP", "TEMP", "TEMPDIR" }) |k| r.removeEnvironmentVariable(k);
 }
 
 /// Publish C application results only after its checked execution succeeds.

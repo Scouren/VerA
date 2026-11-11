@@ -21,7 +21,7 @@
 //! - `pub const Input = struct`, `pub const Options = struct`
 //! - `pub const Result = union(enum) { ok: link.Output, fail: []u8 }`, `Result.deinit`
 //! - `pub fn generate(gpa: Allocator, backend: Backend, in: Input, options: Options) Allocator.Error!Result`
-//! - `pub fn floatRoots(arena: Allocator, air: *const Air, device: *const Air.Device) Allocator.Error![]const Air.Float.Root`
+//! - `pub fn floatRoots(arena: Allocator, air: *const Air, device: *const Air.Device) Allocator.Error![]Air.Float.Root`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -87,8 +87,9 @@ pub fn generate(gpa: Allocator, backend: Backend, in: Input, options: Options) A
 
 /// The float units `generate` reads a verdict for: one per §5.6.1.3
 /// contribution, its slice every `assign` to its resistive and reactive
-/// sums and to its charge sites' slots. Allocated in `arena`.
-pub fn floatRoots(arena: Allocator, air: *const Air, device: *const Air.Device) Allocator.Error![]const Air.Float.Root {
+/// sums and to its charge sites' slots. Allocated in `arena`; the caller
+/// (`air_passes.run`) names and locates each row's `Root` in place.
+pub fn floatRoots(arena: Allocator, air: *const Air, device: *const Air.Device) Allocator.Error![]Air.Float.Root {
     const n = device.contributions.len;
     const of = try arena.alloc(u32, air.instructions.len);
     @memset(of, std.math.maxInt(u32));

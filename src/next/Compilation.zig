@@ -44,6 +44,7 @@ const codegen = @import("codegen");
 const InternPool = @import("intern_pool");
 const frontend = @import("Compilation/frontend.zig");
 const backend = @import("Compilation/backend.zig");
+const air_passes = @import("Compilation/air_passes.zig");
 const errors = @import("Compilation/errors.zig");
 const libmap_reader = @import("Compilation/libmap.zig");
 const Diag = vams.Diag;
@@ -301,7 +302,7 @@ fn runJob(comp: *Compilation, job: Job) UpdateError!void {
         .sema_top => if (try frontend.semaTop(comp)) (if (comp.config.digital()) .sema_digital else .sema_analog) else null,
         .sema_analog => if (try backend.semaAnalog(comp)) .air_passes else null,
         .sema_digital => try backend.semaDigital(comp),
-        .air_passes => if (try backend.airPasses(comp)) try backend.analogBackend(comp) else null,
+        .air_passes => if (try air_passes.run(comp)) try backend.analogBackend(comp) else null,
         .codegen => |b| try backend.codegen(comp, b),
         .link => |t| try backend.link(comp, t),
         .run_digital => try backend.runDigital(comp),

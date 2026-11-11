@@ -17,6 +17,7 @@
 const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
+const field_use_check = @import("field_use_check.zig");
 
 const n_u = @typeInfo(D.U).@"enum".field_names.len;
 
@@ -155,4 +156,12 @@ test "§4.5 a revert leaves no field of Instance or State behind" {
     try std.testing.expectEqualDeep(got.accepted, got.reverted);
     try std.testing.expectEqualDeep(want.inst, got.inst);
     try std.testing.expectEqualDeep(want.state, got.state);
+}
+
+test "field_use (#134): clear bits perturb nothing in eval (every operator's rows)" {
+    const model: D.Model = .{};
+    const got = run(0);
+    const sim = simAt(4e-9, 3e-9, false);
+    const x = bias(1);
+    try field_use_check.checkClearBits(S, D, &x, &model, got.inst, sim);
 }

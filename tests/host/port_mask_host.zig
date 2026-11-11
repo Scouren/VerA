@@ -5,6 +5,7 @@
 const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
+const field_use_check = @import("field_use_check.zig");
 
 const n_u = contract.nU(D);
 const S0 = contract.RefFamily(f64, &@as([n_u]u8, @splat(contract.no_lane)), .{});
@@ -38,4 +39,14 @@ test "only temp cleared" {
     var m: D.Model = .{};
     m.port_connected__ = ~(@as(u64, 1) << 5);
     try std.testing.expectEqual(@as(f64, 2e-3), gds(&m));
+}
+
+test "field_use (#134): clear bits perturb nothing in eval" {
+    var m: D.Model = .{};
+    if (@hasDecl(D, "setup")) D.setup(S0, &m);
+    var inst0: D.Instance = .{};
+    if (@hasDecl(D, "setupInstance")) D.setupInstance(&m, &inst0);
+    var x: [n_u]f64 = @splat(0.0);
+    x[@backingInt(D.U.d)] = 1.0;
+    try field_use_check.checkClearBits(S0, D, &x, &m, inst0, .{});
 }

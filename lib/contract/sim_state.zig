@@ -16,9 +16,13 @@
 //! - `pub const SimState = extern struct`
 //! - `pub const SimReads = struct { t: bool, dt: bool, iteration: bool }`
 //! - `pub const Constant = struct { g: bool, c: bool }`
+//! - `pub const FieldUse = packed struct(u8)`
 //! - `pub fn LimitResult(comptime n: usize) type`
 //! - `pub fn stateClass(comptime D: type) StateClass`
 //! - `pub fn simReads(comptime D: type) SimReads`
+//! - `pub fn limitSimReads(comptime D: type) SimReads`
+//! - `pub fn fieldUse(comptime D: type) [nFields(D)]FieldUse`
+//! - `pub fn nFields(comptime D: type) comptime_int`
 //! - `pub fn InstancePtr(comptime D: type) type`
 
 const std = @import("std");
@@ -134,6 +138,62 @@ pub fn simReads(comptime D: type) SimReads {
     return if (@hasDecl(D, "sim_reads")) D.sim_reads else .{};
 }
 
+/// Returns `D.limit_sim_reads` (`contract.SimReads`, §134): which `SimState`
+/// fields `limit` reads, same meaning as `sim_reads` but for `limit` alone —
+/// not to be confused with `D.limit_reads` (`masks.limitReads`, a `Mask(D)`
+/// over UNKNOWNS: which `cur`/`old` entries `limit` touches). Every field
+/// read when undeclared. A superset.
+pub fn limitSimReads(comptime D: type) SimReads {
+    return if (@hasDecl(D, "limit_sim_reads")) D.limit_sim_reads else .{};
+}
+
+/// One per `Instance` field, in declaration order (#134): which outputs a
+/// read of that field can reach. A superset: a bit set costs a host nothing
+/// but a stale replay it need not have kept; a bit clear it must be able to
+/// trust, since a host that keys a recorded linearization on the instance
+/// row compares only the fields whose bits are set instead of the whole row.
+///   res: can reach a residual value of `eval`.
+///   jac: can reach a derivative lane of `eval` or `q`.
+///   q: can reach a charge site's value.
+///   limit: can reach `limit`'s result.
+///   state: can reach what `updateState` or `acceptQ` stage (a value fed
+///     into a HELD FIELD'S own next staged value, §5.10/§5.6.1.2 — not a
+///     query/commit/revert bookkeeping copy between `Instance` and `State`).
+///   w_update: `updateState` or `acceptQ` writes the `Instance` field
+///     directly (a `.history` field; a `.path_latch` instead stages into its
+///     `State` twin, so this is false for one).
+///   w_commit: `stateCtl`'s `.commit` arm writes the `Instance` field
+///     directly (a `.path_latch` field; a `.history` one instead copies
+///     `Instance` into its `State` twin there, and only `.revert` writes
+///     `Instance` back, which is not `.commit`, so this is false for one).
+pub const FieldUse = packed struct(u8) {
+    res: bool = false,
+    jac: bool = false,
+    q: bool = false,
+    limit: bool = false,
+    state: bool = false,
+    w_update: bool = false,
+    w_commit: bool = false,
+    _: u1 = 0,
+};
+
+/// Returns `D.field_use`, or every read bit set (`w_update`/`w_commit`
+/// false: undeclared says nothing about which writes it) for every field
+/// when undeclared. A superset.
+pub fn fieldUse(comptime D: type) [nFields(D)]FieldUse {
+    const n = nFields(D);
+    if (@hasDecl(D, "field_use")) return D.field_use;
+    var all: [n]FieldUse = undefined;
+    for (&all) |*f| f.* = .{ .res = true, .jac = true, .q = true, .limit = true, .state = true };
+    return all;
+}
+
+/// The number of `D.Instance` fields, in declaration order: `field_use`'s
+/// length.
+pub fn nFields(comptime D: type) comptime_int {
+    return @typeInfo(D.Instance).@"struct".field_names.len;
+}
+
 /// Returns the instance pointer type `eval`/`q` take: `*D.Instance` for a
 /// device that declares `mutable_eval` (it initializes table state on its
 /// first call, permanently and outside timestep rollback), so the host must
@@ -162,6 +222,30 @@ test "stateClass, SimState and LimitResult defaults" {
     try testing.expect(!r.converged);
     // Every field read when undeclared: the superset.
     try testing.expectEqual(SimReads{}, simReads(struct {}));
+    try testing.expectEqual(SimReads{}, limitSimReads(struct {}));
+}
+
+test "fieldUse: every read bit set, both write bits clear, when undeclared" {
+    const testing = std.testing;
+    const D = struct {
+        pub const Instance = struct { a: f64 = 0, b: f64 = 0 };
+    };
+    try testing.expectEqual(2, nFields(D));
+    const want: [2]FieldUse = @splat(.{ .res = true, .jac = true, .q = true, .limit = true, .state = true });
+    try testing.expectEqual(want, fieldUse(D));
+}
+
+test "fieldUse: D.field_use, when declared" {
+    const testing = std.testing;
+    const D = struct {
+        pub const Instance = struct { a: f64 = 0 };
+        pub const field_use = [1]FieldUse{.{ .w_commit = true }};
+    };
+    try testing.expectEqual(D.field_use, fieldUse(D));
+}
+
+comptime {
+    assert(@sizeOf(FieldUse) == 1);
 }
 
 test InstancePtr {

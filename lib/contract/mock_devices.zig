@@ -3,8 +3,10 @@
 //! metadata (`MockTline`), one device declaring every contract member at
 //! once (`MockAll`, so `validate`'s allowlist cannot drift), a linear
 //! source with no lanes (`MockVsrc`), a portless module (`MockNoPorts`), a
-//! 300-unknown device (`MockWide`), a `batch_lead` device (`MockLead`) and a
-//! bare `n`-unknown shape (`MockN`). Test support: no entry point reads it.
+//! 300-unknown device (`MockWide`), a `batch_lead` device (`MockLead`), a
+//! bare `n`-unknown shape (`MockN`) and one `Instance` field per
+//! `contract.FieldUse` bit (`MockFieldUse`, #134). Test support: no entry
+//! point reads it.
 //! Cites: VAMS-2023 §6.2 (an optional port list), §5.6 (a potential
 //! source's constant partials), and each member's own clause as `MockAll`'s
 //! comments give it.
@@ -68,6 +70,7 @@ const Sites = rows_file.Sites;
 const probes = rows_file.probes;
 const rows = rows_file.rows;
 const Constant = sim_state.Constant;
+const FieldUse = sim_state.FieldUse;
 const LimitResult = sim_state.LimitResult;
 const SimReads = sim_state.SimReads;
 const SimState = sim_state.SimState;
@@ -435,6 +438,74 @@ pub const MockAll = struct {
     pub const lane_masks = [_]LaneUse{.{ .mask = 0b11, .uses = 1 }};
     /// A resistor reads no time.
     pub const sim_reads: SimReads = .{ .t = false, .dt = false, .iteration = false };
+    /// `limit` ignores `sim` outright (#134).
+    pub const limit_sim_reads: SimReads = .{ .t = false, .dt = false, .iteration = false };
+    /// None of `MockAll`'s host-written/bookkeeping `Instance` fields are
+    /// read by any core: the allowlist needs the decl present (#134), not an
+    /// interesting value (`MockFieldUse`, below, is the spec example).
+    pub const field_use = [8]FieldUse{
+        .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{},
+    };
+};
+
+/// #134's spec example: one `Instance` field per `FieldUse` bit, each read
+/// (or written) in exactly the way that bit names, so `fieldUse` is
+/// asserted bit for bit (`contract.zig`'s test, oracle 1 of #134: a mock
+/// device with bits asserted). `validate`-legal but never evaluated for its
+/// physics; `eval`/`q`/`limit`/`updateState`/`stateCtl` only read or write
+/// the field their comment names.
+pub const MockFieldUse = struct {
+    pub const U = enum(u8) { p, n };
+    pub const num_ports: usize = 2;
+    const n_u = nU(@This());
+    pub const Model = struct {};
+    pub const State = struct { c: f64 = 0 };
+    pub const Instance = struct {
+        res_f: f64 = 0,
+        jac_f: f64 = 1,
+        q_f: f64 = 0,
+        limit_f: f64 = 0,
+        state_f: f64 = 0,
+        w_update_f: f64 = 0,
+        w_commit_f: f64 = 0,
+    };
+    pub const field_use = [7]FieldUse{
+        .{ .res = true },
+        .{ .jac = true },
+        .{ .q = true },
+        .{ .limit = true },
+        .{ .state = true },
+        .{ .w_update = true },
+        .{ .w_commit = true },
+    };
+    pub fn eval(comptime S: type, x: *const [n_u]S.V, _: *const Model, inst: *const Instance, _: SimState) Rows(@This(), S) {
+        const p = probes(@This(), S, x);
+        const ir = p[0].sub(p[1]).addC(inst.res_f).scale(inst.jac_f);
+        return rows(@This(), S, .{ ir, ir.neg() });
+    }
+    pub fn q(comptime S: type, x: *const [n_u]S.V, _: *const Model, inst: *const Instance, _: SimState) Sites(@This(), S) {
+        return .{ S.probe(0, x[0]).addC(inst.q_f), S.con(0).to(rowMask(@This(), 1)) };
+    }
+    pub fn limit(comptime _: type, _: *const Model, inst: *const Instance, cur: [n_u]f64, _: [n_u]f64, _: SimState) LimitResult(n_u) {
+        var x = cur;
+        x[0] += inst.limit_f;
+        return .{ .x = x, .converged = true };
+    }
+    pub fn initState(_: *const Model, _: *Instance) State {
+        return .{};
+    }
+    pub fn updateState(comptime _: type, _: *const Model, inst: *Instance, _: [n_u]f64, s: *State, _: SimState) UpdateResult {
+        // `state_f`'s read reaches what this stages into `s.c` (the `state`
+        // bit); `w_update_f` is written directly here.
+        s.c = inst.state_f;
+        inst.w_update_f = 1;
+        return .ok;
+    }
+    pub const state_class: StateClass = .history;
+    pub fn stateCtl(_: *const Model, inst: *Instance, s: *State, op: StateCtlOp) bool {
+        if (op == .commit) inst.w_commit_f = s.c;
+        return false;
+    }
 };
 
 /// A §5.6 potential source, `V(p,n) <+ vdc`: the shape whose every partial is

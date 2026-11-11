@@ -9,6 +9,7 @@
 const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
+const field_use_check = @import("field_use_check.zig");
 
 const n_u = @typeInfo(D.U).@"enum".field_names.len;
 const S = contract.RefFamily(f64, &.{ 0, 1 }, .{});
@@ -76,4 +77,13 @@ test "say: a record that does not fit is counted, never cut" {
     try std.testing.expectEqual(@as(usize, 4), out.len);
     try std.testing.expectEqual(@as(usize, 2), out.lost);
     try std.testing.expectEqualStrings("v = 0.5\nk=ff\n[2 display record(s) did not fit the host's buffer]\n", try render(&out));
+}
+
+test "field_use (#134): clear bits perturb nothing in eval" {
+    var m: D.Model = .{};
+    if (@hasDecl(D, "setup")) D.setup(V, &m);
+    const inst0: D.Instance = .{};
+    var x: [n_u]f64 = @splat(0.0);
+    x[@backingInt(D.U.p)] = 0.5;
+    try field_use_check.checkClearBits(V, D, &x, &m, inst0, .{ .t = 1e-9, .dt = 1e-9, .kind = .tran });
 }

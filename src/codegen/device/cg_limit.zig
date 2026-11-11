@@ -1,7 +1,8 @@
 //! Honoured `$limit(V(a,b), "alg", args…)` sites (`plan/limit.zig`) -> the
 //! device's `limit` hook (one clamp per site, writing a corrected `x`), the
-//! `limit_reads`/`limit_writes` masks, and, through `cg_limit_seed.zig`, the
-//! cold-start `seed` (SPICE MODEINITJCT). A §9.17.1 `$discontinuity(-1)`
+//! `limit_reads`/`limit_writes` masks and `limit_sim_reads` (#134), and,
+//! through `cg_limit_seed.zig`, the cold-start `seed` (SPICE MODEINITJCT).
+//! A §9.17.1 `$discontinuity(-1)`
 //! request is `limit`'s `converged` verdict, read off the same core slice
 //! (`cg_limit_args.zig`). The host clamps `x` before `eval`, so `eval`
 //! renders the string form as the identity of its probe; a second clamp would
@@ -202,6 +203,25 @@ pub fn emit(g: *Gen) Error!void {
     var tb: [16]u8 = undefined;
     const ty = gen_mask.typeName(&tb, g.names.n_u);
     try g.w("pub const limit_reads: {s} = 0x{f};\npub const limit_writes: {s} = 0x{f};\n\n", .{ ty, gen_mask.hex(lv.reads, false), ty, gen_mask.hex(lv.writes, false) });
+
+    // #134: which `SimState` fields `limit` reads — not `limit_reads` above
+    // (a `Mask(D)` over unknowns): `limit`'s only path to `SimState` is
+    // forwarding it whole into the shared core (`needs_core`), the same core
+    // `g.sim_reads` already describes, so a device that reaches the core
+    // reads exactly what the core reads; one that never reaches it (no
+    // `sim` parameter named above) reads none.
+    try g.w(
+        "/// Which `SimState` fields `limit` reads (`contract.SimReads`; distinct\n" ++
+            "/// from `limit_reads` above, the unknown mask): the shared core's\n" ++
+            "/// `sim_reads`, since forwarding `sim` into that core is `limit`'s only\n" ++
+            "/// path to `SimState`.\n" ++
+            "pub const limit_sim_reads: contract.SimReads = .{{ .t = {}, .dt = {}, .iteration = {} }};\n\n",
+        .{
+            if (needs_core) g.sim_reads.t else false,
+            if (needs_core) g.sim_reads.dt else false,
+            if (needs_core) g.sim_reads.iteration else false,
+        },
+    );
 
     try limit_seed.emit(g);
     assert(g.out.items.len > len_before);

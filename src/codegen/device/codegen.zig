@@ -180,6 +180,7 @@ test {
     _ = @import("codegen/file.zig");
     _ = @import("codegen/instance.zig");
     _ = @import("codegen/unit.zig");
+    _ = @import("codegen/field_use.zig");
     _ = @import("codegen/cfg.zig");
     _ = @import("codegen/render.zig");
     _ = @import("codegen/host_expr.zig");

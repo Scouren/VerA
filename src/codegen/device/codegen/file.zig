@@ -35,6 +35,7 @@ const gen_status = @import("status.zig");
 const gen_family = @import("family.zig");
 const gen_setup = @import("setup.zig");
 const cg_limit = @import("../cg_limit.zig");
+const gen_field_use = @import("field_use.zig");
 const assert = std.debug.assert;
 const Error = codegen.Error;
 
@@ -221,6 +222,10 @@ pub fn emitFile(self: *Gen) Error!void {
     // the residual non-deterministic and Newton never converges.
     if (f.stateful or self.lowered.rng_auto_seeds.items.len != 0 or gen_instance.pathLatches(self) or gen_status.hasStatus(self)) try gen_state.emitStateMachine(self);
     try cg_limit.emit(self);
+    // #134: a text scan of everything emitted so far (`eval`, `q`, `limit`,
+    // the state machine, same technique as `sim_reads` above), so it must
+    // run after all of them.
+    try gen_field_use.emit(self);
     try gen_collapse.emitCollapse(self, cpairs);
     try gen_breakpoints.emitNextBreakpoint(self);
     try gen_breakpoints.emitDelays(self);

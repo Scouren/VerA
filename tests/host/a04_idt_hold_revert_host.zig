@@ -28,6 +28,7 @@
 const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
+const field_use_check = @import("field_use_check.zig");
 
 const n_u = @typeInfo(D.U).@"enum".field_names.len;
 
@@ -72,4 +73,26 @@ test "§4.5.4 a rejected step leaves the idt assert offset as it was" {
     try std.testing.expectEqualDeep(accepted, inst);
 
     try step(&model, &inst, &state, 1.5e-9, 0.5e-9, bias(0.0, 8.5), 8.5);
+}
+
+// ---- #134's oracle 2: an independent perturbation check ----
+//
+// `field_use`'s contract is a superset (`sim_state.zig`'s doc): a bit CLEAR
+// means a host may trust a replay that never re-read the field, so a clear
+// bit is the one this device's own behaviour must never contradict. Named
+// before the emitter (`field_use.zig`) was written: perturb every `Instance`
+// field whose `res` (`q`) bit this device reports clear, one at a time, off
+// a baseline `eval` (`q`), and the result must come back byte-identical.
+// Nothing here recomputes `field_use`'s own scan — this is `eval`/`q`
+// themselves, the independent oracle `field_use.zig`'s doc names. The loop
+// itself lives once in `field_use_check.zig`; every `*_host.zig` fixture
+// calls it instead of repeating it.
+
+test "field_use (#134): a clear `res`/`q` bit's field perturbs no residual (oracle 2)" {
+    const model: D.Model = .{};
+    var inst0: D.Instance = .{};
+    _ = D.initState(&model, &inst0);
+    const sim: contract.SimState = .{ .t = 1.0e-9, .dt = 1.0e-9, .kind = .tran };
+    const x = bias(0.0, 8.0);
+    try field_use_check.checkClearBits(S, D, &x, &model, inst0, sim);
 }

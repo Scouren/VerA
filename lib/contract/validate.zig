@@ -128,6 +128,12 @@ const AllowedPubDecl = enum {
     vpiShares,
     vpi_share_row,
     lane_masks,
+    // #134: one per `Instance` field, in declaration order — which outputs a
+    // read of that field can reach (`contract.FieldUse`).
+    field_use,
+    // #134: which `SimState` fields `limit` reads (`contract.SimReads`); not
+    // `limit_reads` above, which is `masks.limitReads`'s unknown mask.
+    limit_sim_reads,
 };
 
 /// Every rule `validate` applies, in the order it applies them.
@@ -158,6 +164,8 @@ const rules = .{
     tables.systfTableError,
     tables.cardHooksError,
     tables.breakpointsError,
+    tables.fieldUseError,
+    tables.limitSimReadsError,
     strayDeclError,
 };
 
@@ -226,7 +234,7 @@ const rules = .{
 pub fn validate(comptime D: type) void {
     if (!build_config.validating) return;
     @setEvalBranchQuota(1_000_000);
-    comptime assert(rules.len == 27);
+    comptime assert(rules.len == 29);
     // In this order: a later rule may read a decl an earlier one checked.
     inline for (rules) |rule| {
         if (rule(D)) |m| @compileError(m);

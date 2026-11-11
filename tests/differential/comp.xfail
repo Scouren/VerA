@@ -1696,54 +1696,20 @@ verilog-ams/ch12_vpi_routines/two_libraries_two_instances.c not built: backend v
 verilog-ams/ch12_vpi_routines/vpi_routines_not_va_functions.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0512]: unknown function: `vpi_chk_error``, new `error[E0512]: unknown function: `vpi_chk_error` is not lowered by Sema yet`
 verilog-ams/digital/bare_event_trigger_in_analog_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = help: only `@(<event>) -> ev;` is legal`, new `   = help: run `vera --explain E0434` for a detailed explanation`
 verilog-ams/digital/digital_delay_primitive_notation.v rw-lower (analog lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `digital_delay_buffer` primitive`
-verilog-ams/digital/scaled_delay_udp_rejected.v rw-lower (analog lowering): stderr: line 5: old `   |                         ^`, new `   |                         ^^`
+verilog-ams/digital/scaled_delay_udp_rejected.v rw-comp (elab) location: stderr: line 5: old `   |                         ^`, new `   |                         ^^`
 verilog-ams/digital/std_1364_ams_keywords_reserved_by_default.v rw-comp (parse): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `error[E0219]: a null statement is not an analog statement`
-verilog-ams/digital/vams_digital_temperature_refused.v not built: backend digital_lowering
-verilog/03_lexical_conventions/attribute_positions.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_3_8_2_inv` primitive`
 verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/03_lexical_conventions/escaped_system_task_rejected.v not built: backend digital_lowering
 verilog/03_lexical_conventions/forward_reference_reg_rejected.v rw-dlower (run): stderr: line 10: old ``, new `error: could not compile due to 1 previous error(s)`
-verilog/05_expressions/native_wide_index_bound_limit.v not built: backend digital_lowering
-verilog/08_udp/combinational_reg_rejected.v rw-dlower (digital lowering): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `comb_reg` primitive`
 verilog/08_udp/definition_inside_module_rejected.v rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `q``, new `error[E0205]: unsupported module item: found table`
-verilog/08_udp/definition_placement.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv_before` primitive`
-verilog/08_udp/header_forms.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `and_a` primitive`
-verilog/08_udp/initial_to_input_rejected.v rw-dlower (digital lowering): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `input_init` primitive`
-verilog/08_udp/initial_values.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `i0` primitive`
-verilog/08_udp/input_minimums.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `and10` primitive`
-verilog/08_udp/instance_array.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv` primitive`
-verilog/08_udp/instances.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `gt` primitive`
-verilog/08_udp/jk_edge_ff.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `jk_edge_ff` primitive`
-verilog/08_udp/multibit_initial_rejected.v rw-dlower (digital lowering): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `wide_init` primitive`
-verilog/08_udp/multiplexer.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `multiplexer` primitive`
-verilog/08_udp/output_bit_select.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv` primitive`
-verilog/08_udp/output_reg_initializer.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `hdr` primitive`
-verilog/08_udp/overlapping_entries_agree.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `nand_overlap` primitive`
-verilog/08_udp/sequential_64_inputs.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `seq64` primitive`
-verilog/08_udp/sequential_hold_agrees.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `latch_agree` primitive`
-verilog/08_udp/sequential_without_reg_rejected.v rw-dlower (digital lowering): stderr: line 10: old `error: could not compile due to 1 previous error(s)`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `latch_no_reg` primitive`
-verilog/08_udp/table_symbols.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `pn` primitive`
-verilog/08_udp/two_delays.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `inv` primitive`
-verilog/08_udp/udp_65_inputs.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `and65` primitive`
-verilog/08_udp/udp_comb.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `udp_mux` primitive`
-verilog/08_udp/udp_dff.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `udp_dff` primitive`
-verilog/08_udp/udp_header_order.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `audit_header_udp` primitive`
-verilog/08_udp/udp_latch.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `udp_latch` primitive`
-verilog/08_udp/udp_named_terminal_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1100]: digital source execution failed: §8: a UDP instance connects its terminals by position, none left open`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `triage_pass` primitive`
-verilog/08_udp/udp_null_terminal_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1100]: digital source execution failed: §8: a UDP instance connects its terminals by position, none left open`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `mux` primitive`
-verilog/08_udp/udp_potential_edges_dominance.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `audit_edges_udp` primitive`
 verilog/09_behavioral_modeling/forever_without_timing_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/09_behavioral_modeling/forever_without_timing_rejected.v:20:1`, new `  = note: LRM 8.5`
 verilog/09_behavioral_modeling/unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
 verilog/09_behavioral_modeling/unnamed_fork_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found r`, new `error: could not compile due to 1 previous error(s)`
 verilog/09_behavioral_modeling/zero_delay_always_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/09_behavioral_modeling/zero_delay_always_rejected.v:14:1`, new `  = note: LRM 8.5`
-verilog/10_tasks_functions/constant_function_hierarchical_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/10_tasks_functions/recursion_without_end_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: nesting here exhausts the 1987 MiB stack VerA reserved for it`, new `error[E1100]: digital source execution failed: §10.4.2: subroutine calls nested past 20000 activations`
 verilog/11_scheduling/zero_delay_loop_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/11_scheduling/zero_delay_loop_rejected.v:16:1`, new `  = note: LRM 8.5`
 verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/defparam_across_generate_instances_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element`, new `error[E1100]: digital source execution failed: §12.2.1: a defparam insid
-verilog/12_hierarchy/port_width_mismatch_vams_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/unnamed_block_referenced_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/cell_not_in_its_library_rejected.v not built: backend libmap
 verilog/13_configuration/cfg1_default_liblist.v not built: backend libmap
 verilog/13_configuration/cfg2_gate_first.v not built: backend libmap
@@ -1822,22 +1788,16 @@ verilog/17_system_tasks/readmem_warn_hex_short_up.v rw-dlower (run): stderr: lin
 verilog/17_system_tasks/sdf_annotate_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1102]: an SDF file the annotator cannot read: sdf_annotate_rejected.sdf: the SDF file cannot be read`, new `error[E1100]: digital source execution failed: sdf_annotate_rejected.sdf: the SDF file cannot be read`
 verilog/17_system_tasks/sformat_excess_argument_warning.v rw-dlower (run): stderr: line 1: old `warning[W1153]: format specifiers and arguments do not pair up: $sformat: the format's specifiers and the arguments after it do not pair up`, new ``
 verilog/17_system_tasks/stop_suspends.v rw-dlower (digital lowering): stderr: line 1: old `$stop at tick 1, verilog/17_system_tasks/stop_suspends.v byte 107`, new `$stop at tick 1, verilog/17_system_tasks/stop_suspends.v byte 797`
-verilog/18_vcd/dumpports_duplicate_scope_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/18_vcd/dumpports_same_file_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/18_vcd/dumpports_same_file_rejected.v:28:19`, new `  = note: LRM 8.5`
-verilog/18_vcd/dumpports_variable_scope_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/18_vcd/dumpvars_later_time_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/18_vcd/dumpvars_later_time_rejected.v:11:8`, new `  = note: LRM 8.5`
 verilog/19_compiler_directives/default_nettype_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^`
-verilog/19_compiler_directives/timescale_inside_module_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/19_compiler_directives/unconnected_drive_inside_module_rejected.v rw-comp (parse) location: stderr: line 5: old `   | ^^^^^^^^^^^^^^^^^^`, new `   | ^^^^^^^^^^^^^^^^^^^^^^^^`
 verilog/A_formal_syntax/b_A_1_1_incdir.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v not built: backend libmap
 verilog/A_formal_syntax/b_A_1_1_library_text.v not built: backend libmap
 verilog/A_formal_syntax/b_A_2_8_net_block_item_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found `;``, new `error: could not compile due to 1 previous error(s)`
-verilog/A_formal_syntax/b_A_5_1_udp_declarations.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_A_5_1_mux` primitive`
-verilog/A_formal_syntax/b_A_5_3_udp_body.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_A_5_3_xor` primitive`
 verilog/A_formal_syntax/b_A_6_3_unnamed_block_declaration_rejected.v rw-comp (parse): stderr: line 10: old `error[E0240]: not a module item: found k`, new `error: could not compile due to 1 previous error(s)`
-verilog/A_formal_syntax/b_A_source_text.v rw-dlower (digital lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b_A_inv` primitive`
 verilog/pli/analog_attributes.c not built: backend vpi
 verilog/pli/argument_handle_delays_evaluation.c not built: backend vpi
 verilog/pli/argument_handle_delays_evaluation.v not built: backend vpi

@@ -176,6 +176,8 @@ Callers: 34 `s.fail(` gain a code (E1100 except sdf's E1102); ~30 `s.warn(` gain
 | T4 | config design cell, at both sites (`library.zig:80` with a map; `Sema.zig:438` without: design_cell_missing and design_names_config carry no map) | `src/Sema/library.zig`, `src/Sema.zig`, `src/Zcu.zig`, `src/next/Compilation/legacy.zig`, `src/Sema/test.zig` | T0 | sim −3, comp −2, exe −2, dev −2 |
 | T5 | attribute values | `src/Sema/digital/decl.zig` | frontend `Process.attrs`, T0 | sim −1, comp −1, exe −1, dev −1 |
 | T6 | (a) rtlil + device rulings; (b, after libmap T2) the 7 G14 lines to `sim.rulings`; `$stop` byte test; hand the six comp.rulings lines (G9, G13) to the lead | `tests/differential/{rtlil,digital_device,sim}.rulings`, `{rtlil,digital_device,sim}.xfail`, `src/Sema/digital_test.zig` | T0; (b) libmap T2 | rtlil −2, dev −2, sim −7 (b) |
+| T7 | blame a runtime `$sformat` pairing mismatch (W1153) where old does: old's byte is later than new's in both fixtures (298 vs 293 in `native_sformat_dynamic.v`, 156 vs 148 in `sformat_excess_argument_warning.v`), so old points into the argument list, new at the call. Find old's token, then give Sema one `pc_sites` entry per argument | `src/Sema/digital/task.zig`, `lib/std/sim/display.zig` | T3 | sim −2 |
+| T8 | `fullskew_checks_both_orders.v`: new reports 2 run diagnostics, old 1 (sim.xfail, exposed once T3 gave run diagnostics their sites). Read IEEE 1364-2005 §15.3.7 for how many violations the two orders give; fix the side that disagrees, or rule old's count with the clause | `lib/std/sim/tchk.zig` or `sim.rulings` | T3 | sim −1 |
 
 Lanes after T0: T1, T2, T4, T6 share no file (T6 after T0 because both add to `digital_test.zig`). T3 joins T1 + T2. Wrong-text-no-crash first: T1 → T2 → T3 is the critical path.
 
@@ -193,6 +195,8 @@ Per task: `python3 tools/check_style.py` on touched files (≤500 code lines; `S
 | T4 | `$H diff-sim -j4`; `$H diff-elab -j4`; `$H diff-comp -j4 -Dcomp-filter='13_configuration'`; `$H diff-digital-device -j4 -Dcomp-filter='13_configuration'` |
 | T5 | frontend's `$H test-vams diff-astgen -j4`; then `$H diff-sim -j4`; `$H diff-comp -j4 -Dcomp-filter=attribute` |
 | T6 | `nix develop .#external -c zig build diff-rtlil -j4 -Dcomp-filter='no_top_level|self_instantiation'` (Yosys; take a slot by hand); `$H diff-digital-device -j4 -Dcomp-filter='b_B_keywords|dumpports_same_file'` |
+| T7 | `$H diff-sim -j4`; `$H diff-digital-exe -j4 -Dcomp-filter=sformat` |
+| T8 | `$H test-std_sim`; `$H diff-sim -j4` |
 
 Lists a task may change: sim.xfail, sim.rulings (new), the rw-dlower lines of digital_exe.xfail / digital_device.xfail / rtlil.xfail, rtlil.rulings, digital_device.rulings. Never comp.xfail or comp.rulings: report cleared comp paths and the five ruling lines to the lead.
 

@@ -317,3 +317,61 @@ test "§9.4.3 nextConv: flags, width and the letter" {
     i = 0;
     try std.testing.expectEqual(@as(?Conv, null), nextConv("%#", &i));
 }
+
+// §7.3.1/Table 7-1 oracle (hand derivation, the LRM table), for `declSize`:
+// a scalar `reg` kept as a §7.2.2 discrete read (a mixed module's
+// digital-owned value an analog block reads, `unit.discrete`) has no range
+// to size it from, so it is a generic 32-bit `integer`, never its own 1
+// bit (T8's bug: `declSize` returned `one_bit` for it before this fix).
+// Builds `flag` through the real pipeline (parse, AstGen, elaborate,
+// analyze) so `discrete.mark` populates `unit.discrete` itself, then reads
+// the `$display` lowering's own `display$width(value, bits, signed)` call
+// out of the finished `Air` for the bits it actually recorded. (A planted
+// 1-bit `declSize` makes this go red with no call at all: a 1-bit
+// unsigned value needs no width record, so `decimalWidth` never emits
+// one.)
+test "§7.3.1/Table 7-1 a mixed module's unranged discrete reg displays at integer width" {
+    const gpa = std.testing.allocator;
+    const Zcu = @import("../Zcu.zig");
+    const src: [:0]const u8 =
+        \\nature Voltage; access = V; units = "V"; abstol = 1e-6; endnature
+        \\nature Current; access = I; units = "A"; abstol = 1e-12; endnature
+        \\discipline electrical; potential Voltage; flow Current; enddiscipline
+        \\module m(p); inout p; electrical p;
+        \\  reg flag;
+        \\  initial flag <= 1'b1;
+        \\  analog begin
+        \\    $display("%d", flag);
+        \\    I(p) <+ V(p);
+        \\  end
+        \\endmodule
+        \\
+    ;
+    var ast = try vams.Ast.parse(gpa, src, .{});
+    defer ast.deinit(gpa);
+    try std.testing.expectEqual(@as(usize, 0), ast.errors.len);
+    var vir = try vams.AstGen.generate(gpa, &ast, .{});
+    defer vir.deinit(gpa);
+    var zcu: Zcu = try .init(gpa);
+    defer zcu.deinit();
+    _ = try zcu.addFile("test.va", vir, 0);
+    try Sema.elaborate(&zcu, .{ .roots = .first });
+    var analysis = try Sema.analyze(&zcu);
+    defer if (analysis) |*a| a.deinit(gpa);
+    try std.testing.expectEqualSlices(vams.Diag.Code, &.{}, zcu.failed.items(.code));
+    const a = &(analysis orelse return error.TestUnexpectedResult);
+    const callee_tag = @backingInt(SysFn.Tag.@"display$width");
+    var bits: ?u64 = null;
+    for (a.air.instructions.items(.tag), a.air.instructions.items(.data)) |t, data| {
+        if (t != .call) continue;
+        const x = a.air.extraData(Air.Call, data.ty_pl.payload);
+        if (x.data.callee != callee_tag) continue;
+        const args: []const Air.Inst.Ref = @ptrCast(a.air.extra[x.end..][0..x.data.args_len]);
+        const idx = args[1].toInterned() orelse continue;
+        const c = zcu.intern_pool.indexToKey(idx);
+        if (c != .int or c.int.storage != .small) continue;
+        bits = @intCast(c.int.storage.small);
+        break;
+    }
+    try std.testing.expectEqual(@as(?u64, 32), bits);
+}

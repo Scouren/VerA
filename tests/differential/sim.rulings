@@ -1,0 +1,12 @@
+# diff-sim's rulings (tests/differential/sim.zig `rulingHolds`): a `//! reject`
+# fixture where the old side's and the new side's shape differ (which stage
+# raises it, its wording, its blamed byte) but not its truth. One line per
+# fixture: `<path> <clause>: why`. A ruling holds while both sides reject the
+# fixture under the same code (lib/sim/digital's `diag.Code` and
+# `vams.Diag.Code`, compared by name); a ruling that stops holding fails the
+# run until it is updated or dropped (research/dlower.md G13).
+verilog/03_lexical_conventions/forward_reference_reg_rejected.v IEEE 1364-2005 §4.11: a use before declaration is a compile error; the old side reports it as a run failure only because it binds names lazily while running (lib/sim/digital/name_search.zig), with no compile summary; the new side finds it while lowering, a compile error with the summary
+verilog/10_tasks_functions/recursion_without_end_rejected.v §10.4.1: the old side's MiB is a sixteenth of the machine's physical memory (lib/base/deep_stack.zig); each side names its own reservation, so the fixture's `//! reject` pins the words, not the number
+verilog/09_behavioral_modeling/forever_without_timing_rejected.v §9.6: a budget-exceeded run failure; the old side blames the file's first token (lib/sim/digital/run_until.zig `fail(0, …)`, which names nothing); the new side blames the looping statement
+verilog/09_behavioral_modeling/zero_delay_always_rejected.v §9.6: a budget-exceeded run failure; the old side blames the file's first token (lib/sim/digital/run_until.zig `fail(0, …)`, which names nothing); the new side blames the looping statement
+verilog/11_scheduling/zero_delay_loop_rejected.v §11.4: a budget-exceeded run failure; the old side blames the file's first token (lib/sim/digital/exec.zig `fail(0, …)`, which names nothing); the new side blames the looping statement

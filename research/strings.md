@@ -342,7 +342,7 @@ BSIM3/BSIM4, the end-to-end oracle ("a BSIM4 model parsing and building").
 
 **Q1. Warn under VAMS when a string continues across a line?**
 Recommendation: no (R3): W0151's precedent, and nothing the user can do about BSIM4.
-Decision:
+Decision: No warning (R3).
 
 **Q2. `.v` (1364 unit): keep E0138 (R2), or accept with a warning in W0151's shape?**
 Keeping it costs one `if` in the preprocessor and keeps two `.v` fixtures and string12's
@@ -350,24 +350,24 @@ expectation. Accepting matches Icarus and 1800 but contradicts 3.6/A.8.8's expli
 `except_new_line`, and the 1364 route is the standard by the book elsewhere (W0151 warns, the
 rest refuses).
 Recommendation: keep E0138 in a 1364 unit; the message keeps the §5.9 note.
-Decision:
+Decision: Keep E0138 in a 1364 unit (R2); the message keeps the §5.9 note.
 
 **Q3. Exact bytes: 1800's (`\`+LF removed, next line verbatim) or trim the continuation line's
 indentation?**
 No tool and no standard trims; §2.3 makes the blanks significant; BSIM4's message then carries
 29 inner blanks, as it does in every SystemVerilog tool.
 Recommendation: 1800's bytes, nothing invented.
-Decision:
+Decision: IEEE 1800's bytes (user, 2026-11-11): `\`+LF removed, the next line kept verbatim; nothing invented.
 
 **Q4. Macro text (R4): make the join give R1's bytes inside a string (one meaning), or leave the
 one-space join and document two meanings?**
 One meaning is a few lines in each `joinContinuations` and a red fixture; two meanings are a
 wrong-text-no-crash class with no oracle. In a 1364 unit, E0145 there follows §19.3.1 directly.
 Recommendation: one meaning (R4), E0145 under `std_1364`.
-Decision:
+Decision: One meaning (R4): the join gives R1's bytes inside a string; E0145 under `std_1364`.
 
 **Q5. VD-021: revise the entry in place or add VD-0xx?**
 Recommendation: revise in place (the rule changes for half its scope), keep the original text
 under a "Revised 2026-11-11" line citing `research/strings.md`, status back to `no` until S0-S7
 land.
-Decision:
+Decision: Revise VD-021 in place, keeping the original text as its history.

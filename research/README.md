@@ -82,7 +82,9 @@ the plan's tasks in order and never redecide a `Decision:`.
   stale headers (lower Q7), native markers (vbackends Q3),
   `integer_conversion_saturates.va` rewritten and renamed `integer_conversion_low32.va`
   (conversion Q1/Q8, approved), `vera/ledger/OBLIGATIONS-1364.tsv` (diagcodes A1, staged
-  outside the submodule).
+  outside the submodule); strings R1-R5 (approved): `string_line_continuation_rejected.va`
+  flips to accepted, two new fixtures (`research/strings.md` §6), and expectations.tsv's
+  BSIM3/BSIM4 reject rows (:223, :224, :231) go.
 - Gompute: PR #5 (asinh/acosh/atanh/atan2, 2.1.0) waits on CI, blocked by the account's
   billing lock; the `v2.1.0` tag waits until every pending Gompute PR is merged (user).
 - Filing GitHub issues for the changelog (switchover Q1).

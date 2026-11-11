@@ -294,7 +294,8 @@ pub const Part = union(enum) { whole, conn: u32, param: u32, value: u32, target,
 /// The rules a catalogue code covers whose IEEE 1364 report lib/sim/digital
 /// wrote in its own words: the instance's ports (§12.3.6) and parameter
 /// values (§12.2.2), a UDP instance's delay (§8.6), an unbound cell, a
-/// defparam's name (§12.2.1), a cell defined again (§13.2.1.1).
+/// defparam's name (§12.2.1), a cell defined again (§13.2.1.1), a config's
+/// design cell no library holds (§13.3.1.1).
 pub const Rule = enum(u8) {
     none,
     port_count,
@@ -313,6 +314,11 @@ pub const Rule = enum(u8) {
     /// IEEE 1364-2005 §13.3/§13.4.4 a configuration refused; `name` is the
     /// whole reason.
     config,
+    /// IEEE 1364-2005 §13.3.1.1 a config's `design` statement cell that
+    /// binds no module (missing, outside its library, or a config sharing
+    /// the name: `library.zig`'s `designCellMissing`); `name` is the whole
+    /// reason.
+    design_cell,
     /// IEEE 1364-2005 §12.2.1 a one-name defparam no declaration of its
     /// module names (E0901); `name` the name.
     defparam_nothing,

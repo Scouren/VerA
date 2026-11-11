@@ -25,6 +25,7 @@ const Sema = @import("../Sema.zig");
 const expr = @import("expr.zig");
 const decl = @import("decl.zig");
 const sign = @import("sign.zig");
+const mfactor = @import("mfactor.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const SysFn = vams.SysFn;
@@ -238,16 +239,35 @@ fn hierRead(s: *Sema, b: *Block, k: @import("../Zcu.zig").SystemParam, host: Ref
     const ip = &zcu.intern_pool;
     const here = switch (ip.indexToKey(hiers[@backingInt(b.unit.instance)].get(k))) {
         .float => |f| f,
-        else => return host,
+        // D2-J: did not fold at elaboration (it reads the card); compose
+        // as a run-time instruction instead of silently giving up `host`.
+        else => return hierReadDynamic(s, b, k, host),
     };
     const at_top = switch (ip.indexToKey(hiers[@backingInt(top)].get(k))) {
         .float => |f| f,
-        else => return host,
+        else => return hierReadDynamic(s, b, k, host),
     };
     return switch (k) {
         .mfactor, .hflip, .vflip => expr.binOp(s, b, .fmul, host, .fromIntern(try decl.intern(s, .{ .real = here / at_top }))),
         .xposition, .yposition => expr.binOp(s, b, .fadd, host, .fromIntern(try decl.intern(s, .{ .real = here - at_top }))),
         .angle => expr.binOp(s, b, .fmod, try expr.binOp(s, b, .fadd, host, .fromIntern(try decl.intern(s, .{ .real = @mod(here - at_top, 360) }))), .fromIntern(try decl.intern(s, .{ .real = 360 }))),
+    };
+}
+
+/// D2-J's fallback: `here` and `at_top` as refs (`mfactor.hierRef`), composed
+/// with `host` the same way the folding path above does.
+fn hierReadDynamic(s: *Sema, b: *Block, k: @import("../Zcu.zig").SystemParam, host: Ref) Allocator.Error!Ref {
+    const top = s.units.items[0].instance;
+    const here = try mfactor.hierRef(s, b, b.unit.instance, k);
+    const at_top = try mfactor.hierRef(s, b, top, k);
+    return switch (k) {
+        .mfactor, .hflip, .vflip => expr.binOp(s, b, .fmul, host, try expr.binOp(s, b, .fdiv, here, at_top)),
+        .xposition, .yposition => expr.binOp(s, b, .fadd, host, try expr.binOp(s, b, .fsub, here, at_top)),
+        .angle => blk: {
+            const c360: Ref = .fromIntern(try decl.intern(s, .{ .real = 360 }));
+            const delta = try expr.binOp(s, b, .fmod, try expr.binOp(s, b, .fsub, here, at_top), c360);
+            break :blk expr.binOp(s, b, .fmod, try expr.binOp(s, b, .fadd, host, delta), c360);
+        },
     };
 }
 

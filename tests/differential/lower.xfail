@@ -173,7 +173,6 @@ verilog-a/ch06_hierarchy/implicit_net_hierarchical_reference_coerced.va codes: o
 verilog-a/ch06_hierarchy/matching_size_concatenation_of_a_vector.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/matching_size_concatenation.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/matching_size_vector_net.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
-verilog-a/ch06_hierarchy/mfactor_double_scaling_rejected.va codes: old E0912, new {}
 verilog-a/ch06_hierarchy/named_port_expressions.va codes: old {}, new E0351 (E0351: the net was not declared with a range)
 verilog-a/ch06_hierarchy/nested_loop_generates_share_genvar_rejected.va codes: old E0419, new {}
 verilog-a/ch06_hierarchy/oomr_function_unsupported.va codes: old {}, new E0512 (E0512: `a call` is not lowered by Sema yet)
@@ -214,9 +213,7 @@ verilog-a/ch09_system_tasks/fatal_finish_number_3_rejected.va codes: old E0824, 
 verilog-a/ch09_system_tasks/file_output_real_descriptor_rejected.va codes: old E0888, new {}
 verilog-a/ch09_system_tasks/fopen_type_not_in_table_9_24_rejected.va codes: old E0889, new {}
 verilog-a/ch09_system_tasks/fscanf_real_descriptor_rejected.va codes: old E0888, new {}
-verilog-a/ch09_system_tasks/geometry_card_mfactor_outside_domain_is_fatal.va contribution 0 resist: old 2.0587485053701386e0, new 1e0
 verilog-a/ch09_system_tasks/geometry_defparam_alias.va tables row 0: old `param outer.leaf.placement_x real local = -1e0`, new `charge_sites 0`
-verilog-a/ch09_system_tasks/geometry_parameter_sweep.va contribution 0 resist: old -1.1992240966177543e0, new had no value (Unsupported)
 verilog-a/ch09_system_tasks/geometry_paramset.va tables row 1: old `param leaf.geometry_ps.placement_x real local = 2e0`, new `param leaf.seen_x real local = 2e0`
 verilog-a/ch09_system_tasks/geometry_state_read_rejected.va codes: old E0363, new {}
 verilog-a/ch09_system_tasks/geometry_top_alias_host.va tables row 0: old `param placement_x real = 0e0`, new `charge_sites 0`

@@ -188,10 +188,10 @@ pub fn noise(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
     // §6.3.6 a noise contribution's power is multiplied by $mfactor on a
     // flow (whose `<+` multiplies the amplitude by it) and divided by it on
     // a potential: the amplitude over sqrt($mfactor). `ac_stim` is no noise.
-    const m = @import("mfactor.zig").mfactorOf(s, b.unit);
-    if (tag == .ac_stim or m == 1) return .{ .ref = r, .ty = .real };
-    const mc: Ref = .fromIntern(try decl.intern(s, .{ .real = m }));
-    const root = try expr.binOp(s, b, .pow, mc, .fromIntern(try decl.intern(s, .{ .real = 0.5 })));
+    const m = try @import("mfactor.zig").mfactorRef(s, b, b.unit);
+    const m_one = if (expr.constOf(s, m)) |c| c.asReal() == 1 else false;
+    if (tag == .ac_stim or m_one) return .{ .ref = r, .ty = .real };
+    const root = try expr.binOp(s, b, .pow, m, .fromIntern(try decl.intern(s, .{ .real = 0.5 })));
     return .{ .ref = try expr.binOp(s, b, .fdiv, r, root), .ty = .real };
 }
 

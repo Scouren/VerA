@@ -22,9 +22,9 @@
 //! (the last cell of a name).
 //!
 //! Contents:
-//! - fields `gpa`, `intern_pool`, `files`, `modules`, `paramsets`, `disciplines`, `natures`, `instances`, `instance_map`, `ports`, `defparams`, `defparam_sources`, `net_discipline`, `inserts`, `failed`, `netlist_modules`, `netlist_unsupported`
+//! - fields `gpa`, `intern_pool`, `files`, `modules`, `paramsets`, `disciplines`, `natures`, `instances`, `instance_map`, `ports`, `defparams`, `defparam_sources`, `net_discipline`, `inserts`, `hier_srcs`, `failed`, `netlist_modules`, `netlist_unsupported`
 //! - `pub const File` (`File.Index`), `pub const Decl` (`none`), `pub const Instance` (`Index`, `Key`), `pub const Port`, `pub const Defparam`, `pub const DefparamSource`, `pub const NetKey`, `pub const Insert`, `pub const Failure`, `pub const Rule` (`code`), `pub const Part`
-//! - `pub const SystemParam` (`fromName`, `initial`, `allows`, `domain`), `pub const Hier`, `pub const PathFormatter`
+//! - `pub const SystemParam` (`fromName`, `initial`, `allows`, `domain`), `pub const Hier`, `pub const HierSrc`, `pub const PathFormatter`
 //! - `pub const instances_max: u32`
 //! - `pub fn init(gpa: Allocator) Allocator.Error!Zcu`
 //! - `pub fn deinit(zcu: *Zcu) void`
@@ -79,6 +79,14 @@ net_discipline: std.AutoHashMapUnmanaged(NetKey, InternPool.String) = .empty,
 /// §7.8.4 every port a connect module was inserted on: the bridge takes
 /// the port's upper connection, the port the bridge's other port.
 inserts: std.MultiArrayList(Insert) = .empty,
+/// §9.18/§6.3.6 (D2-J): one row per instance whose own specified
+/// hierarchical system parameter value did not fold at elaboration (it
+/// reads a root parameter a testbench card can override), so `hier` holds
+/// `.undef` for it there: the overriding `#(...)` expression instead,
+/// lowered as a run-time instruction at Sema time in the instantiating
+/// parent's scope. An existence table (most instances have no row), not a
+/// column on every instance.
+hier_srcs: std.ArrayList(HierSrc) = .empty,
 /// Every diagnostic elaboration raised, in the order raised.
 failed: std.MultiArrayList(Failure) = .empty,
 /// §9.21/§4.6.4.3 the data files the analysis asked for, by the name the
@@ -237,6 +245,17 @@ pub const SystemParam = enum(u8) {
 /// An instance's six hierarchical system parameter values (real
 /// constants, or `undef` where a specified value does not fold).
 pub const Hier = std.EnumArray(SystemParam, InternPool.Index);
+
+/// §9.18/§6.3.6 (D2-J): `instance`'s own specified value of `kind` did not
+/// fold at elaboration; `value` is that expression's own last instruction
+/// (`Vir.Inst.Ref`), in the file of `instance`'s parent (the module that
+/// wrote the override), for Sema to lower when `instance`'s `hier` reads
+/// `.undef`.
+pub const HierSrc = struct { instance: Instance.Index, kind: SystemParam, value: Vir.Inst.Ref };
+
+comptime {
+    assert(@sizeOf(HierSrc) == 12);
+}
 
 /// A §6.3.1 defparam's target: an instance and one of its parameters.
 pub const Defparam = struct { instance: Instance.Index, name: InternPool.String };
@@ -404,6 +423,7 @@ pub fn deinit(zcu: *Zcu) void {
     zcu.defparam_sources.deinit(gpa);
     zcu.net_discipline.deinit(gpa);
     zcu.inserts.deinit(gpa);
+    zcu.hier_srcs.deinit(gpa);
     zcu.failed.deinit(gpa);
     zcu.decl_lib.deinit(gpa);
     var it = zcu.data_files.keyIterator();

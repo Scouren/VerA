@@ -72,6 +72,10 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
     if (indirect.on(s, t.hi, t.lo)) return s.fail(.E0409, file, src, "`({s},{s})`", .{ access.nodeName(s, t.hi), access.nodeName(s, t.lo) });
     const row = try rowOf(s, b, t);
     try discardOpposite(s, b, t);
+    // §6.3.6 every flow contribution is already scaled by $mfactor, and
+    // "Verilog-AMS does not provide a method to disable" it: an explicit
+    // factor on the contributed value scales it twice (E0912).
+    if (t.access == .flow) try checkMfactorDoubleScaling(s, b, x.rhs);
     var split: reactive.Split = .{};
     s.contrib_target = t;
     defer s.contrib_target = null;
@@ -80,7 +84,7 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
     const slots = s.device.contributions.get(@backingInt(row));
     // §6.3.6 "All contributions to a branch flow quantity in the analog
     // block shall be multiplied by $mfactor".
-    const m = if (t.access == .flow) mfactor.mfactorOf(s, b.unit) else 1;
+    const m: Ref = if (t.access == .flow) try mfactor.mfactorRef(s, b, b.unit) else .fromIntern(.one_real);
     inline for (.{ "resist", "react" }) |half| if (@field(split, half)) |v1| {
         const v0 = try mfactor.scaled(s, b, v1, m, false);
         const v = if (t.neg) try expr.unOp(s, b, .fneg, v0) else v0;
@@ -120,6 +124,43 @@ pub fn rowOf(s: *Sema, b: *const Block, t: Target) Allocator.Error!Device.Contri
 }
 
 // ---- private ----
+
+/// §6.3.6 (C-P9's neighbour): "The first example, badres, misuses the
+/// $mfactor such that the contributed current would be multiplied by
+/// $mfactor twice ... The simulator will generate an error for this
+/// module." `rhs` is E0912 when `$mfactor` is itself a factor of a `*` or
+/// `/` on `rhs`'s product spine.
+/// ponytail: only the `$mfactor` syscall spelling is read, not a §3.4.7
+/// `aliasparam m = $mfactor;` name for it; add a `Zcu.hier_srcs`-style
+/// lookup from a declaration to `s.sys_alias` if a fixture needs it.
+fn checkMfactorDoubleScaling(s: *Sema, b: *Block, rhs: Inst.Ref) Allocator.Error!void {
+    if (!scalesByMfactor(b.unit.vir, rhs)) return;
+    try s.fail(.E0912, b.unit.file, rhs, "this flow contribution multiplies by `$mfactor`, which every flow contribution is already scaled by (§6.3.6)", .{});
+}
+
+/// Whether the product spine of `r` (`*`, `/`, a sign) reads `$mfactor`
+/// directly: scaling one addend of a sum does not scale the current
+/// (`I(p) <+ V(p) + 0.0 * $mfactor;` is legal on purpose), so the walk
+/// stops at `+`/`-`.
+fn scalesByMfactor(vir: *const Vir, r: Inst.Ref) bool {
+    const i = r.toIndex() orelse return false;
+    return switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+        .mul, .div => blk: {
+            const bin = decl.payloadOf(vir, Inst.Bin, i);
+            break :blk isMfactorRead(vir, bin.lhs) or isMfactorRead(vir, bin.rhs) or scalesByMfactor(vir, bin.lhs) or scalesByMfactor(vir, bin.rhs);
+        },
+        .pos, .neg => scalesByMfactor(vir, vir.instructions.items(.data)[@backingInt(i)].un_node.operand),
+        else => false, // else: not on the multiplicative spine
+    };
+}
+
+/// A direct `$mfactor` syscall read.
+fn isMfactorRead(vir: *const Vir, r: Inst.Ref) bool {
+    const i = r.toIndex() orelse return false;
+    if (vir.instructions.items(.tag)[@backingInt(i)] != .call_sys) return false;
+    const c = decl.payloadOf(vir, Inst.SysCall, i);
+    return std.mem.eql(u8, vir.string(c.name), "$mfactor");
+}
 
 /// §5.6.1.3 "contributing [the other access] to a branch which already has
 /// a value retained for [this one] results in [it] being discarded and the

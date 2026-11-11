@@ -366,12 +366,14 @@ fn libraryArgv(arena: Allocator, f: File, p: ?Piece) Allocator.Error![]const []c
     const backend: Backend = if (p) |q| (if (coldSelfHosted(f, q)) .self_hosted else host) else host;
     var flags: std.ArrayList([]const u8) = .empty;
     try flags.appendSlice(arena, backend.flags());
-    // `-fincremental` only pays inside one compiler process `--watch` keeps
-    // alive across edits; every argv here is a fresh one-shot child
-    // (`Queue.zig` spawns one per build), so the flag buys nothing and only
-    // exposes the build to its miscompilation class (R7, research/builds.md:
-    // an unchanged Debug library rebuild measured 0.80 s with the flag,
-    // 0.09 s without, both a cache hit; cold, 0.87-0.96 s against 0.53-0.69 s).
+    // The only backend that patches in place, so the only one where
+    // `-fincremental` pays. Not for a cold piece of an LLVM build: lld links
+    // it beside the LLVM objects and refuses an incremental object's padded
+    // `.eh_frame` ("corrupted .eh_frame: FDE version 1 or 3 expected").
+    // Dropping it here (R7, research/builds.md) made a whole Debug library
+    // export 34 symbols beyond the device's `@export`s (diff-link unit/whole,
+    // unit/units: "exported symbols differ: old 1, new 35").
+    if (backend == .self_hosted and host == .self_hosted) try flags.append(arena, "-fincremental");
     if (stripOf(f)) try flags.append(arena, "-fstrip");
     if (p == null) if (f.engine) |e| try flags.append(arena, e);
 

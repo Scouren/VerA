@@ -322,6 +322,11 @@ touches only Debug `.so`/`.osdi` builds (the default is `.fast`), so the day-to-
 small; the correctness exposure is the reason. Cost: one line and its comment. Risk: `diff-link`
 compares outcomes, not argv (`tests/differential/link.zig:1-14`), so it is unaffected. Oracle:
 `diff-link` and `test-link` green; the argv no longer carries the flag.
+Outcome (2026-11-11): reverted. Without the flag a self-hosted, `.split = .whole` Debug
+library exports 34 symbols beyond the device's `@export`s (`diff-link` unit/whole and
+unit/units: "exported symbols differ: old 1, new 35"), so the risk line above was wrong:
+the flag changes the outcome, not only the argv. Back to research: why the export set
+depends on `-fincremental`, before any retry.
 
 **R8. Build both sides of a batch at once.** `runBatch` hands both sides' commands to the queue
 it already has (`jobs = 2`) and pipelines the next batch's build with this batch's evaluation.
@@ -446,3 +451,4 @@ Decision: as recommended (user, 2026-11-11).
 Recommendation: yes; the flag buys nothing in a one-shot child and brings the miscompilation
 class into device builds.
 Decision: as recommended (user, 2026-11-11).
+Outcome: merged untested (user), then reverted on `refactor` the same day; see R7.

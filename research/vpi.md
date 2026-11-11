@@ -130,7 +130,7 @@ No group is a ruling: the old library passes all 114 in `build/vpi.zig`'s
 | ramp_load.va (8), dc_divider.va (5), systf_devices.va (2), cap_ramp.va, sampnhold.va | codegen.xfail "a flow contribution to a potential source's branch" | rw-codegen |
 | two_sites.va, functype.va, square_law.va, env_probe.va (3) | codegen.xfail "a call of a user function (callee 4294967295)": `src/codegen/zig/Function.zig:570` emits no `systf_calls`/`SystfHost` call for `Air.Device.systf` (`src/Sema/syscall.zig:316` records them) | rw-codegen |
 | rc_ac.va | codegen.xfail "a call of `ac_stim`" | rw-codegen |
-| verilog/pli/analog_attributes.va | lower.xfail "codes: old {}, new E0357" | rw-lower |
+| verilog/pli/analog_attributes.va | cleared: `$rtoi`/`$itor` fold in `eval.Env.sysCall` (lower T1, commit 75ada1a5 on `worktree-agent-a4adce0a3f2af0653`, not yet in `refactor`); off lower.xfail, only the VPI backend remains | none once merged |
 | analog_system_task_registration.va, cube_solve.va | codegen.xfail "old device stopped ... 0xb": old-side crash with no app; both sides run under the host | not a blocker |
 
 ## 2. The fix, per group
@@ -447,17 +447,17 @@ Where each skill bites (every task):
 
 ## 5. Commands
 
-Worktree setup per README "Building and iterating"; `<wt>` = the task's.
+Worktree setup per AGENTS.md "Building with many agents" (symlinked `.zig-cache`; the inner loop is one private `--watch` per agent; every gate and report is a plain build through `tools/build-slot.sh`, never `-fincremental`); `<wt>` = the task's.
 
 | Task | Inner loop | Gate | Lists it may change |
 |---|---|---|---|
-| V0a | `nix develop -c zig build check test-vpi_rt -j4` | `~/.cache/vera-heavy.sh <wt> check test-unit rewrite vera-vpi-next`; `python3 tools/check_style.py lib/vpi src/vpi_host.zig` | none |
-| V0b | `~/.cache/vera-heavy.sh <wt> diff-comp -Dcomp-filter='verilog/pli/mcd'` | `~/.cache/vera-heavy.sh <wt> diff-comp -Dcomp-filter='ch11_vpi\|ch12_vpi_routines\|verilog/pli' -Dcomp-rebaseline=true` (report the vpi lines of `zig-out/comp.xfail.new`) | none |
-| V1-V4, V6-V8 | `nix develop -c zig build check test-vpi_rt test-std_sim test-sema test-codegen -j4` | `~/.cache/vera-heavy.sh <wt> diff-comp -Dcomp-filter='<group fixtures, \| separated>'`, then the vpi filter above; V3/V4 also `~/.cache/vera-heavy.sh <wt> diff-sim diff-comp -Dcomp-filter=verilog/` (no `.v` line may move) and the lfsr bench | none (report comp.xfail lines) |
-| V5 | `nix develop -c zig build test-vams -j4` | `~/.cache/vera-heavy.sh <wt> diff-render` | `tests/differential/render.xfail` (ends empty) |
-| V9a | as V1 + `test-link` | `~/.cache/vera-heavy.sh <wt> diff-comp -Dcomp-filter='ch12_vpi_routines'`; codegen.xfail unchanged | none |
+| V0a | `nix develop -c zig build check test-vpi_rt --watch -fincremental --cache-dir .zig-cache-watch` | `tools/build-slot.sh <wt> check test-unit rewrite vera-vpi-next`; `python3 tools/check_style.py lib/vpi src/vpi_host.zig` | none |
+| V0b | `tools/build-slot.sh <wt> diff-comp -Dcomp-filter='verilog/pli/mcd'` | `tools/build-slot.sh <wt> diff-comp -Dcomp-filter='ch11_vpi\|ch12_vpi_routines\|verilog/pli' -Dcomp-rebaseline=true` (report the vpi lines of `zig-out/comp.xfail.new`) | none |
+| V1-V4, V6-V8 | `nix develop -c zig build check test-vpi_rt test-std_sim test-sema test-codegen --watch -fincremental --cache-dir .zig-cache-watch` | `tools/build-slot.sh <wt> diff-comp -Dcomp-filter='<group fixtures, \| separated>'`, then the vpi filter above; V3/V4 also `tools/build-slot.sh <wt> diff-sim diff-comp -Dcomp-filter=verilog/` (no `.v` line may move) and the lfsr bench | none (report comp.xfail lines) |
+| V5 | `nix develop -c zig build test-vams --watch -fincremental --cache-dir .zig-cache-watch` | `tools/build-slot.sh <wt> diff-render` | `tests/differential/render.xfail` (ends empty) |
+| V9a | as V1 + `test-link` | `tools/build-slot.sh <wt> diff-comp -Dcomp-filter='ch12_vpi_routines'`; codegen.xfail unchanged | none |
 | V9b | as V1 | the vpi filter | none |
-| V10 | — | `~/.cache/vera-heavy.sh <wt> suite -- vpi`, `test-vpi-negative test-vpi-escaped test-vpi-mem`, `conformance-next` | `tools/vera.xfail` only with the lead |
+| V10 | — | `tools/build-slot.sh <wt> suite -- vpi`, `test-vpi-negative test-vpi-escaped test-vpi-mem`, `conformance-next` | `tools/vera.xfail` only with the lead |
 
 Every task: the README before-commit set, `zig fmt --check`, exit code read
 as `cmd > log 2>&1; echo $?`. `comp.xfail` never.
@@ -481,7 +481,7 @@ Risks and questions for the user, each with a recommendation.
    Recommendation: `comptime assert(@bitSizeOf(usize) == 64)` in `Handles.zig`, exclude the library from 32-bit cross targets. If one is required: `kind u4, index u20, gen u8` there.
    Decision: Every `cross.yaml` target is 64-bit (x86_64/aarch64 on linux, macos, windows); wasm32-wasi cannot load a VPI library. `comptime assert(@bitSizeOf(usize) == 64)` in `Handles.zig`, and the VPI library is excluded from wasm.
 
-2. **G8/G9's 27 fixtures wait on rw-codegen (switch branches, systf calls, `ac_stim`) and rw-lower (E0357).**
+2. **G8/G9's 27 fixtures wait on rw-codegen (switch branches, systf calls, `ac_stim`); the rw-lower E0357 blocker is cleared by lower T1 (75ada1a5), pending its merge.**
    Recommendation: Schedule V9b after those lines clear; ask rw-codegen to own `systf_calls` + `vpi_contribs` in the Zig backend.
    Decision: Yes: V9b after those lines clear; rw-codegen owns `systf_calls` and `vpi_contribs` in the Zig backend.
 

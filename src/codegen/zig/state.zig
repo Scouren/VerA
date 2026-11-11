@@ -26,6 +26,7 @@ const DeclGen = @import("DeclGen.zig");
 const Function = @import("Function.zig");
 const Ident = @import("Ident.zig");
 const ops = @import("ops.zig");
+const status = @import("status.zig");
 const Real = Function.Real;
 
 /// Fills `dg.held_field` (per `alloc`, its `Instance` field when held) and
@@ -65,8 +66,9 @@ pub fn genInstanceFields(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
 }
 
 /// `State`, `initState`, `updateState`, `stateCtl` and `state_class` when
-/// the device holds a variable, snapshots a table (then `mutable_eval`) or
-/// keeps a §9.17.3 `$limit` slot (then `advanceIteration`).
+/// the device holds a variable, snapshots a table or reports §9.7.3 status
+/// (either then `mutable_eval`), or keeps a §9.17.3 `$limit` slot (then
+/// `advanceIteration`).
 pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
     var held = false;
     for (dg.held_field) |f| held = held or f != null;
@@ -74,14 +76,16 @@ pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
     const limits = dg.device.limit_slots.len;
     // §4.5 the operators' fields, kept like the held values.
     const opf = try ops.fields(dg);
-    if (!held and !tables and limits == 0 and opf.len == 0) return;
+    const st = status.hasStatus(dg);
+    if (!held and !tables and limits == 0 and opf.len == 0 and !st) return;
     const p = struct {
         fn f(out: *std.Io.Writer, comptime fmt: []const u8, args: anytype) DeclGen.Error!void {
             out.print(fmt, args) catch return error.OutOfMemory;
         }
     }.f;
-    // §9.21.1 the first call of a site captures its samples into `inst`.
-    if (tables) try p(w, "\npub const mutable_eval = true;\n", .{});
+    // §9.21.1 the first call of a site captures its samples into `inst`
+    // (and, the same way, a status call: `eval`/`q` latch `inst` directly).
+    if (tables or st) try p(w, "\npub const mutable_eval = true;\n", .{});
     try p(w, "\n/// §5.10 the held values as last committed (`stateCtl`).\npub const State = struct {{\n", .{});
     if (tables) try p(w, "    table_kept: [{d}]bool = @splat(false),\n", .{dg.table_len.len});
     for (0..limits) |k| try p(w, "    limiter_previous__{d}: f64 = 0.0,\n", .{k});
@@ -92,14 +96,22 @@ pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
         try writeInit(dg, w, i);
         try p(w, ",\n", .{});
     };
-    try p(w, "}};\n\n/// Every held value back to its initializer: the start of an analysis.\npub fn initState(_: *const Model, {s}: *Instance) State {{\n", .{if (held or opf.len != 0) "inst" else "_"});
+    try p(w, "}};\n\n/// Every held value back to its initializer: the start of an analysis.\npub fn initState(_: *const Model, {s}: *Instance) State {{\n", .{if (held or opf.len != 0 or st) "inst" else "_"});
     for (opf) |o| try p(w, "    inst.{s} = {s};\n", .{ o.name, o.default });
     for (dg.held_field, 0..) |field, i| if (field) |f| {
         try p(w, "    inst.{s} = ", .{f});
         try writeInit(dg, w, i);
         try p(w, ";\n", .{});
     };
+    // §9.7.3 a latched status is re-initialized like any other variable
+    // (§4.6.2: "re-initialized to zero ... at the start of each new analysis").
+    if (st) try p(w, "    inst.vera_status__ = 0;\n    inst.vera_status_args__ = @splat(0.0);\n", .{});
     try p(w, "    return .{{}};\n}}\n\n/// §5.10 an accepted point: the body's held values become the instance's.\npub fn updateState(comptime S: type, model: *const Model, inst: *Instance, x: [n_u]f64, _: *State, sim: contract.SimState) contract.UpdateResult {{\n", .{});
+    // A status-only device reads none of these in its own right; `run`
+    // (held values, table captures, operators) is what would otherwise.
+    if (!tables and !(held or opf.len != 0)) try p(w, "    _ = .{{ S, model, x, sim }};\n", .{});
+    // §9.7.3 a latched status: the device stopped, so its state stays put.
+    if (st) try p(w, "    if (inst.vera_status__ != 0) return .ok;\n", .{});
     // §9.21.1 a capture an iterate made is kept only at an accepted point:
     // the body runs once more at `x` while a site is uncaptured.
     if (tables) try p(w, "    if (std.mem.findScalar(bool, &inst.table_kept, false) != null) {{\n        _ = run(S, &x, D.zProbe(S, &x), model, inst, sim);\n        inst.table_kept = inst.table_ready;\n    }}\n", .{});
@@ -108,7 +120,10 @@ pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
     for (dg.held_field, 0..) |field, i| if (field) |f| {
         try p(w, "    inst.{s} = m.h{d}{s};\n", .{ f, i, if (isInt(dg, i)) "" else ".val()" });
     };
-    try p(w, "    return .ok;\n}}\n\n/// `commit` keeps the instance's held values; `revert` restores them.\npub fn stateCtl(_: *const Model, inst: *Instance, state: *State, op: contract.StateCtlOp) bool {{\n    switch (op) {{\n        .query => {{}},\n        .commit => {{\n", .{});
+    // A status-only device's `commit`/`revert` copy nothing: `inst` and
+    // `state` would otherwise go unused.
+    const copies = tables or held or limits != 0 or opf.len != 0;
+    try p(w, "    return .ok;\n}}\n\n/// `commit` keeps the instance's held values; `revert` restores them.\npub fn stateCtl(_: *const Model, {s}: *Instance, {s}: *State, op: contract.StateCtlOp) bool {{\n    switch (op) {{\n        .query => {{}},\n        .commit => {{\n", .{ if (copies) "inst" else "_", if (copies) "state" else "_" });
     if (tables) try p(w, "            state.table_kept = inst.table_kept;\n            inst.table_ready = inst.table_kept;\n", .{});
     for (dg.held_field) |field| if (field) |f| try p(w, "            state.{s} = inst.{s};\n", .{ f, f });
     for (0..limits) |k| try p(w, "            state.limiter_previous__{0d} = inst.limiter_previous__{0d};\n", .{k});

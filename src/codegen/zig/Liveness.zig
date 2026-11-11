@@ -154,10 +154,11 @@ pub fn maskOf(l: Liveness, ref: Inst.Ref) Mask {
 
 /// Whether an instruction runs for what it does, not for its value: control,
 /// an assignment, a call that changes what a later evaluation sees (a §9.13
-/// draw, a §9.5 file task, a §4.5 operator `ops.zig` keeps, whose input
-/// `updateState` reads from `core` even where only a print reads its
-/// value). A §9.4 print or §9.7 control task runs in the device's display
-/// phase, so it does not run in `core` for its own sake.
+/// draw, a §9.5 file task, a §4.5 operator `ops.zig` keeps, a §9.7.3
+/// `$fatal`/`$error` `status.zig` latches `core`-side, whose input
+/// `updateState`/`eval`/`q` read from `core` even where only a print reads
+/// its value). A §9.4 print or the rest of §9.7's tasks run in the
+/// device's display phase, so they do not run in `core` for their own sake.
 pub fn effect(air: Air, tag: Inst.Tag, data: Inst.Data) bool {
     return switch (tag) {
         .block, .loop, .cond_br, .br, .repeat, .ret, .assign => true,
@@ -167,6 +168,7 @@ pub fn effect(air: Air, tag: Inst.Tag, data: Inst.Data) bool {
             if (callee > std.math.maxInt(@typeInfo(SysFn.Tag).@"enum".tag_type)) return false;
             const fn_tag: SysFn.Tag = @fromBackingInt(@intCast(callee));
             if (fn_tag == .transition or fn_tag == .slew or fn_tag == .idtmod or fn_tag == .last_crossing or fn_tag == .absdelay) return true;
+            if (fn_tag == .@"$fatal" or fn_tag == .@"$error") return true;
             return switch (SysFn.get(fn_tag).family) {
                 .random, .file_out, .file_func => true,
                 else => false, // else: a value, or a task of another phase

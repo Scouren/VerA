@@ -113,7 +113,7 @@ pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Erro
 pub fn fileRow(s: *Sema, tag: SysFn.Tag, call: Ref) Allocator.Error!void {
     if (SysFn.get(tag).family != .file_func) return;
     const i = call.toIndex() orelse return;
-    try s.device.displays.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, @tagName(tag)), .call = i });
+    try s.device.displays.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, @tagName(tag)), .call = i, .file = .empty, .line = 0 });
 }
 
 /// A system task enable (`$strobe(...)`): a `call` with no result; a
@@ -161,11 +161,11 @@ pub fn task(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Error
     // every file_out task one) over the plain call, no format.
     if (info.family == .simctl or tag == .@"$fclose" or tag == .@"$fflush") {
         const r = try expr.call(s, b, @backingInt(tag), null, try lowerArgs(s, b, args));
-        try s.device.displays.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .call = r.toIndex().? });
+        try s.device.displays.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .call = r.toIndex().?, .file = .empty, .line = 0 });
         return;
     }
     const row: u32 = @intCast(s.device.displays.len);
-    try s.device.displays.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .call = undefined });
+    try s.device.displays.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .call = undefined, .file = .empty, .line = 0 });
     if (b.conditional != 0) {
         // A guarded print is minted where it stands.
         const vals = try s.arena.alloc(Value, args.len);
@@ -397,7 +397,7 @@ fn lowerArgs(s: *Sema, b: *Block, args: []const Inst.Ref) Allocator.Error![]cons
 fn userCall(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, ty: ?Sema.Ty) Allocator.Error!Value {
     const refs = try lowerArgs(s, b, args);
     const r = try expr.call(s, b, expr.user_callee, ty, refs);
-    try s.device.systf.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .call = r.toIndex().? });
+    try s.device.systf.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, name), .call = r.toIndex().?, .file = .empty, .line = 0 });
     return .{ .ref = r, .ty = ty orelse .real };
 }
 

@@ -23,6 +23,7 @@ const state = @import("state.zig");
 const ops = @import("ops.zig");
 const Liveness = @import("Liveness.zig");
 const say = @import("say.zig");
+const status = @import("status.zig");
 const Real = Function.Real;
 const Ref = Air.Inst.Ref;
 const Error = DeclGen.Error;
@@ -57,6 +58,9 @@ pub fn genCall(f: *Function, inst: Air.Inst.Index, data: Air.Inst.Data) Error!vo
         .display, .simctl => {
             if (used) return f.dg.fail("the value of `{s}`", .{@tagName(tag)});
             if (f.phase == .say) try say.record(f, inst);
+            // §9.7.3 the status channel: `core` records the latch; `say`
+            // only discards the arguments `Liveness.effect` keeps alive.
+            if (tag == .@"$fatal" or tag == .@"$error") try status.record(f, inst);
             return;
         },
         else => {}, // else: a value, by tag below

@@ -21,7 +21,7 @@ const InternPool = @import("intern_pool");
 const Air = @import("air");
 const Sema = @import("../Sema.zig");
 const decl = @import("decl.zig");
-const contrib = @import("contrib.zig");
+const access = @import("access.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Unit = Sema.Unit;
@@ -298,7 +298,7 @@ fn analogReads(s: *Sema, unit: *Unit, b: Vir.Body, out: *std.AutoArrayHashMapUnm
                 }
                 continue;
             },
-            .call => if (try contrib.accessCall(s, unit, i.toRef()) != null) continue,
+            .call => if (try access.accessCall(s, unit, i.toRef()) != null) continue,
             .store, .store_nb => {
                 if (decl.payloadOf(vir, Inst.Bin, i).rhs.toIndex()) |r| try stack.append(s.arena, r);
                 continue;

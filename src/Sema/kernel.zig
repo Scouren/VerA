@@ -22,6 +22,7 @@ const Sema = @import("../Sema.zig");
 const decl = @import("decl.zig");
 const expr = @import("expr.zig");
 const contrib = @import("contrib.zig");
+const access = @import("access.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const SysFn = vams.SysFn;
@@ -62,7 +63,7 @@ fn limit(s: *Sema, b: *Block, args: []const Inst.Ref, src: Inst.Ref) Allocator.E
         return expr.poison;
     }
     // Syntax 9-12 spells the first argument access_function_reference.
-    const access = (try contrib.accessCall(s, unit, args[0])) orelse {
+    const acall = (try access.accessCall(s, unit, args[0])) orelse {
         try s.fail(.E0891, file, src, "its first argument is not an access function reference", .{});
         return expr.poison;
     };
@@ -73,7 +74,7 @@ fn limit(s: *Sema, b: *Block, args: []const Inst.Ref, src: Inst.Ref) Allocator.E
             return expr.poison;
         }
     };
-    if (args.len >= 2) if (userFunction(unit, args[1])) |f| return limitUser(s, b, f, access, args, src);
+    if (args.len >= 2) if (userFunction(unit, args[1])) |f| return limitUser(s, b, f, acall, args, src);
     const vals = try s.arena.alloc(Ref, args.len);
     for (args, vals, 0..) |a, *v, k| {
         if (a == .none) {
@@ -105,16 +106,16 @@ fn userFunction(unit: *const Sema.Unit, r: Inst.Ref) ?Inst.Index {
 /// value kept in the access function's slot; the result carries the access
 /// function's derivative (`limit$uf(vnew, vlim)`), so the host stamps
 /// `I(vlim) + g·(v - vlim)`.
-fn limitUser(s: *Sema, b: *Block, f: Inst.Index, access: contrib.AccessCall, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
+fn limitUser(s: *Sema, b: *Block, f: Inst.Index, acall: access.AccessCall, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value {
     const vnew: Value = .{ .ref = try expr.coerce(s, b, try expr.lower(s, b, args[0]), .real), .ty = .real };
     // A port access (`I(<p>)`) keys no state: §4.5.15 lets the simulator
     // decline the request, the one answer that invents nothing.
-    const by_port = for (access.args) |a| {
+    const by_port = for (acall.args) |a| {
         const i = a.toIndex() orelse continue;
         if (b.unit.vir.instructions.items(.tag)[@backingInt(i)] == .port_branch) break true;
     } else false;
     if (by_port) return .{ .ref = try expr.call(s, b, @backingInt(SysFn.Tag.@"$limit"), .real, &.{vnew.ref}), .ty = .real };
-    const t = (try contrib.target(s, b, access.name, access.args, src)) orelse return expr.poison;
+    const t = (try access.target(s, b, acall.name, acall.args, src)) orelse return expr.poison;
     const row = try slotOf(s, t);
     const slot = s.device.limit_slots.items(.slot)[row];
     // The seed, not the running value: every site on one access function
@@ -142,7 +143,7 @@ fn slotOf(s: *Sema, t: contrib.Target) Allocator.Error!usize {
     try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slot), .rhs = seed } } }));
     try s.limit_seeds.append(s.arena, seed);
     try d.limit_slots.append(s.gpa, .{
-        .label = try s.zcu.intern_pool.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}({s},{s})", .{ if (t.access == .potential) "V" else "I", contrib.nodeName(s, t.hi), contrib.nodeName(s, t.lo) })),
+        .label = try s.zcu.intern_pool.getString(s.gpa, try std.fmt.allocPrint(s.arena, "{s}({s},{s})", .{ if (t.access == .potential) "V" else "I", access.nodeName(s, t.hi), access.nodeName(s, t.lo) })),
         .access = t.access,
         .branch = t.branch,
         .hi = t.hi,

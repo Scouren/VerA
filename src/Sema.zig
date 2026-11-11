@@ -69,12 +69,12 @@ prologue: std.ArrayList(Air.Inst.Index) = .empty,
 units: std.ArrayList(Unit) = .empty,
 /// A net's flat name to its `device.nodes` row (decl.zig).
 node_rows: std.AutoHashMapUnmanaged(InternPool.String, Air.Device.Node.Index) = .empty,
-/// §5.4.2 a node pair to its flow unknown (contrib.zig).
+/// §5.4.2 a node pair to its flow unknown (access.zig).
 flow_rows: std.AutoHashMapUnmanaged([2]Air.Device.Node.Index, Air.Device.Node.Index) = .empty,
 /// §7.8.4 each bridged child port to its bridge's lower net and (once
 /// bound) its connection's net (net.zig).
 bridged: std.AutoHashMapUnmanaged(struct { Zcu.Instance.Index, Vir.Inst.Index }, Bridged) = .empty,
-/// §5.4.3 a port's row to its port flow unknown (contrib.zig).
+/// §5.4.3 a port's row to its port flow unknown (access.zig).
 port_rows: std.AutoHashMapUnmanaged(Air.Device.Node.Index, Air.Device.Node.Index) = .empty,
 /// §5.6 a contribution target to its row (contrib.zig).
 contrib_rows: std.AutoHashMapUnmanaged(ContribKey, Air.Device.Contribution.Index) = .empty,
@@ -88,10 +88,10 @@ expr_src: Inst.Ref = .none,
 inst_srcs: std.ArrayList(Analysis.Src) = .empty,
 /// A unit has a digital half (`Analysis.mixed`).
 mixed: bool = false,
-/// Each node row's one `probe`, in the prologue (contrib.zig).
+/// Each node row's one `probe`, in the prologue (access.zig).
 probes: std.AutoHashMapUnmanaged(Air.Device.Node.Index, Air.Inst.Ref) = .empty,
 /// §3.6.2 every access function name and the quantity it reads under a
-/// discipline that binds it; each discipline's two names (contrib.zig).
+/// discipline that binds it; each discipline's two names (access.zig).
 access_kind: std.StringHashMapUnmanaged(Air.Device.Access) = .empty,
 disc_access: std.StringHashMapUnmanaged([2][]const u8) = .empty,
 disciplines_loaded: bool = false,

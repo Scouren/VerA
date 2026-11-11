@@ -39,6 +39,15 @@ test {
     _ = @import("Sema/expr.zig");
     _ = @import("Sema/control.zig");
     _ = @import("Sema/contrib.zig");
+    _ = @import("Sema/access.zig");
+    _ = @import("Sema/indirect.zig");
+    _ = @import("Sema/mfactor.zig");
+    _ = @import("Sema/condbr.zig");
+    _ = @import("Sema/branch.zig");
+    _ = @import("Sema/portbind.zig");
+    _ = @import("Sema/param_paramset.zig");
+    _ = @import("Sema/param_check.zig");
+    _ = @import("Sema/held_writes.zig");
     _ = @import("Sema/syscall.zig");
     _ = @import("Sema/held.zig");
     _ = @import("Sema/func.zig");

@@ -13,7 +13,7 @@ const Allocator = std.mem.Allocator;
 const Air = @import("air");
 const Sema = @import("../Sema.zig");
 const Node = Air.Device.Node;
-const nodeName = @import("contrib.zig").nodeName;
+const nodeName = @import("access.zig").nodeName;
 
 /// §1.3.1 "The potential and flow of a probe branch may not both appear in
 /// expressions in a given module" (E0423, the old `checkProbeBranches`): a

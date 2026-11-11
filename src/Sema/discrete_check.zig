@@ -278,7 +278,7 @@ fn probeOutside(s: *Sema, unit: *Unit, r: Inst.Ref, free: *const Set, depth: u32
             } else false;
             if (event) return null;
         },
-        .call => if (try @import("contrib.zig").accessCall(s, unit, r) != null) return r,
+        .call => if (try @import("access.zig").accessCall(s, unit, r) != null) return r,
         .port_branch => return r,
         .decl_ref => if (free.contains(decl.canonical(vir, vir.instructions.items(.data)[@backingInt(i)].decl_tok.decl))) return r,
         else => {}, // else: searched through its operands

@@ -31,6 +31,7 @@ const stamps = @import("stamps.zig");
 const state = @import("state.zig");
 const calls = @import("calls.zig");
 const say = @import("say.zig");
+const status = @import("status.zig");
 const ops = @import("ops.zig");
 const Device = Air.Device;
 const Real = Function.Real;
@@ -70,6 +71,8 @@ ddx_reads: Liveness.Mask = 0,
 table_len: []u32 = &.{},
 /// §4.5 the operator call sites (`ops.plan`).
 op_sites: []const ops.Site = &.{},
+/// §9.7.3 the `$fatal`/`$error` status sites (`status.plan`).
+status_sites: []const status.Site = &.{},
 
 /// A parameter with no `given__` bit.
 pub const no_bit: u32 = std.math.maxInt(u32);
@@ -89,7 +92,10 @@ pub const Error = error{ OutOfMemory, CodegenFail };
 /// carry the fast flags, each field brought back by `fromFast`; on `S`
 /// itself for a family without it. `@setFloatMode` reaches only the
 /// operators of its own function body, so the mode lives in the family
-/// whose methods hold the arithmetic.
+/// whose methods hold the arithmetic. A `Core(S)` field is the family's own
+/// value type (`F.zOf`, named by its `mask` decl) when it needs `fromFast`;
+/// a plain field (`st__`, `sa__`, an operator's own scalar) does not depend
+/// on `S` and is the same type on both twins, so it is just copied.
 const fast =
     \\
     \\inline fn fast(comptime S: type, x: *const [n_u]S.V, xs: D.zX(S), model: *const Model, inst: InstancePtr, sim: contract.SimState) Core(S) {
@@ -97,7 +103,7 @@ const fast =
     \\    const f = @call(.always_inline, core, .{ S.Fast, .optimized, D.zProbe(S.Fast, x), model, inst, sim });
     \\    const info = @typeInfo(Core(S)).@"struct";
     \\    var out: Core(S) = undefined;
-    \\    inline for (info.field_names, info.field_types) |name, T| @field(out, name) = if (T == i64 or T == f64) @field(f, name) else S.fromFast(@field(f, name));
+    \\    inline for (info.field_names, info.field_types) |name, T| @field(out, name) = if (@typeInfo(T) == .@"struct" and @hasDecl(T, "mask")) S.fromFast(@field(f, name)) else @field(f, name);
     \\    return out;
     \\}
     \\
@@ -152,6 +158,7 @@ pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     try dg.givenBits();
     try state.plan(dg);
     try ops.plan(dg);
+    try status.plan(dg);
 
     // The body first: its uses decide `core`'s signature.
     var body: std.Io.Writer.Allocating = .init(dg.arena);
@@ -168,6 +175,8 @@ pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     try dg.genCore(w, f.uses, body.written());
     try dg.genEntries(w, p);
     try state.genEntries(dg, w);
+    try status.genEntries(dg, w);
+    try status.genSetupInstance(dg, w);
     try say.genEntries(dg, w, say_text);
     try dg.print(w, "\ncomptime {{\n    contract.validate(Self);\n}}\n", .{});
 }
@@ -183,6 +192,7 @@ pub fn genReturn(dg: *DeclGen, f: *Function) Error!void {
     for (dg.held_field, 0..) |h, i| if (h != null) try dg.print(f.w, " .h{d} = s{d},", .{ i, i });
     for (d.limit_slots.items(.slot), 0..) |slot, k| try dg.print(f.w, " .l{d} = s{d},", .{ k, @backingInt(slot) });
     try ops.genReturn(dg, f.w);
+    try status.genReturn(dg, f.w);
     try dg.print(f.w, " }};", .{});
 }
 
@@ -249,6 +259,7 @@ fn genModel(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     try dg.print(w, "}};\n", .{});
     try dg.print(w, "\n/// §6.3.6 the instance.\npub const Instance = struct {{\n    mfactor: f64 = 1.0,\n", .{});
     try state.genInstanceFields(dg, w);
+    try status.genInstanceFields(dg, w);
     try dg.print(w, "}};\n", .{});
     try dg.genDerive(w);
 }
@@ -389,11 +400,13 @@ fn genCore(dg: *DeclGen, w: *std.Io.Writer, uses: Function.Uses, body: []const u
     };
     for (d.limit_slots.items(.slot), 0..) |slot, k| try dg.print(w, " l{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
     try ops.genCoreFields(dg, w);
+    try status.genCoreFields(dg, w);
     try dg.print(w, " }};\n}}\n", .{});
     // §9.21.1 every evaluation starts from the snapshots an accepted point kept.
     const tables = dg.table_len.len != 0;
     var decls: std.Io.Writer.Allocating = .init(dg.arena);
     try ops.genDecls(dg, &decls.writer);
+    try status.genDecls(dg, &decls.writer);
     try dg.print(w, "\n/// The whole analog body, once per evaluation.\nfn core(comptime S: type, comptime mode: std.builtin.FloatMode, {s}: D.zX(S), {s}: *const Model, {s}: InstancePtr, {s}: contract.SimState) Core(S) {{\n    @setFloatMode(mode);{s}{s}{s}\n}}\n", .{
         if (uses.x) "x" else "_",
         if (uses.model) "model" else "_",
@@ -470,7 +483,14 @@ fn transcendental(air: Air) bool {
 fn genEntries(dg: *DeclGen, w: *std.Io.Writer, p: stamps.Plan) Error!void {
     const d = dg.device;
     try dg.print(w, "\n/// §5.6 the resistive residual: KCL at every unknown.\npub fn eval(comptime S: type, x: *const [n_u]S.V, model: *const Model, inst: InstancePtr, sim: contract.SimState) contract.Rows(Self, S) {{\n", .{});
-    try dg.print(w, "    const xs = D.zProbe(S, x);\n    const m = run(S, x, xs, model, inst, sim);\n    var res = D.zRowsZero(S);\n    _ = .{{ &m, &res }};\n", .{});
+    // §9.7.3 a latched status (`status.hasStatus`): skip `run` once it is
+    // set, then latch any `$fatal`/`$error` this evaluation newly reaches
+    // and zero the rows it was about to stamp.
+    if (status.hasStatus(dg)) try dg.print(w, "    if (inst.vera_status__ != 0) return D.zRowsZero(S);\n", .{});
+    try dg.print(w, "    const xs = D.zProbe(S, x);\n    const m = run(S, x, xs, model, inst, sim);\n", .{});
+    if (status.hasStatus(dg)) try dg.print(w, "    inst.vera_status__ = m.st__;\n    inst.vera_status_args__ = m.sa__;\n", .{});
+    try dg.print(w, "    var res = D.zRowsZero(S);\n    _ = .{{ &m, &res }};\n", .{});
+    if (status.hasStatus(dg)) try dg.print(w, "    if (inst.vera_status__ != 0) return res;\n", .{});
     for (p.stamps) |s| {
         try dg.print(w, "    res[{d}] = D.zRow(S, .{f}, ", .{ s.row, Ident{ .name = dg.nodeName(s.row) } });
         if (s.op != .set) try dg.print(w, "res[{d}].{t}(", .{ s.row, s.op });
@@ -496,7 +516,18 @@ fn genEntries(dg: *DeclGen, w: *std.Io.Writer, p: stamps.Plan) Error!void {
         try dg.print(w, "    _ = .{{ x, model, inst, sim }};\n    return .{{}};\n}}\n", .{});
         return;
     }
-    try dg.print(w, "    const m = run(S, x, D.zProbe(S, x), model, inst, sim);\n    return .{{", .{});
+    if (status.hasStatus(dg)) {
+        try dg.print(w, "    if (inst.vera_status__ != 0) return .{{", .{});
+        for (0..d.charge_sites.len) |k| try dg.print(w, " F.zTo(S, contract.siteMask(Self, {d}), S.con(0.0)),", .{k});
+        try dg.print(w, " }};\n", .{});
+    }
+    try dg.print(w, "    const m = run(S, x, D.zProbe(S, x), model, inst, sim);\n", .{});
+    if (status.hasStatus(dg)) {
+        try dg.print(w, "    inst.vera_status__ = m.st__;\n    inst.vera_status_args__ = m.sa__;\n    if (inst.vera_status__ != 0) return .{{", .{});
+        for (0..d.charge_sites.len) |k| try dg.print(w, " F.zTo(S, contract.siteMask(Self, {d}), S.con(0.0)),", .{k});
+        try dg.print(w, " }};\n", .{});
+    }
+    try dg.print(w, "    return .{{", .{});
     for (0..d.charge_sites.len) |k| try dg.print(w, " F.zTo(S, contract.siteMask(Self, {d}), m.c{d}),", .{ k, k });
     try dg.print(w, " }};\n}}\n", .{});
 }

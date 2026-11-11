@@ -7,8 +7,12 @@
 //! beside them: the breakpoints and step bound after the accept, the noise
 //! PSDs and AC phasors per branch. Each device is also held to itself: a
 //! rejected step's `stateCtl(.revert)` must give back the point's rows,
-//! and every lane must be its row's central-difference slope. A device that
-//! calls a §12.32 systf gets a fixed linear `SystfHost` (`stub_systf`).
+//! and every lane must be its row's central-difference slope, except a row
+//! the bundle's `fd_skip` names (research/codegen.md T0d): one `u64` row
+//! mask per device, computed off its fixture's `Air` (`sides.zig`'s
+//! `fdSkipMask`) for a row that reaches an op VerA's Jacobian defines by
+//! rule, never by the fixture's name. A device that calls a §12.32 systf
+//! gets a fixed linear `SystfHost` (`stub_systf`).
 //! Cites: VAMS-2023 §5.6, §5.6.1.2 (the rows and charges a host reads),
 //! §4.6.3, §4.6.4, §9.17.2, §12.32.
 //!
@@ -41,15 +45,18 @@ const fd_round = 16;
 var stub_ctx: u8 = 0;
 const stub_systf: contract.SystfHost = .{ .ctx = &stub_ctx, .call = stubCall };
 
-/// `link`'s hook: exports `Run(D).run` as `cg_<decl>` for every device `D`
-/// of bundle `B`'s `devices`, named by its `names`. `name` is the library's, unused.
+/// `link`'s hook: exports `Run(D, skip).run` as `cg_<decl>` for every device
+/// `D` of bundle `B`'s `devices`, named by its `names`, with the matching
+/// row-skip mask of `B.fd_skip` (research/codegen.md T0d; all zero, every
+/// row checked, when `B` declares none). `name` is the library's, unused.
 pub fn exportDevice(comptime B: type, comptime name: []const u8) void {
     _ = name;
     @export(&pinMath, .{ .name = "cg_pin_math" });
-    inline for (B.devices, B.names) |D, n| {
-        @export(&Run(D).run, .{ .name = "cg_" ++ n });
-        @export(&Run(D).unknowns, .{ .name = "cg_" ++ n ++ "_nu" });
-        @export(&Run(D).site, .{ .name = "cg_" ++ n ++ "_site" });
+    const skips: [B.devices.len]u64 = if (@hasDecl(B, "fd_skip")) B.fd_skip else @splat(0);
+    inline for (B.devices, B.names, skips) |D, n, skip| {
+        @export(&Run(D, skip).run, .{ .name = "cg_" ++ n });
+        @export(&Run(D, skip).unknowns, .{ .name = "cg_" ++ n ++ "_nu" });
+        @export(&Run(D, skip).site, .{ .name = "cg_" ++ n ++ "_site" });
     }
 }
 
@@ -77,8 +84,14 @@ fn stubCall(_: *anyopaque, k: usize, args: []const f64, partials: []f64) f64 {
     return v;
 }
 
-/// The entry of device `D`.
-fn Run(comptime D: type) type {
+/// The entry of device `D`; `fd_skip`'s bit `r` (research/codegen.md T0d)
+/// skips `checkJacobian`'s check of row `r` entirely: a central difference
+/// is no oracle for a row that reaches `ddx`, `vera_nodiff`, an
+/// `integer`<->`real` cast, `$realtobits`/`$bitstoreal` or `%`/`fmod`,
+/// whose Jacobian VerA defines by rule rather than as that limit. Every
+/// other row is still checked, so a planted fault on a smooth row still
+/// goes red.
+fn Run(comptime D: type, comptime fd_skip: u64) type {
     return struct {
         const n = contract.nU(D);
         const S = contract.RefFamily(f64, &std.simd.iota(u8, n), .{ .math = math });
@@ -232,15 +245,19 @@ fn Run(comptime D: type) type {
         /// of the row's lanes, plus `fd_round` rounding errors of the rows
         /// the difference subtracts. Where the two differences disagree
         /// with each other the row is not smooth at this scale (a jump, a
-        /// pole): no slope to check. A non-finite value passes too. On a
-        /// miss `out[0..5]` is the row (from `n` on, reactive row k − n),
-        /// the column, the lane, the difference and `h`.
+        /// pole): no slope to check. A non-finite value passes too, and so
+        /// does a row `fd_skip` names (research/codegen.md T0d): a central
+        /// difference is no oracle for a row whose declared Jacobian is a
+        /// VerA rule, not that limit. On a miss `out[0..5]` is the row
+        /// (from `n` on, reactive row k − n), the column, the lane, the
+        /// difference and `h`.
         fn checkJacobian(r: *const [len]f64, xv: *const [n]f64, m: *const D.Model, sim: contract.SimState, out: [*]f64) bool {
             for (0..n) |j| {
                 const h = std.math.cbrt(std.math.floatEps(f64)) * @max(1.0, @abs(xv[j]));
                 const a = slopes(xv, m, sim, j, h);
                 const b = slopes(xv, m, sim, j, h / 2);
                 for (0..2 * n) |k| {
+                    if ((fd_skip >> @intCast(k % n)) & 1 != 0) continue;
                     // Row k's lanes: resistive, then reactive.
                     const lanes = if (k < n) r[n + k * n ..][0..n] else r[2 * n + n * n + (k - n) * n ..][0..n];
                     const d = lanes[j];

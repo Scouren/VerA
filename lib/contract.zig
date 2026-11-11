@@ -29,8 +29,8 @@
 //! - `pub fn validateHost(comptime H: type, comptime D: type) void`
 //! - `pub const gm`: the transcendentals namespace (`contract/gm.zig`)
 //! - re-exported from `contract/build_config.zig`: `validating`, `DevicePart`
-//! - from `contract/display_records.zig`: `StatusSite`, `SaySite`, `Say`,
-//!   `SayPass`, `statusCode`, `statusSite`, `formatStatus`, `formatSay`
+//! - from `contract/display_records.zig`: `StatusSite`, `Severity`, `SaySite`,
+//!   `Say`, `SayPass`, `statusCode`, `statusSite`, `formatStatus`, `formatSay`
 //! - from `contract/c_format.zig`: `formatC`
 //! - `contract/str_real.zig` as `str_real` (§9.4.3's real conversions), and its
 //!   text as `str_real_source`
@@ -117,6 +117,7 @@ pub const gm = gm_file;
 pub const validating = build_config.validating;
 pub const DevicePart = build_config.DevicePart;
 pub const StatusSite = display_records.StatusSite;
+pub const Severity = display_records.Severity;
 pub const SaySite = display_records.SaySite;
 pub const Say = display_records.Say;
 pub const SayPass = display_records.SayPass;

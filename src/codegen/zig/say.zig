@@ -17,6 +17,8 @@
 //! - `pub const Body = struct`, `pub fn genBody(dg: *DeclGen) DeclGen.Error!Body`
 //! - `pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer, b: Body) DeclGen.Error!void`
 //! - `pub fn record(f: *Function, inst: Air.Inst.Index) DeclGen.Error!void`
+//! - `pub fn strConst(dg: *DeclGen, ref: Ref) ?[]const u8`
+//! - `pub fn format(dg: *DeclGen, args: []const Ref, fmt: *std.ArrayList(u8), vals: *std.ArrayList(Ref)) DeclGen.Error!bool`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -137,26 +139,26 @@ pub fn record(f: *Function, inst: Air.Inst.Index) Error!void {
     try f.print(" }});", .{});
 }
 
-// ---- private ----
-
-/// Whether task `tag` is a record: §9.4.1's printing tasks and
-/// `$warning`/`$info`, not `$monitor` (its change detection is state a
-/// device does not keep) nor `$fatal`/`$error` (the status channel).
-fn records(tag: SysFn.Tag) bool {
-    if (SysFn.get(tag).family != .display) return false;
-    return switch (tag) {
-        .@"$monitor", .@"$fatal", .@"$error" => false,
-        else => true, // else: a plain text record
-    };
-}
-
 /// §9.4.1's argument list as one C-style format over recorded numbers (the
 /// old `sayFormat`): a string argument is a format whose conversions take
 /// the arguments after it, a constant string under `%s` is spliced in as
 /// text; an argument no format took is `%d` (integer) or `%g`, and a bare
 /// `%d` gets IEEE 1364's automatic field (`decimal`). False when a value
-/// has no numeric record.
-fn format(dg: *DeclGen, args: []const Ref, fmt: *std.ArrayList(u8), vals: *std.ArrayList(Ref)) Error!bool {
+/// has no numeric record. Shared with `status.zig` (§9.7.3's `$fatal`/
+/// `$error` render their message by the same rules, `contract.formatStatus`
+/// over `contract.formatC`).
+/// Whether `ref` is a string literal, as the text; null for anything else
+/// (shared with `status.zig`: §9.7.3's `finish_number` is the one argument
+/// before the message `$fatal` allows).
+pub fn strConst(dg: *DeclGen, ref: Ref) ?[]const u8 {
+    const i = ref.toInterned() orelse return null;
+    return switch (dg.ip.indexToKey(i)) {
+        .str => |s| dg.ip.stringToSlice(s),
+        else => null, // else: not a string literal
+    };
+}
+
+pub fn format(dg: *DeclGen, args: []const Ref, fmt: *std.ArrayList(u8), vals: *std.ArrayList(Ref)) Error!bool {
     const a = dg.arena;
     var i: usize = 0;
     // Each pass consumes at least one argument.
@@ -211,6 +213,19 @@ fn format(dg: *DeclGen, args: []const Ref, fmt: *std.ArrayList(u8), vals: *std.A
     }
     assert(i == args.len);
     return true;
+}
+
+// ---- private ----
+
+/// Whether task `tag` is a record: §9.4.1's printing tasks and
+/// `$warning`/`$info`, not `$monitor` (its change detection is state a
+/// device does not keep) nor `$fatal`/`$error` (the status channel).
+fn records(tag: SysFn.Tag) bool {
+    if (SysFn.get(tag).family != .display) return false;
+    return switch (tag) {
+        .@"$monitor", .@"$fatal", .@"$error" => false,
+        else => true, // else: a plain text record
+    };
 }
 
 /// `%d` with IEEE 1364 §17.1.1.3's automatic field, as wide as the
@@ -271,14 +286,6 @@ fn oneBit(dg: *DeclGen, v: Ref) bool {
     return switch (dg.air.instructions.items(.tag)[@backingInt(i)]) {
         .flt, .fgt, .fle, .fge, .feq, .fne, .ilt, .igt, .ile, .ige, .ieq, .ine, .logand, .logor, .lognot => true,
         else => false, // else: an `integer`
-    };
-}
-
-fn strConst(dg: *DeclGen, ref: Ref) ?[]const u8 {
-    const i = ref.toInterned() orelse return null;
-    return switch (dg.ip.indexToKey(i)) {
-        .str => |s| dg.ip.stringToSlice(s),
-        else => null, // else: not a string literal
     };
 }
 

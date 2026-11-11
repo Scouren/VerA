@@ -119,12 +119,6 @@ verilog-a/ch09_system_tasks/dist_poisson.va codegen: a call of `$dist_poisson`
 verilog-a/ch09_system_tasks/dist_t.va codegen: a call of `$dist_t`
 verilog-a/ch09_system_tasks/dist_uniform.va codegen: a call of `$dist_uniform`
 verilog-a/ch09_system_tasks/distribution.va codegen: a call of `$dist_normal`
-verilog-a/ch09_system_tasks/error.va point 0: row 0: old 0e0, new 1.2818376926435355e0
-verilog-a/ch09_system_tasks/fatal.va point 1: row 0: old 0e0, new 2.18278479577549e0
-verilog-a/ch09_system_tasks/fatal_finish_number_0_exit_status.va point 0: row 0: old 0e0, new 4.7942962489144225e-1
-verilog-a/ch09_system_tasks/fatal_finish_number_2_exit_status.va point 0: row 0: old 0e0, new -2.5370237327075364e0
-verilog-a/ch09_system_tasks/fatal_in_iteration_terminates.va point 0: row 0: old 0e0, new -1.6025419903108231e0
-verilog-a/ch09_system_tasks/fatal_terminates.va point 0: row 0: old 0e0, new -2.789674796957345e0
 verilog-a/ch09_system_tasks/plusargs.va codegen: a call of `$test$plusargs`
 verilog-a/ch09_system_tasks/plusargs_prefix.va codegen: a call of `$test$plusargs`
 verilog-a/ch09_system_tasks/plusargs_value_order.va codegen: a call of `$value$plusargs`
@@ -144,7 +138,6 @@ verilog-a/ch09_system_tasks/rdist_zero_mean_at_run_time_is_an_error.va codegen: 
 verilog-a/ch09_system_tasks/real_distribution.va codegen: a call of `$rdist_uniform`
 verilog-a/ch09_system_tasks/rng_reference_large_count.va codegen: a call of `$rdist_chi_square`
 verilog-a/ch09_system_tasks/rng_short_circuit.va codegen: a call of `$rdist_exponential`
-verilog-a/ch09_system_tasks/severity_tasks.va point 0: row 0: old 0e0, new 3.3735730291752675e0
 verilog-a/ch09_system_tasks/simparam_fallback_as_parameter_default.va codegen: parameter `lo`'s default does not fold
 verilog-a/ch09_system_tasks/simparam_gmin_source_scale_host_written.va codegen: parameter `g`'s default does not fold
 verilog-a/ch09_system_tasks/simparam_minr_hicum_l2_default.va codegen: parameter `minr`'s default does not fold
@@ -187,8 +180,6 @@ verilog-ams/ch12_vpi_routines/sampnhold.va codegen: a flow contribution to a pot
 verilog-ams/ch12_vpi_routines/square_law.va codegen: a call of a user function (callee 4294967295)
 verilog-ams/ch12_vpi_routines/systf_devices.va codegen: a flow contribution to a potential source's branch
 verilog-ams/ch12_vpi_routines/two_sites.va codegen: a call of a user function (callee 4294967295)
-verilog-a/ch09_system_tasks/say_ops.va point 3: row 0: old 0e0, new 4.420039751777031e-2
-verilog-ams/ch09_system_tasks/say_ops.va point 7: row 0: old 0e0, new 1.5135117424147268e-2
 netlist/hdl/a09_limit_root_transient.assets/a09_limit_ramp.va the new device does not build: n5.zig:150: unused function parameter
 netlist/hdl/veriloga_limit.assets/va_limit.va the new device does not build: n10.zig:154: unused function parameter
 netlist/hdl/veriloga_limit.assets/va_limit_state.va codegen: a §5.6.1.2 path latch (`path_prev`)
@@ -472,14 +463,9 @@ netlist/noise/va_noise.assets/ground_res.va point 0: noise PSD at 1 Hz, branch 0
 netlist/noise/va_noise.assets/ntab_lin.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
 netlist/noise/va_noise.assets/ntab_log.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
 netlist/noise/va_noise.assets/vseries_res.va point 0: noise PSD at 1 Hz, branch 8: old 4e-18, new 0e0
-verilog-a/ch02_lexical/duplicate_attribute_last_value_wins.va point 0: the old device's row 0 lane 0 is 1.951411553231091e1, a central difference (h 8.558588906108557e-6) 3.103778838102158e1
 verilog-a/ch04_expressions/correlated_noise.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
-verilog-a/ch04_expressions/ddx.va point 0: the old device's row 0 lane 0 is 2.589610887311155e0, a central difference (h 6.0554544523933395e-6) 5.179221774544035e0
-verilog-a/ch04_expressions/ddx_flow_column_in_eval.va point 0: the old device's row 0 lane 2 is 1e0, a central difference (h 7.2849595896926125e-6) 3.00000000012254e0
-verilog-a/ch04_expressions/ddx_vera_nodiff_assignment.va point 0: the old device's row 0 lane 0 is 3.069199822529498e-2, a central difference (h 6.0554544523933395e-6) -3.5926909919661254e-1
 verilog-a/ch04_expressions/flicker_noise_topology.va point 0: noise PSD at 1 Hz, branch 1: old 1e-20, new 0e0
 verilog-a/ch04_expressions/flicker_psd_frequency.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
-verilog-a/ch04_expressions/modulo_real_dynamic_zero.va point 309: the old device's row 0 lane 0 is 3.301e3, a central difference (h 9.405771259348332e-6) -8.04862741239994e1
 verilog-a/ch04_expressions/noise_kinds_in_ternary.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
 verilog-a/ch04_expressions/noise_source_name.va point 0: noise PSD at 1 Hz, branch 1: old 9.000000000000001e-18, new 0e0
 verilog-a/ch04_expressions/noise_table_linear_device.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
@@ -498,8 +484,6 @@ verilog-a/ch06_hierarchy/mfactor_potential_noise.va point 0: noise PSD at 1 Hz, 
 verilog-a/ch09_system_tasks/bound_step.va point 0: bound_step 0: old 5.0218266691442895e-5, new inf
 verilog-a/ch09_system_tasks/bound_step_infinite_is_no_bound.va point 0: bound_step 0: old 2e-9, new inf
 verilog-a/ch09_system_tasks/bound_step_smallest_active_wins.va point 0: bound_step 0: old 2e-9, new inf
-verilog-a/ch09_system_tasks/conversion_functions.va point 0: the old device's row 0 lane 0 is 0e0, a central difference (h 6.240414129500862e-6) 9.999999999908319e-1
 verilog-a/ch09_system_tasks/kernel_control_tasks_together.va point 0: bound_step 0: old 1e-6, new inf
-verilog-a/ch09_system_tasks/realtobits.va point 0: the old device's row 0 lane 0 is 1e0, a central difference (h 6.766304534726007e-6) -2.8823037607666688e17
 verilog-a/combined/resistor_with_directives.va point 0: bound_step 0: old 1e-6, new inf
 verilog/pli/analog_attributes.va codegen: a flow contribution to a potential source's branch

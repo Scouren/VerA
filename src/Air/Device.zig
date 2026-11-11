@@ -233,8 +233,12 @@ pub const Kernel = struct {
     reject_iteration: ?Air.Inst.Index = null,
 };
 
-/// §9.4 one display or file task: its name and its `call`.
-pub const Display = struct { name: String, call: Air.Inst.Index };
+/// §9.4 one display or file task: its name, its `call`, and where it is in
+/// the source (W1 status latch, research/codegen.md T1): `codegen/zig/say.zig`
+/// and `status.zig` cite it in their records and, for `$fatal`/`$error`,
+/// in `contract.StatusSite`'s message. `""`/`0` when codegen runs with no
+/// diagnostic bag to look the token up in.
+pub const Display = struct { name: String, call: Air.Inst.Index, file: String, line: u32 };
 
 /// The most rows any table holds: a handle is a `u32` below the sentinels.
 pub const rows_max: u32 = std.math.maxInt(u32) - 2;

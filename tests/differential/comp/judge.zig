@@ -14,6 +14,7 @@
 //! Contents:
 //! - `pub const Run = struct` (`File`), `pub const Verdict = union(enum)`
 //! - `pub fn run(arena: Allocator, io: Io, exe: []const u8, args: []const []const u8, work: []const u8, env: *const std.process.Environ.Map, exec: bool) !Run`
+//! - `pub fn runTwice(arena: Allocator, io: Io, exe: []const u8, args: []const []const u8, work: []const u8, env: *const std.process.Environ.Map, again: *const std.process.Environ.Map) ![2]Run`
 //! - `pub fn compare(arena: Allocator, old: Run, new: Run, digital: bool) !?[]const u8`
 //! - `pub fn notBuilt(new: Run) ?[]const u8`
 //! - `pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool) ![]const u8`
@@ -77,51 +78,25 @@ const Blocks = struct {
     }
 };
 
+/// One headline's code, and whether it came after the run banner
+/// (`=== <name> ===`): a code the run printed is the run stage's,
+/// whatever stage owns it at compile time.
+const Seen = struct { code: []const u8, run: bool };
+
 /// Runs `exe args` in `work` (created fresh, removed after) and returns
 /// what it printed and wrote, in `arena`. With `exec` (an `--emit-exe`),
 /// a successful run's binary (the first line of its stdout) runs too, in
 /// `work`: its status and stdout are the run's, its stderr follows the
 /// build's.
 pub fn run(arena: Allocator, io: Io, exe: []const u8, args: []const []const u8, work: []const u8, env: *const std.process.Environ.Map, exec: bool) !Run {
-    assert(exe.len != 0);
-    const cwd = Io.Dir.cwd();
-    cwd.deleteTree(io, work) catch {};
-    try cwd.createDirPath(io, work);
-    defer cwd.deleteTree(io, work) catch {};
-    const argv = try std.mem.concat(arena, []const u8, &.{ &.{exe}, args });
-    const r = std.process.run(arena, io, .{
-        .argv = argv,
-        .cwd = .{ .path = work },
-        .environ_map = env,
-        .timeout = .{ .duration = .{ .raw = .fromSeconds(timeout_s), .clock = .awake } },
-    }) catch |e| switch (e) {
-        error.Timeout => return .{ .status = 255, .stdout = "", .stderr = "timed out", .files = &.{} },
-        else => return e,
-    };
-    const status: u8 = switch (r.term) {
-        .exited => |c| c,
-        else => 255,
-    };
-    if (exec and status == 0) {
-        const bin = std.mem.trimEnd(u8, r.stdout[0 .. std.mem.findScalar(u8, r.stdout, '\n') orelse r.stdout.len], " \r");
-        if (bin.len != 0) {
-            const x = std.process.run(arena, io, .{
-                .argv = &.{bin},
-                .cwd = .{ .path = work },
-                .environ_map = env,
-                .timeout = .{ .duration = .{ .raw = .fromSeconds(timeout_s), .clock = .awake } },
-            }) catch |e| switch (e) {
-                error.Timeout => return .{ .status = 255, .stdout = "", .stderr = "timed out", .files = &.{} },
-                else => return e,
-            };
-            const x_status: u8 = switch (x.term) {
-                .exited => |c| c,
-                else => 255,
-            };
-            return .{ .status = x_status, .stdout = x.stdout, .stderr = try unthreaded(arena, try std.mem.concat(arena, u8, &.{ r.stderr, x.stderr })), .files = try written(arena, io, work) };
-        }
-    }
-    return .{ .status = status, .stdout = r.stdout, .stderr = try unthreaded(arena, r.stderr), .files = try written(arena, io, work) };
+    return (try runWith(arena, io, exe, args, work, env, exec, null))[0];
+}
+
+/// `run` of an `--emit-exe` whose binary runs twice: under `env`, then
+/// under `again` (diff-native's interpreter-only run). Both runs, in that
+/// order; a failed build is both.
+pub fn runTwice(arena: Allocator, io: Io, exe: []const u8, args: []const []const u8, work: []const u8, env: *const std.process.Environ.Map, again: *const std.process.Environ.Map) ![2]Run {
+    return runWith(arena, io, exe, args, work, env, true, again);
 }
 
 /// The backend `vera-next` named as not built (exit status 126), or null.
@@ -174,10 +149,59 @@ pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool) ![]const u8 {
 
 // ---- private ----
 
-/// One headline's code, and whether it came after the run banner
-/// (`=== <name> ===`): a code the run printed is the run stage's,
-/// whatever stage owns it at compile time.
-const Seen = struct { code: []const u8, run: bool };
+/// Builds and runs `exe args` in `work` under `env`; when `again` is given
+/// (an `--emit-exe` build, `exec`), the built binary runs a second time
+/// under it and both runs come back, in that order. A failed build (or a
+/// build with no exec) is both.
+fn runWith(arena: Allocator, io: Io, exe: []const u8, args: []const []const u8, work: []const u8, env: *const std.process.Environ.Map, exec: bool, again: ?*const std.process.Environ.Map) ![2]Run {
+    assert(exe.len != 0);
+    assert(again == null or exec);
+    const cwd = Io.Dir.cwd();
+    cwd.deleteTree(io, work) catch {};
+    try cwd.createDirPath(io, work);
+    defer cwd.deleteTree(io, work) catch {};
+    const argv = try std.mem.concat(arena, []const u8, &.{ &.{exe}, args });
+    const r = std.process.run(arena, io, .{
+        .argv = argv,
+        .cwd = .{ .path = work },
+        .environ_map = env,
+        .timeout = .{ .duration = .{ .raw = .fromSeconds(timeout_s), .clock = .awake } },
+    }) catch |e| switch (e) {
+        error.Timeout => return @splat(.{ .status = 255, .stdout = "", .stderr = "timed out", .files = &.{} }),
+        else => return e,
+    };
+    const status: u8 = switch (r.term) {
+        .exited => |c| c,
+        else => 255,
+    };
+    if (exec and status == 0) {
+        const bin = std.mem.trimEnd(u8, r.stdout[0 .. std.mem.findScalar(u8, r.stdout, '\n') orelse r.stdout.len], " \r");
+        if (bin.len != 0) {
+            const first = try execBin(arena, io, bin, work, env, r.stderr);
+            return .{ first, if (again) |e| try execBin(arena, io, bin, work, e, r.stderr) else first };
+        }
+    }
+    return @splat(.{ .status = status, .stdout = r.stdout, .stderr = try unthreaded(arena, r.stderr), .files = try written(arena, io, work) });
+}
+
+/// The built binary `bin` run in `work` under `env`: its status and
+/// stdout, its stderr after the build's `built`.
+fn execBin(arena: Allocator, io: Io, bin: []const u8, work: []const u8, env: *const std.process.Environ.Map, built: []const u8) !Run {
+    const x = std.process.run(arena, io, .{
+        .argv = &.{bin},
+        .cwd = .{ .path = work },
+        .environ_map = env,
+        .timeout = .{ .duration = .{ .raw = .fromSeconds(timeout_s), .clock = .awake } },
+    }) catch |e| switch (e) {
+        error.Timeout => return .{ .status = 255, .stdout = "", .stderr = "timed out", .files = &.{} },
+        else => return e,
+    };
+    const x_status: u8 = switch (x.term) {
+        .exited => |c| c,
+        else => 255,
+    };
+    return .{ .status = x_status, .stdout = x.stdout, .stderr = try unthreaded(arena, try std.mem.concat(arena, u8, &.{ built, x.stderr })), .files = try written(arena, io, work) };
+}
 
 /// Of the codes in `a` and not `b` or in `b` and not `a` (as multisets),
 /// the one the earliest stage owns; null when the two agree. A code the

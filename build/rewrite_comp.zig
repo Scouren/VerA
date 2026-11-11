@@ -46,6 +46,7 @@ pub fn add(g: Graph, all: *Build.Step) void {
     const runs = [_]struct { step: []const u8, flag: []const u8, list: []const u8, what: []const u8 }{
         .{ .step = "diff-comp", .flag = "", .list = "comp", .what = "vera-next against vera on every fixture's harness command line: exit code, diagnostics, stdout, emitted files" },
         .{ .step = "diff-digital-exe", .flag = "--emit-exe", .list = "digital_exe", .what = "every .v fixture through --emit-exe and the binary it built, vera-next against vera" },
+        .{ .step = "diff-native", .flag = "--emit-exe", .list = "native", .what = "every .v fixture's --emit-exe binary run with its native step and with the interpreter alone (VERA_INTERPRET=1), byte for byte" },
         .{ .step = "diff-rtlil", .flag = "--emit-rtlil", .list = "rtlil", .what = "every .v fixture through --emit-rtlil, vera-next against vera" },
         .{ .step = "diff-digital-device", .flag = "--check", .list = "digital_device", .what = "every .v fixture through --check (a .v top as a contract device), vera-next against vera" },
     };

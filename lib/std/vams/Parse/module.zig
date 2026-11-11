@@ -216,6 +216,7 @@ fn parseItem(p: *Parse) Error!?Node.Index {
     const vams = p.vamsWordUnder1364(tok);
     const freed = vams and (p.identLike(tok + 1) or p.peek(1) == .hash);
     if (vams and !freed) try p.warnSite(.vams_construct_under_1364, .vams_under_language, tok, @backingInt(p.language));
+    if (!freed) try p.refuseDigital(tok);
     const tag: Token.Tag = if (freed) .identifier else p.tokenTag(tok);
     return switch (tag) {
         .directive_begin_keywords, .directive_end_keywords, .directive_resetall, .directive_default_nettype, .directive_unconnected_drive, .directive_nounconnected_drive, .directive_default_transition => p.fail(.directive_inside_design_element),

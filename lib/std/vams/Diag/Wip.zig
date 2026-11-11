@@ -69,6 +69,10 @@ pub const Builder = struct {
     label_count: u3 = 0,
     note_rows: [max_children]Diag.Note = undefined,
     note_count: u3 = 0,
+    /// False for a row copied from a bundle already deduped under another
+    /// key (a stage's own text, before its locations moved to the files):
+    /// two rows that land on one place stay two, as the old bag kept them.
+    dedupe: bool = true,
 
     /// Whether the parts still format.
     pub const State = enum(u8) {
@@ -142,13 +146,13 @@ pub const Builder = struct {
         };
 
         // ponytail: a linear scan, bounded by `max_entries`.
-        for (wip.roots.items) |i| {
+        if (self.dedupe) for (wip.roots.items) |i| {
             const m = wip.bundle().message(i);
             if (m.tag.code == self.code and m.loc.file == self.loc.file and m.loc.start == self.loc.start) {
                 wip.deduped += 1;
                 return;
             }
-        }
+        };
 
         // Room first, so the counters and the rows move together or not
         // at all.

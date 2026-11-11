@@ -97,13 +97,15 @@ pub fn sources(comp: *Compilation) Allocator.Error![]const Diag.Source {
 }
 
 /// A preprocessed-text range as a range of the original file its start
-/// came from; an end in another file collapses to the start.
+/// came from, as long as it is in the preprocessed text (the old
+/// renderer's rule): a range inside a macro expansion sits at the
+/// invocation with its own width, and the original file's stripped
+/// comments inside it widen it.
 pub fn relocate(out: vams.Preprocessor.Output, start: u32, end: u32) Diag.Loc {
     if (out.source_map.len == 0) return .none;
     const s = out.resolve(@min(start, @as(u32, @intCast(out.text.len))));
-    const e = out.resolve(@min(@max(start, end), @as(u32, @intCast(out.text.len))));
     const from = source(out, s.file, s.offset);
-    const to = if (e.file == s.file) source(out, e.file, e.offset) else from;
+    const to = source(out, s.file, s.offset +| (@max(start, end) - start));
     return .{ .file = @fromBackingInt(@backingInt(s.file)), .start = from, .end = @max(from, to) };
 }
 
@@ -140,6 +142,7 @@ fn copyAs(w: *Diag.Wip, d: Diag, out: ?vams.Preprocessor.Output, route: ?[]const
             continue;
         };
         var b = w.build(m.tag.stage, m.tag.code, move(out, m.loc));
+        b.dedupe = out == null;
         if (m.msg != .none) b.msg("{s}", .{d.string(m.msg)});
         if (m.point != .none) b.point("{s}", .{d.string(m.point)});
         for (d.labels(i)) |l| b.label(move(out, l.loc), "{s}", .{d.string(l.text)});

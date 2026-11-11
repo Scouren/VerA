@@ -390,6 +390,34 @@ test "a parse keeps every error and goes on: one per bad item" {
     try testing.expectEqual(2, tree.rootDecls().len);
 }
 
+test "A.8.2: a user call's empty argument is fatal, not a warning per occurrence" {
+    // Oracle: verilog-a/annex_a_syntax/reject_A_8_2_empty_function_argument.va
+    // ("VerA refuses the empty slot with E0289 at the parse; the code is
+    // pinned"). The old parser's `failAt` aborts the call (and the
+    // statement it is in) on the first empty slot; two empty arguments in
+    // one call must still report `empty_argument` once, not once per slot.
+    try testing.expectEqual(.empty_argument, try firstError("module m; real y; analog y = f(, , 2); endmodule", .vams_2023));
+    var tree = try Ast.parse(testing.allocator, "module m; real y; analog y = f(, , 2); endmodule", .{ .keywords = .vams_2023 });
+    defer tree.deinit(testing.allocator);
+    try testing.expectEqual(1, tree.errors.len);
+}
+
+test "a bad item inside an analog function recovers item by item, not by abandoning to `endfunction` (G7)" {
+    // Oracle: verilog-ams/annex_a_syntax/reject_A_2_8_reg_in_analog_function.va
+    // (A.2.6/A.2.8: `reg` is not an analog_block_item_declaration). The old
+    // parser's `parseFuncDecl` catches a bad item right there, skips to its
+    // `;` and keeps reading items in the same function body (one E0209, and
+    // `f = x;` then parses as the next, ordinary statement); only a `task`
+    // or a digital `function` (the old `parseSubroutine`, which catches
+    // nothing) leaves a bad item to strand everything after it as module
+    // items once it propagates.
+    var tree = try Ast.parse(testing.allocator, "module m; real y; analog function real f; input x; real x; reg r; f = x; endfunction analog y = f(1); endmodule", .{});
+    defer tree.deinit(testing.allocator);
+    try testing.expectEqual(1, tree.errors.len);
+    try testing.expectEqual(.expected_expr, tree.errors[0].tag);
+    try testing.expectEqual(1, tree.rootDecls().len);
+}
+
 test "nesting is capped at `Parse.max_depth` with its own error, on a 256 MiB worker stack" {
     var result: anyerror!void = {};
     const t = try std.Thread.spawn(.{ .stack_size = 256 << 20 }, deep, .{&result});

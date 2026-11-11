@@ -150,6 +150,10 @@ pub fn preprocess(comp: *Compilation) !bool {
     }
     const out = pp.output();
     if (out.failed) return false;
+    // Annex C.4: Verilog-A has no `default_discipline (a `resetall resets
+    // one); each is refused where it stands, and the parse still runs.
+    if (comp.config.sim == .verilog_a) for (out.directives.disciplines) |d|
+        try comp.wip.add(.parse, .E0250, errors.relocate(out, d.at, d.at), "`default_discipline under --sim=verilogA", .{});
     // ponytail: one unit per compilation. The preprocessor writes one text
     // whose directive events are positions in it; a unit per input waits
     // for `Directives` per unit (docs/rewrite/comp.md, "decisions").
@@ -171,6 +175,7 @@ pub fn astgen(comp: *Compilation, unit: u32, failed: *std.atomic.Value(bool), oo
 /// simulation every uninstantiated module (IEEE 1364-2005 §12.1.1).
 /// Stops on an AstGen or elaboration error.
 pub fn semaTop(comp: *Compilation) !bool {
+    if (comp.wip.failed()) return false;
     var netlist: std.ArrayList(sema.Zcu.Decl) = .empty;
     for (comp.units.items) |*u| {
         if (u.vir.diag.failed()) return false;
@@ -196,7 +201,7 @@ pub fn semaTop(comp: *Compilation) !bool {
         else
             try ip.get(comp.gpa, .{ .float = typed.value }),
     };
-    try sema.Sema.elaborate(&comp.zcu, .{ .roots = if (comp.config.digital()) .all else .first, .overrides = overrides, .ieee1364 = comp.config.digital() });
+    try sema.Sema.elaborate(&comp.zcu, .{ .roots = if (comp.config.digital()) .all else .first, .overrides = overrides, .ieee1364 = comp.config.digital(), .verilog_a = comp.config.sim == .verilog_a });
     for (comp.zcu.failed.items(.code)) |code| if (severity(comp, code) == .err) return false;
     if (comp.zcu.instances.len != 0) return true;
     // IEEE 1364-2005 §12.1.1: a simulation needs a top, a module no other
@@ -225,7 +230,7 @@ pub fn notBuilt(comp: *Compilation, b: Compilation.Backend, what: []const u8) !v
 fn astgenUnit(comp: *Compilation, unit: u32) Allocator.Error!?void {
     const gpa = comp.gpa;
     const u = &comp.units.items[unit];
-    u.tree = try vams.Ast.parse(gpa, u.text, .{ .keywords = comp.config.language, .discrete = comp.config.digital() });
+    u.tree = try vams.Ast.parse(gpa, u.text, .{ .keywords = comp.config.language, .discrete = comp.config.digital(), .verilog_a = comp.config.sim == .verilog_a });
     u.vir = .{ .instructions = .empty, .extra = &.{}, .string_bytes = &.{}, .diag = .empty };
     if (u.tree.errors.len != 0) return null;
     u.vir = try vams.AstGen.generate(gpa, &u.tree, .{ .directives = comp.pp.output().directives, .ieee1364 = comp.config.digital() });

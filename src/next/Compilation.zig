@@ -17,17 +17,19 @@
 //! ```
 //!
 //! Cites: VAMS-2023 §10 (preprocessing is serial over the units, §3.1 of
-//! the plan), annex E.2; IEEE 1364-2005 §13.4.1. Each stage cites its own.
+//! the plan), annex E.2; IEEE 1364-2005 §13.4.1, §13.2 (`libmap`,
+//! `unit_libs`, `lib_order`). Each stage cites its own.
 //!
 //! Contents:
-//! - fields `gpa`, `io`, `arena_state`, `config`, `queue`, `next_job`, `reads`, `pp`, `netlist`, `units`, `zcu`, `analysis`, `float`, `device`, `bench`, `lowered`, `wip`, `outputs`, `stopped`
-//! - `pub const Config`, `pub const Job`, `pub const Unit`, `pub const Read`, `pub const Outputs`, `pub const Backend`, `pub const not_built_status`, `pub const jobs_max`
+//! - fields `gpa`, `io`, `arena_state`, `config`, `queue`, `next_job`, `reads`, `real_paths`, `pp`, `netlist`, `libmap`, `unit_libs`, `lib_order`, `units`, `zcu`, `analysis`, `float`, `device`, `bench`, `lowered`, `wip`, `outputs`, `stopped`
+//! - `pub const Config`, `pub const Job`, `pub const Unit`, `pub const Read`, `pub const RealPath`, `pub const Outputs`, `pub const Backend`, `pub const not_built_status`, `pub const jobs_max`
 //! - `pub fn create(gpa: Allocator, io: Io, config: Config) Allocator.Error!*Compilation`
 //! - `pub fn destroy(comp: *Compilation) void`
 //! - `pub fn update(comp: *Compilation) UpdateError!void`, `pub const UpdateError`
 //! - `pub fn getAllErrors(comp: *Compilation) Allocator.Error!Diag`
 //! - `pub fn sources(comp: *Compilation) Allocator.Error![]const Diag.Source`
 //! - `pub fn read(comp: *Compilation, path: []const u8) Allocator.Error!Read`
+//! - `pub fn realPath(comp: *Compilation, path: []const u8) Allocator.Error!RealPath`
 //! - `pub fn arena(comp: *Compilation) Allocator`
 
 const std = @import("std");
@@ -39,9 +41,11 @@ const sema = @import("sema");
 const Air = @import("air");
 const link = @import("link");
 const codegen = @import("codegen");
+const InternPool = @import("intern_pool");
 const frontend = @import("Compilation/frontend.zig");
 const backend = @import("Compilation/backend.zig");
 const errors = @import("Compilation/errors.zig");
+const libmap_reader = @import("Compilation/libmap.zig");
 const Diag = vams.Diag;
 const Zcu = sema.Zcu;
 
@@ -60,9 +64,21 @@ queue: std.ArrayList(Job) = .empty,
 next_job: u32 = 0,
 /// Every file the compilation read, by the path asked: the one reader.
 reads: std.StringArrayHashMapUnmanaged(Read) = .empty,
+/// Every path the compilation resolved (`realPath`), by the path asked:
+/// the only other filesystem touch (symlink resolution).
+real_paths: std.StringArrayHashMapUnmanaged(RealPath) = .empty,
 pp: vams.Preprocessor,
 /// Annex E.2's netlist (`--spice`), read before preprocessing.
 netlist: ?vams.spice.Netlist = null,
+/// IEEE 1364-2005 §13.2: the library maps read, when `config.libmaps` or
+/// `config.search` named any (`Compilation/frontend.zig`'s `libraries`).
+libmap: ?libmap_reader.Output = null,
+/// §13.2.1.1: the library each of `config.paths` placed into, by index,
+/// in the arena; borrowed by `zcu.decl_lib` through `assignLibraries`.
+unit_libs: []const InternPool.String = &.{},
+/// §13.5.1/§13.7.1: the search order, in the arena; borrowed by
+/// `zcu.lib_order`.
+lib_order: []const InternPool.String = &.{},
 /// The texts AstGen ran over, one per `Zcu` file, in file order.
 units: std.ArrayList(Unit) = .empty,
 zcu: Zcu,
@@ -100,7 +116,7 @@ pub const Job = union(enum) {
 /// "not built" (`not_built_status`). `digital_lowering` is no backend: it
 /// names a `.v` construct Sema's digital lowering does not express yet,
 /// so its fixtures' lines say whose debt they are.
-pub const Backend = enum { zig, exe, verilog, osdi, rtlil, digital_device, digital_exe, libmap, digital_lowering };
+pub const Backend = enum { zig, exe, verilog, osdi, rtlil, digital_device, digital_exe, digital_lowering };
 
 /// The exit status of an input that needs a backend not built yet: above
 /// 125, which the conformance harness reads as "the tool could not run
@@ -123,6 +139,9 @@ pub const Unit = struct {
 
 /// A read's outcome: the bytes, or the error that stopped it.
 pub const Read = union(enum) { bytes: []const u8, failed: anyerror };
+
+/// A `realPath` outcome: the resolved path, or the error that stopped it.
+pub const RealPath = union(enum) { path: []const u8, failed: anyerror };
 
 /// What `main` prints and returns; every slice in the arena.
 pub const Outputs = struct {
@@ -191,6 +210,7 @@ pub fn destroy(comp: *Compilation) void {
     comp.wip.deinit();
     comp.queue.deinit(gpa);
     comp.reads.deinit(gpa);
+    comp.real_paths.deinit(gpa);
     comp.arena_state.deinit();
     gpa.destroy(comp);
 }
@@ -248,6 +268,21 @@ pub fn read(comp: *Compilation, path: []const u8) Allocator.Error!Read {
     return r;
 }
 
+/// `path` resolved (symlinks included), once: the only other filesystem
+/// touch. §13.2.1 matches a map's specifications against a command-line
+/// path by comparing both sides resolved alike.
+pub fn realPath(comp: *Compilation, path: []const u8) Allocator.Error!RealPath {
+    if (comp.real_paths.get(path)) |r| return r;
+    const a = comp.arena();
+    const r: RealPath = if (Io.Dir.cwd().realPathFileAlloc(comp.io, path, a)) |p|
+        .{ .path = p }
+    else |e|
+        .{ .failed = e };
+    try comp.real_paths.put(comp.gpa, try a.dupe(u8, path), r);
+    assert(comp.real_paths.contains(path));
+    return r;
+}
+
 // ---- private ----
 
 /// Queues `job` after the ones queued so far.
@@ -302,5 +337,6 @@ test {
     _ = frontend;
     _ = backend;
     _ = errors;
+    _ = libmap_reader;
     _ = @import("Compilation/test.zig");
 }

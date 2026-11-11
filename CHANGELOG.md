@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **A generated device now declares `field_use` and `limit_sim_reads`**: one
+  `contract.FieldUse` per `Instance` field, in declaration order, naming
+  which outputs a read of it can reach and which entry points write it
+  directly (a path latch is `q`/`w_commit` only; the field an ordinary held
+  value advances is `w_update`, never `w_commit`), and which `SimState`
+  fields `limit` reads, so a host that recorded a linearization on an
+  instance row can tell, field by field, whether it may replay it instead
+  of calling the device again. Both are text scans over the whole rendered
+  device, `sim_reads`' own technique; `limit_sim_reads` is not
+  `contract.limitReads`, the pre-existing unknown mask (#134).
 ## v0.23.0 — 2026-11-02
 
 On Suite VAMS-CONFORMANCE, we score Verilog-A 2452/2452, Verilog 3611/3611, Verilog-AMS 755/755, Cumulative: 6818/6818.

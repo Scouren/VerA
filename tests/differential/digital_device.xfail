@@ -15,25 +15,20 @@ verilog/12_hierarchy/extra_ordered_parameter_value_ignored.v rw-dlower (run): ex
 verilog/12_hierarchy/extra_ordered_value_ignored.v rw-dlower (run): exit status old 1, new 0
 verilog/12_hierarchy/port_input_width_extends.v rw-dlower (run): exit status old 1, new 0
 verilog/12_hierarchy/port_output_width_truncates.v rw-dlower (run): exit status old 1, new 0
-verilog/13_configuration/cell_not_in_its_library_rejected.v not built: backend libmap
-verilog/13_configuration/cfg1_default_liblist.v not built: backend libmap
-verilog/13_configuration/cfg2_gate_first.v not built: backend libmap
-verilog/13_configuration/cfg3_cell_use.v not built: backend libmap
-verilog/13_configuration/cfg4_instance_liblist.v not built: backend libmap
-verilog/13_configuration/cfg6_hierarchical.v not built: backend libmap
-verilog/13_configuration/command_line_search_order.v not built: backend libmap
-verilog/13_configuration/config_in_map_rejected.v not built: backend libmap
-verilog/13_configuration/config_overrides_command_line.v not built: backend libmap
-verilog/13_configuration/default_search_order.v not built: backend libmap
+verilog/13_configuration/cell_not_in_its_library_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/13_configuration/cfg1_default_liblist.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/13_configuration/cfg2_gate_first.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/13_configuration/cfg3_cell_use.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/13_configuration/cfg4_instance_liblist.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/13_configuration/cfg6_hierarchical.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/13_configuration/command_line_search_order.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/13_configuration/config_overrides_command_line.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/13_configuration/default_search_order.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/design_cell_missing_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/design_names_config_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/13_configuration/include_map.v not built: backend libmap
-verilog/13_configuration/library_without_path_rejected.v not built: backend libmap
-verilog/13_configuration/parent_library_by_map.v not built: backend libmap
-verilog/13_configuration/resolution_order.v not built: backend libmap
-verilog/13_configuration/source_text_in_map_rejected.v not built: backend libmap
-verilog/13_configuration/two_libraries_match_rejected.v not built: backend libmap
-verilog/13_configuration/undeclared_library_rejected.v not built: backend libmap
+verilog/13_configuration/include_map.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/13_configuration/parent_library_by_map.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/13_configuration/resolution_order.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/18_vcd/dumpports_same_file_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/19_compiler_directives/ams_keywords_instance_names.v rw-dlower (run): exit status old 1, new 0
 verilog/28_protected_envelopes/protected_des_base64.v rw-dlower (run): exit status old 1, new 0
@@ -42,8 +37,6 @@ verilog/28_protected_envelopes/protected_eight_nested_envelopes.v rw-dlower (run
 verilog/28_protected_envelopes/protected_md5_digest.v rw-dlower (run): exit status old 1, new 0
 verilog/28_protected_envelopes/protected_session_key_block.v rw-dlower (run): exit status old 1, new 0
 verilog/28_protected_envelopes/protected_sha1_digest.v rw-dlower (run): exit status old 1, new 0
-verilog/A_formal_syntax/b_A_1_1_incdir.v not built: backend libmap
-verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v not built: backend libmap
-verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v not built: backend libmap
-verilog/A_formal_syntax/b_A_1_1_library_text.v not built: backend libmap
+verilog/A_formal_syntax/b_A_1_1_incdir.v rw-dlower (digital lowering): exit status old 1, new 0
+verilog/A_formal_syntax/b_A_1_1_library_text.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/B_keywords/b_B_keywords.v rw-dlower (digital lowering): exit status old 1, new 0

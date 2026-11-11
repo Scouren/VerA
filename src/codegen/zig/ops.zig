@@ -84,12 +84,15 @@ pub fn fields(dg: *const DeclGen) Error![]const Field {
     return out.items;
 }
 
-/// `Core(S)`'s operator fields: each site's input and control values.
+/// `Core(S)`'s operator fields: each site's input and control values; then
+/// §9.17.2 `$bound_step`'s own running minimum (`genAccept` reads it as
+/// `m.bound_step`, independent of any operator).
 pub fn genCoreFields(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     for (dg.op_sites, 0..) |s, k| {
         try dg.print(w, " o{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(s.call)] });
         for (0..controls(s.kind)) |j| try dg.print(w, " o{d}c{d}: f64,", .{ k, j });
     }
+    if (dg.device.kernel.bound_step) |a| try dg.print(w, " bound_step: F.zOf(S, 0x{x}),", .{dg.live.masks[@backingInt(a)]});
 }
 
 /// `core`'s locals the sites write, before the body.
@@ -101,12 +104,13 @@ pub fn genDecls(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     }
 }
 
-/// `core`'s `return` entries of the sites.
+/// `core`'s `return` entries of the sites, then `$bound_step`'s slot.
 pub fn genReturn(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     for (dg.op_sites, 0..) |s, k| {
         try dg.print(w, " .o{0d} = o{0d},", .{k});
         for (0..controls(s.kind)) |j| try dg.print(w, " .o{0d}c{1d} = o{0d}c{1d},", .{ k, j });
     }
+    if (dg.device.kernel.bound_step) |a| try dg.print(w, " .bound_step = s{d},", .{@backingInt(a)});
 }
 
 /// Writes operator call `inst`'s value: in `core` a block that records the
@@ -171,36 +175,47 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, kind: Kind, args: []const Ref) Er
     try f.print(")); }}", .{});
 }
 
-/// `updateState`'s operator steps, reading `core`'s `m` and `dt`.
+/// `updateState`'s operator steps, reading `core`'s `m` and `dt`; then
+/// §9.17.2 `$bound_step`'s own running minimum (T36), composed with any
+/// ring's by `@min`, independent of whether the device has an operator.
 pub fn genAccept(dg: *DeclGen, w: *std.Io.Writer) Error!void {
-    if (dg.op_sites.len == 0) return;
-    try dg.print(w, "    const dt = sim.t - inst.t_prev__;\n    _ = &dt;\n", .{});
+    const bound_step = dg.device.kernel.bound_step != null;
+    if (dg.op_sites.len == 0 and !bound_step) return;
     // §9.17.2 reset first: a bound last step set must not bind this one.
-    if (delays(dg)) try dg.print(w, "    inst.bound_step = std.math.inf(f64);\n", .{});
-    for (dg.op_sites, 0..) |s, k| switch (s.kind) {
-        // §4.5.8 the accepted input arms or readjusts the excursion.
-        .transition => try dg.print(w, "    K.ops.zTransStep(m.o{0d}.val(), &inst.op{0d}__from, &inst.op{0d}__to, &inst.op{0d}__t0, sim.t, dt, m.o{0d}c0, m.o{0d}c1, m.o{0d}c2);\n", .{k}),
-        // §4.5.9 the output the rates allowed is the next step's origin.
-        .slew => try dg.print(w, "    inst.op{0d}__prev = K.ops.zSlew(F.zL(S, 0), F.zL(S, 0).con(m.o{0d}.val()), inst.op{0d}__prev, dt, m.o{0d}c0, @abs(m.o{0d}c1)).val();\n", .{k}),
-        // §4.5.5 the accepted integral, wrapped.
-        .idtmod => try dg.print(w, "    inst.op{0d}__acc = K.ops.zWrap(K.ops.zIdtAcc(m.o{0d}.val(), inst.op{0d}__acc, dt, m.o{0d}c0), m.o{0d}c1, m.o{0d}c2);\n", .{k}),
-        // §4.5.10 latch the crossing `eval` answered with (the same
-        // operations, so the same bits), then move the history.
-        .last_crossing => try dg.print(w,
-            \\    if (dt > 0.0 and K.ops.zCrossDir(m.o{0d}c0, inst.op{0d}__prev, m.o{0d}.val())) inst.op{0d}__t_last = (sim.t - sim.dt) + inst.op{0d}__prev / (inst.op{0d}__prev - m.o{0d}.val()) * sim.dt;
-            \\    inst.op{0d}__prev = m.o{0d}.val();
-            \\
-        , .{k}),
-        .absdelay => try delay.genAccept(dg, w, k, s.delay),
-    };
-    try dg.print(w, "    inst.t_prev__ = sim.t;\n", .{});
+    if (delays(dg) or bound_step) try dg.print(w, "    inst.bound_step = std.math.inf(f64);\n", .{});
+    if (dg.op_sites.len != 0) {
+        try dg.print(w, "    const dt = sim.t - inst.t_prev__;\n    _ = &dt;\n", .{});
+        for (dg.op_sites, 0..) |s, k| switch (s.kind) {
+            // §4.5.8 the accepted input arms or readjusts the excursion.
+            .transition => try dg.print(w, "    K.ops.zTransStep(m.o{0d}.val(), &inst.op{0d}__from, &inst.op{0d}__to, &inst.op{0d}__t0, sim.t, dt, m.o{0d}c0, m.o{0d}c1, m.o{0d}c2);\n", .{k}),
+            // §4.5.9 the output the rates allowed is the next step's origin.
+            .slew => try dg.print(w, "    inst.op{0d}__prev = K.ops.zSlew(F.zL(S, 0), F.zL(S, 0).con(m.o{0d}.val()), inst.op{0d}__prev, dt, m.o{0d}c0, @abs(m.o{0d}c1)).val();\n", .{k}),
+            // §4.5.5 the accepted integral, wrapped.
+            .idtmod => try dg.print(w, "    inst.op{0d}__acc = K.ops.zWrap(K.ops.zIdtAcc(m.o{0d}.val(), inst.op{0d}__acc, dt, m.o{0d}c0), m.o{0d}c1, m.o{0d}c2);\n", .{k}),
+            // §4.5.10 latch the crossing `eval` answered with (the same
+            // operations, so the same bits), then move the history.
+            .last_crossing => try dg.print(w,
+                \\    if (dt > 0.0 and K.ops.zCrossDir(m.o{0d}c0, inst.op{0d}__prev, m.o{0d}.val())) inst.op{0d}__t_last = (sim.t - sim.dt) + inst.op{0d}__prev / (inst.op{0d}__prev - m.o{0d}.val()) * sim.dt;
+                \\    inst.op{0d}__prev = m.o{0d}.val();
+                \\
+            , .{k}),
+            .absdelay => try delay.genAccept(dg, w, k, s.delay),
+        };
+    }
+    // T36: the device never wrote the `$bound_step()` calls' own running
+    // minimum back to `Instance` (only an absdelay ring's `zad_td` did);
+    // `m.bound_step` is `core`'s copy of the alloc `kernel.zig`'s
+    // `runningMin` already accumulated correctly along the executed CFG.
+    if (bound_step) try dg.print(w, "    inst.bound_step = @min(inst.bound_step, m.bound_step.val());\n", .{});
+    if (dg.op_sites.len != 0) try dg.print(w, "    inst.t_prev__ = sim.t;\n", .{});
 }
 
 /// `Instance`'s fields past `fields`: the rings, and `bound_step` (§9.17.2,
-/// the host reads it after an accepted step) when a ring bounds it.
+/// the host reads it after an accepted step) when a ring bounds it or the
+/// device calls `$bound_step` itself (T36).
 pub fn genInstance(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     for (dg.op_sites, 0..) |s, k| if (s.kind == .absdelay) try delay.genRing(dg, w, k, s.delay);
-    if (delays(dg)) try dg.print(w, "    bound_step: f64 = std.math.inf(f64),\n", .{});
+    if (delays(dg) or dg.device.kernel.bound_step != null) try dg.print(w, "    bound_step: f64 = std.math.inf(f64),\n", .{});
 }
 
 /// `State`'s fields past `fields`.

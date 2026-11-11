@@ -499,16 +499,10 @@ verilog-a/ch04_expressions/noise_table_log_topology.va point 0: noise PSD at 1 H
 verilog-a/ch04_expressions/noise_table_sorts_pairs.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
 verilog-a/ch04_expressions/noise_table_topology.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
 verilog-a/ch04_expressions/white_noise_declaration_initializer.va point 0: noise PSD at 1 Hz, branch 1: old 5.999999999999999e-21, new 0e0
-verilog-a/ch05_analog_behavior/spice_sine_source.va point 0: bound_step 0: old 3.906251258393898e-5, new inf
 verilog-a/ch06_hierarchy/mfactor_divides_named_branch_potential_noise_power.va point 0: noise PSD at 1 Hz, branch 8: old 2.5e-1, new 0e0
 verilog-a/ch06_hierarchy/mfactor_divides_potential_noise_power.va point 0: noise PSD at 1 Hz, branch 8: old 2.5e-1, new 0e0
 verilog-a/ch06_hierarchy/mfactor_flow_noise.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
 verilog-a/ch06_hierarchy/mfactor_multiplies_flow_noise_power.va point 0: noise PSD at 1 Hz, branch 1: old 3.0000000000000013e0, new 0e0
 verilog-a/ch06_hierarchy/mfactor_multiplies_named_branch_flow_noise_power.va point 0: noise PSD at 1 Hz, branch 1: old 3.0000000000000013e0, new 0e0
 verilog-a/ch06_hierarchy/mfactor_potential_noise.va point 0: noise PSD at 1 Hz, branch 8: old 1e-18, new 0e0
-verilog-a/ch09_system_tasks/bound_step.va point 0: bound_step 0: old 5.0218266691442895e-5, new inf
-verilog-a/ch09_system_tasks/bound_step_infinite_is_no_bound.va point 0: bound_step 0: old 2e-9, new inf
-verilog-a/ch09_system_tasks/bound_step_smallest_active_wins.va point 0: bound_step 0: old 2e-9, new inf
-verilog-a/ch09_system_tasks/kernel_control_tasks_together.va point 0: bound_step 0: old 1e-6, new inf
-verilog-a/combined/resistor_with_directives.va point 0: bound_step 0: old 1e-6, new inf
 verilog/pli/analog_attributes.va codegen: a flow contribution to a potential source's branch

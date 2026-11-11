@@ -11,7 +11,8 @@
 //!
 //! Contents:
 //! - `pub const Const`
-//! - `pub const Env = struct` (`init`, `deinit`, `body`, `bodyValue`, `ref`, `param`, `named`, `systemNamed`, `toConst`, `intern`, `arraySize`, `dependsOn`)
+//! - `pub const Env = struct` (`init`, `deinit`, `body`, `bodyValue`, `ref`, `param`, `named`, `systemNamed`, `toConst`, `intern`, `arraySize`, `dependsOn`, `cycleOf`)
+//! - `pub const Pending = struct`
 //! - `pub const eval_depth_max: u32`
 //! - `pub const v1364` (the IEEE 1364 mode: four-state values of any width, constant functions)
 //! - `pub fn toInteger(c: Const) ?i64`
@@ -40,6 +41,11 @@ pub const Const = fold.Const;
 /// cycle stop at their first repeat, long before it.
 pub const eval_depth_max: u32 = 1 << 12;
 
+/// One of an instance's own-targeting defparams (`defparam.ownTargets`): its
+/// parameter stands for `value` instead of its declared default while
+/// `cycleOf` looks for a cycle through it (IEEE 1364-2005 §12.8.1).
+pub const Pending = struct { param: Inst.Index, value: Vir.Body };
+
 /// One instance's evaluation state: which file its names are in, the
 /// values its parameters are given, the module-level values folded so far
 /// and the genvars bound now. Lives while the instance's body is walked.
@@ -67,8 +73,17 @@ pub const Env = struct {
     genvars: std.AutoHashMapUnmanaged(Inst.Index, i64) = .empty,
     /// Parameters being folded: a read of one of these closes a cycle.
     busy: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty,
-    /// A read of a `busy` parameter happened (`dependsOn`).
+    /// A read of a `busy` parameter happened (`dependsOn`, `cycleOf`).
     cycled: bool = false,
+    /// `busy`'s ordered twin: the parameters `param()` is folding, outermost
+    /// first. Bound: `eval_depth_max`.
+    trail: std.ArrayList(Inst.Index) = .empty,
+    /// While `cycleOf` looks for a cycle: an own-targeting defparam's value,
+    /// read instead of its parameter's declared default.
+    pending: std.AutoHashMapUnmanaged(Inst.Index, Vir.Body) = .empty,
+    /// The cycle `cycleOf` found (`trail` from the repeated parameter,
+    /// closed on it again), set once per call, arena-owned.
+    cycle: []const Inst.Index = &.{},
     /// §9.18 this instance's hierarchical system parameters, once known.
     hier: Zcu.Hier = .initFill(.undef),
     depth: u32 = 0,
@@ -102,6 +117,8 @@ pub const Env = struct {
 
     pub fn deinit(env: *Env) void {
         assert(env.busy.count() == 0);
+        assert(env.trail.items.len == 0);
+        assert(env.pending.count() == 0);
         env.positions.deinit(env.gpa);
         env.aliases.deinit(env.gpa);
         env.values.deinit(env.gpa);
@@ -109,6 +126,8 @@ pub const Env = struct {
         env.spelling.deinit(env.gpa);
         env.genvars.deinit(env.gpa);
         env.busy.deinit(env.gpa);
+        env.trail.deinit(env.gpa);
+        env.pending.deinit(env.gpa);
         // `oomrs` is put through `env.arena` (`paramset.zig`'s caller owns
         // it, usually `s.arena`): the same allocator frees it.
         env.oomrs.deinit(env.arena);
@@ -179,6 +198,27 @@ pub const Env = struct {
         return env.cycled;
     }
 
+    /// The cycle (IEEE 1364-2005 §12.8.1) folding `b` closes, if any: every
+    /// cached value cleared, each `pending` parameter's value standing for
+    /// its declared default, then restored. A read of a `busy` parameter
+    /// records the chain from its first read to its repeat (`param`); this
+    /// returns that chain, or null when none closes.
+    /// Asserts `busy` is empty on entry and on exit.
+    pub fn cycleOf(env: *Env, b: Vir.Body, pending: []const Pending) Allocator.Error!?[]const Inst.Index {
+        assert(env.busy.count() == 0);
+        const saved = try env.arena.dupe(InternPool.Index, env.values.items);
+        defer @memcpy(env.values.items, saved);
+        @memset(env.values.items, .none);
+        for (pending) |p| try env.pending.put(env.gpa, p.param, p.value);
+        defer env.pending.clearRetainingCapacity();
+        env.cycled = false;
+        env.cycle = &.{};
+        _ = try env.body(b);
+        defer env.cycled = false;
+        assert(env.busy.count() == 0);
+        return if (env.cycled) env.cycle else null;
+    }
+
     /// The value of `r`, or null when it has none at elaboration.
     pub fn ref(env: *Env, r: Inst.Ref) Allocator.Error!?Const {
         const depth = env.depth;
@@ -191,7 +231,10 @@ pub const Env = struct {
     }
 
     /// The folded value of parameter `p` (a `param` instruction), from its
-    /// given value or its default, in its declared type and range.
+    /// given value or its default, in its declared type and range. While
+    /// `pending` holds an entry, `p`'s own-targeting defparam value
+    /// (`cycleOf`) stands for its default, and a read of a `busy` parameter
+    /// records the cycle (IEEE 1364-2005 §12.8.1) instead of only flagging it.
     pub fn param(env: *Env, p: Inst.Index) Allocator.Error!?Const {
         assert(env.vir.instructions.items(.tag)[@backingInt(p)] == .param);
         if (env.shaping != 0) try env.shapes.put(env.arena, p, {});
@@ -199,18 +242,29 @@ pub const Env = struct {
         if (pos) |k| if (env.values.items[k] != .none) return env.toConst(env.values.items[k]);
         if (env.busy.contains(p)) {
             env.cycled = true;
+            if (env.cycle.len == 0) {
+                const from = std.mem.lastIndexOfScalar(Inst.Index, env.trail.items, p) orelse 0;
+                var chain = try env.arena.alloc(Inst.Index, env.trail.items.len - from + 1);
+                @memcpy(chain[0 .. chain.len - 1], env.trail.items[from..]);
+                chain[chain.len - 1] = p;
+                env.cycle = chain;
+            }
             return null;
         }
         try env.busy.put(env.gpa, p, {});
+        try env.trail.append(env.gpa, p);
+        assert(env.trail.items.len <= eval_depth_max);
         defer _ = env.busy.remove(p);
+        defer _ = env.trail.pop();
         const decl = env.payload(Inst.Param, p);
+        const value: Vir.Body = if (env.pending.count() != 0) (env.pending.get(p) orelse decl.value) else decl.value;
         // §3.4.4 an array parameter's value is an aggregate: no `Const`.
         if (decl.dims.len != 0) {
-            const v = env.given.get(p) orelse try env.bodyValue(decl.value);
+            const v = env.given.get(p) orelse try env.bodyValue(value);
             if (pos) |k| env.values.items[k] = v;
             return null;
         }
-        const raw = if (env.given.get(p)) |g| env.toConst(g) else try env.body(decl.value);
+        const raw = if (env.given.get(p)) |g| env.toConst(g) else try env.body(value);
         const v = if (raw) |c| try env.coerce(decl, c) else null;
         if (pos) |k| env.values.items[k] = if (v) |c| try env.intern(c) else .undef;
         return v;

@@ -16,6 +16,11 @@ const Out = struct {
     arena: std.heap.ArenaAllocator,
     tree: []const u8,
     codes: []const Diag.Code,
+    /// Each `codes[k]`'s `Zcu.Failure.name`, the rule's quoted text (`""`
+    /// when a failure names no rule).
+    names: []const []const u8,
+    /// Each `codes[k]`'s `Zcu.Failure.message`, rendered.
+    messages: []const []const u8,
     /// Distinct instance keys: the analyses the design needs.
     keys: usize,
 
@@ -32,7 +37,7 @@ fn elab(src: [:0]const u8, config: Sema.Config) !Out {
 
 fn elabUnder(src: [:0]const u8, config: Sema.Config, defaults: []const vams.Preprocessor.events.DefaultDiscipline, builtins: u32) !Out {
     const gpa = std.testing.allocator;
-    var out: Out = .{ .arena = .init(gpa), .tree = "", .codes = &.{}, .keys = 0 };
+    var out: Out = .{ .arena = .init(gpa), .tree = "", .codes = &.{}, .names = &.{}, .messages = &.{}, .keys = 0 };
     errdefer out.arena.deinit();
     const arena = out.arena.allocator();
     var ast = try vams.Ast.parse(gpa, src, .{});
@@ -56,6 +61,12 @@ fn elabUnder(src: [:0]const u8, config: Sema.Config, defaults: []const vams.Prep
     }
     out.tree = text.written();
     out.codes = try arena.dupe(Diag.Code, zcu.failed.items(.code));
+    const names = try arena.alloc([]const u8, zcu.failed.len);
+    for (names, zcu.failed.items(.name)) |*n, s| n.* = try arena.dupe(u8, zcu.intern_pool.stringToSlice(s));
+    out.names = names;
+    const messages = try arena.alloc([]const u8, zcu.failed.len);
+    for (messages, zcu.failed.items(.message)) |*m, s| m.* = try arena.dupe(u8, zcu.intern_pool.stringToSlice(s));
+    out.messages = messages;
     out.keys = zcu.instance_map.count();
     return out;
 }
@@ -397,6 +408,80 @@ test "IEEE 1364-2005 §12.2.1 a one-name defparam naming nothing is E0901, one r
     , v, &.{.E1100});
     // The neighbour: an upward name that resolves the same either way.
     try expectCodes("module m; m1 n(); endmodule module m1; parameter p = 2; defparam m.n.p = 1; endmodule", v, &.{});
+}
+
+test "IEEE 1364-2005 §12.2.1 a defparam reaching out of its array element or generate block instance is E1100, however the path is spelled (absolute, relative, generate): named at the element or block it may not leave" {
+    const v: Sema.Config = .{ .ieee1364 = true };
+    // Absolute: `top.u[1].x.p` from `u[0]` leaves its own element; the
+    // report names `u[0]`, not the target `u[1]`.
+    {
+        var o = try elab("module leaf; parameter p = 99; endmodule module blk; leaf x(); defparam top.u[1].x.p = 5; endmodule module top; blk u[0:1](); endmodule", v);
+        defer o.deinit();
+        try std.testing.expectEqualSlices(Diag.Code, &.{.E1100}, o.codes);
+        try std.testing.expectEqualStrings("u[0]", o.names[0]);
+    }
+    // Generate: `somename[1]` from inside `somename[0]` leaves its own
+    // block instance (IEEE 1364-2005 §12.2.1's own example).
+    {
+        var o = try elab("module flop; parameter xyz = 0; endmodule module top; genvar i; generate for (i = 0; i < 2; i = i + 1) begin : somename flop f(); defparam somename[1 - i].f.xyz = i; end endgenerate endmodule", v);
+        defer o.deinit();
+        try std.testing.expectEqualSlices(Diag.Code, &.{ .E1100, .E1100 }, o.codes);
+        try std.testing.expectEqualStrings("somename[0]", o.names[0]);
+        try std.testing.expectEqualStrings("somename[1]", o.names[1]);
+    }
+    // Relative: a same-named sibling array element that `upwardAnchor`
+    // cannot resolve (no `Zcu.instances` row is named `u` alone) is judged
+    // by name, from every element (`u[0]`'s report included).
+    {
+        var o = try elab("module leaf; parameter p = 1; endmodule module blk; leaf x(); defparam u[1].x.p = 5; endmodule module top; blk u[0:1](); endmodule", v);
+        defer o.deinit();
+        try std.testing.expectEqualSlices(Diag.Code, &.{ .E1100, .E1100 }, o.codes);
+        try std.testing.expectEqualStrings("u[0]", o.names[0]);
+        try std.testing.expectEqualStrings("u[1]", o.names[1]);
+    }
+    // The legal neighbours: a defparam targeting its own element or block
+    // instance, however the path is spelled, stays inside it.
+    try expectCodes("module leaf; parameter p = 99; endmodule module blk; leaf x(); defparam top.u[1].x.p = 5; endmodule module top; blk u[1:1](); endmodule", v, &.{});
+    try expectCodes("module leaf; parameter p = 99; endmodule module top; genvar i; generate for (i = 0; i < 2; i = i + 1) begin : g leaf l(); defparam l.p = i; end endgenerate endmodule", v, &.{});
+}
+
+test "IEEE 1364-2005 §12.8.1 a self-targeting defparam whose value reads its own target back through another parameter's declared default (`y` -> `x` -> `y`, named) is E0907" {
+    // `w.x = y` (upward, self-targeting: the instance is named `w`) and
+    // `y`'s own declared default reads `x` back.
+    var o = try elab("module leaf; parameter x = 0; parameter y = x; defparam w.x = y; endmodule module top; leaf w(); endmodule", .{});
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{.E0907}, o.codes);
+    try std.testing.expect(std.mem.indexOf(u8, o.messages[0], "`w.y` → `w.x` → `w.y`") != null);
+    // The legal neighbour: `y`'s default does not read `x` back, so no cycle.
+    try expectCodes("module leaf; parameter x = 0; parameter y = 1; defparam w.x = y; endmodule module top; leaf w(); endmodule", .{}, &.{});
+}
+
+test "IEEE 1364-2005 §12.8.1 a cycle that exists only through a defparam's own given value (not through any declared default) is read by every defparam that reaches it, self-targeting or not" {
+    // Neither `x`'s nor `y`'s declared default reads the other: the cycle
+    // exists only once `w.x`'s own given value (`y`) and `w.y`'s own given
+    // value (`x`) stand for their defaults (`w.own`, `cycleOf`'s `pending`).
+    // Both defparams are self-targeting here (the instance is named `w`).
+    var o = try elab("module leaf; parameter real x = 1.0; parameter real y = 2.0; defparam w.x = y; defparam w.y = x; endmodule module top; leaf w(); endmodule", .{});
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{ .E0907, .E0907 }, o.codes);
+    try std.testing.expect(std.mem.indexOf(u8, o.messages[0], "→") != null);
+    try std.testing.expect(std.mem.indexOf(u8, o.messages[1], "→") != null);
+    // The legal neighbour: given values that do not read each other back.
+    try expectCodes("module leaf; parameter real x = 1.0; parameter real y = 2.0; defparam w.x = 3.0; defparam w.y = 4.0; endmodule module top; leaf w(); endmodule", .{}, &.{});
+}
+
+test "IEEE 1364-2005 §12.8.1's own example: a defparam to a sibling's already-elaborated parameter reads the same cycle as a self-targeting one, and both report it (VAMS §6.3.1 inherits defparam)" {
+    // `cyc.u.g = y` is not self-targeting (`u`, not `w`); `u` is elaborated
+    // before `w` (source order), so its target exists already and the
+    // value is read now. `y`'s declared default reads `x`, and `w.x`'s own
+    // given value is `y`: `u.g`'s read of `y` closes the same cycle `w.x`'s
+    // own check does, so both are reported (the real corpus fixture,
+    // `defparam_upward_value_cycle_rejected.va`, `//! reject-only the cycle`).
+    var o = try elab("module leaf; parameter real g = 0.0; endmodule module writer; parameter real x = 1.0; parameter real y = x; defparam cyc.u.g = y; defparam w.x = y; endmodule module cyc; leaf u(); writer w(); endmodule", .{});
+    defer o.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{ .E0907, .E0907 }, o.codes);
+    try std.testing.expect(std.mem.indexOf(u8, o.messages[0], "u.g") != null);
+    try std.testing.expect(std.mem.indexOf(u8, o.messages[1], "w.x") != null);
 }
 
 test "§6.4.1 a paramset statement reaches out of module only to a localparam (E0907)" {

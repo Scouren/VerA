@@ -90,6 +90,10 @@ pub const Walk = struct {
     /// The defparams (`origins` rows) that reached the instance being made,
     /// a later one's loser included: each is used once the instance exists.
     matched: std.ArrayList(u32) = .empty,
+    /// The instance being made's own-targeting defparams, gathered by
+    /// `defparams.ownTargets` across every body of it before its defparams
+    /// are collected (IEEE 1364-2005 §12.8.1's `cycleOf`).
+    own: std.ArrayList(eval.Pending) = .empty,
     rerun: bool = false,
 };
 
@@ -312,6 +316,7 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
 
     w.kids.clearRetainingCapacity();
     w.prefixes.clearRetainingCapacity();
+    w.own.clearRetainingCapacity();
     try items(w, &env, index, picked.module.file, m.body, "");
     if (p.parent == .none) try rootShapes(s, &env);
     var k = w.kids.items.len;
@@ -489,7 +494,8 @@ fn items(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, body:
         },
         else => {}, // else: only a generate construct opens a scope
     };
-    for (insts) |i| if (tags[@backingInt(i)] == .defparam) try defparams.collect(w, env, index, file, i);
+    try defparams.ownTargets(w, env, index, insts);
+    for (insts) |i| if (tags[@backingInt(i)] == .defparam) try defparams.collect(w, env, index, file, i, prefix);
 }
 
 /// One module instance (or each element of an array of them) as a child.

@@ -138,9 +138,6 @@ verilog-a/ch09_system_tasks/rdist_zero_mean_at_run_time_is_an_error.va codegen: 
 verilog-a/ch09_system_tasks/real_distribution.va codegen: a call of `$rdist_uniform`
 verilog-a/ch09_system_tasks/rng_reference_large_count.va codegen: a call of `$rdist_chi_square`
 verilog-a/ch09_system_tasks/rng_short_circuit.va codegen: a call of `$rdist_exponential`
-verilog-a/ch09_system_tasks/simparam_gmin_source_scale_host_written.va codegen: parameter `g`'s default does not fold
-verilog-a/ch09_system_tasks/simparam_minr_hicum_l2_default.va codegen: parameter `minr`'s default does not fold
-verilog-a/ch09_system_tasks/simparam_newton_tolerances_host_written.va codegen: parameter `rt`'s default does not fold
 verilog-a/ch09_system_tasks/test_plusargs.va codegen: a call of `$test$plusargs`
 verilog-a/ch09_system_tasks/top_port_connected_controls_ddt.va codegen: a call of `$port_connected`
 verilog-a/ch09_system_tasks/value_plusargs.va codegen: a call of `$value$plusargs`

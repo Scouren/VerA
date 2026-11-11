@@ -77,7 +77,10 @@ pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
     // §4.5 the operators' fields, kept like the held values.
     const opf = try ops.fields(dg);
     const st = status.hasStatus(dg);
-    if (!held and !tables and limits == 0 and opf.len == 0 and !st) return;
+    // T36: `$bound_step` needs `run`'s `m` even with no held variable,
+    // table, limiter, operator or status (`ops.genAccept` writes it).
+    const bound_step = dg.device.kernel.bound_step != null;
+    if (!held and !tables and limits == 0 and opf.len == 0 and !st and !bound_step) return;
     const p = struct {
         fn f(out: *std.Io.Writer, comptime fmt: []const u8, args: anytype) DeclGen.Error!void {
             out.print(fmt, args) catch return error.OutOfMemory;
@@ -108,14 +111,15 @@ pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
     if (st) try p(w, "    inst.vera_status__ = 0;\n    inst.vera_status_args__ = @splat(0.0);\n", .{});
     try p(w, "    return .{{}};\n}}\n\n/// §5.10 an accepted point: the body's held values become the instance's.\npub fn updateState(comptime S: type, model: *const Model, inst: *Instance, x: [n_u]f64, _: *State, sim: contract.SimState) contract.UpdateResult {{\n", .{});
     // A status-only device reads none of these in its own right; `run`
-    // (held values, table captures, operators) is what would otherwise.
-    if (!tables and !(held or opf.len != 0)) try p(w, "    _ = .{{ S, model, x, sim }};\n", .{});
+    // (held values, table captures, operators, `$bound_step`) is what
+    // would otherwise.
+    if (!tables and !(held or opf.len != 0 or bound_step)) try p(w, "    _ = .{{ S, model, x, sim }};\n", .{});
     // §9.7.3 a latched status: the device stopped, so its state stays put.
     if (st) try p(w, "    if (inst.vera_status__ != 0) return .ok;\n", .{});
     // §9.21.1 a capture an iterate made is kept only at an accepted point:
     // the body runs once more at `x` while a site is uncaptured.
     if (tables) try p(w, "    if (std.mem.findScalar(bool, &inst.table_kept, false) != null) {{\n        _ = run(S, &x, D.zProbe(S, &x), model, inst, sim);\n        inst.table_kept = inst.table_ready;\n    }}\n", .{});
-    if (held or opf.len != 0) try p(w, "    const m = run(S, &x, D.zProbe(S, &x), model, inst, sim);\n", .{});
+    if (held or opf.len != 0 or bound_step) try p(w, "    const m = run(S, &x, D.zProbe(S, &x), model, inst, sim);\n", .{});
     try ops.genAccept(dg, w);
     for (dg.held_field, 0..) |field, i| if (field) |f| {
         try p(w, "    inst.{s} = m.h{d}{s};\n", .{ f, i, if (isInt(dg, i)) "" else ".val()" });

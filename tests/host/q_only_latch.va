@@ -1,0 +1,20 @@
+// Host-only design for tests/host/q_only_latch_host.zig: a $prev path latch
+// that feeds ONLY a §5.6.1.2 charge (ddt) contribution, never a resistive (I)
+// one directly — but still multiplied by an unknown-dependent factor
+// (V(p, n)), the "mos2 shape", so it still earns jac; see the host file's own
+// doc. The emitted field is still named `pb__0` ("path_prev latch")
+// regardless of whether $prev's result reaches I() or ddt() — VerA does not
+// use a separate "pq__" name for this case (confirmed by reading the
+// generated device.zig). There is no `Q()` access function in VerilogAMS
+// (`error[E0501]: unknown access function: Q` if written that way) — a
+// charge contribution is spelled `I(...) <+ ddt(charge_expr)`, the same idiom
+// `batch_per_instance_state.va` uses for its own ddt() term.
+`include "disciplines.vams"
+module q_only_latch(p, n);
+    inout p, n; electrical p, n;
+    real g;
+    analog begin
+        g = 1.0 + 0.1 * V(p, n);
+        I(p, n) <+ ddt(0.5 * (g + $prev(g)) * V(p, n));
+    end
+endmodule

@@ -187,7 +187,6 @@ verilog-a/ch03_data_types/duplicate_discipline_name.va rw-lower (analog lowering
 verilog-a/ch03_data_types/duplicate_nature_name.va rw-lower (analog lowering): exit status old 1, new 0
 verilog-a/ch03_data_types/duplicate_user_attribute.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch03_data_types/duplicate_user_attribute.va:18:74`, new `  --> verilog-a/ch03_data_types/duplicate_user_attribute.va:18:1`
 verilog-a/ch03_data_types/dynamic_array_index.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch03_data_types/dynamic_multidim_guards.va rw-lower (analog lowering): stderr: line 7: old `guarded repeated reads survive loop invalid indices got=96 want=96 ok=1`, new `guarded repeated reads survive loop invalid indices got=0 want=96 ok=0`
 verilog-a/ch03_data_types/dynamic_multidim_numeric.va rw-lower (analog lowering): stderr: line 13: old `descending outer initialization got=10 want=10 ok=1`, new `descending outer initialization got=0 want=10 ok=0`
 verilog-a/ch03_data_types/dynamic_multidim_order.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch03_data_types/dynamic_multidim_parameter_index.va rw-lower (analog lowering): exit status old 0, new 1
@@ -205,8 +204,8 @@ verilog-a/ch03_data_types/idt_nature_unrelated_to_default_rejected.va rw-lower (
 verilog-a/ch03_data_types/idt_nature_unrelated_to_explicit_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch03_data_types/idt_nature_unrelated_to_explicit_rejected.va:38:5`, new `  --> verilog-a/ch03_data_types/idt_nature_unrelated_to_explicit_rejected.va:37:1`
 verilog-a/ch03_data_types/integer_parameter_precision.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch03_data_types/integer_parameter_precision_conditional.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch03_data_types/integer_parameter_precision_control.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch03_data_types/integer_parameter_precision_derive.va rw-codegen (codegen): exit status old 0, new 1
+verilog-a/ch03_data_types/integer_parameter_precision_control.va rw-zero (air passes) message: stderr: line 8: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,gnd) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — c
+verilog-a/ch03_data_types/integer_parameter_precision_derive.va rw-lower (analog lowering): stderr: line 5: old `real initializer rounds and wraps32 got=          1 want=          1 ok=1`, new `real initializer rounds and wraps32 got= 2147483647 want=          1 ok=0`
 verilog-a/ch03_data_types/integer_parameter_precision_host.va rw-lower (analog lowering): stderr: line 3: old `host override copied exactly got=9007199254740996 want=    9007199254740996 ok=1`, new `host override copied exactly got=          4 want=    9007199254740996 ok=0`
 verilog-a/ch03_data_types/integer_parameter_precision_override.va rw-lower (analog lowering): stderr: line 3: old `override preserves64 got= 4702394921427289928 want= 4702394921427289928 ok=1`, new `override preserves64 got= 1162233672 want= 4702394921427290112 ok=0`
 verilog-a/ch03_data_types/integer_parameter_precision_real_dependents.va rw-codegen (codegen): exit status old 0, new 1
@@ -1155,10 +1154,7 @@ verilog-a/ch09_system_tasks/sformat_runtime_width_past_its_row_rejected.va rw-co
 verilog-a/ch09_system_tasks/sformat_runtime_width_within_its_row.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch09_system_tasks/sformat_variable_format_mismatch_continues.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch09_system_tasks/simparam.va rw-zero (air passes) message: stderr: line 8: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — com
-verilog-a/ch09_system_tasks/simparam_fallback_as_parameter_default.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch09_system_tasks/simparam_gmin_source_scale_host_written.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch09_system_tasks/simparam_minr_hicum_l2_default.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch09_system_tasks/simparam_newton_tolerances_host_written.va rw-codegen (codegen): exit status old 0, new 1
+verilog-a/ch09_system_tasks/simparam_gmin_source_scale_host_written.va rw-zero (air passes) message: stderr: line 6: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — com
 verilog-a/ch09_system_tasks/simparam_spice_option_not_known_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0811]: simulation parameter is not known: `"chgtol"``, new `error[E0811]: simulation parameter is not known: `"chgtol"` is not a §9.15 simulation parameter VerA knows`
 verilog-a/ch09_system_tasks/simparam_str_analysis_name_host_table.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch09_system_tasks/simparam_str_analysis_type_tran_op.va rw-codegen (codegen): exit status old 0, new 1
@@ -1278,7 +1274,6 @@ verilog-a/exhaustive/zi_sample_hold.va rw-codegen (codegen): exit status old 0, 
 verilog-ams/annex_a_syntax/analog_initial.va rw-codegen (codegen): exit status old 0, new 1
 verilog-ams/annex_a_syntax/concatenation_as_switch_terminal.va rw-codegen (run): stderr: line 28: old `warning[W0252]: gate primitive accepted, and it computes nothing: pullup primitive`, new ``
 verilog-ams/annex_a_syntax/configuration_source_text.va rw-codegen (run): stderr: line 12: old `warning[W0253]: configuration read, and nothing binds through it`, new ``
-verilog-ams/annex_a_syntax/digital_statements_in_initial.va rw-lower (analog lowering): stderr: line 4: old `wait released at a's rise got=         1 want=          1 ok=1`, new `wait released at a's rise got=1 want=          1 ok=1`
 verilog-ams/annex_a_syntax/drive_strength_unsupported.va rw-lower (analog lowering): stderr: line 5: old `  x[w] = 1.000000e0`, new `  x[w] = 0.000000e0`
 verilog-ams/annex_a_syntax/gate_instantiation_one_input.va rw-codegen (run): stderr: line 18: old `warning[W0252]: gate primitive accepted, and it computes nothing: `and` primitive`, new ``
 verilog-ams/annex_a_syntax/gate_instantiation_truth_table.va rw-codegen (run): stderr: line 63: old `warning[W0252]: gate primitive accepted, and it computes nothing: `and` primitive`, new ``
@@ -1329,18 +1324,14 @@ verilog-ams/annex_f_resolution/out_of_context_declaration_detail.va rw-lower (an
 verilog-ams/ch02_lexical/attributes_on_module_items.va rw-lower (analog lowering): stderr: line 5: old `the attributed generate loop made both assigns got=          3 want=          3 ok=1`, new `the attributed generate loop made both assigns got=         3 want=          3 ok=1`
 verilog-ams/ch02_lexical/question_digit_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0130]: literal requires digital value support in the execution backend: `4'b?`: the analog backend cannot execute this 4-bit four-state literal`, new `error[E0130]: literal requires digital value support in the execution backend: the an
 verilog-ams/ch02_lexical/unknown_decimal_backend_boundary.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0130]: literal requires digital value support in the execution backend: `80'sd?__`: the analog backend cannot execute this 80-bit four-state literal`, new `error[E0130]: literal requires digital value support in the execution backend: t
-verilog-ams/ch02_lexical/unsized_xz_extends_to_expression_size.va rw-lower (analog lowering): stderr: line 4: old `unsized x fills the 32-bit expression got=          1 want=          1 ok=1`, new `unsized x fills the 32-bit expression got=         1 want=          1 ok=1`
 verilog-ams/ch02_lexical/xz_digit_width_and_padding.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch02_lexical/xz_integer_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0130]: literal requires digital value support in the execution backend: `4'b01xz`: the analog backend cannot execute this 4-bit four-state literal`, new `error[E0130]: literal requires digital value support in the execution backend: the
 verilog-ams/ch03_data_types/digital_primitive_on_mixed_net_rejected.va rw-lower (analog lowering): exit status old 1, new 0
 verilog-ams/ch03_data_types/digital_primitive_on_mixed_net_with_default_discipline.va rw-codegen (run): stderr: line 7: old `  x[pZ5f_ch03_and_bridgeZ5f_logicZ2ed] = 0.000000e0`, new `the analog block still runs beside a digital primitive got=0.5 want=0.5 ok=1`
-verilog-ams/ch03_data_types/discrete_disciplines_compatible.va rw-lower (analog lowering): stderr: line 6: old `the value crosses the port between two discrete disciplines got=          0 want=          0 ok=1`, new `the value crosses the port between two discrete disciplines got=0 want=          0 ok=1`
 verilog-ams/ch03_data_types/ground_non_continuous.va rw-lower (analog lowering): exit status old 1, new 0
 verilog-ams/ch03_data_types/mixed_port_with_connect_statement.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch03_data_types/nodeset_non_continuous.va rw-lower (analog lowering): exit status old 1, new 0
-verilog-ams/ch03_data_types/wand_interconnect_resolves_wired_and.va rw-lower (analog lowering): stderr: line 5: old `the wand interconnect resolves 1 and 0 to 0 got=          1 want=          1 ok=1`, new `the wand interconnect resolves 1 and 0 to 0 got=1 want=          1 ok=1`
 verilog-ams/ch03_data_types/wire_without_discipline_in_analog_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0337]: net has no declared discipline: `w` has no discipline, so `V` names nothing on it`, new `error[E0512]: unknown function: an access of a name with no node`
-verilog-ams/ch03_data_types/wire_without_discipline_is_discrete.va rw-lower (analog lowering): stderr: line 5: old `the always block saw the discrete net's value got=          0 want=          0 ok=1`, new `the always block saw the discrete net's value got=0 want=          0 ok=1`
 verilog-ams/ch03_data_types/wreal_net_undriven_zero_and_driven.va rw-zero (air passes) message: stderr: line 13: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 —  — co
 verilog-ams/ch03_data_types/wreal_wire_port_merge.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch04_expressions/case_equality.va rw-lower (analog lowering) notes: stderr: line 8: old `   = help: use `==`; for reals prefer `abs(a - b) < tol``, new `   = help: run `vera --explain E0369` for a detailed explanation`
@@ -1517,9 +1508,7 @@ verilog-ams/ch08_scheduling/delayed_blocking_assignment_target_at_resume.va rw-l
 verilog-ams/ch08_scheduling/monitor_after_macro_process.va rw-codegen (display phase): stderr: line 20: old `monitor t=4 v=7 ok=1`, new `--- point 2 ---`
 verilog-ams/ch08_scheduling/monitor_at_analog_only_solutions.va rw-lower (analog lowering): stderr: line 11: old `monitor t=1 v=2 ok=1`, new `--- point 1 ---`
 verilog-ams/ch08_scheduling/nonblocking_assignment_to_a_net_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0482]: a procedural assignment writes a variable, not a net: `w` is a net, and a nonblocking assignment (§8.5.3.4) updates a variable`, new `error[E0482]: a procedural assignment writes a variable, not a net: `w` is a net, and a proced
-verilog-ams/ch08_scheduling/procedural_assign_deassign_semantics.va rw-lower (analog lowering): stderr: line 4: old `the assign followed its source over a procedural write, and the deassign kept its value got=         1 want=          1 ok=1`, new `the assign followed its source over a procedural write, and the deassign kept its value got=1 want=          1 ok=1`
 verilog-ams/ch08_scheduling/procedural_assign_to_a_net_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0482]: a procedural assignment writes a variable, not a net: `w` is a net, and a procedural `assign` (§8.5.3.2) writes a variable`, new `error[E0482]: a procedural assignment writes a variable, not a net: `w` is a net, and a procedural
-verilog-ams/ch08_scheduling/procedural_continuous_semantics.va rw-lower (analog lowering): stderr: line 4: old `the force followed its source, and the release stopped it got=         0 want=          0 ok=1`, new `the force followed its source, and the release stopped it got=0 want=          0 ok=1`
 verilog-ams/ch08_scheduling/switch_primitive_accepted.va rw-codegen (display phase): stderr: line 5: old `  x[aZ5f_ch8_sw_bridgeZ5f_logicZ2ed] = 0.000000e0`, new `the analog block of a module carrying a switch primitive still runs got=0.5 want=0.5 ok=1`
 verilog-ams/ch08_scheduling/switch_terminal_is_a_variable_rejected.va rw-lower (analog lowering): exit status old 1, new 0
 verilog-ams/ch09_system_tasks/alias_incompatible_discipline_returns_zero.va rw-lower (analog lowering): exit status old 0, new 1
@@ -1654,7 +1643,6 @@ verilog-ams/ch12_vpi_routines/time_scaling.c not built: backend vpi
 verilog-ams/ch12_vpi_routines/two_libraries_two_instances.c not built: backend vpi
 verilog-ams/ch12_vpi_routines/vpi_routines_not_va_functions.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0512]: unknown function: `vpi_chk_error``, new `error[E0512]: unknown function: `vpi_chk_error` is not lowered by Sema yet`
 verilog-ams/digital/bare_event_trigger_in_analog_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = help: only `@(<event>) -> ev;` is legal`, new `   = help: run `vera --explain E0434` for a detailed explanation`
-verilog-ams/digital/digital_delay_primitive_notation.v rw-lower (analog lowering): stderr: line 1: old ``, new `warning[W0252]: gate primitive accepted, and it computes nothing: `digital_delay_buffer` primitive`
 verilog-ams/digital/scaled_delay_udp_rejected.v rw-comp (elab) location: stderr: line 5: old `   |                         ^`, new `   |                         ^^`
 verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/03_lexical_conventions/forward_reference_reg_rejected.v rw-dlower (run): stderr: line 10: old ``, new `error: could not compile due to 1 previous error(s)`

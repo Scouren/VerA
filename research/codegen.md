@@ -650,3 +650,12 @@ Each emitted Instance/State struct keeps the existing `comptime assert(@sizeOf(.
   each array-parameter element a derive row the same way a scalar gets one.
   Oracle: diff-codegen bit for bit on `dependent_control_host.va`. Wave 4, same
   agent as T5-W12 (both in `src/Sema/derive.zig`).
+- **T39 — a real to an integer parameter always saturates (wrong number, lead at wave 4).**
+  `ch03_data_types/integer_parameter_precision_derive.va`: `parameter integer realwide = 4294967297.0`
+  gives 2147483647 where the fixture's own `CHECKI` (§6.3.4) and the old side give 1. The
+  fixtures together fix the rule: round to nearest (ties away), then wrap to 32 bits
+  (two's complement) when the rounded value fits in 64 bits (2^32 + 1 -> 1, `words[2]` too);
+  saturate only past that (`integer_conversion_saturates.va`'s 1e300 -> 2147483647, a lower
+  ruling). T10's `eval.toInteger` saturates every out-of-range value. The fold and the run-time
+  derive path must apply the same rule. Oracle: both fixtures' own `CHECKI`s, diff-codegen and
+  diff-comp on both; red first.

@@ -406,6 +406,7 @@ fn genBlock(w: *Walk, f: u32, scope: u32, b: Inst.Index, index: ?i64, genvars: [
     const blk = Lower.payload(vir, Inst.GenBlock, b);
     const name = vir.string(blk.name);
     const inner_scope = try newScope(l, scope, name, index, l.b.times.items[scope], l.srcOffset(f, b), true);
+    l.scopes.items[inner_scope].implicit = !blk.flags.named;
     // §12.4 a conditional arm's block sees the genvars of the iteration around it.
     const inner = try newFrame(l, f, l.frames.items[f].instance, inner_scope, if (index == null) l.frames.items[f].genvars else genvars);
     _ = try l.bind(f, b, .{ .kind = .scope, .slot = inner_scope });

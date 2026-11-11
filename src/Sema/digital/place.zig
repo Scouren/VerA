@@ -25,6 +25,7 @@ const std_sim = @import("std_sim");
 const digital = @import("../digital.zig");
 const expr = @import("expr.zig");
 const stmt = @import("stmt.zig");
+const eval = @import("../eval.zig");
 const Lower = digital.Lower;
 const Error = digital.Error;
 const Type = digital.Type;
@@ -336,8 +337,8 @@ pub fn selectOf(l: *Lower, i: Inst.Index) Error!Sel {
         .slice => {
             if (indices.items.len != dims) return l.refuse("a part-select of a bit");
             const t = Lower.payload(vir, Inst.Triple, i);
-            const msb = try l.intOf(l.frame, t.b);
-            const lsb = try l.intOf(l.frame, t.c);
+            const msb = try partBound(l, t.b);
+            const lsb = try partBound(l, t.c);
             if (msb != lsb and (msb > lsb) != (n.msb >= n.lsb)) return l.reject(l.frame, i.toRef(), "§5.2.1: a part-select names its more significant bit first");
             s.mode = .const_part;
             s.count = std.math.cast(u32, @abs(@as(i128, msb) - lsb) + 1) orelse return l.refuse("a part-select past 2^32 bits");
@@ -381,6 +382,21 @@ pub fn selectRow(l: *Lower, s: Sel) Error!u32 {
 }
 
 // ---- private ----
+
+/// §5.2.1 a part-select bound: a constant integer of any width, folded
+/// through the 1364 mode, refused as lib/sim/digital refused one with an
+/// x or z bit or past i64.
+fn partBound(l: *Lower, r: Inst.Ref) Error!i64 {
+    const v = (try eval.v1364.value(try l.envAt(l.frame), r)) orelse return l.intOf(l.frame, r);
+    const lit = switch (v) {
+        .int => |lit| lit,
+        .real => return l.intOf(l.frame, r),
+    };
+    assert(lit.width != 0);
+    if (lit.hasUnknown()) return l.reject(l.frame, r, "a part-select bound cannot contain x or z");
+    const index = lit.asIndex().?; // known bits: asserted above
+    return std.math.cast(i64, index) orelse l.reject(l.frame, r, "a part-select bound is outside the supported i64 range");
+}
 
 /// §6.2/§9.2 a procedural target is a variable (lib/sim/digital's
 /// `checkTarget`): a net, or an element of a net array (§4.9.1), is driven

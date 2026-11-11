@@ -23,7 +23,7 @@
 //!
 //! Contents:
 //! - fields `gpa`, `intern_pool`, `files`, `modules`, `paramsets`, `disciplines`, `natures`, `instances`, `instance_map`, `ports`, `defparams`, `defparam_sources`, `net_discipline`, `inserts`, `failed`, `netlist_modules`, `netlist_unsupported`
-//! - `pub const File` (`File.Index`), `pub const Decl` (`none`), `pub const Instance` (`Index`, `Key`), `pub const Port`, `pub const Defparam`, `pub const DefparamSource`, `pub const NetKey`, `pub const Insert`, `pub const Failure`, `pub const Rule`, `pub const Part`
+//! - `pub const File` (`File.Index`), `pub const Decl` (`none`), `pub const Instance` (`Index`, `Key`), `pub const Port`, `pub const Defparam`, `pub const DefparamSource`, `pub const NetKey`, `pub const Insert`, `pub const Failure`, `pub const Rule` (`code`), `pub const Part`
 //! - `pub const SystemParam` (`fromName`, `initial`, `allows`, `domain`), `pub const Hier`, `pub const PathFormatter`
 //! - `pub const instances_max: u32`
 //! - `pub fn init(gpa: Allocator) Allocator.Error!Zcu`
@@ -317,6 +317,21 @@ pub const Rule = enum(u8) {
     /// §12.2.1 a defparam inside an array element reaching outside it;
     /// `name` the element.
     defparam_outside,
+
+    /// The code the IEEE 1364 route reports `r` under, in lib/sim/digital's
+    /// words: E1100 "digital source execution failed" for most.
+    pub fn code(r: Rule) Diag.Code {
+        assert(r != .none);
+        return switch (r) {
+            .none => unreachable, // asserted above
+            .defparam_unknown => .E0907,
+            .cell_again => .W1152,
+            .param_extra => .W1161,
+            .config => .E0243,
+            .defparam_nothing => .E0901,
+            else => .E1100, // else: lib/sim/digital's catch-all
+        };
+    }
 };
 
 /// `fmtPath`'s value; print it with `{f}`.

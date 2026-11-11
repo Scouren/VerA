@@ -32,6 +32,19 @@ const Vir = vams.Vir;
 const Inst = Vir.Inst;
 
 /// §17 the system functions `ctx` lowers, by name.
+/// VAMS §9.2's functions whose "Supported in digital context" cell is Yes
+/// and that the digital engine does not run, each with its table.
+const vams_digital_unrun = std.StaticStringMap([]const u8).initComptime(.{
+    .{ "$arandom", "9-10" },       .{ "$rdist_chi_square", "9-10" }, .{ "$rdist_exponential", "9-10" },
+    .{ "$rdist_poisson", "9-10" }, .{ "$rdist_uniform", "9-10" },    .{ "$rdist_erlang", "9-10" },
+    .{ "$rdist_normal", "9-10" },  .{ "$rdist_t", "9-10" },          .{ "$min", "9-11" },
+    .{ "$max", "9-11" },           .{ "$abs", "9-11" },              .{ "$temperature", "9-12" },
+    .{ "$vt", "9-12" },            .{ "$simparam", "9-12" },         .{ "$simparam$str", "9-12" },
+    .{ "$mfactor", "9-15" },       .{ "$xposition", "9-15" },        .{ "$yposition", "9-15" },
+    .{ "$angle", "9-15" },         .{ "$hflip", "9-15" },            .{ "$vflip", "9-15" },
+    .{ "$table_model", "9-18" },
+});
+
 const SysFn = enum { time, stime, realtime, abstime, ln1p, expm1, signed, unsigned, clog2, rtoi, itor, realtobits, bitstoreal, random, test_plusargs, value_plusargs, ln, log10, exp, sqrt, floor, ceil, sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh, pow, atan2, hypot, fopen, fgets, ferror, fgetc, ungetc, ftell, rewind, fseek, feof, sscanf, fscanf, fread, dist_uniform, dist_normal, dist_exponential, dist_poisson, dist_chi_square, dist_t, dist_erlang, q_full, driver_count, receiver_count, driver_state, driver_strength, driver_delay, driver_next_state, driver_next_strength, driver_type };
 
 const sys_fns = std.StaticStringMap(SysFn).initComptime(.{
@@ -300,6 +313,12 @@ fn fread(l: *Lower, args: []const Inst.Ref) Error!u32 {
 fn sysOf(l: *Lower, vir: *const Vir, i: Inst.Index) Error!struct { f: SysFn, args: []const Inst.Ref } {
     const c = Lower.payload(vir, Inst.SysCall, i);
     const name = vir.string(c.name);
-    const f = sys_fns.get(name) orelse return l.refuseFmt("the system function `{s}`", .{name});
+    const f = sys_fns.get(name) orelse {
+        // VAMS §9.2: a name whose "Supported in digital context" cell is
+        // Yes, which the digital engine does not run: refused by name.
+        const table = vams_digital_unrun.get(name) orelse return l.refuseFmt("the system function `{s}`", .{name});
+        l.why_code = .E0829;
+        return l.rejectFmt(l.frame, i.toRef(), "VAMS §9.2 Table {s}: `{s}` is supported in the digital context, and VerA's digital engine does not run it", .{ table, name });
+    };
     return .{ .f = f, .args = vir.list(Inst.Ref, c.args) };
 }

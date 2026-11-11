@@ -380,6 +380,7 @@ fn lateParam(l: *Lower, f: u32, i: Inst.Index) Error!u32 {
     }
     n.slot = try slots(l, n.ty, 1, if (n.ty.real) .zero else .x);
     const fv = try finalValue(l, f, i);
+    try @import("constness.zig").constantCalls(l, fv.frame, fv.value);
     // The IEEE 1364 mode folds x/z bits, wide values and constant
     // functions; only what it cannot is evaluated by the run at the end.
     if (!n.ty.real) if (try eval.v1364.value(try l.envAt(fv.frame), fv.value)) |v| if (v == .int) {

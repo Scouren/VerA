@@ -105,7 +105,7 @@ pub fn declare(l: *Lower, f: u32, scope: u32, i: Inst.Index) Error!void {
 
 /// §10.4.1 the type of function call `i`: its result's.
 pub fn resultType(l: *Lower, i: Inst.Index) Error!Type {
-    const row = try callee(l, i);
+    const row = try callee(l, i, false);
     if (!l.subs.items[row].function) return l.reject(l.frame, i.toRef(), "§10.2: a task is enabled as a statement, not called in an expression");
     return l.subs.items[row].result_ty;
 }
@@ -113,7 +113,7 @@ pub fn resultType(l: *Lower, i: Inst.Index) Error!Type {
 /// A `Program.Call` (in `extra`) of call `i` in `Lower.frame`: per formal,
 /// its input value in the formal's type and its output's place.
 pub fn callRow(l: *Lower, i: Inst.Index) Error!u32 {
-    const row = try callee(l, i);
+    const row = try callee(l, i, false);
     const r = l.subs.items[row];
     const args = try argsOf(l, i, r);
     const out = try l.a.alloc(Program.Arg, args.len);
@@ -139,7 +139,7 @@ pub fn callRow(l: *Lower, i: Inst.Index) Error!u32 {
 /// storage (§10.2.3); an automatic one's each get storage of their own,
 /// one per activation since a site cannot be re-entered while suspended.
 pub fn enable(l: *Lower, i: Inst.Index, depth: u32) Error!void {
-    const row = try callee(l, i);
+    const row = try callee(l, i, true);
     const scope = l.frames.items[l.frame].scope;
     if (l.subs.items[row].function) return l.reject(l.frame, i.toRef(), "§10.4: a function is called in an expression, not enabled");
     if (!try timed(l, row)) {
@@ -350,10 +350,10 @@ fn resultName(l: *Lower, outer: u32, s: Inst.Function) Error!Name {
     return n;
 }
 
-/// The `subs` row call or enable `i` names from `Lower.frame` (inside a
+/// The `subs` row call (or, `enabling`, enable) `i` names from `Lower.frame` (inside a
 /// function its name is its result variable, so the row is found further
 /// out).
-fn callee(l: *Lower, i: Inst.Index) Error!u32 {
+fn callee(l: *Lower, i: Inst.Index, enabling: bool) Error!u32 {
     const vir = l.virOf(l.frame);
     const c = Lower.payload(vir, Inst.Call, i);
     const ci = c.callee.toIndex() orelse return l.refuse("a call of no subroutine");
@@ -369,6 +369,16 @@ fn callee(l: *Lower, i: Inst.Index) Error!u32 {
             if (std.mem.eql(u8, rvir.string(Lower.payload(rvir, Inst.Function, r.decl).name), want)) return @intCast(k);
         }
         return l.refuse("a hierarchical name of a task or function its scope does not declare");
+    }
+    // An undeclared name (an escaped `\$display` is no system task, §3.7.3),
+    // quoted as written.
+    if (Lower.tag(vir, ci) == .str_ref) {
+        if (!enabling) return l.reject(l.frame, i.toRef(), "undeclared function");
+        l.reject(l.frame, i.toRef(), "") catch {};
+        const text = l.options.sources[@backingInt(l.fileOf(l.frame))].pp.text;
+        const at = @min(l.why_at, text.len);
+        const end = std.mem.findAnyPos(u8, text, at, " \t\r\n(;") orelse text.len;
+        return l.rejectFmt(l.frame, i.toRef(), "undeclared task `{s}`", .{text[at..end]});
     }
     if (Lower.tag(vir, ci) != .decl_ref) return l.refuse("a hierarchical task or function name");
     const d = vir.instructions.items(.data)[@backingInt(ci)].decl_tok.decl;
@@ -440,7 +450,7 @@ fn bodyTimed(l: *Lower, vir: *const Vir, b: Vir.Body, depth: u32) Error!bool {
             .case => for (vir.list(Inst.Arm, Lower.payload(vir, Inst.Case, i).arms)) |arm| {
                 if (try bodyTimed(l, vir, arm.body, depth + 1)) break true;
             } else false,
-            .call => try timed(l, try callee(l, i)),
+            .call => try timed(l, try callee(l, i, true)),
             else => false, // else: no other instruction suspends or nests a statement
         };
         if (t) return true;

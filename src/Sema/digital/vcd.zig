@@ -81,12 +81,20 @@ pub fn ports(l: *Lower, i: Inst.Index, op: Program.PortsOp, all: []const Inst.Re
     }
     var insts: std.ArrayList(u32) = .empty;
     var name_row: u32 = none;
+    // §18.3.1 "Only modules are allowed (not variables)" and "Each scope
+    // specified in the scope_list shall be unique"; the last argument is
+    // the file unless it names an instance.
     for (args, 0..) |e, k| {
         if (instanceTarget(l, e)) |inst| {
+            if (std.mem.findScalar(u32, insts.items, inst) != null) return l.reject(l.frame, e, "§18.3.1: each $dumpports scope shall be unique");
             try insts.append(l.a, inst);
             continue;
         }
-        if (k + 1 == args.len) name_row = try expr.self_(l, e, 0);
+        if (k + 1 != args.len) return if (isSlot(l, e))
+            l.reject(l.frame, e, "§18.3.1: a $dumpports scope is a module instance: only modules are allowed, not variables")
+        else
+            l.reject(l.frame, e, "§18.3.1: a $dumpports scope is a module instance");
+        name_row = try expr.self_(l, e, 0);
     }
     if (insts.items.len == 0) try insts.append(l.a, @backingInt(l.frames.items[l.frame].instance));
     var header: std.ArrayList(u8) = .empty;
@@ -256,6 +264,17 @@ fn instanceTarget(l: *Lower, r: Inst.Ref) ?u32 {
     if (t.slot) return null;
     for (l.instance_frame, 0..) |f, k| if (l.frames.items[f].scope == t.at) return @intCast(k);
     return null;
+}
+
+/// Whether `r` is a name of a variable or net.
+fn isSlot(l: *Lower, r: Inst.Ref) bool {
+    const i = r.toIndex() orelse return false;
+    switch (Lower.tag(l.virOf(l.frame), i)) {
+        .str_ref, .decl_ref, .field => {},
+        else => return false, // else: no name
+    }
+    const t = target(l, r) catch return false;
+    return t.slot;
 }
 
 /// Whether scope `s` is scope `inst` or inside it.

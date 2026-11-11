@@ -24,6 +24,7 @@ const Air = @import("air");
 const Sema = @import("../Sema.zig");
 const expr = @import("expr.zig");
 const decl = @import("decl.zig");
+const sign = @import("sign.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const SysFn = vams.SysFn;
@@ -99,7 +100,16 @@ pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Erro
                 .none => .real,
             };
             const refs = try lowerArgs(s, b, args);
-            const host = try expr.call(s, b, @backingInt(tag), ty, refs);
+            // §5.4.1/§17.11.1 (D1-G): `$clog2`'s own self-determined width
+            // (`sign.clog2Width`, the fold's: `eval_fn.zig`) rides as a
+            // second `Air.Call` argument codegen reads (`calls.zig`); a
+            // flat 32 bits (T37) masked `4'shf`'s sign-extended -1 at the
+            // wrong width (4294967295, clog2 32, not 15, clog2 4).
+            const call_args = if (tag == .@"$clog2") blk: {
+                const width = sign.clog2Width(vir, args[0]) orelse 32;
+                break :blk try s.arena.dupe(Ref, &.{ refs[0], .fromIntern(try decl.intern(s, .{ .int = @as(i64, width) })) });
+            } else refs;
+            const host = try expr.call(s, b, @backingInt(tag), ty, call_args);
             try fileRow(s, tag, host);
             if (@import("../Zcu.zig").SystemParam.fromName(name)) |k| return .{ .ref = try hierRead(s, b, k, host), .ty = .real };
             return .{ .ref = host, .ty = ty };

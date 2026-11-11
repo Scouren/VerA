@@ -116,7 +116,6 @@ verilog-a/ch08_scheduling/timer_wakeup.va codegen: a call of `timer`
 verilog-a/ch09_system_tasks/arandom.va codegen: a call of `$arandom`
 verilog-a/ch09_system_tasks/arandom_no_seed.va codegen: a call of `$arandom`
 verilog-a/ch09_system_tasks/binding_detection.va codegen: a call of `$port_connected`
-verilog-a/ch09_system_tasks/clog2_unsigned_width.va point 0: display record value 5: old 4e0, new 3.2e1
 verilog-a/ch09_system_tasks/dist_chi_square.va codegen: a call of `$dist_chi_square`
 verilog-a/ch09_system_tasks/dist_erlang.va codegen: a call of `$dist_erlang`
 verilog-a/ch09_system_tasks/dist_exponential.va codegen: a call of `$dist_exponential`

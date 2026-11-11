@@ -10,6 +10,7 @@
 const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
+const field_use_check = @import("field_use_check.zig");
 
 const n_u = @typeInfo(D.U).@"enum".field_names.len;
 const lanes = blk: {
@@ -71,4 +72,10 @@ test "opVars with a value-only family reads a ddx as 0 and every value unchanged
     try std.testing.expectEqual(0.0, v[1]);
     try std.testing.expectEqual(2.0, v[2]);
     try std.testing.expectEqual(1.0, v[3]);
+}
+
+test "field_use (#134): clear bits perturb nothing in eval" {
+    const c = card();
+    const x = at(1.0);
+    try field_use_check.checkClearBits(Dual, D, &x, &c.m, c.inst, .{});
 }

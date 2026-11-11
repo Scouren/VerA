@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **A generated device now declares `field_use` and `limit_sim_reads`**: one
+  `contract.FieldUse` per `Instance` field, in declaration order, naming
+  which outputs a read of it can reach and which entry points write it
+  directly (a path latch is `q`/`w_commit` only; the field an ordinary held
+  value advances is `w_update`, never `w_commit`), and which `SimState`
+  fields `limit` reads, so a host that recorded a linearization on an
+  instance row can tell, field by field, whether it may replay it instead
+  of calling the device again. Both are text scans over the whole rendered
+  device, `sim_reads`' own technique; `limit_sim_reads` is not
+  `contract.limitReads`, the pre-existing unknown mask (#134).
 - **A host prints a device's recorded reals as the device does** (§9.4.3;
   C11 7.21.6.1): `contract.formatC`, behind `formatSay` and `formatStatus`,
   rendered `%e/%f/%g` through Zig's float formatter, which rounds a tie

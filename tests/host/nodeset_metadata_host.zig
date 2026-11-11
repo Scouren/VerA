@@ -10,6 +10,7 @@
 const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
+const field_use_check = @import("field_use_check.zig");
 
 const n_u = @typeInfo(D.U).@"enum".field_names.len;
 const lanes = blk: {
@@ -45,4 +46,6 @@ test "§3.6.3.2 null nodeset preserves the host fallback; explicit zero replaces
     try std.testing.expectEqual(@as(f64, -0.328125), residual[a].v);
     try std.testing.expectEqual(@as(f64, 120.0), residual[b].v);
     try std.testing.expectEqual(@as(f64, -6.0), residual[c].v);
+
+    try field_use_check.checkClearBits(Dual, D, &x, &model, inst, .{ .kind = .dc });
 }

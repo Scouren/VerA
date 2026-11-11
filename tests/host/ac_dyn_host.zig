@@ -18,6 +18,7 @@ const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
 const C = std.math.Complex;
+const field_use_check = @import("field_use_check.zig");
 
 const n_u = @typeInfo(D.U).@"enum".field_names.len;
 const Dual = contract.RefFamily(f64, &lanes, .{});
@@ -63,4 +64,12 @@ test "acDyn over a vector of frequencies is the scalar call per lane" {
             try std.testing.expectEqual(o.im, v.im[i]);
         }
     }
+}
+
+test "field_use (#134): clear bits perturb nothing in eval/q (per AC device)" {
+    const model: D.Model = .{};
+    var inst0: D.Instance = .{};
+    _ = D.initState(&model, &inst0);
+    const x = bias();
+    try field_use_check.checkClearBits(Dual, D, &x, &model, inst0, .{ .kind = .dc });
 }

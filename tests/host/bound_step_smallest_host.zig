@@ -8,6 +8,7 @@
 const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
+const field_use_check = @import("field_use_check.zig");
 
 const n_u = @typeInfo(D.U).@"enum".field_names.len;
 const S = contract.RefFamily(f64, &@as([n_u]u8, @splat(contract.no_lane)), .{});
@@ -28,4 +29,14 @@ fn boundAt(v: f64) f64 {
 test "§9.17.2 the smallest active $bound_step argument is the bound" {
     try std.testing.expectEqual(@as(f64, 1e-9), boundAt(1.0));
     try std.testing.expectEqual(@as(f64, 2e-9), boundAt(0.0));
+}
+
+test "field_use (#134): clear bits perturb nothing in eval" {
+    const model: D.Model = .{};
+    var inst0: D.Instance = .{};
+    _ = D.initState(&model, &inst0);
+    var x: [n_u]f64 = @splat(0.0);
+    x[@backingInt(D.U.p)] = 1.0;
+    const sim: contract.SimState = .{ .t = 1e-9, .dt = 1e-9, .kind = .tran };
+    try field_use_check.checkClearBits(S, D, &x, &model, inst0, sim);
 }

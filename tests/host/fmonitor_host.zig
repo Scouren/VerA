@@ -54,6 +54,7 @@
 const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
+const field_use_check = @import("field_use_check.zig");
 
 const n_u = @typeInfo(D.U).@"enum".field_names.len;
 const S = contract.RefFamily(f64, &@as([n_u]u8, @splat(contract.no_lane)), .{});
@@ -290,4 +291,16 @@ test "§9.5.5 a batch of two instances: each point's eval reads its own latched 
         const got: [2]f64 = rv[i].v;
         try std.testing.expectEqual(want[w][i], got[w]);
     };
+}
+
+test "field_use (#134): clear bits perturb nothing in eval (the $ftell latch stays set)" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var pa: [256]u8 = undefined;
+    var a: Inst = .init(1, 2, tmpPath(&pa, &tmp, "c.txt"));
+    defer D.deinitInstance(&a.inst);
+    a.run();
+    var x = x0;
+    x[@backingInt(D.U.p)] = 0.5;
+    try field_use_check.checkClearBits(S, D, &x, &a.model, a.inst, a.sim());
 }

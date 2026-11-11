@@ -18,6 +18,7 @@
 const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
+const field_use_check = @import("field_use_check.zig");
 
 const n_u = @typeInfo(D.U).@"enum".field_names.len;
 const Dual = contract.RefFamily(f64, &lanes, .{});
@@ -68,4 +69,14 @@ test "§4.5.7 under .ac the delay's partial leaves G and C for acDyn" {
     const dd = out[slot(d, in)];
     try std.testing.expectApproxEqAbs(std.math.pi / 4.0 * h, g_ac[d].ddxAt(in) + dd.re, 1e-12);
     try std.testing.expectApproxEqAbs(std.math.pi / 4.0 * h, w * q_ac[d].ddxAt(in) + dd.im, 1e-12);
+}
+
+test "field_use (#134): absdelay's clear bits perturb nothing in eval/q" {
+    const model: D.Model = .{};
+    var inst0: D.Instance = .{};
+    _ = D.initState(&model, &inst0);
+    var x: [n_u]f64 = @splat(0.0);
+    x[in] = 0.75;
+    const dc: contract.SimState = .{ .kind = .dc };
+    try field_use_check.checkClearBits(Dual, D, &x, &model, inst0, dc);
 }

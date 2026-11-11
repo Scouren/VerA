@@ -21,6 +21,7 @@
 //! - `pub fn primitiveTerminals(l: *Lower, k: u32, f: u32) Error!void`
 //! - `pub fn segmented(l: *Lower, w_placed_frame: u32, k: u32) Error!std.AutoHashMapUnmanaged(Inst.Index, u32)`
 //! - `pub fn skipped(l: *Lower, f: u32, actual: Inst.Ref) Error!bool`
+//! - `pub fn reads(a: Allocator, vir: *const Vir, b: Vir.Body, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -243,6 +244,32 @@ pub fn primitiveTerminals(l: *Lower, k: u32, f: u32) Error!void {
     }
 }
 
+/// Adds every declaration process body `b` names to `out`: one worklist
+/// over each payload's operands and bodies, so no statement form is missed
+/// and a deep expression costs no stack. `held_writes.a2dReads` (§7.3.6.4)
+/// calls this over a digital process too, not only `of`'s own digital-half
+/// read set.
+pub fn reads(a: Allocator, vir: *const Vir, b: Vir.Body, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void {
+    const before = out.count();
+    var stack: std.ArrayList(Inst.Index) = .empty;
+    var seen: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
+    try stack.appendSlice(a, vir.body(b));
+    while (stack.pop()) |i| {
+        if ((try seen.getOrPut(a, i)).found_existing) continue;
+        const data = vir.instructions.items(.data)[@backingInt(i)];
+        switch (vir.instructions.items(.tag)[@backingInt(i)]) {
+            .decl_ref => try out.put(a, decl.canonical(vir, data.decl_tok.decl), {}),
+            inline else => |t| switch (comptime Inst.dataKind(t)) {
+                .un_node => if (data.un_node.operand.toIndex()) |o| try stack.append(a, o),
+                .pl_node => if (Inst.Payload(t) != void) try children(a, vir, Inst.Payload(t), vir.extraData(Inst.Payload(t), data.pl_node.payload_index), &stack),
+                .str_tok, .decl_tok, .int, .float, .str => {},
+            },
+        }
+    }
+    // Each name this call added came from an instruction it visited.
+    assert(out.count() - before <= seen.count());
+}
+
 // ---- private ----
 
 /// Terminal `term` of primitive instance `g` in instance `k`'s module:
@@ -330,30 +357,6 @@ fn below(l: *Lower, scope: u32, out: *std.ArrayList(u8)) Error!void {
         if (sc.index) |x| try out.print(l.a, "[{d}]", .{x});
         try out.append(l.a, '.');
     }
-}
-
-/// Adds every declaration process body `b` names to `out`: one worklist
-/// over each payload's operands and bodies, so no statement form is missed
-/// and a deep expression costs no stack.
-fn reads(a: Allocator, vir: *const Vir, b: Vir.Body, out: *std.AutoHashMapUnmanaged(Inst.Index, void)) Allocator.Error!void {
-    const before = out.count();
-    var stack: std.ArrayList(Inst.Index) = .empty;
-    var seen: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty;
-    try stack.appendSlice(a, vir.body(b));
-    while (stack.pop()) |i| {
-        if ((try seen.getOrPut(a, i)).found_existing) continue;
-        const data = vir.instructions.items(.data)[@backingInt(i)];
-        switch (vir.instructions.items(.tag)[@backingInt(i)]) {
-            .decl_ref => try out.put(a, decl.canonical(vir, data.decl_tok.decl), {}),
-            inline else => |t| switch (comptime Inst.dataKind(t)) {
-                .un_node => if (data.un_node.operand.toIndex()) |o| try stack.append(a, o),
-                .pl_node => if (Inst.Payload(t) != void) try children(a, vir, Inst.Payload(t), vir.extraData(Inst.Payload(t), data.pl_node.payload_index), &stack),
-                .str_tok, .decl_tok, .int, .float, .str => {},
-            },
-        }
-    }
-    // Each name this call added came from an instruction it visited.
-    assert(out.count() - before <= seen.count());
 }
 
 /// Pushes payload `p`'s operands and the instructions of its bodies.

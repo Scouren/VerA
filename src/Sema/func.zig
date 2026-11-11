@@ -12,6 +12,7 @@
 //! Contents:
 //! - `pub fn call(s: *Sema, b: *Block, f: Inst.Index, pre: []const Value, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value`
 //! - `pub fn checkRecursion(s: *Sema, unit: *const Sema.Unit) Allocator.Error!void`
+//! - `pub fn calleeOf(vir: *const Vir, i: Inst.Index) ?Inst.Index`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -121,6 +122,17 @@ pub fn checkRecursion(s: *Sema, unit: *const Sema.Unit) Allocator.Error!void {
             }
         }
     }
+}
+
+/// The function `.call` instruction `i` names, or null when the callee is
+/// not a `decl_ref` to one of the module's `function`s (the old
+/// `discrete_check.zig`'s private `function`, shared now that the held
+/// walk (T2) needs it too).
+pub fn calleeOf(vir: *const Vir, i: Inst.Index) ?Inst.Index {
+    const ci = decl.payloadOf(vir, Inst.Call, i).callee.toIndex() orelse return null;
+    if (vir.instructions.items(.tag)[@backingInt(ci)] != .decl_ref) return null;
+    const f = decl.canonical(vir, vir.instructions.items(.data)[@backingInt(ci)].decl_tok.decl);
+    return if (vir.instructions.items(.tag)[@backingInt(f)] == .function) f else null;
 }
 
 // ---- private ----

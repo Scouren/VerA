@@ -11,6 +11,8 @@
 # Every line below is a fixture that differs under --run too: its tag names
 # the comp.xfail owner whose fix clears it (none is rw-rtlil's own).
 verilog/08_udp/definition_inside_module_rejected.v rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `q``, new `error[E0205]: unsupported module item: found table` [comp.xfail: rw-comp (astgen)]
+verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1251]: an initial block that is not constant assignments`, new `error[E1100]: digital source execution failed: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element`
+verilog/12_hierarchy/defparam_across_generate_instances_rejected.v rw-dlower (digital lowering): stderr: line 1: old `error[E1202]: an analog block --emit-rtlil does not lower`, new `error[E1100]: digital source execution failed: §12.2.1: a defparam inside `somename[0]` cannot change a parameter outside the generate block instance or array `
 verilog/12_hierarchy/no_top_level_module_rejected.v rw-dlower (digital lowering): stdout: line 1: old `autoidx 1`, new `` [comp.xfail: rw-dlower (digital lowering)]
 verilog/12_hierarchy/self_instantiation_rejected.v rw-dlower (digital lowering): stdout: line 1: old `autoidx 1`, new `` [comp.xfail: rw-dlower (digital lowering)]
 verilog/13_configuration/cell_not_in_its_library_rejected.v not built: backend libmap [comp.xfail: not built]

@@ -18,7 +18,9 @@
 //! - `pub fn compare(arena: Allocator, old: Run, new: Run, digital: bool) !?[]const u8`
 //! - `pub fn notBuilt(arena: Allocator, new: Run) !?[]const u8`
 //! - `pub fn buildFailed(new: Run) ?[]const u8`
-//! - `pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool) ![]const u8`
+//! - `pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool, rel: []const u8) ![]const u8`
+//! - `pub fn withoutRemarks(arena: Allocator, text: []const u8, rel: []const u8) ![]const u8`
+//! - `pub fn remarkTiebreak(arena: Allocator, old: Run, new: Run, rel: []const u8) !?[]const u8`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -142,14 +144,16 @@ pub fn compare(arena: Allocator, old: Run, new: Run, digital: bool) !?[]const u8
 /// The agent and stage a disagreement belongs to: of the diagnostic codes
 /// one stream has and the other lacks, the earliest stage's decides; with the same codes,
 /// the driver's own text (a location, a plain line) is the spine's, and a
-/// different transcript or status the lowering's.
-pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool) ![]const u8 {
+/// different transcript or status the lowering's. `rel` is the fixture's
+/// path, the anchor `withoutRemarks` strips the old native codegen's build
+/// remarks by.
+pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool, rel: []const u8) ![]const u8 {
     const a = try codes(arena, old.stderr);
     const b = try codes(arena, new.stderr);
     if (try earliestUnmatched(arena, a, b)) |c| return if (c.run) runOwner(digital) else ownerOf(c.code, digital);
     // The old native codegen's build remarks (`note: ... 4-state: ...`),
     // which the interpreted executable has no counterpart of.
-    if (old.status == new.status and std.mem.eql(u8, try withoutNotes(arena, old.stderr), new.stderr) and std.mem.eql(u8, old.stdout, new.stdout)) return "digital_exe (build remarks)";
+    if (old.status == new.status and std.mem.eql(u8, try withoutRemarks(arena, old.stderr, rel), new.stderr) and std.mem.eql(u8, old.stdout, new.stdout)) return "digital_exe (build remarks)";
     if (std.mem.find(u8, new.stderr, "codegen refused") != null or std.mem.find(u8, new.stderr, "does not compile") != null) return "rw-codegen (codegen)";
     // A testbench transcript with lines missing and nothing else changed:
     // the device's §9.4 display phase (`$strobe`), which the Zig device
@@ -162,6 +166,45 @@ pub fn owner(arena: Allocator, old: Run, new: Run, digital: bool) ![]const u8 {
         return try std.fmt.allocPrint(arena, "{s} {s}", .{ ownerOf(c, digital), part(old.stderr, new.stderr) });
     }
     return if (digital) "rw-dlower (digital lowering)" else "rw-lower (analog lowering)";
+}
+
+/// `text` without its lines that are one of the old native codegen's build
+/// remarks about fixture `rel`: `note: <rel>: ` followed by one of its three
+/// known shapes (digital_exe.rulings' clause `build remark:`, §2 of
+/// research/vbackends.md). Narrower than the old `withoutNotes` (which
+/// stripped every `note: ` line): an unrelated `note:`, or a remark-shaped
+/// line naming a different fixture, stays, so a planted behaviour
+/// difference beside a remark still shows.
+pub fn withoutRemarks(arena: Allocator, text: []const u8, rel: []const u8) ![]const u8 {
+    const anchor = try std.fmt.allocPrint(arena, "note: {s}: ", .{rel});
+    var out: std.ArrayList(u8) = .empty;
+    var it = std.mem.splitScalar(u8, text, '\n');
+    var first = true;
+    while (it.next()) |line| {
+        if (isRemark(line, anchor)) continue;
+        if (!first) try out.append(arena, '\n');
+        first = false;
+        try out.appendSlice(arena, line);
+    }
+    return out.items;
+}
+
+/// digital_exe.rulings' clause `build remark:` (T1, research/vbackends.md
+/// §2): holds when `old` and `new` agree on exit status and every file, and
+/// on stderr except the old native codegen's own build remarks about `rel`
+/// (`withoutRemarks`). Null when it holds, else why not. The stdout check
+/// against the fixture's own transcript is the caller's: only it knows the
+/// fixture root and whether a `.expected.txt` gold exists.
+pub fn remarkTiebreak(arena: Allocator, old: Run, new: Run, rel: []const u8) !?[]const u8 {
+    if (old.status != new.status) return try std.fmt.allocPrint(arena, "exit status old {d}, new {d}", .{ old.status, new.status });
+    if (old.files.len != new.files.len) return try std.fmt.allocPrint(arena, "the runs wrote {d} and {d} files", .{ old.files.len, new.files.len });
+    for (old.files, new.files) |a, b| {
+        if (!std.mem.eql(u8, a.path, b.path)) return try std.fmt.allocPrint(arena, "the runs wrote `{s}` and `{s}`", .{ a.path, b.path });
+        if (!std.mem.eql(u8, undated(a.bytes), undated(b.bytes))) return try std.fmt.allocPrint(arena, "file `{s}`: {s}", .{ a.path, try firstDiff(arena, a.bytes, b.bytes) });
+    }
+    const without = try withoutRemarks(arena, old.stderr, rel);
+    if (!std.mem.eql(u8, without, new.stderr)) return try std.fmt.allocPrint(arena, "stderr differs beyond the build remarks: {s}", .{try firstDiff(arena, without, new.stderr)});
+    return null;
 }
 
 // ---- private ----
@@ -245,19 +288,14 @@ fn earliestUnmatched(arena: Allocator, a: []const Seen, b: []const Seen) !?Seen 
     return best;
 }
 
-/// `text` without its lines that open with `note: ` (the owner of a
-/// difference that is only those).
-fn withoutNotes(arena: Allocator, text: []const u8) ![]const u8 {
-    var out: std.ArrayList(u8) = .empty;
-    var it = std.mem.splitScalar(u8, text, '\n');
-    var first = true;
-    while (it.next()) |line| {
-        if (std.mem.startsWith(u8, line, "note: ")) continue;
-        if (!first) try out.append(arena, '\n');
-        first = false;
-        try out.appendSlice(arena, line);
-    }
-    return out.items;
+/// Whether `line` is one of the old native codegen's three remark shapes,
+/// anchored on `anchor` (`note: <rel>: `).
+fn isRemark(line: []const u8, anchor: []const u8) bool {
+    if (!std.mem.startsWith(u8, line, anchor)) return false;
+    const rest = line[anchor.len..];
+    return std.mem.startsWith(u8, rest, "2-state once a time step begins") or
+        std.mem.startsWith(u8, rest, "4-state: ") or
+        std.mem.startsWith(u8, rest, "not native (");
 }
 
 /// Whether `b` differs from `a` only by transcript lines `a` has and `b`
@@ -437,7 +475,7 @@ test "owner: matching blocks with a different transcript are the run's (J0)" {
     const block = "warning[W0650]: x\n --> a.va:1:1\n\n";
     const old: Run = .{ .status = 0, .stdout = "", .stderr = block ++ "=== t ===\n1\n", .files = &.{} };
     const new: Run = .{ .status = 0, .stdout = "", .stderr = block ++ "=== t ===\n2\n", .files = &.{} };
-    try std.testing.expectEqualStrings("rw-codegen (run)", try owner(arena.allocator(), old, new, false));
+    try std.testing.expectEqualStrings("rw-codegen (run)", try owner(arena.allocator(), old, new, false, "a.va"));
 }
 
 test "owner: W0650 presence alone names no stage (J1); a code after the banner is the run's (J3)" {
@@ -445,7 +483,49 @@ test "owner: W0650 presence alone names no stage (J1); a code after the banner i
     defer arena.deinit();
     const old: Run = .{ .status = 1, .stdout = "", .stderr = "warning[W0650]: x\n\n=== t ===\nerror[E0601]: y\n\n", .files = &.{} };
     const new: Run = .{ .status = 0, .stdout = "", .stderr = "=== t ===\n", .files = &.{} };
-    try std.testing.expectEqualStrings("rw-codegen (run)", try owner(arena.allocator(), old, new, false));
+    try std.testing.expectEqualStrings("rw-codegen (run)", try owner(arena.allocator(), old, new, false, "a.va"));
+}
+
+test "owner: a build-remark-only difference is tagged digital_exe (build remarks) (T1)" {
+    var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena.deinit();
+    const old: Run = .{ .status = 0, .stdout = "1\n", .stderr = "note: a.v: 4-state: nothing delays\n", .files = &.{} };
+    const new: Run = .{ .status = 0, .stdout = "1\n", .stderr = "", .files = &.{} };
+    try std.testing.expectEqualStrings("digital_exe (build remarks)", try owner(arena.allocator(), old, new, true, "a.v"));
+}
+
+test "withoutRemarks: the three shapes strip, an unrelated note and another fixture's remark do not (T1)" {
+    var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    try std.testing.expectEqualStrings("", try withoutRemarks(a, "note: a.v: 4-state: nothing delays, so the run never leaves time 0", "a.v"));
+    try std.testing.expectEqualStrings("", try withoutRemarks(a, "note: a.v: 2-state once a time step begins with no live x or z; 4-state until then", "a.v"));
+    try std.testing.expectEqualStrings("", try withoutRemarks(a, "note: a.v: not native (a §15 timing check)", "a.v"));
+    // An unrelated note stays: narrower than the old withoutNotes, which
+    // stripped every `note: ` line.
+    try std.testing.expectEqualStrings("note: unrelated to the remark\n", try withoutRemarks(a, "note: unrelated to the remark\n", "a.v"));
+    // A remark-shaped line naming a different fixture stays too.
+    try std.testing.expectEqualStrings("note: b.v: 4-state: nothing delays", try withoutRemarks(a, "note: b.v: 4-state: nothing delays", "a.v"));
+}
+
+test "remarkTiebreak: holds only when status, files and stderr but the remark agree (T1)" {
+    var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const base_old: Run = .{ .status = 0, .stdout = "1\n", .stderr = "note: a.v: 4-state: nothing delays, so the run never leaves time 0", .files = &.{} };
+    const matching_new: Run = .{ .status = 0, .stdout = "1\n", .stderr = "", .files = &.{} };
+    try std.testing.expectEqual(null, try remarkTiebreak(a, base_old, matching_new, "a.v"));
+    // Red first: a planted behaviour difference beside the remark (an extra
+    // stderr line the old side never had) must still fail the ruling.
+    const planted: Run = .{ .status = 0, .stdout = "1\n", .stderr = "note: x\n", .files = &.{} };
+    try std.testing.expect((try remarkTiebreak(a, base_old, planted, "a.v")) != null);
+    // A status difference fails, even beside the remark.
+    const bad_status: Run = .{ .status = 1, .stdout = "1\n", .stderr = "", .files = &.{} };
+    try std.testing.expect((try remarkTiebreak(a, base_old, bad_status, "a.v")) != null);
+    // A file difference fails.
+    const old_f: Run = .{ .status = 0, .stdout = "", .stderr = "", .files = &.{.{ .path = "x", .bytes = "1" }} };
+    const new_f: Run = .{ .status = 0, .stdout = "", .stderr = "", .files = &.{.{ .path = "x", .bytes = "2" }} };
+    try std.testing.expect((try remarkTiebreak(a, old_f, new_f, "a.v")) != null);
 }
 
 test "buildFailed: the engine-bug marker is a failure, a clean run and a design refusal are not" {

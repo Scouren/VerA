@@ -441,8 +441,12 @@ fn takeSwitch(cli: *Cli, gpa: Allocator, s: Switch, arg: []const u8, args: anyty
         .zig => cli.zig_exe = try pathValue(args, err, arg, "a path") orelse return 2,
         .negative_timing => cli.negative_timing = true,
         .two_state => {
-            cli.logic = .two;
-            cli.logic_flag = arg;
+            // Q2 (research/vbackends.md): the .v executable is IEEE 1364
+            // §4.1 4-state throughout, with no 2-state mode to honour;
+            // refuse rather than silently run 4-state (compiler-construction
+            // rule 6, Zig mirror: `fatal("unrecognized parameter")`).
+            try err.print("error: `{s}`: the .v executable is IEEE 1364 §4.1 4-state; it has no 2-state mode\n", .{arg});
+            return 2;
         },
         .out => {
             cli.out_path = try pathValue(args, err, arg, "a path") orelse return 2;
@@ -496,8 +500,14 @@ fn takeValued(cli: *Cli, v: Valued, arg: []const u8, value: []const u8, err: *Io
             return 2;
         },
         .state => {
-            cli.logic = if (std.mem.eql(u8, value, "auto")) .auto else if (std.mem.eql(u8, value, "2")) .two else if (std.mem.eql(u8, value, "4")) .four else {
-                try err.print("error: `{s}`: not auto|2|4\n", .{arg});
+            // Q2 (research/vbackends.md): `2` asks for a mode the .v
+            // executable does not have (IEEE 1364 §4.1 4-state throughout);
+            // refuse it by name rather than folding it into "not auto|4".
+            cli.logic = if (std.mem.eql(u8, value, "auto")) .auto else if (std.mem.eql(u8, value, "4")) .four else if (std.mem.eql(u8, value, "2")) {
+                try err.print("error: `{s}`: the .v executable is IEEE 1364 §4.1 4-state; it has no 2-state mode\n", .{arg});
+                return 2;
+            } else {
+                try err.print("error: `{s}`: not auto|4\n", .{arg});
                 return 2;
             };
             cli.logic_flag = arg;
@@ -625,6 +635,35 @@ test "the old driver's command lines settle to their targets" {
         try std.testing.expectEqual(c.target, cfg.target);
         try std.testing.expectEqual(c.check, cfg.check);
         try std.testing.expectEqual(@as(u32, 4), cfg.thread_limit);
+    }
+}
+
+test "--state=2 and --two-state are refused: the .v executable has no 2-state mode (Q2, research/vbackends.md)" {
+    // Oracle: the decision in research/vbackends.md Q2 — refuse rather than
+    // silently run 4-state (an operating error returns to the caller, a
+    // wrong answer with no crash is not acceptable). Red before the fix:
+    // today both parse clean (`.logic = .two`, no refusal).
+    const gpa = std.testing.allocator;
+    for ([_][]const u8{ "--state=2", "--two-state" }) |flag| {
+        var cli: Options = .{};
+        defer cli.deinit(gpa);
+        var it: TestArgv = .{ .items = &.{ flag, "a.v" } };
+        var out: Io.Writer.Allocating = .init(gpa);
+        defer out.deinit();
+        var err: Io.Writer.Allocating = .init(gpa);
+        defer err.deinit();
+        try std.testing.expectEqual(@as(?u8, 2), try parse(&cli, gpa, &it, &out.writer, &err.writer));
+        const want = try std.fmt.allocPrint(gpa, "error: `{s}`: the .v executable is IEEE 1364 §4.1 4-state; it has no 2-state mode\n", .{flag});
+        defer gpa.free(want);
+        try std.testing.expectEqualStrings(want, err.written());
+    }
+    // --state=auto, --state=4 and --schedule=static|fifo still parse clean.
+    for ([_][]const u8{ "--state=auto", "--state=4", "--schedule=static", "--schedule=fifo" }) |flag| {
+        var cli: Options = .{};
+        defer cli.deinit(gpa);
+        var it: TestArgv = .{ .items = &.{ flag, "a.v" } };
+        var discard: Io.Writer.Discarding = .init(&.{});
+        try std.testing.expectEqual(@as(?u8, null), try parse(&cli, gpa, &it, &discard.writer, &discard.writer));
     }
 }
 

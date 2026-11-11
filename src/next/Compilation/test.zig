@@ -232,7 +232,10 @@ test "W0650's probe culprit names the node, through probe_names" {
     // `Float.Input.probe_names`, which `air_passes.run` fills from
     // `Air.Device.nodeName`; `--unknown-bound=inf` forces the probe past
     // `Float.default_unknown_bound` so a bare probe (no parameter in the
-    // expression to blame instead) is the one unbounded leaf.
+    // expression to blame instead) is the one unbounded leaf. `V(p)`
+    // (ground-relative, one argument) gives one probe; `V(p, n)` lowers to
+    // `fsub(probe(p), probe(n))` and `unboundedLeaf`'s stack pops the rhs
+    // first, so a two-terminal probe would name `n`, not `p`.
     const gpa = std.testing.allocator;
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
@@ -243,7 +246,7 @@ test "W0650's probe culprit names the node, through probe_names" {
         \\module m(p, n);
         \\  inout p, n;
         \\  electrical p, n;
-        \\  analog I(p, n) <+ V(p, n);
+        \\  analog I(p, n) <+ V(p);
         \\endmodule
         \\
     ;

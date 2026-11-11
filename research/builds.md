@@ -398,12 +398,12 @@ The argument removes the hash entirely, so test runs also hit across worktrees; 
 is shorter to write but must track what `nix develop` exports.
 Recommendation: the argument for `testRun`; the removal helper for the few steps that need a
 real variable.
-Decision:
+Decision: as recommended (user, 2026-11-11).
 
 **Q2. Where does `diff-codegen`'s library cache live, and who collects it?**
 Recommendation: under the per-store-path global cache (`<ZIG_GLOBAL_CACHE_DIR>/vera-codegen`),
 so a Zig bump starts clean and checkouts share it; R6's collector owns it.
-Decision:
+Decision: as recommended (user, 2026-11-11).
 
 **Q3. Should `diff-codegen` ever build a device below ReleaseFast/LLVM?** The giant builds in
 18.8 s Debug against 1213 s ReleaseFast. The oracle compares devices as users build them, and
@@ -412,7 +412,7 @@ go untested.
 Recommendation: no; keep ReleaseFast everywhere, let R2 make the giant a once-per-change cost and
 the codegen plan fix its size. Revisit only with one full run built both ways and compared bit
 for bit.
-Decision:
+Decision: as recommended (user, 2026-11-11).
 
 **Q4. The shared `.zig-cache` symlink: keep it, or give light steps a private local cache?**
 Shared saves a fresh worktree's first builds (about 10 s for `check`; corpus binaries more) but
@@ -421,28 +421,28 @@ ping-pongs between branches (4.8-8.6 s per alternation of `check`) and grows wit
 Recommendation: R5 first (it is what makes the shared cache hit at all); then try a private
 `--cache-dir` for light steps in `tools/build-slot.sh` for one day, counting reruns per no-op
 call both ways, and decide on the count.
-Decision:
+Decision: as recommended (user, 2026-11-11). R6's collector must never leave a manifest that hits on a deleted `o/` entry: the pinned build runner populates paths from the hit digest without checking they exist (`lib/compiler/Maker/Step/Run.zig:571`), and a manifest does not name its output dir. On 2026-11-11 every `o/` entry was under a day old (the dir was created 2026-11-10 16:28), so an age trim had nothing to take; the lead held the trim the user approved until R6 exists.
 
 **Q5. Change AGENTS.md's edit loop to per-module `check-<module>` watches (R4)?**
 Recommendation: yes; the full `check` watch is the one practice that can run the machine out of
 memory by itself.
-Decision:
+Decision: as recommended (user, 2026-11-11). The AGENTS.md edit-loop text changes with R4.
 
 **Q6. A third build slot?**
 Recommendation: not yet. Outside giant-device batches the sampled corpus steps stayed under 1 GB,
 but the window was four minutes and missed the test-binary compile phases. Land R2, R3 and R4,
 sample a day of peaks, then decide.
-Decision:
+Decision: as recommended (user, 2026-11-11).
 
 **Q7. Split `tests/unit.zig` (the longest `check` root, 5.8 s, every module) into per-namespace
 roots?**
 Recommendation: no for now. The merged root is AGENTS.md's design; with R4 nobody watches it, and
 the plain `check` runs its roots in parallel anyway. Revisit if `check`'s wall after an edit
 matters once R1 to R5 are in.
-Decision:
+Decision: as recommended (user, 2026-11-11).
 
 **Q8. Drop `-fincremental` from `link`'s one-shot children (R7), leaving the frozen
 `zigbuild` as it is?**
 Recommendation: yes; the flag buys nothing in a one-shot child and brings the miscompilation
 class into device builds.
-Decision:
+Decision: as recommended (user, 2026-11-11).

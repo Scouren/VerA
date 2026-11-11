@@ -662,3 +662,10 @@ Each emitted Instance/State struct keeps the existing `comptime assert(@sizeOf(.
   **Superseded:** `research/conversion.md` (Q1, user: W) replaces the rule above: round, then
   the low 32 bits at any magnitude (1e300 -> 0). Its sites C1-C7 are the task; it runs after
   w4-derive, w4-clog2 and w4-gompute merge (it touches eval.zig, derive, lib/std/kernels).
+- **T40 — held-history cells unroll into scalar fields (build cost, from `research/builds.md` R3).**
+  `vera_timepoint_held_history.va`'s device is 9.7 MB with a 51,000-line `core`: each held-history
+  cell is its own `Instance` field and its own straight-line code. Its 35-device library took
+  1213 s and 4.93 GB of a diff-codegen run whose other 34 devices build in 1.7-2.5 s. Emit a
+  history as an array (`[n]f64`) indexed in a loop, so the function's size no longer grows with
+  `n`. Oracle: diff-codegen bit for bit on that fixture and every held-history fixture; the
+  device's byte size and its batch's build ms (R3's timing line) before and after.

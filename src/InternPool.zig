@@ -349,13 +349,19 @@ pub fn typeOf(ip: *const InternPool, index: Index) Index {
 
 /// Returns the `String` of `bytes`, interning them on first sight; `""` is
 /// `.empty`. Bytes may hold NUL. Invalidates every slice `stringToSlice`
-/// returned. Asserts that `bytes` is shorter than 4 GiB.
+/// returned. Asserts that `bytes` is shorter than 4 GiB. When `bytes` is not
+/// already interned, asserts it is not a `stringToSlice` result either
+/// (copy it first): `ensureUnusedCapacity` below may then grow
+/// `string_bytes` and free or move the allocation `bytes` points into. A
+/// `bytes` that is already interned (the common re-lookup case) returns
+/// before that append ever runs, so aliasing it is harmless.
 pub fn getString(ip: *InternPool, gpa: Allocator, bytes: []const u8) Allocator.Error!String {
     assert(bytes.len < std.math.maxInt(u32));
     if (bytes.len == 0) return .empty;
     const adapter: StringAdapter = .{ .bytes = ip.string_bytes.items };
     const gop = try ip.string_table.getOrPutAdapted(gpa, bytes, adapter);
     if (gop.found_existing) return gop.key_ptr.*;
+    assert(!aliases(ip, bytes));
     errdefer ip.string_table.swapRemoveAt(gop.index);
     const at: u32 = @intCast(ip.string_bytes.items.len);
     try ip.string_bytes.ensureUnusedCapacity(gpa, 4 + bytes.len + 1);
@@ -457,6 +463,19 @@ fn assertKey(ip: *const InternPool, key: Key) void {
 
 fn assertString(ip: *const InternPool, s: String) void {
     assert(@backingInt(s) + 5 <= ip.string_bytes.items.len);
+}
+
+/// Returns whether `bytes` overlaps `string_bytes`'s backing allocation: a
+/// `stringToSlice` result fed back into `getString` without copying it.
+fn aliases(ip: *const InternPool, bytes: []const u8) bool {
+    if (bytes.len == 0) return false;
+    const pool = ip.string_bytes.allocatedSlice();
+    if (pool.len == 0) return false;
+    const pool_start = @intFromPtr(pool.ptr);
+    const pool_end = pool_start + pool.len;
+    const bytes_start = @intFromPtr(bytes.ptr);
+    const bytes_end = bytes_start + bytes.len;
+    return bytes_start < pool_end and pool_start < bytes_end;
 }
 
 fn isType(ip: *const InternPool, index: Index) bool {

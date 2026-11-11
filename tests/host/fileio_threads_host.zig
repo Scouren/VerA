@@ -16,6 +16,7 @@
 const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
+const field_use_check = @import("field_use_check.zig");
 
 const n_u = @typeInfo(D.U).@"enum".field_names.len;
 const S = contract.RefFamily(f64, &@as([n_u]u8, @splat(contract.no_lane)), .{});
@@ -122,6 +123,16 @@ test "two instances phase by phase on one thread: each file is its solo bytes, e
         const t = contract.fileIo(D, &r.inst).?;
         try std.testing.expectEqual(fd3 + 1, t.open(t.ctx, tmpPath(&pc, &tmp, name), "w", false));
     }
+}
+
+test "field_use (#134): clear bits perturb nothing in eval" {
+    var tmp2 = std.testing.tmpDir(.{});
+    defer tmp2.cleanup();
+    var pd: [256]u8 = undefined;
+    var d: Inst = .init(1, tmpPath(&pd, &tmp2, "d.txt"));
+    defer D.deinitInstance(&d.inst);
+    d.run();
+    try field_use_check.checkClearBits(S, D, &x0, &d.model, d.inst, d.sim());
 }
 
 test "two instances on two threads: each file is its solo bytes" {

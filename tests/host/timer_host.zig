@@ -25,6 +25,7 @@
 const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
+const field_use_check = @import("field_use_check.zig");
 const n_u = @typeInfo(D.U).@"enum".field_names.len;
 const S = contract.RefFamily(f64, &@as([n_u]u8, @splat(contract.no_lane)), .{});
 const fixed = @hasDecl(D, "nextBreakpoint");
@@ -322,6 +323,13 @@ const case_11 = struct {
 comptime {
     if (!(!@hasField(D.U, "calls"))) _ = case_12;
 }
+test "field_use (#134): clear bits perturb nothing in eval (every timer variant)" {
+    var r = Run.init(.{});
+    const x: [n_u]f64 = @splat(0.0);
+    const sim: contract.SimState = .{ .t = 0, .dt = 0, .kind = .dc, .initial_step = true, .analog_initial = true };
+    try field_use_check.checkClearBits(S, D, &x, &r.model, r.inst, sim);
+}
+
 const case_12 = struct {
     test "§4.7.2.3/.4 final timer controls do not repeat output or inout effects, including retries" {
         var r = Run.init(.{});

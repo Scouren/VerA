@@ -10,6 +10,7 @@
 const std = @import("std");
 const contract = @import("contract");
 const D = @import("device");
+const field_use_check = @import("field_use_check.zig");
 
 const n_u = @typeInfo(D.U).@"enum".field_names.len;
 /// Every unknown in a lane, so a zeroed row is checked in its derivatives too.
@@ -162,4 +163,13 @@ test "the *const Instance entries compile and run beside a status site" {
     try std.testing.expectEqual(@as(f64, 4e-21), psd[0].white);
     const ac = D.acStim(S0, x(0.5), &m, ci, sim(false));
     try std.testing.expectEqual(@as(usize, 1), ac.len);
+}
+
+test "field_use (#134): clear bits perturb nothing in eval (no status latched)" {
+    var m: D.Model = .{};
+    m.mode = 1;
+    var inst0: D.Instance = .{};
+    _ = start(&m, &inst0);
+    const xv = x(0.5);
+    try field_use_check.checkClearBits(S0, D, &xv, &m, inst0, sim(false));
 }

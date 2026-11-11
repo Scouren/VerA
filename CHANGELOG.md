@@ -12,6 +12,7 @@
   of calling the device again. Both are text scans over the whole rendered
   device, `sim_reads`' own technique; `limit_sim_reads` is not
   `contract.limitReads`, the pre-existing unknown mask (#134).
+
 ## v0.23.0 — 2026-11-02
 
 On Suite VAMS-CONFORMANCE, we score Verilog-A 2452/2452, Verilog 3611/3611, Verilog-AMS 755/755, Cumulative: 6818/6818.

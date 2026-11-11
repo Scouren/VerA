@@ -551,7 +551,12 @@ Departures:
 
 - **Q7.** `lib/contract/gm` (1,906 lines) is still `RefOptions.math`'s default; deleting it makes the installed contract depend on Gompute
   Recommendation: keep gm through 0.30.0; move the default to `std_kernels.math` in a contract change agreed with ESPice
-  Decision: Keep gm through 0.30.0; move the default in a contract change agreed with ESPice.
+  Decision (revised by the user, 2026-11-11): consume Gompute, write no math of our own. `gm` and
+  `gm/` are deleted and `RefOptions.math` defaults to Gompute's `math` now, not at 0.30.0; the
+  installed contract depends on the pinned Gompute (ESPice resolves the same pin). The four
+  functions VerA still writes in `lib/std/kernels/math.zig` (`asinh`, `acosh`, `atanh`, `atan2`)
+  move upstream into Gompute and VerA's copies go with the bump. Oracle: diff-kernels' f128
+  reference and `gm`'s corpus, each difference bounded by Gompute's documented ulps.
 
 - **Q8.** E1100 wording table (`src/next/Compilation/legacy.zig`) keeps old codes on the 1364 route
   Recommendation: keep at the switch (byte-identical); dropping it means editing the suite (user's repo), user's call after

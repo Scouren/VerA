@@ -93,7 +93,7 @@ pub fn parseFunction(p: *Parse) Error!Node.Index {
             break;
         }
         const before = p.tok_i;
-        const item = switch (t) {
+        const parsed = switch (t) {
             .keyword_input, .keyword_output, .keyword_inout => port: {
                 if (input_only and t != .keyword_input) try p.warnSite(.invalid_port_declaration, .function_input_only, p.tok_i, 0);
                 break :port decl.parsePortDecl(p, body);
@@ -102,14 +102,22 @@ pub fn parseFunction(p: *Parse) Error!Node.Index {
             // A.2.6's analog_function_item_declaration has no `reg` or event.
             .keyword_reg, .keyword_event => if (analog) stmt.parseStmtIn(p, .analog) else decl.parseBlockDecl(p),
             else => stmt.parseStmtIn(p, if (analog) .analog else .null_ok),
-        } catch |e| switch (e) {
-            error.OutOfMemory => return e,
-            error.ParseError => {
-                p.recoverItem(before);
-                continue;
-            },
         };
-        try p.push(item);
+        // A `task` and a digital (1364) `function` take the old parser's
+        // `parseSubroutine`, which catches nothing here: a bad item
+        // propagates to the module-item loop's own `recoverItem`, same as
+        // every other module item. An AMS `function` (analog or not) takes
+        // `parseFuncDecl`, which catches a bad item right here and resumes
+        // the next one in this same loop (one error per bad item, not one
+        // for every item its absence then strands as a module item).
+        if (task or outer) {
+            try p.push(try parsed);
+        } else if (parsed) |item| {
+            try p.push(item);
+        } else |e| switch (e) {
+            error.OutOfMemory => return e,
+            error.ParseError => p.recoverItem(before),
+        }
         assert(p.tok_i > before);
     }
     // A task may close with `endfunction` too, as the old parser read it.

@@ -390,6 +390,22 @@ test "a parse keeps every error and goes on: one per bad item" {
     try testing.expectEqual(2, tree.rootDecls().len);
 }
 
+test "a bad item inside an analog function recovers item by item, not by abandoning to `endfunction` (G7)" {
+    // Oracle: verilog-ams/annex_a_syntax/reject_A_2_8_reg_in_analog_function.va
+    // (A.2.6/A.2.8: `reg` is not an analog_block_item_declaration). The old
+    // parser's `parseFuncDecl` catches a bad item right there, skips to its
+    // `;` and keeps reading items in the same function body (one E0209, and
+    // `f = x;` then parses as the next, ordinary statement); only a `task`
+    // or a digital `function` (the old `parseSubroutine`, which catches
+    // nothing) leaves a bad item to strand everything after it as module
+    // items once it propagates.
+    var tree = try Ast.parse(testing.allocator, "module m; real y; analog function real f; input x; real x; reg r; f = x; endfunction analog y = f(1); endmodule", .{});
+    defer tree.deinit(testing.allocator);
+    try testing.expectEqual(1, tree.errors.len);
+    try testing.expectEqual(.expected_expr, tree.errors[0].tag);
+    try testing.expectEqual(1, tree.rootDecls().len);
+}
+
 test "nesting is capped at `Parse.max_depth` with its own error, on a 256 MiB worker stack" {
     var result: anyerror!void = {};
     const t = try std.Thread.spawn(.{ .stack_size = 256 << 20 }, deep, .{&result});

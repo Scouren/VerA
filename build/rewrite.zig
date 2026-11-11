@@ -55,6 +55,14 @@ pub fn add(g: Graph) void {
     o.addOption([]const u8, "codegen_filter", b.option([]const u8, "codegen-filter", "diff-codegen: only the fixtures whose path holds one of these `|`-separated substrings") orelse "");
     o.addOption(bool, "codegen_keep", b.option(bool, "codegen-keep", "diff-codegen: keep the built devices under zig-out/codegen-work") orelse false);
     o.addOption(bool, "codegen_why", b.option(bool, "codegen-why", "diff-codegen: print why each fixture codegen.xfail names still differs") orelse false);
+    // R2, research/builds.md: a directory per Zig store path (the flake's
+    // `ZIG_GLOBAL_CACHE_DIR`), not this worktree's, so unlike the R5 fields
+    // above this one is safe to compile in: every worktree on that store
+    // path gets the same string and so the same cache key. Null (the
+    // variable unset, outside `nix develop`) leaves every batch uncached,
+    // today's behaviour.
+    const default_codegen_cache = if (b.graph.environ_map.get("ZIG_GLOBAL_CACHE_DIR")) |dir| b.fmt("{s}/vera-codegen", .{dir}) else null;
+    o.addOption(?[]const u8, "codegen_cache", b.option([]const u8, "codegen-cache", "diff-codegen: the built libraries' cache directory (default $ZIG_GLOBAL_CACHE_DIR/vera-codegen)") orelse default_codegen_cache);
     // diff-codegen builds devices that import std_kernels, which imports Gompute's math.
     o.addOptionPath("gompute_math", b.dependency("gompute", .{}).module("math").root_source_file.?);
     // `libc`: the root loads libraries (`dynlib` needs glibc on Linux).

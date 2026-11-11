@@ -74,7 +74,8 @@ pub fn resolve(s: *Sema, file: Zcu.File.Index, src: Inst.Ref, target: InternPool
         try resolveOomrs(s, &env, vir, decl.body);
         try walk.applyGivens(s, &env, file, src, list.items[run.start..][0..run.len], false, decl.name);
         try defparam.applyDefparams(s, &env, level_dps, decl.name);
-        env.hier = try walk.hierValues(s, &env, if (base) |*b| b else parent, list.items[run.start..][0..run.len], level_dps, file, src);
+        // D2-J is unplanned at a paramset level: no instance exists yet to key a row on.
+        env.hier = try walk.hierValues(s, &env, if (base) |*b| b else parent, list.items[run.start..][0..run.len], level_dps, file, src, null);
         base = env.hier;
         // The first level's own parameters, kept for the instance's rows.
         if (own == .none) {

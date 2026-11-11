@@ -81,6 +81,7 @@ const Lowering = struct {
                 then_b.analog_initial = true;
                 then_b.conditional += 1;
                 try control.body(s, &then_b, payloadOf(vir, Inst.Process, i).body);
+                try errorGuard(s, &then_b);
                 var else_b = b.child();
                 try control.ifElse(s, &b, flag, &then_b, &else_b);
                 try main.insts.appendSlice(s.arena, b.insts.items);
@@ -118,14 +119,16 @@ pub fn run(s: *Sema) Allocator.Error![]const Air.Inst.Index {
     for (s.units.items) |*u| try @import("func.zig").checkRecursion(s, u);
     try net.pullDrives(s);
     var main: Block = .{ .parent = null, .unit = &s.units.items[0] };
-    // The old flattener's order (`elab/instance.zig` inlineInstance,
-    // `Flatten.run`): each placed instance's blocks as the walk reaches it,
-    // in preorder; the top's after every child's (§5.4.2.2: a parent reads
-    // a child's flow after its contribution); then any unit no statement
-    // places (an inserted connect module), in preorder.
+    // (D2-I) §5.4.2.2 a parent reads a child's flow after its contribution,
+    // and an inserted connect module's upper connection can be the top's own
+    // net (§7.8.2's merged node): every placed instance lowers in source
+    // order (unchanged: `units`'s depth-first preorder), then every inserted
+    // connect instance (`instances.src == .none`) in insertion order (the
+    // same table order, restricted to them, already groups a parent's
+    // bridges together), then the top lowers last.
     for (s.units.items[1..]) |*u| if (zcu.instances.items(.src)[@backingInt(u.instance)] != .none) try lowerUnit(s, &main, u, 0);
+    for (s.units.items) |*u| if (!u.lowered and u.instance != s.units.items[0].instance) try lowerUnit(s, &main, u, 0);
     try lowerUnit(s, &main, &s.units.items[0], 0);
-    for (s.units.items) |*u| if (!u.lowered) try lowerUnit(s, &main, u, 0);
     try syscall.finishDisplays(s, &main);
     try @import("probe.zig").checkProbes(s);
     // §5.4.2 a potential or indirect row's branch current, wherever
@@ -378,6 +381,26 @@ fn units(s: *Sema) Allocator.Error!void {
             .prefix = prefix,
         });
     }
+}
+
+/// §9.7.3 (D2-L): right after an `analog initial` body, inside its own
+/// `analog$initial` guard, a second guard on `s.init_error` (set by that
+/// same body's own `$error`, `syscall.zig`'s `markInitError`) mints a
+/// `$fatal`: the message already printed, so this only stops the run past
+/// initialization. A design with no `$error` in any `analog initial` body
+/// never sets `s.init_error`, so this is a no-op and pays for nothing.
+/// `syscall.task` is not called: there is no Vir instruction here for its
+/// diagnostics to point at, so its `device.displays` row is appended
+/// directly, the same shape `task` gives any other display task.
+fn errorGuard(s: *Sema, b: *Block) Allocator.Error!void {
+    if (s.init_error == .none) return;
+    const flag = try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = s.init_error } });
+    var then_b = b.child();
+    then_b.conditional += 1;
+    const call = try @import("expr.zig").call(s, &then_b, @backingInt(vams.SysFn.Tag.@"$fatal"), null, &.{});
+    try s.device.displays.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, "$fatal"), .call = call.toIndex().?, .file = .empty, .line = 0 });
+    var else_b = b.child();
+    try control.ifElse(s, b, flag, &then_b, &else_b);
 }
 
 /// Lowers `u`'s own analog blocks into `main` (its children's are lowered

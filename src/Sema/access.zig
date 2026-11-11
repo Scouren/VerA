@@ -94,13 +94,13 @@ pub fn access(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src
                     return expr.poison;
                 }
                 const slot = s.device.contributions.items(.resist)[@backingInt(row)];
-                const v = try mfactor.scaled(s, b, try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot) } }), mfactor.mfactorOf(s, b.unit), true);
+                const v = try mfactor.scaled(s, b, try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot) } }), try mfactor.mfactorRef(s, b, b.unit), true);
                 return .{ .ref = if (t.neg) try expr.unOp(s, b, .fneg, v) else v, .ty = .real };
             };
             // §6.3.6 "The value returned by any branch flow probe ... shall
             // be divided by $mfactor".
             const u = try flowUnknown(s, b.unit, t.hi, t.lo);
-            const v = try mfactor.scaled(s, b, try probe(s, u), mfactor.mfactorOf(s, b.unit), true);
+            const v = try mfactor.scaled(s, b, try probe(s, u), try mfactor.mfactorRef(s, b, b.unit), true);
             return .{ .ref = if (t.neg) try expr.unOp(s, b, .fneg, v) else v, .ty = .real };
         },
     }

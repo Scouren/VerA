@@ -20,7 +20,7 @@
 //! - `pub const Given = struct`, `pub const Run = struct`, `pub const Pending = struct`, `pub const Walk = struct`
 //! - `pub fn run(s: *Sema, roots: []const Zcu.Decl) Allocator.Error!defparams.Waiting`
 //! - `pub fn applyGivens(s: *Sema, env: *Env, file: Zcu.File.Index, src: Inst.Ref, givens: []const Given, quiet: bool, module: Vir.String) Allocator.Error!void`
-//! - `pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const Given, dps: []const Dp, file: Zcu.File.Index, src: Inst.Ref) Allocator.Error!Zcu.Hier`
+//! - `pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const Given, dps: []const Dp, file: Zcu.File.Index, src: Inst.Ref, inst: ?Instance.Index) Allocator.Error!Zcu.Hier`
 //! - `pub fn isOverridable(vir: *const Vir, p: Inst.Index) bool`
 //! - `pub fn payloadOf(vir: *const Vir, comptime T: type, i: Inst.Index) T`
 //! - `pub fn segment(arena: Allocator, name: []const u8) Allocator.Error![]const u8`
@@ -45,13 +45,23 @@ const Env = eval.Env;
 const Instance = Zcu.Instance;
 const defparams = @import("defparam.zig");
 const Dp = defparams.Dp;
+const attr = @import("attr.zig");
 
 /// A value an instance gives one of its target's parameters: named, or the
 /// next in order (`name` empty); `value` is none for an empty `.name()`,
 /// which keeps the default.
 /// `stmt`: the §6.4.1 paramset statement that gave it (in `stmt_file`),
 /// where its reports point; none for an instance's own value.
-pub const Given = struct { name: InternPool.String, value: InternPool.Index, stmt: Inst.Ref = .none, stmt_file: Zcu.File.Index = undefined };
+/// `expr`: the value's own last Vir instruction (D2-J), `.none` when there
+/// is none to re-lower (a CLI `--param` or a paramset statement's value);
+/// read only when `reads_param`.
+/// `reads_param`: `expr`'s body reads a module parameter (`attr.readsParam`):
+/// `env.toConst` folds it anyway (elaboration's own structural fold, a
+/// parameter's written default), but Sema lowers every parameter read
+/// dynamically (`expr.zig`'s `.param => s.param_args...`), so a hierarchical
+/// system parameter given this way must re-lower, not bake elaboration's
+/// fold, or it goes stale the moment the host's card overrides the parameter.
+pub const Given = struct { name: InternPool.String, value: InternPool.Index, stmt: Inst.Ref = .none, stmt_file: Zcu.File.Index = undefined, expr: Inst.Ref = .none, reads_param: bool = false };
 
 /// A run of `Walk.givens`.
 pub const Run = struct { start: u32, len: u32 };
@@ -216,12 +226,16 @@ pub fn payloadOf(vir: *const Vir, comptime T: type, i: Inst.Index) T {
 /// for the flips and `$mfactor`, a sum modulo 360 for `$angle`. E0890 for a
 /// specified value outside the kind's domain, E0908 for one kind given
 /// under two spellings.
-pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const Given, dps: []const Dp, file: Zcu.File.Index, src: Inst.Ref) Allocator.Error!Zcu.Hier {
+/// D2-J: a `givens` value that does not fold (it reads a root parameter a
+/// testbench card can override) is also recorded in `Zcu.hier_srcs`, keyed
+/// on `instance` (null for a paramset level, which has none yet: its own
+/// D2-J case is unplanned), so Sema can lower it once the card is read.
+pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const Given, dps: []const Dp, file: Zcu.File.Index, src: Inst.Ref, inst: ?Instance.Index) Allocator.Error!Zcu.Hier {
     assert(env.positions.count() == env.values.items.len);
     if (base) |b| assert(b.get(.mfactor) != .none);
     const zcu = s.zcu;
     const Where = struct { file: Zcu.File.Index, src: Inst.Ref, part: Zcu.Part };
-    var specified: std.EnumArray(Zcu.SystemParam, ?struct { value: InternPool.Index, spelling: []const u8, at: Where }) = .initFill(null);
+    var specified: std.EnumArray(Zcu.SystemParam, ?struct { value: InternPool.Index, spelling: []const u8, at: Where, expr: Inst.Ref = .none, reads_param: bool = false }) = .initFill(null);
     for (givens, 0..) |g, n| {
         if (g.name == .empty or g.value == .none) continue;
         const name = zcu.intern_pool.stringToSlice(g.name);
@@ -229,7 +243,7 @@ pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const G
         if (specified.get(k)) |before| if (!std.mem.eql(u8, before.spelling, name))
             try s.fail(.E0908, file, src, "`${s}` is given more than one value", .{@tagName(k)});
         const at: Where = if (g.stmt != .none) .{ .file = g.stmt_file, .src = g.stmt, .part = .whole } else .{ .file = file, .src = src, .part = .{ .value = @intCast(n) } };
-        specified.set(k, .{ .value = g.value, .spelling = try s.arena.dupe(u8, name), .at = at });
+        specified.set(k, .{ .value = g.value, .spelling = try s.arena.dupe(u8, name), .at = at, .expr = g.expr, .reads_param = g.reads_param });
     }
     for (dps) |dp| {
         const k = env.systemNamed(dp.name) orelse continue;
@@ -240,12 +254,19 @@ pub fn hierValues(s: *Sema, env: *Env, base: ?*const Zcu.Hier, givens: []const G
     var out: Zcu.Hier = undefined;
     for (std.enums.values(Zcu.SystemParam)) |k| {
         const up: ?f64 = if (base) |b| if (env.toConst(b.get(k))) |c| c.asReal() else null else k.initial();
-        const own: ?f64 = if (specified.get(k)) |sp| if (env.toConst(sp.value)) |c| c.asReal() else null else k.initial();
+        // D2-J: `sp.reads_param` short-circuits to null even when
+        // `env.toConst` would fold it: elaboration's fold is the parameter's
+        // written default, but Sema lowers every parameter read dynamically
+        // (`expr.zig`'s `.param`), so baking the default here would go stale
+        // the moment the host's card overrides it.
+        const own: ?f64 = if (specified.get(k)) |sp| (if (sp.reads_param) null else if (env.toConst(sp.value)) |c| c.asReal() else null) else k.initial();
         if (specified.get(k)) |sp| if (own) |v| if (!k.allows(v)) {
             const why = "`${s}` is {d}, and Table 9-29 allows only {s}";
             const args = .{ @tagName(k), v, k.domain() };
             if (sp.at.part == .whole) try s.fail(.E0890, sp.at.file, sp.at.src, why, args) else try s.failRule(.{ .part = sp.at.part }, .E0890, sp.at.file, sp.at.src, why, args);
         };
+        if (own == null) if (inst) |i| if (specified.get(k)) |sp| if (sp.expr != .none)
+            try zcu.hier_srcs.append(s.gpa, .{ .instance = i, .kind = k, .value = sp.expr });
         const v: ?f64 = if (own == null or up == null) null else switch (k) {
             .xposition, .yposition => up.? + own.?,
             .angle => @rem(up.? + own.?, 360.0),
@@ -294,7 +315,7 @@ fn instantiate(w: *Walk, p: Pending) Allocator.Error!void {
     // A paramset is a level of Table 9-29's composition: its statements
     // specify the module's values over the paramset level's.
     const base: ?*const Zcu.Hier = if (picked.base) |*b| b else if (p.parent == .none) null else &zcu.instances.items(.hier)[@backingInt(p.parent)];
-    env.hier = try hierValues(s, &env, base, w.givens.items[picked.givens.start..][0..picked.givens.len], if (picked.base == null) dps else &.{}, p.file, p.src);
+    env.hier = try hierValues(s, &env, base, w.givens.items[picked.givens.start..][0..picked.givens.len], if (picked.base == null) dps else &.{}, p.file, p.src, index);
     for (env.positions.keys()) |param_inst| _ = try env.param(param_inst);
     try arraySizes(s, &env, p, picked.module.file, w.givens.items[picked.givens.start..][0..picked.givens.len]);
     const params = try zcu.intern_pool.get(s.gpa, .{ .aggregate = .{ .ty = .none, .elems = env.values.items } });
@@ -529,7 +550,17 @@ fn instance(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i:
     for (vir.list(Inst.Arg, in.params)) |a| {
         // An empty `.name()` keeps the default but still names a parameter.
         const v = if (a.value.len == 0) InternPool.Index.none else try env.bodyValue(a.value);
-        try w.givens.append(s.arena, .{ .name = try ip.getString(s.gpa, vir.string(a.name)), .value = v });
+        // D2-J: kept alongside `v` so a hierarchical system parameter whose
+        // value reads a parameter can still be lowered, in this unit's
+        // scope, once the actual card value is known (Sema, not elaboration).
+        const body = vir.body(a.value);
+        const expr_ref: Inst.Ref = if (body.len == 0) .none else body[body.len - 1].toRef();
+        try w.givens.append(s.arena, .{
+            .name = try ip.getString(s.gpa, vir.string(a.name)),
+            .value = v,
+            .expr = expr_ref,
+            .reads_param = attr.readsParam(vir, a.value),
+        });
     }
     const givens: Run = .{ .start = start, .len = @intCast(w.givens.items.len - start) };
     const name = try segment(s.arena, vir.string(in.name));

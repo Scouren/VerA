@@ -212,7 +212,7 @@ def main(argv):
 # ieee1364-audit: the IEEE 1364-2005 heading worklist (the licensed local PDF)
 # ---------------------------------------------------------------------------
 
-IEEE_SHA256 = "3bebc696d5a338dbfa6925c9ffdeccc6de745e703abae8af84dd8f5551fe0a9e"
+IEEE_SHA256 = "9c8e1cbecfc310eda3ab719308d4630385b118f9cb2b58ba044a0a33beb734e6"
 # The pinned PDF's TOC lists 212; the body heading is on printed page 213.
 # Explicitly retain both, rather than silently searching past a bad anchor.
 ANCHOR_CORRECTIONS = {"14.2.1": 213}

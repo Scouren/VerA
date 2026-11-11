@@ -15,7 +15,8 @@
 //! - `pub fn applyDefparams(s: *Sema, env: *Env, dps: []const Dp, module: Vir.String) Allocator.Error!void`
 //! - `pub fn reaching(w: *Walk, p: Pending, index: Instance.Index) Allocator.Error![]const Dp`
 //! - `pub fn keepLatest(s: *Sema, out: *std.ArrayList(Dp), dp: Dp) Allocator.Error!void`
-//! - `pub fn collect(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i: Inst.Index) Allocator.Error!void`
+//! - `pub fn collect(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i: Inst.Index, prefix: []const u8) Allocator.Error!void`
+//! - `pub fn ownTargets(w: *Walk, env: *Env, index: Instance.Index, insts: []const Inst.Index) Allocator.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -149,7 +150,10 @@ pub fn keepLatest(s: *Sema, out: *std.ArrayList(Dp), dp: Dp) Allocator.Error!voi
 /// §6.3.1 one defparam: its value folded here, its target placed below the
 /// instance (a path through this module's scopes) or, for a path whose head
 /// names no declaration here, below the ancestor or root it names.
-pub fn collect(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i: Inst.Index) Allocator.Error!void {
+/// `prefix`: the generate-block scopes the statement itself is written
+/// under, `items`'s own (IEEE 1364-2005 §12.2.1: the scopes a generate
+/// block or array element restricts a defparam written inside it to).
+pub fn collect(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index, i: Inst.Index, prefix: []const u8) Allocator.Error!void {
     assert(env.vir.instructions.items(.tag)[@backingInt(i)] == .defparam);
     assert(@backingInt(index) < w.zcu.instances.len);
     const s = w.s;
@@ -188,13 +192,6 @@ pub fn collect(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index,
         w.origins.items[origin].used = true;
         return s.failRule(.{ .rule = .defparam_nothing, .name = text.items, .part = .target }, .E0901, file, i.toRef(), "§12.2.1: this defparam's hierarchical name `{s}` names nothing in the design", .{text.items});
     }
-    if (s.config.ieee1364 and up and rel.len != 0) if (outsideElement(w, index, rel)) |element| {
-        // §12.2.1 "a defparam statement in a hierarchy in or under ... an
-        // array of instances ... shall not change a parameter value outside
-        // that hierarchy".
-        w.origins.items[origin].used = true;
-        return s.failRule(.{ .rule = .defparam_outside, .name = element, .part = .target }, .E1100, file, i.toRef(), "a defparam inside `{s}` cannot change a parameter outside the array element it is in (IEEE 1364-2005 12.2.1)", .{element});
-    };
     if (up and std.mem.startsWith(u8, rel, "$root.")) rel = rel["$root.".len..];
     // A head that names no ancestor names a child this module does not
     // declare: a §7.8.5 connect module insertion makes (`a__cm__d.p`).
@@ -203,13 +200,71 @@ pub fn collect(w: *Walk, env: *Env, index: Instance.Index, file: Zcu.File.Index,
         anchor = at;
         rel = if (head_end < rel.len and rel[head_end] == '.') rel[head_end + 1 ..] else rel[head_end..];
     };
-    // IEEE 1364-2005 §12.8.1: a defparam of its own instance's parameter
-    // whose value reads that parameter has no value to be in force first.
-    if (anchor == index and rel.len == 0) if (env.named(param)) |target| if (try env.dependsOn(a.rhs, target)) {
+    if (s.config.ieee1364) if (try outsideScope(w, index, prefix, anchor, rel)) |element| {
+        // §12.2.1 "a defparam statement in a hierarchy in or under ... a
+        // generate block instance or an array of instances ... shall not
+        // change a parameter value outside that hierarchy".
         w.origins.items[origin].used = true;
-        return s.failRule(.{ .part = .target }, .E0907, file, i.toRef(), "`{s}` is applied before its instance's parameters take their values, and its value reads `{s}` itself (IEEE 1364-2005 12.8.1)", .{ text.items, param });
+        return s.failRule(.{ .rule = .defparam_outside, .name = element, .part = .target }, .E1100, file, i.toRef(), "a defparam inside `{s}` cannot change a parameter outside the generate block instance or array element it is in (IEEE 1364-2005 12.2.1)", .{element});
+    };
+    // IEEE 1364-2005 §12.8.1: a defparam's value, with every self-targeting
+    // defparam of the writing instance standing for its parameter's default
+    // instead of its own (`w.own`, gathered by `ownTargets`), reaches a
+    // cycle through the undeclared (not yet in force) parameters it reads,
+    // directly or through their own replacements: no replacement ends it,
+    // so this defparam's value is never in force. Every defparam whose
+    // value folds into the same cycle reports it (not only a self-target):
+    // `w.own`'s own entries are read the same way `a.rhs` is.
+    if (w.own.items.len != 0) if (try env.cycleOf(a.rhs, w.own.items)) |cyc| {
+        w.origins.items[origin].used = true;
+        const below = try std.fmt.allocPrint(s.arena, "{f}", .{w.zcu.fmtPathBelowRoot(anchor)});
+        const flat = flat: {
+            if (rel.len == 0) break :flat if (below.len == 0) param else try std.fmt.allocPrint(s.arena, "{s}.{s}", .{ below, param });
+            const path = if (below.len == 0) rel else try std.fmt.allocPrint(s.arena, "{s}.{s}", .{ below, rel });
+            break :flat try std.fmt.allocPrint(s.arena, "{s}.{s}", .{ path, param });
+        };
+        var names: std.ArrayList(u8) = .empty;
+        for (cyc, 0..) |c, k| {
+            if (k != 0) try names.appendSlice(s.arena, " → ");
+            const nm = vir.string(payloadOf(vir, Inst.Param, c).name);
+            if (below.len == 0) try names.print(s.arena, "`{s}`", .{nm}) else try names.print(s.arena, "`{s}.{s}`", .{ below, nm });
+        }
+        return s.failRule(.{ .part = .target }, .E0907, file, i.toRef(), "`{s}` is applied before its declaring instance is elaborated, and its value reads the cycle {s}, which no replacement ends (IEEE 1364-2005 12.8.1)", .{ flat, names.items });
     };
     try place(w, anchor, rel, param, value, origin);
+}
+
+/// The defparams of `insts` that target a parameter of `index` itself
+/// (rendered text with no path, or one upward segment that resolves to
+/// `index`), appended to `w.own` as `index`'s own-targeting defparams for
+/// `cycleOf` (IEEE 1364-2005 §12.8.1). Called before `insts`' defparams are
+/// collected, for every body of the instance being made (`items`); cleared
+/// with `w.prefixes` per instance.
+/// ponytail: a defparam in a sibling generate block is not `index`'s own
+/// (a different body's `insts`); each call sees only its own.
+pub fn ownTargets(w: *Walk, env: *Env, index: Instance.Index, insts: []const Inst.Index) Allocator.Error!void {
+    assert(@backingInt(index) < w.zcu.instances.len);
+    const s = w.s;
+    const vir = env.vir;
+    const tags = vir.instructions.items(.tag);
+    for (insts) |i| {
+        if (tags[@backingInt(i)] != .defparam) continue;
+        const a = payloadOf(vir, Inst.Assign, i);
+        const lhs = vir.body(a.lhs);
+        if (lhs.len == 0) continue;
+        var text: std.ArrayList(u8) = .empty;
+        const upward = (try render(w, env, lhs[lhs.len - 1].toRef(), &text)) orelse continue;
+        const dot = std.mem.findScalarLast(u8, text.items, '.');
+        const param_name = if (dot) |d| text.items[d + 1 ..] else text.items;
+        const rel = if (dot) |d| text.items[0..d] else "";
+        const self = if (rel.len == 0)
+            !upward
+        else
+            std.mem.findAny(u8, rel, ".[") == null and upwardAnchor(w, index, rel) == index;
+        if (!self) continue;
+        const target = env.named(param_name) orelse continue;
+        try w.own.append(s.arena, .{ .param = target, .value = a.rhs });
+    }
 }
 
 // ---- private ----
@@ -354,21 +409,113 @@ fn headBlock(vir: *const Vir, r: Inst.Ref) ?Inst.Index {
     return null;
 }
 
-/// The array element, `from` or an ancestor (`u[0]`), whose array an
-/// upward path `rel` with a selected head (`u[1].x`) names: the element the
-/// defparam may not reach out of; null otherwise.
-fn outsideElement(w: *Walk, from: Instance.Index, rel: []const u8) ?[]const u8 {
-    const head_end = std.mem.findAny(u8, rel, ".[") orelse return null;
-    if (rel[head_end] != '[') return null;
-    const head = rel[0..head_end];
+/// The generate-block or array-of-instances scope (IEEE 1364-2005 §12.2.1)
+/// the defparam's resolved target (`anchor`, `rel`) falls outside of; null
+/// when every such scope contains it. The scopes checked, innermost first:
+/// each segment of `prefix` (the statement's own generate nesting inside
+/// `index`), then each array-element or generate-block segment of
+/// `index`'s own ancestors' names (`Zcu.Instance.name`'s doc comment: a
+/// root's path below the parent, generate scopes and index included),
+/// outermost last.
+///
+/// A scope `anchor` could not have left (no `Zcu.instances` row is a
+/// generate scope, so an upward name across one is never found by
+/// `upwardAnchor`, and a same-named sibling array element is not either:
+/// `anchor` stays `index` or one of its own descendants) is judged by name
+/// alone, the written head of `rel` against the scope's own base name,
+/// ignoring which element or iteration it names: real path containment
+/// would otherwise always trivially hold, since the target is built as
+/// `anchor`'s own path plus `rel`. ponytail: this misses a same-named
+/// sibling whose defparam targets *itself* by writing its own index back
+/// (`u[1]`'s own defparam naming `u[1]`): accepted for every array element
+/// too, so not a regression here; the generate-block form resolves
+/// locally (`up` is false) and is judged by containment, precisely.
+/// Every other scope is judged by containment: `rel`'s head is split only
+/// on a literal `.`, so an escaped name holding one (§3.7.1) is kept as
+/// its own `\name ` segment by `segment` upstream, and this does not
+/// split inside it either.
+/// Asserts the walk stays bounded by `Zcu.instances_max`.
+fn outsideScope(w: *Walk, index: Instance.Index, prefix: []const u8, anchor: Instance.Index, rel: []const u8) Allocator.Error!?[]const u8 {
+    assert(@backingInt(index) < w.zcu.instances.len);
+    assert(@backingInt(anchor) < w.zcu.instances.len);
     const zcu = w.zcu;
-    var it = from;
-    while (it != .none) : (it = zcu.instances.items(.parent)[@backingInt(it)]) {
-        const n = zcu.intern_pool.stringToSlice(zcu.instances.items(.name)[@backingInt(it)]);
-        const last = if (std.mem.findScalarLast(u8, n, '.')) |d| n[d + 1 ..] else n;
-        if (last.len > head.len and std.mem.startsWith(u8, last, head) and last[head.len] == '[') return last;
+    const arena = w.s.arena;
+    const target = if (rel.len == 0)
+        try std.fmt.allocPrint(arena, "{f}", .{zcu.fmtPath(anchor)})
+    else
+        try std.fmt.allocPrint(arena, "{f}.{s}", .{ zcu.fmtPath(anchor), rel });
+    const head = rel[0 .. std.mem.findAny(u8, rel, ".[") orelse rel.len];
+    var depth: u32 = 0;
+
+    // The generate blocks the statement is nested in, innermost (last)
+    // first: `index`'s own path plus a prefix segment never equals
+    // `anchor`'s, so containment here is never the trivial-pass case below.
+    var end = prefix.len;
+    while (end > 0) {
+        depth += 1;
+        assert(depth < Zcu.instances_max);
+        assert(prefix[end - 1] == '.');
+        end -= 1;
+        const start = if (std.mem.lastIndexOfScalar(u8, prefix[0..end], '.')) |d| d + 1 else 0;
+        const scope = try std.fmt.allocPrint(arena, "{f}.{s}", .{ zcu.fmtPath(index), prefix[0..end] });
+        if (!contains(target, scope)) return try arena.dupe(u8, prefix[start..end]);
+        end = start;
+    }
+
+    // The ancestors' own generate-block and array-element scopes,
+    // innermost first.
+    var it = index;
+    while (true) {
+        const parent = zcu.instances.items(.parent)[@backingInt(it)];
+        if (parent == .none) break;
+        const stuck = isDescendantOrSelf(zcu, anchor, it);
+        const name = zcu.intern_pool.stringToSlice(zcu.instances.items(.name)[@backingInt(it)]);
+        var seg_end = name.len;
+        var is_last = true;
+        while (seg_end > 0) {
+            depth += 1;
+            assert(depth < Zcu.instances_max);
+            const seg_start = if (std.mem.lastIndexOfScalar(u8, name[0..seg_end], '.')) |d| d + 1 else 0;
+            const seg = name[seg_start..seg_end];
+            const last = is_last;
+            is_last = false;
+            const this_end = seg_end;
+            seg_end = seg_start;
+            if (last and seg[seg.len - 1] != ']') continue; // else: an ordinary submodule name, no scope boundary here
+            if (stuck) {
+                if (rel.len != 0 and std.mem.eql(u8, seg[0 .. std.mem.indexOfScalar(u8, seg, '[') orelse seg.len], head))
+                    return try arena.dupe(u8, seg);
+            } else {
+                const scope = try std.fmt.allocPrint(arena, "{f}.{s}", .{ zcu.fmtPath(parent), name[0..this_end] });
+                if (!contains(target, scope)) return try arena.dupe(u8, seg);
+            }
+        }
+        it = parent;
     }
     return null;
+}
+
+/// Whether `target` is `scope` itself or a name below it (`scope` followed
+/// by `.`).
+fn contains(target: []const u8, scope: []const u8) bool {
+    if (std.mem.eql(u8, target, scope)) return true;
+    return target.len > scope.len and std.mem.startsWith(u8, target, scope) and target[scope.len] == '.';
+}
+
+/// Whether `candidate` is `ancestor` or one of its descendants.
+fn isDescendantOrSelf(zcu: *const Zcu, candidate: Instance.Index, ancestor: Instance.Index) bool {
+    assert(@backingInt(candidate) < zcu.instances.len);
+    assert(@backingInt(ancestor) < zcu.instances.len);
+    var it = candidate;
+    var depth: u32 = 0;
+    while (true) {
+        if (it == ancestor) return true;
+        depth += 1;
+        assert(depth < Zcu.instances_max);
+        const p = zcu.instances.items(.parent)[@backingInt(it)];
+        if (p == .none) return false;
+        it = p;
+    }
 }
 
 fn moduleName(zcu: *const Zcu, i: Instance.Index) []const u8 {

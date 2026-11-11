@@ -11,9 +11,6 @@
 verilog/03_lexical_conventions/attribute_value_is_constant_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/03_lexical_conventions/forward_reference_reg_rejected.v rw-codegen (codegen): stderr: line 1: old `error[E1103]: design cannot be a contract device: module `triage_forward_reference_reg`: a name the engine resolves only at run time`, new `error[E1100]: digital source execution failed: a name is used before its declaration`
 verilog/08_udp/definition_inside_module_rejected.v rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `q``, new `error[E0205]: unsupported module item: found table`
-verilog/12_hierarchy/defparam_absolute_out_of_array_element_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/defparam_across_generate_instances_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/12_hierarchy/defparam_relative_out_of_array_element_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: §12.2.1: a defparam inside `u[0]` cannot change a parameter outside the generate block instance or array element`, new `error[E1100]: digital source execution failed: §12.2.1: a defparam insid
 verilog/12_hierarchy/extra_ordered_parameter_value_ignored.v rw-dlower (run): exit status old 1, new 0
 verilog/12_hierarchy/extra_ordered_value_ignored.v rw-dlower (run): exit status old 1, new 0
 verilog/12_hierarchy/port_input_width_extends.v rw-dlower (run): exit status old 1, new 0

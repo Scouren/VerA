@@ -53,6 +53,7 @@ verilog-a/ch05_analog_behavior/cross_direction_out_of_range_is_inert.va codegen:
 verilog-a/ch05_analog_behavior/cross_does_not_fire_at_time_zero.va codegen: a call of `cross`
 verilog-a/ch05_analog_behavior/cross_string_literal_is_an_integer.va codegen: a call of `cross`
 verilog-a/ch05_analog_behavior/cross_tolerances_are_not_the_enable.va codegen: a call of `cross`
+verilog-a/ch05_analog_behavior/cross_under_genvar_condition.va codegen: a call of `cross`
 verilog-a/ch05_analog_behavior/event_above.va codegen: a call of `above`
 verilog-a/ch05_analog_behavior/event_above_enable.va codegen: a call of `above`
 verilog-a/ch05_analog_behavior/event_above_tolerance.va codegen: a call of `above`
@@ -227,6 +228,7 @@ spice/primitive_vpwl.va codegen: a §5.6.1.3 potential contribution that runs un
 spice/primitive_vsine.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 spice/spice_source_primitives.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 spice/vsine_dc_is_the_operating_point_value.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
+verilog-a/ch05_analog_behavior/double_throw_switch_topology.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/annex_a_syntax/indirect_contribution.va codegen: a §5.6.7 indirect contribution
 verilog-a/ch01_intro/signal_flow_bound_to_conservative_node.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch04_expressions/absdelay_vera_interp_quadratic.va point 2: display record value 1: old -3.252357221615589e0, new -3.2516766450323726e0
@@ -240,6 +242,7 @@ verilog-a/ch04_expressions/ac_stim_quadrature.va codegen: a call of `ac_stim`
 verilog-a/ch04_expressions/ddx_in_noise_power.va the new device does not build: n10.zig:70: unused local constant
 verilog-a/ch04_expressions/diode_noise_sources_in_dc.va the new device does not build: n14.zig:81: unused local constant
 verilog-a/ch04_expressions/filter_parameter_arrays.va codegen: a call of `laplace_nd`
+verilog-a/ch04_expressions/laplace_dynamic_coefficient_sampled.va codegen: a call of `laplace_nd`
 verilog-a/ch04_expressions/laplace_nd_zero_padded_coefficients.va codegen: a call of `laplace_nd`
 verilog-a/ch04_expressions/laplace_np_parameter_roots_unpaired_is_nan.va codegen: a call of `laplace_np`
 verilog-a/ch04_expressions/laplace_zp_parameter_roots_ac.va codegen: a call of `laplace_zp`
@@ -264,8 +267,10 @@ verilog-a/ch04_expressions/status_site_beside_noise.va the new device does not b
 verilog-a/ch04_expressions/white_noise_topology.va the new device does not build: n1.zig:63: unused local constant
 verilog-a/ch05_analog_behavior/analog_signals_nets_branches_contributions.va codegen: a §5.6.7 indirect contribution
 verilog-a/ch05_analog_behavior/child_named_branch_potential_and_flow_access.va codegen: a flow contribution to a potential source's branch
+verilog-a/ch05_analog_behavior/controlled_sources.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch05_analog_behavior/held_array_element_between_events.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/hierarchical_contribution_creates_a_new_branch.va codegen: a flow contribution to a potential source's branch
+verilog-a/ch05_analog_behavior/value_retention.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch05_analog_behavior/indirect_and_direct_on_different_pairs.va codegen: a §5.6.7 indirect contribution
 verilog-a/ch05_analog_behavior/indirect_contribution.va codegen: a §5.6.7 indirect contribution
 verilog-a/ch05_analog_behavior/indirect_equation_lhs_tolerance.va codegen: a §5.6.7 indirect contribution
@@ -475,7 +480,6 @@ verilog-ams/ch09_system_tasks/r_format_in_the_digital_context.va codegen: a call
 verilog-ams/ch09_system_tasks/strobe_writes_once_per_accepted_solution.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/ungetc_cancelled_by_fseek_and_gap_reads_zero.va codegen: a call of `$fopen`
 verilog-a/ch06_hierarchy/paramset_outer_defparam_wide_card.va point 0: display record value 25: old 4e1, new 3.2e1
-verilog-ams/ch02_lexical/unsized_xz_extends_to_expression_size.va display site 0: old format "unsized x fills the 32-bit expression got=%11d want=%11d ok=%d\n", new "unsized x fills the 32-bit expression got=%10d want=%11d ok=%d\n"
 
 verilog-a/ch09_system_tasks/simparam_timescale.va point 0: row 0: old -4.511869783264559e-1, new -4.511869793274559e-1
 

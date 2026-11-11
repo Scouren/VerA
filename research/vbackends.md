@@ -430,6 +430,7 @@ Decision: Retire them with the old engine at the switch-over, in the conformance
 **Q4. T2's ship gate for the native step: geometric mean native/interpreted ≥ 1.2×, no design slower than interpreted × 1.05, `--emit-exe` build time ≤ 1.15× today's?**
 Recommendation: accept these thresholds; the prototype already passes the first two on the 4 designs that build.
 Decision: Accept, checked by a script in the bench step; the verdict and its numbers go in the CHANGELOG, measured.
+Measured at w3-native (merged, wave 3), on a machine shared with four agents' builds: geomean 1.313× (passes); mult16 native 0.39 s vs interpreted 0.37 s (1.054×, over 1.05× at `time`'s 10 ms resolution); div16 `--emit-exe` build 1.327× before (over 1.15×), while mult16's went 0.763× and des's 0.887× the other way. The verdict is open: re-measure with `tools/bench_exe.sh` on a quiet machine (no other build running) before the CHANGELOG line; a miss there is a T3 task, not a waiver.
 
 **Q5. If lfsr/cpu are still > 2× slower than old native after T3, build `Air/digital/Schedule.zig` + compiled wake lists (~550+ lines, A.6's full `Function`)?**
 Recommendation: no, unless you name a design that needs it; interpreted + native step is the product (digital.md).

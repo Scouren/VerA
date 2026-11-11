@@ -139,6 +139,7 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
         });
         const vty: Sema.Ty = if (ty == .real) .real else .integer;
         const arg = try s.air.addInst(s.gpa, .{ .tag = .arg, .data = .{ .ty_index = .{ .ty = decl.typeIndex(vty), .index = @backingInt(row) } } });
+        try s.setSrc(arg, unit.file, d.toRef());
         try s.prologue.append(s.arena, arg);
         try s.param_args.append(s.arena, .{ .ref = .fromIndex(arg), .ty = vty });
         try unit.binds.put(s.arena, d, .{ .param = row });

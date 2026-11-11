@@ -89,6 +89,7 @@ pub fn rows(s: *Sema, unit: *Unit) Allocator.Error!void {
             else => if (ty == .real) .real else .integer, // else: an integer, or an unfoldable value read as the declared type
         };
         const arg = try s.air.addInst(s.gpa, .{ .tag = .arg, .data = .{ .ty_index = .{ .ty = decl.typeIndex(vty), .index = @backingInt(r) } } });
+        try s.setSrc(arg, ps.file, i.toRef());
         try s.prologue.append(s.arena, arg);
         try s.param_args.append(s.arena, .{ .ref = .fromIndex(arg), .ty = vty });
         try scope.binds.put(s.arena, decl.canonical(vir, i), .{ .param = r });

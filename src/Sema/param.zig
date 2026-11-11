@@ -46,7 +46,7 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
                 if (vir.instructions.items(.tag)[@backingInt(sp)] != .param) continue;
                 const p = decl.payloadOf(vir, Inst.Param, sp);
                 const value: InternPool.Index = if (try decl.foldBody(s, unit, p.value)) |c| try decl.intern(s, c) else .undef;
-                const row = try addRow(s, unit, vir.string(p.name), p, .unspecified, value);
+                const row = try addRow(s, unit, vir.string(p.name), p, .unspecified, value, sp.toRef());
                 try unit.binds.put(s.arena, decl.canonical(vir, sp), .{ .param = row });
             }
             continue;
@@ -68,7 +68,7 @@ pub fn declare(s: *Sema, unit: *Unit) Allocator.Error!void {
             try declareArray(s, unit, i, p, ty, elems[at]);
             continue;
         }
-        const row = try addRow(s, unit, vir.string(p.name), p, ty, elems[at]);
+        const row = try addRow(s, unit, vir.string(p.name), p, ty, elems[at], i.toRef());
         try unit.binds.put(s.arena, decl.canonical(vir, i), .{ .param = row });
         try checkRange(s, unit, i, p, elems[at]);
         try checkType(s, unit, i, p);
@@ -123,14 +123,16 @@ fn systemAlias(s: *Sema, unit: *Unit, i: Inst.Index) Allocator.Error!void {
         .derive = .none,
     });
     const arg = try s.air.addInst(s.gpa, .{ .tag = .arg, .data = .{ .ty_index = .{ .ty = decl.typeIndex(.real), .index = @backingInt(row) } } });
+    try s.setSrc(arg, unit.file, i.toRef());
     try s.prologue.append(s.arena, arg);
     try s.param_args.append(s.arena, .{ .ref = .fromIndex(arg), .ty = .real });
     s.sys_alias.set(k, row);
 }
 
 /// Appends one card row named `name` (under the unit's prefix) of value
-/// `value`, its ranges, and its `arg` in the prologue.
-fn addRow(s: *Sema, unit: *Unit, name: []const u8, p: Inst.Param, declared: Device.Param.Type, value: InternPool.Index) Allocator.Error!Device.Param.Index {
+/// `value`, its ranges, and its `arg` in the prologue; `src` is its
+/// declaration, where a W0650/E06xx culprit message about it points.
+fn addRow(s: *Sema, unit: *Unit, name: []const u8, p: Inst.Param, declared: Device.Param.Type, value: InternPool.Index, src: Inst.Ref) Allocator.Error!Device.Param.Index {
     const ip = &s.zcu.intern_pool;
     // §3.4.1 an untyped parameter takes its value's type; one that does
     // not fold is real (the old `lowerParam`).
@@ -164,6 +166,7 @@ fn addRow(s: *Sema, unit: *Unit, name: []const u8, p: Inst.Param, declared: Devi
         },
     };
     const arg = try s.air.addInst(s.gpa, .{ .tag = .arg, .data = .{ .ty_index = .{ .ty = decl.typeIndex(vty), .index = @backingInt(row) } } });
+    try s.setSrc(arg, unit.file, src);
     try s.prologue.append(s.arena, arg);
     try s.param_args.append(s.arena, .{ .ref = .fromIndex(arg), .ty = vty });
     return row;
@@ -211,7 +214,7 @@ fn declareArray(s: *Sema, unit: *Unit, i: Inst.Index, p: Inst.Param, ty0: Device
         }
         for (subs[0..arr.dims.len]) |x| try label.print(s.arena, "[{d}]", .{x});
         const elem = try asType(s, ty, if (k < values.len) values[k] else .undef, k >= values.len and vb.len != 0);
-        const row = try addRow(s, unit, label.items, p, ty, elem);
+        const row = try addRow(s, unit, label.items, p, ty, elem, i.toRef());
         try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slot), .rhs = s.param_args.items[@backingInt(row)].ref } } }));
         try rows.append(s.arena, row);
     }

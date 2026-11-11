@@ -32,6 +32,7 @@
 //! - `pub const rows_max: u32`
 //! - `pub fn deinit(d: *Device, gpa: Allocator) void`
 //! - `pub fn paramRanges(d: *const Device, p: Param.Index) []const Range`
+//! - `pub fn nodeName(d: *const Device, ip: *const InternPool, n: Node.Index) []const u8`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -277,4 +278,14 @@ pub fn paramRanges(d: *const Device, p: Param.Index) []const Range {
     const len = d.params.items(.ranges_len)[i];
     assert(start + len <= d.ranges.items.len);
     return d.ranges.items[start..][0..len];
+}
+
+/// Node `n`'s unique spelling (`p`, `bus[3]`, `flow(p,n)`, `idt$0`);
+/// `"gnd"` for the ground reference node, which is no row. The one
+/// spelling of ground: every message that names a node reads it here.
+/// Asserts that `n` is ground or a row of `nodes`.
+pub fn nodeName(d: *const Device, ip: *const InternPool, n: Node.Index) []const u8 {
+    if (n == .ground) return "gnd";
+    assert(@backingInt(n) < d.nodes.len);
+    return ip.stringToSlice(d.nodes.items(.name)[@backingInt(n)]);
 }

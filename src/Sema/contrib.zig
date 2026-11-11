@@ -10,7 +10,7 @@
 //! Contents:
 //! - `pub const Target = struct`
 //! - `pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Error!void`
-//! - `pub fn rowOf(s: *Sema, b: *const Block, t: Target) Allocator.Error!Device.Contribution.Index`
+//! - `pub fn rowOf(s: *Sema, b: *const Block, t: Target, src: Inst.Ref) Allocator.Error!Device.Contribution.Index`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -70,11 +70,23 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
     // §5.6.7.2 "Once a value is indirectly assigned to a branch, it cannot
     // be contributed to using the branch contribution operator <+."
     if (indirect.on(s, t.hi, t.lo)) return s.fail(.E0409, file, src, "`({s},{s})`", .{ access.nodeName(s, t.hi), access.nodeName(s, t.lo) });
-    const row = try rowOf(s, b, t);
+    // W0650's headline points at the access call that opened the row
+    // (the old `mainTok(lhs)`): `x.lhs` is `I(p,n)`/`V(p,n)`'s own call.
+    const row = try rowOf(s, b, t, x.lhs);
     try discardOpposite(s, b, t);
     var split: reactive.Split = .{};
     s.contrib_target = t;
     defer s.contrib_target = null;
+    // `reactive.split` and the resist/react sum below mint instructions
+    // with no `expr.lower` of their own (it is not a value expression: a
+    // `<+` has no result), so without this they inherit whatever
+    // `s.expr_src` an earlier statement left set -- usually `.none`, this
+    // row's W0650 (research/airpasses.md T1) then finding no location for
+    // its own resist/react sum. The statement's own ref is the old side's
+    // answer too (`locate.inst`'s `.contrib` case: the access call's byte).
+    const outer_src = s.expr_src;
+    s.expr_src = src;
+    defer s.expr_src = outer_src;
     try reactive.split(s, b, x.rhs, false, &split);
     if (split.react != null) try s.react_written.put(s.arena, row, {});
     const slots = s.device.contributions.get(@backingInt(row));
@@ -98,24 +110,30 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
 }
 
 /// The contribution row of `t`, made on its first `<+` with its slots.
-pub fn rowOf(s: *Sema, b: *const Block, t: Target) Allocator.Error!Device.Contribution.Index {
+/// `src` is that first `<+`'s access call (or, for an operator row,
+/// its operator call): on a new row only, W0650's headline points there.
+pub fn rowOf(s: *Sema, b: *const Block, t: Target, src: Inst.Ref) Allocator.Error!Device.Contribution.Index {
     const key: Sema.ContribKey = .{ .access = t.access, .branch = t.branch, .hi = t.hi, .lo = t.lo };
     const gop = try s.contrib_rows.getOrPut(s.arena, key);
     if (gop.found_existing) return gop.value_ptr.*;
     const row: Device.Contribution.Index = @fromBackingInt(@intCast(s.device.contributions.len));
+    const resist = try decl.addAlloc(s, .real);
+    const react = try decl.addAlloc(s, .real);
+    const wrote = try decl.addAlloc(s, .real);
     try s.device.contributions.append(s.gpa, .{
         .access = t.access,
         .kind = .direct,
         .branch = t.branch,
         .hi = t.hi,
         .lo = t.lo,
-        .resist = try decl.addAlloc(s, .real),
-        .react = try decl.addAlloc(s, .real),
-        .wrote = try decl.addAlloc(s, .real),
+        .resist = resist,
+        .react = react,
+        .wrote = wrote,
         .instance = decl.rowInstance(b.unit.instance),
         .flow = .none,
     });
     gop.value_ptr.* = row;
+    try s.setSrc(resist, b.unit.file, src);
     return row;
 }
 

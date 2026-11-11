@@ -61,6 +61,9 @@ pub fn lower(s: *Sema, b: *Block, x: Inst.Triple, src: Inst.Ref) Allocator.Error
         .flow = .none,
     });
     const slots = s.device.contributions.get(@backingInt(row));
+    // W0650's headline points at the probe side (`x.a`), as the old
+    // `analog/indirect.zig`'s `lhs` did.
+    try s.setSrc(slots.resist, unit.file, x.a);
     _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slots.resist), .rhs = v } } });
     _ = try s.addInst(b, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(slots.wrote), .rhs = .fromIntern(.one_real) } } });
 }

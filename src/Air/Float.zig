@@ -181,6 +181,10 @@ pub const Input = struct {
     roots: []const Root = &.{},
     /// Indexed by `Air.Call.callee`.
     calls: []const Air.CallFacts = &.{},
+    /// One per `probe` index (`Device.nodes` order): the unknown's name,
+    /// for a probe culprit's message; empty or a short slice falls back to
+    /// "a probe of unknown {d}".
+    probe_names: []const []const u8 = &.{},
     /// One per instruction, or empty: where a diagnostic points.
     locs: []const Diag.Loc = &.{},
     /// A bound B with |unknown| <= B assumed for every §4.4 probe (the

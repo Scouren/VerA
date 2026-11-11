@@ -174,10 +174,10 @@ pub fn target(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src
     return canonical(a, hi, lo, .unnamed);
 }
 
-/// A node row's name; `gnd` for the reference node.
+/// A node row's name; `gnd` for the reference node (one spelling of
+/// ground: `Air.Device.nodeName`).
 pub fn nodeName(s: *const Sema, n: Node.Index) []const u8 {
-    if (n == .ground) return "gnd";
-    return s.zcu.intern_pool.stringToSlice(s.device.nodes.items(.name)[@backingInt(n)]);
+    return Device.nodeName(&s.device, &s.zcu.intern_pool, n);
 }
 
 /// Whether `r` is a §4.4.2 port reference (`<p>`) or names a §3.12.1 port

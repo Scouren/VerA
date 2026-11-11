@@ -175,7 +175,9 @@ pub fn pullDrives(s: *Sema) Allocator.Error!void {
             } else false;
             if (!binds_potential) continue;
             const b: Sema.Block = .{ .parent = null, .unit = unit };
-            const row = try @import("contrib.zig").rowOf(s, &b, .{ .access = .potential, .branch = .unnamed, .hi = bind.node, .lo = .ground, .neg = false });
+            // The old `applyUnconnectedDrive`'s row points at the port's own
+            // declaration (`site.main_tok`): no `<+` wrote this one.
+            const row = try @import("contrib.zig").rowOf(s, &b, .{ .access = .potential, .branch = .unnamed, .hi = bind.node, .lo = .ground, .neg = false }, first.toRef());
             const c = s.device.contributions.get(@backingInt(row));
             const level: InternPool.Index = if (drive == .pull1) .one_real else .zero_real;
             try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(c.resist), .rhs = .fromIntern(level) } } }));

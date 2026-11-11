@@ -18,6 +18,7 @@ the plan's tasks in order and never redecide a `Decision:`.
 | `diagcodes.md` (+ `diagcodes-map.tsv`) | spec-keyed codes, `tools/diag_gaps.py` | the gap report's gates |
 | `switchover.md` | prerequisites P1-P12, switch C1-C8 | the end of `vera` |
 | `zero.md` | the order over every plan above: each list line's type and root cause, waves, what each clears (`tools/xfail_classes.py` re-measures) | every list |
+| `finish.md` | the road to a complete rewrite: what done means (F1-F13, each a command), seven tracks (lists, spec, compiler cost, device code, Zig layout, the switch, build throughput), five stages, the user's decisions; the compiler, device and architecture sections measured for it | everything |
 
 ## Decisions that bind several plans
 

@@ -264,10 +264,7 @@ fn transferUnary(an: *const Analysis, t: *const Taint, op: Mir.Opcode, a: Mir.Va
         // Linear in the operand (sign flip, bit/logical negate, round,
         // cast, the optimisation fence): no cross term.
         .fneg, .ineg, .lognot, .bitnot, .floor, .ceil, .fabs, .iabs, .fi_cast, .if_cast, .opt_barrier => .{ .val = pa.val, .deriv = pa.deriv },
-        // `instData`'s `.unary` variant only ever decodes an opcode whose
-        // `opcode.class` is `.unary` (`Mir.InstData`'s own doc): every other
-        // tag of this full enum cannot reach here.
-        else => unreachable,
+        else => unreachable, // else: `instData`'s `.unary` variant decodes only an opcode whose `opcode.class` is `.unary` (`Mir.InstData`'s doc)
     };
 }
 
@@ -315,9 +312,6 @@ fn transferBinary(an: *const Analysis, t: *const Taint, op: Mir.Opcode, lhs: Mir
             .val = a.val or b.val,
             .deriv = a.deriv or b.deriv or ((a.val or b.val) and (active(an, lhs) or active(an, rhs))),
         },
-        // `instData`'s `.binary` variant only ever decodes an opcode whose
-        // `opcode.class` is `.binary`: every other tag of this full enum
-        // cannot reach here.
-        else => unreachable,
+        else => unreachable, // else: `instData`'s `.binary` variant decodes only an opcode whose `opcode.class` is `.binary`
     };
 }

@@ -632,3 +632,12 @@ Each emitted Instance/State struct keeps the existing `comptime assert(@sizeOf(.
   displays 32 where the old device displays 4 (record value 5) once lowering agrees
   (w2-eval's T10 fixed the fold; the run-time path still takes a 32-bit width).
   Oracle: diff-codegen bit for bit; with lower's `clog2_nested_contexts.va` comp line.
+- **T5-W12 — defparam re-derive (deferred from w3-codegen, wave 4, after frontend T2/T3).**
+  `Zcu.defparams` holds an eagerly folded value, so a `defparam u.gain = scale*2.0`
+  is frozen at `scale`'s default and a host or parent override of `scale` leaves
+  `gain` stale (a wrong number: `defparam_unsupported.va`,
+  `paramset_outer_defparam_selection_parameter.va`). Fix: `Zcu.DefparamSource`
+  keeps the writer's Vir body and unit (Zig's Sema keeps the ZIR instruction and
+  re-analyses it; it does not store a pre-folded value), and `derive.zig:125`
+  re-derives the row through `expression(s, writer_unit, row, body)` instead of
+  skipping it. Files: `src/Zcu.zig`, `src/Sema/defparam.zig`, `src/Sema/derive.zig`.

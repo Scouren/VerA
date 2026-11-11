@@ -3,7 +3,7 @@
 
 Checks: `//!` header first, header Contents names every `pub` item, file-level order
 (imports, pub types, private types, pub fns, separator, private fns, tests), separator
-present before private fns, code lines before tests <= MAX_CODE_LINES, and no source
+present before private fns, and no source
 folder holding a single file. Prints `path:line: rule: message` per violation and exits 1
 if any. `--self-test` runs the built-in cases.
 
@@ -15,7 +15,6 @@ import re
 import sys
 import tempfile
 
-MAX_CODE_LINES = 500
 SEPARATOR = re.compile(r"^// -+ private -+$")
 SKIP_DIRS = {".git", "target", "zig-out", ".zig-cache", "zig-cache", "zig-pkg", "node_modules"}
 CARGO_DIRS = {"src", "tests", "benches", "examples"}
@@ -156,9 +155,6 @@ def check_file(path):
             out.append((n, "order", f"{RANK_NAME[rank]} after {RANK_NAME[highest]}"))
         highest = max(highest, rank)
 
-    code = sum(1 for l in lines[:test_line - 1] if l.strip() and not l.lstrip().startswith("//"))
-    if code > MAX_CODE_LINES:
-        out.append((1, "size", f"{code} code lines before tests (max {MAX_CODE_LINES}): split along its transforms"))
     return out
 
 
@@ -282,8 +278,6 @@ fn helper() {}
         assert bad == {"header", "contents", "separator", "order"}, bad
         bad = {r for _, r, _ in check_file(write("bad.rs", bad_rs))}
         assert bad == {"contents", "order", "separator"}, bad
-        big = "//! Big.\n" + "".join(f"pub const c{i} = {i};\n" for i in range(MAX_CODE_LINES + 1))
-        assert "size" in {r for _, r, _ in check_file(write("big.zig", big))}
 
         write("tree/lone/only.zig", good_zig)
         write("tree/pair/a.zig", good_zig)

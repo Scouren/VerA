@@ -17,7 +17,7 @@ https://github.com/OmarSiwy/NixOSConfig/tree/main/skills
 | `data-oriented-design` | AST, `elab/` and `ir/` tables: the six questions, SoA, narrowest widths, handles |
 | `codebase-clean-code` | `Compilation.zig` as the spine, owners by directory, `module_specs` dependency direction (see Layout) |
 | `api-design` | Every `pub` function, `lib/contract.zig` (the device ABI), OSDI and VPI: usage code first, caller owns memory and flow |
-| `code-style` | File order, ≤500 code lines per file, `check_style.py` |
+| `code-style` | File order, `check_style.py`. No cap on file length: the skill's 500-line rule does not apply here (user) |
 | `simd-loops` | `lib/kernels`: the plain-loop forms, or `@Vector` with a scalar oracle |
 | `doc-comments` | Every `pub` item |
 | `ponytail` (ultra) | How little code; never what shape the data takes |

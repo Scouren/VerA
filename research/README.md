@@ -20,6 +20,11 @@ the plan's tasks in order and never redecide a `Decision:`.
 
 ## Decisions that bind several plans
 
+- **No file-length cap (user, overrides every plan).** The 500-code-line rule
+  is dropped from AGENTS.md and `tools/check_style.py`. A plan task that
+  splits a file only to meet that count is skipped; a split that names a
+  transform (lower L0b's, done) stays.
+
 - **Wrong numbers first.** In every plan, tasks fixing a silent wrong number
   run before code differences: lower's held/RNG/sum-order/short-circuit
   groups, libmap T3 (silent 0.0 probe), airpasses' domain fold, codegen's 75.

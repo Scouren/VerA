@@ -49,9 +49,9 @@ The rules of the rewrite:
    payloads, a compile-time `@sizeOf` assertion on every hot row. Copy Zig's
    shapes; they are the hand-written reference.
 5. **Small, Zig-like files.** One struct per file named after it
-   (`Ast.zig`, `Parse.zig`); helpers that would push a file past
-   `tools/check_style.py`'s 500 code lines go to a subfolder of the same name
-   (`Parse/expr.zig`), as Zig's `Sema/` does.
+   (`Ast.zig`, `Parse.zig`); a file is split by transform when that reads
+   better (`Parse/expr.zig`, as Zig's `Sema/` does), never to meet a line
+   count: there is no cap on file length.
 
 ## The modules
 

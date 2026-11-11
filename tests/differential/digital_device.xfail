@@ -15,7 +15,6 @@ verilog/12_hierarchy/extra_ordered_parameter_value_ignored.v rw-dlower (run): ex
 verilog/12_hierarchy/extra_ordered_value_ignored.v rw-dlower (run): exit status old 1, new 0
 verilog/12_hierarchy/port_input_width_extends.v rw-dlower (run): exit status old 1, new 0
 verilog/12_hierarchy/port_output_width_truncates.v rw-dlower (run): exit status old 1, new 0
-verilog/13_configuration/cell_not_in_its_library_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/cfg1_default_liblist.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/cfg2_gate_first.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/cfg3_cell_use.v rw-dlower (digital lowering): exit status old 1, new 0
@@ -24,8 +23,6 @@ verilog/13_configuration/cfg6_hierarchical.v rw-dlower (digital lowering): exit 
 verilog/13_configuration/command_line_search_order.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/config_overrides_command_line.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/default_search_order.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/13_configuration/design_cell_missing_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
-verilog/13_configuration/design_names_config_rejected.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/include_map.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/parent_library_by_map.v rw-dlower (digital lowering): exit status old 1, new 0
 verilog/13_configuration/resolution_order.v rw-dlower (digital lowering): exit status old 1, new 0

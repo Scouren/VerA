@@ -221,7 +221,16 @@ test "W0650 names each unit and points at its access call" {
         try std.testing.expect(!m.loc.isNone());
         try std.testing.expectEqualStrings("I", src[m.loc.start..m.loc.end]);
         const lbls = errors.labels(i);
-        const body = if (m.point != .none) errors.string(m.point) else if (lbls.len != 0) errors.string(lbls[0].text) else "";
+        // Old (`message.valueSpan`) always resolves a real span for a
+        // computed culprit (never the no-location `.point` fallback): a
+        // `<+` statement's resist/react sum must have its own source, not
+        // `.none` (research/airpasses.md T1's `contrib.zig` bug, caught
+        // only by diff-comp, not by the text check below, since naming
+        // does not need a location: `s.expr_src` was never scoped for
+        // `contribute()`, so every sum it built inherited a stale, usually
+        // `.none`, source).
+        try std.testing.expect(lbls.len != 0);
+        const body = if (m.point != .none) errors.string(m.point) else errors.string(lbls[0].text);
         try std.testing.expect(std.mem.indexOf(u8, body, "an expression of parameter `r`") != null);
     }
     try std.testing.expect(errors.message(w0650[0]).loc.start != errors.message(w0650[1]).loc.start);
@@ -267,7 +276,9 @@ test "W0650's probe culprit names the node, through probe_names" {
     try std.testing.expect(std.mem.indexOf(u8, errors.string(m.msg), "I(p,n)") != null);
 
     const lbls = errors.labels(found.?);
-    const body = if (m.point != .none) errors.string(m.point) else if (lbls.len != 0) errors.string(lbls[0].text) else "";
+    // Same regression as above: a real label, never the `.point` fallback.
+    try std.testing.expect(lbls.len != 0);
+    const body = if (m.point != .none) errors.string(m.point) else errors.string(lbls[0].text);
     try std.testing.expect(std.mem.indexOf(u8, body, "a probe of node `p`") != null);
 }
 

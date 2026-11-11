@@ -77,6 +77,16 @@ pub fn contribute(s: *Sema, b: *Block, x: Inst.Bin, src: Inst.Ref) Allocator.Err
     var split: reactive.Split = .{};
     s.contrib_target = t;
     defer s.contrib_target = null;
+    // `reactive.split` and the resist/react sum below mint instructions
+    // with no `expr.lower` of their own (it is not a value expression: a
+    // `<+` has no result), so without this they inherit whatever
+    // `s.expr_src` an earlier statement left set -- usually `.none`, this
+    // row's W0650 (research/airpasses.md T1) then finding no location for
+    // its own resist/react sum. The statement's own ref is the old side's
+    // answer too (`locate.inst`'s `.contrib` case: the access call's byte).
+    const outer_src = s.expr_src;
+    s.expr_src = src;
+    defer s.expr_src = outer_src;
     try reactive.split(s, b, x.rhs, false, &split);
     if (split.react != null) try s.react_written.put(s.arena, row, {});
     const slots = s.device.contributions.get(@backingInt(row));

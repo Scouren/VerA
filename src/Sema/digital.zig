@@ -15,7 +15,7 @@
 //! - `pub const sites`, `pub const Source = struct`, `pub const Options = struct`, `pub const Lowered = struct`, `pub const Port = struct`, `pub const Named = struct`, `pub const SegmentRef = struct`, `pub const Why = struct`, `pub const Spec = struct`, `pub const ProcSite = struct`
 //! - `pub const Error`, `pub const Type = struct` (`real_type`), `pub const Name = struct` (`Kind`), `pub const Span = struct`
 //! - `pub const Frame = struct` (`Genvar`), `pub const Proc = struct` (`Kind`), `pub const ScopeInfo = struct`
-//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `Declared`, `refuse`, `refuseFmt`, `reject`, `rejectFmt`, `rejectOperand`, `rejectArg`, `rejectArgFmt`, `lookup`, `readsSignal`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
+//! - `pub const Lower = struct` (`Implicit`, `Site`, `Disable`, `LateParam`, `Declared`, `refuse`, `refuseFmt`, `reject`, `rejectFmt`, `rejectOperand`, `argSite`, `rejectArg`, `rejectArgFmt`, `lookup`, `readsSignal`, `bind`, `rootFrame`, `virOf`, `fileOf`, `envAt`, `constOf`, `intOf`, `tyOf`, `payload`, `tag`, `srcOffset`)
 //! - `pub const none: u32`
 //! - `pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Lowered`
 
@@ -67,12 +67,19 @@ pub const Options = struct {
     std_1364: bool = false,
 };
 
-/// The program, and per timing check (`Program.checks` order) the byte of
-/// the preprocessed text its W1199 report is filed at. A mixed design's
-/// also has `names`: its variables and nets by path (`Named`).
+/// The program, per timing check (`Program.checks` order) and per
+/// instruction (`Program.insts` order, `pc_sites`) the byte of the
+/// preprocessed text its diagnostics blame. A mixed design's also has
+/// `names`: its variables and nets by path (`Named`).
 pub const Lowered = struct {
     program: Program,
     check_sites: []const u32 = &.{},
+    /// Per `Program.insts` row, the pp byte its run diagnostics blame
+    /// (T3, research/dlower.md §2: `Builder.setSite`, Zig's `dbg_stmt`
+    /// mirror): the statement's main token by default, an argument's for
+    /// the system tasks the blame table names. Kept off `Program`, like
+    /// DWARF off `.text`.
+    pc_sites: []const u32 = &.{},
     names: []const Named = &.{},
     /// The root instance's ports, in its list of ports' order (`Port`).
     ports: []const Port = &.{},
@@ -267,6 +274,12 @@ pub const Lower = struct {
     why_at: u32 = none,
     /// `reject`'s code: set before a `reject` whose rule has its own.
     why_code: vams.Diag.Code = .E1100,
+    /// T3's blame table: the current statement's first `$dist_*` call's
+    /// pp byte, reset at each statement (`stmt.compileStmt`); a later
+    /// `$dist_*` in the same statement leaves it (system.zig:251's
+    /// warning blames the first one, the enclosing instruction's pc being
+    /// the only blame a run diagnostic can carry).
+    dist_site: ?u32 = null,
     /// What a `nets.sink` lvalue is driven by, for lib/sim/digital's
     /// message when it is no net: set by a gate's or a port's caller.
     sink_use: enum { assign, gate, port } = .assign,
@@ -462,20 +475,28 @@ pub const Lower = struct {
         return error.Rejected;
     }
 
-    /// `reject` at argument `k` of call `call` (frame `f`), found in the
-    /// tree: a literal argument has no position of its own in Vir.
-    pub fn rejectArg(l: *Lower, f: u32, call: Inst.Index, k: usize, comptime msg: []const u8) error{Rejected} {
-        l.why = msg;
-        l.why_at = l.srcOffset(f, call);
+    /// Argument `k` of call `call` (frame `f`)'s byte, found in the tree: a
+    /// literal argument has no position of its own in Vir. `call`'s own
+    /// byte (its callee's token) when the tree holds no such call or
+    /// argument. Reused as a blame token (dlower.md's T3 blame table: a
+    /// `$readmemb`'s file name, a `$fdisplay`'s descriptor, ...), not only
+    /// by `rejectArg`.
+    pub fn argSite(l: *Lower, f: u32, call: Inst.Index, k: usize) u32 {
+        const at = l.srcOffset(f, call);
         const vir = l.virOf(f);
-        if (Inst.dataKind(tag(vir, call)) != .pl_node) return error.Rejected;
+        if (Inst.dataKind(tag(vir, call)) != .pl_node) return at;
         const tree = l.options.sources[@backingInt(l.fileOf(f))].tree;
         const n = vir.instructions.items(.data)[@backingInt(call)].pl_node.src_node;
-        if (tree.nodeTag(n) != .call) return error.Rejected;
+        if (tree.nodeTag(n) != .call) return at;
         const slots = tree.extraDataSlice(tree.extraData(tree.nodeData(n).node_and_extra[1], vams.Ast.Node.SubRange), vams.Ast.Node.OptionalIndex);
-        if (k < slots.len) if (slots[k].unwrap()) |arg| {
-            l.why_at = tree.tokenStart(tree.nodeMainToken(arg));
-        };
+        if (k < slots.len) if (slots[k].unwrap()) |arg| return tree.tokenStart(tree.nodeMainToken(arg));
+        return at;
+    }
+
+    /// `reject` at argument `k` of call `call` (frame `f`): `argSite`'s byte.
+    pub fn rejectArg(l: *Lower, f: u32, call: Inst.Index, k: usize, comptime msg: []const u8) error{Rejected} {
+        l.why = msg;
+        l.why_at = l.argSite(f, call, k);
         return error.Rejected;
     }
 
@@ -653,6 +674,7 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Low
         return e;
     };
     assert(program.inst_scope.len == program.insts.len);
+    assert(l.b.pc_sites.items.len == program.insts.len);
     const named = if (options.mixed) @import("digital/domain.zig").names(&l) catch |e| {
         why.* = .{ .text = l.why, .at = l.why_at, .code = l.why_code };
         return e;
@@ -670,6 +692,7 @@ pub fn lower(arena: Allocator, zcu: *Zcu, options: Options, why: *Why) Error!Low
     return .{
         .program = program,
         .check_sites = l.check_sites.items,
+        .pc_sites = l.b.pc_sites.items,
         .names = named,
         .ports = root_ports,
         .top_at = top.topAt(&l),

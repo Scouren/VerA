@@ -33,7 +33,8 @@ const posedge_mask: u8 = 0b100011;
 const negedge_mask: u8 = 0b011100;
 
 /// Timing check `i` of frame `f` (the instance whose specify block wrote
-/// it): its `Program.Check` row and its report site.
+/// it): its `Program.Check` row (its `name` the W1199 report's quoted
+/// text, lib/sim/digital's own words) and its report site.
 pub fn check(l: *Lower, f: u32, i: Inst.Index) Error!void {
     const vir = l.virOf(f);
     const t = Lower.payload(vir, Inst.TimingCheck, i);
@@ -46,7 +47,10 @@ pub fn check(l: *Lower, f: u32, i: Inst.Index) Error!void {
             return if (k < a.len) a[k] else .none;
         }
     }.at;
-    var c: Program.Check = .{ .kind = kind, .scope = l.frames.items[f].scope, .ev = .{ .{}, .{} }, .lim = .{ 0, 0 }, .notifier = none, .stamp_cond = .{}, .check_cond = .{}, .event_based = false, .remain_active = false, .delay = .{ 0, 0 }, .v = .{ 0, 0 }, .x = .{ 0, 0 } };
+    // W1199's quoted name, lib/sim/digital's words: the task as written
+    // (`name` keeps its leading `$`) and the scope's hierarchical path.
+    const check_name = try std.fmt.allocPrint(l.a, "`{s}` in {f}", .{ name, l.zcu.fmtPath(l.frames.items[f].instance) });
+    var c: Program.Check = .{ .kind = kind, .scope = l.frames.items[f].scope, .name = try l.b.string(check_name), .ev = .{ .{}, .{} }, .lim = .{ 0, 0 }, .notifier = none, .stamp_cond = .{}, .check_cond = .{}, .event_based = false, .remain_active = false, .delay = .{ 0, 0 }, .v = .{ 0, 0 }, .x = .{ 0, 0 } };
     switch (kind) {
         .width, .period => {
             try event(l, &c, 0, args[0]);

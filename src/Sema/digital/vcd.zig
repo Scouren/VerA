@@ -94,6 +94,9 @@ pub fn ports(l: *Lower, i: Inst.Index, op: Program.PortsOp, all: []const Inst.Re
             l.reject(l.frame, e, "§18.3.1: a $dumpports scope is a module instance: only modules are allowed, not variables")
         else
             l.reject(l.frame, e, "§18.3.1: a $dumpports scope is a module instance");
+        // evcd.zig:231 (28:19): a run-time E1100 blames the file name
+        // argument, not the call.
+        l.b.setSite(l.argSite(l.frame, i, k));
         name_row = try expr.self_(l, e, 0);
     }
     if (insts.items.len == 0) try insts.append(l.a, @backingInt(l.frames.items[l.frame].instance));

@@ -8,6 +8,7 @@
 //! - `pub fn slot(b: *Builder, ty: Program.Ty, v: []const u64, x: []const u64) Error!u32`
 //! - `pub fn inst(b: *Builder, tag: Program.Inst.Tag, a: u32, c: u32, scope: u32) Error!u32`
 //! - `pub fn setInst(b: *Builder, pc: u32, tag: Program.Inst.Tag, a: u32, c: u32) void`
+//! - `pub fn setSite(b: *Builder, at: u32) void`
 //! - `pub fn expr(b: *Builder, tag: Program.Expr.Tag, ty: Program.Ty, a: u32, c: u32) Error!u32`
 //! - `pub fn constant(b: *Builder, ty: Program.Ty, v: []const u64, x: []const u64) Error!u32`
 //! - `pub fn int(b: *Builder, ty: Program.Ty, value: u64) Error!u32`
@@ -30,6 +31,12 @@ p: Program = .{},
 init_v: std.ArrayList(u64) = .empty,
 init_x: std.ArrayList(u64) = .empty,
 inst_scope: std.ArrayList(u32) = .empty,
+/// The pp byte `inst` stamps on the row it appends next (`setSite`), one
+/// `pc_sites` entry per `insts` row, Zig's `dbg_stmt` mirror (T3,
+/// research/dlower.md §2): kept off `Program` like DWARF off `.text`, the
+/// caller reads it straight from the spent builder (`Lower.b.pc_sites`).
+site: u32 = 0,
+pc_sites: std.ArrayList(u32) = .empty,
 extra: std.ArrayList(u32) = .empty,
 consts: std.ArrayList(u64) = .empty,
 string_bytes: std.ArrayList(u8) = .empty,
@@ -62,12 +69,15 @@ pub fn slot(b: *Builder, ty: Program.Ty, v: []const u64, x: []const u64) Error!u
     return at;
 }
 
-/// Appends an instruction run in `scope`; returns its pc.
+/// Appends an instruction run in `scope`, blamed at the current `site`
+/// (`setSite`); returns its pc.
 pub fn inst(b: *Builder, tag: Program.Inst.Tag, a: u32, c: u32, scope: u32) Error!u32 {
     const pc: u32 = @intCast(b.p.insts.len);
     try b.p.insts.append(b.arena, .{ .tag = tag, .data = .{ .a = a, .b = c } });
     try b.inst_scope.append(b.arena, scope);
+    try b.pc_sites.append(b.arena, b.site);
     assert(b.inst_scope.items.len == b.p.insts.len);
+    assert(b.pc_sites.items.len == b.p.insts.len);
     return pc;
 }
 
@@ -75,6 +85,14 @@ pub fn inst(b: *Builder, tag: Program.Inst.Tag, a: u32, c: u32, scope: u32) Erro
 pub fn setInst(b: *Builder, pc: u32, tag: Program.Inst.Tag, a: u32, c: u32) void {
     assert(pc < b.p.insts.len);
     b.p.insts.set(pc, .{ .tag = tag, .data = .{ .a = a, .b = c } });
+}
+
+/// Sets the pp byte the next `inst` rows blame their run diagnostics at
+/// (Sema calls it once per statement, Zig's `zirDbgStmt` mirror; some
+/// system tasks override it for one argument's byte before their own
+/// `.task` row, dlower.md's blame table).
+pub fn setSite(b: *Builder, at: u32) void {
+    b.site = at;
 }
 
 /// Appends an expression row; returns its index.

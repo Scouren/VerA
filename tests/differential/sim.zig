@@ -43,9 +43,9 @@ const dirs = [_][]const u8{ "verilog", "verilog-ams/digital" };
 /// One run-stage diagnostic, compared by code name (old `diag.Code`'s, new
 /// `vams.Diag.Code`'s) and text, in order (G3-G6: `exe.report` used to drop
 /// these). `at` is the source byte when resolvable: a `.check`-blamed
-/// diagnostic resolves through `Lowered.check_sites`; a `.pc`-blamed one
-/// has no byte yet (`pc_sites`: T3's table), so `at` is `null` and only its
-/// code and text are compared.
+/// diagnostic resolves through `Lowered.check_sites`, a `.pc`-blamed one
+/// through `Lowered.pc_sites` (T3); `null` only when the lowering wrote no
+/// `pc_sites` at all, so only the code and text are compared.
 const RunDiag = struct { code: []const u8, at: ?u32, text: []const u8 };
 
 /// One elaboration-stage warning (T1(b): `zcu.failed`'s W rows), compared
@@ -302,23 +302,23 @@ fn libraries(a: Allocator, zcu: *Zcu, file: Zcu.File.Index, tree: *const vams.As
 }
 
 /// `d` resolved to a comparable `RunDiag`: a `.check` blame through
-/// `check_sites` (`Lowered.check_sites`, Sema already writes it); a `.pc`
-/// blame has no byte yet (`pc_sites`: T3's table), so `at` is `null` and
-/// only its code and text are compared.
-fn diagOf(d: std_sim.State.Diag, check_sites: []const u32) RunDiag {
+/// `check_sites` (`Lowered.check_sites`); a `.pc` blame through
+/// `pc_sites` (`Lowered.pc_sites`, T3), or `null` when the lowering wrote
+/// none (a design that refused before reaching `std_sim`).
+fn diagOf(d: std_sim.State.Diag, pc_sites: []const u32, check_sites: []const u32) RunDiag {
     return .{
         .code = @tagName(d.code),
         .at = switch (d.of) {
             .check => check_sites[d.at],
-            .pc => null,
+            .pc => if (pc_sites.len != 0) pc_sites[d.at] else null,
         },
         .text = d.text,
     };
 }
 
-/// Runs `p` in `std_sim`, in the working directory, with `check_sites`
-/// naming each timing check's source byte.
-fn runProgram(a: Allocator, io: std.Io, p: *const std_sim.Program, check_sites: []const u32, budget: u64) !Side {
+/// Runs `p` in `std_sim`, in the working directory, with `pc_sites` and
+/// `check_sites` naming each instruction's and timing check's source byte.
+fn runProgram(a: Allocator, io: std.Io, p: *const std_sim.Program, pc_sites: []const u32, check_sites: []const u32, budget: u64) !Side {
     var out: std.Io.Writer.Allocating = .init(a);
     var s: std_sim.State = try .init(a, p, &out.writer);
     s.budget = budget;
@@ -336,9 +336,9 @@ fn runProgram(a: Allocator, io: std.Io, p: *const std_sim.Program, check_sites: 
     for (s.checks, check_sites) |c, site| if (c.count != 0) try violated.append(a, site);
     const v = try uniqueSorted(violated.items);
     const warnings = try a.alloc(RunDiag, s.diags.items.len);
-    for (s.diags.items, warnings) |d, *w| w.* = diagOf(d, check_sites);
+    for (s.diags.items, warnings) |d, *w| w.* = diagOf(d, pc_sites, check_sites);
     result catch |e| switch (e) {
-        error.SimFailed => return .{ .out = out.written(), .failed = true, .warnings = warnings, .fail = diagOf(s.failure.?, check_sites), .sites = v },
+        error.SimFailed => return .{ .out = out.written(), .failed = true, .warnings = warnings, .fail = diagOf(s.failure.?, pc_sites, check_sites), .sites = v },
         error.OutOfMemory, error.WriteFailed => return e,
     };
     return .{ .out = out.written(), .failed = false, .warnings = warnings, .sites = v };
@@ -478,7 +478,7 @@ fn compare(a: Allocator, io: std.Io, root: []const u8, rel: []const u8, ruling: 
     };
 
     try std.process.setCurrentDir(io, new_dir.dir);
-    const new = try runProgram(a, io, &lowered.program, lowered.check_sites, opts.event_budget);
+    const new = try runProgram(a, io, &lowered.program, lowered.pc_sites, lowered.check_sites, opts.event_budget);
 
     if (old.failed and !new.failed) if (first) |f|
         return std.fmt.allocPrint(a, "old run failed ({t}: {s}), new run completed", .{ f.code, f.message });

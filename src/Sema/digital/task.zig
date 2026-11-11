@@ -139,19 +139,36 @@ pub fn task(l: *Lower, i: Inst.Index) Error!void {
             for (args) |a| try place.notAutomatic(l, a, "$monitor");
             break :blk .{ .kind = .monitor, .a = try monitor(l, i, args, sh, at, none) };
         },
-        .fshow => |sh| .{ .kind = .fshow, .a = try fileShow(l, i, args, sh, at) },
-        .fstrobe => |sh| .{ .kind = .fstrobe, .a = try fileShow(l, i, args, sh, at) },
+        // §17.2.2 files.zig:413: W1154 (an unwritten descriptor) blames
+        // arg 0, the descriptor, on every file-output task, not the call.
+        .fshow => |sh| blk: {
+            l.b.setSite(l.argSite(l.frame, i, 0));
+            break :blk .{ .kind = .fshow, .a = try fileShow(l, i, args, sh, at) };
+        },
+        .fstrobe => |sh| blk: {
+            l.b.setSite(l.argSite(l.frame, i, 0));
+            break :blk .{ .kind = .fstrobe, .a = try fileShow(l, i, args, sh, at) };
+        },
         .fmonitor => |sh| blk: {
             if (args.len == 0 or args[0] == .none) return l.reject(l.frame, i.toRef(), "a §17.2.2 file output task's first argument is a descriptor");
+            l.b.setSite(l.argSite(l.frame, i, 0));
             break :blk .{ .kind = .monitor, .a = try monitor(l, i, args[1..], sh, at, try expr.self_(l, args[0], 0)) };
         },
         .swrite, .sformat => blk: {
             if (args.len < 2) return l.refuse("a $swrite/$sformat with no text");
             const sh: Show = if (kind == .swrite) kind.swrite else .{ .radix = .decimal, .newline = false };
+            // §17.2.3 display.zig:485: W1153 (the format mismatch) blames
+            // arg 1, the format argument, not the call.
+            l.b.setSite(l.argSite(l.frame, i, 1));
             const w = try l.b.extraOf(Program.SWrite{ .show = try format.show(l, i, args[1..], sh, at, kind == .sformat), .place = try place.place(l, args[0]), .ty = try l.tyOf(try place.targetType(l, args[0])) });
             break :blk .{ .kind = .swrite, .a = w };
         },
-        .readmem => |radix| .{ .kind = .readmem, .a = try readmem(l, args, radix) },
+        // §17.2.9 readmem.zig:381: W1150/W1156/W1157 blame arg 0, the file
+        // name, not the call.
+        .readmem => |radix| blk: {
+            l.b.setSite(l.argSite(l.frame, i, 0));
+            break :blk .{ .kind = .readmem, .a = try readmem(l, args, radix) };
+        },
         .fclose => blk: {
             if (args.len != 1) return l.reject(l.frame, i.toRef(), "$fclose takes one descriptor");
             break :blk .{ .kind = .fclose, .a = try expr.self_(l, args[0], 0) };

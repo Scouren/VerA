@@ -45,6 +45,10 @@ const driver_bench =
     \\
 ;
 
+/// `oneTask`'s result: the pc of the one `.task` row found, and its
+/// `Program.Task.a` payload index.
+const TaskRow = struct { pc: u32, a: u32 };
+
 // ---- private ----
 
 /// Lowers `mixed` and its twin with the analog half blanked; both must
@@ -195,6 +199,51 @@ fn slotNamed(lowered: *const digital.Lowered, name: []const u8) !u32 {
     for (lowered.slot_names, 0..) |n, k| if (std.mem.eql(u8, n, name)) return @intCast(k);
     std.debug.print("no slot named `{s}`\n", .{name});
     return error.TestUnexpectedResult;
+}
+
+/// `src` through the IEEE 1364 route (one root, no analog half), to a
+/// successful `Lowered` (dlower.md T3's `pc_sites`/`Check.name` tests): a
+/// refusal or an elaboration error fails the test with its reason.
+fn lowerSource1364(a: std.mem.Allocator, src: []const u8) !digital.Lowered {
+    var pp: vams.Preprocessor = .init(a, .{ .std_defs = false });
+    try pp.addUnit("ieee1364.v", src);
+    while (try pp.run()) |_| return error.UnexpectedInclude;
+    const out = try a.create(vams.Preprocessor.Output);
+    out.* = pp.output();
+    try std.testing.expect(!out.failed);
+    const text = try a.dupeSentinel(u8, out.text, 0);
+    const tree = try a.create(vams.Ast);
+    tree.* = try vams.Ast.parse(a, text, .{ .discrete = true });
+    try std.testing.expectEqual(@as(usize, 0), tree.errors.len);
+    const vir = try vams.AstGen.generate(a, tree, .{ .directives = out.directives, .ieee1364 = true });
+    var zcu: Zcu = try .init(a);
+    _ = try zcu.addFile("ieee1364.v", vir, 0);
+    try Sema.elaborate(&zcu, .{ .roots = .all, .ieee1364 = true });
+    for (zcu.failed.items(.code)) |code| if (@tagName(code)[0] == 'E') {
+        std.debug.print("elaboration refuses it: {t}\n", .{code});
+        return error.TestUnexpectedResult;
+    };
+    var why: digital.Why = .{};
+    return digital.lower(a, &zcu, .{ .sources = &.{.{ .tree = tree, .pp = out }} }, &why) catch |e| {
+        std.debug.print("lowering {t}: {s} (at {d})\n", .{ e, why.text, why.at });
+        return error.TestUnexpectedResult;
+    };
+}
+
+/// The one `.task` row of `p.insts` whose `Program.Task.kind` is `kind`:
+/// its pc and its `Task.a` payload index. A test failure when there is
+/// none or more than one (dlower.md T3's blame tests want exactly one
+/// call to attribute a `pc_sites` entry to).
+fn oneTask(p: *const Program, kind: Program.Task.Kind) !TaskRow {
+    var found: ?TaskRow = null;
+    for (p.insts.items(.tag), p.insts.items(.data), 0..) |tg, d, idx| {
+        if (tg != .task) continue;
+        const t = p.extraData(Program.Task, d.a);
+        if (t.kind != kind) continue;
+        try std.testing.expect(found == null);
+        found = .{ .pc = @intCast(idx), .a = t.a };
+    }
+    return found orelse error.TestUnexpectedResult;
 }
 
 fn isMultiArrayList(comptime T: type) bool {
@@ -1010,4 +1059,87 @@ test "§18.3.1 a $dumpports scope naming a variable is rejected (dumpports_varia
         \\endmodule
     );
     try std.testing.expect(std.mem.indexOf(u8, why.text, "not variables") != null);
+}
+
+test "dlower T3: a $readmemb's file name argument is pc_sites' blame, not the call (readmem.zig:381's W1150/W1156/W1157)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const src =
+        \\module top;
+        \\  reg [7:0] mem[0:3];
+        \\  initial $readmemb("data.mem", mem);
+        \\endmodule
+    ;
+    const lowered = try lowerSource1364(a, src);
+    const row = try oneTask(&lowered.program, .readmem);
+    const want: u32 = @intCast(std.mem.indexOf(u8, src, "\"data.mem\"").?);
+    try std.testing.expectEqual(want, lowered.pc_sites[row.pc]);
+}
+
+test "dlower T3: a $swrite's format argument is pc_sites' blame, not the call (display.zig:485's W1153)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const src =
+        \\module top;
+        \\  reg [8*8-1:0] outstr;
+        \\  initial $swrite(outstr, "hello %d", 1);
+        \\endmodule
+    ;
+    const lowered = try lowerSource1364(a, src);
+    const row = try oneTask(&lowered.program, .swrite);
+    const want: u32 = @intCast(std.mem.indexOf(u8, src, "\"hello %d\"").?);
+    try std.testing.expectEqual(want, lowered.pc_sites[row.pc]);
+}
+
+test "dlower T3: a $fdisplay's descriptor argument is pc_sites' blame, not the call (files.zig's W1154)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const src =
+        \\module top;
+        \\  integer fd;
+        \\  initial $fdisplay(fd, "hi");
+        \\endmodule
+    ;
+    const lowered = try lowerSource1364(a, src);
+    const row = try oneTask(&lowered.program, .fshow);
+    const want: u32 = @intCast(std.mem.indexOf(u8, src, "$fdisplay(").? + "$fdisplay(".len);
+    try std.testing.expectEqual(want, lowered.pc_sites[row.pc]);
+}
+
+test "dlower T3: the first $dist_uniform call in a statement is pc_sites' blame (sysfn.zig's dist_site, the old engine's own call-site convention)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const src =
+        \\module top;
+        \\  integer seed;
+        \\  reg [31:0] r;
+        \\  initial r = $dist_uniform(seed, 0, 10);
+        \\endmodule
+    ;
+    const lowered = try lowerSource1364(a, src);
+    try std.testing.expect(lowered.program.insts.len > 0);
+    const want: u32 = @intCast(std.mem.indexOf(u8, src, "$dist_uniform(").? + "$dist_uniform".len);
+    try std.testing.expectEqual(want, lowered.pc_sites[0]);
+}
+
+test "dlower T3: a timing check's Program.Check.name is W1199's quoted text, lib/sim/digital's own words ($width in top)" {
+    var arena_state: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const src =
+        \\module top(clk);
+        \\  input clk;
+        \\  specify
+        \\    $width(posedge clk, 2);
+        \\  endspecify
+        \\endmodule
+    ;
+    const lowered = try lowerSource1364(a, src);
+    try std.testing.expectEqual(@as(usize, 1), lowered.program.checks.len);
+    const got = lowered.program.str(lowered.program.checks[0].name);
+    try std.testing.expectEqualStrings("`$width` in top", got);
 }

@@ -16,13 +16,13 @@
 //! // then `link.buildExe(file, ..., device_text, aw.written())`
 //! ```
 //!
-//! Cites: §2.4, §4.5.2; each `std_sim.bench` file cites its own clauses.
+//! Cites: §2.4, §4.5.2, §6.7.1, §7.3.6.3; each `std_sim.bench` file cites its own clauses.
 //!
 //! Contents:
 //! - from `bench/spec.zig`: `Spec`, `Bench`, `Harness`, `Facts` (= `std_sim.bench.Config`), `Digital`, `Binding`, `ParseError`, `RenderError`, `points_max`
 //! - `pub fn writeRunner(w: *std.Io.Writer, title: []const u8, bench: *const Bench, facts: Facts) RenderError!void`
 //! - `pub fn facts(arena: Allocator, device: *const Air.Device) Allocator.Error!Facts`
-//! - `pub fn digital(arena: Allocator, program: *const std_sim.Program, names: []const Digital.Name) Allocator.Error!Digital`
+//! - `pub fn digital(arena: Allocator, program: *const std_sim.Program, names: []const Digital.Name, device: *const Air.Device, ip: *const InternPool, unresolved: *[]const u8) (Allocator.Error || error{UnknownProbe})!Digital`
 //! - `pub fn gridEvent(air: *const Air) ?Air.Inst.Index`
 //! - `pub fn fmtF64(x: f64) std.fmt.Alt(f64, formatF64)`, `pub fn formatF64(x: f64, w: *std.Io.Writer) std.Io.Writer.Error!void`
 
@@ -30,6 +30,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const Air = @import("air");
+const InternPool = @import("intern_pool");
 const SysFn = @import("vams").SysFn;
 const std_sim = @import("std_sim");
 const spec = @import("bench/spec.zig");
@@ -92,12 +93,47 @@ pub fn facts(arena: Allocator, device: *const Air.Device) Allocator.Error!Facts 
 }
 
 /// A mixed design's digital half as the runner embeds it (`Facts.mixed`):
-/// `program` saved by `std_sim.serial`, beside its `names`; in `arena`.
-pub fn digital(arena: Allocator, program: *const std_sim.Program, names: []const Digital.Name) Allocator.Error!Digital {
+/// `program` saved by `std_sim.serial`, beside its `names` and each VAMS
+/// §7.3.6.3 probe terminal resolved against `device` (a probe's only
+/// argument a named branch first, else a net and ground); in `arena`. A
+/// simple name that is neither is ground, as the old runner read it; a
+/// §6.7.1 hierarchical one is `error.UnknownProbe`, its name in
+/// `unresolved`.
+pub fn digital(
+    arena: Allocator,
+    program: *const std_sim.Program,
+    names: []const Digital.Name,
+    device: *const Air.Device,
+    ip: *const InternPool,
+    unresolved: *[]const u8,
+) (Allocator.Error || error{UnknownProbe})!Digital {
+    var probes: std.ArrayList(Digital.Probe) = .empty;
+    for (program.exprs.items(.tag), program.exprs.items(.data)) |t, d| if (t == .probe) {
+        const pr = program.extraData(std_sim.Program.Probe, d.a);
+        const only = pr.b.len == 0;
+        const terms = [_]std_sim.Program.List{ pr.a, pr.b };
+        for (terms[0 .. @as(usize, 2) - @intFromBool(only)]) |l| {
+            const name = program.str(l);
+            const seen = for (probes.items) |q| {
+                if (std.mem.eql(u8, q.name, name)) break true;
+            } else false;
+            if (seen) continue;
+            // ponytail: a simple name the device lacks (a `ground` net) reads
+            // 0 as the old runner's did; Sema would have to mark ground nets.
+            const row = probeRow(device, ip, name, only) orelse if (std.mem.findScalar(u8, name, '.') == null)
+                Digital.Probe{ .name = name, .hi = null, .lo = null }
+            else {
+                unresolved.* = name;
+                return error.UnknownProbe;
+            };
+            try probes.append(arena, row);
+        }
+    };
+    assert(probes.items.len <= 2 * program.exprs.len);
     var aw: std.Io.Writer.Allocating = .init(arena);
     std_sim.serial.save(program, &aw.writer) catch return error.OutOfMemory;
     assert(aw.written().len != 0);
-    return .{ .program = aw.written(), .names = names };
+    return .{ .program = aw.written(), .names = names, .probes = probes.items };
 }
 
 /// The first §5.10.3 `cross`, `above` or `timer` call in `air`, or null:
@@ -138,6 +174,25 @@ pub fn formatF64(x: f64, w: *std.Io.Writer) std.Io.Writer.Error!void {
 }
 
 // ---- private ----
+
+/// Probe terminal `name` as `device` holds it: a named branch when it is
+/// the probe's `only` argument, else a net with ground; null when neither.
+fn probeRow(device: *const Air.Device, ip: *const InternPool, name: []const u8, only: bool) ?Digital.Probe {
+    assert(name.len != 0);
+    if (only) for (device.branches.items(.name), device.branches.items(.hi), device.branches.items(.lo)) |n, hi, lo| {
+        if (std.mem.eql(u8, ip.stringToSlice(n), name)) return .{ .name = name, .hi = unknown(hi), .lo = unknown(lo) };
+    };
+    for (device.nodes.items(.name), 0..) |n, i| {
+        if (std.mem.eql(u8, ip.stringToSlice(n), name)) return .{ .name = name, .hi = @intCast(i), .lo = null };
+    }
+    return null;
+}
+
+/// Node `n`'s unknown, or null for ground.
+fn unknown(n: Air.Device.Node.Index) ?u32 {
+    assert(n != .none);
+    return if (n == .ground) null else @backingInt(n);
+}
 
 /// Writes `v` as a Zig literal of its type, every field by name: a string
 /// as a string, a slice as `&.{ ... }`, a float exactly (`fmtF64`).

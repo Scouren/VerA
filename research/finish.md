@@ -150,7 +150,7 @@ six corpus steps queued behind it today. In order of effect:
 
 | Task | What | Files | Oracle | Place |
 |---|---|---|---|---|
-| G1 | `test` stops depending on the `diff-*` runs (`build/rewrite.zig:124` `g.test_step.dependOn`); `tools/gate.sh <worktree>` runs `test`, then every `diff-*` as its own `build-slot.sh` call, two at a time, and exits non-zero on the first failure, naming the step | `build/rewrite.zig`, new `tools/gate.sh`, `TESTING.md` (the tier map), AGENTS.md's "Building with many agents" (one line, on the user's approval: AGENTS.md is the user's) | `zig build test --summary all` lists no `diff-*` run; a planted XPASS in one list fails `tools/gate.sh` with that step's name; `test`'s wall on a warm cache under 15 min | S1, lead (build files are no lane's) |
+| G1 | `test` stops depending on the `diff-*` runs (`build/rewrite.zig:124` `g.test_step.dependOn`); `tools/gate.sh <worktree>` runs `test`, then every `diff-*` as its own `build-slot.sh` call, two at a time, and exits non-zero on the first failure, naming the step | `build/rewrite.zig`, new `tools/gate.sh`, `TESTING.md` (the tier map), AGENTS.md's "Building with many agents" (one line) | `zig build test --summary all` lists no `diff-*` run; a planted XPASS in one list fails `tools/gate.sh` with that step's name; `test`'s wall on a warm cache under 15 min | done (lead): 3bb5a8b7, AGENTS.md 368f1c02 (user's yes) |
 
 ## 3. The order
 

@@ -134,6 +134,13 @@ pub fn add(g: Graph, suite_exe: *Build.Step.Compile, check: *Build.Step, espice_
         cache_budget_selftest.expectExitCode(0);
         cache_budget_selftest.has_side_effects = true; // scratch trees under mktemp
         test_step.dependOn(&cache_budget_selftest.step);
+        // tools/gate.sh (research/finish.md G1): the merge gate's diff stage.
+        const gate_selftest = b.addSystemCommand(&.{"bash"});
+        gate_selftest.addFileArg(b.path("tools/gate.sh"));
+        gate_selftest.addArg("selftest");
+        gate_selftest.expectExitCode(0);
+        gate_selftest.has_side_effects = true; // scratch trees under mktemp
+        test_step.dependOn(&gate_selftest.step);
     }
 
     const diag_gaps_selftest = b.addSystemCommand(&.{"python3"});

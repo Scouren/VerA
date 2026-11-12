@@ -177,7 +177,7 @@ Callers: 34 `s.fail(` gain a code (E1100 except sdf's E1102); ~30 `s.warn(` gain
 | T5 | attribute values | `src/Sema/digital/decl.zig` | frontend `Process.attrs`, T0 | sim −1, comp −1, exe −1, dev −1 |
 | T6 | (a) rtlil + device rulings; (b, after libmap T2) the 7 G14 lines to `sim.rulings`; `$stop` byte test; hand the six comp.rulings lines (G9, G13) to the lead | `tests/differential/{rtlil,digital_device,sim}.rulings`, `{rtlil,digital_device,sim}.xfail`, `src/Sema/digital_test.zig` | T0; (b) libmap T2 | rtlil −2, dev −2, sim −7 (b) |
 | T7 | blame a runtime `$sformat` pairing mismatch (W1153) where old does: old's byte is later than new's in both fixtures (298 vs 293 in `native_sformat_dynamic.v`, 156 vs 148 in `sformat_excess_argument_warning.v`), so old points into the argument list, new at the call. Find old's token, then give Sema one `pc_sites` entry per argument | `src/Sema/digital/task.zig`, `lib/std/sim/display.zig` | T3 | sim −2 |
-| T8 | `fullskew_checks_both_orders.v`: new reports 2 run diagnostics, old 1 (sim.xfail, exposed once T3 gave run diagnostics their sites). Read IEEE 1364-2005 §15.3.7 for how many violations the two orders give; fix the side that disagrees, or rule old's count with the clause | `lib/std/sim/tchk.zig` or `sim.rulings` | T3 | sim −1 |
+| T8 | done (lead): old's bag and new's `Diag.Wip` both keep one row per code and site (W1199's explain: "reported once per site"), so the product agreed; diff-sim compared new's raw `State.diags` (one per instance). The oracle now applies the same rule | `tests/differential/sim.zig` | T3 | sim −1 |
 
 Lanes after T0: T1, T2, T4, T6 share no file (T6 after T0 because both add to `digital_test.zig`). T3 joins T1 + T2. Wrong-text-no-crash first: T1 → T2 → T3 is the critical path.
 

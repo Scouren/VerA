@@ -12,7 +12,6 @@ verilog/13_configuration/two_libraries_match_rejected.v a `//@` line the cli ref
 verilog/13_configuration/undeclared_library_rejected.v old run failed (E1100: undeclared module in instantiation: no library of the search order (nosuch) holds cell `adder`), new run completed
 verilog/A_formal_syntax/b_A_1_1_include_without_path_rejected.v a `//@` line the cli refuses
 verilog/A_formal_syntax/b_A_1_1_include_without_semicolon_rejected.v a `//@` line the cli refuses
-verilog/15_timing_checks/fullskew_checks_both_orders.v 1 run diagnostics old, 2 new
 verilog/17_system_tasks/native_sformat_dynamic.v run diagnostic 1: old W1153@298 "$sformat: the format's specifiers and the arguments after it do not pair up"; new W1153@293 "$sformat: the format's specifiers and the arguments after it do not pair up"
 verilog/17_system_tasks/sformat_excess_argument_warning.v run diagnostic 0: old W1153@156 "$sformat: the format's specifiers and the arguments after it do not pair up"; new W1153@148 "$sformat: the format's specifiers and the arguments after it do not pair up"
 verilog/18_vcd/dumpports_same_file_rejected.v 0 run diagnostics old, 1 new

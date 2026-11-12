@@ -335,13 +335,24 @@ fn runProgram(a: Allocator, io: std.Io, p: *const std_sim.Program, pc_sites: []c
     var violated: std.ArrayList(u32) = .empty;
     for (s.checks, check_sites) |c, site| if (c.count != 0) try violated.append(a, site);
     const v = try uniqueSorted(violated.items);
-    const warnings = try a.alloc(RunDiag, s.diags.items.len);
-    for (s.diags.items, warnings) |d, *w| w.* = diagOf(d, pc_sites, check_sites);
+    // What the user sees: one row per code and site (`Diag.Wip`'s dedupe
+    // key, and the old bag's), so two instances of one cell's timing check
+    // report once (W1199's explain: "reported once per site").
+    // ponytail: a linear scan over the kept rows, one per distinct code and
+    // site of the source; a hash set if a design ever has thousands.
+    var warnings: std.ArrayList(RunDiag) = .empty;
+    for (s.diags.items) |d| {
+        const w = diagOf(d, pc_sites, check_sites);
+        const seen = w.at != null and for (warnings.items) |o| {
+            if (o.at != null and o.at.? == w.at.? and std.mem.eql(u8, o.code, w.code)) break true;
+        } else false;
+        if (!seen) try warnings.append(a, w);
+    }
     result catch |e| switch (e) {
-        error.SimFailed => return .{ .out = out.written(), .failed = true, .warnings = warnings, .fail = diagOf(s.failure.?, pc_sites, check_sites), .sites = v },
+        error.SimFailed => return .{ .out = out.written(), .failed = true, .warnings = warnings.items, .fail = diagOf(s.failure.?, pc_sites, check_sites), .sites = v },
         error.OutOfMemory, error.WriteFailed => return e,
     };
-    return .{ .out = out.written(), .failed = false, .warnings = warnings, .sites = v };
+    return .{ .out = out.written(), .failed = false, .warnings = warnings.items, .sites = v };
 }
 
 /// The first run-stage diagnostic that differs, old vs new, in order

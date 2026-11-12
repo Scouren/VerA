@@ -308,7 +308,13 @@ fn Run(comptime D: type, comptime fd_skip: u64) type {
                 sn.kind = .noise;
                 const psd = D.noisePsd(V, xv.*, m, &inst, sn);
                 for (D.noise_gens, psd) |g, p| for (noise_freqs, 0..) |f, fi| {
-                    const table: ?f64 = if (comptime @hasDecl(D, "noise_tables")) if (g.table) |k| contract.noiseTableAt(contract.noiseTable(D, m, k), f) else null else null;
+                    // `noise_tables` is `[_]contract.NoiseTable{...}`: a
+                    // device with no table-kind generator emits it at
+                    // length 0, and `D.noise_tables[k]` (`noiseTable`'s
+                    // own body) is a compile error on a `[0]T` regardless
+                    // of `g.table`'s runtime value, so the length (not
+                    // just the decl) must be comptime-false first.
+                    const table: ?f64 = if (comptime @hasDecl(D, "noise_tables") and D.noise_tables.len != 0) if (g.table) |k| contract.noiseTableAt(contract.noiseTable(D, m, k), f) else null else null;
                     const shape = table orelse p.white + p.flicker / std.math.pow(f64, f, p.ef);
                     e[(fi * n + g.row) * n + g.col] += p.coeff * p.coeff * shape;
                 };

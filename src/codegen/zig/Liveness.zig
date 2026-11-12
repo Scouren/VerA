@@ -57,8 +57,13 @@ pub const Operands = struct {
     len: u8 = 0,
     rest: []const u32 = &.{},
 
-    /// Fills the operands of instruction (`tag`, `data`).
-    pub fn collect(o: *Operands, air: Air, tag: Inst.Tag, data: Inst.Data) void {
+    /// Fills the operands of instruction (`tag`, `data`). `skip_noise_args`
+    /// drops a §4.6 noise call's args (B1): every body but `noise.zig`'s
+    /// renders that call as a constant, so its args would be unread locals.
+    /// `markUsed` skips them unless the call is a root (only `noise.plan`
+    /// roots the calls); `Function.hoistArgs`/`genTree` pass `false`, since
+    /// a derived parameter default never calls one.
+    pub fn collect(o: *Operands, air: Air, tag: Inst.Tag, data: Inst.Data, skip_noise_args: bool) void {
         assert(o.len == 0);
         switch (tag) {
             .select, .store => {
@@ -70,6 +75,10 @@ pub const Operands = struct {
             .cond_br => o.push(data.pl_op.operand),
             .call => {
                 const x = air.extraData(Air.Call, data.ty_pl.payload);
+                // B1: outside `noise.zig`'s own body a §4.6 noise call's
+                // args never render (`calls.zig` renders a constant);
+                // marking them used would leave their local unread.
+                if (skip_noise_args and x.data.callee <= max_sysfn_tag and !readsArgs(@fromBackingInt(@as(@typeInfo(SysFn.Tag).@"enum".tag_type, @intCast(x.data.callee))))) return;
                 o.rest = air.extra[x.end..][0..x.data.args_len];
             },
             .br => o.push(data.br.operand),
@@ -100,6 +109,23 @@ pub const Operands = struct {
         return o.buf[0..o.len];
     }
 };
+
+const max_sysfn_tag = std.math.maxInt(@typeInfo(SysFn.Tag).@"enum".tag_type);
+
+/// B1: whether a call of `tag` reads its own arguments in a body that does
+/// not root it (`core`, `say`).
+/// False for the §4.6.4 noise family: `calls.zig` renders their value as a
+/// constant there, never their arguments, so marking them used would leave
+/// the rendered local unread (an "unused local constant" build failure).
+/// `ac_stim` does read its own `mag`/`phase` (§4.6.3's eval arm), and
+/// `noise.zig`'s own second body roots every call and reads every one of
+/// them, to price `noisePsd`/`acStim`.
+pub fn readsArgs(tag: SysFn.Tag) bool {
+    return switch (tag) {
+        .white_noise, .flicker_noise, .noise_table, .noise_table_log => false,
+        else => true, // else: every other call, `ac_stim` included
+    };
+}
 
 const Liveness = @This();
 
@@ -194,7 +220,7 @@ fn markUsed(l: Liveness, air: Air, reach: []const bool, roots: ?[]const bool) bo
         const root = if (roots) |r| r[i] else false;
         if (!l.used[i] and !root and !effect(air, tags[i], datas[i])) continue;
         var ops: Operands = .{};
-        ops.collect(air, tags[i], datas[i]);
+        ops.collect(air, tags[i], datas[i], !root);
         for (ops.slice()) |r| if (r.toIndex()) |o| {
             if (!l.used[@backingInt(o)]) grew = true;
             l.used[@backingInt(o)] = true;

@@ -208,7 +208,6 @@ verilog-ams/ch12_vpi_routines/two_sites.va codegen: a call of a user function (c
 netlist/hdl/a09_limit_root_transient.assets/a09_limit_ramp.va the new device does not build: n5.zig:150: unused function parameter
 netlist/hdl/veriloga_limit.assets/va_limit.va the new device does not build: n10.zig:154: unused function parameter
 netlist/hdl/veriloga_limit.assets/va_limit_state.va codegen: a §5.6.1.2 path latch (`path_prev`)
-netlist/noise/va_noise.assets/ntab_card.va the new device does not build: n0.zig:80: unused local constant
 spice/limit_fet.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
 spice/limit_pnj.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
 spice/limit_pnjlimds_bsim_pmos_von_at_old.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
@@ -231,38 +230,14 @@ verilog-a/annex_a_syntax/indirect_contribution.va codegen: a §5.6.7 indirect co
 verilog-a/ch01_intro/signal_flow_bound_to_conservative_node.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch04_expressions/absdelay_vera_interp_quadratic.va point 2: display record value 1: old -3.252357221615589e0, new -3.2516766450323726e0
 verilog-a/ch04_expressions/absdelay_vera_interp_quadratic_uneven.va point 2: display record value 1: old 9.436303503529176e-1, new 9.42718491909365e-1
-verilog-a/ch04_expressions/ac_stim.va codegen: a call of `ac_stim`
-verilog-a/ch04_expressions/ac_stim_ac_analysis.va codegen: a call of `ac_stim`
-verilog-a/ch04_expressions/ac_stim_dynamic_magnitude.va codegen: a call of `ac_stim`
-verilog-a/ch04_expressions/ac_stim_long_node_names.va codegen: a call of `ac_stim`
-verilog-a/ch04_expressions/ac_stim_noise_analysis.va codegen: a call of `ac_stim`
-verilog-a/ch04_expressions/ac_stim_quadrature.va codegen: a call of `ac_stim`
-verilog-a/ch04_expressions/ddx_in_noise_power.va the new device does not build: n10.zig:70: unused local constant
-verilog-a/ch04_expressions/diode_noise_sources_in_dc.va the new device does not build: n14.zig:81: unused local constant
 verilog-a/ch04_expressions/filter_parameter_arrays.va codegen: a call of `laplace_nd`
 verilog-a/ch04_expressions/laplace_dynamic_coefficient_sampled.va codegen: a call of `laplace_nd`
 verilog-a/ch04_expressions/laplace_nd_zero_padded_coefficients.va codegen: a call of `laplace_nd`
 verilog-a/ch04_expressions/laplace_np_parameter_roots_unpaired_is_nan.va codegen: a call of `laplace_np`
 verilog-a/ch04_expressions/laplace_zp_parameter_roots_ac.va codegen: a call of `laplace_zp`
 verilog-a/ch04_expressions/laplace_zp_parameter_roots_step.va codegen: a call of `laplace_zp`
-verilog-a/ch04_expressions/noise_anticorrelated_coefficient.va the new device does not build: n7.zig:59: unused local constant
-verilog-a/ch04_expressions/noise_coefficient_beside_a_loop.va the new device does not build: n8.zig:61: unused local constant
-verilog-a/ch04_expressions/noise_coefficient_through_a_conditional.va the new device does not build: n9.zig:66: unused local constant
-verilog-a/ch04_expressions/noise_correlated_scale.va the new device does not build: n10.zig:59: unused local constant
-verilog-a/ch04_expressions/noise_psd_beside_a_held_history.va the new device does not build: n12.zig:95: unused local constant
-verilog-a/ch04_expressions/noise_source_through_variable.va the new device does not build: n14.zig:62: unused local constant
-verilog-a/ch04_expressions/noise_sources.va the new device does not build: n15.zig:63: unused local constant
-verilog-a/ch04_expressions/noise_table_array_parameter.va the new device does not build: n16.zig:90: unused local constant
-verilog-a/ch04_expressions/noise_table_card_knots.va the new device does not build: n17.zig:82: unused local constant
-verilog-a/ch04_expressions/partially_correlated_noise.va the new device does not build: n5.zig:72: unused local constant
 verilog-a/ch04_expressions/psd_bias_dependent.va the new device does not build: n14.zig:85: unused local constant
 verilog-a/ch04_expressions/psd_white_flicker_export.va the new device does not build: n15.zig:65: unused local constant
-verilog-a/ch04_expressions/small_signal_linearization.va codegen: a call of `ac_stim`
-verilog-a/ch04_expressions/spice_noise_rc_white.va the new device does not build: n19.zig:59: unused local constant
-verilog-a/ch04_expressions/spice_noise_series_resistor.va the new device does not build: n20.zig:56: unused local constant
-verilog-a/ch04_expressions/spice_noise_shared_pair.va the new device does not build: n21.zig:62: unused local constant
-verilog-a/ch04_expressions/status_site_beside_noise.va the new device does not build: n1.zig:72: unused local constant
-verilog-a/ch04_expressions/white_noise_topology.va the new device does not build: n1.zig:63: unused local constant
 verilog-a/ch05_analog_behavior/analog_signals_nets_branches_contributions.va codegen: a §5.6.7 indirect contribution
 verilog-a/ch05_analog_behavior/child_named_branch_potential_and_flow_access.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch05_analog_behavior/controlled_sources.va codegen: a flow contribution to a potential source's branch
@@ -307,8 +282,6 @@ verilog-a/ch09_system_tasks/table_status.va codegen: a §9.17.3 `$limit` string 
 verilog-a/ch10_directives/compact_modeling_nonlin_res_example.va the new device does not build: n2.zig:81: unused local constant
 verilog-a/combined/limit_and_discontinuity.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
 verilog-a/combined/named_limiter_nonlinear.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
-verilog-a/combined/noise_and_analysis.va the new device does not build: n10.zig:71: unused local constant
-verilog-a/combined/noise_temperature_analysis.va the new device does not build: n11.zig:73: unused local constant
 verilog-a/exhaustive/indirect_contribution.va codegen: a §5.6.7 indirect contribution
 verilog-ams/ch05_analog_behavior/cross_expr_tol_and_time_tol_both_hold.va codegen: a call of `cross`
 verilog-ams/ch05_analog_behavior/event_array_index_change_is_not_an_event.va codegen: a call of `timer`
@@ -324,7 +297,6 @@ verilog-ams/ch07_mixed_signal/timer_runtime_drift.va codegen: a call of `timer`
 verilog-ams/ch07_mixed_signal/timer_runtime_enable.va codegen: a call of `timer`
 verilog-ams/ch09_system_tasks/status_ops.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/table_status.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
-verilog-ams/ch12_vpi_routines/rc_ac.va codegen: a call of `ac_stim`
 verilog-a/ch06_hierarchy/paramset_outer_defparam_shape.va codegen: parameter `mode` is not a number
 verilog-a/ch06_hierarchy/paramset_string_range_selection.va codegen: parameter `u.h01_type_ps.t` is not a number
 verilog-a/annex_a_syntax/declarations.va codegen: a slot of type 2 (a string)
@@ -347,7 +319,6 @@ verilog-a/ch03_data_types/string_replication_parameter_multiplier.va codegen: a 
 verilog-a/ch03_data_types/string_replication_past_4096_bytes.va codegen: a slot of type 2 (a string)
 verilog-a/ch03_data_types/string_replication_runtime_multiplier.va codegen: a slot of type 2 (a string)
 verilog-a/ch03_data_types/string_variables.va codegen: a slot of type 2 (a string)
-verilog-a/ch04_expressions/ac_stim_label_inactive_in_large_signal.va codegen: a slot of type 2 (a string)
 verilog-a/ch04_expressions/idt.va codegen: a call of `idt$hold`
 verilog-a/ch04_expressions/zi_np_parameter_roots_dc_gain.va codegen: a call of `zi_np`
 verilog-a/ch05_analog_behavior/held_sformat_string_survives_rejected_step.va codegen: a real operand that is not a number
@@ -475,30 +446,19 @@ verilog-ams/ch09_system_tasks/input_position_restore_failure.va codegen: a call 
 verilog-ams/ch09_system_tasks/r_format_in_the_digital_context.va codegen: a call of `$fopen`
 verilog-ams/ch09_system_tasks/strobe_writes_once_per_accepted_solution.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/ungetc_cancelled_by_fseek_and_gap_reads_zero.va codegen: a call of `$fopen`
-
 verilog-a/ch09_system_tasks/simparam_timescale.va point 0: row 0: old -4.511869783264559e-1, new -4.511869793274559e-1
-
-netlist/noise/va_noise.assets/coeff_res.va point 0: noise PSD at 1 Hz, branch 1: old 4e-18, new 0e0
-netlist/noise/va_noise.assets/corr_res.va point 0: noise PSD at 1 Hz, branch 0: old 1e-18, new 0e0
-netlist/noise/va_noise.assets/ground_res.va point 0: noise PSD at 1 Hz, branch 0: old 4e-18, new 0e0
-netlist/noise/va_noise.assets/ntab_lin.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
-netlist/noise/va_noise.assets/ntab_log.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
-netlist/noise/va_noise.assets/vseries_res.va point 0: noise PSD at 1 Hz, branch 8: old 4e-18, new 0e0
-verilog-a/ch04_expressions/correlated_noise.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
-verilog-a/ch04_expressions/flicker_noise_topology.va point 0: noise PSD at 1 Hz, branch 1: old 1e-20, new 0e0
 verilog-a/ch04_expressions/flicker_psd_frequency.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
-verilog-a/ch04_expressions/noise_kinds_in_ternary.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
-verilog-a/ch04_expressions/noise_source_name.va point 0: noise PSD at 1 Hz, branch 1: old 9.000000000000001e-18, new 0e0
-verilog-a/ch04_expressions/noise_table_linear_device.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
-verilog-a/ch04_expressions/noise_table_log_device.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
-verilog-a/ch04_expressions/noise_table_log_topology.va point 0: noise PSD at 1 Hz, branch 8: old 1e0, new 0e0
-verilog-a/ch04_expressions/noise_table_sorts_pairs.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
-verilog-a/ch04_expressions/noise_table_topology.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
-verilog-a/ch04_expressions/white_noise_declaration_initializer.va point 0: noise PSD at 1 Hz, branch 1: old 5.999999999999999e-21, new 0e0
-verilog-a/ch06_hierarchy/mfactor_divides_named_branch_potential_noise_power.va point 0: noise PSD at 1 Hz, branch 8: old 2.5e-1, new 0e0
-verilog-a/ch06_hierarchy/mfactor_divides_potential_noise_power.va point 0: noise PSD at 1 Hz, branch 8: old 2.5e-1, new 0e0
-verilog-a/ch06_hierarchy/mfactor_flow_noise.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
-verilog-a/ch06_hierarchy/mfactor_multiplies_flow_noise_power.va point 0: noise PSD at 1 Hz, branch 1: old 3.0000000000000013e0, new 0e0
-verilog-a/ch06_hierarchy/mfactor_multiplies_named_branch_flow_noise_power.va point 0: noise PSD at 1 Hz, branch 1: old 3.0000000000000013e0, new 0e0
-verilog-a/ch06_hierarchy/mfactor_potential_noise.va point 0: noise PSD at 1 Hz, branch 8: old 1e-18, new 0e0
 verilog/pli/analog_attributes.va codegen: a flow contribution to a potential source's branch
+netlist/noise/va_noise.assets/ntab_card.va codegen: a §4.6.4.3/.4 noise table whose knots are not constant (a parameter array)
+verilog-a/ch04_expressions/ac_stim_label_inactive_in_large_signal.va codegen: a slot of type 2 (a string)
+verilog-a/ch04_expressions/noise_table_array_parameter.va codegen: a §4.6.4.3/.4 noise table whose knots are not constant (a parameter array)
+verilog-a/ch04_expressions/noise_table_card_knots.va codegen: a §4.6.4.3/.4 noise table whose knots are not constant (a parameter array)
+netlist/noise/va_noise.assets/coeff_res.va point 10: noise PSD at 1 Hz, branch 1: old 4e-18, new 3.9999999999999995e-18
+verilog-a/ch04_expressions/noise_coefficient_through_a_conditional.va point 43: noise PSD at 1 Hz, branch 29: old 4.066867375861621e-5, new 4.066867375861622e-5
+verilog-a/ch04_expressions/noise_kinds_in_ternary.va point 7: noise PSD at 1 Hz, branch 1: old 1e-18, new 9.999999999999999e-19
+verilog-a/ch04_expressions/spice_noise_rc_white.va point 3: noise PSD at 1 Hz, branch 1: old 2.0376696217134065e-4, new 2.037669621713406e-4
+verilog-a/ch04_expressions/spice_noise_shared_pair.va point 76: noise PSD at 1 Hz, branch 2: old 2.896356724787477e-4, new 2.896356724787476e-4
+verilog-a/ch04_expressions/white_noise_declaration_initializer.va point 0: noise PSD at 1 Hz, branch 1: old 5.999999999999999e-21, new 2e-21
+verilog-a/combined/noise_and_analysis.va the new device does not build: n1.zig:203: unused local constant
+verilog-a/combined/noise_temperature_analysis.va the new device does not build: n2.zig:232: unused local constant
+verilog-ams/ch12_vpi_routines/rc_ac.va point 6: AC stimulus re, branch 0: old -1e0, new -9.999999999999999e-1

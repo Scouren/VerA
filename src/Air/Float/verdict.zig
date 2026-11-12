@@ -432,7 +432,15 @@ fn warnNotFinite(wip: *Diag.Wip, air: Air, ip: *const InternPool, in: Float.Inpu
 }
 
 /// The first `arg` or `probe` with no bound on `root`'s operand slice: the
-/// thing the user has to constrain. Budgeted.
+/// thing the user has to constrain. Budgeted. `select`/`store` descend into
+/// their condition and both arms, the same operands `firstNotFinite` reads
+/// (research/airpasses.md T1 §0's bug class: `idt`/`idtmod` lower their
+/// held/initial-condition choice to a `select`, e.g. the capacitor
+/// `idt(I(p,n)/c, ic)`, so a `.pl_op` dead end here named the division's
+/// unbounded divisor "a computed expression" instead of recursing to it).
+/// `call` is left a dead end: without T2's callee facts, descending into
+/// every argument would misname a call whose own range does not depend on
+/// them (`sin`, `$vt`).
 fn unboundedLeaf(air: Air, f: *const Float, root: Inst.Index) ?Inst.Index {
     var stack: [leaf_stack_max]Inst.Index = undefined;
     stack[0] = root;
@@ -447,10 +455,14 @@ fn unboundedLeaf(air: Air, f: *const Float, root: Inst.Index) ?Inst.Index {
             if (!f.iv[i].bounded()) return stack[n];
             continue;
         }
-        const ops: [2]Inst.Ref = switch (Air.tag_info.getPtrConst(tag).class) {
-            .un_op => if (tag == .load) .{ .none, .none } else .{ data.un_op, .none },
-            .bin_op => .{ data.bin_op.lhs, data.bin_op.rhs },
-            .pl_op, .ty_pl, .ty, .ty_index, .br, .repeat => .{ .none, .none },
+        const ops: [3]Inst.Ref = switch (Air.tag_info.getPtrConst(tag).class) {
+            .un_op => if (tag == .load) .{ .none, .none, .none } else .{ data.un_op, .none, .none },
+            .bin_op => .{ data.bin_op.lhs, data.bin_op.rhs, .none },
+            .pl_op => if (tag == .select or tag == .store) blk: {
+                const bin = air.extraData(Air.Bin, data.pl_op.payload).data;
+                break :blk .{ data.pl_op.operand, bin.lhs, bin.rhs };
+            } else .{ .none, .none, .none },
+            .ty_pl, .ty, .ty_index, .br, .repeat => .{ .none, .none, .none },
         };
         for (ops) |o| if (o.toIndex()) |oi| if (n < stack.len) {
             stack[n] = oi;

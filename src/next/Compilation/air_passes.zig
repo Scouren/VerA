@@ -17,6 +17,7 @@ const vams = @import("vams");
 const Air = @import("air");
 const InternPool = @import("intern_pool");
 const codegen = @import("codegen");
+const sema = @import("sema");
 const Compilation = @import("../Compilation.zig");
 const errors = @import("errors.zig");
 const Device = Air.Device;
@@ -40,12 +41,14 @@ pub fn run(comp: *Compilation) !bool {
     const probe_names = try a.alloc([]const u8, device.nodes.len);
     for (probe_names, 0..) |*n, k| n.* = Device.nodeName(device, ip, @fromBackingInt(@as(u32, @intCast(k))));
 
+    assert(sema.call_facts.table.len == @typeInfo(vams.SysFn.Tag).@"enum".field_names.len);
     comp.float = try Air.Float.analyze(comp.gpa, an.air, ip, .{
         .params = params,
         .roots = roots,
         .locs = locs,
         .probe_names = probe_names,
         .unknown_bound = comp.config.unknown_bound,
+        .calls = &sema.call_facts.table,
     }, &comp.wip);
     return !comp.wip.failed();
 }

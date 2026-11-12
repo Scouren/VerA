@@ -8,6 +8,7 @@
 //! - `pub const digital`
 //! - `pub const fold`
 //! - `pub const locate`
+//! - `pub const call_facts`
 
 /// The compilation unit's tables.
 pub const Zcu = @import("Zcu.zig");
@@ -20,11 +21,14 @@ pub const digital = @import("Sema/digital.zig");
 pub const fold = @import("Sema/fold.zig");
 /// Where an instruction or a part of one was written, as a token.
 pub const locate = @import("Sema/locate.zig");
+/// What the Air passes know of each `SysFn.Tag` callee (research/airpasses.md T2).
+pub const call_facts = @import("Sema/call_facts.zig");
 
 test {
     _ = Zcu;
     _ = Sema;
     _ = digital;
+    _ = call_facts;
     _ = @import("Sema/eval.zig");
     _ = @import("Sema/eval_fn.zig");
     _ = @import("Sema/sign.zig");

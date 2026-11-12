@@ -301,7 +301,10 @@ fn transfer(w: *Walk, i: u32, tag: Inst.Tag, data: Inst.Data) Abstract {
             const x = w.air.extraData(Air.Call, data.ty_pl.payload);
             const facts: Air.CallFacts = if (x.data.callee < w.in.calls.len) w.in.calls[x.data.callee] else .{};
             const arg: Abstract = if (x.data.args_len == 1) w.abs(@fromBackingInt(w.air.extra[x.end])) else .{ .iv = .top, .nan = true };
-            break :blk Interval.call(facts.range, arg);
+            // §9.15 `$vt`: argument-free is kT/q itself (old `callAbstract`),
+            // not kT/q times an unread argument.
+            const range = if (facts.range == .vt and x.data.args_len == 0) .positive else facts.range;
+            break :blk Interval.call(range, arg);
         },
         .opt_barrier, .dstop => w.abs(data.un_op),
         .if_cast => .{ .iv = w.abs(data.un_op).iv, .nan = false },

@@ -20,6 +20,8 @@ Two user decisions frame it:
   below works through the emitted Zig and the pinned `zig`.
 - **No file-length cap.** A Zig-mirror fold is no longer blocked by a line count
   (architecture §2).
+- **§4's ten decisions**, taken by the lead on the user's instruction
+  (2026-11-11, the best long-term answer), with the pace and budget in §4.1.
 
 ## 1. Done means
 
@@ -97,11 +99,11 @@ the worst model against 1.4-1,213 s for one `zig` child).
 | DV3 | emit less: branch on the comparison, no empty `else`, no unused labels, slot reads in place | text | S2, between codegen waves |
 | DV4 | fold slots whose every write is a constant (the unrolled genvar loops) | text | S2, after air passes T2/T4 |
 | DV5 | one function per child module, called per instance | text | S2, after codegen wave B |
-| DV6 | `evalBatch` and instance-axis `@Vector` lanes (a contract change) | text + contract | S5, only on decision 9 |
+| DV6 | `evalBatch` and instance-axis `@Vector` lanes (an additive contract entry) | text + contract | S5 (decision 9: yes, additive) |
 
 Plus the digital executable: vbackends T3 (the runtime's per-event cost in
 `lib/std/sim`: the arena reset, event-row reuse, `wake`/`watch`), each commit
-≥ 5 % on one bench design and none > 2 % slower; then decision point D-N3.
+≥ 5 % on one bench design and none > 2 % slower; then D-N3 by decision 8's rule.
 
 ### E. The layout: following the Zig compiler (architecture §5)
 
@@ -110,12 +112,12 @@ Plus the digital executable: vbackends T3 (the runtime's per-event cost in
 | Z0 | strike the text that cites the void 500-line cap | now (lead, docs only) |
 | Z1-Z3 | fold `cli/` into `main.zig`, `lsp_diagnostics` into `lsp.zig`, `Compilation/{frontend,backend,errors,test,air_passes}` into `Compilation.zig` | inside C5, as pure moves (golden IDENTICAL, `vera --help` byte-equal) |
 | Z4 = M6 | free Air and Float once codegen returned | after C8 (compiler §5: the peak is the child's) |
-| Z5 | public-API test files out of `src/`/`lib/` into `tests/unit/` | at C3, or amend Layout at C7 (decision 6) |
+| Z5 | public-API test files out of `src/`/`lib/` into `tests/unit/` | at C3 (decision 6) |
 | Z6 | `src/Air/Liveness.zig` (`used`/`assigned`); lanes stay in `codegen/zig` | after C7 |
 | Z7 | `Type.zig`/`Value.zig` as InternPool views; `Sema.Ty` and `Sema.Value` go | after the switch and the lowering waves (touches 44 `Sema/` files) |
 | Z8 (+M8) | per-file units; the Ast unloaded after AstGen and reparsed for a diagnostic | after the switch |
 | Z9 | `Zcu/PerThread.zig` | **dropped**: a VerA compile is too small for threads (compiler §3); reopen only if `measure` shows VerA's own wall above its children's |
-| Z10 | dependency tracking (`--watch`, LSP) | only on the user's yes (decision 7) |
+| Z10 | dependency tracking (`--watch`, LSP) | measure-gated (decision 7) |
 
 Lead rulings on architecture §6 (no user call needed): fold `cli/` (item 1, yes;
 `lsp.zig` imports `main.zig`); `Sema/` stays split by transform (item 3, V5 as
@@ -143,7 +145,12 @@ six corpus steps queued behind it today. In order of effect:
    child on every run.
 3. builds.md R8 (both sides of a diff-codegen batch built at once): merged,
    600440db.
-4. decision 4 (what `test` covers): on `refactor` it runs every diff step.
+4. decision 4: `test` is the merge tier again and the diff steps run as the
+   gate's second stage, one slot call each, two at a time (task G1, S1).
+
+| Task | What | Files | Oracle | Place |
+|---|---|---|---|---|
+| G1 | `test` stops depending on the `diff-*` runs (`build/rewrite.zig:124` `g.test_step.dependOn`); `tools/gate.sh <worktree>` runs `test`, then every `diff-*` as its own `build-slot.sh` call, two at a time, and exits non-zero on the first failure, naming the step | `build/rewrite.zig`, new `tools/gate.sh`, `TESTING.md` (the tier map), AGENTS.md's "Building with many agents" (one line, on the user's approval: AGENTS.md is the user's) | `zig build test --summary all` lists no `diff-*` run; a planted XPASS in one list fails `tools/gate.sh` with that step's name; `test`'s wall on a warm cache under 15 min | S1, lead (build files are no lane's) |
 
 ## 3. The order
 
@@ -151,31 +158,64 @@ Five stages. At most 5 implementers at once; one corpus step per slot call.
 
 | Stage | Runs | Exit |
 |---|---|---|
-| S1 now | zero waves 0-1; M0 and DV0; DV1 (= T40) and DV2 (= M3) after codegen T11 merges; Z0 | wave 1 merged; `measure` gives the first ReleaseFast numbers; compiler T3 budgets set from them |
+| S1 now | zero waves 0-1; M0 and DV0; DV1 (= T40) and DV2 (= M3) after codegen T11 merges; Z0; G1 (the `test`/`diff` split, decision 4); the if-generate rulings (decision 5) | wave 1 merged; `measure` gives the first ReleaseFast numbers; compiler T3 budgets set from them |
 | S2 | zero waves 2-3; VPI A1-A3; M1+M4 behind air passes T1; M2 behind the eval lane; DV3-DV5 between the codegen waves; vbackends T3; P1-P13 (additive, file-disjoint from the waves); diag B0-B2 | every list empty (F1); P-tasks merged |
 | S3 G0 | the 8 G0 conditions; `measure -Dmeasure-record` writes the old side's baseline (nothing old survives C2); the report to the user (F5-F11 against targets) | the user says go |
 | S4 switch | C1-C8 with Z1-Z3 in C5, Z5 at C3, C6b + D1-D6, diag B3; ESPice port (F13); tag v0.30.0 | F2, F3, F4, F12, F13 |
-| S5 after | M5-M8, Z6, Z7, Z8; DV6, Z10 and D-N3 if chosen | F5-F10 re-measured against the G0 baseline |
+| S5 after | M5-M8, Z6, Z7, Z8; DV6 (decision 9); D-N3 if decision 8's threshold trips; Z10 only on decision 7's trigger | F5-F10 re-measured against the G0 baseline |
 
 The rule that orders S1 and S2: a task that changes no bytes lands as soon as
 its files are free; a task that changes text bytes (M3, T40, the device track)
 lands before G0, so g0 records the devices that ship; a task that moves files
 waits for C5.
 
-## 4. Decisions for the user
+## 4. Decisions
 
-| # | Decision | Recommendation |
-|---|---|---|
-| 1 | Does "0 XFAILs according to the specifications" include `tools/diag_gaps.xfail` (726)? | yes, as this plan reads it: F3 closes after C6b, so 100 % is after the switch |
-| 2 | M1 and M2 before G0, behind the owning lanes' current tasks | yes: byte-identical, under 50 lines each; otherwise G0's report shows a 6-12× RSS regression on every big model |
-| 3 | The `measure` gate's tier: RSS + hash + status on a 100-fixture sample in `test`, the full agree list and wall nightly, the absolute budgets in `publish` | yes |
-| 4 | What `test` covers on `refactor` (today: every diff step, about an hour per gate) | keep the diff steps required until G0, but as their own step, so `test` is the fast merge tier again (TESTING.md) and a gate can run them on the two slots side by side |
-| 5 | The if-generate display-sites ruling (2 codegen lines; zero.md decision 2) | rule it: VAMS §6.6.2, IEEE 1364-2005 §12.4.3 |
-| 6 | Public-API test files in `src/`/`lib/`: move at C3 (Z5) or amend Layout at C7 | move at C3: the Layout rule already says so |
-| 7 | Dependency tracking for `--watch` / LSP (Z10) | no, unless you want `--watch` for model work: nothing measured gains from it |
-| 8 | D-N3: build `Air/digital/Schedule.zig` if lfsr or cpu is still > 2× the old native after vbackends T3 | decide on T3's numbers |
-| 9 | `evalBatch` (DV6): a batch entry in the device contract, so a versioned unit checks its box once per batch and lanes run along the instance axis; ESPice must adopt it | after the switch, with ESPice's agreement, measured on bench-fast first; it is the one route left to faster polynomial devices with Zig only |
-| 10 | DV5: a hierarchical device calls one function per child module instead of inlining every instance | yes, gated on DV0's evaluation ns; no contract change |
+Taken by the lead on the user's instruction (2026-11-11: "answer these
+decisions based on the best long-term decision/approach"). Each binds like a
+plan's `Decision:`; no task in this plan waits on the user any more, except the
+outward-facing actions (a push to the suite or Gompute, an issue, a release, a
+published contract version).
+
+| # | Question | Decision | Why, for the long term |
+|---|---|---|---|
+| 1 | Does "0 XFAILs according to the specifications" include `tools/diag_gaps.xfail` (726)? | **Yes.** 100 % means every list, `diag_gaps` included; F3 closes after C6b, so 100 % is after the switch | a diagnostic gap is wrong text the user reads; a list left standing is a permanent known-wrong class |
+| 2 | M1 and M2 before G0? | **Yes**, each right behind its owning lane's current task (M1 behind air passes T1, M2 behind the eval/param lane) | byte-identical, under 50 lines each; G0 must measure the compiler that ships, or its report shows a 6-12× RSS regression on every big model and the switch is decided on wrong numbers |
+| 3 | The `measure` gate's tiers | **Yes**: RSS + hash + status on a 100-fixture sample in `test`; the full agree list and wall nightly; the absolute budgets in `publish` | the method's tiers (merge under 15 min, nightly, release) and "a release ships on numbers a script checks" |
+| 4 | What `test` covers on `refactor` (today: every diff step, about an hour per gate) | **`test` is the merge tier again; the diff steps become the gate's second, required stage**: each `diff-*` its own slot call (one corpus step per call, AGENTS.md), two at a time on the two slots, required on `refactor` until G0 and retired at C2 with the old side. Task G1 (§2 G), in S1 | AGENTS.md: merge under 15 min. A one-hour `test` serialises every merge behind the slots; the diff oracles stay mandatory, only outside the fast tier |
+| 5 | The if-generate display-sites ruling (2 codegen lines; zero.md decision 2) | **Rule it**: one `codegen.rulings` line each for `generate_if_instantiates_one_arm.va` and `if_generate_values_drive_paramset_selection.va`, citing VAMS §6.6.2 and IEEE 1364-2005 §12.4.3 | only the selected generate block exists; old flattens both arms and records the dead arm's display site. Matching old would encode its bug |
+| 6 | Public-API test files in `src/`/`lib/` (Z5): move at C3, or amend Layout at C7? | **Move at C3** into `tests/unit/<namespace>.zig` | the Layout rule already says so, as Zig's std does; one rule for C8's audit, no exception to carry |
+| 7 | Dependency tracking for `--watch` / LSP (Z10) | **Not now; measure-gated.** Re-open only when `measure` (P4) shows, after M1/M2, an LSP edit-to-diagnostics time over 200 ms on any conformance model, or a `--watch` user asks | a VerA compile is under 0.3 s on all but the largest models; Zig's dependency tracking spans four files and every `addDependency` site in Sema, a cost every later Sema change pays. Build it when a measured number needs it |
+| 8 | D-N3: `Air/digital/Schedule.zig` | **The rule is fixed now**: build it if and only if lfsr or cpu is still > 2× the old native after vbackends T3 (`bench-run`, the recorded median); no further decision | a threshold set before the numbers cannot move to fit them; past 2× the per-event cost is no longer a constant-factor tuning problem |
+| 9 | `evalBatch` (DV6) | **Yes, additive**: `evalBatch(S, xs, ...)` beside the per-point entry, which stays and is the `W == 1` scalar oracle; a contract minor version and a CHANGELOG line; S5, after the switch; it lands only if bench-fast shows a gain on the polynomial devices and `W == 1` against `W == 4` is bit for bit. ESPice adopts it when it chooses; nothing breaks before | the method: dispatch per batch, never per element. With Zig only it is the one route left to faster polynomial devices and to instance-axis lanes; additive means no consumer is forced |
+| 10 | DV5: one function per child module, called per instance | **Yes**, gated on DV0's evaluation ns (no device slower) | text stops scaling with the instance count (`generate_loop_4097_instances` 10.1 MB, ~0.2 MB est.); the `zig` child inlines per call site on real costs; no contract change |
+
+### 4.1 Pace and budget
+
+Estimate, from the transcripts of 11-03 to 11-11 (every session under this
+checkout and its worktrees): 7.9 B tokens processed (7.6 B cache reads, 0.24 B
+cache writes, 3.4 M output) while comp.xfail went 3,116 → 1,614, lower 762 →
+345 and sim 204 → 11; codegen stayed near 500 (384 → 526 → 498) as its oracle
+widened. About 5 M tokens per comp line, almost all cache reads.
+
+- Lists to zero (S1-S2): 10-15 B tokens (est.; the tail is harder than what
+  cleared). G0, the switch and the device and compiler tracks: 5-10 B more.
+  Output: 5-10 M in all.
+- Calendar: 3-5 weeks (est.). The binding limit is the weekly model budget,
+  not the work: on 11-11 five Sonnet implementers spent 2.1 B cache-read tokens
+  in 10,327 calls and reached the weekly limit in one day.
+
+Three rules follow (user, 2026-11-11):
+
+1. **Pace Sonnet over the week.** Five implementers spend the week's budget
+   in one day; the sustainable rate is about one implementer at a time. The
+   slots cannot absorb five implementers' gates at once either (two corpus
+   steps at a time; they queued on 11-11). The lead (Opus) merges, rebaselines
+   and finishes what an implementer leaves.
+2. **Codegen first.** codegen.xfail is the list that does not shrink, and comp
+   lines wait on it. Order: codegen T11 (in flight), DV1 (= T40), T13-T16, then
+   the rest of codegen.md's waves, ahead of other lanes when slots are short.
+3. **No task waits on the user** (§4): only the outward-facing actions do.
 
 ---
 
@@ -433,6 +473,8 @@ the big tables are on gpa already), stack sizes.
 
 ### 6. For the user
 
+Decided in §4 (#2 for item 1).
+
 1. **Place of M1 and M2.** Both are byte-identical and under 50 lines, but they touch
    wave files (Float; eval/param). Recommendation: land each right behind the owning
    lane's current task, before G0, so the §8 report at G0#7 measures the compiler that
@@ -554,12 +596,14 @@ expected to bring them under (est.).
 | DV3 | emit less: branch on the comparison, no empty `else`, no unused labels, slot reads in place | `src/codegen/zig/Function.zig` (and `ops` for the condition) | `sequential_ifs_10000` 12.5 MB → ~5 MB (est.); a few % on every device (est.) | diff-codegen rows identical; DV0 bytes, build ms and eval ns (no slower) | S2, between codegen waves (same files) |
 | DV4 | fold slots whose every write is a constant | an Air pass beside `src/Air/Setup.zig` (air passes owner), or Sema's fold | `genvar_loop_*` 794 KB → ~5 KB (est.) | diff-air-passes, diff-codegen identical rows | S2, after air passes T2/T4 |
 | DV5 | one function per child module, called per instance with its parameters | `src/codegen/zig/{DeclGen,Function}.zig`; Sema's instance table read as data | `generate_loop_4097_instances` 10.1 → ~0.2 MB (est.); evaluation cost: one call per instance, inlined or not by LLVM (DV0 measures) | diff-codegen identical rows; DV0 eval ns no slower | S2, after codegen wave B (T18 contributions edit the same emission) |
-| DV6 | `evalBatch` and instance-axis `@Vector` lanes | `lib/contract.zig`, `lib/contract/family.zig`, `src/codegen/zig/DeclGen.zig`; ESPice's loader | polynomial devices versioned again; lanes per batch (est.; nothing measured) | `W == 1` against `W == 4` bit for bit; bench-fast; ESPice's own decks | S5, only on the user's yes and ESPice's agreement (a CHANGELOG contract line) |
+| DV6 | `evalBatch` and instance-axis `@Vector` lanes | `lib/contract.zig`, `lib/contract/family.zig`, `src/codegen/zig/DeclGen.zig`; ESPice's loader | polynomial devices versioned again; lanes per batch (est.; nothing measured) | `W == 1` against `W == 4` bit for bit; bench-fast; ESPice's own decks | S5 (§4 #9: yes, additive; ESPice adopts it when it chooses; a CHANGELOG contract line) |
 
 DV1-DV5 change device text, not numbers, so they land before G0: g0 then records the
 devices that ship (switchover §3.2).
 
 ### 7. For the user
+
+Decided in §4 (#9, #10).
 
 1. **`evalBatch` (DV6)** is a contract change ESPice must adopt; it is the only
    route left to faster polynomial devices with Zig only. Recommendation: after the
@@ -709,7 +753,7 @@ Peak RSS of a device build is the child, not `vera`.
 | Where it sits | first rung: the per-file AstGen cache keyed by hash(pp text) + macro-state digest (lib/TODO §3 row 3), which needs the per-file split (§5 Z8); second rung: `Zcu` outdated maps + InternPool dependency rows per `Instance.Key`, and `update` re-entrant per generation |
 | Buys | LSP latency on multi-file designs; a `--watch` for model development (ESPice iterating on one device) |
 | Costs | the largest item here: Zig's machinery spans four files and every `addDependency` site in Sema; nothing byte-visible to gate on but the determinism test (a cold and a warm update write the same bytes) |
-| When | last; after 3a, 3b, 3d; only if the user wants `--watch` (decision §6 item 5) |
+| When | last; after 3a, 3b, 3d; only on §4 #7's measured trigger |
 
 ### 4. The target tree after the switch
 
@@ -790,13 +834,15 @@ step (P4) reporting peak RSS and wall. Every task is one commit on the slot
 | Z7 | `Type.zig`, `Value.zig` (3d) | `src/Type.zig`, `src/Value.zig` new; `src/Sema.zig:128,190`; 44 `Sema/` files; `Sema/digital.zig` `Type` | `Sema.Ty` → `Type` over `InternPool.Index`; `Sema.Value` → `Air.Inst.Ref` | golden IDENTICAL; diff-sema/test-sema; codegen W10 reads `Type` | after the switch and after zero.md's lower/codegen waves | `src/Sema/*` (owned by those waves until then) |
 | Z8 | per-file units (prerequisite of 3a, 3e) | `lib/std/vams/Preprocessor.zig` (`Directives` per unit), `src/Compilation.zig` (`units` per path), `src/Zcu.zig` (`File.source/tree`), `Compilation/libmap.zig` (`decl_lib` → `File.lib`, libmap §6 item 1) | the comp.md "decisions" item; `astgenBatch` then has N jobs | diff-pp byte-equal; golden IDENTICAL (locations unchanged); `measure` wall on multi-file fixtures | after Z4 | — |
 | Z9 | `Zcu/PerThread.zig` (3a) | new `src/Zcu/PerThread.zig`; `src/InternPool.zig` (`get` takes `tid`, shards); `src/Compilation.zig` | `{zcu, tid}`; AstGen group per file; codegen per part in-process if ever | 1 job and N jobs same bytes (the `test-link-jobs` pattern); golden IDENTICAL; `measure` | after Z8 and a `measure` run that names the wall | — |
-| Z10 | dependency tracking (3e) | `src/Zcu.zig` (outdated maps), `src/InternPool.zig` (deps), `src/Sema.zig` (`addDependency` sites), `src/Compilation.zig` (`update` per generation), `src/lsp.zig` | Zig's rows, keyed by `Instance.Key` | cold and warm update same bytes; LSP latency measured | last; only on the user's yes (§6 item 5) | — |
+| Z10 | dependency tracking (3e) | `src/Zcu.zig` (outdated maps), `src/InternPool.zig` (deps), `src/Sema.zig` (`addDependency` sites), `src/Compilation.zig` (`update` per generation), `src/lsp.zig` | Zig's rows, keyed by `Instance.Key` | cold and warm update same bytes; LSP latency measured | last; only on §4 #7's measured trigger | — |
 
 Z1-Z3 are pure moves inside C5 and keep §4.3's oracle (golden IDENTICAL,
 `check_style.py` on moved files). Z4 is the one structural change worth doing
 before the switch. Z6-Z10 are after it; none blocks the end of `vera`.
 
-### 6. What needs a user decision
+### 6. What needed a user decision
+
+Items 4 and 5 are decided in §4 (#6, #7); the rest are the lead's rulings above.
 
 | # | Decision | Facts | Recommendation |
 |---|---|---|---|

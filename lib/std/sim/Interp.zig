@@ -174,6 +174,7 @@ pub fn runFrom(s: *State, scratch: *std.heap.ArenaAllocator, start: u32) Error!v
         if (s.native) |native| if (bitSet(s.native_pcs, pc)) {
             if (try native(s, scratch, &pc)) return;
             assert(!bitSet(s.native_pcs, pc)); // native stops only at an uncompiled pc.
+            s.pc = pc; // The blame moves with it: native rows never set it.
         };
         const a = scratch.allocator();
         const d = datas[pc];

@@ -10,8 +10,10 @@
 //! returns false with `pc` at it.
 //! An operator inlined here is `small.value`'s fast path: an x or z operand
 //! hands the whole row to `small.value`, so only rows without effects are
-//! inlined (`pure`). The oracle is the interpreter itself: `diff-native`
-//! runs every `.v` fixture's binary with and without its native step.
+//! inlined (`pure`). Every prong that can reach the evaluator sets `s.pc`
+//! first: `warn` and `fail` blame it. The oracle is the interpreter
+//! itself: `diff-native` runs every `.v` fixture's binary with and without
+//! its native step.
 //! Cites: IEEE 1364-2005 §5.1, §9.2, §9.4, §9.5.
 //!
 //! Contents:
@@ -46,7 +48,7 @@ const Gen = struct {
             .assign, .assign_nb => |tag| {
                 const ty = p.exprs.items(.ty)[d.b];
                 if (!small.fits(ty)) return false;
-                try w.print("        {d} => {{\n            var planes: [2]u64 = undefined;\n            const lit = small.literal(&planes, ", .{pc});
+                try w.print("        {d} => {{\n            s.pc = {d};\n            var planes: [2]u64 = undefined;\n            const lit = small.literal(&planes, ", .{ pc, pc });
                 try g.expr(d.b, 0);
                 try w.print(", .{{ .width = {d}, .signed = {} , .real = false }});\n", .{ ty.width, ty.signed });
                 const place = p.extraData(Program.Place, d.a);
@@ -62,7 +64,7 @@ const Gen = struct {
             .branch => {
                 const ty = p.exprs.items(.ty)[d.a];
                 if (!small.fits(ty)) return false;
-                try w.print("        {d} => {{\n            if (small.truthOf(", .{pc});
+                try w.print("        {d} => {{\n            s.pc = {d};\n            if (small.truthOf(", .{ pc, pc });
                 try g.expr(d.a, 0);
                 try w.print(", {d}) == .one) {{\n", .{ty.width});
                 try g.goto(pc, pc + 1);
@@ -85,7 +87,7 @@ const Gen = struct {
                     if (!small.fits(tys[label]) or tys[label].width != tys[c.scrutinee].width) return false;
                     any_labels = true;
                 };
-                try w.print("        {d} => {{\n            const v: V = ", .{pc});
+                try w.print("        {d} => {{\n            s.pc = {d};\n            const v: V = ", .{ pc, pc });
                 try g.expr(c.scrutinee, 0);
                 try w.writeAll(";\n");
                 // A.6.7: a bare `default` is an arm with no labels (every

@@ -191,6 +191,7 @@ verilog-ams/ch07_mixed_signal/driver_state_histogram.va codegen: a flow contribu
 verilog-ams/ch07_mixed_signal/driver_update_without_resolved_change.va codegen: a flow contribution to a potential source's branch
 verilog-ams/ch08_scheduling/analog_digital_initial_order.va codegen: a call of `analog$initial`
 verilog-ams/ch08_scheduling/analog_initial_before_digital_initial.va codegen: a call of `analog$initial`
+verilog-ams/ch09_system_tasks/error_in_analog_initial_stops_after_initialization.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/fatal_in_analog_initial_skips_simulation.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/fdebug_writes_in_rejected_iterations.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/port_mask.va codegen: a call of `$port_connected`

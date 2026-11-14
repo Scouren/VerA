@@ -282,6 +282,61 @@ test "W0650's probe culprit names the node, through probe_names" {
     try std.testing.expect(std.mem.indexOf(u8, body, "a probe of node `p`") != null);
 }
 
+test "W0650's culprit inside an idt names its parameter, not a computed expression" {
+    // Oracle: old vera on spice/primitive_capacitor.va (comp.xfail, rw-zero):
+    // `an expression of parameter `x1.c` is not provably finite`. `idt`'s
+    // held/initial choice lowers to a `select`; the culprit walk once stopped
+    // there and named "a computed expression".
+    const gpa = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var paths: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer paths.deinit();
+    const src =
+        \\`include "disciplines.vams"
+        \\module m(p, n);
+        \\  inout p, n;
+        \\  electrical p, n;
+        \\  parameter real c = 1.0 from (0:inf);
+        \\  analog V(p, n) <+ idt(I(p, n) / c, 0.0);
+        \\endmodule
+        \\
+    ;
+    const comp = try compileText(paths.allocator(), &tmp, "m.va", src, .{ .target = .zig });
+    defer comp.destroy();
+    var errors = try comp.getAllErrors();
+    defer errors.deinit(gpa);
+
+    var found: ?vams.Diag.MessageIndex = null;
+    for (errors.messages()) |i| {
+        if (errors.message(i).tag.code == .W0650) found = i;
+    }
+    const m = errors.message(found orelse return error.TestExpectedW0650);
+    const lbls = errors.labels(found.?);
+    const body = if (m.point != .none) errors.string(m.point) else errors.string(lbls[0].text);
+    try std.testing.expect(std.mem.indexOf(u8, body, "an expression of parameter `c`") != null);
+}
+
+test "a call's modelled range lets its root rate .optimized" {
+    // Oracle: old `callAbstract` (src/prove/transfer.zig:75-115): `analysis`
+    // is in [0,1] and an integer-typed call is finite, so both roots stay
+    // `.optimized` there. Without the callee facts table both are unknown.
+    const gpa = std.testing.allocator;
+    const bodies = [_][]const u8{ "V(p, n) * analysis(\"dc\")", "V(p, n) + $fopen(\"x\")" };
+    for (bodies) |body| {
+        var tmp = std.testing.tmpDir(.{});
+        defer tmp.cleanup();
+        var paths: std.heap.ArenaAllocator = .init(gpa);
+        defer paths.deinit();
+        const src = try std.fmt.allocPrint(paths.allocator(), "`include \"disciplines.vams\"\nmodule m(p, n); inout p, n; electrical p, n;\n  analog I(p, n) <+ {s};\nendmodule\n", .{body});
+        const comp = try compileText(paths.allocator(), &tmp, "m.va", src, .{ .target = .zig });
+        defer comp.destroy();
+        const modes = comp.float.?.verdict.modes;
+        try std.testing.expectEqual(@as(usize, 1), modes.len);
+        try std.testing.expectEqual(Air.Float.Mode.optimized, modes[0]);
+    }
+}
+
 test "every --check scratch directory is its own, under -o's directory" {
     // Oracle: lib/TODO.md §12 (ESPice's race): two invocations never share
     // a scratch path, and it is never a fixed name.

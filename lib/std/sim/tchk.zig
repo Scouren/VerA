@@ -313,9 +313,12 @@ fn violation(s: *State, i: u32, stamp: u64, check: u64) Error!void {
     s.violations += 1;
     const first = s.checks[i].count == 0;
     s.checks[i].count +|= 1;
-    // T3 (Sema's `Check.name`) names the check and gives real times
-    // (`Scale.realAt`) instead of its index and raw ticks.
-    if (first) try s.warnCheck(i, "timing check {d} violated: timestamp event at {d}, timecheck event at {d}", .{ i, stamp, check });
+    // lib/sim/digital's words: `Check.name` (Sema, §19.8's scale) in
+    // place of the run's own index and raw ticks.
+    if (first) {
+        const scale = s.p.times[s.p.scopes[c.scope].time].scale;
+        try s.warnCheck(i, "{s}: timestamp event at {d}, timecheck event at {d}", .{ s.p.str(c.name), scale.realAt(stamp), scale.realAt(check) });
+    }
     const at = c.notifier;
     if (at == std.math.maxInt(u32)) return;
     var tmp: std.heap.ArenaAllocator = .init(s.arena);

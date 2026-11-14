@@ -17,6 +17,10 @@
 //! - `pub fn inputPortOf(s: *Sema, n: Node.Index) ?[]const u8`
 //! - `pub fn netDiscipline(s: *Sema, unit: *const Unit, first: Inst.Index) Allocator.Error!InternPool.String`
 //! - `pub fn internNode(s: *Sema, unit: *const Unit, name: []const u8, discipline: InternPool.String) Allocator.Error!Node.Index`
+//! - `pub fn appendNode(s: *Sema, name: []const u8, kind: Node.Kind, of: Node.Index, discipline: InternPool.String, instance: Air.Device.Instance) Allocator.Error!Node.Index`
+//! - `pub fn vectorRange(s: *Sema, unit: *Unit, first: Inst.Index) Allocator.Error!?[2]i64`
+//! - `pub fn indexedRange(decl_: [2]i64, base: i64, width: i64, down: bool) [2]i64`
+//! - `pub fn partOf(decl_: [2]i64, r: [2]i64) bool`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -38,18 +42,35 @@ const portDecl = decl.portDecl;
 const nameOf = decl.nameOf;
 const rowInstance = decl.rowInstance;
 
-/// §6.5 the root's ports, in header order: the first rows.
+/// §6.5 the root's ports, in header order: the first rows. IEEE 1364-2005
+/// A.1.3's other two `port` shapes hold their position with no single
+/// declaration: a concatenation (`{a, b}`) declares each member in its own
+/// place, and a null port (`(p, , n)`) gets a row of its own that no access
+/// ever reaches, named by the frontend's tab-led convention so it cannot
+/// collide with a written identifier.
 pub fn ports(s: *Sema, unit: *Unit) Allocator.Error!void {
     const vir = unit.vir;
-    for (vir.body(unit.module.ports)) |p| {
-        const first = portDecl(vir, p) orelse continue;
-        try declareNet(s, unit, first);
+    for (vir.body(unit.module.ports), 0..) |p, pos| {
+        if (portDecl(vir, p)) |first| {
+            try declareNet(s, unit, first);
+            continue;
+        }
+        if (vir.instructions.items(.tag)[@backingInt(p)] != .port) continue; // else: an io already handled above
+        const members = vir.body(payloadOf(vir, Inst.Port, p).value);
+        if (members.len == 0) {
+            _ = try internNode(s, unit, try std.fmt.allocPrint(s.arena, "\tnull{d}", .{pos + 1}), .empty);
+            continue;
+        }
+        for (members) |m| {
+            if (vir.instructions.items(.tag)[@backingInt(m)] != .decl_ref) continue; // else: not a simple port_reference (A.1.3)
+            try declareNet(s, unit, canonical(vir, vir.instructions.items(.data)[@backingInt(m)].decl_tok.decl));
+        }
     }
 }
 
 /// §3.6.3 the instance's nets: every `net` and `io` not bound yet. §3.6.4
 /// a `ground` net is the reference node. A child's port waits for
-/// `bindChildPorts`.
+/// `portbind.bindChildren`.
 pub fn nets(s: *Sema, unit: *Unit) Allocator.Error!void {
     const vir = unit.vir;
     const tags = vir.instructions.items(.tag);
@@ -175,7 +196,9 @@ pub fn pullDrives(s: *Sema) Allocator.Error!void {
             } else false;
             if (!binds_potential) continue;
             const b: Sema.Block = .{ .parent = null, .unit = unit };
-            const row = try @import("contrib.zig").rowOf(s, &b, .{ .access = .potential, .branch = .unnamed, .hi = bind.node, .lo = .ground, .neg = false });
+            // The old `applyUnconnectedDrive`'s row points at the port's own
+            // declaration (`site.main_tok`): no `<+` wrote this one.
+            const row = try @import("contrib.zig").rowOf(s, &b, .{ .access = .potential, .branch = .unnamed, .hi = bind.node, .lo = .ground, .neg = false }, first.toRef());
             const c = s.device.contributions.get(@backingInt(row));
             const level: InternPool.Index = if (drive == .pull1) .one_real else .zero_real;
             try s.entry.append(s.arena, try s.air.addInst(s.gpa, .{ .tag = .assign, .data = .{ .bin_op = .{ .lhs = .fromIndex(c.resist), .rhs = .fromIntern(level) } } }));
@@ -196,14 +219,104 @@ pub fn internNode(s: *Sema, unit: *const Unit, name: []const u8, discipline: Int
         if (disc.* == .empty) disc.* = discipline;
         return gop.value_ptr.*;
     }
-    const row: Node.Index = @fromBackingInt(@intCast(s.device.nodes.len));
-    try s.device.nodes.append(s.gpa, .{ .name = key, .kind = .net, .of = .none, .discipline = discipline, .instance = rowInstance(unit.instance) });
+    const row = try appendNode(s, name, .net, .none, discipline, rowInstance(unit.instance));
     gop.value_ptr.* = row;
     assert(@backingInt(row) + 1 == s.device.nodes.len);
     return row;
 }
 
+/// The one place a `device.nodes` row is created, fixing its kind and
+/// spelling together: the caller owns identity (`node_rows` for a net,
+/// `flow_rows` for a branch, `port_rows` for a port), and two distinct
+/// unknowns may ask for one name (a net named `gnd`, §2.7, against the
+/// reference node's own spelling in a generated `flow(a,gnd)`).
+pub fn appendNode(s: *Sema, name: []const u8, kind: Node.Kind, of: Node.Index, discipline: InternPool.String, instance: Air.Device.Instance) Allocator.Error!Node.Index {
+    const spelling = try uniqueSpelling(s, name);
+    try s.spellings.put(s.arena, spelling, {});
+    const row: Node.Index = @fromBackingInt(@intCast(s.device.nodes.len));
+    try s.device.nodes.append(s.gpa, .{ .name = try s.zcu.intern_pool.getString(s.gpa, spelling), .kind = kind, .of = of, .discipline = discipline, .instance = instance });
+    return row;
+}
+
+/// The folded `[msb:lsb]` any declaration of `first`'s name carries, or
+/// null. §6.5.2.2: a port's type declaration and its direction declaration
+/// may each carry a range, and once folded the two must agree (E0350).
+pub fn vectorRange(s: *Sema, unit: *Unit, first: Inst.Index) Allocator.Error!?[2]i64 {
+    const vir = unit.vir;
+    var found: ?[2]i64 = null;
+    var found_io = false;
+    for ([_]Vir.Body{ unit.module.ports, unit.module.body }) |body| for (vir.body(body)) |i| {
+        const tag = vir.instructions.items(.tag)[@backingInt(i)];
+        if (tag != .net and tag != .io) continue;
+        if (canonical(vir, i) != first) continue;
+        const range = if (tag == .net) payloadOf(vir, Inst.Net, i).range else payloadOf(vir, Inst.Io, i).range;
+        const insts = vir.body(range);
+        if (insts.len == 0) continue;
+        const bin = payloadOf(vir, Inst.Bin, insts[insts.len - 1]);
+        var env = try decl.envOf(s, unit);
+        defer env.deinit();
+        const msb = ((try env.ref(bin.lhs)) orelse return found).asIntExact() orelse return found;
+        const lsb = ((try env.ref(bin.rhs)) orelse return found).asIntExact() orelse return found;
+        if (found) |f| {
+            if (f[0] == msb and f[1] == lsb) continue;
+            // §6.5.2.2's own shape: a direction declaration's range against a
+            // discipline declaration's. Two of the same kind (unreachable
+            // for a port today: a second same-kind declaration is E0902
+            // first) fall back to a plain pair.
+            const is_io = tag == .io;
+            if (is_io != found_io) {
+                const dir_r: [2]i64 = if (found_io) f else .{ msb, lsb };
+                const disc_r: [2]i64 = if (found_io) .{ msb, lsb } else f;
+                try s.fail(.E0350, unit.file, i.toRef(), "`{s}` is [{d}:{d}] where it is given a direction and [{d}:{d}] where it is given a discipline", .{ vir.string(nameOf(vir, first)), dir_r[0], dir_r[1], disc_r[0], disc_r[1] });
+            } else {
+                try s.fail(.E0350, unit.file, i.toRef(), "`{s}`'s declarations disagree: [{d}:{d}] against [{d}:{d}]", .{ vir.string(nameOf(vir, first)), f[0], f[1], msb, lsb });
+            }
+        } else {
+            found = .{ msb, lsb };
+            found_io = tag == .io;
+        }
+    };
+    return found;
+}
+
+/// IEEE 1364-2005 §5.2.1's `base +: width` (`down` false) or `base -: width`
+/// (`down` true) on a net declared `[decl_[0]:decl_[1]]`: `+:` counts up
+/// from `base`, `-:` down, and the part reads in the declaration's own
+/// direction.
+pub fn indexedRange(decl_: [2]i64, base: i64, width: i64, down: bool) [2]i64 {
+    const lo_i = if (down) base -| (width - 1) else base;
+    const hi_i = if (down) base else base +| (width - 1);
+    return if (decl_[0] < decl_[1]) .{ lo_i, hi_i } else .{ hi_i, lo_i };
+}
+
+/// Whether `[r[0]:r[1]]` is a part of `[decl_[0]:decl_[1]]` (IEEE
+/// 1364-2005 §5.2.1): both bounds lie within it, and the msb is on the
+/// declared msb's side.
+pub fn partOf(decl_: [2]i64, r: [2]i64) bool {
+    const lo = @min(decl_[0], decl_[1]);
+    const hi = @max(decl_[0], decl_[1]);
+    const has = struct {
+        fn f(l: i64, h: i64, v: i64) bool {
+            return v >= l and v <= h;
+        }
+    }.f;
+    return has(lo, hi, r[0]) and has(lo, hi, r[1]) and (r[0] == r[1] or (r[0] < r[1]) == (decl_[0] < decl_[1]));
+}
+
 // ---- private ----
+
+/// `name`, or the first `name#k` nobody has taken: `#` is not a §2.7
+/// identifier character, so a suffixed name cannot collide with a written
+/// one. The suffix falls on the later slot, so it depends only on creation
+/// order, which is fixed (determinism is a test).
+fn uniqueSpelling(s: *Sema, name: []const u8) Allocator.Error![]const u8 {
+    if (!s.spellings.contains(name)) return name;
+    var k: u32 = 1;
+    while (true) : (k += 1) {
+        const cand = try std.fmt.allocPrint(s.arena, "{s}#{d}", .{ name, k });
+        if (!s.spellings.contains(cand)) return cand;
+    }
+}
 
 /// Whether any declaration of `first`'s name is an `input`.
 fn isInput(unit: *const Unit, first: Inst.Index) bool {
@@ -330,26 +443,6 @@ fn declareNet(s: *Sema, unit: *Unit, first: Inst.Index) Allocator.Error!void {
     try unit.binds.put(s.arena, first, .{ .node = if (isGround(unit, first)) .ground else row });
 }
 
-/// The folded `[msb:lsb]` any declaration of `first`'s name carries, or null.
-fn vectorRange(s: *Sema, unit: *Unit, first: Inst.Index) Allocator.Error!?[2]i64 {
-    const vir = unit.vir;
-    for ([_]Vir.Body{ unit.module.ports, unit.module.body }) |body| for (vir.body(body)) |i| {
-        const tag = vir.instructions.items(.tag)[@backingInt(i)];
-        if (tag != .net and tag != .io) continue;
-        if (canonical(vir, i) != first) continue;
-        const range = if (tag == .net) payloadOf(vir, Inst.Net, i).range else payloadOf(vir, Inst.Io, i).range;
-        const insts = vir.body(range);
-        if (insts.len == 0) continue;
-        const bin = payloadOf(vir, Inst.Bin, insts[insts.len - 1]);
-        var env = try decl.envOf(s, unit);
-        defer env.deinit();
-        const msb = ((try env.ref(bin.lhs)) orelse return null).asIntExact() orelse return null;
-        const lsb = ((try env.ref(bin.rhs)) orelse return null).asIntExact() orelse return null;
-        return .{ msb, lsb };
-    };
-    return null;
-}
-
 /// Whether a `net` declares the name `first` (an `io`) names too.
 fn hasNet(unit: *const Unit, first: Inst.Index) bool {
     const vir = unit.vir;
@@ -357,4 +450,52 @@ fn hasNet(unit: *const Unit, first: Inst.Index) bool {
         if (vir.instructions.items(.tag)[@backingInt(i)] == .net and canonical(vir, i) == first) return true;
     }
     return false;
+}
+
+test uniqueSpelling {
+    // One `U` member per row: a taken spelling gets the first free `#k`.
+    // Only `arena` and `spellings` matter here, so the rest of `Sema` is
+    // its bare defaults (ported from `analog/node.zig`'s
+    // `Lower.Harness`-backed version, which a module source no longer buys).
+    const gpa = std.testing.allocator;
+    var zcu: Zcu = try .init(gpa);
+    defer zcu.deinit();
+    var arena_state: std.heap.ArenaAllocator = .init(gpa);
+    defer arena_state.deinit();
+    var s: Sema = .{ .zcu = &zcu, .gpa = gpa, .arena = arena_state.allocator(), .config = .{} };
+    try std.testing.expectEqualStrings("x", try uniqueSpelling(&s, "x"));
+    try s.spellings.put(s.arena, "x", {});
+    try std.testing.expectEqualStrings("x#1", try uniqueSpelling(&s, "x"));
+    try s.spellings.put(s.arena, "x#1", {});
+    try std.testing.expectEqualStrings("x#2", try uniqueSpelling(&s, "x"));
+}
+
+test indexedRange {
+    // IEEE 1364-2005 §5.2.1: `base +: w` counts up from base and `base -: w`
+    // down, and the part reads in the declaration's direction.
+    const desc: [2]i64 = .{ 7, 0 };
+    const asc: [2]i64 = .{ 0, 7 };
+    const cases = [_]struct { decl: [2]i64, base: i64, width: i64, down: bool, want: [2]i64 }{
+        .{ .decl = desc, .base = 3, .width = 2, .down = false, .want = .{ 4, 3 } },
+        .{ .decl = desc, .base = 3, .width = 2, .down = true, .want = .{ 3, 2 } },
+        .{ .decl = asc, .base = 3, .width = 2, .down = false, .want = .{ 3, 4 } },
+        .{ .decl = asc, .base = 3, .width = 2, .down = true, .want = .{ 2, 3 } },
+        .{ .decl = desc, .base = 5, .width = 1, .down = false, .want = .{ 5, 5 } },
+    };
+    for (cases) |c| try std.testing.expectEqual(c.want, indexedRange(c.decl, c.base, c.width, c.down));
+    // Saturated rather than overflowed, and then no part of anything.
+    const far = indexedRange(desc, std.math.maxInt(i64), 2, false);
+    try std.testing.expectEqual(std.math.maxInt(i64), far[0]);
+    try std.testing.expect(!partOf(desc, far));
+}
+
+test partOf {
+    const desc: [2]i64 = .{ 7, 0 };
+    try std.testing.expect(partOf(desc, .{ 4, 3 }));
+    try std.testing.expect(partOf(desc, .{ 5, 5 }));
+    try std.testing.expect(partOf(desc, .{ 7, 0 }));
+    // The msb on the declared lsb's side.
+    try std.testing.expect(!partOf(desc, .{ 3, 4 }));
+    try std.testing.expect(!partOf(desc, .{ 8, 7 }));
+    try std.testing.expect(!partOf(desc, .{ 0, -1 }));
 }

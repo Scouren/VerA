@@ -30,6 +30,7 @@ const hier = @import("hier.zig");
 const reactive = @import("reactive.zig");
 const contrib = @import("contrib.zig");
 const mfactor = @import("mfactor.zig");
+const net = @import("net.zig");
 const Vir = vams.Vir;
 const Inst = Vir.Inst;
 const Device = Air.Device;
@@ -94,13 +95,13 @@ pub fn access(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src
                     return expr.poison;
                 }
                 const slot = s.device.contributions.items(.resist)[@backingInt(row)];
-                const v = try mfactor.scaled(s, b, try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot) } }), mfactor.mfactorOf(s, b.unit), true);
+                const v = try mfactor.scaled(s, b, try s.addInst(b, .{ .tag = .load, .data = .{ .un_op = .fromIndex(slot) } }), try mfactor.mfactorRef(s, b, b.unit), true);
                 return .{ .ref = if (t.neg) try expr.unOp(s, b, .fneg, v) else v, .ty = .real };
             };
             // §6.3.6 "The value returned by any branch flow probe ... shall
             // be divided by $mfactor".
             const u = try flowUnknown(s, b.unit, t.hi, t.lo);
-            const v = try mfactor.scaled(s, b, try probe(s, u), mfactor.mfactorOf(s, b.unit), true);
+            const v = try mfactor.scaled(s, b, try probe(s, u), try mfactor.mfactorRef(s, b, b.unit), true);
             return .{ .ref = if (t.neg) try expr.unOp(s, b, .fneg, v) else v, .ty = .real };
         },
     }
@@ -174,10 +175,10 @@ pub fn target(s: *Sema, b: *Block, name: []const u8, args: []const Inst.Ref, src
     return canonical(a, hi, lo, .unnamed);
 }
 
-/// A node row's name; `gnd` for the reference node.
+/// A node row's name; `gnd` for the reference node (one spelling of
+/// ground: `Air.Device.nodeName`).
 pub fn nodeName(s: *const Sema, n: Node.Index) []const u8 {
-    if (n == .ground) return "gnd";
-    return s.zcu.intern_pool.stringToSlice(s.device.nodes.items(.name)[@backingInt(n)]);
+    return Device.nodeName(&s.device, &s.zcu.intern_pool, n);
 }
 
 /// Whether `r` is a §4.4.2 port reference (`<p>`) or names a §3.12.1 port
@@ -349,10 +350,12 @@ fn canonical(a: Device.Access, hi: Node.Index, lo: Node.Index, br: Device.Branch
 fn flowUnknown(s: *Sema, unit: *const Sema.Unit, hi: Node.Index, lo: Node.Index) Allocator.Error!Node.Index {
     const gop = try s.flow_rows.getOrPut(s.arena, .{ hi, lo });
     if (gop.found_existing) return gop.value_ptr.*;
-    const ip = &s.zcu.intern_pool;
+    // Deduped on the node pair (the §5.4.1 identity) above, not the printed
+    // name: a net called `gnd` (§2.7) prints like the reference node, so
+    // two different pairs can want this exact spelling (`net.appendNode`
+    // gives the later one `flow(a,gnd)#1`).
     const name = try std.fmt.allocPrint(s.arena, "flow({s},{s})", .{ nodeName(s, hi), nodeName(s, lo) });
-    const row: Node.Index = @fromBackingInt(@intCast(s.device.nodes.len));
-    try s.device.nodes.append(s.gpa, .{ .name = try ip.getString(s.gpa, name), .kind = .branch_flow, .of = hi, .discipline = .empty, .instance = decl.rowInstance(unit.instance) });
+    const row = try net.appendNode(s, name, .branch_flow, hi, .empty, decl.rowInstance(unit.instance));
     try s.device.flows.append(s.gpa, .{ .unknown = row, .hi = hi, .lo = lo, .kind = .branch });
     gop.value_ptr.* = row;
     return row;

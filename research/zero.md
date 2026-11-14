@@ -144,8 +144,12 @@ Q2). None of the 726 is new to `vera-next`: the old compiler has every gap.
    flattens both arms of an if-generate (VAMS §6.6.2, IEEE 1364-2005 §12.4.3:
    only the selected block exists); codegen.md §5 puts `.rulings` after a user
    decision.
+   **Decided** (lead on the user's instruction, 2026-11-11, research/finish.md
+   §4 #5): rule it, one `codegen.rulings` line per fixture.
 3. **What `test` covers.** On `refactor` it runs every diff step, about an
    hour per merge gate; TESTING.md's tiers put those in a separate gate.
+   **Decided** (finish.md §4 #4): `test` is the merge tier again; the diff
+   steps are the gate's second stage, one slot call each, until G0 (G1).
 
 ---
 

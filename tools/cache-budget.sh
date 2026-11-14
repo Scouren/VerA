@@ -22,10 +22,42 @@
 #
 # Usage: tools/cache-budget.sh <held slot 0|1> <lock dir> <.zig-cache path>
 #   [global Zig cache path]
+#        tools/cache-budget.sh selftest   (the script's own oracle, in `test`)
 # The global cache path is optional (build-slot.sh may not be able to read
 # `ZIG_GLOBAL_CACHE_DIR`, e.g. outside `nix develop`); when it is empty,
 # the global cache and vera-codegen are left unchecked.
 set -u
+# The oracle: scratch trees, scratch locks, small budgets. vera-codegen is
+# moved only under both guards: with the other slot held, a read-only global
+# cache must see no `mv` at all (the park R6 first did before the guards).
+if [ "${1:-}" = selftest ]; then
+  T=$(mktemp -d) || exit 1
+  fail=0
+  setup() {
+    rm -rf "$T/locks" "$T/root" "$T/g"*
+    mkdir -p "$T/locks" "$T/root/.zig-cache" "$T/g/vera-codegen/o/a" "$T/g/o/x"
+    head -c 4096 /dev/zero > "$T/g/o/x/f"
+    echo keep > "$T/g/vera-codegen/o/a/f"
+  }
+  run() { bash "$0" 0 "$T/locks" "$T/root/.zig-cache" "$T/g"; }
+  setup
+  exec {other}>"$T/locks/vera-heavy.1.lock"
+  flock -n "$other"
+  chmod a-w "$T/g"
+  err=$(VERA_BUDGET_GLOBAL_CACHE=1 run 2>&1 >/dev/null)
+  chmod u+w "$T/g"
+  exec {other}>&-
+  [ -z "$err" ] || { echo "FAIL: touched the global cache while the other slot ran: $err" >&2; fail=1; }
+  setup
+  VERA_BUDGET_GLOBAL_CACHE=1 run || fail=1
+  [ "$(cat "$T/g/vera-codegen/o/a/f" 2>/dev/null)" = keep ] || { echo "FAIL: rotation lost vera-codegen" >&2; fail=1; }
+  [ ! -e "$T/g/o/x/f" ] || { echo "FAIL: over budget, not rotated" >&2; fail=1; }
+  setup
+  run || fail=1
+  [ -e "$T/g/o/x/f" ] && [ -e "$T/g/vera-codegen/o/a/f" ] || { echo "FAIL: under budget, changed" >&2; fail=1; }
+  rm -rf "$T"
+  exit $fail
+fi
 held=${1:-}
 lock_dir=${2:-}
 zig_cache=${3:-}
@@ -75,11 +107,15 @@ busy() {
 # holding the slot `held` did not already hold, and only while `busy`
 # reports every light step done. Does nothing under budget, and does
 # nothing (this round, skip and retry next time) when either guard fails.
+# `keep`, a subdirectory name, is left out of the size and survives the
+# rotation: it is moved out and back only under both guards, never while a
+# build on the other slot could be using it.
 rotate_if_over() {
   path=$1
   budget=$2
+  keep=${3:-}
   [ -d "$path" ] || return 0
-  size=$(du_bytes "$path")
+  size=$(du -sb ${keep:+--exclude="$keep"} "$path" 2>/dev/null | cut -f1)
   [ -n "$size" ] && [ "$size" -gt "$budget" ] || return 0
   other=$((1 - held))
   exec {ofd}>"$lock_dir/vera-heavy.$other.lock"
@@ -92,32 +128,17 @@ rotate_if_over() {
     return 0
   fi
   aside="$path.evicted.$$"
-  mv "$path" "$aside"
+  if [ -n "$keep" ] && [ -d "$path/$keep" ]; then
+    mv "$path/$keep" "$path.$keep.$$"
+    mv "$path" "$aside"
+    mkdir -p "$path"
+    mv "$path.$keep.$$" "$path/$keep"
+  else
+    mv "$path" "$aside"
+  fi
   exec {ofd}>&-
   nohup rm -rf "$aside" >/dev/null 2>&1 &
   disown
-}
-
-# Rotates the global Zig cache without counting or disturbing
-# `vera-codegen` inside it: parks that one subdirectory aside first (so
-# `rotate_if_over`'s `du` does not count it and a rotation cannot wipe it),
-# then restores it, rotated or not. `evict_codegen` manages its budget on
-# its own.
-rotate_global_if_over() {
-  path=$1
-  budget=$2
-  [ -d "$path" ] || return 0
-  codegen="$path/vera-codegen"
-  parked=""
-  if [ -d "$codegen" ]; then
-    parked="$path.vera-codegen.$$"
-    mv "$codegen" "$parked"
-  fi
-  rotate_if_over "$path" "$budget"
-  if [ -n "$parked" ]; then
-    mkdir -p "$path"
-    mv "$parked" "$codegen"
-  fi
 }
 
 # Deletes the oldest `o/<digest>` entries under `codegen_dir` until it is
@@ -143,6 +164,6 @@ evict_codegen() {
 
 rotate_if_over "$zig_cache" "$budget_zig_cache"
 if [ -n "$global_cache" ]; then
-  rotate_global_if_over "$global_cache" "$budget_global_cache"
+  rotate_if_over "$global_cache" "$budget_global_cache" vera-codegen
   evict_codegen "$global_cache/vera-codegen"
 fi

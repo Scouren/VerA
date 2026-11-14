@@ -598,3 +598,49 @@ test "IEEE 1364-2005 §13.5.1 under a library map a cell binds from the search o
     defer gpa.free(by_config);
     try std.testing.expectEqualStrings("top work.top\ntop.u libB.leaf\ntop.u.k work.b_kid\n", by_config);
 }
+
+test "IEEE 1364-2005 §13.3.1.1 a config's design statement naming no module is E0904, in the old engine's words (G7, dlower T4); a config is no cell" {
+    // No library map: `Sema.zig`'s `configRoots` binds `design` cells by
+    // plain name. `missing` is declared nowhere; `cfg` is a config, which
+    // `Zcu.modules` never holds (`namespace` populates it from
+    // module/macromodule/connectmodule/primitive decls only), so a design
+    // statement naming a config names no cell either.
+    var missing = try elab(
+        "module top; initial $display(\"top\"); endmodule\nconfig cfg; design work.missing; endconfig\n",
+        .{ .ieee1364 = true },
+    );
+    defer missing.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{.E0904}, missing.codes);
+    try std.testing.expectEqualStrings("undeclared module in instantiation: library `work` holds no cell `missing`", missing.messages[0]);
+
+    var names_config = try elab(
+        "module top; initial $display(\"top\"); endmodule\nconfig cfg; design work.cfg; endconfig\n",
+        .{ .ieee1364 = true },
+    );
+    defer names_config.deinit();
+    try std.testing.expectEqualSlices(Diag.Code, &.{.E0904}, names_config.codes);
+    try std.testing.expectEqualStrings("undeclared module in instantiation: library `work` holds no cell `cfg`", names_config.messages[0]);
+}
+
+test "IEEE 1364-2005 §13.2.3 under a library map, a config's design cell no library holds is E0904, in the old engine's words (G7, dlower T4)" {
+    // `top` is mapped to `rtlLib`; `cfg`'s design statement asks for it from
+    // `gateLib`, which holds no cell `top` (§13.2.3's per-source-file
+    // mapping means a library map does not search; `library.zig:roots`).
+    const gpa = std.testing.allocator;
+    const src = "module top; endmodule\nconfig cfg; design gateLib.top; endconfig\n";
+    var ast = try vams.Ast.parse(gpa, src, .{});
+    defer ast.deinit(gpa);
+    try std.testing.expectEqual(@as(usize, 0), ast.errors.len);
+    var vir = try vams.AstGen.generate(gpa, &ast, .{});
+    defer vir.deinit(gpa);
+    var zcu: Zcu = try .init(gpa);
+    defer zcu.deinit();
+    const file = try zcu.addFile("test.v", vir, 0);
+    try zcu.decl_lib.put(gpa, .{ .file = file, .index = @fromBackingInt(0) }, try zcu.intern_pool.getString(gpa, "rtlLib"));
+    try zcu.decl_lib.put(gpa, .{ .file = file, .index = @fromBackingInt(1) }, try zcu.intern_pool.getString(gpa, "rtlLib"));
+    var order: [1]@import("intern_pool").String = .{try zcu.intern_pool.getString(gpa, "rtlLib")};
+    zcu.lib_order = &order;
+    try Sema.elaborate(&zcu, .{});
+    try std.testing.expectEqualSlices(Diag.Code, &.{.E0904}, zcu.failed.items(.code));
+    try std.testing.expectEqualStrings("undeclared module in instantiation: library `gateLib` holds no cell `top`", zcu.intern_pool.stringToSlice(zcu.failed.items(.message)[0]));
+}

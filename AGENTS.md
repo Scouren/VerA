@@ -232,7 +232,9 @@ So:
    memory.
 4. **Narrow before you widen:** first `test-<module>`, then
    `diff-comp -Dcomp-filter='a|b'` on the fixtures you touched, then the
-   full gate once, at the end.
+   full gate once, at the end: `tools/gate.sh <worktree>` (`test`, then
+   every `diff-*` as its own slot call, two at a time; it names each
+   failing step and leaves its log under `zig-out/gate/`).
 5. **Gate on the exit code** (the Builds rule): `tools/build-slot.sh … > log 2>&1; echo $?`.
 
 ## Layout

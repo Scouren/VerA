@@ -18,6 +18,7 @@
 //! - lowering's types: `pub const Ty`, `pub const Value`, `pub const Slot`, `pub const Bind`, `pub const Unit`, `pub const Bridged`, `pub const ContribKey`, `pub const Block` (`Loop`, `Label`, `restricted`, `child`)
 //! - `pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis`
 //! - `pub fn addInst(s: *Sema, b: *Block, inst: Air.Inst) Allocator.Error!Air.Inst.Ref`
+//! - `pub fn setSrc(s: *Sema, i: Air.Inst.Index, file: Zcu.File.Index, src: Inst.Ref) Allocator.Error!void`
 //! - `pub fn fail(s: *Sema, code: Diag.Code, file: Zcu.File.Index, src: Vir.Inst.Ref, comptime fmt: []const u8, args: anytype) Allocator.Error!void`
 //! - `pub const Why = struct`
 //! - `pub fn failRule(s: *Sema, why: Why, code: Diag.Code, file: Zcu.File.Index, src: Vir.Inst.Ref, comptime fmt: []const u8, args: anytype) Allocator.Error!void`
@@ -77,6 +78,11 @@ flow_rows: std.AutoHashMapUnmanaged([2]Air.Device.Node.Index, Air.Device.Node.In
 bridged: std.AutoHashMapUnmanaged(struct { Zcu.Instance.Index, Vir.Inst.Index }, Bridged) = .empty,
 /// §5.4.3 a port's row to its port flow unknown (access.zig).
 port_rows: std.AutoHashMapUnmanaged(Air.Device.Node.Index, Air.Device.Node.Index) = .empty,
+/// Every spelling handed to a `device.nodes` row, so `net.appendNode` can
+/// keep them unique (a net literally named `gnd` against the reference
+/// node's own spelling, §2.7). Not an identity table: two different
+/// unknowns may want one spelling.
+spellings: std.StringHashMapUnmanaged(void) = .empty,
 /// §5.6 a contribution target to its row (contrib.zig).
 contrib_rows: std.AutoHashMapUnmanaged(ContribKey, Air.Device.Contribution.Index) = .empty,
 /// Each `device.params` row's `arg` in the prologue, by row (decl.zig).
@@ -122,6 +128,13 @@ inlining: std.ArrayList(Inst.Index) = .empty,
 /// §3.4.7 the card row an `aliasparam` of each hierarchical system
 /// parameter made on the root (param.zig); the root's reads read it.
 sys_alias: std.EnumArray(Zcu.SystemParam, ?Air.Device.Param.Index) = .initFill(null),
+/// §9.7.3 (D2-L) the slot `$error` in an `analog initial` body sets, read
+/// right after that body by a guarded synthetic `$fatal` (decl.zig,
+/// syscall.zig): `.none` for a design with no such `$error`, which then
+/// pays for neither the slot nor the guard. A sentinel, not `?Air.Inst.Index`:
+/// `Air.Inst.Index` has no spare bit for one, so an optional of it costs a
+/// second field; `Air.Inst.Ref` already reserves `.none`.
+init_error: Air.Inst.Ref = .none,
 /// §1.3.1 every access read: its quantity and node pair, in order
 /// (contrib.zig's `checkProbes`).
 branch_reads: std.ArrayList(struct { access: Air.Device.Access, hi: Air.Device.Node.Index, lo: Air.Device.Node.Index, file: Zcu.File.Index, src: Inst.Ref }) = .empty,
@@ -159,9 +172,11 @@ pub const Config = struct {
 pub const Analysis = struct {
     air: Air,
     device: Air.Device,
-    /// One per `air` instruction: the Vir expression it was lowered from,
-    /// where a later stage's diagnostic about it points (`Air.Float`'s
-    /// `Input.locs`); `.none` for one no expression wrote.
+    /// One per `air` instruction: where it was written, for a later
+    /// stage's diagnostic (`Air.Float`'s `Input.locs`); `.none` for one no
+    /// expression wrote. Rule: an `alloc` or `arg` points at the
+    /// declaration that made it; anything else, the Vir expression being
+    /// lowered when `addInst` appended it.
     srcs: []const Src,
     /// §7.2.2 a module of the design has a digital half the analog blocks
     /// read (discrete.zig): its testbench is the mixed-signal one (§8).
@@ -396,12 +411,24 @@ pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis {
 /// Appends `inst` to `b`'s body and returns it as an operand.
 pub fn addInst(s: *Sema, b: *Block, inst: Air.Inst) Allocator.Error!Air.Inst.Ref {
     const i = try s.air.addInst(s.gpa, inst);
-    const k = @backingInt(i);
-    if (s.inst_srcs.items.len <= k) try s.inst_srcs.appendNTimes(s.arena, .{ .file = b.unit.file, .src = .none }, k + 1 - s.inst_srcs.items.len);
-    s.inst_srcs.items[k] = .{ .file = b.unit.file, .src = s.expr_src };
+    try s.setSrc(i, b.unit.file, s.expr_src);
     try b.insts.append(s.arena, i);
     assert(b.insts.items[b.insts.items.len - 1] == i);
     return .fromIndex(i);
+}
+
+/// Records where instruction `i` was written (`Analysis.srcs`): grows
+/// `inst_srcs` with `.none` up to `i`, as `addInst` always did, then
+/// writes its entry. A caller that already called `addInst` for `i` calls
+/// this again to override the source `addInst` guessed (an `alloc` or
+/// `arg`'s declaration, never the expression being lowered when it was
+/// minted).
+pub fn setSrc(s: *Sema, i: Air.Inst.Index, file: Zcu.File.Index, src: Inst.Ref) Allocator.Error!void {
+    const k = @backingInt(i);
+    assert(k < s.air.instructions.len);
+    if (s.inst_srcs.items.len <= k) try s.inst_srcs.appendNTimes(s.arena, .{ .file = file, .src = .none }, k + 1 - s.inst_srcs.items.len);
+    s.inst_srcs.items[k] = .{ .file = file, .src = src };
+    assert(s.inst_srcs.items.len > k);
 }
 
 /// Appends a diagnostic to `zcu.failed`.
@@ -468,7 +495,11 @@ fn configRoots(s: *Sema, roots: *std.ArrayList(Zcu.Decl)) Allocator.Error!bool {
         return roots.items.len != 0;
     }
     for (root.vir.list(Vir.String, root.c.design)) |cell| {
-        const m = zcu.modules.get(try zcu.intern_pool.getString(s.gpa, cellOf(root.vir.string(cell)))) orelse continue;
+        const text = root.vir.string(cell);
+        const m = zcu.modules.get(try zcu.intern_pool.getString(s.gpa, cellOf(text))) orelse {
+            try library.designCellMissing(s, root, text);
+            continue;
+        };
         try roots.append(s.arena, m);
     }
     for (root.vir.list(Vir.String, root.c.rules)) |r| {

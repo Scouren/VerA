@@ -14,7 +14,6 @@
 //!
 //! Contents:
 //! - `pub fn semaAnalog(comp: *Compilation) !bool`
-//! - `pub fn airPasses(comp: *Compilation) !bool`
 //! - `pub fn analogBackend(comp: *Compilation) !?Job`
 //! - `pub fn codegen(comp: *Compilation, b: Compilation.Backend) !?Job`
 //! - `pub fn link(comp: *Compilation, task: @FieldType(Job, "link")) !?Job`
@@ -28,7 +27,6 @@ const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const vams = @import("vams");
 const sema = @import("sema");
-const Air = @import("air");
 const codegen_mod = @import("codegen");
 const link_mod = @import("link");
 const std_sim = @import("std_sim");
@@ -83,27 +81,6 @@ pub fn semaAnalog(comp: *Compilation) !bool {
         };
     }
     return true;
-}
-
-/// The float verdict over codegen's roots (§11.9), each parameter's
-/// ranges its box; a §4.3.2 error stops here.
-pub fn airPasses(comp: *Compilation) !bool {
-    const an = &comp.analysis.?;
-    const a = comp.arena();
-    const roots = try codegen_mod.floatRoots(a, &an.air, &an.device);
-    const params = try a.alloc(Air.Float.Param, an.device.params.len);
-    for (params, 0..) |*p, k| p.* = .{ .ranges = try floatRanges(a, an.device.paramRanges(@fromBackingInt(@intCast(k)))) };
-    // Where each instruction's diagnostic points: the expression Sema
-    // lowered it from.
-    const locs = try a.alloc(vams.Diag.Loc, an.srcs.len);
-    for (locs, an.srcs) |*l, s| l.* = if (s.src == .none) .none else errors.instLoc(comp.pp.output(), &comp.units.items[@backingInt(s.file)], s.src);
-    comp.float = try Air.Float.analyze(comp.gpa, an.air, &comp.zcu.intern_pool, .{
-        .params = params,
-        .roots = roots,
-        .locs = locs,
-        .unknown_bound = comp.config.unknown_bound,
-    }, &comp.wip);
-    return !comp.wip.failed();
 }
 
 /// The backend the target names (`--lint` stops here).
@@ -261,9 +238,8 @@ pub fn runDigital(comp: *Compilation) !?Job {
     s.io = comp.io;
     const result = std_sim.exe.run(&s);
     try comp.outputs.out.appendSlice(comp.arena(), out.written());
-    // ponytail: no pc_sites table yet (T3's `Sema` work); `report` falls
-    // back to `.none` locations for pc-blamed diagnostics until then.
-    try std_sim.exe.report(&s, result, &comp.wip, &.{}, try checkSites(comp));
+    const sites = try runSites(comp);
+    try std_sim.exe.report(&s, result, &comp.wip, sites.pc, sites.check);
     return null;
 }
 
@@ -294,7 +270,8 @@ fn digitalExe(comp: *Compilation) !?Job {
     const sources = try a.alloc(std_sim.exe.Source, all.len);
     for (sources, all) |*s, d| s.* = .{ .name = d.name, .text = d.text };
     var root: Io.Writer.Allocating = .init(a);
-    try codegen_mod.digital_next.writeExe(&root.writer, a, &comp.lowered.?.program, sources, try checkSites(comp), c.event_budget);
+    const sites = try runSites(comp);
+    try codegen_mod.digital_next.writeExe(&root.writer, a, &comp.lowered.?.program, sources, sites.pc, sites.check, c.event_budget);
     const slots = try a.alloc(link_mod.Server, c.thread_limit);
     var q: link_mod.Queue = .init(slots);
     const mods = [_]link_mod.Module{.{ .name = "contract", .root = c.contract.? }} ++ try simModules(a, c.contract.?);
@@ -420,14 +397,17 @@ fn simModules(a: Allocator, contract: []const u8) ![3]link_mod.Module {
     };
 }
 
-/// Each timing check's W1199 site (`Lowered.check_sites`), relocated to
-/// the file the user wrote.
-fn checkSites(comp: *Compilation) ![]const vams.Diag.Loc {
+/// Every run diagnostic's blame, relocated to the file the user wrote:
+/// `Lowered.pc_sites` (one per `Program.insts` row, T3) and
+/// `Lowered.check_sites` (one per `Program.checks` row, W1199's site).
+fn runSites(comp: *Compilation) !struct { pc: []const vams.Diag.Loc, check: []const vams.Diag.Loc } {
     const l = &comp.lowered.?;
     const pp = comp.pp.output();
-    const out = try comp.arena().alloc(vams.Diag.Loc, l.check_sites.len);
-    for (out, l.check_sites) |*o, site| o.* = errors.relocate(pp, site, site);
-    return out;
+    const pc = try comp.arena().alloc(vams.Diag.Loc, l.pc_sites.len);
+    for (pc, l.pc_sites) |*o, site| o.* = errors.relocate(pp, site, site);
+    const check = try comp.arena().alloc(vams.Diag.Loc, l.check_sites.len);
+    for (check, l.check_sites) |*o, site| o.* = errors.relocate(pp, site, site);
+    return .{ .pc = pc, .check = check };
 }
 
 /// The modules a device compiles against, from the tree its `contract`
@@ -601,15 +581,4 @@ fn checkTop(comp: *Compilation) !bool {
         return false;
     };
     return true;
-}
-
-/// A parameter's `Device` ranges as `Float` reads them; a bound that does
-/// not fold proves nothing.
-fn floatRanges(a: Allocator, ranges: []const Air.Device.Range) ![]const Air.Interval.Range {
-    var out: std.ArrayList(Air.Interval.Range) = .empty;
-    for (ranges) |r| {
-        if (r.strings) continue;
-        try out.append(a, .{ .kind = if (r.exclude) .exclude else .from, .lo = r.lo, .hi = r.hi, .lo_inclusive = r.lo_closed, .hi_inclusive = r.hi_closed });
-    }
-    return out.items;
 }

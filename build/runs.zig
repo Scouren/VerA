@@ -125,6 +125,24 @@ pub fn add(g: Graph, suite_exe: *Build.Step.Compile, check: *Build.Step, espice_
     diag_gaps_check.has_side_effects = true; // reads lib/, src/, tests/conformance and codes.zon
     test_step.dependOn(&diag_gaps_check.step);
 
+    // tools/cache-budget.sh (research/builds.md R6): the build slots' cache
+    // collector. Linux only, as the slots are (`flock`, `/proc`).
+    if (b.graph.host.result.os.tag == .linux) {
+        const cache_budget_selftest = b.addSystemCommand(&.{"bash"});
+        cache_budget_selftest.addFileArg(b.path("tools/cache-budget.sh"));
+        cache_budget_selftest.addArg("selftest");
+        cache_budget_selftest.expectExitCode(0);
+        cache_budget_selftest.has_side_effects = true; // scratch trees under mktemp
+        test_step.dependOn(&cache_budget_selftest.step);
+        // tools/gate.sh (research/finish.md G1): the merge gate's diff stage.
+        const gate_selftest = b.addSystemCommand(&.{"bash"});
+        gate_selftest.addFileArg(b.path("tools/gate.sh"));
+        gate_selftest.addArg("selftest");
+        gate_selftest.expectExitCode(0);
+        gate_selftest.has_side_effects = true; // scratch trees under mktemp
+        test_step.dependOn(&gate_selftest.step);
+    }
+
     const diag_gaps_selftest = b.addSystemCommand(&.{"python3"});
     diag_gaps_selftest.addFileArg(b.path("tools/diag_gaps.py"));
     diag_gaps_selftest.addArg("selftest");

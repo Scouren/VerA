@@ -188,10 +188,10 @@ pub fn noise(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: I
     // §6.3.6 a noise contribution's power is multiplied by $mfactor on a
     // flow (whose `<+` multiplies the amplitude by it) and divided by it on
     // a potential: the amplitude over sqrt($mfactor). `ac_stim` is no noise.
-    const m = @import("mfactor.zig").mfactorOf(s, b.unit);
-    if (tag == .ac_stim or m == 1) return .{ .ref = r, .ty = .real };
-    const mc: Ref = .fromIntern(try decl.intern(s, .{ .real = m }));
-    const root = try expr.binOp(s, b, .pow, mc, .fromIntern(try decl.intern(s, .{ .real = 0.5 })));
+    const m = try @import("mfactor.zig").mfactorRef(s, b, b.unit);
+    const m_one = if (expr.constOf(s, m)) |c| c.asReal() == 1 else false;
+    if (tag == .ac_stim or m_one) return .{ .ref = r, .ty = .real };
+    const root = try expr.binOp(s, b, .pow, m, .fromIntern(try decl.intern(s, .{ .real = 0.5 })));
     return .{ .ref = try expr.binOp(s, b, .fdiv, r, root), .ty = .real };
 }
 
@@ -364,7 +364,9 @@ fn opNode(s: *Sema, b: *const Block, op: []const u8) Allocator.Error!Node.Index 
 /// contribution on (`n`, ground) whose resistive part is `f` (the unknown
 /// itself before the operator runs) and whose charge is `q`.
 fn stampOpRow(s: *Sema, b: *Block, n: Node.Index, f: Ref, q: Ref, q_neg: bool) Allocator.Error!void {
-    const row = try contrib.rowOf(s, b, .{ .access = .flow, .branch = .unnamed, .hi = n, .lo = .ground, .neg = false });
+    // W0650's headline points at the operator call being lowered
+    // (`expr.lower` sets `expr_src` for it): the old `idt`/`ddt` token.
+    const row = try contrib.rowOf(s, b, .{ .access = .flow, .branch = .unnamed, .hi = n, .lo = .ground, .neg = false }, s.expr_src);
     const slots = s.device.contributions.get(@backingInt(row));
     // At entry: the unknown and the flag, so a row whose operator does not
     // run still pins it.

@@ -124,7 +124,15 @@ pub fn sysCall(l: *Lower, i: Inst.Index, t: Ty, nat: Type) Error!u32 {
         .driver_next_state => try l.b.expr(.driver_access, natural, try drivers.access(l, i, .next_state, s.args), 0),
         .driver_next_strength => try l.b.expr(.driver_access, natural, try drivers.access(l, i, .next_strength, s.args), 0),
         .driver_type => try l.b.expr(.driver_access, natural, try drivers.access(l, i, .type, s.args), 0),
-        .random, .dist_uniform, .dist_normal, .dist_exponential, .dist_poisson, .dist_chi_square, .dist_t, .dist_erlang => try l.b.expr(.random, natural, try random(l, s.f, s.args), 0),
+        .random, .dist_uniform, .dist_normal, .dist_exponential, .dist_poisson, .dist_chi_square, .dist_t, .dist_erlang => blk: {
+            // system.zig:251: a $dist_ mean/degree/k_stage warning blames
+            // the first $dist_ call's own token in the statement.
+            if (s.f != .random and l.dist_site == null) {
+                l.dist_site = l.srcOffset(l.frame, i);
+                l.b.setSite(l.dist_site.?);
+            }
+            break :blk try l.b.expr(.random, natural, try random(l, s.f, s.args), 0);
+        },
         .fopen, .fgets, .ferror, .fgetc, .ungetc, .ftell, .rewind, .fseek, .feof => try l.b.expr(.file, natural, try fileCall(l, s.f, s.args), 0),
         .sscanf, .fscanf => blk: {
             if (s.args.len < 2) return l.refuse("a scan with no format");

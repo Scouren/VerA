@@ -465,7 +465,14 @@ fn buildSide(gpa: Allocator, io: Io, q: *link.Queue, dir: []const u8, contract: 
 /// Builds `side`'s library of `group`'s devices still `left`, on `arena`'s
 /// own thread-local arena (an `ArenaAllocator` is not thread-safe, and two
 /// sides build at once): the same work the serial loop used to do inline,
-/// split out so it can run on either side of `std.Thread.spawn`.
+/// split out so it can run on either side of `std.Thread.spawn`. Each
+/// side's `link.File` gets its own `work_dir` (`<dir>/<side>`): `tree.zig`'s
+/// `writeTree` names its files by fixed stem (`device.zig`, `shim.zig`,
+/// `h.zig`, `u/<unit>.zig`), not by `f.name`, so two sides sharing one
+/// `work_dir` would each overwrite the other's (the reverted first attempt
+/// at R8, 9fc5b83b). The per-device source files (`o<k>.zig`/`n<k>.zig`)
+/// stay directly under `dir`: they are already disjoint by name and are
+/// `runBatch`'s own write, done once before any attempt.
 fn buildOne(gpa: Allocator, io: Io, q: *link.Queue, dir: []const u8, contract: []const u8, kernels: []const u8, dyn: []const u8, attempt: usize, side: []const u8, left: []const bool, group: []const Ready, cache_dir: ?[]const u8, result: *SideBuild) !void {
     var arena_state: std.heap.ArenaAllocator = .init(std.heap.smp_allocator);
     defer arena_state.deinit();
@@ -509,7 +516,8 @@ fn buildOne(gpa: Allocator, io: Io, q: *link.Queue, dir: []const u8, contract: [
         return;
     }
     const bundle = try arena.print("pub const devices = .{{{s} }};\npub const names = .{{{s} }};\npub const fd_skip = .{{{s} }};\n", .{ devices.written(), names.written(), fd_skip.written() });
-    const f: link.File = .{ .kind = .so, .work_dir = dir, .name = try arena.print("cg{d}{s}", .{ attempt, side }), .optimize = .fast, .backend = .llvm, .modules = mods.items, .split = .whole, .cache_dir = cache_dir };
+    const side_dir = try arena.print("{s}/{s}", .{ dir, side });
+    const f: link.File = .{ .kind = .so, .work_dir = side_dir, .name = try arena.print("cg{d}{s}", .{ attempt, side }), .optimize = .fast, .backend = .llvm, .modules = mods.items, .split = .whole, .cache_dir = cache_dir };
     const t0 = Io.Clock.awake.now(io);
     result.built = try f.flush(gpa, io, q, .{ .text = bundle }, 1);
     result.elapsed_ns = @intCast(t0.durationTo(Io.Clock.awake.now(io)).toNanoseconds());

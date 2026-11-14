@@ -43,6 +43,7 @@ pub fn rule(w: *Diag.Wip, r: Zcu.Rule, loc: Diag.Loc, name: []const u8, nums: [2
         .defparam_unknown => b.msg("§12.2.1: this defparam names `{s}`, which is no parameter of its module", .{name}),
         .cell_again => b.msg("`{s}` is defined again; this later definition is the cell", .{name}),
         .config => b.msg("{s}", .{name}),
+        .design_cell => b.msg("{s}", .{name}),
         .defparam_nothing => b.msg("§12.2.1: this defparam's hierarchical name `{s}` names nothing in the design", .{name}),
         .defparam_early => b.msg("§12.8.2: this defparam's hierarchical name was resolved before the hierarchy was complete and would resolve differently once it is", .{}),
         .defparam_outside => b.msg("§12.2.1: a defparam inside `{s}` cannot change a parameter outside the generate block instance or array element it is in", .{name}),

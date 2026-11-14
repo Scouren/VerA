@@ -120,8 +120,9 @@ pub fn add(g: Graph) void {
             codegenHosts(g, step);
             benchFast(g);
         }
+        // Not in `test` (research/finish.md §4 #4, G1): the merge tier stays
+        // fast; `tools/gate.sh` runs each diff step as its own slot call.
         all.dependOn(&r.step);
-        g.test_step.dependOn(&r.step);
     }
     // diff-kernels: std_kernels against lib/kernels and against the old
     // kernel text itself, which `kernels_text.zig` writes out as one file
@@ -150,7 +151,6 @@ pub fn add(g: Graph) void {
     kd.dependOn(&kr.step);
     kd.dependOn(kt);
     all.dependOn(kd);
-    g.test_step.dependOn(kd);
     comp.add(g, all);
 }
 

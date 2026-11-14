@@ -699,6 +699,10 @@ pub const Check = struct {
     kind: Kind,
     /// The instance whose specify block wrote it.
     scope: u32 = 0,
+    /// W1199's quoted name, Sema's words for lib/sim/digital's own:
+    /// `` `$setup` in b_15_2_1_setup.u ``, the system task name and the
+    /// scope's path (`Zcu.PathFormatter`), in `string_bytes`.
+    name: List = .empty,
     ev: [2]CheckEvent,
     lim: [2]u64,
     notifier: u32,

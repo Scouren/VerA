@@ -60,6 +60,7 @@ with safety checks on, so a broken invariant is a crash the fuzzer sees.
 |---|---|---|---|
 | Pre-commit | under 10 s | `nix develop -c zig build check` | 7 s cold, under 1 s with `--watch -fincremental` |
 | Merge (required) | under 15 min | `test.yaml` (`zig build test` on Linux, macOS, Windows), `cross.yaml` (`build-all` on five targets, wasm), `conformance.yaml` (`suite -- ams`, `devices`, `vpi`, `--native`), `external.yaml`, `nix.yaml` | `test` 73 s locally, 9-12 min in CI; `conformance` 13-21 min; `nix` 14-18 min |
+| Rewrite gate (`refactor`, until G0) | the merge tier, then the diff stage | `tools/gate.sh <worktree>`: `test`, then every `diff-*` but `diff-rtlil` (the external shell's) as its own `tools/build-slot.sh` call, two at a time (research/finish.md G1) | |
 | Nightly | hours | `nightly.yaml`: perturb, certify, fuzz, determinism, sweep | 19-31 min |
 | Release | unbounded | `publish.yaml`: the merge gate again, `conformance.py --check <tag>`, every target, `sources.json` through `nix flake check` | |
 

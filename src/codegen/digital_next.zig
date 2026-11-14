@@ -13,7 +13,7 @@
 //! - `pub const Port = struct` (`Port.no_slot`)
 //! - `pub fn deviceRefusal(program: *const std_sim.Program, ports: []const Port) ?[]const u8`
 //! - `pub fn writeDevice(w: *std.Io.Writer, arena: Allocator, program: *const std_sim.Program, ports: []const Port) (Allocator.Error || std.Io.Writer.Error)!void`
-//! - `pub fn writeExe(w: *std.Io.Writer, arena: Allocator, program: *const std_sim.Program, sources: []const std_sim.exe.Source, sites: []const Diag.Loc, budget: u64) (Allocator.Error || std.Io.Writer.Error)!void`
+//! - `pub fn writeExe(w: *std.Io.Writer, arena: Allocator, program: *const std_sim.Program, sources: []const std_sim.exe.Source, pc_sites: []const Diag.Loc, check_sites: []const Diag.Loc, budget: u64) (Allocator.Error || std.Io.Writer.Error)!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -132,11 +132,15 @@ pub fn writeDevice(w: *std.Io.Writer, arena: Allocator, program: *const std_sim.
 
 /// Writes the executable's root for `program` to `w`: `vera_digital` (the
 /// Program as `std_sim.serial` bytes; `sources`, the files a diagnostic
-/// points into; `sites`, each timing check's W1199 location; the event
-/// `budget`), the design's compiled instructions (`native.zig`), and
-/// `std_sim.exe.main`. Asserts one site per timing check.
-pub fn writeExe(w: *std.Io.Writer, arena: Allocator, program: *const std_sim.Program, sources: []const std_sim.exe.Source, sites: []const Diag.Loc, budget: u64) (Allocator.Error || std.Io.Writer.Error)!void {
-    assert(sites.len == program.checks.len);
+/// points into; `pc_sites`, each instruction's run-diagnostic location
+/// (T3, research/dlower.md §2; `&.{}` falls back to `.none`, G3-G5's hole
+/// before this table existed); `check_sites`, each timing check's W1199
+/// location; the event `budget`), the design's compiled instructions
+/// (`native.zig`), and `std_sim.exe.main`. Asserts one site per
+/// instruction (or none) and one per timing check.
+pub fn writeExe(w: *std.Io.Writer, arena: Allocator, program: *const std_sim.Program, sources: []const std_sim.exe.Source, pc_sites: []const Diag.Loc, check_sites: []const Diag.Loc, budget: u64) (Allocator.Error || std.Io.Writer.Error)!void {
+    assert(pc_sites.len == 0 or pc_sites.len == program.insts.len);
+    assert(check_sites.len == program.checks.len);
     var bytes: std.Io.Writer.Allocating = .init(arena);
     std_sim.serial.save(program, &bytes.writer) catch return error.OutOfMemory;
     assert(bytes.written().len != 0);
@@ -151,10 +155,10 @@ pub fn writeExe(w: *std.Io.Writer, arena: Allocator, program: *const std_sim.Pro
     );
     try w.print("    .program = \"{f}\",\n    .sources = &.{{\n", .{std.zig.fmtString(bytes.written())});
     for (sources) |s| try w.print("        .{{ .name = \"{f}\", .text = \"{f}\" }},\n", .{ std.zig.fmtString(s.name), std.zig.fmtString(s.text) });
-    // ponytail: the field is `exe.Config.check_sites`; `pc_sites` stays at
-    // its `&.{}` default here until T3 (plan-codegen) gives this a table.
+    try w.writeAll("    },\n    .pc_sites = &.{\n");
+    for (pc_sites) |l| try w.print("        .{{ .file = @enumFromInt({d}), .start = {d}, .end = {d} }},\n", .{ @backingInt(l.file), l.start, l.end });
     try w.writeAll("    },\n    .check_sites = &.{\n");
-    for (sites) |l| try w.print("        .{{ .file = @enumFromInt({d}), .start = {d}, .end = {d} }},\n", .{ @backingInt(l.file), l.start, l.end });
+    for (check_sites) |l| try w.print("        .{{ .file = @enumFromInt({d}), .start = {d}, .end = {d} }},\n", .{ @backingInt(l.file), l.start, l.end });
     var native: std.Io.Writer.Allocating = .init(arena);
     const compiled = try native_step.write(&native.writer, arena, program);
     try w.print("    }},\n    .budget = {d},\n{s}}};\n", .{ budget, if (compiled) "    .native = &native,\n    .native_pcs = &native_pcs,\n" else "" });
@@ -175,7 +179,7 @@ test writeExe {
     _ = try b.slot(.bit, &.{0}, &.{1});
     const p = b.finish();
     var aw: std.Io.Writer.Allocating = .init(a);
-    try writeExe(&aw.writer, a, &p, &.{.{ .name = "a \"b\".v", .text = "module m;\nendmodule\n" }}, &.{}, 7);
+    try writeExe(&aw.writer, a, &p, &.{.{ .name = "a \"b\".v", .text = "module m;\nendmodule\n" }}, &.{}, &.{}, 7);
     const text = try a.dupeSentinel(u8, aw.written(), 0);
     var tree = try std.zig.Ast.parse(a, text, .{});
     defer tree.deinit(a);

@@ -92,6 +92,11 @@ pub fn compileStmt(l: *Lower, i: Inst.Index, depth: u32) Error!void {
     const vir = l.virOf(l.frame);
     const scope = l.frames.items[l.frame].scope;
     const tg = Lower.tag(vir, i);
+    // T3 (research/dlower.md §2): the statement's own main token blames
+    // every instruction it appends, Zig's `dbg_stmt` mirror; a system task
+    // whose old report names one argument overrides it below.
+    l.b.setSite(l.srcOffset(l.frame, i));
+    l.dist_site = null;
     // §10.4.4: "Functions shall not contain any time-controlled statements"
     // nor "any nonblocking assignments", nor enable tasks.
     // An assignment is reported at its target, as lib/sim/digital does.

@@ -12,6 +12,7 @@
 //! - `pub const ConfigRef = struct`, `pub const Ctx = struct`
 //! - `pub fn index(s: *Sema) Allocator.Error!void`
 //! - `pub fn roots(s: *Sema, configs: []const ConfigRef, root: u32, out: *std.ArrayList(Zcu.Decl)) Allocator.Error!void`
+//! - `pub fn designCellMissing(s: *Sema, cfg: ConfigRef, text: []const u8) Allocator.Error!void`
 //! - `pub fn rootTarget(s: *Sema, d: Zcu.Decl, name: InternPool.String) Allocator.Error!InternPool.String`
 //! - `pub fn bind(s: *Sema, parent: Zcu.Instance.Index, name: InternPool.String, target: InternPool.String) Allocator.Error!InternPool.String`
 //! - `pub fn rootConfig(s: *Sema, configs: []const ConfigRef) Allocator.Error!?u32`
@@ -77,12 +78,31 @@ pub fn roots(s: *Sema, configs: []const ConfigRef, root: u32, out: *std.ArrayLis
     s.lib_configs = configs;
     const cfg = configs[root];
     for (cfg.vir.list(Vir.String, cfg.c.design)) |cell| {
-        const d = (try designCell(s, cfg, cfg.vir.string(cell))) orelse continue;
-        const name = cellOf(cfg.vir.string(cell));
+        const text = cfg.vir.string(cell);
+        const d = (try designCell(s, cfg, text)) orelse {
+            try designCellMissing(s, cfg, text);
+            continue;
+        };
+        const name = cellOf(text);
         try s.lib_ctx.put(s.arena, name, .{ .cfg = root, .path = name, .liblist = try defaultList(s, cfg) });
         try out.append(s.arena, d);
     }
     assert(s.lib_configs.len == configs.len);
+}
+
+/// §13.3.1.1 "The cell or cells identified cannot be configurations
+/// themselves": `text` (one of `cfg`'s `design` statement cells) named no
+/// module `designCell` could find — a missing cell, a cell outside its
+/// library (§13.2.3) or a config sharing the name. Raised at `cfg`'s own
+/// declaration, in lib/sim/digital's words (`bind.zig:module`), so the
+/// IEEE 1364 route reports it unchanged (`Zcu.Rule.design_cell`,
+/// `legacy.zig`'s table); the analog route keeps its own E0904 wording
+/// (`paramset.zig`'s `cell_unbound`).
+pub fn designCellMissing(s: *Sema, cfg: ConfigRef, text: []const u8) Allocator.Error!void {
+    const lib = libOf(text) orelse s.zcu.libraryOf(cfg.decl);
+    const cell = cellOf(text);
+    const why = try std.fmt.allocPrint(s.arena, "undeclared module in instantiation: library `{s}` holds no cell `{s}`", .{ lib, cell });
+    try s.failRule(.{ .rule = .design_cell, .name = why }, .E0904, cfg.decl.file, cfg.vir.decls()[@backingInt(cfg.decl.index)].inst.toRef(), "{s}", .{why});
 }
 
 /// The key a root instance of `d` (named `name`) binds by: its library's

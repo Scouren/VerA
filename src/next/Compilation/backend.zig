@@ -238,9 +238,8 @@ pub fn runDigital(comp: *Compilation) !?Job {
     s.io = comp.io;
     const result = std_sim.exe.run(&s);
     try comp.outputs.out.appendSlice(comp.arena(), out.written());
-    // ponytail: no pc_sites table yet (T3's `Sema` work); `report` falls
-    // back to `.none` locations for pc-blamed diagnostics until then.
-    try std_sim.exe.report(&s, result, &comp.wip, &.{}, try checkSites(comp));
+    const sites = try runSites(comp);
+    try std_sim.exe.report(&s, result, &comp.wip, sites.pc, sites.check);
     return null;
 }
 
@@ -271,7 +270,8 @@ fn digitalExe(comp: *Compilation) !?Job {
     const sources = try a.alloc(std_sim.exe.Source, all.len);
     for (sources, all) |*s, d| s.* = .{ .name = d.name, .text = d.text };
     var root: Io.Writer.Allocating = .init(a);
-    try codegen_mod.digital_next.writeExe(&root.writer, a, &comp.lowered.?.program, sources, try checkSites(comp), c.event_budget);
+    const sites = try runSites(comp);
+    try codegen_mod.digital_next.writeExe(&root.writer, a, &comp.lowered.?.program, sources, sites.pc, sites.check, c.event_budget);
     const slots = try a.alloc(link_mod.Server, c.thread_limit);
     var q: link_mod.Queue = .init(slots);
     const mods = [_]link_mod.Module{.{ .name = "contract", .root = c.contract.? }} ++ try simModules(a, c.contract.?);
@@ -397,14 +397,17 @@ fn simModules(a: Allocator, contract: []const u8) ![3]link_mod.Module {
     };
 }
 
-/// Each timing check's W1199 site (`Lowered.check_sites`), relocated to
-/// the file the user wrote.
-fn checkSites(comp: *Compilation) ![]const vams.Diag.Loc {
+/// Every run diagnostic's blame, relocated to the file the user wrote:
+/// `Lowered.pc_sites` (one per `Program.insts` row, T3) and
+/// `Lowered.check_sites` (one per `Program.checks` row, W1199's site).
+fn runSites(comp: *Compilation) !struct { pc: []const vams.Diag.Loc, check: []const vams.Diag.Loc } {
     const l = &comp.lowered.?;
     const pp = comp.pp.output();
-    const out = try comp.arena().alloc(vams.Diag.Loc, l.check_sites.len);
-    for (out, l.check_sites) |*o, site| o.* = errors.relocate(pp, site, site);
-    return out;
+    const pc = try comp.arena().alloc(vams.Diag.Loc, l.pc_sites.len);
+    for (pc, l.pc_sites) |*o, site| o.* = errors.relocate(pp, site, site);
+    const check = try comp.arena().alloc(vams.Diag.Loc, l.check_sites.len);
+    for (check, l.check_sites) |*o, site| o.* = errors.relocate(pp, site, site);
+    return .{ .pc = pc, .check = check };
 }
 
 /// The modules a device compiles against, from the tree its `contract`

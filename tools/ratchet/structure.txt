@@ -522,7 +522,6 @@ src/ir/mir_insts.zig:emitAnewCached:many-parameters
 src/ir/mir_insts.zig:emitBranch:many-parameters
 src/prove/Analysis.zig:(file struct):wide-struct
 src/prove/deps.zig:depRow:long-function
-src/prove/deps.zig:fixDepsWide:deep-nesting
 src/prove/domain.zig:violated:many-parameters
 src/prove/falsify.zig:body:many-parameters
 src/prove/falsify.zig:dump:deep-nesting

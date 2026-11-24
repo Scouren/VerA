@@ -25,6 +25,10 @@ const Analysis = @import("Analysis.zig");
 
 const none = Analysis.none;
 
+/// Checks every worklist column against the whole-table sweep it replaced.
+/// Off: the check costs what the sweep did.
+const verify_against_sweep = false;
+
 /// `fixDeps`' input, decoded once so a sweep reads flat rows instead of
 /// re-decoding every instruction (decoding per Value per sweep measured
 /// 9.4 ms of `build`'s 11.4 on psp103). Per Value: its rule (`kind`) and its
@@ -36,6 +40,11 @@ const DepGraph = struct {
     n_d: []u32,
     off: []u32,
     ops: []u32,
+    /// The reverse of `ops`: the Values whose row names Value `o` are
+    /// `users[user_off[o]..user_off[o + 1]]` (one entry per mention), so a
+    /// Value whose bits grew wakes only the rows that read it.
+    user_off: []u32,
+    users: []u32,
 
     /// How a Value combines its operands' bits (see `fixDeps`).
     const Kind = enum(u8) {
@@ -52,6 +61,17 @@ const DepGraph = struct {
         /// first argument's whole `deps`.
         ac_dynamic,
     };
+};
+
+/// One column's fill: what `rowBits` reads, and the two scratch rows it
+/// writes (`d`, a Value's new bits; `s`, its steering operands' bits).
+const Fill = struct {
+    an: *const Analysis,
+    g: DepGraph,
+    which: Column,
+    col: []u64,
+    d: []u64,
+    s: []u64,
 };
 
 /// Which column `fixDeps` fills.
@@ -121,6 +141,8 @@ fn buildGraph(an: *const Analysis, arena: Allocator) Analysis.Error!DepGraph {
         .n_d = try arena.alloc(u32, nv),
         .off = try arena.alloc(u32, nv + 1),
         .ops = &.{},
+        .user_off = try arena.alloc(u32, nv + 1),
+        .users = &.{},
     };
     var n: u32 = 0;
     for (0..nv) |v| {
@@ -134,6 +156,18 @@ fn buildGraph(an: *const Analysis, arena: Allocator) Analysis.Error!DepGraph {
         assert(wrote == g.off[v + 1] - g.off[v]);
     }
     assert(g.ops.len == g.off[nv]);
+    // The reverse index, by counting: mentions per operand, prefix sums, fill.
+    @memset(g.user_off, 0);
+    for (g.ops) |o| g.user_off[o + 1] += 1;
+    for (0..nv) |v| g.user_off[v + 1] += g.user_off[v];
+    assert(g.user_off[nv] == n);
+    g.users = try arena.alloc(u32, n);
+    const next = try arena.alloc(u32, nv);
+    @memcpy(next, g.user_off[0..nv]);
+    for (0..nv) |v| for (g.ops[g.off[v]..g.off[v + 1]]) |o| {
+        g.users[next[o]] = @intCast(v);
+        next[o] += 1;
+    };
     return g;
 }
 
@@ -242,8 +276,12 @@ fn readsInstance(an: *const Analysis, inst: Mir.Inst) bool {
     };
 }
 
-/// The fixpoint of column `which` over `g`, swept in value order until
-/// nothing changes. Per column, a Value's bits are:
+/// The fixpoint of column `which` over `g`: every Value once in definition
+/// order, then only the rows that read a Value whose bits grew (`g.users`).
+/// The rules are monotone and start from no bits, so any order reaches the
+/// same least fixpoint a whole-table sweep does; a sweep paid one pass over
+/// every Value per link of the longest chain of joins that precede their
+/// operands. Per column, a Value's bits are:
 ///   deriv  `probe`: its unknown's bit; else its derivative operands'.
 ///   value  `probe`: its bit; else every operand's.
 ///   point  as `value`, plus bit 0 for an `instance_call` (over its steering
@@ -256,6 +294,10 @@ fn fixDeps(an: *const Analysis, arena: Allocator, g: DepGraph, which: Column) An
     assert(an.dep_words >= 1);
     const col = try if (an.dep_words == 1) fixDepsWide(an, arena, g, which, 1) else fixDepsWide(an, arena, g, which, 0);
     assert(col.len == @as(usize, an.nv) * an.dep_words);
+    if (verify_against_sweep) {
+        const want = try sweepDeps(an, arena, g, which);
+        assert(std.mem.eql(u64, want, col));
+    }
     return col;
 }
 
@@ -263,55 +305,113 @@ fn fixDeps(an: *const Analysis, arena: Allocator, g: DepGraph, which: Column) An
 fn fixDepsWide(an: *const Analysis, arena: Allocator, g: DepGraph, which: Column, comptime words_ct: u32) Analysis.Error![]u64 {
     const w: usize = if (words_ct != 0) words_ct else an.dep_words;
     assert(w == an.dep_words);
-    assert(g.off.len == @as(usize, an.nv) + 1);
-    const col = try arena.alloc(u64, @as(usize, an.nv) * w);
+    const nv: usize = an.nv;
+    assert(g.off.len == nv + 1);
+    assert(g.user_off.len == nv + 1);
+    const col = try arena.alloc(u64, nv * w);
     @memset(col, 0);
+    if (nv == 0) return col;
     const d = (try arena.alloc(u64, w))[0..w];
-    const s = (try arena.alloc(u64, w))[0..w];
-    // Bound: monotone, and every changing sweep sets at least one of the
-    // `nv * 64 * w` bits.
-    const sweeps_max = @as(usize, an.nv) * 64 * w + 1;
+    const fill: Fill = .{ .an = an, .g = g, .which = which, .col = col, .d = d, .s = (try arena.alloc(u64, w))[0..w] };
+    // A ring of the rows to (re)compute; `queued` keeps each in it once, so
+    // `nv` slots hold it. Seeded with every Value in definition order.
+    const queue = try arena.alloc(u32, nv);
+    const queued = try arena.alloc(bool, nv);
+    for (queue, 0..) |*q, i| q.* = @intCast(i);
+    @memset(queued, true);
+    var head: usize = 0;
+    var len: usize = nv;
+    // Bound: past the seed, a row is queued only by a mention of a Value
+    // that gained at least one of its `64 * w` bits.
+    const pops_max = nv + g.ops.len * 64 * w + 1;
+    var pops: usize = 0;
+    while (len != 0) : (pops += 1) {
+        assert(pops < pops_max);
+        const v: usize = queue[head];
+        head = if (head + 1 == nv) 0 else head + 1;
+        len -= 1;
+        assert(queued[v]);
+        queued[v] = false;
+        rowBits(fill, v);
+        const at = col[v * w ..][0..w];
+        if (std.mem.eql(u64, at, d)) continue;
+        @memcpy(at, d);
+        for (g.users[g.user_off[v]..g.user_off[v + 1]]) |u| {
+            if (queued[u]) continue;
+            queued[u] = true;
+            const tail = head + len;
+            queue[if (tail >= nv) tail - nv else tail] = u;
+            len += 1;
+        }
+    }
+    assert(pops >= nv);
+    return col;
+}
+
+/// Value `v`'s bits in `f.which` from its operands' current bits in `f.col`,
+/// written to `f.d`.
+fn rowBits(f: Fill, v: usize) void {
+    const an = f.an;
+    const g = f.g;
+    const which = f.which;
+    const col = f.col;
+    const d = f.d;
+    const s = f.s;
+    const w = d.len;
+    assert(s.len == w);
+    const row = g.ops[g.off[v]..g.off[v + 1]];
+    @memset(d, 0);
+    @memset(s, 0);
+    for (row[0..g.n_d[v]]) |o| orInto(d, col[@as(usize, o) * w ..][0..w]);
+    if (which.steered()) for (row[g.n_d[v]..]) |o| orInto(s, col[@as(usize, o) * w ..][0..w]);
+    switch (g.kind[v]) {
+        .probe => {
+            @memset(d, 0);
+            if (which != .ac_dyn) {
+                const u = an.mir.valueDef(@fromBackingInt(@intCast(v))).block_param;
+                d[u / 64] = @as(u64, 1) << @intCast(u % 64);
+            }
+        },
+        // Bit 0 marks "reads the instance": `pointDep` asks only
+        // whether any bit is set.
+        .instance_call => if (which == .point) {
+            @memset(d, 0);
+            d[0] = 1;
+        },
+        .latch => if (which == .point) {
+            d[0] |= 1;
+        },
+        .ac_dynamic => if (which == .ac_dyn) {
+            if (g.n_d[v] == 0) @memset(d, 0) else @memcpy(d, an.deps[@as(usize, row[0]) * w ..][0..w]);
+        },
+        .plain => {},
+    }
+    orInto(d, s);
+}
+
+/// The whole-table sweep `fixDepsWide` replaced, kept as its reference:
+/// every Value in order, again until nothing changes.
+fn sweepDeps(an: *const Analysis, arena: Allocator, g: DepGraph, which: Column) Analysis.Error![]u64 {
+    const w: usize = an.dep_words;
+    const nv: usize = an.nv;
+    const col = try arena.alloc(u64, nv * w);
+    @memset(col, 0);
+    const d = try arena.alloc(u64, w);
+    const fill: Fill = .{ .an = an, .g = g, .which = which, .col = col, .d = d, .s = try arena.alloc(u64, w) };
+    const sweeps_max = nv * 64 * w + 1;
     var sweeps: usize = 0;
     var changed = true;
     while (changed) : (sweeps += 1) {
         assert(sweeps < sweeps_max);
         changed = false;
-        for (0..an.nv) |v| {
-            const row = g.ops[g.off[v]..g.off[v + 1]];
-            @memset(d, 0);
-            @memset(s, 0);
-            for (row[0..g.n_d[v]]) |o| orInto(d, col[@as(usize, o) * w ..][0..w]);
-            if (which.steered()) for (row[g.n_d[v]..]) |o| orInto(s, col[@as(usize, o) * w ..][0..w]);
-            switch (g.kind[v]) {
-                .probe => {
-                    @memset(d, 0);
-                    if (which != .ac_dyn) {
-                        const u = an.mir.valueDef(@fromBackingInt(@intCast(v))).block_param;
-                        d[u / 64] = @as(u64, 1) << @intCast(u % 64);
-                    }
-                },
-                // Bit 0 marks "reads the instance": `pointDep` asks only
-                // whether any bit is set.
-                .instance_call => if (which == .point) {
-                    @memset(d, 0);
-                    d[0] = 1;
-                },
-                .latch => if (which == .point) {
-                    d[0] |= 1;
-                },
-                .ac_dynamic => if (which == .ac_dyn) {
-                    if (g.n_d[v] == 0) @memset(d, 0) else @memcpy(d, an.deps[@as(usize, row[0]) * w ..][0..w]);
-                },
-                .plain => {},
-            }
-            orInto(d, s);
+        for (0..nv) |v| {
+            rowBits(fill, v);
             const at = col[v * w ..][0..w];
             if (std.mem.eql(u64, at, d)) continue;
             @memcpy(at, d);
             changed = true;
         }
     }
-    assert(!changed);
     assert(sweeps >= 1);
     return col;
 }

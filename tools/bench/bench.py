@@ -1,14 +1,17 @@
 """Wall time and peak RSS of vera per model and mode, through wait4 (ru_maxrss of the child and its largest descendant).
 
 Usage: bench.py VERA OUT.tsv MODEL... ; modes from BENCH_MODES (default lint,emit-zig).
-emit-so builds the device with zig: its row's peak is the larger of vera's and
-zig's (time -v reports the largest child), its time includes the zig compile.
+check and emit-osdi run zig: their peak is the largest single process (use zig_shim.py for the
+sum over a split build's parallel processes) and their time includes the zig compile.
+Set BENCH_RTIME to the built tools/bench/rtime.c: a child's ru_maxrss starts at its parent's
+size, so without it any peak under about 25 MiB is this interpreter's, not vera's.
 """
 import os, re, subprocess, sys, tempfile, time
 
 vera, out, models = sys.argv[1], sys.argv[2], sys.argv[3:]
 modes = os.environ.get("BENCH_MODES", "lint,emit-zig").split(",")
 reps = int(os.environ.get("BENCH_REPS", "3"))
+rtime = os.environ.get("BENCH_RTIME")  # tools/bench/rtime.c, built; without it peaks under ~25 MiB are this interpreter's
 rows = []
 for m in models:
     for mode in modes:
@@ -22,15 +25,24 @@ for m in models:
                 args += ["-o", os.path.join(wd, "d.osdi")]
             best_t, peak, rc, extra = None, 0, 0, ""
             for _ in range(reps if mode not in ("emit-so", "emit-osdi", "check") else 1):
-                t0 = time.perf_counter()
                 env = dict(os.environ)
                 if os.environ.get('BENCH_FRESH_GLOBAL'):
                     env['ZIG_GLOBAL_CACHE_DIR'] = os.path.join(wd, 'gcache')
-                p = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
-                _, status, ru = os.wait4(p.pid, 0)
-                secs = time.perf_counter() - t0
-                rc = os.waitstatus_to_exitcode(status)
-                kb = ru.ru_maxrss
+                if rtime:
+                    rec = os.path.join(wd, 'rtime.tsv')
+                    if os.path.exists(rec):
+                        os.remove(rec)
+                    env['RTIME_OUT'], env['RTIME_QUIET'] = rec, '1'
+                    subprocess.run([rtime] + args, env=env)
+                    wall, _cpu, mib, code = open(rec).read().split()
+                    secs, kb, rc = float(wall), float(mib) * 1024, int(code)
+                else:
+                    t0 = time.perf_counter()
+                    p = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+                    _, status, ru = os.wait4(p.pid, 0)
+                    secs = time.perf_counter() - t0
+                    rc = os.waitstatus_to_exitcode(status)
+                    kb = ru.ru_maxrss
                 best_t = secs if best_t is None else min(best_t, secs)
                 peak = max(peak, kb)
             if mode == "emit-zig" and os.path.exists(os.path.join(wd, "d.zig")):

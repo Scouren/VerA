@@ -67,7 +67,9 @@ pub fn Setup(comptime D: type) type {
             if (connected > D.num_ports) {
                 var buf: [128]u8 = undefined;
                 // Two u32s and the fixed text fit 128 bytes.
-                const msg = std.mem.print(&buf, "vera osdi: setup_instance connects {d} terminals; the device has {d}", .{ connected, D.num_ports }) catch unreachable;
+                var d0: [20]u8 = undefined;
+                var d1: [20]u8 = undefined;
+                const msg = abi.join(&buf, &.{ "vera osdi: setup_instance connects ", abi.dec(&d0, connected), " terminals; the device has ", abi.dec(&d1, D.num_ports) });
                 return refuse(handle, res, msg);
             }
             self.row = m.card;
@@ -124,7 +126,7 @@ pub fn Setup(comptime D: type) type {
             if (@hasDecl(D, "checkRange")) if (D.checkRange(m)) |param| {
                 var buf: [512]u8 = undefined;
                 const at = "error[E0377]: LRM 3.4.2: parameter `";
-                abi.log(handle, abi.log_lvl_fatal, std.mem.print(&buf, at ++ "{s}` is outside its declared range", .{param}) catch at);
+                abi.log(handle, abi.log_lvl_fatal, abi.join(&buf, &.{ at, param, "` is outside its declared range" }));
                 return false;
             };
             if (@hasDecl(D, "checkCard")) if (D.checkCard(m)) |why| abi.log(handle, abi.log_lvl_err, why);

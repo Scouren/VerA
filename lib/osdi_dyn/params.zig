@@ -43,7 +43,7 @@ pub const SimParasError = error{
 
 /// What `setup_model`, `setup_instance` and `eval` log, fatal, on
 /// `SimParasUnterminated`.
-pub const sim_paras_refusal = std.fmt.comptimePrint("vera osdi: the simulator's $simparam names list has no NULL in its first {d} entries", .{max_sim_paras + 1});
+pub const sim_paras_refusal = "vera osdi: the simulator's $simparam names list has no NULL in its first " ++ abi.comptimeDec(max_sim_paras + 1) ++ " entries";
 
 /// The parameter transport of device `D`.
 // Generic over `D`: every device has its own parameter fields (axis: the
@@ -105,7 +105,16 @@ pub fn Params(comptime D: type) type {
         pub fn overlay(m: *D.Model, comptime idx: []const u16, comptime k: usize, vals: *[k]u64, given: *const [k]bool) ?[]const u8 {
             @setEvalBranchQuota(10_000_000);
             comptime assert(idx.len <= k);
-            inline for (idx, 0..) |pi, i| if (given[i]) {
+            const base: [*]u8 = @ptrCast(m);
+            for (comptime plainOf(idx)) |p| if (given[p.i]) {
+                // SAFETY: `off` is `@offsetOf` a field of that type in `D.Model`.
+                if (p.real) {
+                    @as(*f64, @ptrCast(@alignCast(base + p.off))).* = slot(f64, &vals[p.i]).*;
+                } else {
+                    @as(*i64, @ptrCast(@alignCast(base + p.off))).* = slot(i32, &vals[p.i]).*;
+                }
+            };
+            inline for (idx, 0..) |pi, i| if (comptime !isPlain(pi)) if (given[i]) {
                 const p = T.params[pi];
                 const F = @FieldType(D.Model, p.field);
                 @field(m, p.field) = switch (p.kind) {
@@ -124,7 +133,16 @@ pub fn Params(comptime D: type) type {
         pub fn readback(m: *const D.Model, comptime idx: []const u16, comptime k: usize, vals: *[k]u64, given: *const [k]bool) void {
             @setEvalBranchQuota(10_000_000);
             comptime assert(idx.len <= k);
-            inline for (idx, 0..) |pi, i| if (!given[i]) switch (T.params[pi].kind) {
+            const base: [*]const u8 = @ptrCast(m);
+            for (comptime plainOf(idx)) |p| if (!given[p.i]) {
+                // SAFETY: `off` is `@offsetOf` a field of that type in `D.Model`.
+                if (p.real) {
+                    slot(f64, &vals[p.i]).* = @as(*const f64, @ptrCast(@alignCast(base + p.off))).*;
+                } else {
+                    slot(i32, &vals[p.i]).* = std.math.lossyCast(i32, @as(*const i64, @ptrCast(@alignCast(base + p.off))).*);
+                }
+            };
+            inline for (idx, 0..) |pi, i| if (comptime !isPlain(pi)) if (!given[i]) switch (T.params[pi].kind) {
                 .real => slot(f64, &vals[i]).* = @field(m, T.params[pi].field),
                 .int => slot(i32, &vals[i]).* = std.math.lossyCast(i32, @field(m, T.params[pi].field)),
                 // ponytail: a default string is not known to be NUL-terminated.
@@ -137,7 +155,7 @@ pub fn Params(comptime D: type) type {
             assert(param.len > 0);
             var buf: [512]u8 = undefined;
             const at = "vera osdi: integer parameter `";
-            abi.log(handle, abi.log_lvl_fatal, std.mem.print(&buf, at ++ "{s}` is outside its type's range", .{param}) catch at);
+            abi.log(handle, abi.log_lvl_fatal, abi.join(&buf, &.{ at, param, "` is outside its type's range" }));
         }
 
         /// Copies the simulator's `$simparam` values into `m`'s host fields
@@ -200,6 +218,36 @@ pub fn Params(comptime D: type) type {
         }
 
         // ---- private ----
+
+        /// A parameter a run-time loop can move by offset: a real in an `f64`
+        /// field or an integer in an `i64` field of a `Model` with no
+        /// `setGiven`. Unrolled per parameter, `overlay` and `readback`, two
+        /// copies each, were 45% of the code LLVM was given for a
+        /// 1,600-parameter device.
+        const Plain = struct { i: u16, off: u32, real: bool };
+
+        fn isPlain(comptime pi: u16) bool {
+            if (@hasDecl(D.Model, "setGiven")) return false;
+            const p = T.params[pi];
+            const F = @FieldType(D.Model, p.field);
+            return switch (p.kind) {
+                .real => F == f64,
+                .int => F == i64,
+                .str => false,
+            };
+        }
+
+        /// The plain parameters among `idx`, each with its slot and field offset.
+        fn plainOf(comptime idx: []const u16) []const Plain {
+            comptime {
+                @setEvalBranchQuota(10_000_000);
+                var out: []const Plain = &.{};
+                for (idx, 0..) |pi, i| if (isPlain(pi)) {
+                    out = out ++ &[_]Plain{.{ .i = i, .off = @offsetOf(D.Model, T.params[pi].field), .real = T.params[pi].kind == .real }};
+                };
+                return out;
+            }
+        }
 
         /// One 8-byte value slot as the C type a parameter takes.
         fn slot(comptime C: type, v: *u64) *C {

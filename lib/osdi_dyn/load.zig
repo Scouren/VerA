@@ -34,6 +34,7 @@ pub fn Load(comptime D: type) type {
     const T = tables.Tables(D);
     const I = blobs.Instance(D);
     const n = T.n;
+    const unroll = T.nj <= tables.stamp_unroll_max;
     return struct {
         /// Adds the resistive residual into `dst`, by node.
         pub fn loadResidualResist(ip: *anyopaque, _: *anyopaque, dst: [*]f64) callconv(.c) void {
@@ -67,7 +68,11 @@ pub fn Load(comptime D: type) type {
             const self = I.of(ip);
             var rhs: [n]f64 = undefined;
             for (&rhs, self.res) |*r, f| r.* = -f;
-            for (T.entries, 0..) |e, k| rhs[e.r] += self.jac[k] * self.x[e.c];
+            if (comptime unroll) {
+                inline for (T.entries, 0..) |e, k| rhs[e.r] += self.jac[k] * self.x[e.c];
+            } else {
+                for (T.entries, 0..) |e, k| rhs[e.r] += self.jac[k] * self.x[e.c];
+            }
             for (rhs, self.node_mapping) |v, k| dst[k] += v;
         }
 
@@ -78,7 +83,11 @@ pub fn Load(comptime D: type) type {
             loadSpiceRhsDc(ip, mp, dst, prev);
             const self = I.of(ip);
             var rhs: [n]f64 = @splat(0);
-            for (T.entries, 0..) |e, k| rhs[e.r] += self.jac_q[k] * self.x[e.c];
+            if (comptime unroll) {
+                inline for (T.entries, 0..) |e, k| rhs[e.r] += self.jac_q[k] * self.x[e.c];
+            } else {
+                for (T.entries, 0..) |e, k| rhs[e.r] += self.jac_q[k] * self.x[e.c];
+            }
             for (rhs, self.node_mapping) |v, k| dst[k] += alpha * v;
         }
 
@@ -87,8 +96,14 @@ pub fn Load(comptime D: type) type {
         pub fn loadJacobianResist(ip: *anyopaque, _: *anyopaque) callconv(.c) void {
             @setEvalBranchQuota(10_000_000);
             const self = I.of(ip);
-            for (T.resist_idx) |k| {
-                if (self.jac_ptr[k]) |p| p.* += self.jac[k];
+            if (comptime unroll) {
+                inline for (T.resist_idx) |k| {
+                    if (self.jac_ptr[k]) |p| p.* += self.jac[k];
+                }
+            } else {
+                for (T.resist_idx) |k| {
+                    if (self.jac_ptr[k]) |p| p.* += self.jac[k];
+                }
             }
         }
 
@@ -99,8 +114,14 @@ pub fn Load(comptime D: type) type {
         pub fn loadJacobianReact(ip: *anyopaque, _: *anyopaque, alpha: f64) callconv(.c) void {
             @setEvalBranchQuota(10_000_000);
             const self = I.of(ip);
-            for (T.react_idx) |k| {
-                if (self.react_ptr[k]) |p| p.* += alpha * self.jac_q[k];
+            if (comptime unroll) {
+                inline for (T.react_idx) |k| {
+                    if (self.react_ptr[k]) |p| p.* += alpha * self.jac_q[k];
+                }
+            } else {
+                for (T.react_idx) |k| {
+                    if (self.react_ptr[k]) |p| p.* += alpha * self.jac_q[k];
+                }
             }
             if (!@hasDecl(D, "acDyn")) return;
             if (self.sim.kind != .ac and self.sim.kind != .noise) return;

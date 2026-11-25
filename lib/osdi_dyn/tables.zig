@@ -146,25 +146,56 @@ pub fn Tables(comptime D: type) type {
         /// entries, less a 0 V short's flow row and column (`shortFlow`).
         pub const entries: []const Entry = blk: {
             @setEvalBranchQuota(quota);
-            var es: []const Entry = &.{};
-            for (0..n) |r| for (0..n) |c| {
+            // One pass sizes the table and one fills it, so nothing grows by
+            // `++`; the row's patterns and its extra entries are read once per
+            // row, since this runs n*n times in the compile-time interpreter.
+            const consts = contract.jacConst(D);
+            const dyns = contract.acDynSlots(D);
+            var buf: [n * n]Entry = undefined;
+            var k: usize = 0;
+            for (0..n) |r| {
                 // A short's flow unknown always collapses into ground: its row
                 // and column reach no matrix slot.
-                if (shortFlow(r) or shortFlow(c)) continue;
+                if (shortFlow(r)) continue;
                 const jac_row = if (@hasDecl(D, "jac_pattern")) D.jac_pattern[r] else ~@as(u64, 0);
                 const q_row = if (@hasDecl(D, "q_pattern")) D.q_pattern[r] else ~@as(u64, 0);
-                var e: Entry = .{ .r = r, .c = c, .resist = bit(jac_row, c), .react = has_q and bit(q_row, c) };
-                for (contract.jacConst(D)) |j| if (@backingInt(j.row) == r and @backingInt(j.col) == c) {
-                    e.resist = e.resist or j.g != 0;
-                    e.react = e.react or j.c != 0;
-                };
-                for (contract.acDynSlots(D)) |s| if (s == r * n + c) {
-                    e.resist = true;
-                    e.react = true;
-                };
-                if (e.resist or e.react) es = es ++ [_]Entry{e};
-            };
-            break :blk es;
+                var extra = false;
+                for (consts) |j| extra = extra or @backingInt(j.row) == r;
+                for (dyns) |s| extra = extra or s / n == r;
+                // A row whose patterns are as wide as the device and that has no
+                // extra entry is read by its set bits alone.
+                const wide = @bitSizeOf(@TypeOf(jac_row)) >= n and (!has_q or @bitSizeOf(@TypeOf(q_row)) >= n);
+                if (wide and !extra) {
+                    const W = if (@bitSizeOf(@TypeOf(jac_row)) >= @bitSizeOf(@TypeOf(q_row))) @TypeOf(jac_row) else @TypeOf(q_row);
+                    var bits: W = @as(W, jac_row) | (if (has_q) @as(W, q_row) else 0);
+                    while (bits != 0) : (bits &= bits - 1) {
+                        const c = @ctz(bits);
+                        if (c >= n or shortFlow(c)) continue;
+                        buf[k] = .{ .r = r, .c = c, .resist = bit(jac_row, c), .react = has_q and bit(q_row, c) };
+                        k += 1;
+                    }
+                    continue;
+                }
+                for (0..n) |c| {
+                    var e: Entry = .{ .r = r, .c = c, .resist = bit(jac_row, c), .react = has_q and bit(q_row, c) };
+                    if (extra) {
+                        for (consts) |j| if (@backingInt(j.row) == r and @backingInt(j.col) == c) {
+                            e.resist = e.resist or j.g != 0;
+                            e.react = e.react or j.c != 0;
+                        };
+                        for (dyns) |s| if (s == r * n + c) {
+                            e.resist = true;
+                            e.react = true;
+                        };
+                    }
+                    if (!(e.resist or e.react)) continue;
+                    if (shortFlow(c)) continue;
+                    buf[k] = e;
+                    k += 1;
+                }
+            }
+            const done = buf[0..k].*;
+            break :blk &done;
         };
         /// How many entries.
         pub const nj = entries.len;
@@ -174,11 +205,14 @@ pub fn Tables(comptime D: type) type {
         fn halfIdx(comptime half: enum { resist, react }) []const u32 {
             comptime {
                 @setEvalBranchQuota(quota);
-                var out: []const u32 = &.{};
+                var buf: [entries.len]u32 = undefined;
+                var m: usize = 0;
                 for (entries, 0..) |e, k| if (@field(e, @tagName(half))) {
-                    out = out ++ &[_]u32{k};
+                    buf[m] = k;
+                    m += 1;
                 };
-                return out;
+                const done = buf[0..m].*;
+                return &done;
             }
         }
         /// How many entries have a resistive half.
@@ -273,6 +307,7 @@ pub fn Tables(comptime D: type) type {
 
         /// `kcl` of every row, as a table a run-time loop reads.
         pub const kcl_rows: [n]bool = blk: {
+            @setEvalBranchQuota(quota);
             var t: [n]bool = undefined;
             for (0..n) |i| t[i] = kcl(i);
             break :blk t;

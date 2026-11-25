@@ -146,6 +146,7 @@ fn exportDescriptor(comptime D: type, comptime name: []const u8, comptime build:
     @export(&abi.osdi_descriptor_size, .{ .name = "OSDI_DESCRIPTOR_SIZE" });
     @export(&Lib.descriptors, .{ .name = "OSDI_DESCRIPTORS" });
     @export(&abi.osdi_log, .{ .name = "osdi_log" });
+    @export(&Lib.fill_params_entry, .{ .name = "vera_osdi_fill_params", .section = ".init_array" });
 }
 
 test {

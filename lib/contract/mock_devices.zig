@@ -24,6 +24,8 @@
 //!   (with `n` and `exportChunk`), `jac_f32`, `jac_f32_host`, `batch_lead`,
 //!   `batch_inst`, `batch_ok`, `mutable_eval`, `u_kinds`, `u_abstol`,
 //!   `u_nodeset`, `decl_meta`, `op_vars`, `opVars`, `instance_params`,
+//!   `osdi_entries`, `osdi_param_fields`, `osdi_param_kinds`, `osdi_param_names`,
+//!   `osdi_param_name_at`, `osdi_param_flags`,
 //!   `mc_param`, `constant`, `noise_gens`, `noise_tables`, `noiseTablePoints`,
 //!   `noisePsd`, `ac_gens`, `acStim`, `ac_dyn_slots`, `acDyn`, `systf_calls`,
 //!   `fileIo`, `deinitInstance`, `jac_pattern`, `q_pattern`, `jac_rows`, `q_rows`,
@@ -258,6 +260,14 @@ pub const MockAll = struct {
         return .{@as(f64, m.g) * (x[0] - x[1])};
     }
     pub const instance_params = [_][]const u8{"g"};
+    // The OSDI host's tables as data (prototype): a device may carry what the host would
+    // otherwise derive. Declared here so the allowlist cannot drift; no host reads these.
+    pub const osdi_entries = [_][3]u16{};
+    pub const osdi_param_fields = [_][]const u8{};
+    pub const osdi_param_kinds = [_]u8{};
+    pub const osdi_param_names = "";
+    pub const osdi_param_name_at = [_]u32{};
+    pub const osdi_param_flags = [_]u32{};
     pub const mc_param = "g";
     pub const constant: Constant = .{ .g = true };
     // §4.6.4: a parametric generator and a §4.6.4.4 tabulated one, so the

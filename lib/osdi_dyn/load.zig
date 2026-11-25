@@ -84,10 +84,13 @@ pub fn Load(comptime D: type) type {
             loadSpiceRhsDc(ip, mp, dst, prev);
             const self = I.of(ip);
             var rhs: [n]f64 = @splat(0);
-            if (comptime n_chunks <= 1) {
-                inline for (T.entries, 0..) |e, k| rhs[e.r] += self.jac_q[k] * self.x[e.c];
-            } else inline for (0..n_chunks) |c| {
-                Rhs(c * chunk, @min(T.nj, (c + 1) * chunk)).run(&rhs, &self.jac_q, &self.x);
+            // Only the reactive entries: every other entry's `jac_q` is exactly zero, its
+            // product a signed zero that leaves a sum starting at +0 unchanged, and a
+            // non-finite `x` already reached `dst` through the DC part above.
+            if (comptime T.react_idx.len <= chunk) {
+                inline for (T.react_idx) |k| rhs[T.entries[k].r] += self.jac_q[k] * self.x[T.entries[k].c];
+            } else inline for (0..(T.react_idx.len + chunk - 1) / chunk) |c| {
+                RhsOf(T.react_idx[c * chunk .. @min(T.react_idx.len, (c + 1) * chunk)]).run(&rhs, &self.jac_q, &self.x);
             }
             for (rhs, self.node_mapping) |v, k| dst[k] += alpha * v;
         }
@@ -139,7 +142,7 @@ pub fn Load(comptime D: type) type {
             const self = I.of(ip);
             if (comptime n_chunks <= 1) {
                 inline for (0..T.nj) |k| if (self.jac_ptr[k]) |p| {
-                    p.* += self.jac[k] + alpha * self.jac_q[k];
+                    p.* += if (comptime T.entries[k].react) self.jac[k] + alpha * self.jac_q[k] else self.jac[k];
                 };
             } else inline for (0..n_chunks) |c| {
                 Tran(c * chunk, @min(T.nj, (c + 1) * chunk)).run(&self.jac_ptr, &self.jac, &self.jac_q, alpha);
@@ -198,6 +201,16 @@ pub fn Load(comptime D: type) type {
             };
         }
 
+        /// The entries `idx` of J·x added into `rhs`, unrolled.
+        fn RhsOf(comptime idx: []const u32) type {
+            return struct {
+                noinline fn run(noalias rhs: *[n]f64, noalias jac: *const [T.nj]f64, noalias x: *const [n]f64) void {
+                    @setEvalBranchQuota(10_000_000);
+                    inline for (idx) |k| rhs[T.entries[k].r] += jac[k] * x[T.entries[k].c];
+                }
+            };
+        }
+
         /// The entries `idx` added into their matrix slots, unrolled.
         fn Stamp(comptime idx: []const u32) type {
             return struct {
@@ -222,7 +235,7 @@ pub fn Load(comptime D: type) type {
                 noinline fn run(ptrs: *const [T.nj]?*f64, jac: *const [T.nj]f64, jac_q: *const [T.nj]f64, alpha: f64) void {
                     @setEvalBranchQuota(10_000_000);
                     inline for (lo..hi) |k| if (ptrs[k]) |p| {
-                        p.* += jac[k] + alpha * jac_q[k];
+                        p.* += if (comptime T.entries[k].react) jac[k] + alpha * jac_q[k] else jac[k];
                     };
                 }
             };

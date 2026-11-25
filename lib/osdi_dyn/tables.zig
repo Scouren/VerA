@@ -11,7 +11,7 @@
 //! Contents:
 //! - `pub const HostField = struct`
 //! - `pub const host_fields: [6]HostField`
-//! - `pub const max_sim_paras: usize`, `stamp_unroll_max: usize`
+//! - `pub const max_sim_paras: usize`, `stamp_chunk: usize`
 //! - `pub fn Tables(comptime D: type) type`
 //! - `pub const Tables(D).n, .np, .ni, .has_mf, .num_inst_params, .num_params, .nj, .n_resist, .n_react: comptime_int`
 //! - `pub const Tables(D).has_q, .collapses, .has_bp: bool`
@@ -32,13 +32,12 @@ const std = @import("std");
 const assert = std.debug.assert;
 const contract = @import("contract");
 
-/// The stamps unroll per Jacobian entry up to this many entries and loop over
-/// the entry table above it. Unrolled, the right-hand-side stamps run 1.7x
-/// faster at 256 entries, since each row sums in a register and each entry's
-/// row and column are constants; the code grows by about eight instructions per
-/// entry per stamp, which is what made the wrapper half of a large device's
-/// build.
-pub const stamp_unroll_max: usize = 256;
+/// The per-iterate stamps are unrolled per Jacobian entry, in functions of at
+/// most this many entries. Unrolled, each row of the right-hand side sums in a
+/// register and each entry's row and column are constants, which is 1.7x the
+/// speed of a loop over the table at 256 entries; bounded, no function grows
+/// with the device.
+pub const stamp_chunk: usize = 256;
 
 /// One `$simparam` a simulator passes (`SimParas.names`) and the `Model`
 /// field VerA's device reads it from.

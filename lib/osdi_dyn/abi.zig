@@ -22,6 +22,10 @@
 //! - `pub var osdi_log: ?*const fn (?*anyopaque, [*:0]const u8, u32) callconv(.c) void`
 //! - `pub const log_line_max: usize`
 //! - `pub fn log(handle: ?*anyopaque, lvl: u32, msg: []const u8) void`
+//! - `pub fn join(buf: []u8, parts: []const []const u8) []const u8`
+//! - `pub fn dec(buf: *[20]u8, v: u64) []const u8`
+//! - `pub fn comptimeDec(comptime v: u64) [:0]const u8`
+//! - `pub fn comptimeHex(comptime v: u64) [:0]const u8`
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -272,10 +276,75 @@ pub fn log(handle: ?*anyopaque, lvl: u32, msg: []const u8) void {
     var buf: [log_line_max]u8 = undefined;
     const cut = msg[0..@min(msg.len, buf.len - 2)];
     // `cut`, its newline and the NUL fit `buf` by the bound above.
-    const z = std.mem.printSentinel(&buf, "{s}\n", .{cut}, 0) catch unreachable;
+    @memcpy(buf[0..cut.len], cut);
+    buf[cut.len] = '\n';
+    buf[cut.len + 1] = 0;
+    const z: [:0]const u8 = buf[0 .. cut.len + 1 :0];
     assert(z.len == cut.len + 1);
     assert(z.len < buf.len);
     f(handle, z.ptr, lvl);
+}
+
+/// `parts` end to end in `buf`, cut at its length: the text written. The
+/// fatal messages here are a few fixed strings and a name, and
+/// `std.mem.print` brings the whole of `std.Io.Writer` into every device.
+pub fn join(buf: []u8, parts: []const []const u8) []const u8 {
+    var n: usize = 0;
+    for (parts) |p| {
+        const take = @min(p.len, buf.len - n);
+        @memcpy(buf[n..][0..take], p[0..take]);
+        n += take;
+    }
+    assert(n <= buf.len);
+    return buf[0..n];
+}
+
+/// `v` in decimal, written at the end of `buf`: the digits.
+pub fn dec(buf: *[20]u8, v: u64) []const u8 {
+    var i: usize = buf.len;
+    var x = v;
+    while (true) {
+        i -= 1;
+        buf[i] = @intCast('0' + x % 10);
+        x /= 10;
+        if (x == 0) break;
+    }
+    assert(i < buf.len);
+    return buf[i..];
+}
+
+/// `v` in decimal as a compile-time string. `std.fmt.comptimePrint` formats
+/// through `std.Io.Writer`, whose vtable functions then compile into every
+/// device although nothing calls them at run time.
+pub fn comptimeDec(comptime v: u64) [:0]const u8 {
+    comptime {
+        var b: [20]u8 = undefined;
+        const d = dec(&b, v);
+        var out: [d.len:0]u8 = undefined;
+        @memcpy(out[0..d.len], d);
+        const done = out;
+        return &done;
+    }
+}
+
+/// `v` in lowercase hexadecimal with no leading zeros, as a compile-time string.
+pub fn comptimeHex(comptime v: u64) [:0]const u8 {
+    comptime {
+        var b: [16]u8 = undefined;
+        var i: usize = b.len;
+        var x = v;
+        while (true) {
+            i -= 1;
+            b[i] = "0123456789abcdef"[x % 16];
+            x /= 16;
+            if (x == 0) break;
+        }
+        const n = b.len - i;
+        var out: [n:0]u8 = undefined;
+        @memcpy(out[0..n], b[i..]);
+        const done = out;
+        return &done;
+    }
 }
 
 // ---- private ----

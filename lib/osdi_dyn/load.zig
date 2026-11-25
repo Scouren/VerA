@@ -67,7 +67,7 @@ pub fn Load(comptime D: type) type {
             const self = I.of(ip);
             var rhs: [n]f64 = undefined;
             for (&rhs, self.res) |*r, f| r.* = -f;
-            inline for (T.entries, 0..) |e, k| rhs[e.r] += self.jac[k] * self.x[e.c];
+            for (T.entries, 0..) |e, k| rhs[e.r] += self.jac[k] * self.x[e.c];
             for (rhs, self.node_mapping) |v, k| dst[k] += v;
         }
 
@@ -78,7 +78,7 @@ pub fn Load(comptime D: type) type {
             loadSpiceRhsDc(ip, mp, dst, prev);
             const self = I.of(ip);
             var rhs: [n]f64 = @splat(0);
-            inline for (T.entries, 0..) |e, k| rhs[e.r] += self.jac_q[k] * self.x[e.c];
+            for (T.entries, 0..) |e, k| rhs[e.r] += self.jac_q[k] * self.x[e.c];
             for (rhs, self.node_mapping) |v, k| dst[k] += alpha * v;
         }
 
@@ -87,9 +87,9 @@ pub fn Load(comptime D: type) type {
         pub fn loadJacobianResist(ip: *anyopaque, _: *anyopaque) callconv(.c) void {
             @setEvalBranchQuota(10_000_000);
             const self = I.of(ip);
-            inline for (T.entries, 0..) |e, k| if (e.resist) {
+            for (T.resist_idx) |k| {
                 if (self.jac_ptr[k]) |p| p.* += self.jac[k];
-            };
+            }
         }
 
         /// Adds alpha·dQ/dx into each reactive slot; under AC or noise also
@@ -99,9 +99,9 @@ pub fn Load(comptime D: type) type {
         pub fn loadJacobianReact(ip: *anyopaque, _: *anyopaque, alpha: f64) callconv(.c) void {
             @setEvalBranchQuota(10_000_000);
             const self = I.of(ip);
-            inline for (T.entries, 0..) |e, k| if (e.react) {
+            for (T.react_idx) |k| {
                 if (self.react_ptr[k]) |p| p.* += alpha * self.jac_q[k];
-            };
+            }
             if (!@hasDecl(D, "acDyn")) return;
             if (self.sim.kind != .ac and self.sim.kind != .noise) return;
             var out: [D.ac_dyn_slots.len]std.math.Complex(f64) = undefined;
@@ -119,7 +119,7 @@ pub fn Load(comptime D: type) type {
         pub fn loadJacobianTran(ip: *anyopaque, _: *anyopaque, alpha: f64) callconv(.c) void {
             @setEvalBranchQuota(10_000_000);
             const self = I.of(ip);
-            inline for (0..T.nj) |k| if (self.jac_ptr[k]) |p| {
+            for (0..T.nj) |k| if (self.jac_ptr[k]) |p| {
                 p.* += self.jac[k] + alpha * self.jac_q[k];
             };
         }
@@ -130,12 +130,8 @@ pub fn Load(comptime D: type) type {
         pub fn writeJacobianResist(ip: *anyopaque, _: *anyopaque, dst: [*]f64) callconv(.c) void {
             @setEvalBranchQuota(10_000_000);
             const self = I.of(ip);
-            comptime var j = 0;
-            inline for (T.entries, 0..) |e, k| if (e.resist) {
-                dst[j] = self.jac[k];
-                j += 1;
-            };
-            comptime assert(j == T.n_resist);
+            comptime assert(T.resist_idx.len == T.n_resist);
+            for (T.resist_idx, 0..) |k, j| dst[j] = self.jac[k];
         }
 
         /// Writes the reactive entries into `dst`, which holds
@@ -143,12 +139,8 @@ pub fn Load(comptime D: type) type {
         pub fn writeJacobianReact(ip: *anyopaque, _: *anyopaque, dst: [*]f64) callconv(.c) void {
             @setEvalBranchQuota(10_000_000);
             const self = I.of(ip);
-            comptime var j = 0;
-            inline for (T.entries, 0..) |e, k| if (e.react) {
-                dst[j] = self.jac_q[k];
-                j += 1;
-            };
-            comptime assert(j == T.n_react);
+            comptime assert(T.react_idx.len == T.n_react);
+            for (T.react_idx, 0..) |k, j| dst[j] = self.jac_q[k];
         }
 
         /// Writes one density per noise source into `dens`: its PSD

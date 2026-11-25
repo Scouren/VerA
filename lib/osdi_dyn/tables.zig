@@ -19,6 +19,7 @@
 //! - `pub const Tables(D).Kind = enum`, `.Param = struct`, `.params: []const Param`
 //! - `pub const Tables(D).all_idx: [np]u16`, `.inst_idx: []const u16`
 //! - `pub const Tables(D).Entry = struct`, `.entries: []const Entry`
+//! - `pub const Tables(D).resist_idx, .react_idx: []const u32`, `.kcl_rows: [n]bool`
 //! - `pub const Tables(D).PairKind = enum`, `.Pair = struct`, `.pairs: []const Pair`
 //! - `pub const Tables(D).gens: []const contract.NoiseGen(D)`
 //! - `pub fn Tables(D).isFlow(comptime u: usize) bool`
@@ -165,6 +166,19 @@ pub fn Tables(comptime D: type) type {
         };
         /// How many entries.
         pub const nj = entries.len;
+        /// The entries with a resistive (reactive) half, by index.
+        pub const resist_idx: []const u32 = halfIdx(.resist);
+        pub const react_idx: []const u32 = halfIdx(.react);
+        fn halfIdx(comptime half: enum { resist, react }) []const u32 {
+            comptime {
+                @setEvalBranchQuota(quota);
+                var out: []const u32 = &.{};
+                for (entries, 0..) |e, k| if (@field(e, @tagName(half))) {
+                    out = out ++ &[_]u32{k};
+                };
+                return out;
+            }
+        }
         /// How many entries have a resistive half.
         pub const n_resist = count(.resist);
         /// How many entries have a reactive half.
@@ -254,6 +268,13 @@ pub fn Tables(comptime D: type) type {
             comptime assert(i < n);
             return !@hasDecl(D, "u_kinds") or D.u_kinds[i] == .voltage;
         }
+
+        /// `kcl` of every row, as a table a run-time loop reads.
+        pub const kcl_rows: [n]bool = blk: {
+            var t: [n]bool = undefined;
+            for (0..n) |i| t[i] = kcl(i);
+            break :blk t;
+        };
 
         /// Whether `q` writes row `i`.
         pub fn reactRow(comptime i: usize) bool {

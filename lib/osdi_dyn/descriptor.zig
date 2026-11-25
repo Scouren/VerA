@@ -189,7 +189,7 @@ pub fn Library(comptime D: type, comptime name: []const u8, comptime split: bool
             @setEvalBranchQuota(10_000_000);
             var a: [T.gens.len]abi.NoiseSource = undefined;
             for (&a, T.gens, 0..) |*s, g, k| s.* = .{
-                .name = if (g.name.len != 0) zStr(g.name) else std.fmt.comptimePrint("noise{d}", .{k}),
+                .name = if (g.name.len != 0) zStr(g.name) else "noise" ++ abi.comptimeDec(k),
                 .nodes = .{ .node_1 = g.row, .node_2 = if (g.row == g.col) abi.no_off else g.col },
             };
             break :blk a;
@@ -295,7 +295,7 @@ pub fn Library(comptime D: type, comptime name: []const u8, comptime split: bool
         /// The hidden symbol a split build exports descriptor slot `slot`
         /// under: the device name hashed, as a name may hold any byte.
         fn sym(comptime slot: []const u8) []const u8 {
-            return std.fmt.comptimePrint("vera_osdi_{s}_{x}", .{ slot, std.hash.Wyhash.hash(0, name) });
+            return "vera_osdi_" ++ slot ++ "_" ++ abi.comptimeHex(std.hash.Wyhash.hash(0, name));
         }
     };
 }

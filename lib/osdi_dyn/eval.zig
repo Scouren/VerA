@@ -205,11 +205,11 @@ pub fn Eval(comptime D: type) type {
             // The card's value, which may be any double: no assert on it.
             const m = self.inst.mfactor;
             if (m == 1) return;
-            inline for (0..n) |i| if (comptime T.kcl(i)) {
+            for (0..n) |i| if (T.kcl_rows[i]) {
                 self.res[i] *= m;
                 self.q[i] *= m;
             };
-            inline for (T.entries, 0..) |e, k| if (comptime T.kcl(e.r)) {
+            for (T.entries, 0..) |e, k| if (T.kcl_rows[e.r]) {
                 self.jac[k] *= m;
                 self.jac_q[k] *= m;
             };
@@ -223,7 +223,7 @@ pub fn Eval(comptime D: type) type {
             self.lim_res = @splat(0);
             self.lim_q = @splat(0);
             if (!@reduce(.Or, @as(@Vector(n, f64), x.*) != @as(@Vector(n, f64), cur.*))) return;
-            inline for (T.entries, 0..) |e, k| {
+            for (T.entries, 0..) |e, k| {
                 const dx = x[e.c] - cur[e.c];
                 self.lim_res[e.r] += self.jac[k] * dx;
                 self.lim_q[e.r] += self.jac_q[k] * dx;

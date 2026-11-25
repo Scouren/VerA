@@ -91,19 +91,21 @@ pub fn Tables(comptime D: type) type {
         /// the setup cache (`su`, `su_ok`), of a real, integer or string type.
         pub const params: []const Param = blk: {
             @setEvalBranchQuota(quota);
-            var ps: []const Param = &.{};
             const s = @typeInfo(D.Model).@"struct";
+            var buf: [s.field_names.len]Param = undefined;
+            var n_params: usize = 0;
             for (s.field_names, s.field_types) |f, T| {
-                if (std.mem.find(u8, f, "__") != null) continue;
-                if (std.mem.eql(u8, f, "su") or std.mem.eql(u8, f, "su_ok")) continue;
+                if (ownField(f)) continue;
                 const k: Kind = switch (@typeInfo(T)) {
                     .float => .real,
                     .int => .int,
                     else => if (T == []const u8) .str else continue, // else: every other field type is no parameter
                 };
-                ps = ps ++ [_]Param{.{ .field = f, .kind = k }};
+                buf[n_params] = .{ .field = f, .kind = k };
+                n_params += 1;
             }
-            break :blk ps;
+            const done = buf[0..n_params].*;
+            break :blk &done;
         };
         /// How many parameters: the model card's set.
         pub const np = params.len;
@@ -291,6 +293,19 @@ pub fn Tables(comptime D: type) type {
         }
 
         // ---- private ----
+
+        /// Whether `f` is one of VerA's own `Model` fields: it holds `__`, or is the
+        /// setup cache. Plain loops, since this runs once per field at compile time
+        /// and `std.mem.find` there costs far more than the bytes it reads.
+        fn ownField(comptime f: []const u8) bool {
+            if (f.len == 2 and f[0] == 's' and f[1] == 'u') return true;
+            if (f.len == 5 and f[0] == 's' and f[1] == 'u' and f[2] == '_' and f[3] == 'o' and f[4] == 'k') return true;
+            var i: usize = 0;
+            while (i + 1 < f.len) : (i += 1) {
+                if (f[i] == '_' and f[i + 1] == '_') return true;
+            }
+            return false;
+        }
 
         /// Unknown `u` on lane `u`. A `u8` table holds 255 lanes, its maximum
         /// being `no_lane`; a larger device takes `u16`, whose maximum then is.

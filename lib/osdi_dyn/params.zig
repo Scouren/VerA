@@ -114,7 +114,9 @@ pub fn Params(comptime D: type) type {
                     @as(*i64, @ptrCast(@alignCast(base + p.off))).* = slot(i32, &vals[p.i]).*;
                 }
             };
-            inline for (idx, 0..) |pi, i| if (comptime !isPlain(pi)) if (given[i]) {
+            inline for (comptime otherOf(idx)) |o| if (given[o.i]) {
+                const pi = o.pi;
+                const i = o.i;
                 const p = T.params[pi];
                 const F = @FieldType(D.Model, p.field);
                 @field(m, p.field) = switch (p.kind) {
@@ -142,11 +144,11 @@ pub fn Params(comptime D: type) type {
                     slot(i32, &vals[p.i]).* = std.math.lossyCast(i32, @as(*const i64, @ptrCast(@alignCast(base + p.off))).*);
                 }
             };
-            inline for (idx, 0..) |pi, i| if (comptime !isPlain(pi)) if (!given[i]) switch (T.params[pi].kind) {
-                .real => slot(f64, &vals[i]).* = @field(m, T.params[pi].field),
-                .int => slot(i32, &vals[i]).* = std.math.lossyCast(i32, @field(m, T.params[pi].field)),
+            inline for (comptime otherOf(idx)) |o| if (!given[o.i]) switch (T.params[o.pi].kind) {
+                .real => slot(f64, &vals[o.i]).* = @field(m, T.params[o.pi].field),
+                .int => slot(i32, &vals[o.i]).* = std.math.lossyCast(i32, @field(m, T.params[o.pi].field)),
                 // ponytail: a default string is not known to be NUL-terminated.
-                .str => slot(abi.Str, &vals[i]).* = null,
+                .str => slot(abi.Str, &vals[o.i]).* = null,
             };
         }
 
@@ -237,15 +239,36 @@ pub fn Params(comptime D: type) type {
             };
         }
 
+        /// A parameter the loops cannot move, by `params` index and slot.
+        const Other = struct { pi: u16, i: u16 };
+
+        /// The parameters among `idx` that are not plain: these keep a statement each.
+        fn otherOf(comptime idx: []const u16) []const Other {
+            comptime {
+                @setEvalBranchQuota(10_000_000);
+                var buf: [idx.len]Other = undefined;
+                var n: usize = 0;
+                for (idx, 0..) |pi, i| if (!isPlain(pi)) {
+                    buf[n] = .{ .pi = pi, .i = i };
+                    n += 1;
+                };
+                const done = buf[0..n].*;
+                return &done;
+            }
+        }
+
         /// The plain parameters among `idx`, each with its slot and field offset.
         fn plainOf(comptime idx: []const u16) []const Plain {
             comptime {
                 @setEvalBranchQuota(10_000_000);
-                var out: []const Plain = &.{};
+                var buf: [idx.len]Plain = undefined;
+                var n: usize = 0;
                 for (idx, 0..) |pi, i| if (isPlain(pi)) {
-                    out = out ++ &[_]Plain{.{ .i = i, .off = @offsetOf(D.Model, T.params[pi].field), .real = T.params[pi].kind == .real }};
+                    buf[n] = .{ .i = i, .off = @offsetOf(D.Model, T.params[pi].field), .real = T.params[pi].kind == .real };
+                    n += 1;
                 };
-                return out;
+                const done = buf[0..n].*;
+                return &done;
             }
         }
 

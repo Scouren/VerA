@@ -7,6 +7,8 @@ stage as emitted, and replaces the rest:
 
   MODE roll      one loop over a table of slot rows, the stage body written once
   MODE outline   the stage body once as a noinline function, called once per stage in a row
+  MODE chunk     every stage as emitted, CHUNK_STAGES (32) to a noinline function: no code is
+                 shared, only the size of each function is bounded
                  (what a repeated macro or analog function looks like when it does not form a loop)
 
 The statements, their order and the float mode are unchanged, so results are the same bits.
@@ -50,7 +52,48 @@ out = [f'    const Row = [{ns}]u16;', '    const rows = [_]Row{'] + ['        .{
        f'    var carry = {names[first[3]]};']
 if keep: out.append(f'    var keep = {names[first[["sD", "sA", "sB", "sC"].index(keep[2])]]};')
 def inner(t): return re.sub(r'\bt1\b', 't1_in', re.sub(r'\bcarry\b', 'carry_in', t))
-if mode == 'roll':
+if mode == 'chunk':
+    import os
+    per = int(os.environ.get('CHUNK_STAGES', '32'))
+    kidx = ['sD', 'sA', 'sB', 'sC'].index(keep[2]) if keep else 1
+    # A value crosses each call as ONE vector of a power-of-two width, the scalar first and the
+    # unused elements exactly 0. Two things measured here decide that form:
+    #   - a struct crosses through memory in both directions (0.8 to 1% per iterate);
+    #   - a 3-lane vector read back from memory brings its padding element with it, and stale bytes
+    #     there (a pointer reads as a subnormal double) cost a floating-point assist on every
+    #     operation that touches them: 450 to 600 ns per eval, on or off with the stack's alignment.
+    out = [f'    const TC = @TypeOf({names[first[3]]});', f'    const TK = @TypeOf({names[first[kidx]]});', '    const T1 = @TypeOf(t1);', '    const Stages = struct {',
+           '        fn FlatOf(comptime T: type) type {', '            var n: usize = 1;', '            while (n < 1 + @typeInfo(@FieldType(T, "d")).vector.len) n *= 2;', '            return @Vector(n, f64);', '        }',
+           '        inline fn flatOf(val: anytype) FlatOf(@TypeOf(val)) {', '            const D = @FieldType(@TypeOf(val), "d");', '            const n = @typeInfo(D).vector.len;',
+           '            var a: [@typeInfo(FlatOf(@TypeOf(val))).vector.len]f64 = @splat(0.0);', '            a[0] = val.v;', '            const d: [n]@typeInfo(D).vector.child = val.d;',
+           '            inline for (0..n) |i| a[1 + i] = d[i];', '            return a;', '        }',
+           '        inline fn unflatOf(comptime T: type, f: FlatOf(T)) T {', '            const D = @FieldType(T, "d");', '            const n = @typeInfo(D).vector.len;',
+           '            const a: [@typeInfo(FlatOf(T)).vector.len]f64 = f;', '            // SAFETY: every element is written by the loop below.', '            var d: [n]@typeInfo(D).vector.child = undefined;',
+           '            inline for (0..n) |i| d[i] = @floatCast(a[1 + i]);', '            return .{ .v = a[0], .d = d };', '        }']
+    calls = []
+    rest = groups[1:]
+    for c in range((len(rest) + per - 1) // per):
+        gs = rest[c * per:(c + 1) * per]
+        prev_c = names[groups[groups.index(gs[0]) - 1][3]]
+        kname = None
+        body = []
+        for g in gs:
+            for i in g:
+                text = re.sub(r'\b%s\b' % prev_c, 'carry_in', rhs[i])
+                text = re.sub(r'\bt1\b', 't1_in', text).replace('model.su.r[', 'm.su.r[')
+                body.append(f'            const {names[i]} = {text};')
+            if keep and groups.index(g) == keep[1]: kname = names[g[kidx]]
+        sig = 'cf: FlatOf(TC), t1f: FlatOf(T1), m: *const Model' + (', keep_out: *FlatOf(TK)' if kname else '')
+        out += [f'        noinline fn run{c}({sig}) FlatOf(TC) {{', '            @setFloatMode(.strict);', '            const carry_in = unflatOf(TC, cf);', '            const t1_in = unflatOf(T1, t1f);'] + body
+        if kname: out.append(f'            keep_out.* = flatOf({kname});')
+        out += [f'            return flatOf({names[gs[-1][3]]});', '        }']
+        calls.append(f'    carry_f = Stages.run{c}(carry_f, t1_f, model' + (', &keep_f' if kname else '') + ');')
+    out += ['    };', f'    var carry_f = Stages.flatOf({names[first[3]]});', '    const t1_f = Stages.flatOf(t1);']
+    if keep: out.append(('    const' if keep[1] == 0 else '    var') + f' keep_f = Stages.flatOf({names[first[kidx]]});')
+    out += calls + ['    const carry = Stages.unflatOf(TC, carry_f);']
+    if keep: out.append('    const keep = Stages.unflatOf(TK, keep_f);')
+    else: out = [l for l in out if not l.startswith('    const TK = ')]
+elif mode == 'roll':
     # Two loops when a mid-chain value is read later, so no iteration tests its own index.
     cut = keep[1] if keep and keep[1] > 0 else len(canons) - 1
     spans = [(0, cut, True), (cut, len(canons) - 1, False)] if cut < len(canons) - 1 else [(0, cut, bool(keep and keep[1] > 0))]

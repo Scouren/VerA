@@ -52,19 +52,31 @@ pub fn main(init: std.process.Init.Minimal) void {
     const nj = d.num_jacobian_entries;
 
     // The descriptor's own tables.
-    mixU(n); mixU(d.num_terminals); mixU(nj); mixU(d.num_params); mixU(d.num_instance_params); mixU(d.num_noise_src); mixU(d.num_collapsible);
+    mixU(n);
+    mixU(d.num_terminals);
+    mixU(nj);
+    mixU(d.num_params);
+    mixU(d.num_instance_params);
+    mixU(d.num_noise_src);
+    mixU(d.num_collapsible);
     for (0..d.num_params) |i| {
         const p = d.param_opvar[i];
-        mixU(p.flags); mixU(p.num_alias);
+        mixU(p.flags);
+        mixU(p.num_alias);
         var k: usize = 0;
         const name = p.name[0].?;
         while (name[k] != 0) : (k += 1) mixU(name[k]);
     }
-    for (0..nj) |k| { mixU(d.jacobian_entries[k].nodes.node_1); mixU(d.jacobian_entries[k].nodes.node_2); mixU(d.jacobian_entries[k].flags); }
+    for (0..nj) |k| {
+        mixU(d.jacobian_entries[k].nodes.node_1);
+        mixU(d.jacobian_entries[k].nodes.node_2);
+        mixU(d.jacobian_entries[k].flags);
+    }
 
     const null_name = [_]abi.Str{null};
     const paras: abi.SimParas = .{ .names = &null_name, .vals = null, .names_str = &null_name, .vals_str = null };
     var iter_ns: u64 = std.math.maxInt(u64);
+    var part_ns: [3]u64 = @splat(std.math.maxInt(u64));
     for (0..2) |card| {
         const model = zeroed(u8, d.model_size);
         const inst = zeroed(u8, d.instance_size);
@@ -107,19 +119,44 @@ pub fn main(init: std.process.Init.Minimal) void {
             for ([_]u32{ calc_all | analysis_dc, calc_all | abi.analysis_tran | abi.enable_lim, calc_all | abi.analysis_tran | abi.init_lim }) |flags| {
                 var sim: abi.SimInfo = .{ .paras = paras, .abstime = 1.0e-9 * @as(f64, @floatFromInt(pt)), .prev_solve = x.ptr, .prev_state = st0.ptr, .next_state = st1.ptr, .flags = flags };
                 mixU(d.eval(null, inst.ptr, model.ptr, &sim));
-                @memset(out, 0); d.load_residual_resist(inst.ptr, model.ptr, out.ptr); mixF(out);
-                @memset(out, 0); d.load_residual_react(inst.ptr, model.ptr, out.ptr); mixF(out);
-                @memset(out, 0); d.load_limit_rhs_resist(inst.ptr, model.ptr, out.ptr); mixF(out);
-                @memset(out, 0); d.load_limit_rhs_react(inst.ptr, model.ptr, out.ptr); mixF(out);
-                @memset(out, 0); d.load_spice_rhs_dc(inst.ptr, model.ptr, out.ptr, x.ptr); mixF(out);
-                @memset(out, 0); d.load_spice_rhs_tran(inst.ptr, model.ptr, out.ptr, x.ptr, 1.0e9); mixF(out);
-                @memset(mat, 0); @memset(mat_q, 0);
-                d.load_jacobian_resist(inst.ptr, model.ptr); mixF(mat);
-                d.load_jacobian_react(inst.ptr, model.ptr, 2.0e6); mixF(mat_q);
-                @memset(mat, 0); d.load_jacobian_tran(inst.ptr, model.ptr, 1.0e9); mixF(mat);
-                @memset(arr, 0); d.write_jacobian_array_resist(inst.ptr, model.ptr, arr.ptr); mixF(arr);
-                @memset(arr, 0); d.write_jacobian_array_react(inst.ptr, model.ptr, arr.ptr); mixF(arr);
-                if (d.num_noise_src > 0) { @memset(dens, 0); d.load_noise(inst.ptr, model.ptr, 1.0e3, dens.ptr); mixF(dens); }
+                @memset(out, 0);
+                d.load_residual_resist(inst.ptr, model.ptr, out.ptr);
+                mixF(out);
+                @memset(out, 0);
+                d.load_residual_react(inst.ptr, model.ptr, out.ptr);
+                mixF(out);
+                @memset(out, 0);
+                d.load_limit_rhs_resist(inst.ptr, model.ptr, out.ptr);
+                mixF(out);
+                @memset(out, 0);
+                d.load_limit_rhs_react(inst.ptr, model.ptr, out.ptr);
+                mixF(out);
+                @memset(out, 0);
+                d.load_spice_rhs_dc(inst.ptr, model.ptr, out.ptr, x.ptr);
+                mixF(out);
+                @memset(out, 0);
+                d.load_spice_rhs_tran(inst.ptr, model.ptr, out.ptr, x.ptr, 1.0e9);
+                mixF(out);
+                @memset(mat, 0);
+                @memset(mat_q, 0);
+                d.load_jacobian_resist(inst.ptr, model.ptr);
+                mixF(mat);
+                d.load_jacobian_react(inst.ptr, model.ptr, 2.0e6);
+                mixF(mat_q);
+                @memset(mat, 0);
+                d.load_jacobian_tran(inst.ptr, model.ptr, 1.0e9);
+                mixF(mat);
+                @memset(arr, 0);
+                d.write_jacobian_array_resist(inst.ptr, model.ptr, arr.ptr);
+                mixF(arr);
+                @memset(arr, 0);
+                d.write_jacobian_array_react(inst.ptr, model.ptr, arr.ptr);
+                mixF(arr);
+                if (d.num_noise_src > 0) {
+                    @memset(dens, 0);
+                    d.load_noise(inst.ptr, model.ptr, 1.0e3, dens.ptr);
+                    mixF(dens);
+                }
             }
         }
         // One transient iterate, as a simulator's load loop calls it.
@@ -135,6 +172,21 @@ pub fn main(init: std.process.Init.Minimal) void {
             }
             iter_ns = @min(iter_ns, (now() - t0) / reps);
         }
+        // The same three calls timed one at a time.
+        for (0..5) |_| {
+            inline for (0..3) |which| {
+                const t0 = now();
+                for (0..reps) |r| {
+                    x[0] = 0.15 + 1.0e-7 * @as(f64, @floatFromInt(r & 15));
+                    switch (which) {
+                        0 => _ = d.eval(null, inst.ptr, model.ptr, &sim),
+                        1 => d.load_spice_rhs_tran(inst.ptr, model.ptr, out.ptr, x.ptr, 1.0e9),
+                        else => d.load_jacobian_tran(inst.ptr, model.ptr, 1.0e9),
+                    }
+                }
+                part_ns[which] = @min(part_ns[which], (now() - t0) / reps);
+            }
+        }
     }
-    std.debug.print("nodes {d} entries {d} params {d} instance_bytes {d} model_bytes {d} iterate_ns {d} checksum {x}\n", .{ n, nj, d.num_params, d.instance_size, d.model_size, iter_ns, h });
+    std.debug.print("nodes {d} entries {d} params {d} instance_bytes {d} model_bytes {d} iterate_ns {d} (eval {d} rhs_tran {d} jac_tran {d}) checksum {x}\n", .{ n, nj, d.num_params, d.instance_size, d.model_size, iter_ns, part_ns[0], part_ns[1], part_ns[2], h });
 }

@@ -324,6 +324,9 @@ fn cName(comptime s: []const u8) [:0]const u8 {
     // Computed in a comptime block and returned outside it, as `zStr`.
     const z = comptime blk: {
         @setEvalBranchQuota(100_000);
+        var has_z = false;
+        for (s) |c| has_z = has_z or c == 'Z';
+        if (!has_z) break :blk s ++ [_]u8{0};
         var out: []const u8 = "";
         var i = 0;
         while (i < s.len) : (i += 1) {

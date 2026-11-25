@@ -140,9 +140,15 @@ pub fn Load(comptime D: type) type {
         pub fn loadJacobianTran(ip: *anyopaque, _: *anyopaque, alpha: f64) callconv(.c) void {
             @setEvalBranchQuota(10_000_000);
             const self = I.of(ip);
-            for (0..T.nj) |k| if (self.jac_ptr[k]) |p| {
-                p.* += self.jac[k] + alpha * self.jac_q[k];
-            };
+            if (comptime unroll) {
+                inline for (0..T.nj) |k| if (self.jac_ptr[k]) |p| {
+                    p.* += self.jac[k] + alpha * self.jac_q[k];
+                };
+            } else {
+                for (0..T.nj) |k| if (self.jac_ptr[k]) |p| {
+                    p.* += self.jac[k] + alpha * self.jac_q[k];
+                };
+            }
         }
 
         /// Writes the resistive entries into `dst`, which holds

@@ -13,6 +13,7 @@
 //!
 //! Contents:
 //! - `pub fn Library(comptime D: type, comptime name: []const u8, comptime split: bool) type`
+//! - `pub fn Library(D, name, split).fillParams() callconv(.c) void`, `.fill_params_entry`
 //! - `pub const Library(...).calls_setup, .mutable_eval, .iteration_hooks, .noise_table_points, .shape_check, .calls_ac_dyn: bool`
 //! - `pub const Library(...).descriptors: [1]abi.Descriptor`
 //! - `pub fn Library(...).exportHot(comptime part: contract.DevicePart) void`
@@ -197,14 +198,74 @@ pub fn Library(comptime D: type, comptime name: []const u8, comptime split: bool
 
         /// The instance side first (`inst_idx`, then `$mfactor`), then the
         /// model side, every parameter once more.
-        const param_opvar = blk: {
-            @setEvalBranchQuota(10_000_000);
-            var a: [T.num_params]abi.ParamOpvar = undefined;
-            for (T.params, 0..) |p, i| a[T.num_inst_params + i] = param(cName(p.field), paraTy(p.kind), "");
-            for (T.inst_idx, 0..) |pi, k| a[k] = param(cName(T.params[pi].field), paraTy(T.params[pi].kind) | abi.para_kind_inst, "");
-            if (T.has_mf) a[T.ni] = param("$mfactor", abi.para_ty_real | abi.para_kind_inst, "multiplicity");
+        /// The parameter records, filled when the library is loaded (`fillParams`, an
+        /// `.init_array` entry) from the three compact tables below. As constants
+        /// they cost three relocations and a name cell each: 411 KB of a
+        /// 1,600-parameter library.
+        var param_opvar: [T.num_params]abi.ParamOpvar = undefined;
+        var param_name_cell: [T.num_params]abi.Str = undefined;
+
+        /// Every parameter's C name, NUL-terminated, end to end; `param_name_at[i]` is where
+        /// record `i`'s starts. A device that carries the three tables as data is not walked.
+        const literal = @hasDecl(D, "osdi_param_names");
+        const param_names: []const u8 = if (literal) D.osdi_param_names else blk: {
+            @setEvalBranchQuota(100_000_000);
+            var total: usize = 0;
+            for (0..T.num_params) |i| total += paramName(i).len + 1;
+            var buf: [total]u8 = undefined;
+            var at: usize = 0;
+            for (0..T.num_params) |i| {
+                const nm = paramName(i);
+                @memcpy(buf[at..][0..nm.len], nm);
+                buf[at + nm.len] = 0;
+                at += nm.len + 1;
+            }
+            const done = buf;
+            break :blk &done;
+        };
+        const param_name_at: [T.num_params]u32 = if (literal) D.osdi_param_name_at else blk: {
+            @setEvalBranchQuota(100_000_000);
+            var a: [T.num_params]u32 = undefined;
+            var at: usize = 0;
+            for (0..T.num_params) |i| {
+                a[i] = at;
+                at += paramName(i).len + 1;
+            }
             break :blk a;
         };
+        const param_flags: [T.num_params]u32 = if (literal) D.osdi_param_flags else blk: {
+            @setEvalBranchQuota(100_000_000);
+            var a: [T.num_params]u32 = undefined;
+            for (T.params, 0..) |p, i| a[T.num_inst_params + i] = paraTy(p.kind);
+            for (T.inst_idx, 0..) |pi, k| a[k] = paraTy(T.params[pi].kind) | abi.para_kind_inst;
+            if (T.has_mf) a[T.ni] = abi.para_ty_real | abi.para_kind_inst;
+            break :blk a;
+        };
+
+        /// Record `i`'s name: the instance side first (`inst_idx`, then `$mfactor`), then the
+        /// model side, every parameter once more.
+        fn paramName(comptime i: usize) []const u8 {
+            if (i < T.ni) return cName(T.params[T.inst_idx[i]].field);
+            if (T.has_mf and i == T.ni) return "$mfactor";
+            return cName(T.params[i - T.num_inst_params].field);
+        }
+
+        /// Fills `param_opvar` from the compact tables. Runs from `.init_array`, before the
+        /// simulator reads `OSDI_DESCRIPTORS`.
+        pub fn fillParams() callconv(.c) void {
+            for (&param_opvar, &param_name_cell, param_name_at, param_flags, 0..) |*rec, *cell, at, flags, i| {
+                cell.* = @ptrCast(param_names.ptr + at);
+                rec.* = .{
+                    .name = @ptrCast(cell),
+                    .num_alias = 0,
+                    .description = if (T.has_mf and i == T.ni) "multiplicity" else "",
+                    .units = "",
+                    .flags = flags,
+                    .len = 0,
+                };
+            }
+        }
+        pub const fill_params_entry: *const fn () callconv(.c) void = &fillParams;
 
         /// One `hot` row: a descriptor slot and the callback behind it.
         const HotSlot = struct { slot: []const u8, func: []const u8 };
@@ -369,6 +430,8 @@ test "cName undoes naming.sanitize's escape" {
 
 test "the descriptor: two terminals, four dense entries, each parameter as instance and model" {
     const d = &Library(fixture.Rc, "rc", false).descriptors[0];
+    // As the loader would: the parameter records are filled from `.init_array`.
+    Library(fixture.Rc, "rc", false).fillParams();
     try testing.expectEqualStrings("rc", std.mem.span(d.name.?));
     try testing.expectEqual(@as(u32, 2), d.num_nodes);
     try testing.expectEqual(@as(u32, 2), d.num_terminals);
@@ -461,6 +524,8 @@ test "setup, eval and every load: the stamps of a linear RC, and $mfactor over i
 
 test "a module with no parameters builds: $mfactor is the only slot, the model side has none (#79)" {
     const d = &Library(fixture.NoParam, "noparam", false).descriptors[0];
+    // As the loader would: the parameter records are filled from `.init_array`.
+    Library(fixture.NoParam, "noparam", false).fillParams();
     try testing.expectEqual(@as(u32, 1), d.num_params);
     try testing.expectEqual(@as(u32, 1), d.num_instance_params);
     try testing.expectEqualStrings("$mfactor", std.mem.span(d.param_opvar[0].name[0].?));
@@ -667,6 +732,8 @@ test "a 0 V short is a merge pair and its flow collapses into ground; no entry t
 
 test "instance_params: only the marked parameter is an instance parameter; its id asked of the model reads the card" {
     const d = &Library(fixture.Short, "short", false).descriptors[0];
+    // As the loader would: the parameter records are filled from `.init_array`.
+    Library(fixture.Short, "short", false).fillParams();
     // `r` on the instance side; `rs` and `r` on the model side.
     try testing.expectEqual(@as(u32, 1), d.num_instance_params);
     try testing.expectEqual(@as(u32, 3), d.num_params);

@@ -26,6 +26,12 @@ const testing = std.testing;
 /// is one lookup, where building a `StaticStringMap` at comptime cost every
 /// device build analysis time.
 const AllowedPubDecl = enum {
+    osdi_param_names,
+    osdi_param_name_at,
+    osdi_param_flags,
+    osdi_entries,
+    osdi_param_fields,
+    osdi_param_kinds,
     U,
     num_ports,
     vera_version,

@@ -98,6 +98,13 @@ pub fn Tables(comptime D: type) type {
         /// the setup cache (`su`, `su_ok`), of a real, integer or string type.
         pub const params: []const Param = blk: {
             @setEvalBranchQuota(quota);
+            // A device that carries the list as data is not reflected on.
+            if (@hasDecl(D, "osdi_param_fields")) {
+                var lit: [D.osdi_param_fields.len]Param = undefined;
+                for (&lit, D.osdi_param_fields, D.osdi_param_kinds) |*o, f, kd| o.* = .{ .field = f, .kind = @fromBackingInt(@intCast(kd)) };
+                const done_lit = lit;
+                break :blk &done_lit;
+            }
             const s = @typeInfo(D.Model).@"struct";
             var buf: [s.field_names.len]Param = undefined;
             var n_params: usize = 0;
@@ -153,6 +160,13 @@ pub fn Tables(comptime D: type) type {
         /// entries, less a 0 V short's flow row and column (`shortFlow`).
         pub const entries: []const Entry = blk: {
             @setEvalBranchQuota(quota);
+            // A device that carries the table as data is not scanned.
+            if (@hasDecl(D, "osdi_entries")) {
+                var lit: [D.osdi_entries.len]Entry = undefined;
+                for (&lit, D.osdi_entries) |*o, e| o.* = .{ .r = e[0], .c = e[1], .resist = e[2] & 1 != 0, .react = e[2] & 2 != 0 };
+                const done_lit = lit;
+                break :blk &done_lit;
+            }
             // One pass sizes the table and one fills it, so nothing grows by
             // `++`; the row's patterns and its extra entries are read once per
             // row, since this runs n*n times in the compile-time interpreter.

@@ -148,7 +148,38 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Ref
             try close(f, int);
         },
         // §4.6.4 a noise source is 0 in the residual; `noisePsd` reads it.
-        .white_noise, .flicker_noise, .noise_table, .noise_table_log => try f.print("S.con(0.0)", .{}),
+        // `noise.zig`'s own second body renders this call a second way,
+        // one generator forced to 1 at a time (`hot`), to price it there.
+        .white_noise, .flicker_noise, .noise_table, .noise_table_log => {
+            if (f.phase == .noise) return f.print("(if (hot == {d}) S.con(1.0) else S.con(0.0))", .{@backingInt(inst)});
+            try f.print("S.con(0.0)", .{});
+        },
+        // §4.6.3 `ac_stim([name[, mag[, phase]]])`: zero outside the
+        // small-signal analysis it names (`contract.acStimActive`).
+        // `noise.zig`'s own second body prices this call by forcing it
+        // to exactly 1 (`hot`) or 0, NEVER the real `sim.kind` gate: the
+        // oracle sets `sim.kind` to `.ac` before calling `acStim`, so the
+        // real gate is already open at the "no call hot" baseline and a
+        // hot-minus-base subtraction against it collapses to zero. Forcing
+        // both sides measures the call's own topological factor only.
+        .ac_stim => {
+            if (f.phase == .noise) return f.print("(if (hot == {d}) S.con(1.0) else S.con(0.0))", .{@backingInt(inst)});
+            f.uses.sim = true;
+            const name = if (args.len > 0) (str(f, args[0]) orelse return f.dg.fail("an `ac_stim` name that is not a string literal", .{})) else "ac";
+            // Both branches are already `S` (`.mul`/`.cos` return `S`, and
+            // the else is `S.con(0.0)`): no outer `S.con(...)` here, or
+            // `S.con` sees an `S` where its own signature wants `f64`. And
+            // an `S` if/else needs its own peer type, unlike a numeric one:
+            // both branches widen to this call's own mask (`widened`'s
+            // pattern), which conservatively covers `mag`'s (Liveness's
+            // call mask is the union of what a call may read, §5.6).
+            const m = f.dg.live.masks[@backingInt(inst)];
+            try f.print("(if (contract.acStimActive(\"{f}\", sim.kind, \"\")) F.zTo(S, 0x{x}, (", .{ std.zig.fmtString(name), m });
+            if (args.len > 1) try f.real(args[1]) else try f.print("S.con(1.0)", .{});
+            try f.print(").mul((", .{});
+            if (args.len > 2) try f.real(args[2]) else try f.print("S.con(0.0)", .{});
+            try f.print(").cos())) else F.zTo(S, 0x{x}, S.con(0.0)))", .{m});
+        },
         // §9.15 a known name's value; the fallback where it is not known.
         .@"$simparam" => try simparam(f, args),
         // §9.11 conversions.

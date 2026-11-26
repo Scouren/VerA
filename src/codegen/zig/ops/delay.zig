@@ -176,7 +176,7 @@ fn dynamic(dg: *const DeclGen, ref: Ref) bool {
             else => {}, // else: a pure operation over its operands
         }
         var o: Liveness.Operands = .{};
-        o.collect(air.*, tag, air.instructions.items(.data)[@backingInt(i)]);
+        o.collect(air.*, tag, air.instructions.items(.data)[@backingInt(i)], false);
         for (o.slice()) |r| if (r.toIndex()) |oi| {
             if (len == stack.len) return true;
             stack[len] = oi;

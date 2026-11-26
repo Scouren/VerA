@@ -42,7 +42,7 @@ indent: u32 = 1,
 /// Which body: `core`'s, or `say`'s (prints recorded, `say.zig`).
 phase: Phase = .core,
 
-pub const Phase = enum { core, say };
+pub const Phase = enum { core, say, noise };
 
 /// Which of `core`'s parameters the body read.
 pub const Uses = struct { x: bool = false, model: bool = false, inst: bool = false, sim: bool = false };
@@ -226,7 +226,7 @@ fn hoistArgs(f: *Function, i: Inst.Index, seen: []bool, rendered: []bool, n: *u3
         return;
     }
     var ops: Liveness.Operands = .{};
-    ops.collect(air.*, tag, data);
+    ops.collect(air.*, tag, data, false);
     for (ops.slice()) |o| if (o.toIndex()) |oi| try hoistArgs(f, oi, seen, rendered, n);
     if (tag == .cond_br) {
         const x = air.extraData(Air.CondBr, data.pl_op.payload);
@@ -262,7 +262,7 @@ fn treeInst(f: *Function, i: Inst.Index, rendered: []bool, n: *u32) Error!void {
         else => {}, // else: `ops.collect` below reads its operands by class
     }
     var ops: Liveness.Operands = .{};
-    ops.collect(air.*, tag, data);
+    ops.collect(air.*, tag, data, false);
     for (ops.slice()) |o| if (o.toIndex()) |oi| try treeInst(f, oi, rendered, n);
     switch (tag) {
         .cond_br => {

@@ -33,6 +33,7 @@ const calls = @import("calls.zig");
 const say = @import("say.zig");
 const status = @import("status.zig");
 const ops = @import("ops.zig");
+const noise = @import("noise.zig");
 const Device = Air.Device;
 const Real = Function.Real;
 
@@ -64,6 +65,13 @@ held_field: []?[]const u8 = &.{},
 /// of its body.
 say_sites: []const say.Site = &.{},
 say_live: Liveness = undefined,
+/// §4.6.4/§4.6.3 the noise generators and `ac_stim` placed on a branch
+/// (`noise.plan`), split by kind; and the liveness of `noise.genBody`'s
+/// second body (roots: every `Device.noise` call and assigned resist
+/// slot).
+noise_rows: []const noise.Row = &.{},
+ac_rows: []const noise.Row = &.{},
+noise_live: Liveness = undefined,
 /// §4.5.14 the lanes a `ddx` reads (`calls.zig`), in `core` or `say`.
 ddx_reads: Liveness.Mask = 0,
 /// Per §9.21.1 snapshot site (a `$table_model` call's `site - 1`): its
@@ -167,6 +175,8 @@ pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     try say.plan(dg);
     // `say`'s body before the tables: its `ddx` lanes join `deriv_reads`.
     const say_text = try say.genBody(dg);
+    try noise.plan(dg);
+    const noise_text = try noise.genBody(dg);
 
     try dg.print(w, "{s}", .{header});
     try dg.genUnknowns(w);
@@ -178,6 +188,8 @@ pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     try status.genEntries(dg, w);
     try status.genSetupInstance(dg, w);
     try say.genEntries(dg, w, say_text);
+    try noise.genTables(dg, w);
+    try noise.genEntries(dg, w, noise_text);
     try dg.print(w, "\ncomptime {{\n    contract.validate(Self);\n}}\n", .{});
 }
 
@@ -186,6 +198,7 @@ pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
 pub fn genReturn(dg: *DeclGen, f: *Function) Error!void {
     const d = dg.device;
     if (f.phase == .say) return dg.print(f.w, "return;", .{});
+    if (f.phase == .noise) return noise.genReturn(dg, f);
     try dg.print(f.w, "return .{{", .{});
     for (d.contributions.items(.resist), 0..) |slot, k| if (dg.live.assigned[@backingInt(slot)]) try dg.print(f.w, " .r{d} = s{d},", .{ k, @backingInt(slot) });
     for (d.charge_sites.items(.slot), 0..) |slot, k| try dg.print(f.w, " .c{d} = s{d},", .{ k, @backingInt(slot) });

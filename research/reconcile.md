@@ -113,7 +113,7 @@ The work is paced by the weekly model budget, not by the tasks. Rules, in order 
 5. **Narrow, then gate once**: `test-<module>`, then `diff-<x> -D<x>-filter=` on the
    touched fixtures, then `tools/gate.sh` once at the end (AGENTS.md step 4). Wait on a
    gate with a Monitor, never by polling its log.
-6. **Stale worktrees go.** 52 worktrees confuse agents and hold disk; prune every one whose
+6. **One branch, one checkout** (user, 2026-11-26). Every lane's branch merges into `refactor` as soon as its gate passes; its worktree and branch are then deleted. Between tasks the only worktree is the main checkout on `refactor`, and no other local branch holds a commit `refactor` lacks. A branch that cannot merge (a stop rule fired) is the one exception, named in the report. **Stale worktrees go.** 52 worktrees confuse agents and hold disk; prune every one whose
    branch is merged, and decide the 6 with unmerged commits (step 0).
 7. **Skills per role** (§6 Q3, decided): an implementer loads `zig` and the one domain
    skill its task names; the full table in AGENTS.md is the lead's.

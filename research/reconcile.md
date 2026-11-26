@@ -114,5 +114,6 @@ The work is paced by the weekly model budget, not by the tasks. Rules, in order 
 - **Q3. Skills per role** (user: yes). An implementer loads `zig` and the one domain
   skill its task names; the full table is the lead's. Step 0 amends AGENTS.md's "Skills
   to load first" with one line saying so.
-- **Q4. Codex** (user: no). Sonnet implements, Fable researches, the lead (Opus) merges
-  (`research/README.md`, 2026-11-11).
+- **Q4. Codex** (user: no). **Models** (user, 2026-11-25, replaces 2026-11-11's
+  Sonnet rule): implementers run on Opus at medium effort; Fable researches; the lead
+  (Opus) merges.

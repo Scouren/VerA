@@ -22,7 +22,7 @@ the plan's tasks in order and never redecide a `Decision:`.
 
 ## Decisions that bind several plans
 
-- **Models (user, 2026-11-11).** Implementation agents run on Sonnet; research
+- **Models (user, 2026-11-11; 2026-11-25: implementers on Opus, medium effort).** Implementation agents run on Opus at medium effort; research
   agents (a question the plans do not answer, an LRM reading, a rule fitted to
   fixtures) run on Fable. A rule the lead derived from fixtures alone goes to
   research before an implementer takes it (T39 -> `conversion.md`).

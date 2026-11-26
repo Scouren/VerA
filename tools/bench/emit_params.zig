@@ -45,7 +45,7 @@ pub fn main() void {
         std.debug.print("{s}\\x00", .{nm});
         starts[i] = @intCast(at);
         at += nm.len + 1;
-        flags[i] = @as(u32, @intFromEnum(kind)) | (if (i < T.num_inst_params) abi.para_kind_inst else 0);
+        flags[i] = @as(u32, @backingInt(kind)) | (if (i < T.num_inst_params) abi.para_kind_inst else 0);
     }
     std.debug.print("\";\npub const osdi_param_name_at = [_]u32{{", .{});
     for (starts, 0..) |s, i| std.debug.print("{s}{d},", .{ if (i % 24 == 0) "\n    " else " ", s });

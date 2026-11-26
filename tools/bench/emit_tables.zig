@@ -18,6 +18,6 @@ pub fn main() void {
     std.debug.print("}};\n/// The wrapper's parameter list as data: Model field and kind (0 real, 1 integer, 2 string).\npub const osdi_param_fields = [_][]const u8{{\n", .{});
     for (T.params) |p| std.debug.print("    \"{s}\",\n", .{p.field});
     std.debug.print("}};\npub const osdi_param_kinds = [_]u8{{", .{});
-    for (T.params, 0..) |p, i| std.debug.print("{s}{d},", .{ if (i % 40 == 0) "\n    " else " ", @intFromEnum(p.kind) });
+    for (T.params, 0..) |p, i| std.debug.print("{s}{d},", .{ if (i % 40 == 0) "\n    " else " ", @backingInt(p.kind) });
     std.debug.print("\n}};\n", .{});
 }

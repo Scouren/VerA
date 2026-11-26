@@ -59,6 +59,42 @@ zero-padded vector of power-of-two width; never a struct (0.8-1 % slower per ite
 never a 3-lane vector read back from memory (a 450-600 ns slow mode that came and went with
 stack alignment, consistent with stale padding read as subnormals).
 
+## 3b. The performance guide and its kit
+
+Inputs: `~/Documents/Notes/OmarSiwy.github.io/Blogs/The Ultimate System-Level Performance
+Guide.md` (the user's) and `~/Downloads/perf-kit.zip` (its kit: per-topic examples in Zig,
+Rust and C++, `lint/perf_tidy.py` with 39 Zig rules, `lint/zig/{layout,perf_lint}.zig`,
+`tools/{asmstat,looptext}.py`, `skills/zig-performance-fundamentals`). Measured against
+`refactor` on 2026-11-26:
+
+- `perf_tidy.py` over the new modules (`src/{Sema,Air,codegen/zig,link}`, `lib/std`,
+  `lib/osdi_dyn`): 6,066 errors, 5,053 of them `line-too-long` (VerA has no column rule;
+  `zig fmt` owns layout); the rest repeat the method's own rules (`missing-assertion` 444,
+  `recursion` 102, `unbounded-loop` 74) or are the `structure` ratchet's (§2).
+- Over three emitted devices (`tests/bench/{diode,mosfet,tanh_amp}.va`, `--emit-zig`,
+  marked `// tidy: hot-file`): the hot-path rules find nothing real. `branch-in-hot-loop`
+  and `bool-parameters` hit `inline for` and `comptime bool` (resolved at compile time);
+  the entry check is already a branchless `&` of `u1`s. One real gap: no `@sizeOf`
+  assertion on the emitted `Model` and `Instance`, which the method asks of every hot
+  struct. `function-too-long` fires on mosfet's 112-line `core`: that is DV8's measured
+  lever (build time and peak), which is where the guide's function-size rule pays.
+
+| # | Take | Where | Oracle |
+|---|---|---|---|
+| K1 | `zig-performance-fundamentals` is the perf lane's domain skill (§4 rule 7) | every P-brief | — |
+| K2 | the guide's measurement method in DV0: interleaved A/B rounds, inputs and outputs through a black box, min and median, and the bundle's four stack alignments (main alone spans 78 ns) | P1 | a planted 2× device fails by name; a planted no-op change passes |
+| K3 | the kit's `perf_tidy.py` over emitted devices as hot files, beside DV0's harness; each allow (the `comptime` false positives) carries its reason | P1 | a planted allocation or print in an emitted `core` fails it |
+| K4 | `noalias` on the emitted `core`'s pointer parameters (`model`, `inst`): bit for bit, lets LLVM keep parameter loads across state stores | P4, before packing | diff-codegen identical; eval ns no slower |
+| K5 | the select moved off the dependency chain for a conditional accumulation (`acc += if (c) x else 0`), in `.optimized` units only: in strict units `-0.0 + 0.0` is `+0.0`, so it is not bit for bit | P4 | diff-codegen within the versioned bound; eval ns |
+| K6 | `@sizeOf` assertions on the emitted `Model` and `Instance`, computed by codegen from its own slot table (an independent check of the layout it assumed) | with DV3 | a planted slot-width change fails the device's build |
+
+Not taken: `perf_tidy.py` over the compiler tree (a 1,000-row list that repeats AGENTS.md's
+rules, the `structure` ratchet's cost again); `@mulAdd` (strict units forbid a fused
+rounding; `.optimized` units already let LLVM contract, which P1 confirms in one unit's
+assembly with `tools/asm_probe.py` or the kit's `looptext.py`); several accumulators for
+long sums (a different rounding, so not bit for bit; the method's fixed-order reductions
+rule); `layout.assertNoPadding` (VerA asserts `@sizeOf` already; add it when a row pads).
+
 ## 4. Token budget rules
 
 The work is paced by the weekly model budget, not by the tasks. Rules, in order of effect:

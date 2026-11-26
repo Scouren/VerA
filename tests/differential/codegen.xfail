@@ -237,8 +237,6 @@ verilog-a/ch04_expressions/laplace_nd_zero_padded_coefficients.va codegen: a cal
 verilog-a/ch04_expressions/laplace_np_parameter_roots_unpaired_is_nan.va codegen: a call of `laplace_np`
 verilog-a/ch04_expressions/laplace_zp_parameter_roots_ac.va codegen: a call of `laplace_zp`
 verilog-a/ch04_expressions/laplace_zp_parameter_roots_step.va codegen: a call of `laplace_zp`
-verilog-a/ch04_expressions/psd_bias_dependent.va the new device does not build: n14.zig:85: unused local constant
-verilog-a/ch04_expressions/psd_white_flicker_export.va the new device does not build: n15.zig:65: unused local constant
 verilog-a/ch05_analog_behavior/analog_signals_nets_branches_contributions.va codegen: a §5.6.7 indirect contribution
 verilog-a/ch05_analog_behavior/child_named_branch_potential_and_flow_access.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch05_analog_behavior/controlled_sources.va codegen: a flow contribution to a potential source's branch
@@ -280,7 +278,6 @@ verilog-a/ch09_system_tasks/table_capture_rejected_step_recaptures.va codegen: a
 verilog-a/ch09_system_tasks/table_snapshot.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
 verilog-a/ch09_system_tasks/table_snapshot_collapse.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch09_system_tasks/table_status.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
-verilog-a/ch10_directives/compact_modeling_nonlin_res_example.va the new device does not build: n2.zig:81: unused local constant
 verilog-a/combined/limit_and_discontinuity.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
 verilog-a/combined/named_limiter_nonlinear.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
 verilog-a/exhaustive/indirect_contribution.va codegen: a §5.6.7 indirect contribution
@@ -448,7 +445,6 @@ verilog-ams/ch09_system_tasks/r_format_in_the_digital_context.va codegen: a call
 verilog-ams/ch09_system_tasks/strobe_writes_once_per_accepted_solution.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/ungetc_cancelled_by_fseek_and_gap_reads_zero.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/simparam_timescale.va point 0: row 0: old -4.511869783264559e-1, new -4.511869793274559e-1
-verilog-a/ch04_expressions/flicker_psd_frequency.va point 0: noise PSD at 1 Hz, branch 1: old 1e-18, new 0e0
 verilog/pli/analog_attributes.va codegen: a flow contribution to a potential source's branch
 netlist/noise/va_noise.assets/ntab_card.va codegen: a §4.6.4.3/.4 noise table whose knots are not constant (a parameter array)
 verilog-a/ch04_expressions/ac_stim_label_inactive_in_large_signal.va codegen: a slot of type 2 (a string)

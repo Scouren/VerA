@@ -36,7 +36,7 @@ and budget rules for the rest of the work. It changes no earlier `Decision:`.
 | `rewrite/plan` `tools/ratchet.py` `emit-sites`, `lower-rules`, `lower-mixed` | named-violation lists over `src/analog` and `lib/diag` | **drop** | both trees are deleted at C4; the new side's codes are `diagcodes.md`'s (clause keys, one table) |
 | `rewrite/plan` `tools/ratchet.py` `structure` | functions > 70 lines, nesting > 4, > 5 params, structs > 24 fields; 622 rows at d26fe7f1 | **drop** (§6 Q2) | measured: the pinned Zig's own `lib/std/zig` + aro fail it on 15.0 % of 3,302 functions (225 long, 326 deep), VerA's new modules on 7.6 % of 3,320 (284 rows). It would forbid the shapes `docs/rewrite/README.md` rule 4 says to copy |
 | `proto/host-tables` (7 commits, `lib/osdi_dyn/` only) | the OSDI wrapper's stamps, parameter overlay and messages by table and loop; unrolled to 256 Jacobian entries, looped above; transient stamps skip entries with no reactive half | **take, S1** | `lib/osdi_dyn` survives (C5 renames it `lib/std/osdi`) and the new link uses it (`src/link/File.zig:451`); no ABI change; cuts the wrapper's share of every OSDI build |
-| `proto/host-literals` (+1 commit) | a device may carry the host's tables as data; parameter records fill at load (`lib/contract/validate.zig`, `mock_devices.zig`) | **defer to S5**, one contract minor version with DV6 (`evalBatch`) | a contract change ESPice pins; additive, so it follows decision 9's rule; the new backend must emit the tables, which is codegen work after the switch |
+| `proto/host-literals` (+1 commit) | a device may carry the host's tables as data; parameter records fill at load (`lib/contract/validate.zig`, `mock_devices.zig`) | **take, perf lane P3** (revised 2026-11-26, user) | additive: the wrapper reads the six declarations only when a device has them, so no host breaks and ESPice is untouched; measured 549 -> 174 KB and 0.71 -> 0.46 s on a 1,600-parameter library. The lib side lands as is, with a contract minor version and a CHANGELOG line; `codegen/zig` then emits the tables (`tools/bench/emit_tables.zig`, `emit_params.zig` show their form) |
 | `proto/rules-area` | `lib/diag/rules/`, five contribution-context rules moved out of `src/analog/contrib.zig` | **drop the code**; the idea is input to `diagcodes.md` phase A | edits the old side, which is the oracle and read-only (`docs/rewrite/README.md` rule 2) |
 | `proto/deps-worklist` | `src/prove/deps.zig` fixpoint by worklist; `--emit-zig` 334 -> 88 ms at 6,400 params, bytes identical | **drop the code; port the measurement** (task M9) | old side, read-only. The new side has the same shape: `src/Air/Legalize.zig:9` "fixpoint, no worklist", `src/Air/Setup.zig:7` one optimistic fixpoint, `src/Air/Float/Walk.zig:7` iterates to a fixpoint |
 
@@ -48,11 +48,11 @@ not hold there is dropped with its number, not argued.
 
 | # | Task | Measured (old side) | Oracle | Place |
 |---|---|---|---|---|
-| DV-C | census: `origin_census.py` and `zig_shim.py` on `codegen/zig` builds of `tests/bench/*.va`, gen_models wide 800-3200 and inst 1000 | wrapper hot/cold share, the split build's summed peak (1,493 MiB against 513 for the largest child at 3,200 params) | none needed: it decides DV7-DV9 | S1, after the import; one research agent |
-| DV7 | pack isomorphic branches: four branches computed as one chain over `@Vector`, eight packs per `noinline` function, vectors in and out | eval 953 -> 533 ns (64 branches), 4,641 -> 2,928 ns (256); device build 2.90 -> 0.97 s and 22.7 -> 4.26 s | `osdi_host` checksum identical to the scalar build (`W == 1` is the oracle); diff-codegen rows identical; DV0 eval ns | S2, after DV3 (same files) |
-| DV8 | bound each emitted function: a repeated sequential stage chunked 32 stages to a `noinline` function | 1,600 params: build 2.80 -> 2.24 s, peak 272 -> 170 MiB, iterate 23,087 against 23,059 ns (within main's own 78 ns spread) | diff-codegen identical rows; DV0 build ms, peak and eval ns | S2, with DV3; before G0 (changes text) |
+| DV-C | census: `origin_census.py` and `zig_shim.py` on `codegen/zig` builds of `tests/bench/*.va`, gen_models wide 800-3200 and inst 1000 | wrapper hot/cold share, the split build's summed peak (1,493 MiB against 513 for the largest child at 3,200 params) | none needed: it decides DV7-DV9 | perf lane P1 |
+| DV7 | pack isomorphic branches: four branches computed as one chain over `@Vector`, eight packs per `noinline` function, vectors in and out | eval 953 -> 533 ns (64 branches), 4,641 -> 2,928 ns (256); device build 2.90 -> 0.97 s and 22.7 -> 4.26 s | `osdi_host` checksum identical to the scalar build (`W == 1` is the oracle); diff-codegen rows identical; DV0 eval ns | perf lane P4 |
+| DV8 | bound each emitted function: a repeated sequential stage chunked 32 stages to a `noinline` function | 1,600 params: build 2.80 -> 2.24 s, peak 272 -> 170 MiB, iterate 23,087 against 23,059 ns (within main's own 78 ns spread) | diff-codegen identical rows; DV0 build ms, peak and eval ns | perf lane P5; before G0 (changes text) |
 | DV9 | cold code (`checkRange`, `setup`) as tables and loops | slots and refusals unchanged; no time recorded | diff-codegen identical rows; DV-C's cold share | only if DV-C shows cold code a real share of build time |
-| M9 | the new side's fixpoints: time `--emit-zig` CPU on gen_models wide 800/1600/3200/6400; if superlinear, queue users of a changed value instead of sweeping, keeping the sweep as the asserted reference | old side was 14, 35, 105, 335 ms, superlinear | bytes identical over the corpus; the sweep reference asserted equal in a Debug run | S2, behind air passes' current task (same files) |
+| M9 | the new side's fixpoints: time `--emit-zig` CPU on gen_models wide 800/1600/3200/6400; if superlinear, queue users of a changed value instead of sweeping, keeping the sweep as the asserted reference | old side was 14, 35, 105, 335 ms, superlinear | bytes identical over the corpus; the sweep reference asserted equal in a Debug run | perf lane P2 |
 
 Layout rules the bundle measured, binding on DV7 and DV8: a value crosses a call as one
 zero-padded vector of power-of-two width; never a struct (0.8-1 % slower per iterate) and
@@ -84,16 +84,28 @@ The work is paced by the weekly model budget, not by the tasks. Rules, in order 
 
 ## 5. Order
 
-| Step | Who | What | Exit |
+Revised 2026-11-26 (user: the bundle's performance work is the point, not an afterthought).
+Two lanes run at once, one implementer each, one corpus step each: the 15 GB machine holds
+two corpus steps (about 7.5 GB each) and nothing else heavy, so the lead runs no
+ReleaseFast build or second gate beside them.
+
+| Step | Lane | What | Exit |
 |---|---|---|---|
-| 0 | lead | decide the 6 unmerged branches (merge, or delete with a one-line reason); `git worktree prune` and remove merged worktrees; confirm codegen T11's state; rebaseline comp.xfail; AGENTS.md's skills-per-role line (§6 Q3) | lists re-measured; worktrees ≤ the active lanes |
-| 1 | lead | merge `refs/bundle/rewrite/plan` minus `tools/ratchet*` (all four checks dropped) and `refs/bundle/proto/host-tables`; run `test`, the OSDI decks (`tools/external_analog.py`), `osdi_host` checksum old wrapper vs new on 3 devices | `tools/gate.sh` green; checksums equal |
-| 2 | 1 implementer | M0 + DV0 on the imported tools: `measure` step and diff-codegen eval ns per device, record + gate by name, one probe on an emitted device | a planted 2× device fails by name |
-| 3 | 1 implementer | DV1 (= T40), then DV2 | diff-codegen wall measured before/after |
-| 4 | 1 research agent | DV-C census; M9's timing sweep | DV7-DV9 and M9 kept or dropped, each with its number |
-| 5 | 1 implementer at a time | codegen waves (T11 rest, T13-T16, ...), then zero waves 2-3, with M1/M2 behind their lanes (`finish.md` §3 S1-S2) | F1 |
-| 6 | 1 implementer | DV3, DV8, DV5, DV7 (DV0-gated: no device slower) | F7-F9 targets |
-| 7 | lead + user | S3 G0, S4 switch, S5 (host-literals + DV6 as one contract minor) unchanged from `finish.md` | F1-F13 |
+| 0 | lead | done: branches decided, 49 worktrees removed, comp.xfail rebaselined (1,614 -> 1,572), skills-per-role line | done |
+| 1 | lead | done: `tools/bench` and `host-tables` merged, codegen T11 merged; gate green but for list lines; OSDI decks 30/30 in ngspice | done |
+| 2 | lists | DV1 (= T40), gated and merged; then DV2 | diff-codegen wall: giant batch 1,816 s -> 0.28 s |
+| P1 | perf | DV0 on the bundle's tools: `osdi_host` eval ns and checksum for `codegen/zig` OSDI builds of `tests/bench/*.va` and gen_models (wide 64/256/1600, inst 1000), a TSV per device, a script gate by name; plus DV-C (`origin_census.py`, `zig_shim.py`) on the same builds | first new-side numbers; DV7-DV9's premises confirmed or dropped, each with its number |
+| P2 | perf | M9: the new side's fixpoints timed on gen_models wide 800-6400; worklist if superlinear | `--emit-zig` CPU scales linearly; bytes identical |
+| P3 | perf | `host-literals`: the lib side (cherry-pick 91870118), then `codegen/zig` emits the tables | library bytes and build s per P1's TSV; OSDI decks green; `osdi_host` checksum equal |
+| P4 | perf | DV7, pack isomorphic branches (`@Vector`, power-of-two zero-padded, vectors across calls) | eval ns down on the branch-heavy devices, none slower; `W == 1` bit for bit |
+| P5 | perf | DV8, bounded emitted functions; DV9 only if P1 shows the cold share | build s and peak down, eval ns within noise |
+| 3 | lists | codegen waves (T13-T16, ...), then zero waves 2-3, M1/M2 behind their lanes | F1 |
+| 4 | lists | DV3, DV5 (DV0-gated) | F7-F9 targets |
+| 5 | lead + user | S3 G0, S4 switch, S5 (DV6 `evalBatch`, the engine-side batch entry ESPice adopts) as `finish.md` | F1-F13 |
+
+The perf lane changes device text, so every P-step lands before G0 (`finish.md` §3: g0
+records the devices that ship). P4 and lane step 4 edit `src/codegen/zig/Function.zig`;
+P4 runs first and step 4 rebases on it.
 
 ## 6. Decisions
 

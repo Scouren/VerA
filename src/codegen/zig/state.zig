@@ -3,8 +3,9 @@
 //! slot), `core` returns it, `updateState` writes it back at an accepted
 //! point, and `State` keeps the last committed copy for `stateCtl`'s
 //! revert (the old device's `held` protocol, `src/codegen/device/codegen/
-//! state.zig`). Fields are named `<name>__held` (`__<k>` per element of a
-//! held array); no host reads them by name. The §9.21.1 `$table_model`
+//! state.zig`). Fields are named `<name>__held`, a held array's one
+//! `[n]` field (DV1: indexed in a loop, never one field per element); no
+//! host reads them by name. The §9.21.1 `$table_model`
 //! snapshots ride the same protocol (`table_<k>`, `table_ready`,
 //! `table_kept`, the old `instance.zig`/`state_ctl.zig` names).
 //! Cites: VAMS-2023 §5.10 (variables keep their value between
@@ -16,6 +17,7 @@
 //! - `pub fn genInstanceFields(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void`
 //! - `pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void`
 //! - `pub fn intConst(dg: *const DeclGen, ref: Air.Inst.Ref) ?usize`
+//! - `pub fn arrayLen(dg: *const DeclGen, i: usize) ?u32`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -27,6 +29,7 @@ const Function = @import("Function.zig");
 const Ident = @import("Ident.zig");
 const ops = @import("ops.zig");
 const status = @import("status.zig");
+const array = @import("array.zig");
 const Real = Function.Real;
 
 /// Fills `dg.held_field` (per `alloc`, its `Instance` field when held) and
@@ -38,15 +41,23 @@ pub fn plan(dg: *DeclGen) DeclGen.Error!void {
     @memset(dg.held_field, null);
     for (d.held.items(.name), d.held.items(.slot), d.held.items(.count)) |n, slot, count| {
         const name = dg.ip.stringToSlice(n);
-        for (0..count) |k| {
-            const i = @backingInt(slot) + k;
-            if (i >= dg.air.instructions.len or dg.air.instructions.items(.tag)[i] != .alloc) return dg.fail("held variable `{s}`'s slots are not consecutive allocs", .{name});
-            dg.held_field[i] = if (count == 1)
-                try std.fmt.allocPrint(dg.arena, "{f}__held", .{Ident{ .name = name }})
-            else
-                try std.fmt.allocPrint(dg.arena, "{f}__held__{d}", .{ Ident{ .name = name }, k });
-        }
+        const i = @backingInt(slot);
+        if (i >= dg.air.instructions.len or dg.air.instructions.items(.tag)[i] != .alloc) return dg.fail("held variable `{s}`'s slot is not an alloc", .{name});
+        // A held array is one of `Device.arrays`: its first slot names the field.
+        if (count != 1 and (array.base(dg, i) != i or arrayLen(dg, i) != count)) return dg.fail("held array `{s}` is not one declared array", .{name});
+        dg.held_field[i] = try std.fmt.allocPrint(dg.arena, "{f}__held", .{Ident{ .name = name }});
     }
+}
+
+/// The element count when slot `i` starts a §3.2.2 array, else null (a
+/// scalar).
+pub fn arrayLen(dg: *const DeclGen, i: usize) ?u32 {
+    const g = dg.group[i];
+    if (g == .none) return null;
+    const a = dg.device.arrays.items[@backingInt(g)];
+    if (@backingInt(a.slot) != i) return null;
+    assert(a.count > 1);
+    return a.count;
 }
 
 /// The held fields of `Instance`, each at its §3.2 initializer (0 without),
@@ -59,8 +70,10 @@ pub fn genInstanceFields(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
     for (try ops.fields(dg)) |o| w.print("    {s}: {s} = {s},\n", .{ o.name, o.ty, o.default }) catch return error.OutOfMemory;
     try ops.genInstance(dg, w);
     for (dg.held_field, 0..) |field, i| if (field) |f| {
-        w.print("    {s}: {s} = ", .{ f, typeName(dg, i) }) catch return error.OutOfMemory;
-        try writeInit(dg, w, i);
+        w.print("    {s}: ", .{f}) catch return error.OutOfMemory;
+        try writeType(dg, w, i);
+        w.writeAll(" = ") catch return error.OutOfMemory;
+        try writeHeldInit(dg, w, i);
         w.writeAll(",\n") catch return error.OutOfMemory;
     };
 }
@@ -95,15 +108,17 @@ pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
     for (opf) |o| try p(w, "    {s}: {s} = {s},\n", .{ o.name, o.ty, o.default });
     try ops.genState(dg, w);
     for (dg.held_field, 0..) |field, i| if (field) |f| {
-        try p(w, "    {s}: {s} = ", .{ f, typeName(dg, i) });
-        try writeInit(dg, w, i);
+        try p(w, "    {s}: ", .{f});
+        try writeType(dg, w, i);
+        try p(w, " = ", .{});
+        try writeHeldInit(dg, w, i);
         try p(w, ",\n", .{});
     };
     try p(w, "}};\n\n/// Every held value back to its initializer: the start of an analysis.\npub fn initState(_: *const Model, {s}: *Instance) State {{\n", .{if (held or opf.len != 0 or st) "inst" else "_"});
     for (opf) |o| try p(w, "    inst.{s} = {s};\n", .{ o.name, o.default });
     for (dg.held_field, 0..) |field, i| if (field) |f| {
         try p(w, "    inst.{s} = ", .{f});
-        try writeInit(dg, w, i);
+        try writeHeldInit(dg, w, i);
         try p(w, ";\n", .{});
     };
     // §9.7.3 a latched status is re-initialized like any other variable
@@ -122,7 +137,10 @@ pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
     if (held or opf.len != 0 or bound_step) try p(w, "    const m = run(S, &x, D.zProbe(S, &x), model, inst, sim);\n", .{});
     try ops.genAccept(dg, w);
     for (dg.held_field, 0..) |field, i| if (field) |f| {
-        try p(w, "    inst.{s} = m.h{d}{s};\n", .{ f, i, if (isInt(dg, i)) "" else ".val()" });
+        if (arrayLen(dg, i) != null and !isInt(dg, i))
+            try p(w, "    for (&inst.{s}, m.h{d}) |*e, v| e.* = v.val();\n", .{ f, i })
+        else
+            try p(w, "    inst.{s} = m.h{d}{s};\n", .{ f, i, if (isInt(dg, i)) "" else ".val()" });
     };
     // A status-only device's `commit`/`revert` copy nothing: `inst` and
     // `state` would otherwise go unused.
@@ -187,8 +205,29 @@ fn isInt(dg: *const DeclGen, i: usize) bool {
     return ty != InternPool.Index.real_type;
 }
 
-fn typeName(dg: *const DeclGen, i: usize) []const u8 {
-    return if (isInt(dg, i)) "i64" else "f64";
+/// Writes held slot `i`'s field type: a scalar, or an array's `[n]` of them.
+fn writeType(dg: *const DeclGen, w: *std.Io.Writer, i: usize) DeclGen.Error!void {
+    if (arrayLen(dg, i)) |n| w.print("[{d}]", .{n}) catch return error.OutOfMemory;
+    w.writeAll(if (isInt(dg, i)) "i64" else "f64") catch return error.OutOfMemory;
+}
+
+/// Writes held slot `i`'s initial value: `writeInit`'s, or an array's
+/// elements (`@splat` when they agree, as they do without an initializer).
+fn writeHeldInit(dg: *DeclGen, w: *std.Io.Writer, i: usize) DeclGen.Error!void {
+    const n = arrayLen(dg, i) orelse return writeInit(dg, w, i);
+    var first: std.Io.Writer.Allocating = .init(dg.arena);
+    try writeInit(dg, &first.writer, i);
+    var all: std.Io.Writer.Allocating = .init(dg.arena);
+    var same = true;
+    for (0..n) |e| {
+        var one: std.Io.Writer.Allocating = .init(dg.arena);
+        try writeInit(dg, &one.writer, i + e);
+        same = same and std.mem.eql(u8, one.written(), first.written());
+        all.writer.print("{s}{s}", .{ if (e == 0) "" else ", ", one.written() }) catch return error.OutOfMemory;
+    }
+    assert(n > 1);
+    const r = if (same) w.print("@splat({s})", .{first.written()}) else w.print(".{{ {s} }}", .{all.written()});
+    r catch return error.OutOfMemory;
 }
 
 /// Writes held slot `i`'s initial value: its row's initializer (an array's

@@ -26,7 +26,7 @@ pub fn generate(gpa: Allocator, in: codegen.Input, options: codegen.Options) All
     var arena_state: std.heap.ArenaAllocator = .init(gpa);
     defer arena_state.deinit();
     const arena = arena_state.allocator();
-    const live = Liveness.init(arena, in.air.*, @intCast(in.device.nodes.len), null) catch |e| switch (e) {
+    const live = Liveness.init(arena, in.air.*, @intCast(in.device.nodes.len), null, in.device.arrays.items) catch |e| switch (e) {
         error.OutOfMemory => return error.OutOfMemory,
         error.TooManyUnknowns => return .{ .fail = try std.fmt.allocPrint(gpa, "more than {d} unknowns", .{Liveness.unknowns_max}) },
     };

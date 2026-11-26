@@ -250,6 +250,11 @@ pub fn declareArray(s: *Sema, unit: *Unit, first: Inst.Index, dims_body: Vir.Bod
     if (s.zcu.instances.items(.parent)[@backingInt(unit.instance)] == .none) try @import("walk.zig").rootShapes(s, &env);
     const slots = try s.arena.alloc(Air.Inst.Index, @intCast(cells));
     for (slots) |*slot| slot.* = try addAlloc(s, ty);
+    if (slots.len > 1) {
+        // `addAlloc` mints them back to back: codegen indexes them as one slot.
+        assert(@backingInt(slots[slots.len - 1]) - @backingInt(slots[0]) == slots.len - 1);
+        try s.device.arrays.append(s.gpa, .{ .slot = slots[0], .count = @intCast(slots.len) });
+    }
     try unit.binds.put(s.arena, first, .{ .array = .{ .slots = slots, .dims = dims.items, .ty = ty } });
 }
 

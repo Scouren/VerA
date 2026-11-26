@@ -34,6 +34,7 @@ const say = @import("say.zig");
 const status = @import("status.zig");
 const ops = @import("ops.zig");
 const noise = @import("noise.zig");
+const array = @import("array.zig");
 const Device = Air.Device;
 const Real = Function.Real;
 
@@ -59,8 +60,14 @@ u_names: []const []const u8 = &.{},
 branch_u: []u32 = &.{},
 /// Bit k: the body reads `calls.host_params[k]` (a `Model` field).
 host_params: u8 = 0,
-/// Per instruction: an `alloc`'s `Instance` field when §5.10 holds it.
+/// Per instruction: an `alloc`'s `Instance` field when §5.10 holds it (a
+/// held array's on its first slot only: one `[n]` field).
 held_field: []?[]const u8 = &.{},
+/// Per instruction: the §3.2.2 array an `alloc` is an element of, and how
+/// `Function` writes it (one indexed read or write per chain, `array.zig`).
+group: []array.Group = &.{},
+fuse: []array.Fuse = &.{},
+fused: []const array.Fused = &.{},
 /// §9.4 the display tasks `say` records (`say.plan`), and the liveness
 /// of its body.
 say_sites: []const say.Site = &.{},
@@ -103,7 +110,8 @@ pub const Error = error{ OutOfMemory, CodegenFail };
 /// whose methods hold the arithmetic. A `Core(S)` field is the family's own
 /// value type (`F.zOf`, named by its `mask` decl) when it needs `fromFast`;
 /// a plain field (`st__`, `sa__`, an operator's own scalar) does not depend
-/// on `S` and is the same type on both twins, so it is just copied.
+/// on `S` and is the same type on both twins, so it is just copied. A held
+/// array's field is mapped element by element.
 const fast =
     \\
     \\inline fn fast(comptime S: type, x: *const [n_u]S.V, xs: D.zX(S), model: *const Model, inst: InstancePtr, sim: contract.SimState) Core(S) {
@@ -111,7 +119,15 @@ const fast =
     \\    const f = @call(.always_inline, core, .{ S.Fast, .optimized, D.zProbe(S.Fast, x), model, inst, sim });
     \\    const info = @typeInfo(Core(S)).@"struct";
     \\    var out: Core(S) = undefined;
-    \\    inline for (info.field_names, info.field_types) |name, T| @field(out, name) = if (@typeInfo(T) == .@"struct" and @hasDecl(T, "mask")) S.fromFast(@field(f, name)) else @field(f, name);
+    \\    inline for (info.field_names, info.field_types) |name, T| @field(out, name) = switch (@typeInfo(T)) {
+    \\        .@"struct" => if (@hasDecl(T, "mask")) S.fromFast(@field(f, name)) else @field(f, name),
+    \\        .array => |a| if (@typeInfo(a.child) == .@"struct" and @hasDecl(a.child, "mask")) blk: {
+    \\            var o: T = undefined;
+    \\            for (&o, @field(f, name)) |*e, v| e.* = S.fromFast(v);
+    \\            break :blk o;
+    \\        } else @field(f, name),
+    \\        else => @field(f, name),
+    \\    };
     \\    return out;
     \\}
     \\
@@ -164,6 +180,7 @@ pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     try stamps.unknowns(dg);
     const p = try stamps.plan(dg);
     try dg.givenBits();
+    try array.plan(dg);
     try state.plan(dg);
     try ops.plan(dg);
     try status.plan(dg);
@@ -409,7 +426,10 @@ fn genCore(dg: *DeclGen, w: *std.Io.Writer, uses: Function.Uses, body: []const u
     for (d.contributions.items(.resist), 0..) |slot, k| if (dg.live.assigned[@backingInt(slot)]) try dg.print(w, " r{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
     for (d.charge_sites.items(.slot), 0..) |slot, k| try dg.print(w, " c{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
     for (dg.held_field, 0..) |h, i| if (h != null) {
-        if (dg.air.instructions.items(.data)[i].ty == InternPool.Index.real_type) try dg.print(w, " h{d}: F.zOf(S, 0x{x}),", .{ i, dg.live.masks[i] }) else try dg.print(w, " h{d}: i64,", .{i});
+        // A held array returns whole: one `[n]` field.
+        try dg.print(w, " h{d}: ", .{i});
+        if (state.arrayLen(dg, i)) |n| try dg.print(w, "[{d}]", .{n});
+        if (dg.air.instructions.items(.data)[i].ty == InternPool.Index.real_type) try dg.print(w, "F.zOf(S, 0x{x}),", .{dg.live.masks[i]}) else try dg.print(w, "i64,", .{});
     };
     for (d.limit_slots.items(.slot), 0..) |slot, k| try dg.print(w, " l{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
     try ops.genCoreFields(dg, w);

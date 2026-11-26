@@ -30,6 +30,8 @@ const DeclGen = @import("DeclGen.zig");
 const Liveness = @import("Liveness.zig");
 const Ident = @import("Ident.zig");
 const calls = @import("calls.zig");
+const array = @import("array.zig");
+const state = @import("state.zig");
 const Inst = Air.Inst;
 const Ref = Inst.Ref;
 const Error = DeclGen.Error;
@@ -87,6 +89,17 @@ const Label = struct {
     i: u32,
     pub fn format(l: Label, w: *std.Io.Writer) std.Io.Writer.Error!void {
         try w.print("ld{d}", .{l.i});
+    }
+};
+
+/// A scalar slot's name: `s<i>`, or element `i - b` of the §3.2.2 array
+/// whose first slot is `b` (`s<b>[i - b]`).
+const SlotName = struct {
+    i: u32,
+    base: ?u32,
+    pub fn format(s: SlotName, w: *std.Io.Writer) std.Io.Writer.Error!void {
+        if (s.base) |b| return w.print("s{d}[{d}]", .{ b, s.i - b });
+        try w.print("s{d}", .{s.i});
     }
 };
 
@@ -339,8 +352,18 @@ fn genInst(f: *Function, inst: Inst.Index) Error!void {
     const tag = air.instructions.items(.tag)[i];
     const data = air.instructions.items(.data)[i];
     const live = f.dg.live;
+    switch (f.dg.fuse[i]) {
+        .none => {},
+        .skip => return,
+        _ => |x| return f.genFused(inst, f.dg.fused[@backingInt(x)]),
+    }
     switch (tag) {
         .alloc => {
+            // §3.2.2 an array's elements are its first slot's `[n]`.
+            if (array.base(f.dg, i)) |b| {
+                if (b == i) try f.genArraySlot(i);
+                return;
+            }
             try f.line();
             const kw = if (live.assigned[i]) "var" else "const";
             if (f.dg.held_field[i]) |field| {
@@ -367,7 +390,7 @@ fn genInst(f: *Function, inst: Inst.Index) Error!void {
             const slot = data.bin_op.lhs.toIndex().?;
             if (f.arrayOf(f.dg.air.typeOfIndex(f.dg.ip, slot)) != null) return f.assignArray(slot, data.bin_op.rhs);
             try f.line();
-            try f.print("s{d} = ", .{@backingInt(slot)});
+            try f.print("{f} = ", .{f.slotName(slot)});
             try f.widened(slot, data.bin_op.rhs);
             try f.print(";", .{});
         },
@@ -437,6 +460,70 @@ fn genValueStmt(f: *Function, inst: Inst.Index, tag: Inst.Tag, data: Inst.Data) 
     try f.print("const v{d} = ", .{@backingInt(inst)});
     try f.genValue(inst, tag, data);
     try f.print(";", .{});
+}
+
+fn slotName(f: *const Function, slot: Inst.Index) SlotName {
+    const i = @backingInt(slot);
+    return .{ .i = i, .base = array.base(f.dg, i) };
+}
+
+/// §3.2.2 a declared array's one slot, at its first element's `alloc`: a
+/// `[n]` of the element type, each element from its §5.10 held field (DV1:
+/// a loop, not a line per element), else zero.
+fn genArraySlot(f: *Function, i: u32) Error!void {
+    const n = state.arrayLen(f.dg, i).?;
+    const live = f.dg.live;
+    const ty = f.dg.air.instructions.items(.data)[i].ty;
+    const is_int = isInt(f.dg.ip, ty);
+    if (!is_int and ty != InternPool.Index.real_type) return f.dg.fail("an array slot of type {d} (a string)", .{@backingInt(ty)});
+    assert(live.masks[i] == live.masks[i + n - 1]);
+    var assigned = false;
+    for (live.assigned[i..][0..n]) |a| assigned = assigned or a;
+    const kw = if (assigned) "var" else "const";
+    const elem: TypeText = .{ .int = is_int, .mask = live.masks[i] };
+    try f.line();
+    if (f.dg.held_field[i]) |field| {
+        // §5.10 the values the last accepted point left.
+        f.uses.inst = true;
+        try f.print("{s} s{d}: [{d}]{f} = h{d}: {{ var ha: [{d}]{f} = undefined; for (&ha, 0..) |*he, hk| he.* = ", .{ kw, i, n, elem, i, n, elem });
+        if (is_int) try f.print("M.zInstIA(S, inst, \"{s}\", hk)", .{field}) else try f.print("F.zTo(S, 0x{x}, M.zInstA(S, inst, \"{s}\", hk))", .{ live.masks[i], field });
+        try f.print("; break :h{d} ha; }};", .{i});
+    } else if (is_int) {
+        try f.print("{s} s{d}: [{d}]i64 = @splat(0);", .{ kw, i, n });
+    } else try f.print("{s} s{d}: [{d}]{f} = @splat(F.zTo(S, 0x{x}, S.con(0.0)));", .{ kw, i, n, elem, live.masks[i] });
+    try f.print(" _ = &s{d};", .{i});
+}
+
+/// A run-time-index chain over a §3.2.2 array (`array.zig`) as one indexed
+/// read or write: an index outside the array reads the chain's constant
+/// and writes nothing, as the chain did.
+fn genFused(f: *Function, inst: Inst.Index, row: array.Fused) Error!void {
+    const a = f.dg.device.arrays.items[row.group];
+    const b = @backingInt(a.slot);
+    const live = f.dg.live;
+    assert(live.masks[b] == live.masks[b + a.count - 1]);
+    switch (row.kind) {
+        .read => {
+            const i = @backingInt(inst);
+            if (!live.used[i]) return;
+            // The chain's value carries its elements' lanes, the array's.
+            assert(live.masks[i] == live.masks[b]);
+            try f.line();
+            try f.print("const v{d} = {f}: {{ const k: i64 = ", .{ i, Label{ .i = i } });
+            try f.int(row.k);
+            try f.print("; break :{f} if (k >= 0 and k < {d}) s{d}[@intCast(k)] else ", .{ Label{ .i = i }, a.count, b });
+            try f.widened(inst, row.v);
+            try f.print("; }};", .{});
+        },
+        .write => {
+            try f.line();
+            try f.print("{{ const k: i64 = ", .{});
+            try f.int(row.k);
+            try f.print("; if (k >= 0 and k < {d}) s{d}[@intCast(k)] = ", .{ a.count, b });
+            try f.widened(a.slot, row.v);
+            try f.print("; }}", .{});
+        },
+    }
 }
 
 /// §3.2.2 the array slot a version reads: a `load` of it, or a `store` made
@@ -528,7 +615,7 @@ fn genValue(f: *Function, inst: Inst.Index, tag: Inst.Tag, data: Inst.Data) Erro
             f.uses.x = true;
             return f.print("x[{d}]", .{data.ty_index.index});
         },
-        .load => return f.print("s{d}", .{@backingInt(data.un_op.toIndex().?)}),
+        .load => return f.print("{f}", .{f.slotName(data.un_op.toIndex().?)}),
         // §4.2.4 real arithmetic over the family's methods.
         .fadd, .fsub, .fmul, .fdiv => {
             try f.print("(", .{});

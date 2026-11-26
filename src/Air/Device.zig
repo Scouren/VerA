@@ -3,7 +3,7 @@
 //! that is not an instruction. The solver unknowns (`nodes`, ports first),
 //! the named branches, the model card (`params`, one `arg` each), the
 //! contributions with the slots that accumulate them, the §5.6.1.2 charge
-//! sites, the §5.10 held slots, the §9.17.3 limit slots, the §4.6 noise
+//! sites, the §3.2.2 declared arrays, the §5.10 held slots, the §9.17.3 limit slots, the §4.6 noise
 //! sources, the §9.17 kernel-control slots and the §9.4 display calls.
 //! Every row is appended by Sema's lowering, which owns every write; a
 //! later stage reads them through `*const Device`. Every name is an
@@ -26,9 +26,9 @@
 //! §5.6.7, §5.10, §9.4, §9.17.3.
 //!
 //! Contents:
-//! - fields `nodes`, `num_ports`, `branches`, `params`, `ranges`, `contributions`, `charge_sites`, `held`, `limit_slots`, `flows`, `table_samples`, `noise`, `kernel`, `systf`, `displays`
+//! - fields `nodes`, `num_ports`, `branches`, `params`, `ranges`, `contributions`, `charge_sites`, `arrays`, `held`, `limit_slots`, `flows`, `table_samples`, `noise`, `kernel`, `systf`, `displays`
 //! - `pub const Instance`, `pub const Node` (`Index`, `Kind`), `pub const Branch` (`Index`), `pub const Param` (`Index`, `Type`), `pub const Range`
-//! - `pub const Access`, `pub const Contribution` (`Index`, `Kind`), `pub const ChargeSite`, `pub const Held`, `pub const Flow` (`Kind`), `pub const LimitSlot`, `pub const Noise` (`Kind`), `pub const Kernel`, `pub const Display`
+//! - `pub const Access`, `pub const Contribution` (`Index`, `Kind`), `pub const ChargeSite`, `pub const Array`, `pub const Held`, `pub const Flow` (`Kind`), `pub const LimitSlot`, `pub const Noise` (`Kind`), `pub const Kernel`, `pub const Display`
 //! - `pub const rows_max: u32`
 //! - `pub fn deinit(d: *Device, gpa: Allocator) void`
 //! - `pub fn paramRanges(d: *const Device, p: Param.Index) []const Range`
@@ -59,6 +59,9 @@ ranges: std.ArrayList(Range) = .empty,
 contributions: std.MultiArrayList(Contribution) = .empty,
 /// §5.6.1.2 every `ddt` that charges a contribution, in source order.
 charge_sites: std.MultiArrayList(ChargeSite) = .empty,
+/// §3.2.2 every declared array of two or more elements, in declaration
+/// order: codegen gives each one slot (DV1, research/codegen.md T40).
+arrays: std.ArrayList(Array) = .empty,
 /// §5.10 the variables that keep their value between evaluations.
 held: std.MultiArrayList(Held) = .empty,
 /// §9.17.3 one row per access function a user-function `$limit` limits.
@@ -177,6 +180,11 @@ pub const Contribution = struct {
 /// the sum; `slot` holds the charge at the end of the body.
 pub const ChargeSite = struct { contrib: Contribution.Index, sign: f64, slot: Air.Inst.Index };
 
+/// §3.2.2 one declared array: `count` consecutive `alloc`s from `slot`, its
+/// elements in declaration order (`Sema/decl.zig`'s `declareArray`). Read
+/// whole (both fields at once), so a row, not two columns.
+pub const Array = struct { slot: Air.Inst.Index, count: u32 };
+
 /// §5.10 a variable kept between evaluations and its slot.
 /// A §3.2.2 array is one row: `count` consecutive slots from `slot`, its
 /// elements in declaration order (a scalar's `count` is 1). `init` is the
@@ -250,6 +258,7 @@ comptime {
     // Hot rows read by column: a handle per column, no padding words.
     assert(@sizeOf(Node.Index) == 4);
     assert(@sizeOf(Branch.Index) == 4);
+    assert(@sizeOf(Array) == 8);
 }
 
 /// Frees every table.
@@ -260,6 +269,7 @@ pub fn deinit(d: *Device, gpa: Allocator) void {
     d.ranges.deinit(gpa);
     d.contributions.deinit(gpa);
     d.charge_sites.deinit(gpa);
+    d.arrays.deinit(gpa);
     d.held.deinit(gpa);
     d.limit_slots.deinit(gpa);
     d.noise.deinit(gpa);

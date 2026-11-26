@@ -74,7 +74,7 @@ pub fn plan(dg: *DeclGen) Error!void {
     const roots = try dg.arena.alloc(bool, dg.air.instructions.len);
     @memset(roots, false);
     for (sites.items) |s| roots[@backingInt(s.call)] = true;
-    dg.say_live = Liveness.init(dg.arena, dg.air.*, @intCast(dg.device.nodes.len), roots) catch |e| switch (e) {
+    dg.say_live = Liveness.init(dg.arena, dg.air.*, @intCast(dg.device.nodes.len), roots, dg.device.arrays.items) catch |e| switch (e) {
         error.OutOfMemory => return error.OutOfMemory,
         error.TooManyUnknowns => unreachable, // `dg.live` was built over the same unknowns
     };

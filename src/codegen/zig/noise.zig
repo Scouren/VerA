@@ -72,7 +72,7 @@ pub fn plan(dg: *DeclGen) Error!void {
     for (d.contributions.items(.resist)) |slot| {
         if (dg.live.assigned[@backingInt(slot)]) roots[@backingInt(slot)] = true;
     }
-    dg.noise_live = Liveness.init(dg.arena, dg.air.*, @intCast(dg.device.nodes.len), roots) catch |e| switch (e) {
+    dg.noise_live = Liveness.init(dg.arena, dg.air.*, @intCast(dg.device.nodes.len), roots, dg.device.arrays.items) catch |e| switch (e) {
         error.OutOfMemory => return error.OutOfMemory,
         error.TooManyUnknowns => unreachable, // `dg.live` was built over the same unknowns
     };

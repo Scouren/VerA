@@ -5,7 +5,8 @@
 //! (`used`: a pure value nothing reads is not emitted, since Zig refuses an
 //! unused local), and per `alloc` whether anything writes it (`assigned`: a
 //! slot nothing writes is a `const`). Slots and `block` results join every
-//! value written to them, flow-insensitively, to a fixed point.
+//! value written to them, flow-insensitively, to a fixed point; the slots
+//! of one §3.2.2 array share one mask (`Function` types them as one array).
 //! Cites: VAMS-2023 §4.4 (probes), §5.7 (assignments), §4.5.14 (`ddx`).
 //!
 //! The data, by `data-oriented-design`'s six questions:
@@ -20,7 +21,7 @@
 //! Contents:
 //! - fields `masks`, `used`, `assigned`, `targeted`
 //! - `pub const Mask = u64`, `pub const unknowns_max: u32`
-//! - `pub fn init(arena: Allocator, air: Air, n_u: u32, roots: ?[]const bool) error{ OutOfMemory, TooManyUnknowns }!Liveness`
+//! - `pub fn init(arena: Allocator, air: Air, n_u: u32, roots: ?[]const bool, arrays: []const Air.Device.Array) error{ OutOfMemory, TooManyUnknowns }!Liveness`
 //! - `pub fn maskOf(l: Liveness, ref: Air.Inst.Ref) Mask`
 //! - `pub fn effect(air: Air, tag: Air.Inst.Tag, data: Air.Inst.Data) bool`
 //! - `pub const Operands = struct` (`collect`, `slice`)
@@ -131,8 +132,9 @@ const Liveness = @This();
 
 /// Computes the three columns of `air`, whose probes read `n_u` unknowns,
 /// into `arena`; `roots`, per instruction, adds effects (the display tasks
-/// `say` records). Fails with `error.TooManyUnknowns` past `unknowns_max`.
-pub fn init(arena: Allocator, air: Air, n_u: u32, roots: ?[]const bool) error{ OutOfMemory, TooManyUnknowns }!Liveness {
+/// `say` records); each of `arrays` gets the join of its slots' masks.
+/// Fails with `error.TooManyUnknowns` past `unknowns_max`.
+pub fn init(arena: Allocator, air: Air, n_u: u32, roots: ?[]const bool, arrays: []const Air.Device.Array) error{ OutOfMemory, TooManyUnknowns }!Liveness {
     if (n_u > unknowns_max) return error.TooManyUnknowns;
     const n = air.instructions.len;
     const l: Liveness = .{
@@ -166,7 +168,7 @@ pub fn init(arena: Allocator, air: Air, n_u: u32, roots: ?[]const bool) error{ O
     // every slot and block, plus the pass that sees nothing change.
     const passes_max = n * unknowns_max + 2;
     var pass: usize = 0;
-    while (l.propagate(air)) : (pass += 1) assert(pass < passes_max);
+    while (l.propagate(air) or l.joinArrays(arrays)) : (pass += 1) assert(pass < passes_max);
     assert(l.masks.len == n);
     return l;
 }
@@ -304,6 +306,24 @@ fn propagate(l: Liveness, air: Air) bool {
     return grew;
 }
 
+/// Every slot of each array to the join of the array's masks; returns
+/// whether any mask grew.
+fn joinArrays(l: Liveness, arrays: []const Air.Device.Array) bool {
+    var grew = false;
+    for (arrays) |a| {
+        const slots = l.masks[@backingInt(a.slot)..][0..a.count];
+        assert(a.count > 1);
+        var m: Mask = 0;
+        for (slots) |x| m |= x;
+        for (slots) |*x| {
+            grew = grew or x.* != m;
+            x.* = m;
+        }
+        assert(slots[0] == m and slots[a.count - 1] == m);
+    }
+    return grew;
+}
+
 fn orInto(l: Liveness, i: u32, m: Mask) bool {
     const before = l.masks[i];
     l.masks[i] = before | m;
@@ -329,12 +349,12 @@ test "Liveness: a slot joins every value assigned to it; a constant has no lanes
     defer air.deinit(gpa);
     var arena: std.heap.ArenaAllocator = .init(gpa);
     defer arena.deinit();
-    const l = try init(arena.allocator(), air, 2, null);
+    const l = try init(arena.allocator(), air, 2, null, &.{});
     try std.testing.expectEqual(@as(Mask, 0b11), l.masks[@backingInt(ld)]);
     try std.testing.expectEqual(@as(Mask, 0b11), l.masks[@backingInt(mul)]);
     try std.testing.expect(l.assigned[@backingInt(s)]);
     try std.testing.expect(l.used[@backingInt(mul)]);
     try std.testing.expect(!l.used[@backingInt(ret)]);
     try std.testing.expectEqual(@as(Mask, 0), l.maskOf(.fromIntern(InternPool.Index.two_real)));
-    try std.testing.expectError(error.TooManyUnknowns, init(arena.allocator(), air, 65, null));
+    try std.testing.expectError(error.TooManyUnknowns, init(arena.allocator(), air, 65, null, &.{}));
 }

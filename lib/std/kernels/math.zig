@@ -29,7 +29,7 @@
 //! - `pub fn zModZero() noreturn`
 //! - `pub fn zMin(comptime S: type, a: S, b: S) S`, `zMax`, `zMinF(a: f64, b: f64) f64`, `zMaxF`
 //! - `pub fn zCmp(comptime S: type, comptime op: std.math.CompareOperator, a: anytype, b: anytype) bool`
-//! - `pub fn zRoundI(comptime S: type, a: anytype) i64`, `zStrip`, `zMulP`, `zAddP`, `zSubP`, `zInst`, `zInstI`, `zLeads`
+//! - `pub fn zRoundI(comptime S: type, a: anytype) i64`, `zStrip`, `zMulP`, `zAddP`, `zSubP`, `zInst`, `zInstI`, `zInstA`, `zInstIA`, `zLeads`
 //! - `pub fn zDevExp(x: f64) f64`, `zDevExpm1`, `zDevAtan`, `zDevLog`, `zDevPow`, `zDevSin`, `zDevCos`, `zDevTanh`, `zDevSinh`, `zDevCosh`
 //! - `pub fn zTan(comptime S: type, a: S) S`, `zGraft`, `zLog10`, `zPick`, `zSqrtD`, `zLnD`, `zLn1pD`, `zLog10D`, `zPowOk`, `zPowK`, `zHypot`, `zAsin`, `zAcos`, `zAsinh`, `zAcosh`, `zAtanh`, `zAtan2`, `zFloor`, `zCeil`, `zFmod`, `zPow`, `zLimitUf`
 //! - `pub fn zIabs(a: i64) i64`, `zShl`, `zShr`, `zClog2`, `zStrCmp`
@@ -265,6 +265,26 @@ pub fn zInstI(comptime S: type, inst: anytype, comptime f: []const u8) i64 {
     }
     if (comptime @hasDecl(S, "decideI")) return S.decideI(S.con(@floatFromInt(@field(inst, f)))); // `region` hashes it
     return @field(inst, f);
+}
+/// Element `k` of array field `f` of the `Instance`, as `zInst` (a §5.10
+/// held array is one `[n]f64` field, indexed in a loop).
+pub fn zInstA(comptime S: type, inst: anytype, comptime f: []const u8, k: usize) @TypeOf(S.con(0.0)) {
+    if (comptime contract.instLanes(S)) {
+        var ls: [S.lane_count]@TypeOf(S.Lane.con(0.0)) = undefined;
+        inline for (0..S.lane_count) |w| ls[w] = S.Lane.con(@field(S.instLane(@TypeOf(inst.*), w), f)[k]);
+        return S.fromLanes(0, ls);
+    }
+    return S.con(@field(inst, f)[k]);
+}
+/// Element `k` of integer array field `f` of the `Instance`, as `zInstI`.
+pub fn zInstIA(comptime S: type, inst: anytype, comptime f: []const u8, k: usize) i64 {
+    if (comptime contract.instLanes(S)) {
+        var ls: [S.lane_count]@TypeOf(S.Lane.con(0.0)) = undefined;
+        inline for (0..S.lane_count) |w| ls[w] = S.Lane.con(@floatFromInt(@field(S.instLane(@TypeOf(inst.*), w), f)[k]));
+        return S.decideI(S.fromLanes(0, ls));
+    }
+    if (comptime @hasDecl(S, "decideI")) return S.decideI(S.con(@floatFromInt(@field(inst, f)[k]))); // `region` hashes it
+    return @field(inst, f)[k];
 }
 /// Whether `S` runs the lead protocol; a vector family that cannot is
 /// refused, since its points would follow point 0's branches.

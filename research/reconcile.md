@@ -165,3 +165,16 @@ P4 runs first and step 4 rebases on it.
 - **Q4. Codex** (user: no). **Models** (user, 2026-11-25, replaces 2026-11-11's
   Sonnet rule): implementers run on Opus at medium effort; Fable researches; the lead
   (Opus) merges.
+- **Q5. The stopping condition** (user, 2026-11-26: "run until we are done the full rewrite
+  with 0 differences, unless bugs are found in the codegen"). The lead runs the two lanes
+  until **F1**: every `tests/differential/*.xfail` empty, each remaining difference ended
+  as a build, a stage re-owning, or a ruling where the old side is wrong (its tiebreaker
+  named). It then stops at **G0** and reports to the user: the switch (C2 onward) flips
+  what `vera` ships and waits for the user's go (`finish.md` S3).
+  Allowed meanwhile: merges into `refactor` after `tools/gate.sh` passes, list rebaselines
+  with no new fixture path, pushes of `refactor`. Never: `main`, tags, releases, issues,
+  pushes to the conformance suite or Gompute, a published contract version (each is
+  queued as a question). A lane stops, and the other continues, on a real regression that
+  one fix attempt does not clear (the branch stays unmerged) or on a choice no plan's
+  `Decision:` covers (the question is written down). All heavy work stops on two OOM kills
+  or the model usage limit; it resumes from this file and the lists.

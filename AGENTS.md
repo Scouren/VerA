@@ -12,6 +12,10 @@ Load each with the Skill tool (other agents: read
 `~/.claude/skills/<name>/SKILL.md` and the companion files it names). Source:
 https://github.com/OmarSiwy/NixOSConfig/tree/main/skills
 
+The tables are the lead's. An implementer agent loads `zig` and the one
+domain skill its task names, nothing more (user, 2026-11-25;
+`research/reconcile.md` §4).
+
 | Skill | Use it for here |
 |---|---|
 | `data-oriented-design` | AST, `elab/` and `ir/` tables: the six questions, SoA, narrowest widths, handles |

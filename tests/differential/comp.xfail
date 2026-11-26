@@ -17,13 +17,10 @@ spice/limit_seed_explicit_beats_default.va rw-codegen (codegen): exit status old
 spice/limit_seed_mos1_initjct.va rw-codegen (codegen): exit status old 0, new 1
 spice/limit_vds.va rw-codegen (run): exit status old 0, new 1
 spice/mfactor_on_a_netlist_subckt.va rw-lower (analog lowering): exit status old 0, new 1
-spice/model_card_capacitor_c_and_ic.va rw-zero (air passes) location: stderr: line 69: old `   |                  --- an expression of parameter `x1.prim.c` is not provably finite`, new `   |                  --- a computed expression is not provably finite`
-spice/primitive_capacitor.va rw-zero (air passes) location: stderr: line 69: old `   |                  --- an expression of parameter `x1.c` is not provably finite`, new `   |                  --- a computed expression is not provably finite`
-spice/primitive_iexp.va rw-zero (air passes) location: stderr: line 22: old `70 |          I(p, n) <+ $simparam("sourceScaleFactor") * (dc);`, new `69 |       if (analysis("static") && !analysis("tran"))`
-spice/primitive_inductor.va rw-zero (air passes) location: stderr: line 56: old `   |                  --- an expression of parameter `x1.l` is not provably finite`, new `   |                  --- a computed expression is not provably finite`
-spice/primitive_ipulse.va rw-zero (air passes) location: stderr: line 31: old `107 |          I(p, n) <+ $simparam("sourceScaleFactor") * (dc);`, new `106 |       if (analysis("static") && !analysis("tran"))`
-spice/primitive_ipwl.va rw-zero (air passes) location: stderr: line 20: old `147 |          I(p, n) <+ $simparam("sourceScaleFactor") * (dc);`, new `146 |       if (analysis("static") && !analysis("tran"))`
-spice/primitive_isine.va rw-zero (air passes) location: stderr: line 22: old `182 |          I(p, n) <+ $simparam("sourceScaleFactor") * (dc);`, new `181 |       if (analysis("static") && !analysis("tran"))`
+spice/primitive_iexp.va rw-zero (air passes) location: stderr: line 22: old `70 |          I(p, n) <+ $simparam("sourceScaleFactor") * (dc);`, new `63 |    parameter real td0 = 0.0;`
+spice/primitive_ipulse.va rw-zero (air passes) location: stderr: line 32: old `    |          ^ a computed expression is not provably finite`, new `    |          ^`
+spice/primitive_ipwl.va rw-zero (air passes) location: stderr: line 21: old `    |          ^ a computed expression is not provably finite`, new `    |          ^`
+spice/primitive_isine.va rw-zero (air passes) location: stderr: line 23: old `    |          ^ a computed expression is not provably finite`, new `    |          ^`
 spice/primitive_mixed_discipline_override.va rw-zero (air passes) location: stderr: line 27: old `    |       - an expression of a probe of node `gnd_rot` is not provably finite`, new `    |       - an expression of parameter `motor1.gain` is not provably finite`
 spice/primitive_segment_discipline.va rw-lower (analog lowering): exit status old 0, new 1
 spice/primitive_source_scale_factor.va rw-codegen (codegen): exit status old 0, new 1
@@ -64,7 +61,6 @@ verilog-a/annex_a_syntax/indirect_contribution.va rw-codegen (codegen): exit sta
 verilog-a/annex_a_syntax/jump_statements.va rw-lower (analog lowering): stderr: line 1: old `error[E0403]: `return` outside an analog function`, new `error[E0512]: unknown function: `return` outside a function`
 verilog-a/annex_a_syntax/module_instantiation.va rw-zero (air passes) location: stderr: line 8: old `   |         - an expression of a probe of node `n` is not provably finite`, new `   |         - an expression of parameter `child_instance.gain` is not provably finite`
 verilog-a/annex_a_syntax/nested_event_control_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/annex_a_syntax/nested_event_control_rejected.va:21:41`, new `  --> verilog-a/annex_a_syntax/nested_event_control_rejected.va:21:39`
-verilog-a/annex_a_syntax/null_statement_in_analog_event_block.va rw-lower (analog lowering): stderr: line 2: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`
 verilog-a/annex_a_syntax/parameter_declarations.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/annex_a_syntax/parameter_port_list.va rw-zero (air passes) location: stderr: line 8: old `   |         - an expression of a probe of node `n` is not provably finite`, new `   |         - an expression of parameter `gain` is not provably finite`
 verilog-a/annex_a_syntax/paramset.va rw-zero (air passes) location: stderr: line 7: old `   |         - an expression of a probe of node `n` is not provably finite`, new `   |         - an expression of parameter `instance_of_paramset.gain` is not provably finite`
@@ -76,7 +72,7 @@ verilog-a/annex_a_syntax/system_task_null_argument_space.va rw-codegen (codegen)
 verilog-a/annex_b_keywords/keyword_function_name_rejected.va rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `x``, new `error[E0240]: not a module item: found `repeat``
 verilog-a/annex_c_analog_subset/analog_event.va rw-codegen (run): exit status old 0, new 1
 verilog-a/annex_c_analog_subset/analog_only_device.va rw-lower (analog lowering): stderr: line 13: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`
-verilog-a/annex_c_analog_subset/analog_operators.va rw-zero (air passes) location: stderr: line 36: old `   |         - an expression of a probe of node `n` is not provably finite`, new `   |         - a computed expression is not provably finite`
+verilog-a/annex_c_analog_subset/analog_operators.va rw-zero (air passes) message: stderr: line 31: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 2 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/annex_c_analog_subset/disable_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = help: only `@(<event>) disable <block>;` is legal`, new `   = help: run `vera --explain E0401` for a detailed explanation`
 verilog-a/annex_c_analog_subset/no_discipline_rejected.va rw-lower (analog lowering): stderr: line 8: old `   = note: §3.6.2.4 treats a net with no discipline that is referenced in behavioral code as discrete; declare one, e.g. `electrical p;``, new `   = help: run `vera --explain E0337` for a detailed explanation`
 verilog-a/annex_c_analog_subset/parameter_range.va rw-lower (analog lowering): stderr: line 10: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`
@@ -88,7 +84,6 @@ verilog-a/annex_d_standard_definitions/signal_flow_potential_access_rejected.va 
 verilog-a/annex_d_standard_definitions/unbound_nature_access_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = help: did you mean `V`?`, new `   = help: run `vera --explain E0501` for a detailed explanation`
 verilog-a/annex_d_standard_definitions/unbound_nature_charge_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0501]: unknown access function: `Q``, new `error[E0512]: unknown function: `Q` is not lowered by Sema yet`
 verilog-a/annex_g_change_history/2023_math_additions.va rw-zero (air passes) location: stderr: line 12: old `   |     - an expression of a probe of node `n` is not provably finite`, new `   |     - a computed expression is not provably finite`
-verilog-a/annex_g_change_history/abstime_replaced_realtime.va rw-lower (analog lowering): stderr: line 2: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`
 verilog-a/annex_g_change_history/brace_array_initialiser_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/annex_g_change_history/brace_array_initialiser_rejected.va:44:32`, new `  --> verilog-a/annex_g_change_history/brace_array_initialiser_rejected.va:44:18`
 verilog-a/annex_g_change_history/delay_v1_spelling_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0512]: unknown function: `delay``, new `error[E0512]: unknown function: `delay` is not lowered by Sema yet`
 verilog-a/annex_g_change_history/generate_replaced_by_analog_for.va rw-codegen (codegen): exit status old 0, new 1
@@ -174,8 +169,6 @@ verilog-a/ch03_data_types/forward_parameter_reference.va rw-lower (analog loweri
 verilog-a/ch03_data_types/genvar_assigned_outside_loop.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0313]: unknown variable: `index``, new `error[E0313]: unknown variable: `index` is a genvar: only an analog `for` assigns it`
 verilog-a/ch03_data_types/genvar_nonstatic_loop_control.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0419]: genvar loop step is not a constant expression`, new `error[E0419]: genvar loop step is not a constant expression: the iteration of `index``
 verilog-a/ch03_data_types/idt_nature_not_a_nature.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch03_data_types/idt_nature_not_a_nature.va:16:66`, new `  --> verilog-a/ch03_data_types/idt_nature_not_a_nature.va:16:1`
-verilog-a/ch03_data_types/idt_nature_related_overrides.va rw-lower (analog lowering): stderr: line 23: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(idt$0,gnd) — compiles with @setFloatMode(.strict)`
-verilog-a/ch03_data_types/idt_nature_self_reference.va rw-lower (analog lowering): stderr: line 23: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(idt$0,gnd) — compiles with @setFloatMode(.strict)`
 verilog-a/ch03_data_types/idt_nature_string_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch03_data_types/idt_nature_string_rejected.va:20:5`, new `  --> verilog-a/ch03_data_types/idt_nature_string_rejected.va:16:1`
 verilog-a/ch03_data_types/idt_nature_unrelated_override.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch03_data_types/idt_nature_unrelated_override.va:26:40`, new `  --> verilog-a/ch03_data_types/idt_nature_unrelated_override.va:26:1`
 verilog-a/ch03_data_types/idt_nature_unrelated_to_default_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch03_data_types/idt_nature_unrelated_to_default_rejected.va:55:5`, new `  --> verilog-a/ch03_data_types/idt_nature_unrelated_to_default_rejected.va:54:1`
@@ -261,9 +254,8 @@ verilog-a/ch03_data_types/vector_branch_part_select_reversed_rejected.va rw-lowe
 verilog-a/ch03_data_types/vector_branch_size_mismatch.va rw-lower (analog lowering): exit status old 1, new 0
 verilog-a/ch03_data_types/vector_branches.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch03_data_types/vector_range_past_65535_elements.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch03_data_types/vera_scratch_starts_each_evaluation.va rw-zero (air passes) location: stderr: line 40: old `62 |     I(a, b) <+ y * V(a, b) + ht[1] * 1e-3 * V(a, b);`, new `56 |     w = ($abstime < 0.5) ? 1 : 2;`
+verilog-a/ch03_data_types/vera_scratch_starts_each_evaluation.va rw-zero (air passes) message: stderr: line 37: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(a,b) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch03_data_types/vera_scratch_uninit_reads_nan_when_safe.va rw-lower (analog lowering): stderr: line 5: old `unwritten slot reads NaN got=1 want=          1 ok=1`, new `unwritten slot reads NaN got=0 want=          1 ok=0`
-verilog-a/ch03_data_types/vera_scratch_uninit_tape.va rw-lower (analog lowering): stderr: line 33: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(a,b) — compiles with @setFloatMode(.strict)`
 verilog-a/ch03_data_types/wrong_access_function.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0360]: signal-flow discipline on an `inout` port: `p` is an `inout` port of discipline `ch3_right_d`, which binds a potential nature only`, new `error[E0360]: signal-flow discipline on an `inout` port: `p` is an `inout` port of discipli
 verilog-a/ch04_expressions/13b_generic_access.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/abs.va rw-lower (analog lowering): stderr: line 7: old `abs(0) = 0 got=0 want=0 ok=1`, new `abs(0) = 0 got=-0 want=0 ok=1`
@@ -276,19 +268,14 @@ verilog-a/ch04_expressions/absdelay_three_arg_negative_rejected.va rw-lower (ana
 verilog-a/ch04_expressions/absdelay_vera_interp_quadratic.va rw-lower (analog lowering): stderr: line 10: old `in flight, quadratic got=2.25 want=2.25 ok=1`, new `in flight, quadratic got=2.5 want=2.25 ok=0`
 verilog-a/ch04_expressions/absdelay_vera_interp_quadratic_uneven.va rw-lower (analog lowering): stderr: line 7: old `td 1.5n got=2.25 want=2.25 ok=1`, new `td 1.5n got=3 want=2.25 ok=0`
 verilog-a/ch04_expressions/absdelay_zero_delay_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch04_expressions/absdelay_zero_delay_rejected.va:13:39`, new `  --> verilog-a/ch04_expressions/absdelay_zero_delay_rejected.va:13:22`
-verilog-a/ch04_expressions/ac_stim.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch04_expressions/ac_stim_ac_analysis.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch04_expressions/ac_stim_dynamic_magnitude.va rw-codegen (codegen): exit status old 0, new 1
+verilog-a/ch04_expressions/ac_stim_dynamic_magnitude.va rw-zero (air passes) location: stderr: line 10: old `  res[n] = -2.002000e0`, new `    d res[p]/d x[ctrl] = 1.000000e0`
 verilog-a/ch04_expressions/ac_stim_label_inactive_in_large_signal.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch04_expressions/ac_stim_long_node_names.va rw-codegen (codegen): exit status old 0, new 1
+verilog-a/ch04_expressions/ac_stim_long_node_names.va rw-zero (air passes) location: stderr: line 22: old `   |     - an expression of a probe of node `nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` is not provab`, new `   |     - a computed expression is not provably finite`
 verilog-a/ch04_expressions/ac_stim_name_not_literal_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch04_expressions/ac_stim_name_not_literal_rejected.va:43:50`, new `  --> verilog-a/ch04_expressions/ac_stim_name_not_literal_rejected.va:43:42`
-verilog-a/ch04_expressions/ac_stim_noise_analysis.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch04_expressions/ac_stim_quadrature.va rw-codegen (codegen): exit status old 0, new 1
+verilog-a/ch04_expressions/ac_stim_quadrature.va rw-codegen (run): stderr: line 18: old `  res[q] = 1.923132e-17`, new `  res[q] = 6.123234e-17`
 verilog-a/ch04_expressions/access_bus_variable_index_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0352]: vector index is not a constant inside the declared range: index into `b` is not a constant expression`, new `error[E0512]: unknown function: an access of a vector element at a run-time index`
 verilog-a/ch04_expressions/access_three_nets_rejected.va rw-comp (parse): stderr: line 1: old `error[E0207]: unexpected token: found `,``, new `error[E0512]: unknown function: `V` with 3 arguments`
 verilog-a/ch04_expressions/analog_function_four_return_mechanisms.va rw-zero (air passes) message: stderr: line 17: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
-verilog-a/ch04_expressions/analog_operator_keeps_internal_state.va rw-lower (analog lowering): stderr: line 5: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(idt$0,gnd) — compiles with @setFloatMode(.strict)`
-verilog-a/ch04_expressions/analysis.va rw-lower (analog lowering): stderr: line 18: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`
 verilog-a/ch04_expressions/analysis_numeric_argument_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0574]: analysis() argument is not a quoted analysis name: each argument of `analysis()` is a quoted analysis name`, new `error: verilog-a/ch04_expressions/analysis_numeric_argument_rejected.va: the generated testbench does not compile — this 
 verilog-a/ch04_expressions/arithmetic_shift_left_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = help: use `<<` and `>>``, new `   = help: run `vera --explain E0324` for a detailed explanation`
 verilog-a/ch04_expressions/array_assignment.va rw-lower (analog lowering): exit status old 0, new 1
@@ -303,7 +290,6 @@ verilog-a/ch04_expressions/concatenation_real_operand_rejected.va rw-lower (anal
 verilog-a/ch04_expressions/concatenation_unsized_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0216]: concatenation operand has no bit width`, new `error[E0512]: unknown function: a concatenation of sized integers is not lowered by Sema yet`
 verilog-a/ch04_expressions/conditional_operator.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/constant_expression_reads_a_probe_rejected.va rw-lower (analog lowering): stderr: line 10: old `error[E0337]: net has no declared discipline: `p` has no discipline, so `V` names nothing on it`, new `error: could not compile due to 1 previous error(s)`
-verilog-a/ch04_expressions/correlated_noise.va rw-codegen (run): stderr: line 2: old `noise count got=2 want=2 ok=1`, new `noise count got=0 want=2 ok=0`
 verilog-a/ch04_expressions/cosh.va rw-codegen (display phase): stderr: line 14: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch04_expressions/ddt.va rw-zero (air passes) location: stderr: line 10: old `   |         - an expression of a probe of node `n` is not provably finite`, new `   |         - an expression of parameter `capacitance` is not provably finite`
 verilog-a/ch04_expressions/ddt_abstol_dynamic_rejected.va rw-codegen (codegen) location: stderr: line 2: old `  --> verilog-a/ch04_expressions/ddt_abstol_dynamic_rejected.va:23:33`, new `  --> verilog-a/ch04_expressions/ddt_abstol_dynamic_rejected.va:23:23`
@@ -313,10 +299,10 @@ verilog-a/ch04_expressions/ddt_output_abstol.va rw-lower (analog lowering): stde
 verilog-a/ch04_expressions/ddx.va rw-zero (air passes) location: stderr: line 10: old `   |         - an expression of a probe of node `n` is not provably finite`, new `   |         - a computed expression is not provably finite`
 verilog-a/ch04_expressions/ddx_flow_column_in_eval.va rw-zero (air passes) location: stderr: line 34: old `   |         - an expression of a probe of node `flow(p,n)` is not provably finite`, new `   |         - a computed expression is not provably finite`
 verilog-a/ch04_expressions/ddx_flow_unknown.va rw-zero (air passes) location: stderr: line 8: old `   |         - an expression of a probe of node `flow(p,n)` is not provably finite`, new `   |         - a computed expression is not provably finite`
-verilog-a/ch04_expressions/ddx_in_noise_power.va rw-codegen (codegen): exit status old 0, new 1
+verilog-a/ch04_expressions/ddx_in_noise_power.va rw-zero (air passes) location: stderr: line 22: old `   |     - an expression of a probe of node `n` is not provably finite`, new `   |     - a computed expression is not provably finite`
 verilog-a/ch04_expressions/ddx_runtime_indexed_array_element.va rw-zero (air passes) message: stderr: line 13: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(a,b) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch04_expressions/ddx_two_node_probe_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch04_expressions/ddx_two_node_probe_rejected.va:33:36`, new `  --> verilog-a/ch04_expressions/ddx_two_node_probe_rejected.va:33:17`
-verilog-a/ch04_expressions/diode_noise_sources_in_dc.va rw-codegen (codegen): exit status old 0, new 1
+verilog-a/ch04_expressions/diode_noise_sources_in_dc.va rw-zero (air passes) location: stderr: line 22: old `   |         - an expression of parameter `ef` is not provably finite`, new `   |         - an expression of parameter `n` is not provably finite`
 verilog-a/ch04_expressions/discontinuity_real_degree.va rw-lower (analog lowering): stderr: line 1: old `$discontinuity(-1.0) converts to -1 and vetoes exactly one iteration got=2 want=2 ok=1`, new `$discontinuity(-1.0) converts to -1 and vetoes exactly one iteration got=1 want=2 ok=0`
 verilog-a/ch04_expressions/discontinuity_string_degree_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch04_expressions/discontinuity_string_degree_rejected.va:44:20`, new `  --> verilog-a/ch04_expressions/discontinuity_string_degree_rejected.va:44:5`
 verilog-a/ch04_expressions/divisor_unproven_accepted.va rw-zero (air passes) location: stderr: line 27: old `   |         - an expression of parameter `r` is not provably finite`, new `   |         - a computed expression is not provably finite`
@@ -325,8 +311,7 @@ verilog-a/ch04_expressions/exp.va rw-zero (air passes) message: stderr: line 12:
 verilog-a/ch04_expressions/filter_null_zeros_argument.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch04_expressions/filter_parameter_arrays.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch04_expressions/filter_scalar_coefficient_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0572]: filter coefficient argument is not an array: `laplace_nd()` argument 2 is a scalar`, new `error: verilog-a/ch04_expressions/filter_scalar_coefficient_rejected.va: codegen refused a construct; generated output is not usable`
-verilog-a/ch04_expressions/flicker_noise_topology.va rw-codegen (run): stderr: line 2: old `noise count got=1 want=1 ok=1`, new `noise count got=0 want=1 ok=0`
-verilog-a/ch04_expressions/flicker_psd_frequency.va rw-zero (air passes) location: stderr: line 2: old `noise count got=1 want=1 ok=1`, new `noise count got=0 want=1 ok=0`
+verilog-a/ch04_expressions/flicker_psd_frequency.va rw-zero (air passes) location: stderr: line 22: old `   |         - an expression of a probe of node `n` is not provably finite`, new `   |         - a computed expression is not provably finite`
 verilog-a/ch04_expressions/function_array_inout_pattern.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/function_array_inout_pattern_actual.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/function_array_inout_pattern_size_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0511]: wrong number of arguments to an analog function: `arrayadd()` argument `a` needs 2 elements`, new `error[E0512]: unknown function: a bit or part select of a scalar is not lowered by Sema yet`
@@ -353,10 +338,9 @@ verilog-a/ch04_expressions/idt_assert_release_resumes.va rw-codegen (codegen): e
 verilog-a/ch04_expressions/idt_hold_revert.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch04_expressions/idt_is_a_charge_site.va rw-lower (analog lowering): stderr: line 3: old `qsite[1] got=idtZ241+ nolte want=idtZ241+ nolte ok=1`, new `qsite[1] got=idtZ241+ lte want=idtZ241+ nolte ok=0`
 verilog-a/ch04_expressions/idt_reset_rejected.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch04_expressions/idtmod.va rw-zero (air passes) message: stderr: line 43: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 6 — V(p,n) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(idt$0
+verilog-a/ch04_expressions/idtmod.va rw-zero (air passes) location: stderr: line 48: old `   |         - an expression of a probe of node `flow(p,n)` is not provably finite`, new `   |         - a computed expression is not provably finite`
 verilog-a/ch04_expressions/idtmod_ic_forces_dc_solution.va rw-zero (air passes) location: stderr: line 20: old `   |         - an expression of a probe of node `n` is not provably finite`, new `   |         - a computed expression is not provably finite`
 verilog-a/ch04_expressions/idtmod_modulus_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch04_expressions/idtmod_modulus_rejected.va:28:49`, new `  --> verilog-a/ch04_expressions/idtmod_modulus_rejected.va:28:28`
-verilog-a/ch04_expressions/idtmod_offset_window_negative_integrand.va rw-lower (analog lowering): stderr: line 37: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(idt$0,gnd) — compiles with @setFloatMode(.strict)`
 verilog-a/ch04_expressions/laplace_ac_response.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch04_expressions/laplace_dynamic_coefficient_sampled.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch04_expressions/laplace_filters.va rw-codegen (codegen): exit status old 0, new 1
@@ -388,37 +372,28 @@ verilog-a/ch04_expressions/logical_and.va rw-lower (analog lowering): exit statu
 verilog-a/ch04_expressions/logical_equal.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/logical_not.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/logical_unequal.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch04_expressions/modulo_integer_display_zero.va rw-zero (air passes): stderr: line 2: old `error[E0601]: LRM 4.2.4: integer modulus divisor is zero`, new `Illegal instruction at address 0x120dd6b`
+verilog-a/ch04_expressions/modulo_integer_display_zero.va rw-zero (air passes): stderr: line 2: old `error[E0601]: LRM 4.2.4: integer modulus divisor is zero`, new `Illegal instruction at address 0x120a45b`
 verilog-a/ch04_expressions/modulo_integer_dynamic.va rw-zero (air passes) location: stderr: line 33: old `   |     - an expression of a probe of node `n` is not provably finite`, new `   |               --------- a computed expression is not provably finite`
 verilog-a/ch04_expressions/modulo_integer_dynamic_nonzero.va rw-zero (air passes) location: exit status old 0, new 1
 verilog-a/ch04_expressions/modulo_integer_dynamic_zero.va rw-zero (air passes): stderr: line 1: old `only the nonzero point completes got=          2 want=          2 ok=1`, new `narrow_check FAIL: dres[p]/dx[p]: a unit step moves the row by 1e0, jac_const says 0e0`
-verilog-a/ch04_expressions/modulo_integer_unused_zero.va rw-zero (air passes): stderr: line 2: old `error[E0601]: LRM 4.2.4: integer modulus divisor is zero`, new `Illegal instruction at address 0x120d73b`
-verilog-a/ch04_expressions/modulo_real_dynamic_zero.va rw-zero (air passes): stderr: line 2: old `error[E0601]: LRM 4.2.4: real modulus divisor is zero`, new `Illegal instruction at address 0x11fd394`
-verilog-a/ch04_expressions/noise_anticorrelated_coefficient.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch04_expressions/noise_coefficient_beside_a_loop.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch04_expressions/noise_coefficient_through_a_conditional.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch04_expressions/noise_correlated_scale.va rw-codegen (codegen): exit status old 0, new 1
+verilog-a/ch04_expressions/modulo_integer_unused_zero.va rw-zero (air passes): stderr: line 2: old `error[E0601]: LRM 4.2.4: integer modulus divisor is zero`, new `Illegal instruction at address 0x1209e2b`
+verilog-a/ch04_expressions/modulo_real_dynamic_zero.va rw-zero (air passes): stderr: line 2: old `error[E0601]: LRM 4.2.4: real modulus divisor is zero`, new `Illegal instruction at address 0x11f9a84`
+verilog-a/ch04_expressions/noise_anticorrelated_coefficient.va rw-zero (air passes) location: stderr: line 37: old `   |         - an expression of parameter `pwr` is not provably finite`, new `   |         - an expression of parameter `c1` is not provably finite`
+verilog-a/ch04_expressions/noise_coefficient_beside_a_loop.va rw-zero (air passes) location: stderr: line 23: old `   |         - an expression of a probe of node `b` is not provably finite`, new `   |         - a computed expression is not provably finite`
+verilog-a/ch04_expressions/noise_coefficient_through_a_conditional.va rw-zero (air passes) location: stderr: line 45: old `   |         - an expression of parameter `pwr` is not provably finite`, new `   |         - a computed expression is not provably finite`
+verilog-a/ch04_expressions/noise_correlated_scale.va rw-zero (air passes) location: stderr: line 38: old `    |         - an expression of parameter `pwr` is not provably finite`, new `    |         - an expression of parameter `c1` is not provably finite`
 verilog-a/ch04_expressions/noise_generator_without_branch_rejected.va rw-lower (analog lowering): stderr: line 1: old `error: verilog-a/ch04_expressions/noise_generator_without_branch_rejected.va: codegen refused a construct; generated output is not usable`, new `error[E0512]: unknown function: an access of a name with no node`
-verilog-a/ch04_expressions/noise_kinds_in_ternary.va rw-codegen (run): stderr: line 2: old `noise count got=2 want=2 ok=1`, new `noise count got=0 want=2 ok=0`
-verilog-a/ch04_expressions/noise_psd_beside_a_held_history.va rw-codegen (codegen): exit status old 0, new 1
+verilog-a/ch04_expressions/noise_psd_beside_a_held_history.va rw-zero (air passes) location: stderr: line 22: old `   |         - an expression of a probe of node `n` is not provably finite`, new `   |         - an expression of parameter `R` is not provably finite`
 verilog-a/ch04_expressions/noise_source_inside_array_pattern_argument.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch04_expressions/noise_source_name.va rw-codegen (run): stderr: line 2: old `noise count got=3 want=3 ok=1`, new `noise count got=0 want=3 ok=0`
-verilog-a/ch04_expressions/noise_source_through_variable.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch04_expressions/noise_sources.va rw-codegen (codegen): exit status old 0, new 1
+verilog-a/ch04_expressions/noise_sources.va rw-zero (air passes) location: stderr: line 24: old `   |         - an expression of parameter `resistance` is not provably finite`, new `   |         - a computed expression is not provably finite`
 verilog-a/ch04_expressions/noise_table_array_parameter.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch04_expressions/noise_table_card_knots.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch04_expressions/noise_table_duplicate_frequency_rejected.va rw-lower (analog lowering): exit status old 1, new 0
-verilog-a/ch04_expressions/noise_table_file_input.va rw-codegen (run): stderr: line 2: old `noise count got=1 want=1 ok=1`, new `noise count got=0 want=1 ok=0`
 verilog-a/ch04_expressions/noise_table_file_name_parameter.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch04_expressions/noise_table_file_name_variable_rejected.va rw-lower (analog lowering): stderr: line 2: old `error[E0519]: noise table is not a usable (frequency, power) table: the argument is not a vector of (frequency, power) pairs`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @
-verilog-a/ch04_expressions/noise_table_linear_device.va rw-codegen (run): stderr: line 2: old `noise count got=1 want=1 ok=1`, new `noise count got=0 want=1 ok=0`
-verilog-a/ch04_expressions/noise_table_log_device.va rw-codegen (run): stderr: line 2: old `noise count got=1 want=1 ok=1`, new `noise count got=0 want=1 ok=0`
-verilog-a/ch04_expressions/noise_table_log_topology.va rw-codegen (run): stderr: line 2: old `noise count got=2 want=2 ok=1`, new `noise count got=0 want=2 ok=0`
 verilog-a/ch04_expressions/noise_table_parameter_part_select.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/noise_table_part_select_out_of_range_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0310]: array index is out of bounds: index 7 is outside `tbl[0:5]``, new `error[E0512]: unknown function: `slice` is not lowered by Sema yet`
 verilog-a/ch04_expressions/noise_table_resistor_device.va rw-lower (analog lowering): stderr: line 14: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`
-verilog-a/ch04_expressions/noise_table_sorts_pairs.va rw-codegen (run): stderr: line 2: old `noise count got=1 want=1 ok=1`, new `noise count got=0 want=1 ok=0`
-verilog-a/ch04_expressions/noise_table_topology.va rw-codegen (run): stderr: line 2: old `noise count got=1 want=1 ok=1`, new `noise count got=0 want=1 ok=0`
 verilog-a/ch04_expressions/nonfinite_array_subscript_rejected.va rw-lower (analog lowering): exit status old 1, new 0
 verilog-a/ch04_expressions/operator_in_case_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = help: hoist `transition(...)` onto the spine and make only its USE conditional`, new `   = help: run `vera --explain E0514` for a detailed explanation`
 verilog-a/ch04_expressions/operator_in_conditional.va rw-lower (analog lowering) notes: stderr: line 8: old `   = help: hoist `transition(...)` onto the spine and make only its USE conditional`, new `   = help: run `vera --explain E0514` for a detailed explanation`
@@ -430,7 +405,7 @@ verilog-a/ch04_expressions/operator_in_while.va rw-lower (analog lowering) notes
 verilog-a/ch04_expressions/operator_missing_mandatory_argument.va rw-lower (analog lowering): stderr: line 1: old `error[E0505]: analog operator does not accept an empty argument: `ddt()` needs 1 argument(s), got 0`, new `error[E0506]: wrong number of arguments to a math function or analog operator: `ddt` takes 1 to 2, given 0`
 verilog-a/ch04_expressions/own_expm1_function_warns.va rw-codegen (run): stderr: line 12: old `warning[W0259]: a VAMS-2023 math function name declared as a function: `expm1` is a built-in under "VAMS-2023"; calls in this file reach the declared function`, new ``
 verilog-a/ch04_expressions/partial_slice_assignment.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch04_expressions/partially_correlated_noise.va rw-codegen (codegen): exit status old 0, new 1
+verilog-a/ch04_expressions/partially_correlated_noise.va rw-codegen (run): stderr: line 4: old `noise[1] got=thermal(flowZ28aZ2cbZ29,flowZ28aZ2cbZ29)#1 want=thermal(flowZ28aZ2cbZ29,flowZ28aZ2cbZ29)#1 ok=1`, new `noise[1] got=thermal(b,c)#1 want=thermal(flowZ28aZ2cbZ29,flowZ28aZ2cbZ29)#1 ok=0`
 verilog-a/ch04_expressions/port_access_bus_genvar_index.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch04_expressions/port_access_bus_variable_index_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0352]: vector index is not a constant inside the declared range: index into `pb` is not a constant expression`, new `error[E0512]: unknown function: a port access of an instance's port (`<u.p>`) is not lowered by Sema yet`
 verilog-a/ch04_expressions/port_access_lhs_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0407]: port access function cannot be a contribution target`, new `error[E0407]: port access function cannot be a contribution target: a contribution to a port access`
@@ -440,8 +415,8 @@ verilog-a/ch04_expressions/pow_even_exponent_accepted.va rw-zero (air passes) lo
 verilog-a/ch04_expressions/pow_negative_base_runtime_exponent.va rw-zero (air passes) location: stderr: line 19: old `   |         - an expression of a probe of node `q` is not provably finite`, new `   |         - a computed expression is not provably finite`
 verilog-a/ch04_expressions/pow_parameter_derivative.va rw-zero (air passes) location: stderr: line 29: old `   |         - an expression of a probe of node `n` is not provably finite`, new `   |         - a computed expression is not provably finite`
 verilog-a/ch04_expressions/power_operator.va rw-zero (air passes) message: stderr: line 12: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
-verilog-a/ch04_expressions/psd_bias_dependent.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch04_expressions/psd_white_flicker_export.va rw-codegen (codegen): exit status old 0, new 1
+verilog-a/ch04_expressions/psd_bias_dependent.va rw-zero (air passes) location: stderr: line 28: old `    |         - an expression of parameter `ef` is not provably finite`, new `    |         - a computed expression is not provably finite`
+verilog-a/ch04_expressions/psd_white_flicker_export.va rw-zero (air passes) location: stderr: line 26: old `   |         - an expression of parameter `kf` is not provably finite`, new `   |         - an expression of parameter `R` is not provably finite`
 verilog-a/ch04_expressions/punctured_divisor_accepted.va rw-zero (air passes) location: stderr: line 19: old `   |         - an expression of a probe of node `n` is not provably finite`, new `   |         - a computed expression is not provably finite`
 verilog-a/ch04_expressions/rc_88_operator_outside_event.va rw-codegen (run): exit status old 0, new 1
 verilog-a/ch04_expressions/reduction_on_real_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0319]: reduction operator requires an integer operand: got a real`, new `error[E0348]: reduction operators cannot be used inside the analog block`
@@ -477,13 +452,12 @@ verilog-a/ch04_expressions/sinh.va rw-codegen (display phase): stderr: line 14: 
 verilog-a/ch04_expressions/slew.va rw-zero (air passes) location: stderr: line 48: old `   |         - an expression of a probe of node `n` is not provably finite`, new `   |         - a computed expression is not provably finite`
 verilog-a/ch04_expressions/slew_rate_sign_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch04_expressions/slew_rate_sign_rejected.va:36:39`, new `  --> verilog-a/ch04_expressions/slew_rate_sign_rejected.va:36:25`
 verilog-a/ch04_expressions/slice_index_is_dynamic.va rw-lower (analog lowering): exit status old 0, new 1
-verilog-a/ch04_expressions/small_signal_linearization.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch04_expressions/spice_noise_rc_white.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch04_expressions/spice_noise_series_resistor.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch04_expressions/spice_noise_shared_pair.va rw-codegen (codegen): exit status old 0, new 1
+verilog-a/ch04_expressions/small_signal_linearization.va rw-zero (air passes) location: stderr: line 22: old `    |         - an expression of a probe of node `c` is not provably finite`, new `    |         - a computed expression is not provably finite`
+verilog-a/ch04_expressions/spice_noise_rc_white.va rw-zero (air passes) location: stderr: line 28: old `   |         - an expression of parameter `pwr` is not provably finite`, new `   |         - a computed expression is not provably finite`
+verilog-a/ch04_expressions/spice_noise_series_resistor.va rw-zero (air passes) location: stderr: line 24: old `   |         - an expression of parameter `pwr` is not provably finite`, new `   |         - an expression of parameter `r` is not provably finite`
+verilog-a/ch04_expressions/spice_noise_shared_pair.va rw-zero (air passes) location: stderr: line 35: old `   |         - an expression of parameter `pwr` is not provably finite`, new `   |         - an expression of parameter `c1` is not provably finite`
 verilog-a/ch04_expressions/standard_math_system.va rw-zero (air passes) message: stderr: line 13: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch04_expressions/standard_math_traditional.va rw-zero (air passes) message: stderr: line 16: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
-verilog-a/ch04_expressions/status_site_beside_noise.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch04_expressions/tan.va rw-zero (air passes) location: stderr: line 17: old `   |         ^ a computed expression is not provably finite`, new `   |         ^`
 verilog-a/ch04_expressions/transcendental_domain_runtime_error.va rw-zero (air passes): exit status old 1, new 0
 verilog-a/ch04_expressions/transcendental_math.va rw-zero (air passes) location: stderr: line 17: old `   |         - an expression of a probe of node `n` is not provably finite`, new `   |         - a computed expression is not provably finite`
@@ -495,9 +469,8 @@ verilog-a/ch04_expressions/transition_interrupted_rising_higher.va rw-zero (air 
 verilog-a/ch04_expressions/transition_negative_time_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0516]: analog operator argument is outside the range the LRM allows: `transition()` argument `td` shall be non-negative, got -0.000000001`, new `error[E0516]: analog operator argument is outside the range the LRM allows: `transition()` 
 verilog-a/ch04_expressions/transition_six_arguments_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0506]: wrong number of arguments to a math function or analog operator: `transition()` takes at most 5 argument(s), got 6 (A.8.2)`, new `error[E0506]: wrong number of arguments to a math function or analog operator: `transition` takes 1
 verilog-a/ch04_expressions/transition_transport_delay.va rw-zero (air passes) location: stderr: line 20: old `   |         - an expression of a probe of node `n` is not provably finite`, new `   |         - a computed expression is not provably finite`
-verilog-a/ch04_expressions/white_noise_declaration_initializer.va rw-zero (air passes) location: stderr: line 2: old `noise count got=2 want=2 ok=1`, new `noise count got=0 want=2 ok=0`
+verilog-a/ch04_expressions/white_noise_declaration_initializer.va rw-zero (air passes) location: stderr: line 2: old `noise count got=2 want=2 ok=1`, new `noise count got=1 want=2 ok=0`
 verilog-a/ch04_expressions/white_noise_numeric_label_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch04_expressions/white_noise_numeric_label_rejected.va:24:79`, new `  --> verilog-a/ch04_expressions/white_noise_numeric_label_rejected.va:24:38`
-verilog-a/ch04_expressions/white_noise_topology.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch04_expressions/wrong_discipline_access.va rw-lower (analog lowering) notes: stderr: line 8: old `   = help: did you mean `CustomV`?`, new `   = help: run `vera --explain E0501` for a detailed explanation`
 verilog-a/ch04_expressions/z_filter_period_rejected.va rw-codegen (codegen): stderr: line 2: old `error[E0540]: filter root or coefficient vector violates a Laplace or Z-transform filter rule: LRM 4.5.12: the sampling period T of a zi_* filter shall be posit`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 
 verilog-a/ch04_expressions/z_filter_zero_transition_branch_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0518]: a zero-transition-time Z-filter cannot be contributed to a branch: a Z-filter with zero (0) transition time shall not be directly assigned to a br`, new `error: verilog-a/ch04_expressions/z_filter_zero_transition_branch_rejected.va: code
@@ -588,7 +561,7 @@ verilog-a/ch05_analog_behavior/event_or.va rw-codegen (run): exit status old 0, 
 verilog-a/ch05_analog_behavior/event_timer.va rw-codegen (run): exit status old 0, new 1
 verilog-a/ch05_analog_behavior/event_timer_enable.va rw-codegen (run): exit status old 0, new 1
 verilog-a/ch05_analog_behavior/event_timer_one_shot.va rw-codegen (run): exit status old 0, new 1
-verilog-a/ch05_analog_behavior/final_step.va rw-zero (air passes) location: stderr: line 11: old `28 |     I(p) <+ x + V(p);`, new `25 |     @(final_step) x = V(p);`
+verilog-a/ch05_analog_behavior/final_step.va rw-zero (air passes) message: stderr: line 8: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,gnd) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch05_analog_behavior/final_step_on_finish.va rw-lower (analog lowering): stderr: line 6: old `$finish: t=0 (ch05_final_step_on_finish)`, new `  res[p] = 0.000000e0`
 verilog-a/ch05_analog_behavior/for_zero_iterations.va rw-zero (air passes) message: stderr: line 8: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,gnd) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch05_analog_behavior/function_locals_have_no_lifetime.va rw-codegen (run): exit status old 0, new 1
@@ -616,9 +589,8 @@ verilog-a/ch05_analog_behavior/indirect_contribution.va rw-codegen (codegen): ex
 verilog-a/ch05_analog_behavior/indirect_equation_lhs_invalid.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch05_analog_behavior/indirect_equation_lhs_invalid.va:20:12`, new `  --> verilog-a/ch05_analog_behavior/indirect_equation_lhs_invalid.va:20:5`
 verilog-a/ch05_analog_behavior/indirect_under_parameter_condition.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-a/ch05_analog_behavior/inductor_dc_short.va rw-lower (analog lowering): stderr: line 23: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(src,l0) — compiles with @setFloatMode(.strict)`
-verilog-a/ch05_analog_behavior/initial_final_analysis_lists.va rw-zero (air passes) location: stderr: line 9: old `20 |     I(p) <+ state + 0.0 * V(p);`, new `18 |     @(final_step("tran", "noise")) state = 0.0;`
-verilog-a/ch05_analog_behavior/initial_step.va rw-zero (air passes) location: stderr: line 9: old `15 |     I(p) <+ x + 0.0*V(p);`, new `13 |     @(initial_step) x = 1.0;`
-verilog-a/ch05_analog_behavior/initial_step_unknown_analysis.va rw-lower (analog lowering): stderr: line 29: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,gnd) — compiles with @setFloatMode(.strict)`
+verilog-a/ch05_analog_behavior/initial_final_analysis_lists.va rw-zero (air passes) message: stderr: line 6: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,gnd) — compiles with @setFloatMode(.strict)`, new ``
+verilog-a/ch05_analog_behavior/initial_step.va rw-zero (air passes) message: stderr: line 6: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,gnd) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch05_analog_behavior/jump_continue.va rw-zero (air passes) location: stderr: line 10: old `   |     ^ a computed expression is not provably finite`, new `   |     ^`
 verilog-a/ch05_analog_behavior/jump_in_function_binds_function_loop.va rw-zero (air passes) location: stderr: line 9: old `48 |         I(p) <+ acc * 1.0e-6;`, new `32 |             while (i < 100) begin`
 verilog-a/ch05_analog_behavior/jump_in_function_outside_loop_invalid.va rw-lower (analog lowering): stderr: line 1: old `error[E0404]: `break` or `continue` outside a loop: `break``, new `error[E0512]: unknown function: `break` outside a loop`
@@ -754,15 +726,10 @@ verilog-a/ch06_hierarchy/instance_array_unsupported.va rw-zero (air passes) loca
 verilog-a/ch06_hierarchy/local_scope_variable_shadows_parameter.va rw-zero (air passes) location: stderr: line 13: old `   |     - an expression of a probe of node `p` is not provably finite`, new `   |     - an expression of parameter `k` is not provably finite`
 verilog-a/ch06_hierarchy/localparam_dependency.va rw-zero (air passes) location: stderr: line 12: old `   |     - an expression of a probe of node `p` is not provably finite`, new `   |     - an expression of parameter `doubled` is not provably finite`
 verilog-a/ch06_hierarchy/macromodule_unsupported.va rw-zero (air passes) location: stderr: line 13: old `   |     - an expression of a probe of node `p` is not provably finite`, new `   |     - an expression of parameter `gain` is not provably finite`
-verilog-a/ch06_hierarchy/mfactor.va rw-lower (analog lowering): stderr: line 7: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,gnd) — compiles with @setFloatMode(.strict)`
 verilog-a/ch06_hierarchy/mfactor_conditional_only.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch06_hierarchy/mfactor_divides_a_flow_probe.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch06_hierarchy/mfactor_divides_named_branch_potential_noise_power.va rw-codegen (run): stderr: line 2: old `noise count got=1 want=1 ok=1`, new `noise count got=0 want=1 ok=0`
-verilog-a/ch06_hierarchy/mfactor_divides_potential_noise_power.va rw-codegen (run): stderr: line 2: old `noise count got=1 want=1 ok=1`, new `noise count got=0 want=1 ok=0`
 verilog-a/ch06_hierarchy/mfactor_double_scaling_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0912]: flow contribution scaled by $mfactor twice: this flow contribution multiplies by `$mfactor``, new `error[E0912]: flow contribution scaled by $mfactor twice: this flow contribution multiplies by `$mfactor`, which every flow contri
 verilog-a/ch06_hierarchy/mfactor_multiplies_a_flow_contribution.va rw-lower (analog lowering): stderr: line 21: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(n,x) — compiles with @setFloatMode(.strict)`
-verilog-a/ch06_hierarchy/mfactor_multiplies_flow_noise_power.va rw-codegen (run): stderr: line 2: old `noise count got=1 want=1 ok=1`, new `noise count got=0 want=1 ok=0`
-verilog-a/ch06_hierarchy/mfactor_multiplies_named_branch_flow_noise_power.va rw-codegen (run): stderr: line 2: old `noise count got=1 want=1 ok=1`, new `noise count got=0 want=1 ok=0`
 verilog-a/ch06_hierarchy/mfactor_scales_named_branch_flow.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch06_hierarchy/module_instantiation_unsupported.va rw-zero (air passes) location: stderr: line 21: old `   |     - an expression of a probe of node `n` is not provably finite`, new `   |     - an expression of parameter `u.gain` is not provably finite`
 verilog-a/ch06_hierarchy/multiple_instances_unsupported.va rw-zero (air passes) location: stderr: line 22: old `   |     - an expression of a probe of node `p` is not provably finite`, new `   |     - an expression of parameter `second.gain` is not provably finite`
@@ -860,10 +827,8 @@ verilog-a/ch08_scheduling/cross_wakeup.va rw-codegen (run): exit status old 0, n
 verilog-a/ch08_scheduling/elaboration_parameter_sweep.va rw-zero (air passes) location: stderr: line 14: old `   |     - an expression of a probe of node `p` is not provably finite`, new `   |     - a computed expression is not provably finite`
 verilog-a/ch08_scheduling/event_state.va rw-codegen (run): exit status old 0, new 1
 verilog-a/ch08_scheduling/explicit_guard.va rw-codegen (run): exit status old 0, new 1
-verilog-a/ch08_scheduling/integrator_state.va rw-lower (analog lowering): stderr: line 33: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(idt$0,gnd) — compiles with @setFloatMode(.strict)`
 verilog-a/ch08_scheduling/nonlinear_safe.va rw-zero (air passes) location: stderr: line 19: old `   |     - an expression of a probe of node `n` is not provably finite`, new `   |     - an expression of parameter `scale` is not provably finite`
 verilog-a/ch08_scheduling/timer_wakeup.va rw-codegen (run): exit status old 0, new 1
-verilog-a/ch09_system_tasks/abstime.va rw-lower (analog lowering): stderr: line 9: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`
 verilog-a/ch09_system_tasks/acos.va rw-zero (air passes) message: stderr: line 12: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch09_system_tasks/acosh.va rw-zero (air passes) message: stderr: line 14: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch09_system_tasks/analog_decimal_is_auto_sized.va rw-codegen (codegen): exit status old 0, new 1
@@ -885,7 +850,6 @@ verilog-a/ch09_system_tasks/bitstoreal.va rw-zero (air passes) location: stderr:
 verilog-a/ch09_system_tasks/bound_step.va rw-lower (analog lowering): stderr: line 10: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`
 verilog-a/ch09_system_tasks/bound_step_negative_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/bound_step_negative_rejected.va:22:17`, new `  --> verilog-a/ch09_system_tasks/bound_step_negative_rejected.va:22:5`
 verilog-a/ch09_system_tasks/ceil.va rw-zero (air passes) message: stderr: line 13: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
-verilog-a/ch09_system_tasks/clog2.va rw-lower (analog lowering): stderr: line 13: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`
 verilog-a/ch09_system_tasks/clog2_nested_contexts.va rw-codegen (run): stderr: line 3: old `folded narrow intermediate got=          4 want=          4 ok=1`, new `folded narrow intermediate got=          2 want=          4 ok=0`
 verilog-a/ch09_system_tasks/clog2_unsigned_width.va rw-lower (analog lowering): stderr: line 19: old `dependent default follows signed override got=         32 want=         32 ok=1`, new `dependent default follows signed override got=          3 want=         32 ok=0`
 verilog-a/ch09_system_tasks/conversion_functions.va rw-zero (air passes) location: stderr: line 14: old `   |     - an expression of a probe of node `n` is not provably finite`, new `   |     - a computed expression is not provably finite`
@@ -946,7 +910,7 @@ verilog-a/ch09_system_tasks/file_output_real_descriptor_rejected.va rw-lower (an
 verilog-a/ch09_system_tasks/file_position_status.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch09_system_tasks/file_read_scan.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch09_system_tasks/finish_in_rejected_iteration_has_no_effect.va rw-lower (analog lowering): stderr: line 5: old `the accepted vector is the iterate after the vetoed one got=2 want=2 ok=1`, new `the accepted vector is the iterate after the vetoed one got=1 want=2 ok=0`
-verilog-a/ch09_system_tasks/finish_terminates.va rw-lower (analog lowering): stderr: line 6: old `$finish: p=1 memory=16156 kB cpu=0.001 s (ch09_finish_terminates)`, new `  res[p] = 1.000000e0`
+verilog-a/ch09_system_tasks/finish_terminates.va rw-lower (analog lowering): stderr: line 6: old `$finish: p=1 memory=16016 kB cpu=0.001 s (ch09_finish_terminates)`, new `  res[p] = 1.000000e0`
 verilog-a/ch09_system_tasks/finish_two_arguments_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0887]: wrong number of arguments to a system task or function: `$finish` takes at most 1 argument, got 2`, new `error[E0887]: wrong number of arguments to a system task or function: `$finish` takes 0 to 1 arguments, got 2`
 verilog-a/ch09_system_tasks/floor.va rw-zero (air passes) message: stderr: line 13: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch09_system_tasks/fmonitor.va rw-codegen (codegen): exit status old 0, new 1
@@ -1009,9 +973,8 @@ verilog-a/ch09_system_tasks/math_2023.va rw-zero (air passes) location: stderr: 
 verilog-a/ch09_system_tasks/math_binary.va rw-zero (air passes) message: stderr: line 18: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch09_system_tasks/math_system_function_arity_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0506]: wrong number of arguments to a math function or analog operator: `$pow()` takes 2`, new `error[E0506]: wrong number of arguments to a math function or analog operator: `$pow` takes 2 to 2, given 1`
 verilog-a/ch09_system_tasks/math_trig.va rw-zero (air passes) location: stderr: line 20: old `   |     - an expression of a probe of node `n` is not provably finite`, new `   |     - a computed expression is not provably finite`
-verilog-a/ch09_system_tasks/math_unary.va rw-zero (air passes) location: stderr: line 15: old `   |     - an expression of a probe of node `n` is not provably finite`, new `   |     - a computed expression is not provably finite`
+verilog-a/ch09_system_tasks/math_unary.va rw-zero (air passes) message: stderr: line 10: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
 verilog-a/ch09_system_tasks/mcd_channels_exhausted_at_bit_31.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch09_system_tasks/mfactor.va rw-lower (analog lowering): stderr: line 12: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`
 verilog-a/ch09_system_tasks/monitor_ignores_abstime.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch09_system_tasks/monitor_reports_every_change.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch09_system_tasks/monitor_suppresses_an_unchanged_step.va rw-codegen (codegen): exit status old 0, new 1
@@ -1062,7 +1025,6 @@ verilog-a/ch09_system_tasks/real_hash_flag_e_always_prints_the_point.va rw-codeg
 verilog-a/ch09_system_tasks/real_hash_flag_f_always_prints_the_point.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch09_system_tasks/real_hash_flag_g_keeps_trailing_zeros.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch09_system_tasks/real_hash_flag_string_operand_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-a/ch09_system_tasks/real_hash_flag_string_operand_rejected.va:27:23`, new `  --> verilog-a/ch09_system_tasks/real_hash_flag_string_operand_rejected.va:27:5`
-verilog-a/ch09_system_tasks/realtobits.va rw-lower (analog lowering): stderr: line 13: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`
 verilog-a/ch09_system_tasks/receiver_count_outside_connectmodule_rejected.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: §9.22: "Driver access functions can only be called from connect modules." This is a `module``, new `   = help: run `vera --explain E0818` for a detailed explanation`
 verilog-a/ch09_system_tasks/reject_9_16_simprobe_unresolved_without_fallback.va rw-lower (analog lowering) notes: stderr: line 8: old `   = note: §9.16: with no third argument, an unresolvable probe "shall generate an error"`, new `   = help: run `vera --explain E0817` for a detailed explanation`
 verilog-a/ch09_system_tasks/reject_9_21_2_control_substring_too_long.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0815]: $table_model data source or control string: `1LLL`: a control sub-string carries at most 2 extrapolation characters`, new `error[E0815]: $table_model data source or control string: a control sub-string carries at most 2 extrapola
@@ -1142,7 +1104,6 @@ verilog-a/ch09_system_tasks/table_snapshot_function.va rw-lower (analog lowering
 verilog-a/ch09_system_tasks/table_snapshot_per_instance.va rw-zero (air passes) location: stderr: line 36: old `   |     - an expression of parameter `la.k` is not provably finite`, new `   |     - a computed expression is not provably finite`
 verilog-a/ch09_system_tasks/tan.va rw-zero (air passes) location: stderr: line 17: old `   |     - an expression of a probe of node `n` is not provably finite`, new `   |     - a computed expression is not provably finite`
 verilog-a/ch09_system_tasks/tanh.va rw-zero (air passes) message: stderr: line 14: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`, new ``
-verilog-a/ch09_system_tasks/temperature.va rw-lower (analog lowering): stderr: line 13: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`
 verilog-a/ch09_system_tasks/temperature_vt.va rw-lower (analog lowering): stderr: line 10: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`
 verilog-a/ch09_system_tasks/test_plusargs.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch09_system_tasks/top_port_connected_controls_ddt.va rw-codegen (codegen): exit status old 0, new 1
@@ -1150,8 +1111,6 @@ verilog-a/ch09_system_tasks/two_instances_hold_distinct_channels.va rw-codegen (
 verilog-a/ch09_system_tasks/value_plusargs.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch09_system_tasks/value_plusargs_without_variable_rejected.va rw-lower (analog lowering) message: stderr: line 1: old `error[E0887]: wrong number of arguments to a system task or function: `$value$plusargs` takes 2 arguments, got 1`, new `error[E0887]: wrong number of arguments to a system task or function: `$value$plusargs` takes 2 to 2 arguments, got 1`
 verilog-a/ch09_system_tasks/vflip.va rw-zero (air passes) location: stderr: line 17: old `   |     - an expression of a probe of node `n` is not provably finite`, new `   |     - a computed expression is not provably finite`
-verilog-a/ch09_system_tasks/vt_ambient.va rw-lower (analog lowering): stderr: line 13: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`
-verilog-a/ch09_system_tasks/vt_temperature.va rw-lower (analog lowering): stderr: line 13: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,n) — compiles with @setFloatMode(.strict)`
 verilog-a/ch09_system_tasks/warning.va rw-lower (analog lowering): stderr: line 6: old `WARNING: t=0 voltage=1.5`, new `WARNING: voltage=1.5`
 verilog-a/ch09_system_tasks/write_mode_path_65_opens.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/ch09_system_tasks/write_mode_reopen_appends_across_analyses.va rw-codegen (codegen): exit status old 0, new 1
@@ -1159,7 +1118,7 @@ verilog-a/ch09_system_tasks/xposition.va rw-zero (air passes) location: stderr: 
 verilog-a/ch09_system_tasks/yposition.va rw-zero (air passes) location: stderr: line 17: old `   |     - an expression of a probe of node `n` is not provably finite`, new `   |     - a computed expression is not provably finite`
 verilog-a/ch10_directives/compact_modeling_extension_set.va rw-codegen (run): exit status old 0, new 1
 verilog-a/ch10_directives/compact_modeling_macro_implies_its_extensions.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/ch10_directives/compact_modeling_nonlin_res_example.va rw-codegen (codegen): exit status old 0, new 1
+verilog-a/ch10_directives/compact_modeling_nonlin_res_example.va rw-zero (air passes) location: stderr: line 23: old `   |     - an expression of a probe of node `b` is not provably finite`, new `   |     - a computed expression is not provably finite`
 verilog-a/ch10_directives/default_nettype_crosses_a_file_boundary.va rw-lower (analog lowering): exit status old 1, new 0
 verilog-a/ch10_directives/default_nettype_none_rejects_an_implicit_net.va rw-lower (analog lowering): exit status old 1, new 0
 verilog-a/ch10_directives/default_nettype_none_rejects_an_undeclared_probe.va rw-lower (analog lowering): stderr: line 1: old `error[E0367]: implicit net under `default_nettype none: `floating` was never declared, and `default_nettype none is in force`, new `error[E0512]: unknown function: an access of a name with no node`
@@ -1195,7 +1154,7 @@ verilog-a/exhaustive/ddx_derivative.va rw-zero (air passes) location: stderr: li
 verilog-a/exhaustive/diode.va rw-zero (air passes) location: stderr: line 31: old `   |     - an expression of a probe of node `c` is not provably finite`, new `   |     - an expression of parameter `is` is not provably finite`
 verilog-a/exhaustive/display_formats.va rw-lower (analog lowering): stderr: line 8: old `int   %h  -> 0000002a`, new `int   %h  -> 2a`
 verilog-a/exhaustive/event_hold.va rw-codegen (codegen): exit status old 0, new 1
-verilog-a/exhaustive/idt_integral.va rw-zero (air passes) location: stderr: line 26: old `   |     --- an expression of parameter `k` is not provably finite`, new `   |     --- a computed expression is not provably finite`
+verilog-a/exhaustive/idt_integral.va rw-zero (air passes) message: stderr: line 33: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 1 — I(idt$1,gnd) — compiles with @setFloatMode(.strict)`, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 2 — I
 verilog-a/exhaustive/indirect_contribution.va rw-codegen (codegen): exit status old 0, new 1
 verilog-a/exhaustive/internal_node.va rw-lower (analog lowering): stderr: line 34: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,mid) — compiles with @setFloatMode(.strict)`
 verilog-a/exhaustive/laplace_dc_gain.va rw-codegen (codegen): exit status old 0, new 1
@@ -1245,7 +1204,7 @@ verilog-ams/annex_a_syntax/timing_checks_unsupported.va rw-codegen (run): stderr
 verilog-ams/annex_a_syntax/udp_declared_and_instantiated.va rw-codegen (run): stderr: line 45: old `warning[W0252]: gate primitive accepted, and it computes nothing: b8_udp_mux primitive`, new `warning[W0252]: gate primitive accepted, and it computes nothing: `b8_udp_dff` primitive`
 verilog-ams/annex_a_syntax/udp_instantiation_unsupported.va rw-codegen (run): stderr: line 16: old `warning[W0252]: gate primitive accepted, and it computes nothing: annex_a_udp_pulse primitive`, new ``
 verilog-ams/annex_c_analog_subset/digital_event_control_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-ams/annex_c_analog_subset/digital_event_control_rejected.va:51:11`, new `  --> verilog-ams/annex_c_analog_subset/digital_event_control_rejected.va:51:9`
-verilog-ams/annex_c_analog_subset/named_event_in_subset.va rw-zero (air passes) location: stderr: line 9: old `69 |         I(p) <+ 1m * seen;`, new `66 |         @(initial_step) -> tick;`
+verilog-ams/annex_c_analog_subset/named_event_in_subset.va rw-zero (air passes) message: stderr: line 6: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,gnd) — compiles with @setFloatMode(.strict)`, new ``
 verilog-ams/annex_c_analog_subset/real_value_inout_port_accepted.va rw-lower (analog lowering): stderr: line 4: old `§6.5.3 an `inout wreal` port carries the child's driver got=2.25 want=2.25 ok=1`, new `  x[uZ2ep] = 0.000000e0`
 verilog-ams/annex_c_analog_subset/real_value_output_port_accepted.va rw-lower (analog lowering): stderr: line 4: old `§6.5.3 an `output wreal` port delivers the child's driver got=-1.5 want=-1.5 ok=1`, new `  x[uZ2ep] = 0.000000e0`
 verilog-ams/annex_c_analog_subset/real_value_port_accepted.va rw-lower (analog lowering): exit status old 0, new 1
@@ -1283,7 +1242,7 @@ verilog-ams/ch05_analog_behavior/cross_expr_tol_and_time_tol_both_hold.va rw-cod
 verilog-ams/ch05_analog_behavior/event_array_index_change_is_not_an_event.va rw-codegen (run): exit status old 0, new 1
 verilog-ams/ch05_analog_behavior/multiple_analog_initial_blocks_concatenate.va rw-codegen (codegen): exit status old 0, new 1
 verilog-ams/ch05_analog_behavior/named_event_has_no_time_duration.va rw-codegen (run): exit status old 0, new 1
-verilog-ams/ch05_analog_behavior/named_event_unsupported.va rw-zero (air passes) location: stderr: line 9: old `36 |     I(p) <+ 1m * seen;`, new `33 |     @(initial_step) -> tick;`
+verilog-ams/ch05_analog_behavior/named_event_unsupported.va rw-zero (air passes) message: stderr: line 6: old `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — I(p,gnd) — compiles with @setFloatMode(.strict)`, new ``
 verilog-ams/ch05_analog_behavior/node_alias_reevaluated_when_a_parameter_changes.va rw-lower (analog lowering): exit status old 0, new 1
 verilog-ams/ch06_hierarchy/connect_insertion_follows_paramset_selection.va rw-lower (analog lowering): stderr: line 13: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 1 — I(a,gnd) — compiles with @setFloatMode(.strict)`
 verilog-ams/ch06_hierarchy/digital_port_expression_actual.va rw-lower (analog lowering): exit status old 0, new 1
@@ -1326,7 +1285,6 @@ verilog-ams/ch07_mixed_signal/continuous_net_resolution_modes_agree.va rw-lower 
 verilog-ams/ch07_mixed_signal/continuous_variable_read_from_digital.va rw-codegen (codegen): exit status old 0, new 1
 verilog-ams/ch07_mixed_signal/contribution_under_a_digital_event_rejected.va rw-lower (analog lowering): stderr: line 1: old `error[E0406]: contribution inside an event statement`, new `error[E0704]: posedge/negedge is digital-only`
 verilog-ams/ch07_mixed_signal/cross_direction_in_digital_event_control_rejected.va rw-lower (analog lowering) location: stderr: line 2: old `  --> verilog-ams/ch07_mixed_signal/cross_direction_in_digital_event_control_rejected.va:43:25`, new `  --> verilog-ams/ch07_mixed_signal/cross_direction_in_digital_event_control_rejected.va:43:7`
-verilog-ams/ch07_mixed_signal/cross_time_tol_below_time_resolution.va rw-lower (analog lowering): stderr: line 388: old ``, new `warning[W0650]: unit is not provably finite, so it compiles in strict float mode: unit 0 — V(vo,gnd) — compiles with @setFloatMode(.strict)`
 verilog-ams/ch07_mixed_signal/ddiscrete_net_continuously_assigned.va rw-lower (analog lowering): stderr: line 4: old `Table 7-1: a ddiscrete bus assigned 4'b1100 reads as the integer 12 got=         12 want=         12 ok=1`, new `Table 7-1: a ddiscrete bus assigned 4'b1100 reads as the integer 12 got=12 want=         12 ok=1`
 verilog-ams/ch07_mixed_signal/digital_function_from_analog_rejected.va rw-codegen (display phase): stderr: line 4: old `59 |   function real dig_helper(input real x);`, new `66 |     y = dig_helper(V(p));`
 verilog-ams/ch07_mixed_signal/digital_function_from_analog_unsupported.va rw-codegen (display phase): stderr: line 4: old `30 |   function real digital_scale;`, new `34 |   analog I(p) <+ digital_scale(V(p));`
@@ -1539,7 +1497,7 @@ verilog-ams/ch12_vpi_routines/printf_log.c not built: backend vpi
 verilog-ams/ch12_vpi_routines/pulse_limits.c not built: backend vpi
 verilog-ams/ch12_vpi_routines/pulse_retain.c not built: backend vpi
 verilog-ams/ch12_vpi_routines/ramp_load.va rw-codegen (codegen): exit status old 0, new 1
-verilog-ams/ch12_vpi_routines/rc_ac.va rw-codegen (codegen): exit status old 0, new 1
+verilog-ams/ch12_vpi_routines/rc_ac.va rw-zero (air passes) location: stderr: line 16: old `   |`, new `    |`
 verilog-ams/ch12_vpi_routines/reactive_branch_flow.c not built: backend vpi
 verilog-ams/ch12_vpi_routines/readwrite_inactive.c not built: backend vpi
 verilog-ams/ch12_vpi_routines/registration_roundtrip.c not built: backend vpi
@@ -1572,7 +1530,7 @@ verilog/03_lexical_conventions/forward_reference_reg_rejected.v rw-dlower (run):
 verilog/08_udp/definition_inside_module_rejected.v rw-comp (astgen): stderr: line 10: old `error[E0206]: identifier is not a port of this module: `q``, new `error[E0205]: unsupported module item: found table`
 verilog/09_behavioral_modeling/forever_without_timing_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/09_behavioral_modeling/forever_without_timing_rejected.v:20:1`, new `  --> verilog/09_behavioral_modeling/forever_without_timing_rejected.v:22:21`
 verilog/09_behavioral_modeling/zero_delay_always_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/09_behavioral_modeling/zero_delay_always_rejected.v:14:1`, new `  --> verilog/09_behavioral_modeling/zero_delay_always_rejected.v:19:15`
-verilog/10_tasks_functions/recursion_without_end_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: nesting here exhausts the 1987 MiB stack VerA reserved for it`, new `error[E1100]: digital source execution failed: nesting here exhausts the 1024 MiB stack VerA reserved for it`
+verilog/10_tasks_functions/recursion_without_end_rejected.v rw-dlower (digital lowering) message: stderr: line 1: old `error[E1100]: digital source execution failed: nesting here exhausts the 971 MiB stack VerA reserved for it`, new `error[E1100]: digital source execution failed: nesting here exhausts the 1024 MiB stack VerA reserved for it`
 verilog/11_scheduling/zero_delay_loop_rejected.v rw-dlower (digital lowering) location: stderr: line 2: old `  --> verilog/11_scheduling/zero_delay_loop_rejected.v:16:1`, new `  --> verilog/11_scheduling/zero_delay_loop_rejected.v:19:10`
 verilog/17_system_tasks/native_sformat_dynamic.v rw-dlower (run) location: stderr: line 11: old `  --> verilog/17_system_tasks/native_sformat_dynamic.v:31:22`, new `  --> verilog/17_system_tasks/native_sformat_dynamic.v:31:17`
 verilog/17_system_tasks/sformat_excess_argument_warning.v rw-dlower (run) location: stderr: line 2: old `  --> verilog/17_system_tasks/sformat_excess_argument_warning.v:20:25`, new `  --> verilog/17_system_tasks/sformat_excess_argument_warning.v:20:17`

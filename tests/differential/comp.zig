@@ -189,6 +189,12 @@ fn worker(s: *Shared) void {
             s.failed = e;
             return;
         };
+        // A fixture's directories go once it is judged: kept to the run's
+        // end they peaked at tens of GB of child caches (ESPice, 2026-11-26).
+        for ([_][]const u8{ "n", "o", "y", "d", "r" }) |tag| {
+            const dir = std.fmt.allocPrint(arena_state.allocator(), "{s}/{d}-{s}", .{ s.work, k, tag }) catch continue;
+            Io.Dir.cwd().deleteTree(s.io, dir) catch {};
+        }
         s.lock.lockUncancelable(s.io);
         defer s.lock.unlock(s.io);
         s.outcomes[k] = switch (out) {

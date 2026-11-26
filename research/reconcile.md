@@ -178,3 +178,13 @@ P4 runs first and step 4 rebases on it.
   one fix attempt does not clear (the branch stays unmerged) or on a choice no plan's
   `Decision:` covers (the question is written down). All heavy work stops on two OOM kills
   or the model usage limit; it resumes from this file and the lists.
+- **Q6. Outward actions** (user, 2026-11-26: "full freedom"; replaces Q5's "Never" list).
+  The lead may push the conformance suite and Gompute, open issues and pull requests, tag
+  and release, and does not stop at G0: it writes the G0 report to `research/g0.md` and
+  runs the switch (C1-C8) and the ESPice port (F13) to `finish.md`'s F1-F13. Every
+  repository rule still binds: `main` moves only through a pull request whose required
+  checks passed (no bypass), a release goes through `publish`'s checks and the
+  hand-written changelog, a contract change is versioned with its CHANGELOG line, and each
+  outward action is logged in its commit or pull request. The stop rules for a lane (a
+  regression one fix does not clear, an undecided choice) and for all heavy work (two OOM
+  kills, the usage limit) stay.

@@ -252,6 +252,10 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Ref
         .idtmod => try ops.gen(f, inst, .idtmod, args),
         .last_crossing => try ops.gen(f, inst, .last_crossing, args),
         .absdelay => try ops.gen(f, inst, .absdelay, args),
+        // §5.10.3 the monitored events (`ops/events.zig`).
+        .cross => try ops.gen(f, inst, .cross, args),
+        .above => try ops.gen(f, inst, .above, args),
+        .timer => try ops.gen(f, inst, .timer, args),
         else => {
             // rw-lower's `display$phase` guards a print's operands: `core`
             // drops prints, so it answers 0, and `say` 1. By name, so this

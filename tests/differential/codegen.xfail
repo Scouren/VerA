@@ -2,20 +2,10 @@
 # old one (`zig build diff-codegen`, tests/differential/codegen.zig). One line
 # each: the fixture path under tests/conformance/tests, then why. A listed
 # fixture that agrees fails the run until its line goes.
-netlist/hdl/a09_absdelay_accepted_only.assets/a09_cross_rejector.va codegen: a call of `cross`
-netlist/hdl/a09_abstime_per_attempt.assets/a09_cross_rejector.va codegen: a call of `cross`
-netlist/hdl/a09_analog_initial_once.assets/a09_cross_rejector.va codegen: a call of `cross`
 netlist/hdl/a09_analog_initial_once.assets/a09_initial_once.va codegen: a call of `analog$initial`
-netlist/hdl/a09_cross_count_revert.assets/a09_cross_rejector.va codegen: a call of `cross`
-netlist/hdl/a09_idt_bystander_reject.assets/a09_cross_rejector.va codegen: a call of `cross`
-netlist/hdl/a09_idt_self_reject.assets/a09_idt_latched.va codegen: a call of `cross`
-netlist/hdl/veriloga_timer_rearm.assets/va_tick.va codegen: a call of `timer`
-netlist/hdl/veriloga_transition_reject.assets/va_cmp.va codegen: a call of `cross`
 netlist/hdl/veriloga_vpi_app.assets/va_vpi_gain.va codegen: a call of a user function (callee 4294967295)
 netlist/hdl/veriloga_vpi_callbacks.assets/va_vpi_scaled.va codegen: a call of a user function (callee 4294967295)
 netlist/invalid/veriloga_systf.assets/va_systf_value.va codegen: a call of a user function (callee 4294967295)
-verilog-a/annex_a_syntax/event_control.va codegen: a call of `cross`
-verilog-a/annex_c_analog_subset/analog_event.va codegen: a call of `cross`
 verilog-a/annex_d_standard_definitions/electrical_definitions.va point 0: row 2: old -1.455553325670242e0, new 1e0
 verilog-a/ch01_intro/flow_signal_flow.va point 0: row 1: old 2.000578565135318e0, new -3.5679308067735205e-1
 verilog-a/ch01_intro/signal_flow_single_nature_contributions.va point 0: row 2: old -1.1524062148530296e0, new -4.6680035262893504e-1
@@ -37,81 +27,24 @@ verilog-a/ch04_expressions/laplace_transcendental_coefficient.va codegen: a call
 verilog-a/ch04_expressions/laplace_zd_conjugate_zeros.va codegen: a call of `laplace_zd`
 verilog-a/ch04_expressions/laplace_zp_dynamic_pole_sampled.va codegen: a call of `laplace_zp`
 verilog-a/ch04_expressions/laplace_zp_lrm_example.va codegen: a call of `laplace_zp`
-verilog-a/ch04_expressions/rc_88_operator_outside_event.va codegen: a call of `cross`
 verilog-a/ch04_expressions/z_transform_filters.va codegen: a call of `zi_nd`
 verilog-a/ch04_expressions/zi_ac_response.va codegen: a call of `zi_nd`
 verilog-a/ch04_expressions/zi_dc_gains.va codegen: a call of `zi_zp`
 verilog-a/ch04_expressions/zi_nd_output_at_sample_instant.va codegen: a call of `zi_nd`
 verilog-a/ch04_expressions/zi_sampling_period.va codegen: a call of `zi_zp`
 verilog-a/ch04_expressions/zi_transition_time_and_first_transition.va codegen: a call of `zi_nd`
-verilog-a/ch05_analog_behavior/above_enable_integer.va codegen: a call of `above`
-verilog-a/ch05_analog_behavior/above_fires_in_dc_sweep_cross_does_not.va codegen: a call of `above`
 verilog-a/ch05_analog_behavior/batch_per_instance_state.va codegen: a §5.6.1.2 path latch (`path_prev`)
-verilog-a/ch05_analog_behavior/block_local_is_static_between_events.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/conditional_potential_open.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
-verilog-a/ch05_analog_behavior/cross_direction_out_of_range_is_inert.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/cross_does_not_fire_at_time_zero.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/cross_string_literal_is_an_integer.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/cross_tolerances_are_not_the_enable.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/cross_under_genvar_condition.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/event_above.va codegen: a call of `above`
-verilog-a/ch05_analog_behavior/event_above_enable.va codegen: a call of `above`
-verilog-a/ch05_analog_behavior/event_above_tolerance.va codegen: a call of `above`
-verilog-a/ch05_analog_behavior/event_bounds_cross_legal.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/event_cross.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/event_cross_any.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/event_cross_enable.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/event_cross_falling.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/event_cross_fires.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/event_cross_fires_on_a_time_grid.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/event_cross_param_direction.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/event_cross_rising_and_falling.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/event_cross_runtime_direction.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/event_initial_or_cross.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/event_list_comma_equals_or.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/event_or.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/event_timer.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/event_timer_enable.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/event_timer_one_shot.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/function_locals_have_no_lifetime.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/held_survives_an_inout_function_argument.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/held_through_output_actual_seed_and_scan.va codegen: a call of `$sscanf`
-verilog-a/ch05_analog_behavior/held_value_is_visible_before_its_event_statement.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/implicit_zero_contribution.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
-verilog-a/ch05_analog_behavior/many_timers_instance_defaults.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/rc_event_cross_tolerance_with_direction.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/shadowed_block_locals_hold_independently.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/spice_cross_latch_device.va codegen: a call of `cross`
-verilog-a/ch05_analog_behavior/spice_timer_steps_device.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/static_switch_elision.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch05_analog_behavior/switch_branch.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch05_analog_behavior/switch_branch_solved.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
-verilog-a/ch05_analog_behavior/timer_body_array_controls.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/timer_body_clog2_controls.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/timer_body_constant_effect_controls.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/timer_body_controls.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/timer_body_effect_controls.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/timer_body_function_controls.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/timer_body_precomputed_controls.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/timer_controls.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/timer_dynamic.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/timer_dynamic_period.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/timer_enable_integer.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/timer_enable_resumes_on_grid.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/timer_fixed.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/timer_nonpositive_period_fires_once.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/timer_start_rearmed_earlier.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/unassigned_switch_arm.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch06_hierarchy/generate_if_instantiates_one_arm.va the display sites differ in number: only the old has site 1
 verilog-a/ch06_hierarchy/if_generate_values_drive_paramset_selection.va the display sites differ in number: only the old has site 3
 verilog-a/ch06_hierarchy/mfactor_conditional_only.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch06_hierarchy/string_derived_parameter.va codegen: parameter `u.mode` is not a number
-verilog-a/ch08_scheduling/above_initial_event.va codegen: a call of `above`
-verilog-a/ch08_scheduling/analog_event.va codegen: a call of `cross`
-verilog-a/ch08_scheduling/cross_wakeup.va codegen: a call of `cross`
-verilog-a/ch08_scheduling/event_state.va codegen: a call of `timer`
-verilog-a/ch08_scheduling/explicit_guard.va codegen: a call of `cross`
-verilog-a/ch08_scheduling/timer_wakeup.va codegen: a call of `timer`
 verilog-a/ch09_system_tasks/arandom.va codegen: a call of `$arandom`
 verilog-a/ch09_system_tasks/arandom_no_seed.va codegen: a call of `$arandom`
 verilog-a/ch09_system_tasks/binding_detection.va codegen: a call of `$port_connected`
@@ -169,24 +102,10 @@ verilog-a/ch10_directives/compact_modeling_macro_implies_its_extensions.va the n
 verilog-a/combined/optional_port_environment.va codegen: a call of `$port_connected`
 verilog-a/combined/optional_port_hierarchy.va codegen: a call of `$port_connected`
 verilog-a/combined/parameter_binding_environment.va codegen: a call of `$port_connected`
-verilog-a/exhaustive/event_hold.va codegen: a call of `cross`
 verilog-a/exhaustive/laplace_dc_gain.va codegen: a call of `laplace_nd`
-verilog-a/exhaustive/timer_breakpoint_one_shot.va codegen: a call of `timer`
-verilog-a/exhaustive/timer_breakpoint_periodic.va codegen: a call of `timer`
 verilog-a/exhaustive/zi_sample_hold.va codegen: a call of `zi_nd`
 verilog-ams/ch03_data_types/operator_equation_tolerances.va codegen: a call of `idt$hold`
 verilog-ams/ch05_analog_behavior/analog_initial.va codegen: a call of `analog$initial`
-verilog-ams/ch05_analog_behavior/timer_body_array_controls.va codegen: a call of `timer`
-verilog-ams/ch05_analog_behavior/timer_body_clog2_controls.va codegen: a call of `timer`
-verilog-ams/ch05_analog_behavior/timer_body_constant_effect_controls.va codegen: a call of `timer`
-verilog-ams/ch05_analog_behavior/timer_body_controls.va codegen: a call of `timer`
-verilog-ams/ch05_analog_behavior/timer_body_effect_controls.va codegen: a call of `timer`
-verilog-ams/ch05_analog_behavior/timer_body_function_controls.va codegen: a call of `timer`
-verilog-ams/ch05_analog_behavior/timer_body_precomputed_controls.va codegen: a call of `timer`
-verilog-ams/ch05_analog_behavior/timer_controls.va codegen: a call of `timer`
-verilog-ams/ch05_analog_behavior/timer_dynamic.va codegen: a call of `timer`
-verilog-ams/ch05_analog_behavior/timer_fixed.va codegen: a call of `timer`
-verilog-ams/ch07_mixed_signal/analog_event.va codegen: a call of `cross`
 verilog-ams/ch07_mixed_signal/driver_state_histogram.va codegen: a flow contribution to a potential source's branch
 verilog-ams/ch07_mixed_signal/driver_update_without_resolved_change.va codegen: a flow contribution to a potential source's branch
 verilog-ams/ch08_scheduling/analog_digital_initial_order.va codegen: a call of `analog$initial`
@@ -240,7 +159,6 @@ verilog-a/ch04_expressions/laplace_zp_parameter_roots_step.va codegen: a call of
 verilog-a/ch05_analog_behavior/analog_signals_nets_branches_contributions.va codegen: a §5.6.7 indirect contribution
 verilog-a/ch05_analog_behavior/child_named_branch_potential_and_flow_access.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch05_analog_behavior/controlled_sources.va codegen: a flow contribution to a potential source's branch
-verilog-a/ch05_analog_behavior/held_array_element_between_events.va codegen: a call of `timer`
 verilog-a/ch05_analog_behavior/hierarchical_contribution_creates_a_new_branch.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch05_analog_behavior/value_retention.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch05_analog_behavior/indirect_and_direct_on_different_pairs.va codegen: a §5.6.7 indirect contribution
@@ -248,9 +166,6 @@ verilog-a/ch05_analog_behavior/indirect_contribution.va codegen: a §5.6.7 indir
 verilog-a/ch05_analog_behavior/indirect_equation_lhs_tolerance.va codegen: a §5.6.7 indirect contribution
 verilog-a/ch05_analog_behavior/multiple_indirect.va codegen: a §5.6.7 indirect contribution
 verilog-a/ch05_analog_behavior/static_switch_port_probe.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
-verilog-a/ch05_analog_behavior/timer_body_index_controls.va codegen: a call of `timer`
-verilog-a/ch05_analog_behavior/vera_reject_step_retry.va codegen: a call of `above`
-verilog-a/ch05_analog_behavior/vera_timepoint_cache.va codegen: a call of `timer`
 verilog-a/ch06_hierarchy/inherited_flow_tolerance_minimum.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch06_hierarchy/mfactor_divides_a_flow_probe.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch06_hierarchy/oomr_branch_probe_two_levels.va codegen: a flow contribution to a potential source's branch
@@ -274,25 +189,14 @@ verilog-a/ch09_system_tasks/limit_user_function_previous_iterate.va the new devi
 verilog-a/ch09_system_tasks/limit_with_derivative.va the new device does not build: n11.zig:260: unused function parameter
 verilog-a/ch09_system_tasks/simprobe_string_parameter_name_resolves.va codegen: parameter `u_m.inst` is not a number
 verilog-a/ch09_system_tasks/status_ops.va codegen: a call of `analog$initial`
-verilog-a/ch09_system_tasks/table_capture_rejected_step_recaptures.va codegen: a call of `above`
 verilog-a/ch09_system_tasks/table_snapshot.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
 verilog-a/ch09_system_tasks/table_snapshot_collapse.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch09_system_tasks/table_status.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
 verilog-a/combined/limit_and_discontinuity.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
 verilog-a/combined/named_limiter_nonlinear.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
 verilog-a/exhaustive/indirect_contribution.va codegen: a §5.6.7 indirect contribution
-verilog-ams/ch05_analog_behavior/cross_expr_tol_and_time_tol_both_hold.va codegen: a call of `cross`
-verilog-ams/ch05_analog_behavior/event_array_index_change_is_not_an_event.va codegen: a call of `timer`
 verilog-ams/ch05_analog_behavior/indirect_equation_lhs_tolerance.va codegen: a §5.6.7 indirect contribution
-verilog-ams/ch05_analog_behavior/named_event_has_no_time_duration.va codegen: a call of `timer`
-verilog-ams/ch05_analog_behavior/timer_body_index_controls.va codegen: a call of `timer`
-verilog-ams/ch07_mixed_signal/a2d_tick_quantization.va codegen: a call of `cross`
 verilog-ams/ch07_mixed_signal/mixed_top_with_an_analog_child.va codegen: a flow contribution to a potential source's branch
-verilog-ams/ch07_mixed_signal/named_event_from_analog_reaches_digital.va codegen: a call of `timer`
-verilog-ams/ch07_mixed_signal/timer_runtime_body_period.va codegen: a call of `timer`
-verilog-ams/ch07_mixed_signal/timer_runtime_controls.va codegen: a call of `timer`
-verilog-ams/ch07_mixed_signal/timer_runtime_drift.va codegen: a call of `timer`
-verilog-ams/ch07_mixed_signal/timer_runtime_enable.va codegen: a call of `timer`
 verilog-ams/ch09_system_tasks/status_ops.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/table_status.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
 verilog-a/ch06_hierarchy/paramset_outer_defparam_shape.va codegen: parameter `mode` is not a number
@@ -364,7 +268,7 @@ verilog-a/ch09_system_tasks/sscanf_reads_a_string_variable.va codegen: a slot of
 verilog-a/ch09_system_tasks/string_concat_past_4096_bytes.va codegen: a slot of type 2 (a string)
 verilog-a/ch09_system_tasks/string_formatting.va codegen: a call of `$swrite`
 verilog-a/ch09_system_tasks/swrite_s_with_argument.va codegen: a call of `$swrite`
-verilog-a/ch10_directives/compact_modeling_extension_set.va codegen: a call of `above`
+verilog-a/ch10_directives/compact_modeling_extension_set.va codegen: a call of `str$cmp`
 verilog-a/ch10_directives/file_macro_is_the_opened_path.va codegen: a slot of type 2 (a string)
 verilog-ams/annex_a_syntax/analog_initial.va codegen: a call of `analog$initial`
 verilog-ams/ch05_analog_behavior/analog_initial_integer.va codegen: a call of `analog$initial`

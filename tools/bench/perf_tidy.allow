@@ -1,0 +1,9 @@
+# tools/bench/tidy_devices.py's allow list: rule<TAB>regex searched in the finding's source line<TAB>reason.
+# FP = a false positive (the rule misreads comptime code); DEFERRED = a real finding, not a per-iterate cost,
+# left to the task named. A row no finding uses fails the run.
+branch-in-hot-loop	^\s*inline for \(info\.field_names, info\.field_types\)	FP: an `inline for` over a struct's fields whose `if` tests @typeInfo/@hasDecl, decided at compile time; no run-time loop or branch remains
+bool-parameters	^\s*inline fn zIn\(	FP: the three bools (lo_open, hi_open, nonzero) are `comptime` range-end flags, so every call is specialised; none is a run-time argument
+line-too-long	.	DEFERRED (style, not speed): the emitter writes one statement per line and never wraps; generated text is read through the .va, not edited
+missing-size-assert	^\s*pub const (Model|Instance) = struct \{	DEFERRED: the card and instance records grow with the model's parameters by design; an emitted comptime @sizeOf pin is a codegen change, not this task's
+missing-assertion	^\s*fn core\(	DEFERRED: core is the analog block lowered straight-line; its inputs are range-checked (zIn) in `run` before it is called, so the precondition is held by the caller
+function-too-long	^\s*fn core\(	DEFERRED to DV8 (bound emitted function size): core's length is the model's analog block (mos_exp: 122 lines); tools/bench/dv0-census.md has the numbers

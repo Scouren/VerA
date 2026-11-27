@@ -178,11 +178,19 @@ pub fn isInt(ip: *const InternPool, ty: InternPool.Index) bool {
     };
 }
 
-/// Starts a statement line at the current nesting.
+/// Starts a statement line at the current nesting, four spaces a level up to
+/// `max_indent` levels: deeper statements share the last column, so a
+/// 500-deep `if` chain is not megabytes of spaces (DV2).
 pub fn line(f: *Function) Error!void {
+    assert(f.indent <= Air.nesting_max + 1);
+    // `@min` against a comptime bound narrows its type: widen before multiplying.
+    const levels: usize = @min(f.indent, max_indent);
     try f.print("\n", .{});
-    for (0..f.indent) |_| try f.print("    ", .{});
+    f.w.splatByteAll(' ', 4 * levels) catch return error.OutOfMemory;
 }
+
+/// The deepest indentation `line` writes, as the RTLIL emitter's.
+const max_indent = 32;
 
 /// Writes to the body.
 pub fn print(f: *Function, comptime fmt: []const u8, args: anytype) Error!void {

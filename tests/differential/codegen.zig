@@ -200,7 +200,9 @@ fn runAll() !void {
         switch (try sides.new(gpa, arena, io, path, source, &dirs)) {
             .refused => tally.new_refused += 1,
             .fail => |why| try whys.put(arena, rel, try arena.print("codegen: {s}", .{why})),
-            .ok => |n| {
+            .ok => |n| if (deepest(n.text) > indent_cap) {
+                try whys.put(arena, rel, try arena.print("codegen: a line indented {d} spaces, past DV2's cap of {d}", .{ deepest(n.text), indent_cap }));
+            } else {
                 tally.optimized += n.optimized;
                 tally.roots += n.roots;
                 try ready.append(arena, .{ .rel = rel, .old = old, .new = n.text, .ver = n.versioned, .card = n.card });
@@ -275,6 +277,18 @@ fn runAll() !void {
         tally.cache_hits, tally.cache_misses,
     });
     if (tally.failed != 0) return error.DiffCodegenFailed;
+}
+
+/// The deepest indentation codegen may write (DV2: 32 levels of four spaces,
+/// research/finish.md M3), stated here and not read from codegen.
+const indent_cap = 4 * 32;
+
+/// The longest run of leading spaces on any line of `text`.
+fn deepest(text: []const u8) usize {
+    var most: usize = 0;
+    var it = std.mem.splitScalar(u8, text, '\n');
+    while (it.next()) |l| most = @max(most, l.len - std.mem.trimStart(u8, l, " ").len);
+    return most;
 }
 
 /// The median text size of one side's devices.

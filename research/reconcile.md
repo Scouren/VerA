@@ -95,6 +95,30 @@ assembly with `tools/asm_probe.py` or the kit's `looptext.py`); several accumula
 long sums (a different rounding, so not bit for bit; the method's fixed-order reductions
 rule); `layout.assertNoPadding` (VerA asserts `@sizeOf` already; add it when a row pads).
 
+## 3c. What P1 measured (2026-11-27, `p1-dv0`, `tools/bench/dv0-census.md`)
+
+New-side numbers, `vera-next` at f58247d5, `tools/bench/dv0.py` (20 samples: 5 rounds x 4 stack
+offsets). Verdicts on §3's premises, each with its number:
+
+- **DV7 narrowed**: the wide models are one serial chain (nothing isomorphic to pack); only
+  instance-array models qualify, and inst62's eval is 2,478 of 8,553 ns per iterate (29 %
+  ceiling). P4 takes inst models only.
+- **DV8 holds**: one function (`device.run`) is 90-97 % of the IR LLVM gets (45,935 / 91,665 /
+  183,135 lines at wide 800/1600/3200); LLVM time 0.95 -> 2.23 -> 7.24 s, 2.3x then 3.2x per
+  doubling.
+- **DV9 dropped**: cold code is 1-2 % of instructions.
+- **DV8b (new)**: the split build hands `device.run` to LLVM in all three units: at wide3200
+  that frontend bitcode is 21.8 of 39.8 s. One unit owns it, the others declare it. Perf lane,
+  with P5.
+
+New tasks P1 found (each blocks F2 or is a regression, so each runs before G0):
+
+| # | Task | Evidence | Oracle | Lane |
+|---|---|---|---|---|
+| O1 | `vera-next --emit-osdi`: build the OSDI backend over `lib/osdi_dyn` (it exits 126, "the OSDI backend is not built") | `src/next/main.zig` `contractTree` | the OSDI decks in ngspice (`tools/external_analog.py`) 30/30; `osdi_host` checksum equal to `--emit-so` + osdi_dyn | lists, after O2 |
+| O2 | codegen emits `evalQ` (eval and q off one core evaluation) when the device has `q`; `lib/osdi_dyn` calls `D.evalQ` | P1's `tools/bench/dv0_zig.py` adapter appends it today; every DV0 number includes the adapter | diff-codegen identical; DV0 checksums equal with the adapter removed | lists |
+| O3 | no cap at 64 unknowns: codegen refuses `ladder70`, `vector_port_past_256_unknowns`, gen_models inst >= 63 ("more than 64 unknowns"); the old side has no such cap, so it is a regression, never a ruling | codegen.xfail 2 lines; inst1000 refused | diff-codegen bit for bit on the two fixtures; DV0 inst1000 row measured | lists |
+
 ## 4. Token budget rules
 
 The work is paced by the weekly model budget, not by the tasks. Rules, in order of effect:

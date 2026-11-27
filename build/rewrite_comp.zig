@@ -95,6 +95,31 @@ pub fn add(g: Graph, all: *Build.Step) void {
     b.step("bench-run", "vera-next --run on a swept and re-carded resistor: every transcript line against Ohm's law").dependOn(&bench.step);
     all.dependOn(&bench.step);
 
+    // DV0 (tools/bench/dv0.py): the gate's logic on planted rows, in `test`
+    // (no compiler, well under a second). The gate's oracle on real devices
+    // (a planted slow and a planted no-op diode, built and timed interleaved:
+    // minutes, a build slot) and perf_tidy over the emitted devices (K3,
+    // tools/bench/tidy_devices.py) are steps of their own.
+    const dv0_logic = b.addSystemCommand(&.{ "python3", "-I" });
+    dv0_logic.addFileArg(b.path("tools/bench/dv0.py"));
+    dv0_logic.addArg("gate-selftest");
+    dv0_logic.expectExitCode(0);
+    g.test_step.dependOn(&dv0_logic.step);
+    const dv0_real = b.addSystemCommand(&.{ "python3", "-I" });
+    dv0_real.addFileArg(b.path("tools/bench/dv0.py"));
+    dv0_real.addArg("selftest");
+    dv0_real.addArtifactArg(next);
+    dv0_real.expectExitCode(0);
+    dv0_real.has_side_effects = true; // A timing, and it spawns vera-next, which spawns zig.
+    b.step("bench-dv0-selftest", "tools/bench/dv0.py's gate on real devices: a planted slow diode fails by name, a planted no-op passes (minutes; a build slot)").dependOn(&dv0_real.step);
+    const tidy = b.addSystemCommand(&.{ "python3", "-I" });
+    tidy.addFileArg(b.path("tools/bench/tidy_devices.py"));
+    tidy.addArg("selftest");
+    tidy.addArtifactArg(next);
+    tidy.expectExitCode(0);
+    tidy.has_side_effects = true; // Reads tests/bench/*.va, tools/perf_tidy.py and tools/bench/perf_tidy.allow.
+    b.step("tidy-devices", "tools/perf_tidy.py over vera-next --emit-zig of tests/bench/*.va as hot files, against tools/bench/perf_tidy.allow, and a planted allocation and print caught").dependOn(&tidy.step);
+
     // exe-run: a `.v --emit-exe` binary against vera-next's own `--run`.
     const exe_mod = g.m.make("tests/differential/exe_run.zig", &.{});
     exe_mod.addOptions("comp_options", o);

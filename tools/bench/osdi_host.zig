@@ -3,6 +3,9 @@
 //! default card and for a perturbed one. Prints the descriptor's sizes, one checksum over every
 //! number the library handed back, and the time of one transient iterate (eval, load_spice_rhs_tran,
 //! load_jacobian_tran). Two builds of one device are equivalent here when the checksums match.
+//! The timed loops pass their inputs and outputs through `std.mem.doNotOptimizeAway` (K2): the
+//! calls are already opaque (a dlopen'd function pointer), the black box keeps them so.
+//! tools/bench/dv0.py runs it at four stack alignments (the environment's size) and takes the min.
 //!
 //! Build: zig build-exe -OReleaseFast -lc --dep abi -Mroot=tools/bench/osdi_host.zig -Mabi=lib/osdi_dyn/abi.zig
 //! Run:   ./osdi_host path/to/device.osdi
@@ -161,14 +164,29 @@ pub fn main(init: std.process.Init.Minimal) void {
         }
         // One transient iterate, as a simulator's load loop calls it.
         var sim: abi.SimInfo = .{ .paras = paras, .abstime = 1.0e-9, .prev_solve = x.ptr, .prev_state = st0.ptr, .next_state = st1.ptr, .flags = calc_all | abi.analysis_tran };
-        const reps: usize = if (nj > 500) 3000 else 30000;
+        // Each timed loop runs about 2 ms (3000 to 30000 iterates for a small device, fewer for a
+        // large one, at least 20): a calibration of 16 warm iterates sets the count.
+        var per: u64 = 1;
+        for (0..2) |_| { // the first pass warms the caches and the predictors; the second counts
+            const cal0 = now();
+            for (0..16) |_| {
+                std.mem.doNotOptimizeAway(d.eval(null, inst.ptr, model.ptr, &sim));
+                d.load_spice_rhs_tran(inst.ptr, model.ptr, out.ptr, x.ptr, 1.0e9);
+                d.load_jacobian_tran(inst.ptr, model.ptr, 1.0e9);
+            }
+            per = @max((now() - cal0) / 16, 1);
+        }
+        const reps: usize = std.math.clamp(2_000_000 / per, 20, @as(u64, if (nj > 500) 3000 else 30000));
         for (0..5) |_| {
             const t0 = now();
             for (0..reps) |r| {
                 x[0] = 0.15 + 1.0e-7 * @as(f64, @floatFromInt(r & 15));
-                _ = d.eval(null, inst.ptr, model.ptr, &sim);
+                std.mem.doNotOptimizeAway(x.ptr);
+                std.mem.doNotOptimizeAway(d.eval(null, inst.ptr, model.ptr, &sim));
                 d.load_spice_rhs_tran(inst.ptr, model.ptr, out.ptr, x.ptr, 1.0e9);
                 d.load_jacobian_tran(inst.ptr, model.ptr, 1.0e9);
+                std.mem.doNotOptimizeAway(out.ptr);
+                std.mem.doNotOptimizeAway(mat.ptr);
             }
             iter_ns = @min(iter_ns, (now() - t0) / reps);
         }
@@ -178,11 +196,14 @@ pub fn main(init: std.process.Init.Minimal) void {
                 const t0 = now();
                 for (0..reps) |r| {
                     x[0] = 0.15 + 1.0e-7 * @as(f64, @floatFromInt(r & 15));
+                    std.mem.doNotOptimizeAway(x.ptr);
                     switch (which) {
-                        0 => _ = d.eval(null, inst.ptr, model.ptr, &sim),
+                        0 => std.mem.doNotOptimizeAway(d.eval(null, inst.ptr, model.ptr, &sim)),
                         1 => d.load_spice_rhs_tran(inst.ptr, model.ptr, out.ptr, x.ptr, 1.0e9),
                         else => d.load_jacobian_tran(inst.ptr, model.ptr, 1.0e9),
                     }
+                    std.mem.doNotOptimizeAway(out.ptr);
+                    std.mem.doNotOptimizeAway(mat.ptr);
                 }
                 part_ns[which] = @min(part_ns[which], (now() - t0) / reps);
             }

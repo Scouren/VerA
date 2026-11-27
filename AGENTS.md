@@ -220,7 +220,8 @@ So:
    `nix develop -c zig build check-<module> --watch -fincremental --cache-dir .zig-cache-watch`
    for each module root you are editing, never the full `check`: that watch
    alone holds all 38 roots' compiler processes resident (6.4-6.5 GB), and
-   six agents on it would need about 39 GB on a 31 GB machine. The private
+   six agents on it would need about 39 GB, and the build machines have 15 GB
+   (2026-11-27; two corpus steps at once is the ceiling). The private
    `--cache-dir` keeps your incremental state from colliding with other
    worktrees. A re-check takes under a second; a cold `check-<module>` holds
    only that root's memory (0.14-0.56 GB). Use `test-<module>` the same way

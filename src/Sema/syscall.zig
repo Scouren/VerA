@@ -94,6 +94,7 @@ pub fn lower(s: *Sema, b: *Block, c: Inst.SysCall, src: Inst.Ref) Allocator.Erro
                 if (b.unit.instance == s.units.items[0].instance) return s.param_args.items[@backingInt(row)];
             if (tag == .@"$param_given") if (try paramGiven(s, b, args)) |v| return v;
             if ((tag == .@"$simparam" or tag == .@"$simparam$str") and try unknownSimparam(s, b, tag, args, src)) return expr.poison;
+            if (tag == .@"$simparam$str") if (try @import("string.zig").simparamStr(s, b, args)) |v| return v;
             const ty: Sema.Ty = switch (info.ty) {
                 .real => .real,
                 .int => .integer,

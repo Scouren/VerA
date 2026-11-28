@@ -30,6 +30,7 @@ const Ident = @import("Ident.zig");
 const ops = @import("ops.zig");
 const status = @import("status.zig");
 const array = @import("array.zig");
+const strings = @import("strings.zig");
 const Real = Function.Real;
 
 /// Fills `dg.held_field` (per `alloc`, its `Instance` field when held) and
@@ -137,7 +138,9 @@ pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void {
     if (held or opf.len != 0 or bound_step) try p(w, "    const m = run(S, &x, D.zProbe(S, &x), model, inst, sim);\n", .{});
     try ops.genAccept(dg, w);
     for (dg.held_field, 0..) |field, i| if (field) |f| {
-        if (arrayLen(dg, i) != null and !isInt(dg, i))
+        if (isStr(dg, i))
+            try p(w, "    inst.{s} = K.str.zStrHeldN({d}, m.h{d});\n", .{ f, try strings.capOf(dg, i), i })
+        else if (arrayLen(dg, i) != null and !isInt(dg, i))
             try p(w, "    for (&inst.{s}, m.h{d}) |*e, v| e.* = v.val();\n", .{ f, i })
         else
             try p(w, "    inst.{s} = m.h{d}{s};\n", .{ f, i, if (isInt(dg, i)) "" else ".val()" });
@@ -202,11 +205,20 @@ pub fn intConst(dg: *const DeclGen, ref: Air.Inst.Ref) ?usize {
 
 fn isInt(dg: *const DeclGen, i: usize) bool {
     const ty = dg.air.instructions.items(.data)[i].ty;
-    return ty != InternPool.Index.real_type;
+    return ty != InternPool.Index.real_type and !strings.isStrType(ty);
+}
+
+/// Whether held slot `i` is §3.3's string (an `Instance` field of its bytes).
+fn isStr(dg: *const DeclGen, i: usize) bool {
+    return strings.isStrType(dg.air.instructions.items(.data)[i].ty);
 }
 
 /// Writes held slot `i`'s field type: a scalar, or an array's `[n]` of them.
-fn writeType(dg: *const DeclGen, w: *std.Io.Writer, i: usize) DeclGen.Error!void {
+fn writeType(dg: *DeclGen, w: *std.Io.Writer, i: usize) DeclGen.Error!void {
+    if (isStr(dg, i)) {
+        if (arrayLen(dg, i) != null) return dg.fail("a held string array", .{});
+        return w.print("K.str.ZStrHeldN({d})", .{try strings.capOf(dg, i)}) catch error.OutOfMemory;
+    }
     if (arrayLen(dg, i)) |n| w.print("[{d}]", .{n}) catch return error.OutOfMemory;
     w.writeAll(if (isInt(dg, i)) "i64" else "f64") catch return error.OutOfMemory;
 }
@@ -244,6 +256,16 @@ fn writeInit(dg: *DeclGen, w: *std.Io.Writer, i: usize) DeclGen.Error!void {
         else => {}, // else: one value for the scalar
     };
     const key = if (init == InternPool.Index.undef or init == .none) InternPool.Key{ .undef = .none } else dg.ip.indexToKey(init);
+    if (isStr(dg, i)) {
+        // §3.3 the initializer's bytes, "" without one.
+        const text = switch (key) {
+            .str => |t| dg.ip.stringToSlice(t),
+            else => "", // else: no initializer
+        };
+        w.print("K.str.zStrHeldN({d}, \"", .{try strings.capOf(dg, i)}) catch return error.OutOfMemory;
+        for (text) |c| if (c != 0) w.print("{f}", .{std.zig.fmtString(&.{c})}) catch return error.OutOfMemory;
+        return w.writeAll("\")") catch error.OutOfMemory;
+    }
     const r = switch (key) {
         .float => |x| if (isInt(dg, i)) w.print("{d}", .{@as(i64, @intFromFloat(@round(x)))}) else w.print("{f}", .{Real{ .x = x }}),
         .int => |n| if (n.storage == .small) (if (isInt(dg, i)) w.print("{d}", .{n.storage.small}) else w.print("{d}.0", .{n.storage.small})) else return dg.fail("a held initializer wider than 64 bits", .{}),

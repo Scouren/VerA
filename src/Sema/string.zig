@@ -12,6 +12,8 @@
 //! - `pub fn concat(s: *Sema, b: *Block, i: Inst.Index, src: Inst.Ref) Allocator.Error!Value`
 //! - `pub fn write(s: *Sema, b: *Block, tag: SysFn.Tag, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!void`
 //! - `pub fn read(s: *Sema, b: *Block, tag: SysFn.Tag, first: usize, args: []const Inst.Ref, src: Inst.Ref) Allocator.Error!Value`
+//! - `pub fn simparamStr(s: *Sema, b: *Block, args: []const Inst.Ref) Allocator.Error!?Value`
+//! - `pub fn finish(s: *Sema, air: *const Air) Allocator.Error!void`: `Device.name` and `Device.str_caps`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -26,9 +28,208 @@ const SysFn = vams.SysFn;
 const Block = Sema.Block;
 const Value = Sema.Value;
 const Ref = Air.Inst.Ref;
+const InternPool = @import("intern_pool");
+const Device = Air.Device;
 
 /// The longest string a constant replication folds to.
 const concat_bytes_max: u64 = 1 << 20;
+
+const none = std.math.maxInt(u32);
+
+/// `finish`'s walk: one memoized capacity per instruction.
+const Caps = struct {
+    air: *const Air,
+    ip: *const InternPool,
+    name_len: u64,
+    caps: []u64,
+    state: []State,
+    /// Per slot or block, its first `assign` or `br`; `next` chains the rest.
+    head: []u32,
+    next: []u32,
+    /// Per §5.10 held slot, its initializer's length.
+    held_init: []?u64,
+
+    const State = enum(u8) { new, open, done };
+    /// The deepest chain of string operands followed; past it a piece counts the row.
+    const depth_max = 1 << 10;
+
+    fn cap(c: *Caps, ref: Ref, depth: u32) u64 {
+        const i = ref.toIndex() orelse {
+            const index = ref.toInterned() orelse return 0;
+            return switch (c.ip.indexToKey(index)) {
+                .str => |t| c.ip.stringToSlice(t).len,
+                else => 0, // else: §2.7 a number read as a string
+            };
+        };
+        const k = @backingInt(i);
+        switch (c.state[k]) {
+            .done => return c.caps[k],
+            .open => return Device.str_row, // a cycle through a slot
+            .new => {},
+        }
+        if (depth >= depth_max) return Device.str_row;
+        c.state[k] = .open;
+        const v = c.compute(i, depth + 1);
+        c.caps[k] = v;
+        c.state[k] = .done;
+        return v;
+    }
+
+    fn compute(c: *Caps, i: Air.Inst.Index, depth: u32) u64 {
+        const air = c.air;
+        const k = @backingInt(i);
+        const data = air.instructions.items(.data)[k];
+        switch (air.instructions.items(.tag)[k]) {
+            .alloc, .block => {
+                var m: u64 = if (c.held_init[k]) |len| @max(len, Device.str_row) else 0;
+                var at = c.head[k];
+                // Each pass follows one link of the list `finish` chained.
+                for (0..air.instructions.len) |_| {
+                    if (at == none) break;
+                    const d = air.instructions.items(.data)[at];
+                    const v = if (air.instructions.items(.tag)[at] == .assign) d.bin_op.rhs else d.br.operand;
+                    if (v != .none) m = @max(m, c.cap(v, depth));
+                    at = c.next[at];
+                }
+                return m;
+            },
+            .load => return c.cap(data.un_op, depth),
+            .opt_barrier, .dstop => return c.cap(data.un_op, depth),
+            .select => {
+                const bin = air.extraData(Air.Bin, data.pl_op.payload).data;
+                return @max(c.cap(bin.lhs, depth), c.cap(bin.rhs, depth));
+            },
+            .call => {
+                const x = air.extraData(Air.Call, data.ty_pl.payload);
+                const args: []const Ref = @ptrCast(air.extra[x.end..][0..x.data.args_len]);
+                if (x.data.callee > std.math.maxInt(@typeInfo(SysFn.Tag).@"enum".tag_type)) return Device.str_row;
+                const tag: SysFn.Tag = @fromBackingInt(@intCast(x.data.callee));
+                return switch (tag) {
+                    .@"$sformat", .@"$swrite" => if (tag == .@"$sformat" and args.len != 0 and c.str(args[0]) == null)
+                        c.rtFormat(args, depth)
+                    else
+                        @max(c.literalFormat(args, depth), Device.str_row),
+                    .@"str$cat" => blk: {
+                        var m: u64 = 0;
+                        for (args) |a| m +|= c.cap(a, depth);
+                        break :blk @max(m, Device.str_row);
+                    },
+                    .@"str$repeat" => blk: {
+                        const copies = c.int(args[0]) orelse break :blk Device.str_row;
+                        break :blk @max(@as(u64, @intCast(@max(copies, 0))) *| c.cap(args[1], depth), Device.str_row);
+                    },
+                    // §9.5.4.2 an item is a slice of the scanned string.
+                    .@"scan$str" => blk: {
+                        const r = args[0].toIndex() orelse break :blk Device.str_row;
+                        const rd = air.instructions.items(.data)[@backingInt(r)];
+                        if (air.instructions.items(.tag)[@backingInt(r)] != .call) break :blk Device.str_row;
+                        const rx = air.extraData(Air.Call, rd.ty_pl.payload);
+                        if (rx.data.callee != @backingInt(SysFn.Tag.@"$sscanf") or rx.data.args_len == 0) break :blk Device.str_row;
+                        break :blk c.cap(@fromBackingInt(air.extra[rx.end]), depth);
+                    },
+                    else => Device.str_row, // else: a file line, a `$simparam$str` answer: run-time lengths
+                };
+            },
+            else => return Device.str_row, // else: a parameter, an array element: run-time lengths
+        }
+    }
+
+    /// `zSFormatRt`'s row: the format's own text plus each operand's widest
+    /// rendering (the old `rtFormatCap`).
+    fn rtFormat(c: *Caps, args: []const Ref, depth: u32) u64 {
+        var m = c.cap(args[0], depth);
+        for (args[1..]) |a| m +|= if (c.isStr(a)) c.cap(a, depth) else 512;
+        return @max(m, Device.str_row);
+    }
+
+    /// The bytes a §9.4.1 argument list can render to: each constant
+    /// string a format, its literal bytes and each conversion's widest
+    /// field (the old `siteCap` over `PrintArg.textMax`); an operand no
+    /// format took, its default conversion's.
+    fn literalFormat(c: *Caps, args: []const Ref, depth: u32) u64 {
+        var m: u64 = 0;
+        var i: usize = 0;
+        // Each pass consumes at least one argument.
+        while (i < args.len) {
+            const fmt = c.str(args[i]) orelse {
+                m +|= c.field(0, 0, null, args[i], depth);
+                i += 1;
+                continue;
+            };
+            i += 1;
+            var j: usize = 0;
+            while (j < fmt.len) {
+                if (fmt[j] != '%') {
+                    m +|= 1;
+                    j += 1;
+                    continue;
+                }
+                j += 1;
+                while (j < fmt.len and @import("kernels").str_real.zcFlag(fmt[j]) != null) j += 1;
+                var width: u64 = 0;
+                while (j < fmt.len and std.ascii.isDigit(fmt[j])) : (j += 1) width = width *| 10 +| (fmt[j] - '0');
+                var prec: ?u64 = null;
+                if (j < fmt.len and fmt[j] == '.') {
+                    j += 1;
+                    var p: u64 = 0;
+                    while (j < fmt.len and std.ascii.isDigit(fmt[j])) : (j += 1) p = p *| 10 +| (fmt[j] - '0');
+                    prec = p;
+                }
+                if (j >= fmt.len) break;
+                const conv = std.ascii.toLower(fmt[j]);
+                j += 1;
+                switch (conv) {
+                    '%' => m +|= 1,
+                    'm', 'l' => m +|= c.name_len + 5,
+                    else => {
+                        const op: Ref = if (i < args.len) args[i] else .fromIntern(.zero_real);
+                        i += 1;
+                        m +|= c.field(conv, width, prec, op, depth);
+                    },
+                }
+            }
+        }
+        return m;
+    }
+
+    /// The widest text conversion `conv` (0: an operand's default) of `op`
+    /// writes in a field of `width`.
+    fn field(c: *Caps, conv: u8, width: u64, prec: ?u64, op: Ref, depth: u32) u64 {
+        const body: u64 = switch (conv) {
+            'e', 'f', 'g', 'r' => @max(width, (prec orelse 6) +| 320) +| 8,
+            'b', 'o', 'h', 'x' => 64,
+            'c' => 1,
+            'd' => width +| 24,
+            's' => if (c.isStr(op)) c.cap(op, depth) else 8,
+            0 => if (c.isStr(op)) c.cap(op, depth) else 512,
+            else => 512,
+        };
+        return @max(body, width);
+    }
+
+    fn isStr(c: *const Caps, r: Ref) bool {
+        return c.air.typeOf(c.ip, r) == InternPool.Index.string_type;
+    }
+
+    fn str(c: *const Caps, r: Ref) ?[]const u8 {
+        const index = r.toInterned() orelse return null;
+        return switch (c.ip.indexToKey(index)) {
+            .str => |t| c.ip.stringToSlice(t),
+            else => null, // else: not a string literal
+        };
+    }
+
+    fn int(c: *const Caps, r: Ref) ?i64 {
+        const index = r.toInterned() orelse return null;
+        return switch (c.ip.indexToKey(index)) {
+            .int => |v| switch (v.storage) {
+                .small => |x| x,
+                .big => null,
+            },
+            else => null, // else: not an integer literal
+        };
+    }
+};
 
 /// §3.3 Table 3-3's equality and relational operators over two strings: an
 /// integer 0 or 1, lexicographic.
@@ -176,13 +377,114 @@ pub fn read(s: *Sema, b: *Block, tag: SysFn.Tag, first: usize, args: []const Ins
         if (!(k == first or (many and k > first)) or a == .none) continue;
         const ty = slotType(b, a) orelse .real;
         const at: Ref = .fromIntern(try decl.intern(s, .{ .int = @intCast(k - first) }));
+        // §9.5.4.2 a scan assigns only the items it converted: destination k
+        // keeps its value unless the count passed k (the old `lowerScan`).
+        var then_b = b.child();
+        var else_b = b.child();
+        if (many) {
+            then_b.conditional += 1;
+            then_b.runtime += 1;
+            else_b.conditional += 1;
+            else_b.runtime += 1;
+        }
+        const into = if (many) &then_b else b;
         const v: Value = if (ty == .string)
-            .{ .ref = try expr.call(s, b, @backingInt(SysFn.Tag.@"scan$str"), .string, &.{ r, at }), .ty = .string }
+            .{ .ref = try expr.call(s, into, @backingInt(SysFn.Tag.@"scan$str"), .string, &.{ r, at }), .ty = .string }
         else
-            .{ .ref = try expr.call(s, b, @backingInt(SysFn.Tag.@"scan$item"), .real, &.{ r, at }), .ty = .real };
-        try @import("control.zig").assignTo(s, b, a, v, src);
+            .{ .ref = try expr.call(s, into, @backingInt(SysFn.Tag.@"scan$item"), .real, &.{ r, at }), .ty = .real };
+        try @import("control.zig").assignTo(s, into, a, v, src);
+        if (many) try @import("control.zig").ifElse(s, b, try expr.binOp(s, b, .igt, r, at), &then_b, &else_b);
     }
     return .{ .ref = r, .ty = .integer };
+}
+
+/// §9.15 Table 9-28's hierarchy rows, elaboration facts of the calling
+/// instance (the old `Lower.simparamStr`): "module" is "the name of the
+/// module from which $simparam$str is called", "instance" "the hierarchical
+/// name of the instance" (its root's module first, §6.7). Null for any other
+/// name, or one known only at run time: the host answers it.
+pub fn simparamStr(s: *Sema, b: *Block, args: []const Inst.Ref) Allocator.Error!?Value {
+    if (args.len == 0 or args[0] == .none) return null;
+    const c = (try decl.foldRef(s, b.unit, args[0])) orelse return null;
+    if (c != .str) return null;
+    const zcu = s.zcu;
+    const inst = b.unit.instance;
+    if (std.mem.eql(u8, c.str, "module")) {
+        const d = zcu.instances.items(.module)[@backingInt(inst)];
+        return try str(s, zcu.fileVir(d.file).string(zcu.declRow(d).name));
+    }
+    if (std.mem.eql(u8, c.str, "instance")) return try str(s, try std.fmt.allocPrint(s.arena, "{f}", .{zcu.fmtPath(inst)}));
+    return null;
+}
+
+/// Sets the device's `name` (the top module's, §9.4.3 `%m`) and
+/// `str_caps` (the old `cg_strcap.cap`): per instruction that yields a
+/// string, the most bytes it can hold. A piece whose length is run-time
+/// data no fold bounds (a string parameter a card may set, a `$simparam$str`
+/// answer, a file line) counts `Device.str_row`; a run-time string's row is
+/// never below it, and a slot holds the most of every value assigned to it
+/// (a §5.10 held one also its initializer, and never below the row). A slot
+/// met again while its own capacity is computed (a loop's `s = {s, "x"}`)
+/// counts the row, as the old phi did. Called once, after `Air.finish`.
+pub fn finish(s: *Sema, air: *const Air) Allocator.Error!void {
+    const zcu = s.zcu;
+    const d = zcu.instances.items(.module)[0];
+    s.device.name = try zcu.intern_pool.getString(s.gpa, zcu.fileVir(d.file).string(zcu.declRow(d).name));
+    const ip = &zcu.intern_pool;
+    const n = air.instructions.len;
+    const tags = air.instructions.items(.tag);
+    const datas = air.instructions.items(.data);
+    var any = false;
+    for (0..n) |i| any = any or air.typeOfIndex(ip, @fromBackingInt(@intCast(i))) == InternPool.Index.string_type;
+    if (!any) return;
+    var c: Caps = .{
+        .air = air,
+        .ip = ip,
+        .name_len = ip.stringToSlice(s.device.name).len,
+        .caps = try s.arena.alloc(u64, n),
+        .state = try s.arena.alloc(Caps.State, n),
+        .head = try s.arena.alloc(u32, n),
+        .next = try s.arena.alloc(u32, n),
+        .held_init = try s.arena.alloc(?u64, n),
+    };
+    @memset(c.caps, 0);
+    @memset(c.state, .new);
+    @memset(c.head, none);
+    @memset(c.next, none);
+    @memset(c.held_init, null);
+    // Each slot's assignments and each block's breaks, one list per head.
+    for (tags, datas, 0..) |tag, data, i| {
+        const owner: u32 = switch (tag) {
+            .assign => @backingInt(data.bin_op.lhs.toIndex() orelse continue),
+            .br => @backingInt(data.br.block_inst),
+            else => continue, // else: no value joins a slot or a block
+        };
+        c.next[i] = c.head[owner];
+        c.head[owner] = @intCast(i);
+    }
+    for (s.device.held.items(.slot), s.device.held.items(.count), s.device.held.items(.init)) |slot, count, init| {
+        for (0..count) |k| {
+            const at = @backingInt(slot) + k;
+            var len: u64 = 0;
+            if (init != .none and init != InternPool.Index.undef) switch (ip.indexToKey(init)) {
+                .str => |t| len = ip.stringToSlice(t).len,
+                .aggregate => |agg| if (k < agg.elems.len) switch (ip.indexToKey(agg.elems[k])) {
+                    .str => |t| len = ip.stringToSlice(t).len,
+                    else => {}, // else: a number's element
+                },
+                else => {}, // else: a number
+            };
+            c.held_init[at] = len;
+        }
+    }
+    const caps = try s.gpa.alloc(u64, n);
+    errdefer s.gpa.free(caps);
+    for (caps, 0..) |*out, i| {
+        out.* = 0;
+        if (air.typeOfIndex(ip, @fromBackingInt(@intCast(i))) != InternPool.Index.string_type) continue;
+        out.* = c.cap(.fromIndex(@fromBackingInt(@intCast(i))), 0);
+    }
+    s.device.str_caps = caps;
 }
 
 // ---- private ----

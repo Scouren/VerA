@@ -223,11 +223,18 @@ fn scanItem(f: *Function, comptime kernel: []const u8, args: []const Ref) Error!
     const max_tag = std.math.maxInt(@typeInfo(SysFn.Tag).@"enum".tag_type);
     if (rx.data.callee > max_tag) return f.dg.fail("a scan item of no scan", .{});
     const scan: SysFn.Tag = @fromBackingInt(@intCast(rx.data.callee));
-    if (scan != .@"$sscanf") return f.dg.fail("a call of `{s}`", .{@tagName(scan)});
-    const sargs: []const Ref = @ptrCast(air.extra[rx.end..][0..rx.data.args_len]);
     const k = state.intConst(f.dg, args[1]) orelse return f.dg.fail("a scan item at no constant index", .{});
     const zero = comptime if (std.mem.eql(u8, kernel, "zScanNulR")) "0.0" else if (std.mem.eql(u8, kernel, "zScanNulS")) "\"\"" else "0";
     const real = comptime std.mem.eql(u8, kernel, "zScanNulR");
+    // §9.5.4 a `$fgets`/`$fscanf`/§9.5.7 `$ferror` destination: a recording
+    // device reads no file (`calls.fileZero`), so the item is the zero the
+    // old device's dropped reader gave; the count is still read.
+    if (SysFn.get(scan).family == .file_func) {
+        const typed = comptime if (real) "@as(f64, 0.0)" else if (std.mem.eql(u8, kernel, "zScanNulI")) "@as(i64, 0)" else "@as([]const u8, \"\")";
+        return f.print("{s}(if (v{d} > {d}) {s} else {s})", .{ if (real) "S.con" else "", @backingInt(r), k, typed, typed });
+    }
+    if (scan != .@"$sscanf") return f.dg.fail("a call of `{s}`", .{@tagName(scan)});
+    const sargs: []const Ref = @ptrCast(air.extra[rx.end..][0..rx.data.args_len]);
     try f.print("{s}(if (v{d} > {d}) K.str.{s}(", .{ if (real) "S.con" else "", @backingInt(r), k, kernel });
     try raw(f, sargs[0]);
     try f.print(", ", .{});

@@ -55,18 +55,6 @@ verilog-a/ch09_system_tasks/dist_poisson.va codegen: a call of `$dist_poisson`
 verilog-a/ch09_system_tasks/dist_t.va codegen: a call of `$dist_t`
 verilog-a/ch09_system_tasks/dist_uniform.va codegen: a call of `$dist_uniform`
 verilog-a/ch09_system_tasks/distribution.va codegen: a call of `$dist_normal`
-verilog-a/ch09_system_tasks/feof.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/ferror.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fgets.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fgets_on_write_only_fd_fails.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/file_position_status.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/file_read_scan.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fscanf_failed_match_leaves_input.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fscanf_successive_scans_on_one_line.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/ftell.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/long_record_is_not_truncated.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/mcd_channels_exhausted_at_bit_31.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/numeric_string.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/plusargs.va codegen: a call of `$test$plusargs`
 verilog-a/ch09_system_tasks/plusargs_prefix.va codegen: a call of `$test$plusargs`
 verilog-a/ch09_system_tasks/plusargs_value_order.va codegen: a call of `$value$plusargs`
@@ -84,15 +72,11 @@ verilog-a/ch09_system_tasks/rdist_positive_mean_at_run_time.va codegen: a call o
 verilog-a/ch09_system_tasks/rdist_t.va codegen: a call of `$rdist_t`
 verilog-a/ch09_system_tasks/rdist_zero_mean_at_run_time_is_an_error.va codegen: a call of `$rdist_exponential`
 verilog-a/ch09_system_tasks/real_distribution.va codegen: a call of `$rdist_uniform`
-verilog-a/ch09_system_tasks/rejected_iterations_leave_no_file_side_effects.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/rewind.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/rng_reference_large_count.va codegen: a call of `$rdist_chi_square`
 verilog-a/ch09_system_tasks/rng_short_circuit.va codegen: a call of `$rdist_exponential`
 verilog-a/ch09_system_tasks/test_plusargs.va codegen: a call of `$test$plusargs`
 verilog-a/ch09_system_tasks/top_port_connected_controls_ddt.va codegen: a call of `$port_connected`
 verilog-a/ch09_system_tasks/value_plusargs.va codegen: a call of `$value$plusargs`
-verilog-a/ch09_system_tasks/write_mode_path_65_opens.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/write_mode_reopen_appends_across_analyses.va codegen: a call of `$fopen`
 verilog-a/ch10_directives/compact_modeling_macro_implies_its_extensions.va the new device does not build: n6.zig:75: unused local constant
 verilog-a/combined/optional_port_environment.va codegen: a call of `$port_connected`
 verilog-a/combined/optional_port_hierarchy.va codegen: a call of `$port_connected`
@@ -229,40 +213,8 @@ verilog-a/ch06_hierarchy/mfactor_scales_named_branch_flow.va codegen: a flow con
 verilog-a/ch06_hierarchy/undeclared_interconnect_port_binding.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch06_hierarchy/vector_port_past_256_unknowns.va codegen: more than 64 unknowns
 verilog-a/ch04_expressions/ddt_idt_nature_tolerance.va codegen: a call of `idt$hold`
-verilog-a/ch09_system_tasks/append_writes_at_end_of_file.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fd_channels_past_30.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fdebug.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fdisplay.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fflush.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fgets_line_over_4096.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/file_io_categories_in_analog_context.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/file_open_close.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/file_output.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fmonitor.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fopen_multichannel_descriptor.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fscanf.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fscanf_destination_preservation.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fscanf_directive_spans_lines.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fscanf_real_destination.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fscanf_window_over_4096.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fseek.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fstrobe.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fwrite.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/input_position_restore_failure.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/monitor_ignores_abstime.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/monitor_reports_every_change.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/monitor_suppresses_an_unchanged_step.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/numeric_string_local_width.va point 0: display record value 1: old 1e0, new 0e0
-verilog-a/ch09_system_tasks/sformat_33_conversions.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/sscanf_nul_is_whitespace.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/two_instances_hold_distinct_channels.va codegen: a call of `$fopen`
-verilog-a/combined/file_and_display_side_effects.va codegen: a call of `$fopen`
-verilog-a/combined/file_display_diagnostics.va codegen: a call of `$fopen`
-verilog-ams/ch09_system_tasks/file_descriptor_shared_across_contexts.va codegen: the task `$fwrite`
-verilog-ams/ch09_system_tasks/input_position_restore_failure.va codegen: a call of `$fopen`
-verilog-ams/ch09_system_tasks/r_format_in_the_digital_context.va codegen: a call of `$fopen`
 verilog-ams/ch09_system_tasks/strobe_writes_once_per_accepted_solution.va codegen: a call of `analog$initial`
-verilog-ams/ch09_system_tasks/ungetc_cancelled_by_fseek_and_gap_reads_zero.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/simparam_timescale.va point 0: row 0: old -4.511869783264559e-1, new -4.511869793274559e-1
 verilog/pli/analog_attributes.va codegen: a flow contribution to a potential source's branch
 netlist/noise/va_noise.assets/ntab_card.va codegen: a §4.6.4.3/.4 noise table whose knots are not constant (a parameter array)

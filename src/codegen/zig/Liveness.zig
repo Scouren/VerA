@@ -124,7 +124,12 @@ const max_sysfn_tag = std.math.maxInt(@typeInfo(SysFn.Tag).@"enum".tag_type);
 pub fn readsArgs(tag: SysFn.Tag) bool {
     return switch (tag) {
         .white_noise, .flicker_noise, .noise_table, .noise_table_log => false,
-        else => true, // else: every other call, `ac_stim` included
+        // §9.5 a descriptor call renders its type's zero (`calls.zig`'s
+        // `fileZero`), never its operands.
+        else => switch (SysFn.get(tag).family) {
+            .file_out, .file_func => false,
+            else => true, // else: every other call, `ac_stim` included
+        },
     };
 }
 
@@ -182,11 +187,13 @@ pub fn maskOf(l: Liveness, ref: Inst.Ref) Mask {
 
 /// Whether an instruction runs for what it does, not for its value: control,
 /// an assignment, a call that changes what a later evaluation sees (a §9.13
-/// draw, a §9.5 file task, a §4.5 operator `ops.zig` keeps, a §9.7.3
+/// draw, a §4.5 operator `ops.zig` keeps, a §9.7.3
 /// `$fatal`/`$error` `status.zig` latches `core`-side, whose input
 /// `updateState`/`eval`/`q` read from `core` even where only a print reads
 /// its value). A §9.4 print or the rest of §9.7's tasks run in the
-/// device's display phase, so they do not run in `core` for their own sake.
+/// device's display phase, so they do not run in `core` for their own sake;
+/// nor does a §9.5 file call, which a recording device never performs (its
+/// value is its type's zero, `calls.zig`'s `fileZero`).
 pub fn effect(air: Air, tag: Inst.Tag, data: Inst.Data) bool {
     return switch (tag) {
         .block, .loop, .cond_br, .br, .repeat, .ret, .assign => true,
@@ -200,7 +207,7 @@ pub fn effect(air: Air, tag: Inst.Tag, data: Inst.Data) bool {
             if (fn_tag == .cross or fn_tag == .above or fn_tag == .timer) return true;
             if (fn_tag == .@"$fatal" or fn_tag == .@"$error") return true;
             return switch (SysFn.get(fn_tag).family) {
-                .random, .file_out, .file_func => true,
+                .random => true,
                 else => false, // else: a value, or a task of another phase
             };
         },

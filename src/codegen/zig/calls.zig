@@ -3,14 +3,16 @@
 //! tests, §9.11 conversions and the §9.21 table lookup, each spelled as
 //! the old device spelled it (`src/codegen/device/codegen/call.zig`,
 //! `call_analysis.zig`, `render_sysfunc.zig`), so the two
-//! compute the same bits. A §4.6.4 noise source is 0 in the residual.
-//! Cites: VAMS-2023 §4.5.4, §4.5.13, §4.6.1, §4.6.3, §4.6.4, §5.10.2, §9.10,
+//! compute the same bits. A §4.6.4 noise source is 0 in the residual, and
+//! a §9.5 file call its type's zero (`fileZero`).
+//! Cites: VAMS-2023 §4.5.4, §4.5.13, §4.6.1, §4.6.3, §4.6.4, §5.10.2, §9.5, §9.10,
 //! §9.11, §9.14, §9.15, §9.18, §9.19, §9.21; IEEE 1364-2005 §17.8, §17.11.1.
 //!
 //! Contents:
 //! - `pub fn genCall(f: *Function, inst: Air.Inst.Index, data: Air.Inst.Data) DeclGen.Error!void`
 //! - `pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Air.Inst.Ref) DeclGen.Error!void`
 //! - `pub const host_params`: the §9.15 parameters a host writes into `Model`
+//! - `pub fn fileZero(f: *Function, inst: Air.Inst.Index) DeclGen.Error!void`
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -64,6 +66,8 @@ pub fn genCall(f: *Function, inst: Air.Inst.Index, data: Air.Inst.Data) Error!vo
             if (tag == .@"$fatal" or tag == .@"$error") try status.record(f, inst);
             return;
         },
+        // §9.5 a file task: a recording device performs none (`fileZero`).
+        .file_out => return if (used) f.dg.fail("the value of `{s}`", .{@tagName(tag)}),
         else => {}, // else: a value, by tag below
     }
     if (!used and !Liveness.effect(air.*, .call, data)) return;
@@ -258,6 +262,7 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Ref
         .above => try ops.gen(f, inst, .above, args),
         .timer => try ops.gen(f, inst, .timer, args),
         else => {
+            if (SysFn.get(tag).family == .file_func) return fileZero(f, inst);
             // §3.3/§9.5.3/§9.5.4.2/§9.15 the string calls (`strings.zig`).
             if (try strings.gen(f, inst, tag, args)) return;
             // rw-lower's `display$phase` guards a print's operands: `core`
@@ -269,6 +274,22 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Ref
             return f.dg.fail("a call of `{s}`", .{@tagName(tag)}); // not yet spelled by this backend
         },
     }
+}
+
+/// §9.5 a descriptor call's value in a device: its type's zero, with no
+/// file effect. This is the device contract: a device has no host file
+/// table, so VAMS §9.5.1's zero descriptor is the answer (W0850,
+/// `src/Compilation/analyze.zig`; `Config.display` defaults to `.drop`, and
+/// `.record` is the harness's), as the old device answers it
+/// (`src/codegen/device/codegen/call_gate.zig:104`, `emitFileCallDropped`):
+/// §9.5.1 a failed `$fopen`, §9.5.4.1 a read error, §9.5.8 no end of file,
+/// §9.5.7 no error. Real §9.5 I/O (`--display=emit`, `--emit-exe`: the old
+/// `cg_file_io.zig` over `Instance.zf__`) is not this path.
+pub fn fileZero(f: *Function, inst: Air.Inst.Index) Error!void {
+    const ty = f.dg.air.typeOfIndex(f.dg.ip, inst);
+    assert(ty != .none); // a file task (`file_out`) has no value to spell
+    if (ty == InternPool.Index.string_type) return f.print("@as([]const u8, \"\")", .{});
+    try f.print("{s}", .{if (Function.isInt(f.dg.ip, ty)) "@as(i64, 0)" else "S.con(0.0)"});
 }
 
 // ---- private ----

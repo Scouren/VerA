@@ -196,6 +196,8 @@ pub fn effect(air: Air, tag: Inst.Tag, data: Inst.Data) bool {
             if (callee > std.math.maxInt(@typeInfo(SysFn.Tag).@"enum".tag_type)) return false;
             const fn_tag: SysFn.Tag = @fromBackingInt(@intCast(callee));
             if (fn_tag == .transition or fn_tag == .slew or fn_tag == .idtmod or fn_tag == .last_crossing or fn_tag == .absdelay) return true;
+            // §5.10.3 an event records its input for `updateState` (`ops/events.zig`).
+            if (fn_tag == .cross or fn_tag == .above or fn_tag == .timer) return true;
             if (fn_tag == .@"$fatal" or fn_tag == .@"$error") return true;
             return switch (SysFn.get(fn_tag).family) {
                 .random, .file_out, .file_func => true,

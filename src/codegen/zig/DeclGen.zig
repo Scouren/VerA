@@ -202,6 +202,7 @@ pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     try dg.genCore(w, f.uses, body.written());
     try dg.genEntries(w, p);
     try state.genEntries(dg, w);
+    try ops.genBreakpoints(dg, w);
     try status.genEntries(dg, w);
     try status.genSetupInstance(dg, w);
     try say.genEntries(dg, w, say_text);

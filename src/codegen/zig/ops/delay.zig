@@ -12,6 +12,7 @@
 //! - `pub const Delay = struct { len, freezes, sampled, maxd }`
 //! - `pub fn plan(dg: *const DeclGen, args: []const Air.Inst.Ref) Delay`
 //! - `pub fn fields(dg: *DeclGen, k: usize, d: Delay, out: *std.ArrayList(ops.Field)) DeclGen.Error!void`
+//! - `pub fn dynamic(dg: *const DeclGen, ref: Air.Inst.Ref) bool`
 //! - `pub fn genRing`, `pub fn genEval`, `pub fn genAccept`, `pub fn genState`, `pub fn genCommit`, `pub fn genRevertPre`, `pub fn genRevertPost`
 
 const std = @import("std");
@@ -134,30 +135,9 @@ pub fn genRevertPost(dg: *DeclGen, w: *std.Io.Writer, k: usize) Error!void {
     try dg.print(w, "            K.ops.zHistRevert(&inst.op{0d}__t, &inst.op{0d}__v, inst.op{0d}__head, zh{0d}, state.op{0d}__t__acc, state.op{0d}__v__acc, state.op{0d}__t__acc2, state.op{0d}__v__acc2);\n", .{k});
 }
 
-// ---- private ----
-
-/// The effective td in `core`: the frozen field (`k` given) or the live
-/// value, clamped to maxdelay (§4.5.7 "If td becomes greater than maxdelay,
-/// maxdelay will be used").
-fn clamp(f: *Function, args: []const Ref, k: ?usize, d: Delay) Error!void {
-    if (d.maxd) try f.print("@min(", .{});
-    if (k != null and d.freezes) try f.print("inst.op{d}__td", .{k.?}) else try ops.value(f, args, 1, "0.0");
-    if (!d.maxd) return;
-    try f.print(", ", .{});
-    if (k != null and d.sampled) try f.print("inst.op{d}__maxd", .{k.?}) else try ops.value(f, args, 2, "0.0");
-    try f.print(")", .{});
-}
-
-/// The effective td in `updateState`, from `core`'s recorded controls.
-fn stepTd(dg: *DeclGen, w: *std.Io.Writer, k: usize, d: Delay) Error!void {
-    if (d.maxd) try dg.print(w, "@min(", .{});
-    if (d.freezes) try dg.print(w, "inst.op{d}__td", .{k}) else try dg.print(w, "m.o{d}c0", .{k});
-    if (d.maxd) try dg.print(w, ", {s})", .{if (d.sampled) try std.fmt.allocPrint(dg.arena, "inst.op{d}__maxd", .{k}) else try std.fmt.allocPrint(dg.arena, "m.o{d}c1", .{k})});
-}
-
 /// Whether `ref` moves with the solve: it reads something beyond constants
 /// and parameters (a probe, a variable, a call).
-fn dynamic(dg: *const DeclGen, ref: Ref) bool {
+pub fn dynamic(dg: *const DeclGen, ref: Ref) bool {
     const root = ref.toIndex() orelse return false;
     const air = dg.air;
     var stack: [64]Air.Inst.Index = undefined;
@@ -184,6 +164,27 @@ fn dynamic(dg: *const DeclGen, ref: Ref) bool {
         };
     }
     return false;
+}
+
+// ---- private ----
+
+/// The effective td in `core`: the frozen field (`k` given) or the live
+/// value, clamped to maxdelay (§4.5.7 "If td becomes greater than maxdelay,
+/// maxdelay will be used").
+fn clamp(f: *Function, args: []const Ref, k: ?usize, d: Delay) Error!void {
+    if (d.maxd) try f.print("@min(", .{});
+    if (k != null and d.freezes) try f.print("inst.op{d}__td", .{k.?}) else try ops.value(f, args, 1, "0.0");
+    if (!d.maxd) return;
+    try f.print(", ", .{});
+    if (k != null and d.sampled) try f.print("inst.op{d}__maxd", .{k.?}) else try ops.value(f, args, 2, "0.0");
+    try f.print(")", .{});
+}
+
+/// The effective td in `updateState`, from `core`'s recorded controls.
+fn stepTd(dg: *DeclGen, w: *std.Io.Writer, k: usize, d: Delay) Error!void {
+    if (d.maxd) try dg.print(w, "@min(", .{});
+    if (d.freezes) try dg.print(w, "inst.op{d}__td", .{k}) else try dg.print(w, "m.o{d}c0", .{k});
+    if (d.maxd) try dg.print(w, ", {s})", .{if (d.sampled) try std.fmt.allocPrint(dg.arena, "inst.op{d}__maxd", .{k}) else try std.fmt.allocPrint(dg.arena, "m.o{d}c1", .{k})});
 }
 
 /// `ref`'s value when it is a real literal or a parameter with one as its

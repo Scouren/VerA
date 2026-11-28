@@ -1,6 +1,7 @@
 //! §4.5 the stateful analog operators as the device's state: each call
-//! site of `transition`, `slew`, `idtmod`, `last_crossing` or `absdelay`
-//! (`ops/delay.zig`: its ring) owns
+//! site of `transition`, `slew`, `idtmod`, `last_crossing`, `absdelay`
+//! (`ops/delay.zig`: its ring) or a §5.10.3 event `cross`, `above`, `timer`
+//! (`ops/events.zig`) owns
 //! `Instance` fields (`op<k>__<slot>`, the old `op_zig.zig` rows), `core`
 //! evaluates it from them and returns its
 //! input and control values (`o<k>`, `o<k>c<j>`), and `updateState` advances
@@ -12,10 +13,11 @@
 //! Cites: VAMS-2023 §4.5 (an operator's output is a function of its input
 //! and its internal state), §4.5.5 (idtmod), §4.5.8 (transition), §4.5.9
 //! (slew), §4.5.10 (last_crossing), §5.10.3.1 (its direction), §10.3
-//! (`default_transition`, which Air does not carry yet: 0).
+//! (`default_transition`, which Air does not carry yet: 0), §5.10.3 (the
+//! monitored events).
 //!
 //! Contents:
-//! - `pub const Kind = enum { transition, slew, idtmod, last_crossing, absdelay }`, `pub const Site = struct { call, kind, delay }`
+//! - `pub const Kind = enum { transition, slew, idtmod, last_crossing, absdelay, cross, above, timer }`, `pub const Site = struct { call, kind, delay }`
 //! - `pub const Field = struct { name, ty, default }`
 //! - `pub fn plan(dg: *DeclGen) DeclGen.Error!void`
 //! - `pub fn fields(dg: *const DeclGen) DeclGen.Error![]const Field`
@@ -23,6 +25,7 @@
 //! - `pub fn gen(f: *Function, inst: Air.Inst.Index, kind: Kind, args: []const Air.Inst.Ref) DeclGen.Error!void`
 //! - `pub fn genAccept(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void`
 //! - `pub fn genInstance`, `pub fn genState`, `pub fn genCommit`, `pub fn genRevertPre`, `pub fn genRevertPost`: what `state.zig` adds past the fields
+//! - `pub fn genBreakpoints(dg: *DeclGen, w: *std.Io.Writer) DeclGen.Error!void`: the timers' host hooks
 //! - `pub fn value(f: *Function, args: []const Air.Inst.Ref, i: usize, dflt: []const u8) DeclGen.Error!void`
 
 const std = @import("std");
@@ -32,11 +35,12 @@ const SysFn = @import("vams").SysFn;
 const DeclGen = @import("DeclGen.zig");
 const Function = @import("Function.zig");
 const delay = @import("ops/delay.zig");
+const events = @import("ops/events.zig");
 const Ref = Air.Inst.Ref;
 const Error = DeclGen.Error;
 
-/// The operators this file spells.
-pub const Kind = enum { transition, slew, idtmod, last_crossing, absdelay };
+/// The operators this file spells; the last three are `events.zig`'s.
+pub const Kind = enum { transition, slew, idtmod, last_crossing, absdelay, cross, above, timer };
 
 /// One operator call site, in `Air` order: its index is `k` in its names.
 pub const Site = struct { call: Air.Inst.Index, kind: Kind, delay: delay.Delay = .{} };
@@ -61,6 +65,9 @@ pub fn plan(dg: *DeclGen) Error!void {
             .idtmod => .idtmod,
             .last_crossing => .last_crossing,
             .absdelay => .absdelay,
+            .cross => .cross,
+            .above => .above,
+            .timer => .timer,
             else => continue, // else: not an operator this file spells
         };
         const x = air.extraData(Air.Call, data.ty_pl.payload);
@@ -78,7 +85,10 @@ pub fn fields(dg: *const DeclGen) Error![]const Field {
     for (dg.op_sites, 0..) |s, k| {
         if (s.kind == .absdelay) try delay.fields(@constCast(dg), k, s.delay, &out);
         for (slots(s.kind)) |slot| try out.append(dg.arena, .{ .name = try std.fmt.allocPrint(dg.arena, "op{d}__{s}", .{ k, slot.name }), .default = slot.default });
+        if (events.of(s.kind)) |e| for (events.fields(e)) |slot| try out.append(dg.arena, .{ .name = try std.fmt.allocPrint(dg.arena, "op{d}__{s}", .{ k, slot.name }), .default = slot.default });
     }
+    // §5.10.3.1 where a late `cross` should have fired (`events.located`).
+    if (events.anyLocated(dg)) try out.append(dg.arena, .{ .name = "vera_cross_retry__", .default = "std.math.inf(f64)" });
     if (out.items.len != 0) try out.append(dg.arena, .{ .name = "t_prev__", .default = "0.0" });
     assert(out.items.len == 0 or dg.op_sites.len != 0);
     return out.items;
@@ -122,13 +132,23 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, kind: Kind, args: []const Ref) Er
         if (s.call == inst) break k;
     } else unreachable; // `plan` named every operator call
     const m = dg.live.masks[@backingInt(inst)];
+    const event = events.of(kind);
     f.uses.inst = true;
-    f.uses.sim = true;
+    // §5.10.3.2 above() reads no analysis state.
+    f.uses.sim = f.uses.sim or kind != .above;
     const core = f.phase == .core;
     try f.print("op{d}: {{", .{k});
+    // An event's tolerances (and, outside `core`, its controls) are read
+    // by `updateState` alone: the operands `Liveness` keeps are named here.
+    if (event != null) for (args) |a| if (a.toIndex()) |ai| try f.print(" _ = &v{d};", .{@backingInt(ai)});
     if (core) {
         try f.print(" o{d} = F.zTo(S, 0x{x}, ", .{ k, m });
-        try f.real(args[0]);
+        // An event's input (a timer's start_time) may be an integer.
+        if (event != null) {
+            try f.print("S.con(", .{});
+            try value(f, args, 0, "0.0");
+            try f.print(")", .{});
+        } else try f.real(args[0]);
         try f.print(");", .{});
         for (0..controls(kind)) |j| {
             try f.print(" o{d}c{d} = ", .{ k, j });
@@ -137,6 +157,7 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, kind: Kind, args: []const Ref) Er
         }
     }
     if (kind == .absdelay) return delay.genEval(f, k, dg.op_sites[k].delay, args, m);
+    if (event) |e| return events.genValue(f, k, e, args);
     try f.print(" break :op{d} F.zLu(S, 0x{x}, K.ops.{s}(F.zL(S, 0x{x}), F.zLw(S, 0x{x}, ", .{
         k, m,
         switch (kind) {
@@ -145,6 +166,7 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, kind: Kind, args: []const Ref) Er
             .idtmod => "zIdtmod",
             .last_crossing => "zLastCross",
             .absdelay => unreachable, // `delay.genEval`
+            .cross, .above, .timer => unreachable, // `events.genValue`
         },
         m, m,
     });
@@ -154,6 +176,7 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, kind: Kind, args: []const Ref) Er
         .slew => try f.print("), inst.op{d}__prev, sim.dt, ", .{k}),
         .idtmod => try f.print("), inst.op{d}__acc, sim.dt, ", .{k}),
         .absdelay => unreachable, // `delay.genEval`
+        .cross, .above, .timer => unreachable, // `events.genValue`
         // §4.5.10 a crossing since the last accepted point is the last one;
         // `sim.dt > 0` is the seeding rule `updateState` keeps too.
         .last_crossing => {
@@ -183,6 +206,7 @@ pub fn genAccept(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     if (dg.op_sites.len == 0 and !bound_step) return;
     // §9.17.2 reset first: a bound last step set must not bind this one.
     if (delays(dg) or bound_step) try dg.print(w, "    inst.bound_step = std.math.inf(f64);\n", .{});
+    if (events.anyLocated(dg)) try dg.print(w, "    inst.vera_cross_retry__ = std.math.inf(f64);\n", .{});
     if (dg.op_sites.len != 0) {
         try dg.print(w, "    const dt = sim.t - inst.t_prev__;\n    _ = &dt;\n", .{});
         for (dg.op_sites, 0..) |s, k| switch (s.kind) {
@@ -200,6 +224,9 @@ pub fn genAccept(dg: *DeclGen, w: *std.Io.Writer) Error!void {
                 \\
             , .{k}),
             .absdelay => try delay.genAccept(dg, w, k, s.delay),
+            .cross => try events.genAccept(dg, w, k, .cross, events.located(dg, siteArgs(dg, s.call))),
+            .above => try events.genAccept(dg, w, k, .above, false),
+            .timer => try events.genAccept(dg, w, k, .timer, false),
         };
     }
     // T36: the device never wrote the `$bound_step()` calls' own running
@@ -221,6 +248,11 @@ pub fn genInstance(dg: *DeclGen, w: *std.Io.Writer) Error!void {
 /// `State`'s fields past `fields`.
 pub fn genState(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     for (dg.op_sites, 0..) |s, k| if (s.kind == .absdelay) try delay.genState(dg, w, k);
+}
+
+/// The timers' host hooks (`events.genBreakpoints`).
+pub fn genBreakpoints(dg: *DeclGen, w: *std.Io.Writer) Error!void {
+    try events.genBreakpoints(dg, w);
 }
 
 /// `stateCtl(.commit)`'s lines past the field copies.
@@ -253,6 +285,13 @@ pub fn value(f: *Function, args: []const Ref, i: usize, dflt: []const u8) Error!
 
 // ---- private ----
 
+/// The arguments of call `inst`.
+fn siteArgs(dg: *const DeclGen, inst: Air.Inst.Index) []const Ref {
+    const data = dg.air.instructions.items(.data)[@backingInt(inst)];
+    const x = dg.air.extraData(Air.Call, data.ty_pl.payload);
+    return @ptrCast(dg.air.extra[x.end..][0..x.data.args_len]);
+}
+
 /// Whether some site is an `absdelay`.
 fn delays(dg: *const DeclGen) bool {
     for (dg.op_sites) |s| if (s.kind == .absdelay) return true;
@@ -271,6 +310,8 @@ fn slots(kind: Kind) []const Slot {
         .last_crossing => &.{ .{ .name = "prev" }, .{ .name = "t_last", .default = "-1.0" } },
         // `delay.fields`: its shape is the call's.
         .absdelay => &.{},
+        // `events.fields`.
+        .cross, .above, .timer => &.{},
     };
 }
 
@@ -282,6 +323,9 @@ fn controls(kind: Kind) usize {
         .transition, .idtmod => 3,
         .slew, .absdelay => 2,
         .last_crossing => 1,
+        .cross => events.controls(.cross),
+        .above => events.controls(.above),
+        .timer => events.controls(.timer),
     };
 }
 
@@ -311,5 +355,8 @@ fn control(f: *Function, kind: Kind, args: []const Ref, j: usize) Error!void {
         .last_crossing => try value(f, args, 1, "0.0"),
         // §4.5.7 td and maxdelay, as written.
         .absdelay => try value(f, args, j + 1, "0.0"),
+        .cross => try events.control(f, .cross, args, j),
+        .above => try events.control(f, .above, args, j),
+        .timer => try events.control(f, .timer, args, j),
     }
 }

@@ -105,6 +105,36 @@ pub const Constant = struct {
     c: bool = false,
 };
 
+/// One per `Instance` field, in declaration order (#134): which outputs a
+/// read of that field can reach. A superset: a bit set costs a host nothing
+/// but a stale replay it need not have kept; a bit clear it must be able to
+/// trust, since a host that keys a recorded linearization on the instance
+/// row compares only the fields whose bits are set instead of the whole row.
+///   res: can reach a residual value of `eval`.
+///   jac: can reach a derivative lane of `eval` or `q`.
+///   q: can reach a charge site's value.
+///   limit: can reach `limit`'s result.
+///   state: can reach what `updateState` or `acceptQ` stage (a value fed
+///     into a HELD FIELD'S own next staged value, §5.10/§5.6.1.2 — not a
+///     query/commit/revert bookkeeping copy between `Instance` and `State`).
+///   w_update: `updateState` or `acceptQ` writes the `Instance` field
+///     directly (a `.history` field; a `.path_latch` instead stages into its
+///     `State` twin, so this is false for one).
+///   w_commit: `stateCtl`'s `.commit` arm writes the `Instance` field
+///     directly (a `.path_latch` field; a `.history` one instead copies
+///     `Instance` into its `State` twin there, and only `.revert` writes
+///     `Instance` back, which is not `.commit`, so this is false for one).
+pub const FieldUse = packed struct(u8) {
+    res: bool = false,
+    jac: bool = false,
+    q: bool = false,
+    limit: bool = false,
+    state: bool = false,
+    w_update: bool = false,
+    w_commit: bool = false,
+    _: u1 = 0,
+};
+
 comptime {
     // Budget: returned once per instance per accepted point; a time and a tag.
     assert(@sizeOf(UpdateResult) <= 16);
@@ -146,36 +176,6 @@ pub fn simReads(comptime D: type) SimReads {
 pub fn limitSimReads(comptime D: type) SimReads {
     return if (@hasDecl(D, "limit_sim_reads")) D.limit_sim_reads else .{};
 }
-
-/// One per `Instance` field, in declaration order (#134): which outputs a
-/// read of that field can reach. A superset: a bit set costs a host nothing
-/// but a stale replay it need not have kept; a bit clear it must be able to
-/// trust, since a host that keys a recorded linearization on the instance
-/// row compares only the fields whose bits are set instead of the whole row.
-///   res: can reach a residual value of `eval`.
-///   jac: can reach a derivative lane of `eval` or `q`.
-///   q: can reach a charge site's value.
-///   limit: can reach `limit`'s result.
-///   state: can reach what `updateState` or `acceptQ` stage (a value fed
-///     into a HELD FIELD'S own next staged value, §5.10/§5.6.1.2 — not a
-///     query/commit/revert bookkeeping copy between `Instance` and `State`).
-///   w_update: `updateState` or `acceptQ` writes the `Instance` field
-///     directly (a `.history` field; a `.path_latch` instead stages into its
-///     `State` twin, so this is false for one).
-///   w_commit: `stateCtl`'s `.commit` arm writes the `Instance` field
-///     directly (a `.path_latch` field; a `.history` one instead copies
-///     `Instance` into its `State` twin there, and only `.revert` writes
-///     `Instance` back, which is not `.commit`, so this is false for one).
-pub const FieldUse = packed struct(u8) {
-    res: bool = false,
-    jac: bool = false,
-    q: bool = false,
-    limit: bool = false,
-    state: bool = false,
-    w_update: bool = false,
-    w_commit: bool = false,
-    _: u1 = 0,
-};
 
 /// Returns `D.field_use`, or every read bit set (`w_update`/`w_commit`
 /// false: undeclared says nothing about which writes it) for every field

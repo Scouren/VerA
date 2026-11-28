@@ -18,6 +18,9 @@
 //!   `q_pattern`, `u_kinds`, `instance_params`, `collapse`, `collapse_full`,
 //!   `limit`, `seed`, `v_max`, `v_seed`
 //! - `pub const DioBench = struct`, with `d`, `init`, `residual`, `jacobian`
+//! - `pub const RcCarried, RcSwapped`: `Rc`'s shape with the host's tables as data
+//!   (`osdi_entries`, `osdi_param_fields`, `osdi_param_kinds`, `osdi_param_names`,
+//!   `osdi_param_name_at`, `osdi_param_flags`)
 //! - `pub const no_paras: abi.SimParas`
 //! - `pub fn real(d: *const abi.Descriptor, ip: ?*anyopaque, mp: ?*anyopaque, id: u32, flags: u32) *f64`
 //! - `pub fn evalDc(d: *const abi.Descriptor, ip: *anyopaque, mp: *anyopaque, x: []const f64) u32`
@@ -271,6 +274,15 @@ pub const DioBench = struct {
     }
 };
 
+/// `Rc`'s shape carrying the host's six tables as data, written by hand from
+/// the OSDI rules (`Rc` declares no patterns, so every entry of its 2x2
+/// Jacobian has both halves; `r` and `c` are instance parameters, then
+/// `$mfactor`, then the model side). Its `eval` and `q` are `Rc`'s.
+pub const RcCarried = Carried(.{ .{ 0, 0, 3 }, .{ 0, 1, 3 }, .{ 1, 0, 3 }, .{ 1, 1, 3 } });
+/// `RcCarried` with one Jacobian entry swapped: (0, 1) and (1, 0) out of
+/// row-major order, what a wrong emitter would write.
+pub const RcSwapped = Carried(.{ .{ 0, 0, 3 }, .{ 1, 0, 3 }, .{ 0, 1, 3 }, .{ 1, 1, 3 } });
+
 /// No `$simparam` list: what a simulator passes that sets none.
 pub const no_paras: abi.SimParas = .{ .names = null, .vals = null, .names_str = null, .vals_str = null };
 
@@ -296,4 +308,39 @@ pub fn evalFlags(d: *const abi.Descriptor, ip: *anyopaque, mp: *anyopaque, x: []
     const ret = d.eval(null, ip, mp, &si);
     assert(ret & ~(abi.eval_ret_flag_lim | abi.eval_ret_flag_fatal) == 0);
     return ret;
+}
+
+// ---- private ----
+
+/// `Rc`'s unknowns, card and instance, with the Jacobian entry table `entries` and the
+/// parameter tables as `RcCarried` gives them.
+fn Carried(comptime entries: [4][3]u16) type {
+    return struct {
+        pub const U = Rc.U;
+        pub const num_ports = Rc.num_ports;
+        pub const vera_version = Rc.vera_version;
+        pub const Model = Rc.Model;
+        pub const Instance = Rc.Instance;
+        const Self = @This();
+
+        pub fn eval(comptime S: type, x: *const [2]S.V, m: *const Model, _: *const Instance, _: contract.SimState) contract.Rows(Self, S) {
+            const p = contract.probes(Self, S, x);
+            const i = p[0].sub(p[1]).scale(1.0 / m.r);
+            return contract.rows(Self, S, .{ i, i.neg() });
+        }
+        pub fn q(comptime S: type, x: *const [2]S.V, m: *const Model, _: *const Instance, _: contract.SimState) contract.Sites(Self, S) {
+            const p = contract.probes(Self, S, x);
+            const v = p[0].sub(p[1]).scale(m.c);
+            return contract.sites(Self, S, .{ v, v.neg() });
+        }
+        pub fn evalQ(comptime S: type, x: *const [2]S.V, m: *const Model, i: *const Instance, sim: contract.SimState) struct { res: contract.Rows(Self, S), q: contract.Sites(Self, S) } {
+            return .{ .res = eval(S, x, m, i, sim), .q = q(S, x, m, i, sim) };
+        }
+        pub const osdi_entries = entries;
+        pub const osdi_param_fields = [_][]const u8{ "r", "c" };
+        pub const osdi_param_kinds = [_]u8{ 0, 0 };
+        pub const osdi_param_names = "r\x00c\x00$mfactor\x00r\x00c\x00";
+        pub const osdi_param_name_at = [_]u32{ 0, 2, 4, 13, 15 };
+        pub const osdi_param_flags = [_]u32{ abi.para_kind_inst, abi.para_kind_inst, abi.para_kind_inst, 0, 0 };
+    };
 }

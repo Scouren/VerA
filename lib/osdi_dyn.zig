@@ -92,6 +92,7 @@
 //! - `pub fn SetupValue(comptime D: type) type`
 
 const std = @import("std");
+const builtin = @import("builtin");
 const assert = std.debug.assert;
 const contract = @import("contract");
 const abi = @import("osdi_dyn/abi.zig");
@@ -139,6 +140,9 @@ fn exportDescriptor(comptime D: type, comptime name: []const u8, comptime build:
     comptime assert(name.len > 0);
     const Lib = descriptor.Library(D, name, build == .split);
     contract.validateHost(Lib, D);
+    // The tables a device carries are the ones derived, element for element: checked where
+    // compile time is not measured, since deriving them is what carrying them saves.
+    if (builtin.mode == .debug) if (comptime Lib.literal_error) |m| @compileError(@typeName(D) ++ ": " ++ m);
     comptime assert(Lib.descriptors.len == abi.osdi_num_descriptors);
     @export(&abi.osdi_version_major, .{ .name = "OSDI_VERSION_MAJOR" });
     @export(&abi.osdi_version_minor, .{ .name = "OSDI_VERSION_MINOR" });

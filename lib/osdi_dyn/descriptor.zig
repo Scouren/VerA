@@ -14,6 +14,7 @@
 //! Contents:
 //! - `pub fn Library(comptime D: type, comptime name: []const u8, comptime split: bool) type`
 //! - `pub fn Library(D, name, split).fillParams() callconv(.c) void`, `.fill_params_entry`
+//! - `pub const Library(...).literal_error: ?[]const u8`
 //! - `pub const Library(...).calls_setup, .mutable_eval, .iteration_hooks, .noise_table_points, .shape_check, .calls_ac_dyn: bool`
 //! - `pub const Library(...).descriptors: [1]abi.Descriptor`
 //! - `pub fn Library(...).exportHot(comptime part: contract.DevicePart) void`
@@ -208,7 +209,13 @@ pub fn Library(comptime D: type, comptime name: []const u8, comptime split: bool
         /// Every parameter's C name, NUL-terminated, end to end; `param_name_at[i]` is where
         /// record `i`'s starts. A device that carries the three tables as data is not walked.
         const literal = @hasDecl(D, "osdi_param_names");
-        const param_names: []const u8 = if (literal) D.osdi_param_names else blk: {
+        const param_names: []const u8 = if (literal) D.osdi_param_names else derived_param_names;
+        const param_name_at: [T.num_params]u32 = if (literal) D.osdi_param_name_at else derived_param_name_at;
+        const param_flags: [T.num_params]u32 = if (literal) D.osdi_param_flags else derived_param_flags;
+
+        /// The three tables as the wrapper derives them from `T.params`,
+        /// whatever the device carries: `literal_error`'s oracle.
+        const derived_param_names: []const u8 = blk: {
             @setEvalBranchQuota(100_000_000);
             var total: usize = 0;
             for (0..T.num_params) |i| total += paramName(i).len + 1;
@@ -223,7 +230,7 @@ pub fn Library(comptime D: type, comptime name: []const u8, comptime split: bool
             const done = buf;
             break :blk &done;
         };
-        const param_name_at: [T.num_params]u32 = if (literal) D.osdi_param_name_at else blk: {
+        const derived_param_name_at: [T.num_params]u32 = blk: {
             @setEvalBranchQuota(100_000_000);
             var a: [T.num_params]u32 = undefined;
             var at: usize = 0;
@@ -233,13 +240,33 @@ pub fn Library(comptime D: type, comptime name: []const u8, comptime split: bool
             }
             break :blk a;
         };
-        const param_flags: [T.num_params]u32 = if (literal) D.osdi_param_flags else blk: {
+        const derived_param_flags: [T.num_params]u32 = blk: {
             @setEvalBranchQuota(100_000_000);
             var a: [T.num_params]u32 = undefined;
             for (T.params, 0..) |p, i| a[T.num_inst_params + i] = paraTy(p.kind);
             for (T.inst_idx, 0..) |pi, k| a[k] = paraTy(T.params[pi].kind) | abi.para_kind_inst;
             if (T.has_mf) a[T.ni] = abi.para_ty_real | abi.para_kind_inst;
             break :blk a;
+        };
+
+        /// Null when every table the device carries (`osdi_entries`,
+        /// `osdi_param_fields` and `osdi_param_kinds`, `osdi_param_names`,
+        /// `osdi_param_name_at`, `osdi_param_flags`) is the one the wrapper
+        /// derives, element for element; else the first difference. Read only
+        /// where a build asks (`exportDescriptor` in Debug).
+        pub const literal_error: ?[]const u8 = blk: {
+            @setEvalBranchQuota(100_000_000);
+            if (T.literal_error) |m| break :blk m;
+            if (!literal) break :blk null;
+            if (!std.mem.eql(u8, param_names, derived_param_names)) {
+                const at = std.mem.findDiff(u8, param_names, derived_param_names).?;
+                break :blk std.fmt.comptimePrint("osdi_param_names: byte {d} differs from the derived names", .{at});
+            }
+            for (param_name_at, derived_param_name_at, param_flags, derived_param_flags, 0..) |a, da, f, df, i| {
+                if (a != da) break :blk std.fmt.comptimePrint("osdi_param_name_at[{d}]: {d}, derived {d}", .{ i, a, da });
+                if (f != df) break :blk std.fmt.comptimePrint("osdi_param_flags[{d}]: 0x{x}, derived 0x{x}", .{ i, f, df });
+            }
+            break :blk null;
         };
 
         /// Record `i`'s name: the instance side first (`inst_idx`, then `$mfactor`), then the
@@ -754,4 +781,26 @@ test "instance_params: only the marked parameter is an instance parameter; its i
     // Past the one instance id (no `$mfactor` here), id 1 is the model's `rs`.
     try testing.expectEqual(@as(?*anyopaque, @ptrCast(&b.model.vals[0])), d.access(&b.inst, &b.model, 1, abi.access_flag_instance));
     try testing.expectEqual(@as(u32, 0), d.given_flag_instance(&b.inst, 1));
+}
+
+test "literal_error: carried tables equal to the derived ones pass; one swapped Jacobian entry fails by index" {
+    // Oracle: `RcCarried`'s tables are written by hand from the OSDI rules, not by the wrapper.
+    try testing.expectEqual(@as(?[]const u8, null), comptime Library(fixture.RcCarried, "rc", false).literal_error);
+    // The tables the wrapper reads are the carried ones.
+    try testing.expectEqual(@as(usize, 4), tables.Tables(fixture.RcCarried).nj);
+    try testing.expectEqualStrings("osdi_entries[1]: (1, 0, 3), the patterns give (0, 1, 3)", comptime Library(fixture.RcSwapped, "rc", false).literal_error.?);
+    // The descriptor built from the carried tables is `Rc`'s, record for record.
+    const a = &Library(fixture.RcCarried, "rc", false).descriptors[0];
+    const b = &Library(fixture.Rc, "rc", false).descriptors[0];
+    Library(fixture.RcCarried, "rc", false).fillParams();
+    Library(fixture.Rc, "rc", false).fillParams();
+    try testing.expectEqual(b.num_jacobian_entries, a.num_jacobian_entries);
+    for (0..b.num_jacobian_entries) |k| try testing.expectEqual(b.jacobian_entries[k], a.jacobian_entries[k]);
+    try testing.expectEqual(b.num_params, a.num_params);
+    for (0..b.num_params) |i| {
+        try testing.expectEqualStrings(std.mem.span(b.param_opvar[i].name[0].?), std.mem.span(a.param_opvar[i].name[0].?));
+        try testing.expectEqual(b.param_opvar[i].flags, a.param_opvar[i].flags);
+    }
+    // A device that carries nothing is not checked.
+    try testing.expectEqual(@as(?[]const u8, null), comptime Library(fixture.Rc, "rc", false).literal_error);
 }

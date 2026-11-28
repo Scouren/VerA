@@ -16,9 +16,10 @@
 //! - `pub const Tables(D).n, .np, .ni, .has_mf, .num_inst_params, .num_params, .nj, .n_resist, .n_react: comptime_int`
 //! - `pub const Tables(D).has_q, .collapses, .has_bp: bool`
 //! - `pub const Tables(D).State: type`, `.Val`, `.Dual: type`
-//! - `pub const Tables(D).Kind = enum`, `.Param = struct`, `.params: []const Param`
+//! - `pub const Tables(D).Kind = enum`, `.Param = struct`, `.params, .derived_params: []const Param`
 //! - `pub const Tables(D).all_idx: [np]u16`, `.inst_idx: []const u16`
-//! - `pub const Tables(D).Entry = struct`, `.entries: []const Entry`
+//! - `pub const Tables(D).Entry = struct`, `.entries, .derived_entries: []const Entry`
+//! - `pub const Tables(D).literal_error: ?[]const u8`
 //! - `pub const Tables(D).resist_idx, .react_idx: []const u32`, `.kcl_rows: [n]bool`
 //! - `pub const Tables(D).PairKind = enum`, `.Pair = struct`, `.pairs: []const Pair`
 //! - `pub const Tables(D).gens: []const contract.NoiseGen(D)`
@@ -96,15 +97,19 @@ pub fn Tables(comptime D: type) type {
         /// The §3.4 parameters: `Model` fields with no `__` (VerA's own
         /// fields all carry one, and a sanitized leaf never does) other than
         /// the setup cache (`su`, `su_ok`), of a real, integer or string type.
-        pub const params: []const Param = blk: {
+        /// A device that carries the list as data (`osdi_param_fields`,
+        /// `osdi_param_kinds`) is not reflected on.
+        pub const params: []const Param = if (@hasDecl(D, "osdi_param_fields")) blk: {
             @setEvalBranchQuota(quota);
-            // A device that carries the list as data is not reflected on.
-            if (@hasDecl(D, "osdi_param_fields")) {
-                var lit: [D.osdi_param_fields.len]Param = undefined;
-                for (&lit, D.osdi_param_fields, D.osdi_param_kinds) |*o, f, kd| o.* = .{ .field = f, .kind = @fromBackingInt(@intCast(kd)) };
-                const done_lit = lit;
-                break :blk &done_lit;
-            }
+            var lit: [D.osdi_param_fields.len]Param = undefined;
+            for (&lit, D.osdi_param_fields, D.osdi_param_kinds) |*o, f, kd| o.* = .{ .field = f, .kind = @fromBackingInt(@intCast(kd)) };
+            const done_lit = lit;
+            break :blk &done_lit;
+        } else derived_params;
+        /// `params` as the wrapper derives it from `D.Model`, whatever the
+        /// device carries: `literal_error`'s oracle.
+        pub const derived_params: []const Param = blk: {
+            @setEvalBranchQuota(quota);
             const s = @typeInfo(D.Model).@"struct";
             var buf: [s.field_names.len]Param = undefined;
             var n_params: usize = 0;
@@ -158,15 +163,22 @@ pub fn Tables(comptime D: type) type {
         /// The Jacobian entries, row-major: every (row, col) in
         /// `jac_pattern | q_pattern`, plus the `jac_const` and `ac_dyn_slots`
         /// entries, less a 0 V short's flow row and column (`shortFlow`).
-        pub const entries: []const Entry = blk: {
+        /// A device that carries the table as data (`osdi_entries`: row,
+        /// column, 1 resistive | 2 reactive) is not scanned.
+        pub const entries: []const Entry = if (@hasDecl(D, "osdi_entries")) blk: {
             @setEvalBranchQuota(quota);
-            // A device that carries the table as data is not scanned.
-            if (@hasDecl(D, "osdi_entries")) {
-                var lit: [D.osdi_entries.len]Entry = undefined;
-                for (&lit, D.osdi_entries) |*o, e| o.* = .{ .r = e[0], .c = e[1], .resist = e[2] & 1 != 0, .react = e[2] & 2 != 0 };
-                const done_lit = lit;
-                break :blk &done_lit;
+            var lit: [D.osdi_entries.len]Entry = undefined;
+            for (&lit, D.osdi_entries) |*o, e| {
+                assert(e[2] != 0 and e[2] <= 3);
+                o.* = .{ .r = e[0], .c = e[1], .resist = e[2] & 1 != 0, .react = e[2] & 2 != 0 };
             }
+            const done_lit = lit;
+            break :blk &done_lit;
+        } else derived_entries;
+        /// `entries` as the wrapper derives it from the patterns, whatever the
+        /// device carries: `literal_error`'s oracle.
+        pub const derived_entries: []const Entry = blk: {
+            @setEvalBranchQuota(quota);
             // One pass sizes the table and one fills it, so nothing grows by
             // `++`; the row's patterns and its extra entries are read once per
             // row, since this runs n*n times in the compile-time interpreter.
@@ -220,6 +232,30 @@ pub fn Tables(comptime D: type) type {
         };
         /// How many entries.
         pub const nj = entries.len;
+
+        /// Null when the device carries neither table, or carries each as the
+        /// wrapper would derive it (`derived_params`, `derived_entries`),
+        /// element for element; else the first difference. Read only where a
+        /// build asks (`exportDescriptor` in Debug): deriving is what carrying
+        /// the tables saves.
+        pub const literal_error: ?[]const u8 = blk: {
+            @setEvalBranchQuota(quota);
+            if (@hasDecl(D, "osdi_param_fields")) {
+                if (params.len != derived_params.len) break :blk std.fmt.comptimePrint("osdi_param_fields: {d} parameters, the Model has {d}", .{ params.len, derived_params.len });
+                for (params, derived_params, 0..) |p, d, i| {
+                    if (!std.mem.eql(u8, p.field, d.field) or p.kind != d.kind)
+                        break :blk std.fmt.comptimePrint("osdi_param_fields[{d}]: {s} ({t}), the Model's is {s} ({t})", .{ i, p.field, p.kind, d.field, d.kind });
+                }
+            }
+            if (@hasDecl(D, "osdi_entries")) {
+                if (entries.len != derived_entries.len) break :blk std.fmt.comptimePrint("osdi_entries: {d} entries, the patterns give {d}", .{ entries.len, derived_entries.len });
+                for (entries, derived_entries, 0..) |e, d, k| {
+                    if (e.r != d.r or e.c != d.c or e.resist != d.resist or e.react != d.react)
+                        break :blk std.fmt.comptimePrint("osdi_entries[{d}]: ({d}, {d}, {d}), the patterns give ({d}, {d}, {d})", .{ k, e.r, e.c, flagsOf(e), d.r, d.c, flagsOf(d) });
+                }
+            }
+            break :blk null;
+        };
         /// The entries with a resistive (reactive) half, by index.
         pub const resist_idx: []const u32 = halfIdx(.resist);
         pub const react_idx: []const u32 = halfIdx(.react);
@@ -376,6 +412,11 @@ pub fn Tables(comptime D: type) type {
         /// row's width is taken as set, as for an undeclared pattern.
         fn bit(row: anytype, c: usize) bool {
             return c >= @bitSizeOf(@TypeOf(row)) or (row >> @intCast(c)) & 1 != 0;
+        }
+
+        /// An entry's `osdi_entries` flags: 1 resistive, 2 reactive.
+        fn flagsOf(e: Entry) u16 {
+            return @as(u16, @intFromBool(e.resist)) | (@as(u16, @intFromBool(e.react)) << 1);
         }
 
         fn count(comptime half: enum { resist, react }) comptime_int {

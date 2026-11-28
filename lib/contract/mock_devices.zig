@@ -14,7 +14,7 @@
 //! Contents:
 //! - `pub const mock_version: []const u8`
 //! - `pub const MockR`, `MockSw`, `MockTline`, `MockAll`, `MockVsrc`, `MockNoPorts`,
-//!   `MockWide`, `MockLead = struct`; `pub fn MockN(comptime n: usize) type`
+//!   `MockWide`, `MockLead`, `MockFieldUse = struct`; `pub fn MockN(comptime n: usize) type`
 //! - Each declares the contract members `validate` knows, among them:
 //!   `U`, `num_ports`, `vera_version`, `Model`, `Instance`, `State`, `Setup`,
 //!   `eval`, `q`, `evalQ`, `limit`, `limit_reads`, `limit_writes`, `seed`,
@@ -35,7 +35,7 @@
 //!   `pendingBreakpoint`, `delays`, `display`, `displayPass`,
 //!   `vpi_contrib_access`, `vpi_contrib_hi`, `vpi_contrib_lo`,
 //!   `vpi_contrib_flow_u`, `vpiContribs`, `vpi_share_row`, `vpiShares`,
-//!   `lane_masks`, `sim_reads`
+//!   `lane_masks`, `sim_reads`, `limit_sim_reads`, `field_use`
 
 const std = @import("std");
 const ac = @import("ac.zig");

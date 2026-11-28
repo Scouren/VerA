@@ -3,9 +3,10 @@
 //! and the file-scope declarations of the emitted device, in the order a
 //! reader meets them: the imports, the unknowns (`U`), the card (`Model`),
 //! the instance, the lane tables, the charge sites, `core` (the one body,
-//! `Function`), its versioned entry (§11.9), and the entry points `eval`
-//! and `q` over it. The device imports `std_kernels` for every kernel; no
-//! kernel text is written. `comptime contract.validate(Self)` closes it.
+//! `Function`), its versioned entry (§11.9), the entry points `eval` and
+//! `q` over it, and the OSDI host's tables as data (`host.zig`). The
+//! device imports `std_kernels` for every kernel; no kernel text is
+//! written. `comptime contract.validate(Self)` closes it.
 //! Cites: VAMS-2023 §1.3.1, §3.4, §3.4.2, §4.4, §5.6, §5.6.1.2, §9.10.
 //!
 //! Contents:
@@ -35,6 +36,7 @@ const status = @import("status.zig");
 const ops = @import("ops.zig");
 const noise = @import("noise.zig");
 const array = @import("array.zig");
+const host = @import("host.zig");
 const Device = Air.Device;
 const Real = Function.Real;
 
@@ -208,6 +210,7 @@ pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     try say.genEntries(dg, w, say_text);
     try noise.genTables(dg, w);
     try noise.genEntries(dg, w, noise_text);
+    try host.genTables(dg, w, p.pattern);
     try dg.print(w, "\ncomptime {{\n    contract.validate(Self);\n}}\n", .{});
 }
 

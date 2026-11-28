@@ -59,7 +59,9 @@ pub fn add(g: Graph, ams: bool) Added {
     b.step("test-cli", "Run the CLI's tests (src/main.zig, src/cli/) only").dependOn(&cli_run.step);
 
     const osdi_mod = m.make("lib/osdi_dyn.zig", &.{.{ .name = "contract", .module = contract }});
-    test_step.dependOn(&testRun(b, "osdi_dyn", osdi_mod, runner, results_dir).step);
+    const osdi_run = testRun(b, "osdi_dyn", osdi_mod, runner, results_dir);
+    test_step.dependOn(&osdi_run.step);
+    b.step("test-osdi_dyn", "Run lib/osdi_dyn.zig's tests (the OSDI 0.4 wrapper) only").dependOn(&osdi_run.step);
     // zrunner cannot be its own runner's root: stock runner.
     const zrunner_test = b.addTest(.{ .name = "zrunner", .root_module = m.make("tools/zrunner.zig", &.{}) });
     all_step.dependOn(&zrunner_test.step);

@@ -60,4 +60,5 @@ test {
     _ = @import("zig/state.zig");
     _ = @import("zig/say.zig");
     _ = @import("zig/calls.zig");
+    _ = @import("zig/host.zig");
 }

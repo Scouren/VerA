@@ -212,3 +212,15 @@ P4 runs first and step 4 rebases on it.
   outward action is logged in its commit or pull request. The stop rules for a lane (a
   regression one fix does not clear, an undecided choice) and for all heavy work (two OOM
   kills, the usage limit) stay.
+
+## 3d. Oracle holes and gaps found by the implementers (queue, 2026-11-28)
+
+Each is a hole in the oracle set (AGENTS.md: it lands with the oracle that catches its class)
+or a gap a list line now names. Taken in the lists lane in this order once its files are free.
+
+| # | What | Found by | Oracle to add |
+|---|---|---|---|
+| T12b | `dyn.zig` always runs at `dt = 1e-9`, kind `.tran`: cross's `dt > 0` guard and transient-only rule are invisible; `stateCtl(.query)` (a held variable an event flipped) is never called, and the new side always answers false | T12's red run (stayed green) | a `dt = 0` point and a `.query` comparison after each accept; expect other operators' lines to move |
+| T16b | zero-fill `%-08h`, `%0Nc`, `%0Ns` on a string pad with spaces on the new side, '0' on the old; no fixture hits them | T15/T16 | a format generator over flag x width x conversion x value, both sides' bytes compared (`tests/generators.zig` row) |
+| SW1 | `Sema/format.zig` `intSize` sizes an unranged `localparam wide = 64'h…` at 32 bits; IEEE 1364-2005 §12.2 gives it its value's width (64) | T15/T16 (`numeric_string_local_width`) | the fixture; plus a width table test over unranged parameter forms |
+| SW2 | `$simparam$str("path")` in a generate block answers ""; Sema does not keep the generate scope path | T15/T16 (`conditional_direct_nesting_is_not_a_scope`) | the fixture |

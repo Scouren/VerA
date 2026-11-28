@@ -28,9 +28,12 @@
 //!   `stateCtl(.revert)`, and every lane must match a central difference;
 //!   the §9.4 display records `say` writes at each
 //!   accepted point and the `say_sites` formats, exactly (the old device
-//!   built `.record`); where a side stops the process (§4.2.4's zero
-//!   divisor), every side must stop there by the same signal, and the run
-//!   goes on past the point;
+//!   built `.record`); each side runs in its own empty working directory
+//!   (`zig-out/codegen-work/b<k>/w<j>/{o,n,v}`), and the §9.5 files it
+//!   wrote there must be the old side's, path for path, byte for byte;
+//!   where a side stops the process (§4.2.4's zero divisor), every side
+//!   must stop there by the same signal, and the run goes on past the
+//!   point;
 //! - the bsource stack (`codegen.examples.stack`) against `Air.interp`, and
 //!   the contract's hosts (`tests/host`) on the new devices of their
 //!   fixtures (build/rewrite.zig's `codegenHosts`).
@@ -43,6 +46,7 @@
 const std = @import("std");
 const Io = std.Io;
 const Allocator = std.mem.Allocator;
+const assert = std.debug.assert;
 const link = @import("link");
 const DynLib = @import("dynlib").DynLib;
 const options = @import("rewrite_options");
@@ -445,7 +449,16 @@ fn runBatch(gpa: Allocator, arena: Allocator, io: Io, qs: *[2]link.Queue, work: 
             }
             var rn = r;
             rn.card.n_u = nu[0];
-            if (try compareIsolated(arena, rn, old_fn, new_fn, ver_fn, tally)) |why| try whys.put(arena, r.rel, why);
+            // §9.5 each side runs in its own empty directory, so a file a
+            // device writes lands under it by its relative path.
+            var cwds: Cwds = undefined;
+            for (&cwds, [3][]const u8{ "o", "n", "v" }) |*c, side| {
+                c.* = try arena.printSentinel("{s}/w{d}/{s}", .{ dir, k, side }, 0);
+                try Io.Dir.cwd().createDirPath(io, c.*);
+            }
+            const why = try compareIsolated(arena, rn, old_fn, new_fn, ver_fn, &cwds, tally) orelse
+                try filesDiffer(arena, io, &cwds, ver_fn != null);
+            if (why) |w| try whys.put(arena, r.rel, w);
         };
         return;
     }
@@ -570,13 +583,13 @@ fn blame(arena: Allocator, b: std.zig.ErrorBundle, group: []const Ready, left: [
 /// (`dyn.zig`), so each point is evaluated a bounded number of times. A
 /// side that stops alone is the fixture's disagreement. Bounded: each
 /// resume starts past a new point of `stops`.
-fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, tally: *Tally) !?[]const u8 {
+fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, cwds: *const Cwds, tally: *Tally) !?[]const u8 {
     const sides_n: u2 = if (ver_fn != null) 3 else 2;
     const side_names = [3][]const u8{ "old", "new", "versioned" };
     var stops: std.ArrayList(u32) = .empty;
     for (0..points + 1) |_| {
         const start: u32 = if (stops.items.len == 0) 0 else stops.items[stops.items.len - 1] + 1;
-        const first = try child(arena, r, old_fn, new_fn, ver_fn, stops.items, start, null);
+        const first = try child(arena, r, old_fn, new_fn, ver_fn, cwds, stops.items, start, null);
         const stop = switch (first) {
             .done => |d| {
                 tally.points += d.counts[0];
@@ -594,7 +607,7 @@ fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver
         const side: u2 = @intCast(stop.rec & 3);
         for (0..sides_n) |o| {
             if (o == side) continue;
-            const other = try child(arena, r, old_fn, new_fn, ver_fn, stops.items, start, .{ .point = p, .side = @intCast(o) });
+            const other = try child(arena, r, old_fn, new_fn, ver_fn, cwds, stops.items, start, .{ .point = p, .side = @intCast(o) });
             switch (other) {
                 .done => return try arena.print("the {s} device stopped the process at point {d} (wait status 0x{x}), the {s} device did not", .{ side_names[side], p, stop.status, side_names[o] }),
                 .stopped => |os| if (os.rec != (stop.rec & ~@as(u32, 3)) | @as(u32, @intCast(o)) or os.status != stop.status)
@@ -609,7 +622,7 @@ fn compareIsolated(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver
 /// Runs `compare` in a forked child. The child writes a `u32` record
 /// before each call (point << 2 | side), then `done`, its counts and the
 /// why; a child that dies leaves its last record.
-fn child(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, stops: []const u32, start: u32, probe: ?Probe) !ChildRun {
+fn child(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, cwds: ?*const Cwds, stops: []const u32, start: u32, probe: ?Probe) !ChildRun {
     const linux = std.os.linux;
     var fds: [2]i32 = undefined;
     if (linux.errno(linux.pipe2(&fds, .{})) != .SUCCESS) return error.PipeFailed;
@@ -625,7 +638,7 @@ fn child(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunF
         const dfl: std.posix.Sigaction = .{ .handler = .{ .handler = std.posix.SIG.DFL }, .mask = std.posix.sigemptyset(), .flags = 0 };
         std.debug.updateSegfaultHandler(&dfl);
         var counts: Counts = @splat(0);
-        const why = compare(arena, r, old_fn, new_fn, ver_fn, fds[1], &counts, stops, start, probe) catch "the oracle ran out of memory";
+        const why = compare(arena, r, old_fn, new_fn, ver_fn, cwds, fds[1], &counts, stops, start, probe) catch "the oracle ran out of memory";
         const tail = [_]u32{done} ++ counts;
         _ = linux.write(fds[1], @ptrCast(&tail), @sizeOf(@TypeOf(tail)));
         if (why) |w| _ = linux.write(fds[1], w.ptr, w.len);
@@ -660,7 +673,7 @@ fn child(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunF
 
 /// Evaluates both devices at `points` seeded points, writing a progress
 /// record to `fd` before each call; returns the first difference, or null.
-fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, fd: i32, counts: *Counts, stops: []const u32, start: u32, probe: ?Probe) !?[]const u8 {
+fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?RunFn, cwds: ?*const Cwds, fd: i32, counts: *Counts, stops: []const u32, start: u32, probe: ?Probe) !?[]const u8 {
     const libm = for (libm_kernels) |k| {
         if (std.mem.find(u8, r.new, k) != null) break true;
     } else false;
@@ -722,12 +735,14 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?Ru
         if (probe) |pr| if (pr.point == p) {
             const rec: u32 = @intCast(p << 2 | pr.side);
             _ = std.os.linux.write(fd, @ptrCast(&rec), 4);
+            enter(cwds, pr.side);
             _ = fns[pr.side].?(names.ptr, vals.ptr, @intCast(vals.len), x.ptr, n, t, @intCast(p), outs[pr.side].ptr, @intCast(len), says[pr.side].ptr, say_cap, &say_lens[pr.side]);
             return null;
         };
         for (fns[0..sides_n], outs[0..sides_n], ([3][]const u8{ "old", "new", "versioned" })[0..sides_n], 0..) |f, out, side, s| {
             const rec: u32 = @intCast(p << 2 | s);
             _ = std.os.linux.write(fd, @ptrCast(&rec), 4);
+            enter(cwds, s);
             const rc = f.?(names.ptr, vals.ptr, @intCast(vals.len), x.ptr, n, t, @intCast(p), out.ptr, @intCast(len), says[s].ptr, say_cap, &say_lens[s]);
             switch (rc) {
                 0 => {},
@@ -782,6 +797,55 @@ fn compare(arena: Allocator, r: Ready, old_fn: RunFn, new_fn: RunFn, ver_fn: ?Ru
     // A device versioned on a box no point reached proved nothing.
     if (ver_fn != null and counts[2] == 0) return "the versioned device's box admitted none of the points";
     return say_why;
+}
+
+/// Each side's own working directory (old, new, versioned), absolute.
+const Cwds = [3][:0]const u8;
+
+/// Makes side `s`'s directory the forked child's working directory, so a
+/// §9.5 file the side opens by a relative path is its own. Null: stay.
+fn enter(cwds: ?*const Cwds, s: usize) void {
+    const c = cwds orelse return;
+    assert(s < c.len);
+    const rc = std.os.linux.chdir(c[s].ptr);
+    // The directory was made before the child forked.
+    assert(std.os.linux.errno(rc) == .SUCCESS);
+}
+
+/// §9.5 why the files the sides wrote differ, or null: every file under
+/// the old side's directory and the new (and versioned) side's, by its
+/// path relative to that directory, byte for byte, none missing or extra.
+fn filesDiffer(arena: Allocator, io: Io, cwds: *const Cwds, versioned: bool) !?[]const u8 {
+    const old = try filesUnder(arena, io, cwds[0]);
+    for ([2]usize{ 1, 2 }) |s| {
+        if (s == 2 and !versioned) continue;
+        const name = if (s == 1) "new" else "versioned";
+        const got = try filesUnder(arena, io, cwds[s]);
+        for (old.keys(), old.values()) |path, bytes| {
+            const b = got.get(path) orelse return try arena.print("the old device wrote the file `{s}`, the {s} did not", .{ path, name });
+            if (std.mem.eql(u8, bytes, b)) continue;
+            const at = std.mem.indexOfDiff(u8, bytes, b).?;
+            return try arena.print("file `{s}` byte {d}: old {d} bytes, {s} {d} bytes", .{ path, at, bytes.len, name, b.len });
+        }
+        for (got.keys()) |path| if (!old.contains(path))
+            return try arena.print("the {s} device wrote the file `{s}`, the old did not", .{ name, path });
+    }
+    return null;
+}
+
+/// Every regular file under `root`, by relative path, with its bytes.
+fn filesUnder(arena: Allocator, io: Io, root: []const u8) !std.StringArrayHashMapUnmanaged([]const u8) {
+    var out: std.StringArrayHashMapUnmanaged([]const u8) = .empty;
+    var dir = try Io.Dir.cwd().openDir(io, root, .{ .iterate = true });
+    defer dir.close(io);
+    var walker = try dir.walk(arena);
+    defer walker.deinit();
+    while (try walker.next(io)) |e| {
+        if (e.kind != .file) continue;
+        const bytes = try dir.readFileAlloc(io, e.path, arena, .limited(1 << 26));
+        try out.put(arena, try arena.dupe(u8, e.path), bytes);
+    }
+    return out;
 }
 
 /// Why the two devices' §9.4 `say_sites` formats differ, or null.
@@ -950,7 +1014,7 @@ test "compare: a display difference only the strict new device makes is named ne
     const box = [_]@import("air").Float.Guard{.{ .iv = .{ .lo = -10, .hi = 10 }, .index = 0, .leaf = .probe }};
     const r: Ready = .{ .rel = "fake.va", .old = "", .new = "", .ver = "", .card = .{ .names = &.{}, .defaults = &.{}, .ranges = &.{}, .n_u = 1, .box = &box } };
     var counts: Counts = @splat(0);
-    const why = try compare(arena.allocator(), r, Fake.side(1), Fake.side(2), Fake.side(2), -1, &counts, &.{}, 0, null);
+    const why = try compare(arena.allocator(), r, Fake.side(1), Fake.side(2), Fake.side(2), null, -1, &counts, &.{}, 0, null);
     try std.testing.expectEqualStrings("point 0: display record value 0: old 1e0, new 2e0", why.?);
 }
 

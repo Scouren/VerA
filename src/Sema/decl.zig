@@ -27,6 +27,7 @@
 //! - `pub fn eachItem(s: *Sema, unit: *Unit, env: *eval.Env, body: Vir.Body, visitor: anytype, depth: u32) Allocator.Error!void`
 
 const std = @import("std");
+const builtin = @import("builtin");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const vams = @import("vams");
@@ -281,11 +282,15 @@ pub fn nameOf(vir: *const Vir, i: Inst.Index) Vir.String {
 /// An evaluator over `unit`'s module with the instance's folded parameters.
 pub fn envOf(s: *Sema, unit: *Unit) Allocator.Error!eval.Env {
     const zcu = s.zcu;
-    var env: eval.Env = try .init(s.gpa, s.arena, &zcu.intern_pool, unit.vir, &.{ unit.module.params, unit.module.body });
-    errdefer env.deinit();
     const elems = zcu.intern_pool.indexToKey(zcu.instances.items(.params)[@backingInt(unit.instance)]).aggregate.elems;
-    assert(elems.len == env.values.items.len);
-    @memcpy(env.values.items, elems);
+    if (unit.layout == null) {
+        unit.layout = try .init(s.arena, unit.vir, &.{ unit.module.params, unit.module.body });
+        // A copy: the pool's storage moves as a fold interns.
+        unit.values = try s.arena.dupe(InternPool.Index, elems);
+    }
+    var env: eval.Env = .initShared(s.gpa, s.arena, &zcu.intern_pool, unit.vir, &unit.layout.?, unit.values);
+    errdefer env.deinit();
+    if (builtin.mode == .debug) try checkLayout(s, unit, &env, elems);
     env.hier = zcu.instances.items(.hier)[@backingInt(unit.instance)];
     return env;
 }
@@ -345,6 +350,21 @@ pub fn eachItem(s: *Sema, unit: *Unit, env: *eval.Env, body: Vir.Body, visitor: 
 }
 
 // ---- private ----
+
+/// Debug's oracle for `Unit.layout` and `Unit.values`: the environment
+/// built afresh from the module's bodies, as every fold built it before
+/// M9, names the same parameters at the same positions and the same aliases
+/// in order, and the instance's values are still the cached ones.
+fn checkLayout(s: *Sema, unit: *Unit, shared: *const eval.Env, elems: []const InternPool.Index) Allocator.Error!void {
+    assert(std.mem.eql(InternPool.Index, shared.base, elems));
+    var fresh: eval.Env = try .init(s.gpa, s.arena, &s.zcu.intern_pool, unit.vir, &.{ unit.module.params, unit.module.body });
+    defer fresh.deinit();
+    assert(!fresh.shared and shared.shared);
+    assert(std.mem.eql(Inst.Index, fresh.positions.keys(), shared.positions.keys()));
+    assert(std.mem.eql(u32, fresh.positions.values(), shared.positions.values()));
+    assert(std.mem.eql(Inst.Index, fresh.aliases.items, shared.aliases.items));
+    for (shared.positions.keys(), shared.positions.values()) |k, v| assert(shared.positions.get(k).? == v);
+}
 
 /// The main body: the prologue's slots, the entry assignments, `body`, and the `ret`.
 fn finish(s: *Sema, body: []const Air.Inst.Index) Allocator.Error![]const Air.Inst.Index {

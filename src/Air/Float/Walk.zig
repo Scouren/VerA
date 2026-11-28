@@ -8,12 +8,21 @@
 //! about one value holds for every value structurally equal to it (a
 //! congruence class: the same tag over the same classes, a `load` keyed by
 //! its slot's version).
+//!
+//! Slot states are saved and joined through an undo trail (`States.trail`):
+//! a `cond_br` rolls back what its first arm wrote, and a frame joins only
+//! the slots written since it began, so a walk costs its writes, not its
+//! constructs times its slots (M9: `tools/bench/m9.md`). `States.dense`
+//! copies every slot at every construct, the plain reading of the rules
+//! above: `Float.analyze` runs it beside the trail in safe builds and
+//! asserts the two write the same tables.
 //! Cites: VAMS-2023 §3.4.2, §4.2.3, §4.2.4, §4.2.5, §4.2.7, §4.2.12, §4.3.2,
 //! §4.4, §5.8, §5.9.
 //!
 //! Contents:
 //! - `pub const Walk = @This()`
-//! - `pub const empty: Interval`, `pub const Leaves = struct { probe: Interval, whole_nan: bool }`
+//! - `pub const empty: Interval`, `pub const Leaves = struct { probe: Interval, whole_nan: bool, states: States = .trail }`
+//! - `pub const States = enum { trail, dense }`
 //! - `pub fn init(arena: Allocator, air: Air, ip: *const InternPool, in: Float.Input, leaves: Leaves, f: *Float) Allocator.Error!Walk`
 //! - `pub fn body(w: *Walk, insts: []const Inst.Index, depth: u32) Allocator.Error!void`
 
@@ -63,6 +72,9 @@ civ: []Interval,
 classes: std.AutoHashMapUnmanaged(Key, u32) = .empty,
 saved: std.ArrayList(Saved) = .empty,
 frames: std.ArrayList(Frame) = .empty,
+/// Per slot write since the outermost open construct, in `.trail`: the
+/// slot and the state it overwrote.
+trail: std.ArrayList(Undo) = .empty,
 leaves: Leaves,
 
 /// The empty interval: a block nothing leaves, a slot no path reaches.
@@ -71,7 +83,11 @@ pub const empty: Interval = .{ .lo = math.inf(f64), .hi = -math.inf(f64) };
 /// How the walk reads its leaves: every `probe`'s interval (never NaN), and
 /// whether a real parameter whose range is the whole line may be NaN (the
 /// box does not refuse it) or is a number (the model's legal input).
-pub const Leaves = struct { probe: Interval, whole_nan: bool };
+pub const Leaves = struct { probe: Interval, whole_nan: bool, states: States = .trail };
+
+/// How a construct saves and joins slot states: `trail` touches only the
+/// slots written inside it; `dense` copies every slot (the oracle).
+pub const States = enum { trail, dense };
 
 /// Rounds a `loop` joins exactly before it widens.
 const widen_after: u32 = 3;
@@ -83,8 +99,22 @@ const Fact = struct { inst: u32, iv: Interval };
 /// What one fact push overwrote: class `rep`'s fact interval.
 const Saved = struct { rep: u32, prev: Interval };
 /// A `block` or `loop` around the walk: the join of what reaches its exit
-/// (a block's `br`s) or its head again (a loop's `repeat`s).
-const Frame = struct { inst: Inst.Index, reached: bool = false, slots: []Abstract, result: Abstract = bottom };
+/// (a block's `br`s) or its head again (a loop's `repeat`s). `.dense` keeps
+/// every slot in `slots`; `.trail` keeps, per slot written since `mark`,
+/// its state at `mark` and the join so far in `vals`.
+const Frame = struct {
+    inst: Inst.Index,
+    reached: bool = false,
+    slots: []Abstract = &.{},
+    mark: u32 = 0,
+    vals: std.AutoArrayHashMapUnmanaged(u32, Delta) = .empty,
+    result: Abstract = bottom,
+};
+/// One slot a frame's paths wrote: its state at the frame's start, and the
+/// join of its states at every exit so far.
+const Delta = struct { entry: Abstract, val: Abstract };
+/// One slot write the trail can undo.
+const Undo = struct { slot: u32, prev: Abstract };
 /// A congruence class key: a tag over its operands' classes.
 const Key = struct { tag: Inst.Tag, a: u32, b: u32 = 0, c: u32 = 0 };
 
@@ -138,11 +168,11 @@ pub fn body(w: *Walk, insts: []const Inst.Index, depth: u32) Allocator.Error!voi
         switch (w.tags[i]) {
             .block => {
                 const x = w.air.extraData(Air.Block, data.ty_pl.payload);
-                try w.frames.append(w.arena, .{ .inst = inst, .slots = try w.arena.alloc(Abstract, w.state.len) });
+                try w.frames.append(w.arena, try w.frame(inst));
                 try w.body(w.air.body(x.end, x.data.body_len), depth + 1);
                 const fr = w.frames.pop().?;
                 w.reached = fr.reached;
-                if (fr.reached) @memcpy(w.state, fr.slots);
+                if (fr.reached) try w.settle(fr);
                 w.define(i, fr.result);
             },
             .loop => return w.loop(inst, data, depth),
@@ -153,10 +183,10 @@ pub fn body(w: *Walk, insts: []const Inst.Index, depth: u32) Allocator.Error!voi
                 w.reached = false;
                 return;
             },
-            .alloc => w.write(i, .{ .iv = .point(0), .nan = false }),
+            .alloc => try w.write(i, .{ .iv = .point(0), .nan = false }),
             .assign => {
                 const v = w.abs(data.bin_op.rhs);
-                w.write(@backingInt(data.bin_op.lhs.toIndex().?), v);
+                try w.write(@backingInt(data.bin_op.lhs.toIndex().?), v);
                 w.define(i, v);
             },
             else => |tag| { // else: the value tags
@@ -179,7 +209,7 @@ pub fn body(w: *Walk, insts: []const Inst.Index, depth: u32) Allocator.Error!voi
 // ---- private ----
 
 /// Joins the walk's state into the frame `br` or `repeat` names.
-fn exit(w: *Walk, target: Inst.Index, operand: Inst.Ref) void {
+fn exit(w: *Walk, target: Inst.Index, operand: Inst.Ref) Allocator.Error!void {
     defer w.reached = false;
     if (!w.reached) return;
     var k = w.frames.items.len;
@@ -188,10 +218,71 @@ fn exit(w: *Walk, target: Inst.Index, operand: Inst.Ref) void {
         if (w.frames.items[k].inst == target) break &w.frames.items[k];
     } else unreachable; // Verify: a `br` leaves an enclosing block
     if (operand != .none) fr.result = joinAbs(fr.result, w.abs(operand));
-    if (fr.reached) {
-        for (fr.slots, w.state) |*s, x| s.* = joinAbs(s.*, x);
-    } else @memcpy(fr.slots, w.state);
+    switch (w.leaves.states) {
+        .dense => if (fr.reached) {
+            for (fr.slots, w.state) |*s, x| s.* = joinAbs(s.*, x);
+        } else @memcpy(fr.slots, w.state),
+        .trail => try w.joinTrail(fr),
+    }
     fr.reached = true;
+}
+
+/// Joins the state into `fr.vals`: a slot an earlier exit wrote joins its
+/// state here (its state at `mark` if this path left it); a slot only this
+/// path wrote joins its state at `mark` first, as `.dense` would have it.
+fn joinTrail(w: *Walk, fr: *Frame) Allocator.Error!void {
+    assert(fr.mark <= w.trail.items.len);
+    if (fr.reached) {
+        for (fr.vals.keys(), fr.vals.values()) |s, *d| d.val = joinAbs(d.val, w.state[s]);
+    }
+    const before = fr.vals.count();
+    for (w.trail.items[fr.mark..]) |u| {
+        const g = try fr.vals.getOrPut(w.arena, u.slot);
+        if (g.found_existing) continue;
+        // The first undo since `mark` holds the slot's state at `mark`.
+        g.value_ptr.* = .{ .entry = u.prev, .val = if (fr.reached) joinAbs(u.prev, w.state[u.slot]) else w.state[u.slot] };
+    }
+    assert(fr.vals.count() >= before);
+    assert(fr.vals.count() <= w.state.len);
+}
+
+/// A frame at the walk's point, in `.dense` with its full slot table.
+fn frame(w: *Walk, inst: Inst.Index) Allocator.Error!Frame {
+    return switch (w.leaves.states) {
+        .dense => .{ .inst = inst, .slots = try w.arena.alloc(Abstract, w.state.len) },
+        .trail => .{ .inst = inst, .mark = @intCast(w.trail.items.len) },
+    };
+}
+
+/// Sets the state to the join `fr` holds: in `.trail`, back to `mark` and
+/// then each slot its exits wrote.
+fn settle(w: *Walk, fr: Frame) Allocator.Error!void {
+    switch (w.leaves.states) {
+        .dense => @memcpy(w.state, fr.slots),
+        .trail => {
+            w.rollback(fr.mark);
+            for (fr.vals.keys(), fr.vals.values()) |s, d| try w.setSlot(s, d.val);
+            assert(w.trail.items.len == fr.mark + fr.vals.count());
+        },
+    }
+}
+
+/// Sets slot `s`'s state; in `.trail`, logged so `rollback` can undo it.
+/// Versions are not states: no rollback restores one.
+fn setSlot(w: *Walk, s: u32, a: Abstract) Allocator.Error!void {
+    assert(s < w.state.len);
+    if (w.leaves.states == .trail) try w.trail.append(w.arena, .{ .slot = s, .prev = w.state[s] });
+    w.state[s] = a;
+}
+
+/// Undoes every slot write after `mark`, newest first.
+fn rollback(w: *Walk, mark: u32) void {
+    assert(w.leaves.states == .trail);
+    assert(mark <= w.trail.items.len);
+    while (w.trail.items.len > mark) {
+        const u = w.trail.pop().?;
+        w.state[u.slot] = u.prev;
+    }
 }
 
 /// Walks both bodies, each under its edge's facts and from the state
@@ -201,12 +292,13 @@ fn condBr(w: *Walk, data: Inst.Data, depth: u32) Allocator.Error!void {
     const x = w.air.extraData(Air.CondBr, data.pl_op.payload);
     const cond = data.pl_op.operand;
     const c = w.abs(cond).iv;
-    const before = try w.arena.dupe(Abstract, w.state);
+    const before: []Abstract = if (w.leaves.states == .dense) try w.arena.dupe(Abstract, w.state) else &.{};
+    const mark: u32 = @intCast(w.trail.items.len);
     const reached = w.reached;
     const active = w.active;
     defer w.active = active;
     try w.arm(w.air.body(x.end, x.data.then_body_len), cond, true, c.lo == 0 and c.hi == 0, depth);
-    @memcpy(w.state, before);
+    if (w.leaves.states == .dense) @memcpy(w.state, before) else w.rollback(mark);
     w.reached = reached;
     w.active = active;
     try w.arm(w.air.body(x.end + x.data.then_body_len, x.data.else_body_len), cond, false, c.excludesZero(), depth);
@@ -232,17 +324,29 @@ fn arm(w: *Walk, insts: []const Inst.Index, cond: Inst.Ref, taken: bool, dead: b
 fn loop(w: *Walk, inst: Inst.Index, data: Inst.Data, depth: u32) Allocator.Error!void {
     const x = w.air.extraData(Air.Block, data.ty_pl.payload);
     const insts = w.air.body(x.end, x.data.body_len);
+    switch (w.leaves.states) {
+        .dense => try w.loopDense(inst, insts, depth),
+        .trail => try w.loopTrail(inst, insts, depth),
+    }
+    w.reached = false;
+}
+
+// Bound on a loop's rounds: past `widen_after`, a changing round moves one
+// of six one-way features of one slot (each end to infinity, the two
+// openness flags, `nonzero`, `nan`).
+fn roundsMax(w: *const Walk) u32 {
+    return widen_after + 6 * @as(u32, @intCast(w.state.len)) + 1;
+}
+
+/// The head as every slot's state, copied in whole each round.
+fn loopDense(w: *Walk, inst: Inst.Index, insts: []const Inst.Index, depth: u32) Allocator.Error!void {
     const entry = w.reached;
     const head = try w.arena.dupe(Abstract, w.state);
-    try w.frames.append(w.arena, .{ .inst = inst, .slots = try w.arena.alloc(Abstract, w.state.len) });
+    try w.frames.append(w.arena, try w.frame(inst));
     const k = w.frames.items.len - 1;
-    // Bound: past `widen_after`, a changing round moves one of six
-    // one-way features of one slot (each end to infinity, the two
-    // openness flags, `nonzero`, `nan`).
-    const rounds_max = widen_after + 6 * @as(u32, @intCast(head.len)) + 1;
     var rounds: u32 = 0;
     while (true) : (rounds += 1) {
-        assert(rounds <= rounds_max);
+        assert(rounds <= w.roundsMax());
         @memcpy(w.state, head);
         w.reached = entry;
         w.frames.items[k].reached = false;
@@ -250,16 +354,53 @@ fn loop(w: *Walk, inst: Inst.Index, data: Inst.Data, depth: u32) Allocator.Error
         const fr = w.frames.items[k];
         if (!fr.reached) break;
         var changed = false;
-        for (head, fr.slots) |*h, back| {
-            const j = joinAbs(h.*, back);
-            if (j.nan == h.nan and std.meta.eql(j.iv, h.iv)) continue;
-            changed = true;
-            h.* = if (rounds < widen_after) j else .{ .iv = h.iv.widen(j.iv), .nan = j.nan };
-        }
+        for (head, fr.slots) |*h, back| changed = widenInto(h, back, rounds) or changed;
         if (!changed) break;
     }
     _ = w.frames.pop();
-    w.reached = false;
+}
+
+/// The head as the slots some `repeat` wrote, over the entry state: each
+/// round rolls back to the entry and sets those. A slot no `repeat` wrote
+/// keeps its entry state, which joins with itself unchanged.
+fn loopTrail(w: *Walk, inst: Inst.Index, insts: []const Inst.Index, depth: u32) Allocator.Error!void {
+    const entry = w.reached;
+    const start: u32 = @intCast(w.trail.items.len);
+    var head: std.AutoArrayHashMapUnmanaged(u32, Abstract) = .empty;
+    try w.frames.append(w.arena, try w.frame(inst));
+    const k = w.frames.items.len - 1;
+    var rounds: u32 = 0;
+    while (true) : (rounds += 1) {
+        assert(rounds <= w.roundsMax());
+        w.rollback(start);
+        for (head.keys(), head.values()) |s, v| try w.setSlot(s, v);
+        w.reached = entry;
+        const f = &w.frames.items[k];
+        f.reached = false;
+        f.mark = @intCast(w.trail.items.len);
+        f.vals.clearRetainingCapacity();
+        try w.body(insts, depth + 1);
+        const fr = w.frames.items[k];
+        if (!fr.reached) break;
+        var changed = false;
+        for (fr.vals.keys(), fr.vals.values()) |s, d| {
+            const g = try head.getOrPut(w.arena, s);
+            if (!g.found_existing) g.value_ptr.* = d.entry;
+            changed = widenInto(g.value_ptr, d.val, rounds) or changed;
+        }
+        assert(head.count() <= w.state.len);
+        if (!changed) break;
+    }
+    _ = w.frames.pop();
+}
+
+/// Joins `back` into head slot `h`, widening from round `widen_after` on;
+/// returns whether `h` grew.
+fn widenInto(h: *Abstract, back: Abstract, rounds: u32) bool {
+    const j = joinAbs(h.*, back);
+    if (j.nan == h.nan and std.meta.eql(j.iv, h.iv)) return false;
+    h.* = if (rounds < widen_after) j else .{ .iv = h.iv.widen(j.iv), .nan = j.nan };
+    return true;
 }
 
 /// Returns the abstract result of value tag `tag` before its domain.
@@ -391,10 +532,10 @@ fn define(w: *Walk, i: u32, a: Abstract) void {
 }
 
 /// Writes slot `alloc`'s state; a new version, so no older `load` speaks for it.
-fn write(w: *Walk, alloc: u32, a: Abstract) void {
+fn write(w: *Walk, alloc: u32, a: Abstract) Allocator.Error!void {
     const s = w.slot_of[alloc];
     assert(s != none);
-    w.state[s] = a;
+    try w.setSlot(s, a);
     w.next_ver += 1;
     w.ver[s] = w.next_ver;
 }
@@ -531,7 +672,7 @@ fn pushFacts(w: *Walk, facts: []const Fact) Allocator.Error!void {
         w.civ[r] = w.civ[r].meet(fa.iv);
         if (w.tags[fa.inst] != .load) continue;
         const s = w.slot_of[@backingInt(w.datas[fa.inst].un_op.toIndex().?)];
-        if (w.ver[s] == w.load_ver[fa.inst]) w.state[s].iv = w.state[s].iv.meet(fa.iv);
+        if (w.ver[s] == w.load_ver[fa.inst]) try w.setSlot(s, .{ .iv = w.state[s].iv.meet(fa.iv), .nan = w.state[s].nan });
     }
     assert(w.saved.items.len == before + facts.len);
 }

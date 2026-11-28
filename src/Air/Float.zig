@@ -58,6 +58,7 @@
 //! - `pub fn deinit(f: *Float, gpa: Allocator) void`
 
 const std = @import("std");
+const builtin = @import("builtin");
 const assert = std.debug.assert;
 const math = std.math;
 const Allocator = std.mem.Allocator;
@@ -219,19 +220,17 @@ pub fn analyze(gpa: Allocator, air: Air, ip: *const InternPool, in: Input, wip: 
     // The diagnostics' walk, into scratch tables: an error must hold for
     // every legal input, never only inside the default box.
     var d = try alloc(arena, n, in.roots.len);
-    var wd = try Walk.init(arena, air, ip, in, .{
+    const wd = try walk(arena, air, ip, in, .{
         .probe = if (bound) |b| .{ .lo = -b, .hi = b } else .{ .lo = -inf, .hi = inf, .lo_open = true, .hi_open = true },
         .whole_nan = false,
     }, &d);
-    try wd.body(air.mainBody(), 0);
     try rating.report(wip, air, ip, in, &d, wd.why, wd.dom_iv);
 
     var f = try alloc(gpa, n, in.roots.len);
     errdefer f.deinit(gpa);
     f.error_count = d.error_count;
     const b = bound orelse default_unknown_bound;
-    var w = try Walk.init(arena, air, ip, in, .{ .probe = .{ .lo = -b, .hi = b }, .whole_nan = true }, &f);
-    try w.body(air.mainBody(), 0);
+    _ = try walk(arena, air, ip, in, .{ .probe = .{ .lo = -b, .hi = b }, .whole_nan = true }, &f);
     try rating.rate(gpa, arena, air, ip, in, &f, wip);
     if (f.error_count != 0) for (f.verdict.modes) |m| assert(m == .strict);
     assert(f.verdict.guard_start[in.roots.len] == f.verdict.guards.len);
@@ -262,6 +261,35 @@ pub fn deinit(f: *Float, gpa: Allocator) void {
 
 /// Returns tables for `n` instructions and `roots` roots, every value
 /// unwritten (empty and maybe NaN) and every box empty.
+/// One walk of `air` into `f`. In Debug (tests included) the `.dense` walk
+/// runs too, into scratch tables, and every table it writes must match the
+/// trail's bit for bit: the oracle for the trail's saves and joins (M9).
+fn walk(arena: Allocator, air: Air, ip: *const InternPool, in: Input, leaves: Walk.Leaves, f: *Float) Allocator.Error!Walk {
+    assert(leaves.states == .trail);
+    var w = try Walk.init(arena, air, ip, in, leaves, f);
+    try w.body(air.mainBody(), 0);
+    if (builtin.mode != .debug) return w;
+    var g = try alloc(arena, air.instructions.len, in.roots.len);
+    var dense = leaves;
+    dense.states = .dense;
+    var o = try Walk.init(arena, air, ip, in, dense, &g);
+    try o.body(air.mainBody(), 0);
+    for (0..air.instructions.len) |i| {
+        assert(sameIv(f.iv[i], g.iv[i]));
+        assert(f.nan[i] == g.nan[i]);
+        assert(f.domain[i] == g.domain[i]);
+        assert(w.why[i] == o.why[i]);
+        if (w.why[i] != .none) assert(sameIv(w.dom_iv[i], o.dom_iv[i]));
+    }
+    return w;
+}
+
+/// Bit equality: two walks that agree agree on the sign of a zero bound.
+fn sameIv(a: Interval, b: Interval) bool {
+    return @as(u64, @bitCast(a.lo)) == @as(u64, @bitCast(b.lo)) and @as(u64, @bitCast(a.hi)) == @as(u64, @bitCast(b.hi)) and
+        a.lo_open == b.lo_open and a.hi_open == b.hi_open and a.nonzero == b.nonzero;
+}
+
 fn alloc(a: Allocator, n: usize, roots: usize) Allocator.Error!Float {
     const iv = try a.alloc(Interval, n);
     errdefer a.free(iv);
@@ -287,6 +315,60 @@ test Mode {
     try std.testing.expectEqual(Mode.strict, Mode.strictest(.optimized, .strict));
     try std.testing.expectEqual(Mode.strict, Mode.strictest(.strict, .optimized));
     try std.testing.expectEqual(Mode.strict, Mode.strictest(.strict, .strict));
+}
+
+test "analyze: a merge joins a slot one arm leaves with its entry state; a loop carries one" {
+    // Oracle: the `.dense` walk, which `walk` runs beside the trail in
+    // Debug and holds to it bit for bit; and by hand, the join each slot
+    // must reach. `alloc` starts a slot at 0.
+    //   a = 0; b = 0;  if (p0 < 0) a = 1; else b = 2;      -> a in [0,1], b in [0,2]
+    //   k = 0;  while (k < 3) k = k + 1;                    -> k in [0,inf) (widened)
+    //   ret a + b + k
+    const gpa = std.testing.allocator;
+    var ip: InternPool = try .init(gpa);
+    defer ip.deinit(gpa);
+    var b: Air.Builder = try .init(gpa);
+    defer b.deinit(gpa);
+    const x = try b.addInst(gpa, .{ .tag = .probe, .data = .{ .ty_index = .{ .ty = .real_type, .index = 0 } } });
+    const sa = try b.addInst(gpa, .{ .tag = .alloc, .data = .{ .ty = .real_type } });
+    const sb = try b.addInst(gpa, .{ .tag = .alloc, .data = .{ .ty = .real_type } });
+    const sk = try b.addInst(gpa, .{ .tag = .alloc, .data = .{ .ty = .integer_type } });
+    const merge = try b.addInst(gpa, .{ .tag = .block, .data = undefined });
+    const neg = try b.addBinOp(gpa, .flt, .fromIndex(x), .fromIntern(.zero_real));
+    const ta = try b.addBinOp(gpa, .assign, .fromIndex(sa), .fromIntern(.one_real));
+    const tbr = try b.addInst(gpa, .{ .tag = .br, .data = .{ .br = .{ .block_inst = merge, .operand = .none } } });
+    const eb = try b.addBinOp(gpa, .assign, .fromIndex(sb), .fromIntern(.two_real));
+    const ebr = try b.addInst(gpa, .{ .tag = .br, .data = .{ .br = .{ .block_inst = merge, .operand = .none } } });
+    const cb = try b.addCondBr(gpa, .fromIndex(neg), &.{ ta, tbr }, &.{ eb, ebr });
+    try b.setBody(gpa, merge, .none, &.{ neg, cb });
+    const three = Inst.Ref.fromIntern(try ip.get(gpa, .{ .int = .{ .ty = .integer_type, .storage = .{ .small = 3 } } }));
+    const out = try b.addInst(gpa, .{ .tag = .block, .data = undefined });
+    const lp = try b.addInst(gpa, .{ .tag = .loop, .data = undefined });
+    const k0 = try b.addUnOp(gpa, .load, .fromIndex(sk));
+    const go = try b.addBinOp(gpa, .ilt, .fromIndex(k0), three);
+    const k1 = try b.addBinOp(gpa, .iadd, .fromIndex(k0), .fromIntern(.one));
+    const set_k = try b.addBinOp(gpa, .assign, .fromIndex(sk), .fromIndex(k1));
+    const again = try b.addInst(gpa, .{ .tag = .repeat, .data = .{ .repeat = .{ .loop_inst = lp } } });
+    const done = try b.addInst(gpa, .{ .tag = .br, .data = .{ .br = .{ .block_inst = out, .operand = .none } } });
+    const step = try b.addCondBr(gpa, .fromIndex(go), &.{ k1, set_k, again }, &.{done});
+    try b.setBody(gpa, lp, .none, &.{ k0, go, step });
+    try b.setBody(gpa, out, .none, &.{lp});
+    const la = try b.addUnOp(gpa, .load, .fromIndex(sa));
+    const lb = try b.addUnOp(gpa, .load, .fromIndex(sb));
+    const ab = try b.addBinOp(gpa, .fadd, .fromIndex(la), .fromIndex(lb));
+    const ret = try b.addUnOp(gpa, .ret, .fromIndex(ab));
+    var air = try b.finish(gpa, &.{ x, sa, sb, sk, merge, out, la, lb, ab, ret });
+    defer air.deinit(gpa);
+    try std.testing.expectEqual(@as(?Air.Verify.Violation, null), try Air.Verify.verify(gpa, air, &ip));
+    var wip: Diag.Wip = .init(gpa);
+    defer wip.deinit();
+    var f = try analyze(gpa, air, &ip, .{}, &wip);
+    defer f.deinit(gpa);
+    const ia = f.iv[@backingInt(la)];
+    const ib = f.iv[@backingInt(lb)];
+    try std.testing.expect(ia.lo == 0 and ia.hi == 1);
+    try std.testing.expect(ib.lo == 0 and ib.hi == 2);
+    try std.testing.expect(f.iv[@backingInt(k0)].lo == 0);
 }
 
 test {

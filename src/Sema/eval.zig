@@ -11,7 +11,8 @@
 //!
 //! Contents:
 //! - `pub const Const`
-//! - `pub const Env = struct` (`init`, `deinit`, `body`, `bodyValue`, `ref`, `param`, `named`, `systemNamed`, `toConst`, `intern`, `arraySize`, `dependsOn`, `cycleOf`)
+//! - `pub const Layout = struct` (`init`)
+//! - `pub const Env = struct` (`init`, `initShared`, `deinit`, `body`, `bodyValue`, `ref`, `param`, `named`, `systemNamed`, `toConst`, `intern`, `arraySize`, `dependsOn`, `cycleOf`)
 //! - `pub const Pending = struct`
 //! - `pub const eval_depth_max: u32`
 //! - `pub const v1364` (the IEEE 1364 mode: four-state values of any width, constant functions)
@@ -46,6 +47,38 @@ pub const eval_depth_max: u32 = 1 << 12;
 /// `cycleOf` looks for a cycle through it (IEEE 1364-2005 §12.8.1).
 pub const Pending = struct { param: Inst.Index, value: Vir.Body };
 
+/// A module's parameters as an `Env` names them: each module-level
+/// parameter's position in `values`, and the aliasparams in order. A pure
+/// function of the Vir and the bodies, so one instance builds it once
+/// (`Sema.Unit.layout`) and every `Env.initShared` over it borrows it: an
+/// `Env.init` per fold costs the module's size, and a model folds once per
+/// parameter (M9, `tools/bench/m9.md`). Read-only once built.
+pub const Layout = struct {
+    positions: std.AutoArrayHashMapUnmanaged(Inst.Index, u32) = .empty,
+    aliases: std.ArrayList(Inst.Index) = .empty,
+
+    /// The layout of `params` (bodies holding `param` instructions, in
+    /// order), in `a`; an arena's, or freed with `deinit`.
+    pub fn init(a: Allocator, vir: *const Vir, params: []const Vir.Body) Allocator.Error!Layout {
+        var l: Layout = .{};
+        errdefer l.deinit(a);
+        const tags = vir.instructions.items(.tag);
+        for (params) |b| for (vir.body(b)) |i| switch (tags[@backingInt(i)]) {
+            .param => try l.positions.put(a, i, @intCast(l.positions.count())),
+            .aliasparam => try l.aliases.append(a, i),
+            else => {}, // else: only parameters and their aliases are named by a value
+        };
+        assert(l.positions.count() <= vir.instructions.len);
+        return l;
+    }
+
+    pub fn deinit(l: *Layout, a: Allocator) void {
+        l.positions.deinit(a);
+        l.aliases.deinit(a);
+        l.* = undefined;
+    }
+};
+
 /// One instance's evaluation state: which file its names are in, the
 /// values its parameters are given, the module-level values folded so far
 /// and the genvars bound now. Lives while the instance's body is walked.
@@ -56,13 +89,20 @@ pub const Env = struct {
     ip: *InternPool,
     vir: *const Vir,
     /// The module-level parameters (header, then body), each with its
-    /// position in `values`.
+    /// position in `values`. Read-only: borrowed when `shared`.
     positions: std.AutoArrayHashMapUnmanaged(Inst.Index, u32) = .empty,
-    /// The module-level aliasparams (§3.4.6), in order.
+    /// The module-level aliasparams (§3.4.6), in order. Read-only: borrowed
+    /// when `shared`.
     aliases: std.ArrayList(Inst.Index) = .empty,
+    /// `positions` and `aliases` are a `Layout`'s, which outlives this
+    /// environment: `deinit` leaves them.
+    shared: bool = false,
     /// The folded value of each module-level parameter, `.none` until
-    /// folded and `.undef` when it has no value.
+    /// folded and `.undef` when it has no value. A shared environment
+    /// leaves it empty and reads `base` until its first write (`own`).
     values: std.ArrayList(InternPool.Index) = .empty,
+    /// A shared environment's starting values, borrowed (`initShared`).
+    base: []const InternPool.Index = &.{},
     /// A value from outside the declaration: an override, a defparam or a
     /// paramset statement. Wins over the declared default.
     given: std.AutoHashMapUnmanaged(Inst.Index, InternPool.Index) = .empty,
@@ -100,18 +140,22 @@ pub const Env = struct {
     /// An environment over `vir` whose module-level parameters are those of
     /// `params` (bodies holding `param` instructions, in order).
     pub fn init(gpa: Allocator, arena: Allocator, ip: *InternPool, vir: *const Vir, params: []const Vir.Body) Allocator.Error!Env {
-        var env: Env = .{ .gpa = gpa, .arena = arena, .ip = ip, .vir = vir };
-        errdefer env.deinit();
-        const tags = vir.instructions.items(.tag);
-        for (params) |b| for (vir.body(b)) |i| switch (tags[@backingInt(i)]) {
-            .param => {
-                try env.positions.put(gpa, i, @intCast(env.values.items.len));
-                try env.values.append(gpa, .none);
-            },
-            .aliasparam => try env.aliases.append(gpa, i),
-            else => {}, // else: only parameters and their aliases are named by a value
-        };
+        var l: Layout = try .init(gpa, vir, params);
+        errdefer l.deinit(gpa);
+        var env: Env = .{ .gpa = gpa, .arena = arena, .ip = ip, .vir = vir, .positions = l.positions, .aliases = l.aliases };
+        try env.values.appendNTimes(gpa, .none, l.positions.count());
         assert(env.positions.count() == env.values.items.len);
+        return env;
+    }
+
+    /// An environment over `layout`'s parameters whose values start as
+    /// `base` (one per parameter), borrowing both (they must outlive it)
+    /// instead of building its own tables: costs nothing until a fold
+    /// writes a value, where `init` costs the module's size.
+    pub fn initShared(gpa: Allocator, arena: Allocator, ip: *InternPool, vir: *const Vir, layout: *const Layout, base: []const InternPool.Index) Env {
+        assert(base.len == layout.positions.count());
+        const env: Env = .{ .gpa = gpa, .arena = arena, .ip = ip, .vir = vir, .positions = layout.positions, .aliases = layout.aliases, .shared = true, .base = base };
+        assert(env.values.items.len == 0);
         return env;
     }
 
@@ -119,8 +163,11 @@ pub const Env = struct {
         assert(env.busy.count() == 0);
         assert(env.trail.items.len == 0);
         assert(env.pending.count() == 0);
-        env.positions.deinit(env.gpa);
-        env.aliases.deinit(env.gpa);
+        assert(env.positions.count() == env.values.items.len or (env.shared and env.values.items.len == 0));
+        if (!env.shared) {
+            env.positions.deinit(env.gpa);
+            env.aliases.deinit(env.gpa);
+        }
         env.values.deinit(env.gpa);
         env.given.deinit(env.gpa);
         env.spelling.deinit(env.gpa);
@@ -132,6 +179,27 @@ pub const Env = struct {
         // it, usually `s.arena`): the same allocator frees it.
         env.oomrs.deinit(env.arena);
         env.* = undefined;
+    }
+
+    /// Parameter `k`'s value: `base`'s until the environment owns `values`.
+    fn valueAt(env: *const Env, k: u32) InternPool.Index {
+        assert(k < env.positions.count());
+        return if (env.values.items.len != 0) env.values.items[k] else env.base[k];
+    }
+
+    fn setValue(env: *Env, k: u32, v: InternPool.Index) Allocator.Error!void {
+        try env.own();
+        env.values.items[k] = v;
+        assert(env.valueAt(k) == v);
+    }
+
+    /// Copies a shared environment's `base` into `values`, which it then
+    /// writes; a no-op once it has.
+    fn own(env: *Env) Allocator.Error!void {
+        if (env.values.items.len == env.positions.count()) return;
+        assert(env.shared and env.values.items.len == 0);
+        try env.values.appendSlice(env.gpa, env.base);
+        assert(env.values.items.len == env.positions.count());
     }
 
     /// The value of a body: its last instruction's. Null for an empty body.
@@ -187,6 +255,7 @@ pub const Env = struct {
     pub fn dependsOn(env: *Env, b: Vir.Body, target: Inst.Index) Allocator.Error!bool {
         assert(env.vir.instructions.items(.tag)[@backingInt(target)] == .param);
         assert(!env.busy.contains(target));
+        try env.own();
         const saved = try env.arena.dupe(InternPool.Index, env.values.items);
         defer @memcpy(env.values.items, saved);
         @memset(env.values.items, .none);
@@ -206,6 +275,7 @@ pub const Env = struct {
     /// Asserts `busy` is empty on entry and on exit.
     pub fn cycleOf(env: *Env, b: Vir.Body, pending: []const Pending) Allocator.Error!?[]const Inst.Index {
         assert(env.busy.count() == 0);
+        try env.own();
         const saved = try env.arena.dupe(InternPool.Index, env.values.items);
         defer @memcpy(env.values.items, saved);
         @memset(env.values.items, .none);
@@ -239,7 +309,7 @@ pub const Env = struct {
         assert(env.vir.instructions.items(.tag)[@backingInt(p)] == .param);
         if (env.shaping != 0) try env.shapes.put(env.arena, p, {});
         const pos = env.positions.get(p);
-        if (pos) |k| if (env.values.items[k] != .none) return env.toConst(env.values.items[k]);
+        if (pos) |k| if (env.valueAt(k) != .none) return env.toConst(env.valueAt(k));
         if (env.busy.contains(p)) {
             env.cycled = true;
             if (env.cycle.len == 0) {
@@ -261,12 +331,12 @@ pub const Env = struct {
         // §3.4.4 an array parameter's value is an aggregate: no `Const`.
         if (decl.dims.len != 0) {
             const v = env.given.get(p) orelse try env.bodyValue(value);
-            if (pos) |k| env.values.items[k] = v;
+            if (pos) |k| try env.setValue(k, v);
             return null;
         }
         const raw = if (env.given.get(p)) |g| env.toConst(g) else try env.body(value);
         const v = if (raw) |c| try env.coerce(decl, c) else null;
-        if (pos) |k| env.values.items[k] = if (v) |c| try env.intern(c) else .undef;
+        if (pos) |k| try env.setValue(k, if (v) |c| try env.intern(c) else .undef);
         return v;
     }
 

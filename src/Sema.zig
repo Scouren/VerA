@@ -265,6 +265,12 @@ pub const Unit = struct {
     /// The variables whose value an `analog initial` or `@(...)` body
     /// leaves for a later evaluation's read (held.zig).
     carried: std.AutoHashMapUnmanaged(Inst.Index, void) = .empty,
+    /// Its module's parameter layout, built by the first `decl.envOf`
+    /// (in `Sema.arena`) and borrowed by every later one.
+    layout: ?@import("Sema/eval.zig").Layout = null,
+    /// Its instance's folded parameter values, copied (in `Sema.arena`)
+    /// beside `layout`: every `decl.envOf` starts from them.
+    values: []const InternPool.Index = &.{},
 };
 
 /// One bridged port's two sides (`Sema.bridged`).

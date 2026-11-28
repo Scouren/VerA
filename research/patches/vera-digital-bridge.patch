@@ -1,0 +1,849 @@
+From 16b6cf37e5aaa046df86269ec245a12eaeb762ca Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 28 Nov 2026 02:14:30 +0000
+Subject: [PATCH 1/2] sim/rt/device: only visible events synchronize; one-retry
+ crossings
+
+After each saved boundary the engine runs on with its inputs held (`look`,
+at most `look_cap` = 1024 event ticks) to the first tick an output pin's
+level or drive changes or the engine stops; `pendingBreakpoint` reports
+that time (merged with any further visible change less than `ttol` after
+it), not the next internal event, and a step that reaches neither it nor an
+input crossing runs no engine. `wakes` is the union over the ticks `look`
+ran; a crossing past them wakes conservatively.
+
+A crossing more than `ttol` late in a step that wakes a process now
+returns `.request_reject_at` (its secant time + ttol/2), so a host re-lands
+once; `late_cross` stays for hosts that query.
+
+A `profile` debug flag prints each active step's cost split.
+
+tests/host/vdev_host.zig: v_edge_clock (metamorphic with v_edge), the
+retry, and v_skew's merge window, each red on 0bc0092; `test-vdev` runs
+the host alone.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_014DSyq6YHPYv8k8qvURepx5
+---
+ TESTING.md                     |   2 +-
+ build/devices.zig              |  10 +-
+ lib/sim/rt/device.zig          | 206 +++++++++++++++++++++++++++------
+ tests/host/vdev/v_edge_clock.v |  19 +++
+ tests/host/vdev/v_skew.v       |  18 +++
+ tests/host/vdev_host.zig       | 106 +++++++++++++++++
+ 6 files changed, 320 insertions(+), 41 deletions(-)
+ create mode 100644 tests/host/vdev/v_edge_clock.v
+ create mode 100644 tests/host/vdev/v_skew.v
+
+diff --git a/TESTING.md b/TESTING.md
+index 1aaff1c..3176cfa 100644
+--- a/TESTING.md
++++ b/TESTING.md
+@@ -27,7 +27,7 @@ names the clause behind it.
+ | VPI analog library (`src/vpi/host.zig`) | its runner sizing a device's arrays differently from `--emit-exe`'s (`mem_bytes = 0`: Facts without `compileFacts`) | the hand count: `tbl`'s 4096 reals are 32768 bytes, read from the library's own `.tb.zig` | `tests/vpi_mem/` (`test-vpi-mem`, in `test`) |
+ | Name resolution (`lib/sim/digital`, `src/codegen/digital`, `src/vpi`) | an escaped identifier (IEEE 1364-2005 §3.7.1: `\a[1] ` is one name) split, merged or asserted on: the defparam `segment()` abort | renaming: seeded escaped names holding a bracket, a parenthesis, a dot, a `[k]` suffix, a bare `[k]` or a leading backslash must behave as plain names, a three-level `defparam` and hierarchical reads under `--run` printing the hand-derived `8 2 7`, and `--emit-rtlil`'s text renamed equal to the plain design's; through VPI, each object's `vpiFullName` given back to `vpi_handle_by_name` names that object, and its `vpiName` is the declared identifier | `tests/generators.zig` `escaped` (`test-generators`), `tests/vpi_escaped/` (`test-vpi-escaped`); both in `test`, known rows in their `known` |
+ | Runner templates (`src/codegen/exe/text/*.zig.txt`) | a template that does not compile (a syntax error in mixed_tail passed `check`, `test-exe` and `test-vpi`; only `suite -- ams` built it) | the compiler: one emitted runner per variant (fixed, mixed, mixed with D2A events, the VPI library), each fixture first checked to render its variant, built by `zigbuild.buildExe`'s own argv with `-fno-emit-bin` on a private cache | `tests/runners.zig` (`test-runners`, in `test`) |
+-| Codegen backends (`src/codegen`) | emitted code wrong for a host | the host that drives it, beside the device | `tests/host/*_host.zig` (in `test`) |
++| Codegen backends (`src/codegen`) | emitted code wrong for a host | the host that drives it, beside the device | `tests/host/*_host.zig` (in `test`; `test-vdev` runs `vdev_host.zig`, the `.v` devices of `lib/sim/rt/device.zig`, alone) |
+ | OSDI dyn (`lib/osdi_dyn`) | a wrong Jacobian entry or limited RHS, no crash | the residual's central difference; a diode's closed form at the clamp and OSDI's second RHS path | `lib/osdi_dyn/eval.zig` (in `test`); ngspice through `tools/external_analog.py` |
+ | Device contract (`lib/contract`) | a reference family's derivative lane wrong | a central difference of the family's own value | `lib/contract/family.zig` (`test-contract`) |
+ | | wrong `%e` text, wrong special-function value | the C11 7.21.6.1 and C99 F.10.2.1 rows | `lib/contract/c_format.zig`, `lib/contract/gm.zig` (`test-contract`) |
+diff --git a/build/devices.zig b/build/devices.zig
+index 370f8e9..8a97d82 100644
+--- a/build/devices.zig
++++ b/build/devices.zig
+@@ -92,8 +92,10 @@ pub fn add(g: Graph, va_gen: Gen) void {
+         .{ .name = "dynlib", .module = dynlib },
+     });
+     vdev_so_host.link_libc = true;
+-    for ([_][]const u8{ "v_inv", "v_buf", "v_count", "v_a2d", "v_edge", "v_any", "v_wide", "v_huge", "v_say" }) |name| {
+-        const src_path = b.fmt("tests/conformance/tests/verilog-ams/ch07_mixed_signal/{s}.v", .{name});
++    // The suite's `.v` devices, then those only this host judges (tests/host/vdev/).
++    for ([_][]const u8{ "v_inv", "v_buf", "v_count", "v_a2d", "v_edge", "v_any", "v_wide", "v_huge", "v_say", "v_edge_clock", "v_skew" }) |name| {
++        const own = std.mem.eql(u8, name, "v_edge_clock") or std.mem.eql(u8, name, "v_skew");
++        const src_path = if (own) b.fmt("tests/host/vdev/{s}.v", .{name}) else b.fmt("tests/conformance/tests/verilog-ams/ch07_mixed_signal/{s}.v", .{name});
+         const src = b.path(src_path);
+         const gen = genRun(b, va_gen, src_path);
+         gen.addArg("--emit-zig");
+@@ -120,7 +122,9 @@ pub fn add(g: Graph, va_gen: Gen) void {
+         const host = &b.graph.host.result;
+         so_opts.addOptionPath(name, wd.path(b, b.fmt("{s}{s}.1{s}", .{ host.libPrefix(), name, host.dynamicLibSuffix() })));
+     }
+-    test_step.dependOn(&testRun(b, "vdev_host", vdev_host, runner, results_dir).step);
++    const vdev_run = testRun(b, "vdev_host", vdev_host, runner, results_dir);
++    test_step.dependOn(&vdev_run.step);
++    b.step("test-vdev", "Run tests/host/vdev_host.zig (the `.v` contract devices, lib/sim/rt/device.zig) only").dependOn(&vdev_run.step);
+     test_step.dependOn(&testRun(b, "vdev_so_host", vdev_so_host, runner, results_dir).step);
+ 
+     for ([_]struct { []const []const u8, []const u8, u8, []const u8 }{
+diff --git a/lib/sim/rt/device.zig b/lib/sim/rt/device.zig
+index 546b527..1db8462 100644
+--- a/lib/sim/rt/device.zig
++++ b/lib/sim/rt/device.zig
+@@ -13,6 +13,11 @@
+ //! The engine is `State.zig` rebuilt from a saved tick boundary
+ //! (`snapshot.save`) whenever it has work, run, and saved again: `State`
+ //! holds two boundaries, the accepted one and the one this step made.
++//! Only a visible event synchronizes: after each save the engine runs on
++//! with its inputs held (`look`) to the first tick an output's level or
++//! drive changes, and the host lands there, not on an internal tick. The
++//! engine catches up from the saved boundary when that time or an input
++//! edge comes.
+ //! Clauses: VAMS §7.3.6 (synchronization), §7.8, §8.4.3.3 (an A2D event at
+ //! the nearest tick), §4.5.8 (the ramps), §5.10.3.1 (`cross`); IEEE 1364-2005
+ //! §9.7.2 (which edges wake a process), §11.4 (a tick boundary).
+@@ -34,6 +39,7 @@
+ //! - `Device.updateState(comptime S: type, m: *const Model, inst: *Instance, x: [n_u]f64, st: *State, sim: contract.SimState) contract.UpdateResult`
+ //! - `Device.stateCtl(_: *const Model, inst: *Instance, st: *State, op: contract.StateCtlOp) bool`
+ //! - `Device.pendingBreakpoint(inst: *const Instance, t: f64) ?f64`
++//! - `Device.look_cap`
+ 
+ const std = @import("std");
+ const assert = std.debug.assert;
+@@ -117,6 +123,8 @@ pub fn Device(comptime spec: Spec) type {
+     const cap = snapshot.bound(spec.design);
+     const nan = std.math.nan(f64);
+     const inf = std.math.inf(f64);
++    // `Instance.seen` when `look` ran the queue dry.
++    const never = std.math.maxInt(u64);
+ 
+     return struct {
+         const Self = @This();
+@@ -170,10 +178,21 @@ pub fn Device(comptime spec: Spec) type {
+             a2d_v: [n_in]f64 = @splat(nan),
+             a2d_t: f64 = 0,
+             /// Per input, which of its crossings would wake a process at the
+-            /// accepted boundary: bit 0 a rising one, bit 1 a falling one.
++            /// accepted boundary or at any tick `look` ran up to `seen`: bit
++            /// 0 a rising one, bit 1 a falling one.
+             wakes: [n_in]u2 = @splat(3),
+-            /// The next digital event, in seconds.
++            /// The next visible event (`look`), in seconds: the first tick
++            /// an output's level or drive changes or the engine stops, or
++            /// the last tick `look` ran when `look_cap` cut it short. A step
++            /// that reaches it runs the engine though no input crossed.
+             next_ev: f64 = inf,
++            /// Where the host should land for `next_ev`: the last visible
++            /// change less than `ttol` after it, so a skewed bus is one
++            /// landing.
++            land: f64 = inf,
++            /// The last tick `look` ran, or `never` when the queue ran dry.
++            /// A crossing at a later tick is treated as waking.
++            seen: u64 = never,
+             /// A crossing this step took more than `ttol` before its end, in
+             /// a step where some process woke.
+             late_cross: bool = false,
+@@ -256,7 +275,7 @@ pub fn Device(comptime spec: Spec) type {
+             for (ins) |u| try drive(s, spec.pins[u], .x);
+             try run(s, 0);
+             outputs(m, inst, s, 0, true);
+-            try keep(inst, st, s);
++            try keep(m, inst, st, s);
+             st.cur ^= 1;
+             st.work = false;
+             // Time 0 is never rejected.
+@@ -270,7 +289,10 @@ pub fn Device(comptime spec: Spec) type {
+         /// a transient every crossing since the last sample is delivered at
+         /// its nearest tick and every tick up to `sim.t` runs; an output
+         /// that moved starts its ramp at `sim.t`, where its value has not
+-        /// changed, so the step never needs repeating (`.ok` always).
++        /// changed. A crossing more than `ttol` before `sim.t` in a step
++        /// that wakes a process asks the host to end the step `ttol`/2
++        /// after the earliest such crossing (`.request_reject_at`), and
++        /// sets `late_cross` for a host that queries instead.
+         pub fn updateState(comptime S: type, m: *const Model, inst: *Instance, x: [n_u]f64, st: *State, sim: contract.SimState) contract.UpdateResult {
+             _ = S;
+             // Pair of `keep`: each boundary fits its buffer.
+@@ -287,8 +309,13 @@ pub fn Device(comptime spec: Spec) type {
+                 };
+                 return if (moved) .{ .request_reject_at = sim.t } else .ok;
+             }
+-            transient(arena.allocator(), m, inst, x, st, sim.t) catch poison(inst);
+-            return .ok;
++            if (profile) prof = .{};
++            const tr = transient(arena.allocator(), m, inst, x, st, sim.t) catch {
++                poison(inst);
++                return .ok;
++            };
++            if (profile and st.work) std.debug.print("vera-device-profile: t={e} rebuild_ns={d} restore_ns={d} run_ns={d} save_ns={d} look_ns={d} restored_bytes={d} saved_bytes={d} arena_bytes={d}\n", .{ sim.t, prof.rebuild, prof.restore, prof.run, prof.save, prof.look, prof.restored, prof.saved, arena.queryCapacity() });
++            return if (tr) |r| .{ .request_reject_at = r } else .ok;
+         }
+ 
+         fn static(a: std.mem.Allocator, m: *const Model, inst: *Instance, x: [n_u]f64, st: *State, t: f64) !bool {
+@@ -304,13 +331,15 @@ pub fn Device(comptime spec: Spec) type {
+             try run(s, s.sched.now);
+             const before = inst.dc_lvl ++ inst.dc_g;
+             outputs(m, inst, s, t, true);
+-            try keep(inst, st, s);
++            try keep(m, inst, st, s);
+             return !std.mem.eql(f64, &before, &(inst.dc_lvl ++ inst.dc_g));
+         }
+ 
+         const Edge = struct { tick: u64, pin: u32, bit: logic.Bit };
+ 
+-        fn transient(a: std.mem.Allocator, m: *const Model, inst: *Instance, x: [n_u]f64, st: *State, t: f64) !void {
++        /// The step's run, and the time the step should have ended at when
++        /// a crossing in it ran late (`updateState`).
++        fn transient(a: std.mem.Allocator, m: *const Model, inst: *Instance, x: [n_u]f64, st: *State, t: f64) !?f64 {
+             // A running engine has an accepted boundary (`birth`, `keep`).
+             assert(!inst.stopped);
+             assert(st.lens[st.cur] != 0);
+@@ -321,7 +350,7 @@ pub fn Device(comptime spec: Spec) type {
+             var n: usize = 0;
+             // A crossing's time matters only if the step wakes a process: one
+             // that wakes nothing runs at its secant tick, unlocated.
+-            var late = false;
++            var late: f64 = inf; // The earliest late crossing.
+             var woke = false;
+             for (ins, 0..) |u, i| {
+                 const v0 = inst.a2d_v[i];
+@@ -335,11 +364,13 @@ pub fn Device(comptime spec: Spec) type {
+                     if (!time.crosses(dir, v0 - th, v1 - th)) continue;
+                     // The secant between the two samples, as `cross` finds it.
+                     const tc = inst.a2d_t + (t - inst.a2d_t) * (th - v0) / (v1 - v0);
+-                    late = late or t - tc > ttol(m);
+-                    woke = woke or inst.wakes[i] & wake != 0;
++                    if (t - tc > ttol(m)) late = @min(late, tc);
+                     // ponytail: a crossing that rounds past `horizon` runs at it,
+                     // a tick early, rather than holding an event past `t`.
+-                    edges[n] = .{ .tick = @min(@as(u64, @intFromFloat(@max(@round(ticks(tc)), 0))), horizon), .pin = u, .bit = bit };
++                    const k = @min(@as(u64, @intFromFloat(@max(@round(ticks(tc)), 0))), horizon);
++                    // Past `seen` the processes waiting are unknown: it wakes.
++                    woke = woke or inst.wakes[i] & wake != 0 or k > inst.seen;
++                    edges[n] = .{ .tick = k, .pin = u, .bit = bit };
+                     n += 1;
+                 }
+                 inst.a2d_v[i] = v1;
+@@ -347,8 +378,12 @@ pub fn Device(comptime spec: Spec) type {
+             inst.a2d_t = t;
+             assert(n <= edges.len); // At most two edges per input.
+             const due = inst.next_ev != inf and time.tickAtOrBefore(inst.next_ev, tick) <= horizon;
+-            if (late and (woke or due)) inst.late_cross = true;
+-            if (n == 0 and !due) return;
++            const retry: ?f64 = if (late != inf and (woke or due)) late + ttol(m) / 2 else null;
++            if (retry) |r| {
++                inst.late_cross = true;
++                assert(r < t); // `late` is more than `ttol` before `t`.
++            }
++            if (n == 0 and !due) return retry;
+             // Stable, as `std.mem.sort`, without its 28 KB block sort: at
+             // most two edges per input.
+             std.sort.insertion(Edge, edges[0..n], {}, struct {
+@@ -357,6 +392,7 @@ pub fn Device(comptime spec: Spec) type {
+                 }
+             }.lt);
+             const s = try open(a, st.bufs[st.cur][0..st.lens[st.cur]]);
++            const t_run = clock();
+             for (edges[0..n]) |e| {
+                 if (e.tick > s.sched.now) {
+                     try run(s, e.tick - 1);
+@@ -366,8 +402,10 @@ pub fn Device(comptime spec: Spec) type {
+                 try drive(s, spec.pins[e.pin], e.bit);
+             }
+             try run(s, @max(horizon, s.sched.now));
++            if (profile) prof.run += clock() - t_run;
+             outputs(m, inst, s, t, false);
+-            try keep(inst, st, s);
++            try keep(m, inst, st, s);
++            return retry;
+         }
+ 
+         /// The engine at the boundary `saved`, or at time 0 for null, with
+@@ -377,8 +415,13 @@ pub fn Device(comptime spec: Spec) type {
+             // Pair of `keep`: a boundary `saveTo` wrote into `cap` bytes.
+             if (saved) |b| assert(b.len != 0);
+             if (saved) |b| assert(b.len <= cap);
++            const t0 = clock();
+             const s = try RtState.quietState(a, spec.design, spec.units);
++            const t1 = clock();
+             if (saved) |b| try s.restore(b);
++            if (profile) prof.rebuild += t1 - t0;
++            if (profile) prof.restore += clock() - t1;
++            if (profile) prof.restored += if (saved) |b| b.len else 0;
+             assert(s.quiet); // No file, dump or transcript leaves the engine.
+             return s;
+         }
+@@ -408,12 +451,7 @@ pub fn Device(comptime spec: Spec) type {
+         fn outputs(m: *const Model, inst: *Instance, s: *const RtState, t: f64, static_: bool) void {
+             assert(s.quiet);
+             assert(s.v.len == s.x.len);
+-            for (outs, 0..) |u, k| {
+-                const p = spec.pins[u];
+-                assert(p.out);
+-                const w = s.get(p.off + p.bit / 64);
+-                const at: u6 = @intCast(p.bit % 64);
+-                const b: u2 = @intCast(((w.v >> at) & 1) | (((w.x >> at) & 1) << 1));
++            for (levels(s), 0..) |b, k| {
+                 const lvl = switch (b) {
+                     0 => m.vss,
+                     1 => m.vdd,
+@@ -434,10 +472,10 @@ pub fn Device(comptime spec: Spec) type {
+             }
+         }
+ 
+-        /// The engine's next event, whether it stopped, which input edges
+-        /// wake it, and its boundary as this step's work; a boundary longer
+-        /// than `cap` fails.
+-        fn keep(inst: *Instance, st: *State, s: *RtState) !void {
++        /// Whether the engine stopped, which input edges wake it, and its
++        /// boundary as this step's work; then `look` from that boundary. A
++        /// boundary longer than `cap` fails.
++        fn keep(m: *const Model, inst: *Instance, st: *State, s: *RtState) !void {
+             assert(s.quiet);
+             assert(s.out == s.buffers.sink); // No `capture` is left open.
+             const said = s.buffers.sink.buffered();
+@@ -451,23 +489,99 @@ pub fn Device(comptime spec: Spec) type {
+             }
+             assert(st.say_len <= say_cap);
+             inst.stopped = s.sched.phase == .stopped;
+-            inst.next_ev = if (s.sched.peekTime()) |k| seconds(k) else inf;
+-            for (ins, 0..) |u, i| {
+-                const p = spec.pins[u];
+-                const e = s.wakes(p.slot);
+-                // An edge term sees only the slot's least significant bit.
+-                const lsb = p.bit == 0;
+-                const up = e.contains(.any) or lsb and e.contains(.posedge);
+-                const down = e.contains(.any) or lsb and e.contains(.negedge);
+-                inst.wakes[i] = @as(u2, @intFromBool(up)) | @as(u2, @intFromBool(down)) << 1;
+-            }
++            inst.wakes = wakeBits(s);
++            inst.next_ev = inf;
++            inst.land = inf;
++            inst.seen = never;
+             // A stopped engine is never run again, so its state is not kept.
+             if (inst.stopped) return;
+             const into = st.cur ^ 1;
++            const t0 = clock();
+             st.lens[into] = @intCast(try snapshot.saveTo(s, &st.bufs[into]));
++            const t1 = clock();
+             st.work = true;
+             assert(st.lens[into] != 0);
+             assert(st.lens[into] <= cap);
++            look(m, inst, s);
++            if (profile) prof.save += t1 - t0;
++            if (profile) prof.look += clock() - t1;
++            if (profile) prof.saved += st.lens[into];
++        }
++
++        /// The most event ticks `look` runs past a saved boundary before it
++        /// reports the last one as a landing: the host's cost of an internal
++        /// clock no output sees is one landing per this many of its ticks.
++        pub const look_cap = 1024;
++
++        /// `s`, at the boundary `keep` saved, run on with the inputs held
++        /// one event tick at a time, setting `next_ev`, `land` and `seen`
++        /// (see `Instance`) and adding to `wakes` every edge a process waits
++        /// on at a tick it runs. A tick that fails is reported as `next_ev`:
++        /// the run that reaches it meets the failure. `s` is spent: its
++        /// transcript was kept already, and nothing it does here is kept.
++        fn look(m: *const Model, inst: *Instance, s: *RtState) void {
++            assert(!inst.stopped);
++            assert(inst.next_ev == inf and inst.land == inf); // `keep`'s reset.
++            var prev = levels(s);
++            var first: ?u64 = null;
++            const window = ticks(ttol(m));
++            for (0..look_cap) |_| {
++                const k = s.sched.peekTime() orelse return; // Dry: `seen` stays `never`.
++                if (first) |f| if (@as(f64, @floatFromInt(k - f)) >= window) break;
++                const was = s.sched.now;
++                run(s, k) catch {
++                    inst.seen = was;
++                    if (first == null) inst.next_ev = seconds(k);
++                    if (first == null) inst.land = seconds(k);
++                    return;
++                };
++                for (&inst.wakes, wakeBits(s)) |*w, b| w.* |= b;
++                const now = levels(s);
++                const stop = s.sched.phase == .stopped;
++                if (stop or !std.mem.eql(u2, &prev, &now)) {
++                    if (first == null) inst.next_ev = seconds(k);
++                    first = first orelse k;
++                    inst.land = seconds(k);
++                    prev = now;
++                }
++                if (stop) break;
++            }
++            inst.seen = s.sched.now;
++            // `look_cap` ticks and nothing visible: land on the last.
++            if (first == null) inst.next_ev = seconds(s.sched.now);
++            if (first == null) inst.land = inst.next_ev;
++            assert(inst.land >= inst.next_ev);
++        }
++
++        /// Each output pin's (v, x) bits in the engine: 0 = 00, 1 = 10,
++        /// z = 01, x = 11.
++        fn levels(s: *const RtState) [n_out]u2 {
++            assert(s.v.len == s.x.len);
++            var b: [n_out]u2 = undefined;
++            for (outs, &b) |u, *o| {
++                const p = spec.pins[u];
++                assert(p.out);
++                const w = s.get(p.off + p.bit / 64);
++                const at: u6 = @intCast(p.bit % 64);
++                o.* = @intCast(((w.v >> at) & 1) | (((w.x >> at) & 1) << 1));
++            }
++            return b;
++        }
++
++        /// Per input, the edges a process waits on now (`Instance.wakes`).
++        fn wakeBits(s: *const RtState) [n_in]u2 {
++            var b: [n_in]u2 = undefined;
++            for (ins, &b) |u, *o| {
++                const p = spec.pins[u];
++                assert(!p.out);
++                const e = s.wakes(p.slot);
++                // An edge term sees only the slot's least significant bit.
++                const lsb = p.bit == 0;
++                const up = e.contains(.any) or lsb and e.contains(.posedge);
++                const down = e.contains(.any) or lsb and e.contains(.negedge);
++                o.* = @as(u2, @intFromBool(up)) | @as(u2, @intFromBool(down)) << 1;
++            }
++            return b;
+         }
+ 
+         /// `query`: a crossing ran late; `commit`: this step's boundary and
+@@ -510,9 +624,10 @@ pub fn Device(comptime spec: Spec) type {
+             assert(st.say_len == 0);
+         }
+ 
+-        /// The next digital event or end of an output ramp after `t`.
++        /// The next visible digital event's landing (`Instance.land`) or
++        /// end of an output ramp after `t`.
+         pub fn pendingBreakpoint(inst: *const Instance, t: f64) ?f64 {
+-            var best = if (inst.next_ev > t) inst.next_ev else inf;
++            var best = if (inst.land > t) inst.land else inf;
+             for (inst.lvl_t1 ++ inst.g_t1) |t1| {
+                 if (t1 > t) best = @min(best, t1);
+             }
+@@ -521,6 +636,23 @@ pub fn Device(comptime spec: Spec) type {
+             return best;
+         }
+ 
++        /// A debug flag: when set, each transient step that runs the engine
++        /// prints the split of its cost (`vera-device-profile:` on stderr):
++        /// the nanoseconds `open` spends in `quietState` (rebuild) and in
++        /// `restore`, the run, `keep`'s save and `look`, and the bytes
++        /// restored, saved and allocated.
++        const profile = false;
++        /// The current step's split while `profile` is set.
++        var prof: struct { rebuild: u64 = 0, restore: u64 = 0, run: u64 = 0, save: u64 = 0, look: u64 = 0, restored: usize = 0, saved: usize = 0 } = .{};
++
++        /// A monotonic clock in nanoseconds while `profile` is set, else 0.
++        fn clock() u64 {
++            if (!profile or @import("builtin").os.tag != .linux) return 0; // os: a comptime test; other targets get 0
++            var ts: std.os.linux.timespec = undefined; // os: analyzed only for linux with `profile` set
++            assert(std.os.linux.clock_gettime(.MONOTONIC, &ts) == 0); // os: analyzed only for linux with `profile` set
++            return @as(u64, @intCast(ts.sec)) * std.time.ns_per_s + @as(u64, @intCast(ts.nsec));
++        }
++
+         /// The ramp from `from` at `t0` to `to` at `t1`, at `t`.
+         fn ramp(from: f64, to: f64, t0: f64, t1: f64, t: f64) f64 {
+             if (from == to) return to;
+diff --git a/tests/host/vdev/v_edge_clock.v b/tests/host/vdev/v_edge_clock.v
+new file mode 100644
+index 0000000..efcffa2
+--- /dev/null
++++ b/tests/host/vdev/v_edge_clock.v
+@@ -0,0 +1,19 @@
++// v_edge with a free-running 1 ns clock feeding a counter no output reads
++// (tests/host/vdev_host.zig): no pin can tell it from v_edge, so a host
++// drives both through the same steps.
++`timescale 1ns/1ps
++module v_edge_clock(clk, q);
++  input clk;
++  output [1:0] q;
++  reg [1:0] q;
++  reg c;
++  reg [7:0] n;
++  initial begin
++    q = 0;
++    c = 0;
++    n = 0;
++  end
++  always #1 c = ~c;
++  always @(posedge c) n <= n + 1;
++  always @(posedge clk) q <= q + 1;
++endmodule
+diff --git a/tests/host/vdev/v_skew.v b/tests/host/vdev/v_skew.v
+new file mode 100644
+index 0000000..985b73c
+--- /dev/null
++++ b/tests/host/vdev/v_skew.v
+@@ -0,0 +1,18 @@
++// A skewed bus (tests/host/vdev_host.zig): every 10 ns the 8 bits of q
++// flip one after another, 1 ps apart, q[0] first at 10 ns.
++`timescale 1ns/1ps
++module v_skew(q);
++  output [7:0] q;
++  reg [7:0] q;
++  integer k;
++  initial begin
++    q = 0;
++    forever begin
++      #10;
++      for (k = 0; k < 8; k = k + 1) begin
++        q[k] = ~q[k];
++        if (k < 7) #0.001;
++      end
++    end
++  end
++endmodule
+diff --git a/tests/host/vdev_host.zig b/tests/host/vdev_host.zig
+index cf9f6be..24ba764 100644
+--- a/tests/host/vdev_host.zig
++++ b/tests/host/vdev_host.zig
+@@ -56,6 +56,22 @@
+ //! crossing at 5.5 ns q = d. d[599] is 1 (599 mod 3 = 2), so y is 5 V
+ //! through rout into 10 kΩ from the operating point on.
+ //!
++//! v_edge_clock is v_edge plus a 1 ns internal clock and a counter no pin
++//! reads (tests/host/vdev/). Only a visible event synchronizes: the host
++//! sees no breakpoint before the 1024th internal tick (`look_cap`), 1024 ns,
++//! a step no input crosses runs no engine, and through the same steps both
++//! devices end identical.
++//!
++//! v_edge on a ramp clk = 1 V/ns: the step from 0 to 4 ns crosses 2.5 V at
++//! 2.5 ns, 1.5 ns late, and posedge clk wakes a process, so the device asks
++//! the host to end the step at 2.5 ns + ttol/2 = 2.51 ns. The ramp is
++//! linear, so the secant of the retried step is exact and it is accepted.
++//!
++//! v_skew flips q[0] .. q[7] 1 ps apart from 10 ns (tests/host/vdev/). With
++//! the default ttol = 20 ps the eight are one landing at the last,
++//! 10.007 ns, where all eight ramps start; with ttol = 0.5 ps the first
++//! landing is 10 ns.
++//!
+ //! v_say prints "born" at time 0 and "edge" at each rising clk. The device
+ //! holds a step's text until the host commits it: the step that runs the
+ //! 5.5 ns edge holds "edge\n", a revert drops it, and the retried step that
+@@ -479,6 +495,96 @@ test "v_say: a step's transcript is printed when it is accepted, never when reje
+     try expectEqual(@as(u32, 0), c.st.say_len);
+ }
+ 
++test "v_edge_clock: an internal clock no output reads moves no landing and runs no engine" {
++    const K = Circuit(@import("v_edge_clock"));
++    var k: K = .{};
++    k.src[K.pin("clk")] = pulse;
++    k.birth();
++    _ = try k.op();
++    // Nothing visible before clk rises: the only landing is the last tick
++    // `look` runs, its 1024th (`look_cap`), at 1024 ns.
++    try expectEqual(@as(?f64, 1024e-9), K.Dev.pendingBreakpoint(&k.inst, 0));
++    // A step to 3 ns crosses nothing: the engine stays at its boundary.
++    var sim = K.at(3e-9);
++    sim.dt = 3e-9;
++    try k.solve(sim);
++    try expectEqual(contract.UpdateResult.ok, K.Dev.updateState(K.Fam, &k.m, &k.inst, k.x, &k.st, sim));
++    try expect(!k.st.work);
++}
++
++test "v_edge_clock and v_edge: the same steps, levels and ramps" {
++    // Oracle (metamorphic): the two differ only in state no pin reads.
++    const E = Circuit(@import("v_edge"));
++    const K = Circuit(@import("v_edge_clock"));
++    var e: E = .{};
++    var k: K = .{};
++    const re = try clockEdges(E, &e);
++    const rk = try clockEdges(K, &k);
++    try expectEqual(re.q, rk.q);
++    try expectEqual(re.shrunk, rk.shrunk);
++    try expectEqual(e.solves, k.solves);
++    try expectEqual(e.t, k.t);
++    try expectEqual(e.x, k.x);
++    try expectEqual(e.inst.lvl_t0, k.inst.lvl_t0);
++    try expectEqual(e.inst.lvl_t1, k.inst.lvl_t1);
++}
++
++test "v_edge: a late crossing that wakes a process asks for one retry at ttol/2 past it" {
++    const C = Circuit(@import("v_edge"));
++    var c: C = .{};
++    c.src[C.pin("clk")] = struct {
++        fn f(t: f64) f64 {
++            return 1e9 * t;
++        }
++    }.f;
++    c.g_gnd[C.pin("q[1]")] = 1e-4;
++    c.g_gnd[C.pin("q[0]")] = 1e-4;
++    c.birth();
++    _ = try c.op();
++    var sim = C.at(4e-9);
++    sim.dt = 4e-9;
++    try c.solve(sim);
++    const r = C.Dev.updateState(C.Fam, &c.m, &c.inst, c.x, &c.st, sim);
++    try expect(r == .request_reject_at);
++    try std.testing.expectApproxEqAbs(2.51e-9, r.request_reject_at, 1e-21);
++    // A host that queries instead still sees the late crossing.
++    try expect(C.Dev.stateCtl(&c.m, &c.inst, &c.st, .query));
++    _ = C.Dev.stateCtl(&c.m, &c.inst, &c.st, .revert);
++    sim = C.at(r.request_reject_at);
++    sim.dt = r.request_reject_at;
++    try c.solve(sim);
++    try expectEqual(contract.UpdateResult.ok, C.Dev.updateState(C.Fam, &c.m, &c.inst, c.x, &c.st, sim));
++    try expect(!C.Dev.stateCtl(&c.m, &c.inst, &c.st, .query));
++    _ = C.Dev.stateCtl(&c.m, &c.inst, &c.st, .commit);
++    try expectEqual(@as(u2, 1), count(c.inst));
++    try expectEqual(r.request_reject_at, c.inst.lvl_t0[1]);
++}
++
++test "v_skew: bus bits less than ttol apart are one landing, at the last" {
++    const C = Circuit(@import("v_skew"));
++    var c: C = .{};
++    inline for (0..8) |b| c.g_gnd[C.pin(std.fmt.comptimePrint("q[{d}]", .{b}))] = 1e-4;
++    c.birth();
++    _ = try c.op();
++    try expectEqual(@as(?f64, 10.007e-9), C.Dev.pendingBreakpoint(&c.inst, 0));
++    // 4 ns steps: 4, 8, then clamped to the landing. (A step that ends
++    // inside the window, past q[0]'s flip, runs the engine there: correct
++    // for a host that steps anywhere, but not the one landing tested here.)
++    while (c.t < 10.007e-9 - 1e-20) try c.step(4e-9, 5e-14);
++    try std.testing.expectApproxEqAbs(10.007e-9, c.t, 1e-20);
++    // Every bit moved at the landing (output k is q[7 - k]).
++    for (0..8) |k| {
++        try expectEqual(@as(f64, 5), c.inst.lvl_to[k]);
++        try expectEqual(c.t, c.inst.lvl_t0[k]);
++    }
++    // A window narrower than the skew merges nothing.
++    var n: C = .{};
++    n.m.ttol = 0.5e-12;
++    n.birth();
++    _ = try n.op();
++    try expectEqual(@as(?f64, 10e-9), C.Dev.pendingBreakpoint(&n.inst, 0));
++}
++
+ test "every .v device is stamped with the contract's vera_version" {
+     // `src/codegen/digital/emit.zig` (then in src/sim) once wrote a literal ABI 5 after the
+     // contract moved to 6, so every `.v` device failed a host's ABI check (ESPice,
+-- 
+2.43.0
+
+
+From b31d568e5803254f1802fc8d45cafb94d2de1ece Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 28 Nov 2026 02:14:30 +0000
+Subject: [PATCH 2/2] sim/rt/State: a quiet state allocates no stdout buffer
+
+`quietState` built the 64 KiB stdout buffer a quiet engine never writes, so
+the contract device's per-step arena outgrew the allocator's size classes
+and mapped fresh pages on every active step. `initTo` now prints into the
+quiet sink from the start and allocates the buffer only for a real run.
+On a 2000-flip-flop design (ESpice, Debug): arena 105912 -> 9358 bytes per
+active step, (rebuild + restore + save) / run 3.93 -> 1.30.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_014DSyq6YHPYv8k8qvURepx5
+---
+ lib/sim/rt/State.zig      | 168 ++++++++++++++++++++------------------
+ lib/sim/rt/transcript.zig |   3 +-
+ 2 files changed, 90 insertions(+), 81 deletions(-)
+
+diff --git a/lib/sim/rt/State.zig b/lib/sim/rt/State.zig
+index eeef5a2..21c509c 100644
+--- a/lib/sim/rt/State.zig
++++ b/lib/sim/rt/State.zig
+@@ -714,83 +714,7 @@ pub fn init(self: *State, init_: std.process.Init, d: *const Design, time_units:
+ /// `deinit`, so give it an arena, or let the process exit reclaim it.
+ /// The time-0 processes (`d.order`) are queued, not run.
+ pub fn initIn(self: *State, gpa: std.mem.Allocator, io: std.Io, d: *const Design, time_units: i32) Error!void {
+-    assert(d.v.len == d.x.len);
+-    assert(d.code_len < show_base); // Every pc is a payload below the display band.
+-    if (d.nodes != 0) assert(d.comb_start.len == d.slots + 1);
+-    // Cold: out of line, so the hot fields share fewer cache lines.
+-    const dumps = try gpa.create(observe.Dumps);
+-    dumps.* = .{
+-        .catalog = d.vcd,
+-        .port_files = d.ports_dump,
+-        .port_live = try gpa.alloc(evcd.Live, d.ports_dump.len),
+-        .dumped = try gpa.alloc(bool, if (d.vcd != null) d.slots else 0),
+-    };
+-    // Cold and large (a 64 KiB buffer): out of line.
+-    const buffers = try gpa.create(transcript.Buffers);
+-    buffers.* = .{ .stdout = undefined, .sink = undefined, .cap = .init(gpa), .buf = undefined };
+-    self.* = .{
+-        .gpa = gpa,
+-        .v = try gpa.dupe(u64, d.v),
+-        .x = try gpa.dupe(u64, d.x),
+-        .sched = .empty,
+-        .terms = try gpa.alloc(std.ArrayList(Term), d.slots),
+-        .fan_start = d.fan_start,
+-        .fan = d.fan,
+-        .armed = try gpa.alloc(bool, d.code_len),
+-        .comb_start = d.comb_start,
+-        .comb = d.comb,
+-        .pending = try gpa.alloc(bool, if (d.nodes == 0) 0 else d.slots),
+-        .diff = try gpa.alloc(u64, if (d.nodes == 0) 0 else d.v.len),
+-        .dirty = try gpa.alloc(u64, (d.nodes + 63) / 64),
+-        .watch_start = d.watch_start,
+-        .watchers = d.watchers,
+-        .waiting = try gpa.alloc(u64, d.triggered),
+-        .repeats = try gpa.alloc(u64, d.repeats),
+-        .joins = try gpa.alloc(u32, d.joins),
+-        .calls = .{
+-            .active = try gpa.alloc(u32, d.subs),
+-            .resident = try gpa.alloc(u32, if (activations) d.subs else 0),
+-            .act_events = d.act_events,
+-        },
+-        .monitored = try gpa.alloc(bool, d.slots),
+-        .time_format = .{ .units = time_units },
+-        .layers = try gpa.alloc(Layers, if (overrides) d.slots else 0),
+-        .part_start = d.part_start,
+-        .parts = try gpa.alloc(Part, if (d.part_start.len == 0) 0 else d.part_start[d.part_start.len - 1]),
+-        .dumps = dumps,
+-        .nets = try .init(gpa, d.nets, d.drivers, d.udps, d.trans),
+-        .scratch = .init(gpa),
+-        .out = undefined,
+-        .io = io,
+-        .buffers = buffers,
+-    };
+-    buffers.stdout = std.Io.File.stdout().writerStreaming(io, &buffers.buf);
+-    try net.seedPaths(&self.nets, gpa, d.v, d.x);
+-    self.buffers.sink = &self.buffers.stdout.interface;
+-    self.out = self.buffers.sink;
+-    @memset(self.terms, .empty);
+-    @memset(self.armed, false);
+-    @memset(self.pending, false);
+-    // Each slot at most once (`pending`): `changed` never grows.
+-    try self.changed.ensureTotalCapacityPrecise(gpa, self.pending.len);
+-    @memset(self.diff, 0);
+-    @memset(self.dirty, 0);
+-    @memset(self.waiting, 0);
+-    @memset(self.repeats, 0);
+-    @memset(self.joins, 0);
+-    @memset(self.calls.active, 0);
+-    @memset(self.calls.resident, 0);
+-    @memset(self.monitored, false);
+-    @memset(self.layers, .{});
+-    @memset(self.parts, .{});
+-    @memset(self.dumps.dumped, false);
+-    @memset(self.dumps.port_live, .{});
+-    // §7.11: the switch groups `Run.elaborate` settled, again, so each
+-    // has its signal (`Nets.sig0`, `%v`) before any process runs.
+-    for (self.nets.on_net, 0..) |l, k| if (l.len != 0) try net.resolve(self, @intCast(k));
+-    for (d.order) |pc| try self.runPlain(pc, null);
+-    assert(self.out == self.buffers.sink);
+-    assert(self.sched.now == 0);
++    return self.initTo(gpa, io, d, time_units, null);
+ }
+ 
+ /// The next process to dispatch, at the pc it resumes at, or
+@@ -896,18 +820,102 @@ pub fn quietState(a: std.mem.Allocator, d: *const Design, time_units: i32) Error
+     assert(time_units <= 2); // A §19.8 exponent.
+     assert(time_units >= -15);
+     const s = try a.create(State);
+-    try s.initIn(a, std.Io.failing, d, time_units);
+     const memory = try a.create(std.Io.Writer.Allocating);
+     memory.* = .init(a);
++    try s.initTo(a, std.Io.failing, d, time_units, &memory.writer);
+     s.quiet = true;
+-    s.buffers.sink = &memory.writer;
+-    s.out = s.buffers.sink;
++    assert(s.buffers.sink == &memory.writer);
++    assert(s.out == s.buffers.sink);
+     assert(s.quiet);
+     return s;
+ }
+ 
+ // ---- private ----
+ 
++/// `initIn`, the transcript into `sink` from the start when given (a
++/// `quiet` state's memory), else to stdout through a 64 KiB buffer, which a
++/// quiet state never allocates: allocated per `open`, it alone made the
++/// device's arena map fresh pages every step.
++fn initTo(self: *State, gpa: std.mem.Allocator, io: std.Io, d: *const Design, time_units: i32, sink: ?*std.Io.Writer) Error!void {
++    assert(d.v.len == d.x.len);
++    assert(d.code_len < show_base); // Every pc is a payload below the display band.
++    if (d.nodes != 0) assert(d.comb_start.len == d.slots + 1);
++    // Cold: out of line, so the hot fields share fewer cache lines.
++    const dumps = try gpa.create(observe.Dumps);
++    dumps.* = .{
++        .catalog = d.vcd,
++        .port_files = d.ports_dump,
++        .port_live = try gpa.alloc(evcd.Live, d.ports_dump.len),
++        .dumped = try gpa.alloc(bool, if (d.vcd != null) d.slots else 0),
++    };
++    // Cold, and with stdout's 64 KiB buffer large: out of line.
++    const buffers = try gpa.create(transcript.Buffers);
++    buffers.* = .{ .stdout = undefined, .sink = undefined, .cap = .init(gpa), .buf = if (sink == null) try gpa.alloc(u8, 1 << 16) else &.{} };
++    self.* = .{
++        .gpa = gpa,
++        .v = try gpa.dupe(u64, d.v),
++        .x = try gpa.dupe(u64, d.x),
++        .sched = .empty,
++        .terms = try gpa.alloc(std.ArrayList(Term), d.slots),
++        .fan_start = d.fan_start,
++        .fan = d.fan,
++        .armed = try gpa.alloc(bool, d.code_len),
++        .comb_start = d.comb_start,
++        .comb = d.comb,
++        .pending = try gpa.alloc(bool, if (d.nodes == 0) 0 else d.slots),
++        .diff = try gpa.alloc(u64, if (d.nodes == 0) 0 else d.v.len),
++        .dirty = try gpa.alloc(u64, (d.nodes + 63) / 64),
++        .watch_start = d.watch_start,
++        .watchers = d.watchers,
++        .waiting = try gpa.alloc(u64, d.triggered),
++        .repeats = try gpa.alloc(u64, d.repeats),
++        .joins = try gpa.alloc(u32, d.joins),
++        .calls = .{
++            .active = try gpa.alloc(u32, d.subs),
++            .resident = try gpa.alloc(u32, if (activations) d.subs else 0),
++            .act_events = d.act_events,
++        },
++        .monitored = try gpa.alloc(bool, d.slots),
++        .time_format = .{ .units = time_units },
++        .layers = try gpa.alloc(Layers, if (overrides) d.slots else 0),
++        .part_start = d.part_start,
++        .parts = try gpa.alloc(Part, if (d.part_start.len == 0) 0 else d.part_start[d.part_start.len - 1]),
++        .dumps = dumps,
++        .nets = try .init(gpa, d.nets, d.drivers, d.udps, d.trans),
++        .scratch = .init(gpa),
++        .out = undefined,
++        .io = io,
++        .buffers = buffers,
++    };
++    buffers.stdout = std.Io.File.stdout().writerStreaming(io, buffers.buf);
++    try net.seedPaths(&self.nets, gpa, d.v, d.x);
++    self.buffers.sink = sink orelse &self.buffers.stdout.interface;
++    self.out = self.buffers.sink;
++    @memset(self.terms, .empty);
++    @memset(self.armed, false);
++    @memset(self.pending, false);
++    // Each slot at most once (`pending`): `changed` never grows.
++    try self.changed.ensureTotalCapacityPrecise(gpa, self.pending.len);
++    @memset(self.diff, 0);
++    @memset(self.dirty, 0);
++    @memset(self.waiting, 0);
++    @memset(self.repeats, 0);
++    @memset(self.joins, 0);
++    @memset(self.calls.active, 0);
++    @memset(self.calls.resident, 0);
++    @memset(self.monitored, false);
++    @memset(self.layers, .{});
++    @memset(self.parts, .{});
++    @memset(self.dumps.dumped, false);
++    @memset(self.dumps.port_live, .{});
++    // §7.11: the switch groups `Run.elaborate` settled, again, so each
++    // has its signal (`Nets.sig0`, `%v`) before any process runs.
++    for (self.nets.on_net, 0..) |l, k| if (l.len != 0) try net.resolve(self, @intCast(k));
++    for (d.order) |pc| try self.runPlain(pc, null);
++    assert(self.out == self.buffers.sink);
++    assert(self.sched.now == 0);
++}
++
+ /// `Run.runUntil`'s zero-delay-loop guard, counted the same way: one
+ /// event per nonblocking row.
+ inline fn count(self: *State, at: u64) Error!void {
+diff --git a/lib/sim/rt/transcript.zig b/lib/sim/rt/transcript.zig
+index afcf30c..a845e0c 100644
+--- a/lib/sim/rt/transcript.zig
++++ b/lib/sim/rt/transcript.zig
+@@ -46,7 +46,8 @@ pub const Buffers = struct {
+     cap: std.Io.Writer.Allocating,
+     zero_out: ?*std.Io.Writer = null,
+     zero_field: std.Io.Writer.Allocating = undefined,
+-    buf: [1 << 16]u8,
++    /// `stdout`'s buffer; empty in a `quiet` state, which prints to `sink`.
++    buf: []u8,
+ };
+ 
+ /// Everything printed until `captured` or `fshow` goes to a buffer.
+-- 
+2.43.0
+

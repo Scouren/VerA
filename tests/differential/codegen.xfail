@@ -35,7 +35,7 @@ verilog-a/ch04_expressions/zi_sampling_period.va codegen: a call of `zi_zp`
 verilog-a/ch04_expressions/zi_transition_time_and_first_transition.va codegen: a call of `zi_nd`
 verilog-a/ch05_analog_behavior/batch_per_instance_state.va codegen: a §5.6.1.2 path latch (`path_prev`)
 verilog-a/ch05_analog_behavior/conditional_potential_open.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
-verilog-a/ch05_analog_behavior/held_through_output_actual_seed_and_scan.va codegen: a call of `$sscanf`
+verilog-a/ch05_analog_behavior/held_through_output_actual_seed_and_scan.va codegen: a call of `$random`
 verilog-a/ch05_analog_behavior/implicit_zero_contribution.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch05_analog_behavior/static_switch_elision.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
 verilog-a/ch05_analog_behavior/switch_branch.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
@@ -44,7 +44,6 @@ verilog-a/ch05_analog_behavior/unassigned_switch_arm.va codegen: a §5.6.1.3 pot
 verilog-a/ch06_hierarchy/generate_if_instantiates_one_arm.va the display sites differ in number: only the old has site 1
 verilog-a/ch06_hierarchy/if_generate_values_drive_paramset_selection.va the display sites differ in number: only the old has site 3
 verilog-a/ch06_hierarchy/mfactor_conditional_only.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
-verilog-a/ch06_hierarchy/string_derived_parameter.va codegen: parameter `u.mode` is not a number
 verilog-a/ch09_system_tasks/arandom.va codegen: a call of `$arandom`
 verilog-a/ch09_system_tasks/arandom_no_seed.va codegen: a call of `$arandom`
 verilog-a/ch09_system_tasks/binding_detection.va codegen: a call of `$port_connected`
@@ -66,8 +65,8 @@ verilog-a/ch09_system_tasks/fscanf_failed_match_leaves_input.va codegen: a call 
 verilog-a/ch09_system_tasks/fscanf_successive_scans_on_one_line.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/ftell.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/long_record_is_not_truncated.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/mcd_channels_exhausted_at_bit_31.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/numeric_string.va codegen: a call of `$sformat`
+verilog-a/ch09_system_tasks/mcd_channels_exhausted_at_bit_31.va codegen: a call of `$fopen`
+verilog-a/ch09_system_tasks/numeric_string.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/plusargs.va codegen: a call of `$test$plusargs`
 verilog-a/ch09_system_tasks/plusargs_prefix.va codegen: a call of `$test$plusargs`
 verilog-a/ch09_system_tasks/plusargs_value_order.va codegen: a call of `$value$plusargs`
@@ -89,14 +88,10 @@ verilog-a/ch09_system_tasks/rejected_iterations_leave_no_file_side_effects.va co
 verilog-a/ch09_system_tasks/rewind.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/rng_reference_large_count.va codegen: a call of `$rdist_chi_square`
 verilog-a/ch09_system_tasks/rng_short_circuit.va codegen: a call of `$rdist_exponential`
-verilog-a/ch09_system_tasks/sformat.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/sscanf_conversion_rules.va codegen: a call of `$sscanf`
-verilog-a/ch09_system_tasks/sscanf_engineering_and_path_codes.va codegen: a call of `$sscanf`
-verilog-a/ch09_system_tasks/swrite.va codegen: a call of `$swrite`
 verilog-a/ch09_system_tasks/test_plusargs.va codegen: a call of `$test$plusargs`
 verilog-a/ch09_system_tasks/top_port_connected_controls_ddt.va codegen: a call of `$port_connected`
 verilog-a/ch09_system_tasks/value_plusargs.va codegen: a call of `$value$plusargs`
-verilog-a/ch09_system_tasks/write_mode_path_65_opens.va codegen: a call of `$sformat`
+verilog-a/ch09_system_tasks/write_mode_path_65_opens.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/write_mode_reopen_appends_across_analyses.va codegen: a call of `$fopen`
 verilog-a/ch10_directives/compact_modeling_macro_implies_its_extensions.va the new device does not build: n6.zig:75: unused local constant
 verilog-a/combined/optional_port_environment.va codegen: a call of `$port_connected`
@@ -187,7 +182,6 @@ verilog-a/ch09_system_tasks/limit_user_function.va the new device does not build
 verilog-a/ch09_system_tasks/limit_user_function_multiple_sites.va the new device does not build: n8.zig:303: unused function parameter
 verilog-a/ch09_system_tasks/limit_user_function_previous_iterate.va the new device does not build: n9.zig:177: unused function parameter
 verilog-a/ch09_system_tasks/limit_with_derivative.va the new device does not build: n11.zig:260: unused function parameter
-verilog-a/ch09_system_tasks/simprobe_string_parameter_name_resolves.va codegen: parameter `u_m.inst` is not a number
 verilog-a/ch09_system_tasks/status_ops.va codegen: a call of `analog$initial`
 verilog-a/ch09_system_tasks/table_snapshot.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
 verilog-a/ch09_system_tasks/table_snapshot_collapse.va codegen: a §5.6.1.3 potential contribution that runs under a condition (a switch branch)
@@ -199,83 +193,16 @@ verilog-ams/ch05_analog_behavior/indirect_equation_lhs_tolerance.va codegen: a �
 verilog-ams/ch07_mixed_signal/mixed_top_with_an_analog_child.va codegen: a flow contribution to a potential source's branch
 verilog-ams/ch09_system_tasks/status_ops.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/table_status.va codegen: a §9.17.3 `$limit` string form (the host's `limit` hook)
-verilog-a/ch06_hierarchy/paramset_outer_defparam_shape.va codegen: parameter `mode` is not a number
-verilog-a/ch06_hierarchy/paramset_string_range_selection.va codegen: parameter `u.h01_type_ps.t` is not a number
-verilog-a/annex_a_syntax/declarations.va codegen: a slot of type 2 (a string)
-verilog-a/annex_a_syntax/system_task_null_argument_space.va codegen: a call of `$swrite`
 verilog-a/ch03_data_types/dynamic_multidim_numeric.va point 0: display record value 69: old 0e0, new 1.2e1
-verilog-a/ch03_data_types/multidimensional_strings.va codegen: a slot of type 2 (a string)
-verilog-a/ch03_data_types/parameter_types.va codegen: a call of `str$cmp`
-verilog-a/ch03_data_types/string_arrays.va codegen: a slot of type 2 (a string)
-verilog-a/ch03_data_types/string_comparison_context.va codegen: a slot of type 2 (a string)
-verilog-a/ch03_data_types/string_comparisons.va codegen: a slot of type 2 (a string)
-verilog-a/ch03_data_types/string_concatenation.va codegen: a slot of type 2 (a string)
-verilog-a/ch03_data_types/string_concatenation_runtime_operand.va codegen: a slot of type 2 (a string)
-verilog-a/ch03_data_types/string_literal_operand_is_a_number.va codegen: a slot of type 2 (a string)
-verilog-a/ch03_data_types/string_nul_removal.va codegen: a slot of type 2 (a string)
-verilog-a/ch03_data_types/string_parameter_range.va codegen: a call of `str$cmp`
-verilog-a/ch03_data_types/string_range_overrides.va codegen: a call of `str$cmp`
-verilog-a/ch03_data_types/string_replication.va codegen: a slot of type 2 (a string)
-verilog-a/ch03_data_types/string_replication_4096_bytes.va codegen: a slot of type 2 (a string)
-verilog-a/ch03_data_types/string_replication_parameter_multiplier.va codegen: a slot of type 2 (a string)
-verilog-a/ch03_data_types/string_replication_past_4096_bytes.va codegen: a slot of type 2 (a string)
-verilog-a/ch03_data_types/string_replication_runtime_multiplier.va codegen: a slot of type 2 (a string)
-verilog-a/ch03_data_types/string_variables.va codegen: a slot of type 2 (a string)
 verilog-a/ch04_expressions/idt.va codegen: a call of `idt$hold`
 verilog-a/ch04_expressions/zi_np_parameter_roots_dc_gain.va codegen: a call of `zi_np`
-verilog-a/ch05_analog_behavior/held_sformat_string_survives_rejected_step.va codegen: a real operand that is not a number
-verilog-a/ch05_analog_behavior/simparam_dynamic_name.va codegen: a slot of type 2 (a string)
-verilog-a/ch05_analog_behavior/string_written_in_event_body_is_held.va codegen: a real operand that is not a number
-verilog-a/ch05_analog_behavior/timer_body_context_controls.va codegen: a call of `$simparam$str`
-verilog-a/ch06_hierarchy/conditional_direct_nesting_is_not_a_scope.va codegen: a slot of type 2 (a string)
-verilog-a/ch09_system_tasks/analog_decimal_is_auto_sized.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/analog_radix_of_integer_expression_is_32_bits.va codegen: a call of `$sformat`
+verilog-a/ch06_hierarchy/conditional_direct_nesting_is_not_a_scope.va point 0: display record value 1: old 1e0, new 0e0
 verilog-a/ch09_system_tasks/diagnostic_finish_initial.va codegen: a call of `analog$initial`
 verilog-a/ch09_system_tasks/diagnostic_info_initial.va codegen: a call of `analog$initial`
-verilog-a/ch09_system_tasks/display_argument_runs.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/display_c_format_flags.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/display_formats.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/display_library_binding.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/display_radix_of_integer_is_32_bits.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/integer_default_fields.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/l_format_library_cell.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/m_format_hierarchical_name.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/null_argument_consumed_by_s.va codegen: a call of `$swrite`
-verilog-a/ch09_system_tasks/percent_escape_prints_one_percent.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/real_conversion_rounds_half_to_even.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/real_engineering_notation.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/real_flags_sign_before_zero_fill.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/real_format_fields.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/real_g_conversion_is_significant_digits.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/real_hash_flag_e_always_prints_the_point.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/real_hash_flag_f_always_prints_the_point.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/real_hash_flag_g_keeps_trailing_zeros.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/scan_destination_preservation.va codegen: a slot of type 2 (a string)
-verilog-a/ch09_system_tasks/sformat_32_conversions.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/sformat_field_width_over_4096.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/sformat_runtime_width_past_its_row_rejected.va codegen: a slot of type 2 (a string)
-verilog-a/ch09_system_tasks/sformat_runtime_width_within_its_row.va codegen: a slot of type 2 (a string)
-verilog-a/ch09_system_tasks/sformat_variable_format_mismatch_continues.va codegen: a slot of type 2 (a string)
-verilog-a/ch09_system_tasks/simparam_str_analysis_name_host_table.va codegen: a slot of type 2 (a string)
-verilog-a/ch09_system_tasks/simparam_str_analysis_type_tran_op.va codegen: a slot of type 2 (a string)
-verilog-a/ch09_system_tasks/simparam_str_cwd_and_analysis_name.va codegen: a slot of type 2 (a string)
-verilog-a/ch09_system_tasks/simparam_str_cwd_host_table.va codegen: a slot of type 2 (a string)
-verilog-a/ch09_system_tasks/simparam_string.va codegen: a slot of type 2 (a string)
-verilog-a/ch09_system_tasks/sscanf.va codegen: a call of `$sscanf`
-verilog-a/ch09_system_tasks/sscanf_invalid_conversion_runtime_choice.va codegen: a slot of type 2 (a string)
-verilog-a/ch09_system_tasks/sscanf_literal_and_excess_arguments.va codegen: a call of `$sscanf`
-verilog-a/ch09_system_tasks/sscanf_reads_a_string_variable.va codegen: a slot of type 2 (a string)
-verilog-a/ch09_system_tasks/string_concat_past_4096_bytes.va codegen: a slot of type 2 (a string)
-verilog-a/ch09_system_tasks/string_formatting.va codegen: a call of `$swrite`
-verilog-a/ch09_system_tasks/swrite_s_with_argument.va codegen: a call of `$swrite`
-verilog-a/ch10_directives/compact_modeling_extension_set.va codegen: a call of `str$cmp`
-verilog-a/ch10_directives/file_macro_is_the_opened_path.va codegen: a slot of type 2 (a string)
 verilog-ams/annex_a_syntax/analog_initial.va codegen: a call of `analog$initial`
 verilog-ams/ch05_analog_behavior/analog_initial_integer.va codegen: a call of `analog$initial`
 verilog-ams/ch05_analog_behavior/analog_initial_real.va codegen: a call of `analog$initial`
 verilog-ams/ch05_analog_behavior/multiple_analog_initial_blocks_concatenate.va codegen: a call of `analog$initial`
-verilog-ams/ch05_analog_behavior/timer_body_context_controls.va codegen: a call of `$simparam$str`
-verilog-ams/ch07_mixed_signal/display_binary_operand_analog.va codegen: a call of `$sformat`
 verilog-ams/ch07_mixed_signal/driver_count_excludes_connectmodule.va codegen: a flow contribution to a potential source's branch
 verilog-ams/ch07_mixed_signal/driver_delay_and_next_state.va codegen: a flow contribution to a potential source's branch
 verilog-ams/ch07_mixed_signal/receiver_count_reports_ordinary_receivers.va codegen: a flow contribution to a potential source's branch
@@ -289,16 +216,8 @@ verilog-ams/ch09_system_tasks/diagnostic_info_initial.va codegen: a call of `ana
 verilog-ams/ch09_system_tasks/driver_strength_next_strength_type.va codegen: a flow contribution to a potential source's branch
 verilog-ams/ch09_system_tasks/finish_in_analog_initial_skips_simulation.va codegen: a call of `analog$initial`
 verilog-ams/ch09_system_tasks/receiver_segregation_ignored_without_driver_value.va codegen: a flow contribution to a potential source's branch
-verilog-a/ch02_lexical/octal_escape_377_largest_byte.va codegen: a real operand that is not a number
-verilog-a/ch02_lexical/octal_escape_boundaries.va codegen: a real operand that is not a number
-verilog-a/ch02_lexical/string_bytes_above_7f.va codegen: a real operand that is not a number
-verilog-a/ch02_lexical/string_escapes.va codegen: a real operand that is not a number
-verilog-a/ch02_lexical/string_literal_tab_positions.va codegen: a real operand that is not a number
-verilog-a/ch02_lexical/string_whitespace_significant.va codegen: a real operand that is not a number
-verilog-a/ch02_lexical/undefined_escape_keeps_character.va codegen: a real operand that is not a number
 verilog-a/ch04_expressions/laplace_nd_pole_at_origin.va codegen: a call of `laplace_nd`
 verilog-a/ch04_expressions/zi_nd_dynamic_coefficient_sampled.va codegen: a call of `zi_nd`
-verilog-a/ch05_analog_behavior/simparam_str_hierarchy_names.va codegen: a call of `$simparam$str`
 verilog-a/ch04_expressions/abs.va point 0: display record value 9: old 0e0, new -0e0
 verilog-a/ch04_expressions/cosh.va point 0: display record value 9: old 1.543080634815244e0, new 1.5430806348152437e0
 verilog-a/ch04_expressions/hypot_fmod_extreme_magnitude.va point 0: display record value 13: old 0e0, new -0e0
@@ -306,15 +225,12 @@ verilog-a/exhaustive/hyperbolic.va point 0: display record value 9: old 1.543080
 verilog-a/exhaustive/rounding_selection.va point 0: display record value 29: old 0e0, new -0e0
 netlist/hdl/veriloga_wide_ladder.assets/ladder70.va codegen: more than 64 unknowns
 verilog-a/annex_g_change_history/generate_replaced_by_analog_for.va the new device does not build: n23.zig:390: unused local constant
-verilog-a/ch03_data_types/string_comparison_in_a_constant_expression.va codegen: parameter `mode` is not a number
-verilog-a/ch04_expressions/replication_real_count.va codegen: a slot of type 2 (a string)
 verilog-a/ch06_hierarchy/mfactor_scales_named_branch_flow.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch06_hierarchy/undeclared_interconnect_port_binding.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch06_hierarchy/vector_port_past_256_unknowns.va codegen: more than 64 unknowns
-verilog-a/annex_a_syntax/parameter_declarations.va codegen: a call of `str$cmp`
 verilog-a/ch04_expressions/ddt_idt_nature_tolerance.va codegen: a call of `idt$hold`
 verilog-a/ch09_system_tasks/append_writes_at_end_of_file.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fd_channels_past_30.va codegen: a call of `$sformat`
+verilog-a/ch09_system_tasks/fd_channels_past_30.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/fdebug.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/fdisplay.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/fflush.va codegen: a call of `$fopen`
@@ -325,7 +241,7 @@ verilog-a/ch09_system_tasks/file_output.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/fmonitor.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/fopen_multichannel_descriptor.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/fscanf.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/fscanf_destination_preservation.va codegen: a slot of type 2 (a string)
+verilog-a/ch09_system_tasks/fscanf_destination_preservation.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/fscanf_directive_spans_lines.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/fscanf_real_destination.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/fscanf_window_over_4096.va codegen: a call of `$fopen`
@@ -336,9 +252,8 @@ verilog-a/ch09_system_tasks/input_position_restore_failure.va codegen: a call of
 verilog-a/ch09_system_tasks/monitor_ignores_abstime.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/monitor_reports_every_change.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/monitor_suppresses_an_unchanged_step.va codegen: a call of `$fopen`
-verilog-a/ch09_system_tasks/numeric_string_local_width.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/numeric_string_width.va codegen: a call of `$sformat`
-verilog-a/ch09_system_tasks/sformat_33_conversions.va codegen: a call of `$sformat`
+verilog-a/ch09_system_tasks/numeric_string_local_width.va point 0: display record value 1: old 1e0, new 0e0
+verilog-a/ch09_system_tasks/sformat_33_conversions.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/sscanf_nul_is_whitespace.va codegen: a call of `$fopen`
 verilog-a/ch09_system_tasks/two_instances_hold_distinct_channels.va codegen: a call of `$fopen`
 verilog-a/combined/file_and_display_side_effects.va codegen: a call of `$fopen`
@@ -351,7 +266,6 @@ verilog-ams/ch09_system_tasks/ungetc_cancelled_by_fseek_and_gap_reads_zero.va co
 verilog-a/ch09_system_tasks/simparam_timescale.va point 0: row 0: old -4.511869783264559e-1, new -4.511869793274559e-1
 verilog/pli/analog_attributes.va codegen: a flow contribution to a potential source's branch
 netlist/noise/va_noise.assets/ntab_card.va codegen: a §4.6.4.3/.4 noise table whose knots are not constant (a parameter array)
-verilog-a/ch04_expressions/ac_stim_label_inactive_in_large_signal.va codegen: a slot of type 2 (a string)
 verilog-a/ch04_expressions/noise_table_array_parameter.va codegen: a §4.6.4.3/.4 noise table whose knots are not constant (a parameter array)
 verilog-a/ch04_expressions/noise_table_card_knots.va codegen: a §4.6.4.3/.4 noise table whose knots are not constant (a parameter array)
 netlist/noise/va_noise.assets/coeff_res.va point 10: noise PSD at 1 Hz, branch 1: old 4e-18, new 3.9999999999999995e-18

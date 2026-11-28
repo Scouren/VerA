@@ -26,10 +26,10 @@
 //! §5.6.7, §5.10, §9.4, §9.17.3.
 //!
 //! Contents:
-//! - fields `nodes`, `num_ports`, `branches`, `params`, `ranges`, `contributions`, `charge_sites`, `arrays`, `held`, `limit_slots`, `flows`, `table_samples`, `noise`, `kernel`, `systf`, `displays`
+//! - fields `nodes`, `num_ports`, `branches`, `params`, `ranges`, `contributions`, `charge_sites`, `arrays`, `held`, `limit_slots`, `flows`, `table_samples`, `noise`, `kernel`, `systf`, `displays`, `name`, `str_caps`
 //! - `pub const Instance`, `pub const Node` (`Index`, `Kind`), `pub const Branch` (`Index`), `pub const Param` (`Index`, `Type`), `pub const Range`
 //! - `pub const Access`, `pub const Contribution` (`Index`, `Kind`), `pub const ChargeSite`, `pub const Array`, `pub const Held`, `pub const Flow` (`Kind`), `pub const LimitSlot`, `pub const Noise` (`Kind`), `pub const Kernel`, `pub const Display`
-//! - `pub const rows_max: u32`
+//! - `pub const rows_max: u32`, `pub const str_row: u64`, `pub const str_row_max: u64`
 //! - `pub fn deinit(d: *Device, gpa: Allocator) void`
 //! - `pub fn paramRanges(d: *const Device, p: Param.Index) []const Range`
 //! - `pub fn nodeName(d: *const Device, ip: *const InternPool, n: Node.Index) []const u8`
@@ -80,6 +80,15 @@ kernel: Kernel = .{},
 systf: std.MultiArrayList(Display) = .empty,
 /// §9.4 the display and file tasks, in source order.
 displays: std.MultiArrayList(Display) = .empty,
+/// The top module's name: what §9.4.3's `%m` prints and `%l` names after
+/// `work.` (`.empty` before Sema sets it).
+name: String = .empty,
+/// §3.3 per instruction, the most bytes the string it yields (a run-time
+/// string's call site, a string slot) can hold, never below `str_row` for
+/// a run-time one; 0 for a value that is no string. Sema's `string.caps`
+/// writes it (the old `cg_strcap.cap`); codegen sizes each row and held
+/// field by it. Empty when the body holds no string.
+str_caps: []const u64 = &.{},
 
 /// The `Zcu.Instance.Index` a row was declared in, by its backing integer
 /// (`Air` sits below the `Zcu`); `none` for a row no instance declares.
@@ -249,6 +258,12 @@ pub const Kernel = struct {
 /// diagnostic bag to look the token up in.
 pub const Display = struct { name: String, call: Air.Inst.Index, file: String, line: u32 };
 
+/// The row every run-time string had before rows were sized, and what a
+/// piece of run-time length counts (the old `cg_strcap.row`).
+pub const str_row: u64 = 4096;
+/// The largest row a device can address, 2^47 bytes (`cg_strcap.max_row`).
+pub const str_row_max: u64 = 1 << 47;
+
 /// The most rows any table holds: a handle is a `u32` below the sentinels.
 pub const rows_max: u32 = std.math.maxInt(u32) - 2;
 
@@ -277,6 +292,7 @@ pub fn deinit(d: *Device, gpa: Allocator) void {
     d.flows.deinit(gpa);
     d.table_samples.deinit(gpa);
     d.displays.deinit(gpa);
+    gpa.free(d.str_caps);
     d.* = undefined;
 }
 

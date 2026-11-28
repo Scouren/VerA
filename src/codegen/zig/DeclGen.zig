@@ -60,6 +60,8 @@ u_names: []const []const u8 = &.{},
 branch_u: []u32 = &.{},
 /// Bit k: the body reads `calls.host_params[k]` (a `Model` field).
 host_params: u8 = 0,
+/// §9.15 the body reads the host's Table 9-28 strings (`strings.zig`).
+host_strings: bool = false,
 /// Per instruction: an `alloc`'s `Instance` field when §5.10 holds it (a
 /// held array's on its first slot only: one `[n]` field).
 held_field: []?[]const u8 = &.{},
@@ -268,13 +270,22 @@ fn genModel(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     for (d.params.items(.name), d.params.items(.default), d.params.items(.derive), d.params.items(.ty)) |n, def, der, ty| {
         if ((def == InternPool.Index.undef or def == .none) and der != .none) {
             // `derive` computes it from the card before any reader.
-            try dg.print(w, "    {f}: {s} = 0,\n", .{ Ident{ .name = dg.ip.stringToSlice(n) }, if (ty == .integer) "i64" else "f64" });
+            try dg.print(w, "    {f}: {s},\n", .{
+                Ident{ .name = dg.ip.stringToSlice(n) },
+                switch (ty) {
+                    .integer => "i64 = 0",
+                    .string => "[]const u8 = \"\"",
+                    else => "f64 = 0", // else: a real, or one typed by its default
+                },
+            });
             continue;
         }
         if (def == InternPool.Index.undef or def == .none) return dg.fail("parameter `{s}`'s default does not fold", .{dg.ip.stringToSlice(n)});
         try dg.print(w, "    {f}: ", .{Ident{ .name = dg.ip.stringToSlice(n) }});
         switch (dg.ip.indexToKey(def)) {
             .float => |x| try dg.print(w, "f64 = {f},\n", .{Real{ .x = x }}),
+            // §3.4.6 a string parameter: its text.
+            .str => |t| try dg.print(w, "[]const u8 = \"{f}\",\n", .{std.zig.fmtString(dg.ip.stringToSlice(t))}),
             .int => |i| switch (i.storage) {
                 .small => |s| try dg.print(w, "i64 = {d},\n", .{s}),
                 .big => return dg.fail("parameter `{s}` wider than 64 bits", .{dg.ip.stringToSlice(n)}),
@@ -285,10 +296,15 @@ fn genModel(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     for (calls.host_params, 0..) |h, k| if (dg.host_params & (@as(u8, 1) << @intCast(k)) != 0)
         try dg.print(w, "    /// §9.15 `$simparam(\"{s}\")`, host-written.\n    {s}: f64 = {f},\n", .{ h.name, h.field, Real{ .x = h.default } });
     try dg.print(w, "    temperature__: f64 = 300.15,\n", .{});
+    // §9.15 Table 9-28 through the GPU-safe channel: indices into the host's
+    // `contract.host_strings`, 0 ("not written") unless the host writes them.
+    if (dg.host_strings) try dg.print(w, "    cwd_idx__: u32 = 0,\n    analysis_name_idx__: u32 = 0,\n", .{});
     // `given__` is the last field: `genGiven` writes declarations after it.
     try dg.genGiven(w);
     try dg.print(w, "}};\n", .{});
     try dg.print(w, "\n/// §6.3.6 the instance.\npub const Instance = struct {{\n    mfactor: f64 = 1.0,\n", .{});
+    // §9.15 where a CPU host writes its working directory and analysis name.
+    if (dg.host_strings) try dg.print(w, "    cwd: []const u8 = \"\",\n    analysis_name: []const u8 = \"\",\n", .{});
     try state.genInstanceFields(dg, w);
     try status.genInstanceFields(dg, w);
     try dg.print(w, "}};\n", .{});
@@ -430,7 +446,8 @@ fn genCore(dg: *DeclGen, w: *std.Io.Writer, uses: Function.Uses, body: []const u
         // A held array returns whole: one `[n]` field.
         try dg.print(w, " h{d}: ", .{i});
         if (state.arrayLen(dg, i)) |n| try dg.print(w, "[{d}]", .{n});
-        if (dg.air.instructions.items(.data)[i].ty == InternPool.Index.real_type) try dg.print(w, "F.zOf(S, 0x{x}),", .{dg.live.masks[i]}) else try dg.print(w, "i64,", .{});
+        const ty = dg.air.instructions.items(.data)[i].ty;
+        if (ty == InternPool.Index.real_type) try dg.print(w, "F.zOf(S, 0x{x}),", .{dg.live.masks[i]}) else if (ty == InternPool.Index.string_type) try dg.print(w, "[]const u8,", .{}) else try dg.print(w, "i64,", .{});
     };
     for (d.limit_slots.items(.slot), 0..) |slot, k| try dg.print(w, " l{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
     try ops.genCoreFields(dg, w);

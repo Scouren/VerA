@@ -24,6 +24,7 @@ const ops = @import("ops.zig");
 const Liveness = @import("Liveness.zig");
 const say = @import("say.zig");
 const status = @import("status.zig");
+const strings = @import("strings.zig");
 const Real = Function.Real;
 const Ref = Air.Inst.Ref;
 const Error = DeclGen.Error;
@@ -257,6 +258,8 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Ref
         .above => try ops.gen(f, inst, .above, args),
         .timer => try ops.gen(f, inst, .timer, args),
         else => {
+            // §3.3/§9.5.3/§9.5.4.2/§9.15 the string calls (`strings.zig`).
+            if (try strings.gen(f, inst, tag, args)) return;
             // rw-lower's `display$phase` guards a print's operands: `core`
             // drops prints, so it answers 0, and `say` 1. By name, so this
             // spells it before and after the tag lands.
@@ -305,7 +308,16 @@ fn analysisMatch(f: *Function, args: []const Ref) Error!void {
 
 /// §9.15 `$simparam(name [, fallback])`.
 fn simparam(f: *Function, args: []const Ref) Error!void {
-    const name = (if (args.len > 0) str(f, args[0]) else null) orelse return f.dg.fail("`$simparam` of a name that is not a literal", .{});
+    const name = (if (args.len > 0) str(f, args[0]) else null) orelse {
+        // A name known only at run time is not known (the old device's
+        // answer): the fallback, else 0; the name is still read.
+        if (args.len == 0) return f.print("S.con(0.0)", .{});
+        try f.print("sp: {{ std.mem.doNotOptimizeAway(", .{});
+        try strings.operand(f, args[0]);
+        try f.print("); break :sp ", .{});
+        if (args.len > 1) try f.real(args[1]) else try f.print("S.con(0.0)", .{});
+        return f.print("; }}", .{});
+    };
     if (std.mem.eql(u8, name, "iteration")) {
         f.uses.sim = true;
         return f.print("S.con(@floatFromInt(sim.iteration))", .{});

@@ -233,6 +233,8 @@ fn records(tag: SysFn.Tag) bool {
 /// bits (`%20d`); an integer's from its `display$width(v, bits, signed)`
 /// marker, none without one (a 1-bit result).
 fn decimal(dg: *DeclGen, fmt: *std.ArrayList(u8), v: Ref) Error!void {
+    // §2.7 a string's integer has no fixed width.
+    if (isString(dg, v)) return fmt.appendSlice(dg.arena, "%d");
     if (!isIntRef(dg, v)) return fmt.appendSlice(dg.arena, "%20d");
     const bits: u7, const signed = if (comptime has_width_tag) blk: {
         const m = widthOf(dg, v) orelse return fmt.appendSlice(dg.arena, "%d");

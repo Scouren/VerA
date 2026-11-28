@@ -401,6 +401,7 @@ pub fn analyze(zcu: *Zcu) Allocator.Error!?Analysis {
     var air = try s.air.finish(zcu.gpa, main);
     errdefer air.deinit(zcu.gpa);
     assert(air.mainBody().len == main.len);
+    try @import("Sema/string.zig").finish(&s, &air);
     const srcs = try zcu.gpa.alloc(Analysis.Src, air.instructions.len);
     @memset(srcs, .{ .file = @fromBackingInt(0), .src = .none });
     const n = @min(srcs.len, s.inst_srcs.items.len);

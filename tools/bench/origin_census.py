@@ -8,7 +8,7 @@ the assembly. Count instructions per function and group them by origin:
   device cold   the device's setup, range checks and everything else it declares
   host hot      the OSDI wrapper's per-iterate code (osdi_dyn eval.zig, load.zig)
   host cold     the rest of the wrapper (params, setup, descriptor, tables, abi)
-  contract      lib/contract, including the gm math kernels
+  contract      lib/contract, including the gm math kernels (lib/std/kernels, Gompute's math)
   std           Zig's standard library
 
 Then time three runs through rtime: semantic analysis only, analysis plus unoptimized bitcode,
@@ -23,9 +23,10 @@ def origin(name):
     n = name.lstrip('.L')
     if n.startswith('osdi_dyn.'):
         return 'host hot' if re.match(r'osdi_dyn\.(eval|load)\.', n) else 'host cold'
-    if n.startswith('contract.'): return 'contract'
+    if n.startswith(('contract.', 'kernels.', 'std_kernels.', 'gompute')): return 'contract'
     if n.startswith('device.') or re.match(r'u\.|[\w]+__common__', n):
-        return 'device hot' if re.match(r'device\.(eval|evalQ|q|core|updateState|stateCtl|noisePsd|limit|seed|z[A-Z])', n) or '__core' in n else 'device cold'
+        # `run` and `fast` are codegen/zig's (the new side's) per-iterate wrappers around `core`.
+        return 'device hot' if re.match(r'device\.(eval|evalQ|q|core|run|fast|updateState|stateCtl|noisePsd|limit|seed|z[A-Z])', n) or '__core' in n else 'device cold'
     return 'std'
 def ir_funcs(path):
     out = collections.OrderedDict(); cur = None
@@ -68,6 +69,7 @@ for w in sys.argv[2:]:
         fresh(); c, p = timed(args); t['full'] += c; peak = max(peak, p)
         fresh(); subprocess.run(['zig'] + args + [f'--verbose-llvm-ir={pre}', f'-femit-llvm-ir={post}', f'-femit-asm={asm}'], capture_output=True)
         for key, fn, path in (('pre', ir_funcs, pre), ('post', ir_funcs, post), ('asm', asm_funcs, asm)):
+            if not any(x.startswith('-Mroot=') for x in args): continue  # a link of objects alone: no IR, no assembly
             for name, n in fn(path).items():
                 tot[key][origin(name)] += n
                 if key == 'pre': nfun[origin(name)] += 1; top.append((n, name))

@@ -3,7 +3,7 @@
 //! every slot a `var s<i>` (§11.7), `block`/`br` a labelled block, `cond_br`
 //! an `if`, `loop`/`repeat` a labelled `while`. Structured Air is
 //! structured Zig, so there is no relooper. A real is a family value typed
-//! by the unknowns it depends on (`F.zOf(S, mask)`, `Liveness.masks`), an
+//! by the unknowns it depends on (`F.zOf(S, mask)`, `Liveness.mask`), an
 //! integer an `i64` wrapped to §3.2's 32 bits. What the body reads beyond
 //! its own values (`x`, `model`, `inst`, `sim`) is recorded while it is
 //! written (`uses`), never by scanning the text. Each operation is spelled
@@ -69,7 +69,7 @@ const TypeText = struct {
     pub fn format(t: TypeText, w: *std.Io.Writer) std.Io.Writer.Error!void {
         if (t.str) return w.writeAll("[]const u8");
         if (t.int) return w.writeAll("i64");
-        return w.print("F.zOf(S, 0x{x})", .{t.mask});
+        return w.print("F.zOf(S, 0x{f})", .{t.mask});
     }
 };
 
@@ -210,9 +210,9 @@ pub fn print(f: *Function, comptime fmt: []const u8, args: anytype) Error!void {
 /// operand widened to it.
 pub fn kernel(f: *Function, m: Liveness.Mask, name: []const u8, ops: []const Ref) Error!void {
     assert(ops.len == 1 or ops.len == 2);
-    try f.print("F.zLu(S, 0x{x}, M.{s}(F.zL(S, 0x{x})", .{ m, name, m });
+    try f.print("F.zLu(S, 0x{f}, M.{s}(F.zL(S, 0x{f})", .{ m, name, m });
     for (ops) |o| {
-        try f.print(", F.zLw(S, 0x{x}, ", .{m});
+        try f.print(", F.zLw(S, 0x{f}, ", .{m});
         try f.real(o);
         try f.print(")", .{});
     }
@@ -396,11 +396,11 @@ fn genInst(f: *Function, inst: Inst.Index) Error!void {
                 if (isInt(f.dg.ip, data.ty))
                     try f.print("{s} s{d}: i64 = M.zInstI(S, inst, \"{s}\");", .{ kw, i, field })
                 else
-                    try f.print("{s} s{d}: F.zOf(S, 0x{x}) = F.zTo(S, 0x{x}, M.zInst(S, inst, \"{s}\"));", .{ kw, i, live.masks[i], live.masks[i], field });
+                    try f.print("{s} s{d}: F.zOf(S, 0x{f}) = F.zTo(S, 0x{f}, M.zInst(S, inst, \"{s}\"));", .{ kw, i, live.mask(i), live.mask(i), field });
             } else if (isInt(f.dg.ip, data.ty)) {
                 try f.print("{s} s{d}: i64 = 0;", .{ kw, i });
             } else if (data.ty == InternPool.Index.real_type) {
-                try f.print("{s} s{d}: F.zOf(S, 0x{x}) = F.zTo(S, 0x{x}, S.con(0.0));", .{ kw, i, live.masks[i], live.masks[i] });
+                try f.print("{s} s{d}: F.zOf(S, 0x{f}) = F.zTo(S, 0x{f}, S.con(0.0));", .{ kw, i, live.mask(i), live.mask(i) });
             } else if (f.arrayOf(data.ty)) |a| {
                 // §11.10 a scratch array: its storage is never zeroed; the
                 // written-element mask `_m` says which elements hold a value.
@@ -508,21 +508,21 @@ fn genArraySlot(f: *Function, i: u32) Error!void {
         return f.print("{s} s{d}: [{d}][]const u8 = @splat(\"\"); _ = &s{d};", .{ if (written) "var" else "const", i, n, i });
     }
     if (!is_int and ty != InternPool.Index.real_type) return f.dg.fail("an array slot of type {d}", .{@backingInt(ty)});
-    assert(live.masks[i] == live.masks[i + n - 1]);
+    assert(live.mask(i).eql(live.mask(i + n - 1)));
     var assigned = false;
     for (live.assigned[i..][0..n]) |a| assigned = assigned or a;
     const kw = if (assigned) "var" else "const";
-    const elem: TypeText = .{ .int = is_int, .mask = live.masks[i] };
+    const elem: TypeText = .{ .int = is_int, .mask = live.mask(i) };
     try f.line();
     if (f.dg.held_field[i]) |field| {
         // §5.10 the values the last accepted point left.
         f.uses.inst = true;
         try f.print("{s} s{d}: [{d}]{f} = h{d}: {{ var ha: [{d}]{f} = undefined; for (&ha, 0..) |*he, hk| he.* = ", .{ kw, i, n, elem, i, n, elem });
-        if (is_int) try f.print("M.zInstIA(S, inst, \"{s}\", hk)", .{field}) else try f.print("F.zTo(S, 0x{x}, M.zInstA(S, inst, \"{s}\", hk))", .{ live.masks[i], field });
+        if (is_int) try f.print("M.zInstIA(S, inst, \"{s}\", hk)", .{field}) else try f.print("F.zTo(S, 0x{f}, M.zInstA(S, inst, \"{s}\", hk))", .{ live.mask(i), field });
         try f.print("; break :h{d} ha; }};", .{i});
     } else if (is_int) {
         try f.print("{s} s{d}: [{d}]i64 = @splat(0);", .{ kw, i, n });
-    } else try f.print("{s} s{d}: [{d}]{f} = @splat(F.zTo(S, 0x{x}, S.con(0.0)));", .{ kw, i, n, elem, live.masks[i] });
+    } else try f.print("{s} s{d}: [{d}]{f} = @splat(F.zTo(S, 0x{f}, S.con(0.0)));", .{ kw, i, n, elem, live.mask(i) });
     try f.print(" _ = &s{d};", .{i});
 }
 
@@ -533,13 +533,13 @@ fn genFused(f: *Function, inst: Inst.Index, row: array.Fused) Error!void {
     const a = f.dg.device.arrays.items[row.group];
     const b = @backingInt(a.slot);
     const live = f.dg.live;
-    assert(live.masks[b] == live.masks[b + a.count - 1]);
+    assert(live.mask(b).eql(live.mask(b + a.count - 1)));
     switch (row.kind) {
         .read => {
             const i = @backingInt(inst);
             if (!live.used[i]) return;
             // The chain's value carries its elements' lanes, the array's.
-            assert(live.masks[i] == live.masks[b]);
+            assert(live.mask(i).eql(live.mask(b)));
             try f.line();
             try f.print("const v{d} = {f}: {{ const k: i64 = ", .{ i, Label{ .i = i } });
             try f.int(row.k);
@@ -613,7 +613,7 @@ fn genLoad(f: *Function, inst: Inst.Index, data: Inst.Data) Error!void {
     try f.print("{f}: {{ const k: i64 = ", .{Label{ .i = @backingInt(inst) }});
     try f.int(data.bin_op.rhs);
     try f.print("; break :{f} if (k >= 0 and k < {d} and (s{d}_m >> @intCast(k)) & 1 != 0) s{d}[@intCast(k)] else ", .{ Label{ .i = @backingInt(inst) }, a.len, s, s });
-    if (strings.isStrType(a.elem)) try f.print("\"\"; }}", .{}) else if (isInt(f.dg.ip, a.elem)) try f.print("0; }}", .{}) else try f.print("F.zTo(S, 0x{x}, S.con(0.0)); }}", .{f.dg.live.masks[s]});
+    if (strings.isStrType(a.elem)) try f.print("\"\"; }}", .{}) else if (isInt(f.dg.ip, a.elem)) try f.print("0; }}", .{}) else try f.print("F.zTo(S, 0x{f}, S.con(0.0)); }}", .{f.dg.live.mask(s)});
 }
 
 /// The length and element type of array type `ty`, or null.
@@ -628,13 +628,13 @@ fn arrayOf(f: *Function, ty: InternPool.Index) ?InternPool.Key.ArrayType {
 /// An array slot's element type: an `i64`, or the family value at the
 /// slot's mask.
 fn elemText(f: *Function, elem: InternPool.Index, slot: u32) TypeText {
-    return .{ .int = isInt(f.dg.ip, elem), .mask = f.dg.live.masks[slot], .str = strings.isStrType(elem) };
+    return .{ .int = isInt(f.dg.ip, elem), .mask = f.dg.live.mask(slot), .str = strings.isStrType(elem) };
 }
 
 /// Writes a value instruction's expression.
 fn genValue(f: *Function, inst: Inst.Index, tag: Inst.Tag, data: Inst.Data) Error!void {
     const i = @backingInt(inst);
-    const m = f.dg.live.masks[i];
+    const m = f.dg.live.mask(i);
     switch (tag) {
         .arg => {
             f.uses.model = true;
@@ -711,7 +711,7 @@ fn genValue(f: *Function, inst: Inst.Index, tag: Inst.Tag, data: Inst.Data) Erro
         }, &.{ data.bin_op.lhs, data.bin_op.rhs }),
         .pow => {
             const b = data.bin_op.rhs;
-            if (f.dg.live.maskOf(b) == 0) {
+            if (f.dg.live.maskOf(b).isZero()) {
                 // An exponent that does not move with the solve.
                 try f.print("M.zPowK(S, ", .{});
                 try f.real(data.bin_op.lhs);
@@ -719,9 +719,9 @@ fn genValue(f: *Function, inst: Inst.Index, tag: Inst.Tag, data: Inst.Data) Erro
                 try f.real(b);
                 return f.print(").val())", .{});
             }
-            try f.print("F.zPowL(S, 0x{x}, F.zTo(S, 0x{x}, ", .{ m, m });
+            try f.print("F.zPowL(S, 0x{f}, F.zTo(S, 0x{f}, ", .{ m, m });
             try f.real(data.bin_op.lhs);
-            try f.print("), F.zTo(S, 0x{x}, ", .{m});
+            try f.print("), F.zTo(S, 0x{f}, ", .{m});
             try f.real(b);
             return f.print("), true)", .{});
         },
@@ -834,8 +834,8 @@ fn widened(f: *Function, to: Inst.Index, ref: Ref) Error!void {
     const ty = f.dg.air.typeOfIndex(f.dg.ip, to);
     if (strings.isStrType(ty)) return strings.operand(f, ref);
     if (isInt(f.dg.ip, ty)) return f.int(ref);
-    const m = f.dg.live.masks[@backingInt(to)];
-    try f.print("F.zTo(S, 0x{x}, ", .{m});
+    const m = f.dg.live.mask(@backingInt(to));
+    try f.print("F.zTo(S, 0x{f}, ", .{m});
     try f.real(ref);
     try f.print(")", .{});
 }
@@ -843,7 +843,7 @@ fn widened(f: *Function, to: Inst.Index, ref: Ref) Error!void {
 /// The Zig type of instruction `inst`'s value.
 fn typeText(f: *Function, inst: Inst.Index) TypeText {
     const ty = f.dg.air.typeOfIndex(f.dg.ip, inst);
-    return .{ .int = isInt(f.dg.ip, ty), .mask = f.dg.live.masks[@backingInt(inst)], .str = strings.isStrType(ty) };
+    return .{ .int = isInt(f.dg.ip, ty), .mask = f.dg.live.mask(@backingInt(inst)), .str = strings.isStrType(ty) };
 }
 
 fn nested(f: *Function, body: []const Inst.Index) Error!void {

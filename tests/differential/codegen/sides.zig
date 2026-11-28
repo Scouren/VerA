@@ -234,8 +234,8 @@ fn regions(comptime T: type, arena: Allocator, src: anytype) ![]const events.Reg
 }
 
 /// Returns a bit mask over `device.nodes.len` rows (`Air.Device.Node.Index`
-/// backing ints; `Liveness.unknowns_max`-sized, so `u64` holds every
-/// device): a contribution whose resist or react slot's value is tainted
+/// backing ints, one `u64`: a tainted row past 63 panics, never a silent
+/// skip): a contribution whose resist or react slot's value is tainted
 /// (`taintBody`) by `rule_jac_tags`/`rule_jac_calls` sets its `hi`, `lo` and
 /// flow rows. `dyn.zig`'s FD Jacobian check skips exactly these rows
 /// (research/codegen.md T0d): a table of ops, not a fixture's name, so it
@@ -257,6 +257,7 @@ fn fdSkipMask(arena: Allocator, air: *const Air, device: *const Air.Device, root
         if (!tainted) continue;
         for ([_]Air.Device.Node.Index{ h, l, fl }) |node| {
             if (node == .ground or node == .none) continue;
+            if (@backingInt(node) >= 64) @panic("fdSkipMask: a tainted row past 63 (widen the mask)");
             mask |= @as(u64, 1) << @intCast(@backingInt(node));
         }
     }

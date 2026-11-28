@@ -72,10 +72,8 @@ pub fn plan(dg: *DeclGen) Error!void {
     for (d.contributions.items(.resist)) |slot| {
         if (dg.live.assigned[@backingInt(slot)]) roots[@backingInt(slot)] = true;
     }
-    dg.noise_live = Liveness.init(dg.arena, dg.air.*, @intCast(dg.device.nodes.len), roots, dg.device.arrays.items) catch |e| switch (e) {
-        error.OutOfMemory => return error.OutOfMemory,
-        error.TooManyUnknowns => unreachable, // `dg.live` was built over the same unknowns
-    };
+    // Over `dg.live`'s unknowns, so its masks have `dg.live.mw` words.
+    dg.noise_live = try Liveness.init(dg.arena, dg.air.*, dg.nU(), roots, dg.device.arrays.items);
 
     var noise_rows: std.ArrayList(Row) = .empty;
     var ac_rows: std.ArrayList(Row) = .empty;
@@ -507,7 +505,7 @@ pub fn genEntries(dg: *DeclGen, w: *std.Io.Writer, b: Body) Error!void {
     } else false;
     try dg.print(w, "\nfn NoiseCore(comptime S: type) type {{\n{s}    return struct {{", .{if (any_row) "" else "    _ = S;\n"});
     for (d.contributions.items(.resist), 0..) |slot, k| if (dg.live.assigned[@backingInt(slot)])
-        try dg.print(w, " r{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
+        try dg.print(w, " r{d}: F.zOf(S, 0x{f}),", .{ k, dg.live.mask(@backingInt(slot)) });
     for (d.noise.items(.kind), 0..) |kind, i| switch (kind) {
         .thermal => try dg.print(w, " g{d}a: f64,", .{i}),
         .flicker, .ac_stim => try dg.print(w, " g{d}a: f64, g{d}b: f64,", .{ i, i }),

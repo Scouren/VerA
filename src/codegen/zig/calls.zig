@@ -178,12 +178,12 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Ref
             // both branches widen to this call's own mask (`widened`'s
             // pattern), which conservatively covers `mag`'s (Liveness's
             // call mask is the union of what a call may read, §5.6).
-            const m = f.dg.live.masks[@backingInt(inst)];
-            try f.print("(if (contract.acStimActive(\"{f}\", sim.kind, \"\")) F.zTo(S, 0x{x}, (", .{ std.zig.fmtString(name), m });
+            const m = f.dg.live.mask(@backingInt(inst));
+            try f.print("(if (contract.acStimActive(\"{f}\", sim.kind, \"\")) F.zTo(S, 0x{f}, (", .{ std.zig.fmtString(name), m });
             if (args.len > 1) try f.real(args[1]) else try f.print("S.con(1.0)", .{});
             try f.print(").mul((", .{});
             if (args.len > 2) try f.real(args[2]) else try f.print("S.con(0.0)", .{});
-            try f.print(").cos())) else F.zTo(S, 0x{x}, S.con(0.0)))", .{m});
+            try f.print(").cos())) else F.zTo(S, 0x{f}, S.con(0.0)))", .{m});
         },
         // §9.15 a known name's value; the fallback where it is not known.
         .@"$simparam" => try simparam(f, args),
@@ -223,8 +223,10 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Ref
         // `ddx_reads` (and so `deriv_reads`) then carries.
         .ddx => {
             const u = state.intConst(f.dg, args[1]) orelse return f.dg.fail("a `ddx` along no constant unknown", .{});
-            if (u >= Liveness.unknowns_max) return f.dg.fail("a `ddx` past unknown {d}", .{Liveness.unknowns_max});
-            f.dg.ddx_reads |= @as(Liveness.Mask, 1) << @intCast(u);
+            // A lane of `contract.MaskOf(n_u)`: `u64` up to 64 unknowns.
+            if (u >= @max(64, f.dg.nU())) return f.dg.fail("a `ddx` along unknown {d}, past `U`", .{u});
+            assert(u / 64 < f.dg.ddx_reads.len);
+            f.dg.ddx_reads[@intCast(u / 64)] |= @as(u64, 1) << @intCast(u % 64);
             try f.print("S.con((", .{});
             try f.real(args[0]);
             try f.print(").ddxAt({d}))", .{u});
@@ -234,7 +236,7 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, tag: SysFn.Tag, args: []const Ref
         // function's derivative (`M.zLimitUf`).
         .@"limit$uf" => {
             if (args.len != 2) return f.dg.fail("a malformed `limit$uf` call", .{});
-            try f.kernel(f.dg.live.masks[@backingInt(inst)], "zLimitUf", args);
+            try f.kernel(f.dg.live.mask(@backingInt(inst)), "zLimitUf", args);
         },
         // The slot's value at the end of the previous iterate
         // (`advanceIteration`, `state.zig`).
@@ -373,7 +375,7 @@ fn table(f: *Function, inst: Air.Inst.Index, args: []const Ref) Error!void {
     const site = state.intConst(f.dg, args[5]) orelse 0;
     const head = head_fixed + nd;
     if (nd == 0 or ncol == 0 or args.len != head + np * ncol) return f.dg.fail("a malformed `$table_model` call", .{});
-    const m = f.dg.live.masks[@backingInt(inst)];
+    const m = f.dg.live.mask(@backingInt(inst));
     const i = @backingInt(inst);
     // `previous` orders the sites; its value is unused.
     try f.print("tbl{d}: {{ _ = ", .{i});
@@ -392,10 +394,10 @@ fn table(f: *Function, inst: Air.Inst.Index, args: []const Ref) Error!void {
         try f.print(").val()", .{});
     }
     if (site != 0) try f.print("}}; inst.table_ready[{d}] = true; }} const rows = inst.table_{d};", .{ site - 1, site - 1 }) else try f.print("}};", .{});
-    try f.print(" break :tbl{d} F.zLu(S, 0x{x}, K.table.zTable(F.zL(S, 0x{x}), {d}, {d}, {d}, {d}, \"{f}\", rows, [_]F.zL(S, 0x{x}){{", .{ i, m, m, np, ncol, nd, dep, std.zig.fmtString(ext), m });
+    try f.print(" break :tbl{d} F.zLu(S, 0x{f}, K.table.zTable(F.zL(S, 0x{f}), {d}, {d}, {d}, {d}, \"{f}\", rows, [_]F.zL(S, 0x{f}){{", .{ i, m, m, np, ncol, nd, dep, std.zig.fmtString(ext), m });
     for (args[head_fixed..head], 0..) |v, k| {
         if (k != 0) try f.print(", ", .{});
-        try f.print("F.zLw(S, 0x{x}, ", .{m});
+        try f.print("F.zLw(S, 0x{f}, ", .{m});
         try f.real(v);
         try f.print(")", .{});
     }

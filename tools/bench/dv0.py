@@ -92,7 +92,7 @@ def shim_rows(log):
 def build_device(vera, va, out_dir, name):
     """A device's .osdi and its build ms (vera-next's wall time, zig included), in a fresh work
     directory, every zig process logged by zig_shim.py in <wd>/zig.tsv (the census reads it) through
-    dv0_zig.py (which appends the evalQ adapter the new side's device needs under lib/osdi_dyn).
+    dv0_zig.py.
     `vera-next --emit-osdi`; while vera-next refuses that (its OSDI backend is not built), the route
     --emit-osdi resolves to (src/next/main.zig `contractTree`): --emit-so under the work tree's own
     lib/osdi_dyn.zig, the library copied to <name>.osdi. A model codegen refuses gives (None, ms)."""

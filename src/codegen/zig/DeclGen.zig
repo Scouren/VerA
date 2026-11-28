@@ -15,6 +15,7 @@
 //! - `pub fn genReturn(dg: *DeclGen, f: *Function) Error!void`
 //! - `pub fn unconditional(dg: *const DeclGen, slot: Air.Inst.Index) bool`
 //! - `pub fn paramName(dg: *const DeclGen, k: u32) []const u8`
+//! - `pub fn nU(dg: *const DeclGen) u32`
 //! - `pub fn fail(dg: *DeclGen, comptime fmt: []const u8, args: anytype) Error`
 
 const std = @import("std");
@@ -81,8 +82,9 @@ say_live: Liveness = undefined,
 noise_rows: []const noise.Row = &.{},
 ac_rows: []const noise.Row = &.{},
 noise_live: Liveness = undefined,
-/// §4.5.14 the lanes a `ddx` reads (`calls.zig`), in `core` or `say`.
-ddx_reads: Liveness.Mask = 0,
+/// §4.5.14 the lanes a `ddx` reads (`calls.zig`), in `core` or `say`:
+/// `live.mw` words.
+ddx_reads: []u64 = &.{},
 /// Per §9.21.1 snapshot site (a `$table_model` call's `site - 1`): its
 /// sample count, the length of `Instance.table_<k>` (`state.plan`).
 table_len: []u32 = &.{},
@@ -180,6 +182,10 @@ const DeclGen = @This();
 /// Writes the whole device to `w`.
 pub fn genFile(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     try stamps.unknowns(dg);
+    // The masks span every unknown, the branch currents `unknowns` minted too.
+    dg.live = try Liveness.init(dg.arena, dg.air.*, dg.nU(), null, dg.device.arrays.items);
+    dg.ddx_reads = try dg.arena.alloc(u64, dg.live.mw);
+    @memset(dg.ddx_reads, 0);
     const p = try stamps.plan(dg);
     try dg.givenBits();
     try array.plan(dg);
@@ -244,6 +250,13 @@ pub fn unconditional(dg: *const DeclGen, slot: Air.Inst.Index) bool {
 pub fn paramName(dg: *const DeclGen, k: u32) []const u8 {
     assert(k < dg.device.params.len);
     return dg.ip.stringToSlice(dg.device.params.items(.name)[k]);
+}
+
+/// The unknowns' count, `U`'s fields (`stamps.unknowns` has run).
+pub fn nU(dg: *const DeclGen) u32 {
+    assert(dg.u_names.len >= dg.device.nodes.len);
+    assert(dg.u_names.len <= Liveness.unknowns_max);
+    return @intCast(dg.u_names.len);
 }
 
 /// Records why the device cannot be written and returns `error.CodegenFail`.
@@ -411,18 +424,25 @@ test namesIdent {
 /// sites (`n_q`, `q_stamps`, `q_site_pattern`).
 fn genTables(dg: *DeclGen, w: *std.Io.Writer, p: stamps.Plan) Error!void {
     const d = dg.device;
-    var all: Liveness.Mask = 0;
-    for (p.pattern) |m| all |= m;
-    for (d.charge_sites.items(.slot)) |slot| all |= dg.live.masks[@backingInt(slot)];
-    all |= dg.ddx_reads;
-    try dg.print(w, "\n/// The unknowns whose derivative lane the device reads.\npub const deriv_reads: u64 = 0x{x};\n/// The lanes a §4.5.14 `ddx` reads.\npub const ddx_reads: u64 = 0x{x};\n", .{ all, dg.ddx_reads });
-    try dg.print(w, "/// §5.6 bit `c` of row `r`: d eval[r] / d x[c] may be nonzero.\npub const jac_pattern = [n_u]u64{{", .{});
-    for (p.pattern) |m| try dg.print(w, " 0x{x},", .{m});
+    const mw = dg.live.mw;
+    assert(p.mw == mw and dg.ddx_reads.len == mw);
+    const all = try dg.arena.dupe(u64, dg.ddx_reads);
+    for (0..p.pattern.len / mw) |r| for (all, p.row(@intCast(r)).words) |*x, y| {
+        x.* |= y;
+    };
+    for (d.charge_sites.items(.slot)) |slot| for (all, dg.live.mask(@backingInt(slot)).words) |*x, y| {
+        x.* |= y;
+    };
+    // `contract.MaskOf(n_u)`: `u64` up to 64 unknowns, `u<n_u>` past them.
+    const ty = @max(64, dg.nU());
+    try dg.print(w, "\n/// The unknowns whose derivative lane the device reads.\npub const deriv_reads: u{d} = 0x{f};\n/// The lanes a §4.5.14 `ddx` reads.\npub const ddx_reads: u{d} = 0x{f};\n", .{ ty, Liveness.Mask{ .words = all }, ty, Liveness.Mask{ .words = dg.ddx_reads } });
+    try dg.print(w, "/// §5.6 bit `c` of row `r`: d eval[r] / d x[c] may be nonzero.\npub const jac_pattern = [n_u]u{d}{{", .{ty});
+    for (0..p.pattern.len / mw) |r| try dg.print(w, " 0x{f},", .{p.row(@intCast(r))});
     try dg.print(w, " }};\n", .{});
 
     try dg.print(w, "/// §5.6.1.2 the charge sites `q` returns.\npub const n_q: usize = {d};\n", .{d.charge_sites.len});
-    try dg.print(w, "pub const q_site_pattern = [n_q]u64{{", .{});
-    for (d.charge_sites.items(.slot)) |slot| try dg.print(w, " 0x{x},", .{dg.live.masks[@backingInt(slot)]});
+    try dg.print(w, "pub const q_site_pattern = [n_q]u{d}{{", .{ty});
+    for (d.charge_sites.items(.slot)) |slot| try dg.print(w, " 0x{f},", .{dg.live.mask(@backingInt(slot))});
     try dg.print(w, " }};\n", .{});
     try dg.print(w, "pub const q_stamps = [_]contract.QStamp(U){{\n", .{});
     for (p.q) |s| try dg.print(w, "    .{{ .site = {d}, .row = .{f}, .sign = {f} }},\n", .{ s.site, Ident{ .name = dg.nodeName(s.row) }, Real{ .x = s.sign } });
@@ -440,16 +460,16 @@ fn genCore(dg: *DeclGen, w: *std.Io.Writer, uses: Function.Uses, body: []const u
     for (d.contributions.items(.resist)) |slot| reals += @intFromBool(dg.live.assigned[@backingInt(slot)]);
     reals += d.limit_slots.len + dg.op_sites.len;
     try dg.print(w, "\nfn Core(comptime S: type) type {{\n    {s}return struct {{", .{if (reals == 0) "_ = S;\n    " else ""});
-    for (d.contributions.items(.resist), 0..) |slot, k| if (dg.live.assigned[@backingInt(slot)]) try dg.print(w, " r{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
-    for (d.charge_sites.items(.slot), 0..) |slot, k| try dg.print(w, " c{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
+    for (d.contributions.items(.resist), 0..) |slot, k| if (dg.live.assigned[@backingInt(slot)]) try dg.print(w, " r{d}: F.zOf(S, 0x{f}),", .{ k, dg.live.mask(@backingInt(slot)) });
+    for (d.charge_sites.items(.slot), 0..) |slot, k| try dg.print(w, " c{d}: F.zOf(S, 0x{f}),", .{ k, dg.live.mask(@backingInt(slot)) });
     for (dg.held_field, 0..) |h, i| if (h != null) {
         // A held array returns whole: one `[n]` field.
         try dg.print(w, " h{d}: ", .{i});
         if (state.arrayLen(dg, i)) |n| try dg.print(w, "[{d}]", .{n});
         const ty = dg.air.instructions.items(.data)[i].ty;
-        if (ty == InternPool.Index.real_type) try dg.print(w, "F.zOf(S, 0x{x}),", .{dg.live.masks[i]}) else if (ty == InternPool.Index.string_type) try dg.print(w, "[]const u8,", .{}) else try dg.print(w, "i64,", .{});
+        if (ty == InternPool.Index.real_type) try dg.print(w, "F.zOf(S, 0x{f}),", .{dg.live.mask(@intCast(i))}) else if (ty == InternPool.Index.string_type) try dg.print(w, "[]const u8,", .{}) else try dg.print(w, "i64,", .{});
     };
-    for (d.limit_slots.items(.slot), 0..) |slot, k| try dg.print(w, " l{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(slot)] });
+    for (d.limit_slots.items(.slot), 0..) |slot, k| try dg.print(w, " l{d}: F.zOf(S, 0x{f}),", .{ k, dg.live.mask(@backingInt(slot)) });
     try ops.genCoreFields(dg, w);
     try status.genCoreFields(dg, w);
     try dg.print(w, " }};\n}}\n", .{});

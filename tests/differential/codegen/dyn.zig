@@ -257,7 +257,8 @@ fn Run(comptime D: type, comptime fd_skip: u64) type {
                 const a = slopes(xv, m, sim, j, h);
                 const b = slopes(xv, m, sim, j, h / 2);
                 for (0..2 * n) |k| {
-                    if ((fd_skip >> @intCast(k % n)) & 1 != 0) continue;
+                    // `fd_skip` names rows below 64 only (`fdSkipMask`).
+                    if (k % n < 64 and (fd_skip >> @intCast(k % n)) & 1 != 0) continue;
                     // Row k's lanes: resistive, then reactive.
                     const lanes = if (k < n) r[n + k * n ..][0..n] else r[2 * n + n * n + (k - n) * n ..][0..n];
                     const d = lanes[j];

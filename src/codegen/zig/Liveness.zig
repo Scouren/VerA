@@ -13,15 +13,18 @@
 //! 1. In: one `Air`. Out: three columns over its instructions.
 //! 2. One per device; tens to tens of thousands of rows.
 //! 3. Row `i` is `Air.Inst.Index` `i`; a mask is one bit per unknown, at
-//!    most `unknowns_max` of them.
+//!    most `unknowns_max` of them, in `mw = max(1, ceil(n_u / 64))` u64
+//!    words: one flat column, row `i` at `words[i * mw ..][0..mw]`.
 //! 4. Read by row while `Function` renders an instruction.
 //! 5. Lives for one `generate`.
 //! 6. Written once by `init`, read only after.
 //!
 //! Contents:
-//! - fields `masks`, `used`, `assigned`, `targeted`
-//! - `pub const Mask = u64`, `pub const unknowns_max: u32`
-//! - `pub fn init(arena: Allocator, air: Air, n_u: u32, roots: ?[]const bool, arrays: []const Air.Device.Array) error{ OutOfMemory, TooManyUnknowns }!Liveness`
+//! - fields `mw`, `words`, `used`, `assigned`, `targeted`
+//! - `pub const Mask = struct` (`eql`, `isZero`, `format`), `pub const unknowns_max: u32`
+//! - `pub fn wordsOf(n_u: u32) u32`
+//! - `pub fn init(arena: Allocator, air: Air, n_u: u32, roots: ?[]const bool, arrays: []const Air.Device.Array) Allocator.Error!Liveness`
+//! - `pub fn mask(l: Liveness, i: u32) Mask`
 //! - `pub fn maskOf(l: Liveness, ref: Air.Inst.Ref) Mask`
 //! - `pub fn effect(air: Air, tag: Air.Inst.Tag, data: Air.Inst.Data) bool`
 //! - `pub const Operands = struct` (`collect`, `slice`)
@@ -33,16 +36,59 @@ const Air = @import("air");
 const Inst = Air.Inst;
 const SysFn = @import("vams").SysFn;
 
-/// The unknowns a value may depend on: bit `u` is unknown `u`.
-pub const Mask = u64;
-/// Most unknowns a device may have: one `Mask` bit each.
-// ponytail: one word per mask; `contract.MaskOf` past 64 unknowns needs a
-// wide mask (a `[]u64` column of `mw` words), add it with the first such fixture.
-pub const unknowns_max: u32 = @bitSizeOf(Mask);
+/// The unknowns a value may depend on, a view of `mw` words: bit `u` is
+/// unknown `u`, in word `u / 64`. Its `{f}` text is the Zig literal of
+/// `contract.MaskOf(n_u)` without the `0x`.
+pub const Mask = struct {
+    words: []const u64,
 
-/// Per instruction: the unknowns its value (an `alloc`'s: every value
-/// assigned to it; a `block`'s: every `br` operand) may depend on.
-masks: []Mask,
+    /// Whether `a` and `b` name the same unknowns. Asserts equal widths.
+    pub fn eql(a: Mask, b: Mask) bool {
+        assert(a.words.len == b.words.len);
+        return std.mem.eql(u64, a.words, b.words);
+    }
+
+    /// Whether no unknown is named.
+    pub fn isZero(m: Mask) bool {
+        assert(m.words.len != 0);
+        return std.mem.allEqual(u64, m.words, 0);
+    }
+
+    /// The hex digits of one literal: the highest nonzero word unpadded,
+    /// each word below it 16 digits, so a one-word mask writes as its
+    /// `u64` did and a zero mask as `0`.
+    pub fn format(m: Mask, w: *std.Io.Writer) std.Io.Writer.Error!void {
+        assert(m.words.len != 0);
+        var top = m.words.len - 1;
+        while (top > 0 and m.words[top] == 0) top -= 1;
+        try w.print("{x}", .{m.words[top]});
+        for (0..top) |k| try w.print("{x:0>16}", .{m.words[top - 1 - k]});
+    }
+};
+
+/// Most unknowns a device may have: `contract.MaskOf(n_u)` is one
+/// `u<n_u>`, and Zig's widest integer is `u65535` (`std_kernels.Family`
+/// takes `n_u` as a `u16`).
+pub const unknowns_max: u32 = std.math.maxInt(u16);
+
+/// The words of a mask over `n_u` unknowns: `max(1, ceil(n_u / 64))`.
+pub fn wordsOf(n_u: u32) u32 {
+    assert(n_u <= unknowns_max);
+    const mw = @max(1, std.math.divCeil(u32, n_u, 64) catch unreachable);
+    assert(mw * 64 >= n_u);
+    return mw;
+}
+
+/// Words per mask (`wordsOf(n_u)`); 1 up to 64 unknowns.
+mw: u32,
+/// Per instruction `mw` words, row `i` at `words[i * mw ..][0..mw]`: the
+/// unknowns its value (an `alloc`'s: every value assigned to it; a
+/// `block`'s: every `br` operand) may depend on.
+words: []u64,
+/// `mw` zero words: a constant's mask.
+zero: []const u64,
+/// `mw` words of scratch for `propagate` and `joinArrays`.
+acc: []u64,
 /// Per instruction: some instruction reads it as an operand.
 used: []bool,
 /// Per instruction: an `alloc` some `assign` writes.
@@ -138,17 +184,24 @@ const Liveness = @This();
 /// Computes the three columns of `air`, whose probes read `n_u` unknowns,
 /// into `arena`; `roots`, per instruction, adds effects (the display tasks
 /// `say` records); each of `arrays` gets the join of its slots' masks.
-/// Fails with `error.TooManyUnknowns` past `unknowns_max`.
-pub fn init(arena: Allocator, air: Air, n_u: u32, roots: ?[]const bool, arrays: []const Air.Device.Array) error{ OutOfMemory, TooManyUnknowns }!Liveness {
-    if (n_u > unknowns_max) return error.TooManyUnknowns;
+/// Asserts `n_u <= unknowns_max` (the caller refuses past it) and that
+/// every probe reads an unknown below `n_u`.
+pub fn init(arena: Allocator, air: Air, n_u: u32, roots: ?[]const bool, arrays: []const Air.Device.Array) Allocator.Error!Liveness {
+    assert(n_u <= unknowns_max);
     const n = air.instructions.len;
+    const mw = wordsOf(n_u);
+    const zero = try arena.alloc(u64, mw);
+    @memset(zero, 0);
     const l: Liveness = .{
-        .masks = try arena.alloc(Mask, n),
+        .mw = mw,
+        .words = try arena.alloc(u64, n * mw),
+        .zero = zero,
+        .acc = try arena.alloc(u64, mw),
         .used = try arena.alloc(bool, n),
         .assigned = try arena.alloc(bool, n),
         .targeted = try arena.alloc(bool, n),
     };
-    @memset(l.masks, 0);
+    @memset(l.words, 0);
     @memset(l.used, false);
     @memset(l.assigned, false);
     @memset(l.targeted, false);
@@ -171,18 +224,24 @@ pub fn init(arena: Allocator, air: Air, n_u: u32, roots: ?[]const bool, arrays: 
     while (l.markUsed(air, reach, roots)) : (sweep += 1) assert(sweep <= n);
     // Each pass only ORs bits in, so it stops: at most one pass per bit of
     // every slot and block, plus the pass that sees nothing change.
-    const passes_max = n * unknowns_max + 2;
-    var pass: usize = 0;
-    while (l.propagate(air) or l.joinArrays(arrays)) : (pass += 1) assert(pass < passes_max);
-    assert(l.masks.len == n);
+    const passes_max = @as(u64, n) * n_u + 2;
+    var pass: u64 = 0;
+    while (l.propagate(air, n_u) or l.joinArrays(arrays)) : (pass += 1) assert(pass < passes_max);
+    assert(l.words.len == n * mw);
     return l;
 }
 
-/// The unknowns operand `ref` may depend on; 0 for a constant.
+/// The unknowns instruction `i`'s value may depend on.
+pub fn mask(l: Liveness, i: u32) Mask {
+    assert(i < l.used.len);
+    return .{ .words = l.words[i * l.mw ..][0..l.mw] };
+}
+
+/// The unknowns operand `ref` may depend on; none for a constant.
 pub fn maskOf(l: Liveness, ref: Inst.Ref) Mask {
     assert(ref != .none);
-    const i = ref.toIndex() orelse return 0;
-    return l.masks[@backingInt(i)];
+    const i = ref.toIndex() orelse return .{ .words = l.zero };
+    return l.mask(@backingInt(i));
 }
 
 /// Whether an instruction runs for what it does, not for its value: control,
@@ -265,15 +324,21 @@ fn markReach(air: Air, body: []const Inst.Index, reach: []bool) void {
 }
 
 /// One pass over every instruction in index order; returns whether any
-/// mask grew.
-fn propagate(l: Liveness, air: Air) bool {
+/// mask grew. Probes read unknowns below `n_u`.
+fn propagate(l: Liveness, air: Air, n_u: u32) bool {
     const tags = air.instructions.items(.tag);
     const datas = air.instructions.items(.data);
     var grew = false;
     for (tags, datas, 0..) |tag, data, i| {
-        const m: Mask = switch (tag) {
-            .probe => if (data.ty_index.index < unknowns_max) @as(Mask, 1) << @intCast(data.ty_index.index) else 0,
-            .load => l.maskOf(data.un_op),
+        const acc = l.acc;
+        @memset(acc, 0);
+        switch (tag) {
+            .probe => {
+                const u = data.ty_index.index;
+                assert(u < n_u);
+                acc[u / 64] = @as(u64, 1) << @intCast(u % 64);
+            },
+            .load => l.orIn(acc, data.un_op),
             .assign => {
                 grew = l.orInto(@backingInt(data.bin_op.lhs.toIndex().?), l.maskOf(data.bin_op.rhs)) or grew;
                 continue;
@@ -282,35 +347,38 @@ fn propagate(l: Liveness, air: Air) bool {
                 if (data.br.operand != .none) grew = l.orInto(@backingInt(data.br.block_inst), l.maskOf(data.br.operand)) or grew;
                 continue;
             },
-            .store => blk: {
+            .store => {
                 const bin = air.extraData(Air.Bin, data.pl_op.payload).data;
-                break :blk l.maskOf(data.pl_op.operand) | l.maskOf(bin.rhs);
+                l.orIn(acc, data.pl_op.operand);
+                l.orIn(acc, bin.rhs);
             },
-            .select => blk: {
+            .select => {
                 const bin = air.extraData(Air.Bin, data.pl_op.payload).data;
-                break :blk l.maskOf(bin.lhs) | l.maskOf(bin.rhs);
+                l.orIn(acc, bin.lhs);
+                l.orIn(acc, bin.rhs);
             },
-            .fload => l.maskOf(data.bin_op.lhs),
+            .fload => l.orIn(acc, data.bin_op.lhs),
             // A real's lanes are its operands'; an integer, a derivative stop
             // and a latch carry none.
-            .fadd, .fsub, .fmul, .fdiv, .fmod, .pow, .hypot, .fmin, .fmax, .atan2 => l.maskOf(data.bin_op.lhs) | l.maskOf(data.bin_op.rhs),
-            .fneg, .sqrt, .exp, .expm1, .ln, .ln1p, .log10, .floor, .ceil, .fabs, .sin, .cos, .tan, .asin, .acos, .atan, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh, .opt_barrier => l.maskOf(data.un_op),
-            .call => blk: {
+            .fadd, .fsub, .fmul, .fdiv, .fmod, .pow, .hypot, .fmin, .fmax, .atan2 => {
+                l.orIn(acc, data.bin_op.lhs);
+                l.orIn(acc, data.bin_op.rhs);
+            },
+            .fneg, .sqrt, .exp, .expm1, .ln, .ln1p, .log10, .floor, .ceil, .fabs, .sin, .cos, .tan, .asin, .acos, .atan, .sinh, .cosh, .tanh, .asinh, .acosh, .atanh, .opt_barrier => l.orIn(acc, data.un_op),
+            .call => {
                 const x = air.extraData(Air.Call, data.ty_pl.payload);
-                var acc: Mask = 0;
                 for (air.extra[x.end..][0..x.data.args_len]) |w| {
                     const r: Inst.Ref = @fromBackingInt(w);
-                    if (r != .none) acc |= l.maskOf(r);
+                    if (r != .none) l.orIn(acc, r);
                 }
-                break :blk acc;
             },
             // Blocks and slots gather from their `br`s and `assign`s above.
             .block, .alloc => continue,
             // Integers, comparisons, casts to integer, `dstop`, the §5.6.1.2
             // latches, `arg`, `anew` and the control tags carry no lanes.
-            else => 0, // else: every tag above the lanes come from
-        };
-        grew = l.orInto(@intCast(i), m) or grew;
+            else => {}, // else: every tag above the lanes come from
+        }
+        grew = l.orInto(@intCast(i), .{ .words = acc }) or grew;
     }
     return grew;
 }
@@ -320,23 +388,40 @@ fn propagate(l: Liveness, air: Air) bool {
 fn joinArrays(l: Liveness, arrays: []const Air.Device.Array) bool {
     var grew = false;
     for (arrays) |a| {
-        const slots = l.masks[@backingInt(a.slot)..][0..a.count];
         assert(a.count > 1);
-        var m: Mask = 0;
-        for (slots) |x| m |= x;
-        for (slots) |*x| {
-            grew = grew or x.* != m;
-            x.* = m;
+        const slots = l.words[@backingInt(a.slot) * l.mw ..][0 .. a.count * l.mw];
+        const m = l.acc;
+        @memset(m, 0);
+        for (0..a.count) |k| for (m, slots[k * l.mw ..][0..l.mw]) |*x, y| {
+            x.* |= y;
+        };
+        for (0..a.count) |k| {
+            const s = slots[k * l.mw ..][0..l.mw];
+            grew = grew or !std.mem.eql(u64, s, m);
+            @memcpy(s, m);
         }
-        assert(slots[0] == m and slots[a.count - 1] == m);
+        assert(std.mem.eql(u64, slots[0..l.mw], m));
+        assert(std.mem.eql(u64, slots[(a.count - 1) * l.mw ..][0..l.mw], m));
     }
     return grew;
 }
 
+/// Ors operand `ref`'s mask into `acc`, `mw` words.
+fn orIn(l: Liveness, acc: []u64, ref: Inst.Ref) void {
+    assert(acc.len == l.mw);
+    for (acc, l.maskOf(ref).words) |*x, y| x.* |= y;
+}
+
+/// Ors `m` into instruction `i`'s mask; returns whether it grew.
 fn orInto(l: Liveness, i: u32, m: Mask) bool {
-    const before = l.masks[i];
-    l.masks[i] = before | m;
-    return l.masks[i] != before;
+    assert(m.words.len == l.mw);
+    const row = l.words[i * l.mw ..][0..l.mw];
+    var grew = false;
+    for (row, m.words) |*x, y| {
+        grew = grew or y & ~x.* != 0;
+        x.* |= y;
+    }
+    return grew;
 }
 
 test "Liveness: a slot joins every value assigned to it; a constant has no lanes" {
@@ -359,11 +444,36 @@ test "Liveness: a slot joins every value assigned to it; a constant has no lanes
     var arena: std.heap.ArenaAllocator = .init(gpa);
     defer arena.deinit();
     const l = try init(arena.allocator(), air, 2, null, &.{});
-    try std.testing.expectEqual(@as(Mask, 0b11), l.masks[@backingInt(ld)]);
-    try std.testing.expectEqual(@as(Mask, 0b11), l.masks[@backingInt(mul)]);
+    try std.testing.expectEqualSlices(u64, &.{0b11}, l.mask(@backingInt(ld)).words);
+    try std.testing.expectEqualSlices(u64, &.{0b11}, l.mask(@backingInt(mul)).words);
     try std.testing.expect(l.assigned[@backingInt(s)]);
     try std.testing.expect(l.used[@backingInt(mul)]);
     try std.testing.expect(!l.used[@backingInt(ret)]);
-    try std.testing.expectEqual(@as(Mask, 0), l.maskOf(.fromIntern(InternPool.Index.two_real)));
-    try std.testing.expectError(error.TooManyUnknowns, init(arena.allocator(), air, 65, null, &.{}));
+    try std.testing.expect(l.maskOf(.fromIntern(InternPool.Index.two_real)).isZero());
+}
+
+test "Liveness: past 64 unknowns a mask is one column of mw words, bits 64 and up kept" {
+    // %0 = probe 1, %1 = probe 129, %2 = fadd(%0, %1), ret: three words,
+    // and the literal is one hex number, the top word unpadded.
+    const gpa = std.testing.allocator;
+    var b = try Air.Builder.init(gpa);
+    defer b.deinit(gpa);
+    const p0 = try b.addInst(gpa, .{ .tag = .probe, .data = .{ .ty_index = .{ .ty = .real_type, .index = 1 } } });
+    const p1 = try b.addInst(gpa, .{ .tag = .probe, .data = .{ .ty_index = .{ .ty = .real_type, .index = 129 } } });
+    const add = try b.addBinOp(gpa, .fadd, .fromIndex(p0), .fromIndex(p1));
+    const ret = try b.addUnOp(gpa, .ret, .fromIndex(add));
+    var air = try b.finish(gpa, &.{ p0, p1, add, ret });
+    defer air.deinit(gpa);
+    var arena: std.heap.ArenaAllocator = .init(gpa);
+    defer arena.deinit();
+    const l = try init(arena.allocator(), air, 130, null, &.{});
+    try std.testing.expectEqual(@as(u32, 3), l.mw);
+    try std.testing.expectEqualSlices(u64, &.{ 0b10, 0, 0b10 }, l.mask(@backingInt(add)).words);
+    var buf: [64]u8 = undefined;
+    try std.testing.expectEqualStrings("2" ++ "0000000000000000" ++ "0000000000000002", try std.fmt.bufPrint(&buf, "{f}", .{l.mask(@backingInt(add))}));
+    try std.testing.expectEqualStrings("2", try std.fmt.bufPrint(&buf, "{f}", .{l.mask(@backingInt(p0))}));
+    try std.testing.expectEqual(@as(u32, 1), wordsOf(0));
+    try std.testing.expectEqual(@as(u32, 1), wordsOf(64));
+    try std.testing.expectEqual(@as(u32, 2), wordsOf(65));
+    try std.testing.expectEqual(@as(u32, 1024), wordsOf(unknowns_max));
 }

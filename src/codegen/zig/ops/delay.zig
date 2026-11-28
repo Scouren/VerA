@@ -73,13 +73,13 @@ pub fn genRing(dg: *DeclGen, w: *std.Io.Writer, k: usize, d: Delay) Error!void {
 /// and controls (td, maxdelay): the small-signal delay for a family with
 /// `acMul`, else the ring read at the effective td.
 pub fn genEval(f: *Function, k: usize, d: Delay, args: []const Ref, m: Liveness.Mask) Error!void {
-    try f.print(" break :op{d} F.zLu(S, 0x{x}, if (comptime @hasDecl(S.Of(0), \"acMul\")) K.ac.zAcDelay(F.zL(S, 0x{x}), F.zLw(S, 0x{x}, ", .{ k, m, m, m });
+    try f.print(" break :op{d} F.zLu(S, 0x{f}, if (comptime @hasDecl(S.Of(0), \"acMul\")) K.ac.zAcDelay(F.zL(S, 0x{f}), F.zLw(S, 0x{f}, ", .{ k, m, m, m });
     try f.real(args[0]);
     // §4.5.7 "td is evaluated as a constant at a particular time for any
     // small signal analysis": read live, clamped by maxdelay.
     try f.print("), ", .{});
     try clamp(f, args, null, d);
-    try f.print(") else K.ac.zSs(F.zL(S, 0x{x}), sim.kind, K.ops.zAbsdelay(F.zL(S, 0x{x}), F.zLw(S, 0x{x}, ", .{ m, m, m });
+    try f.print(") else K.ac.zSs(F.zL(S, 0x{f}), sim.kind, K.ops.zAbsdelay(F.zL(S, 0x{f}), F.zLw(S, 0x{f}, ", .{ m, m, m });
     try f.real(args[0]);
     try f.print("), &inst.op{0d}__t, &inst.op{0d}__v, inst.op{0d}__head, sim.t, sim.dt, ", .{k});
     try clamp(f, args, k, d);

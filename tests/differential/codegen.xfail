@@ -207,11 +207,9 @@ verilog-a/ch04_expressions/cosh.va point 0: display record value 9: old 1.543080
 verilog-a/ch04_expressions/hypot_fmod_extreme_magnitude.va point 0: display record value 13: old 0e0, new -0e0
 verilog-a/exhaustive/hyperbolic.va point 0: display record value 9: old 1.543080634815244e0, new 1.5430806348152437e0
 verilog-a/exhaustive/rounding_selection.va point 0: display record value 29: old 0e0, new -0e0
-netlist/hdl/veriloga_wide_ladder.assets/ladder70.va codegen: more than 64 unknowns
 verilog-a/annex_g_change_history/generate_replaced_by_analog_for.va the new device does not build: n23.zig:390: unused local constant
 verilog-a/ch06_hierarchy/mfactor_scales_named_branch_flow.va codegen: a flow contribution to a potential source's branch
 verilog-a/ch06_hierarchy/undeclared_interconnect_port_binding.va codegen: a flow contribution to a potential source's branch
-verilog-a/ch06_hierarchy/vector_port_past_256_unknowns.va codegen: more than 64 unknowns
 verilog-a/ch04_expressions/ddt_idt_nature_tolerance.va codegen: a call of `idt$hold`
 verilog-a/ch09_system_tasks/numeric_string_local_width.va point 0: display record value 1: old 1e0, new 0e0
 verilog-ams/ch09_system_tasks/strobe_writes_once_per_accepted_solution.va codegen: a call of `analog$initial`

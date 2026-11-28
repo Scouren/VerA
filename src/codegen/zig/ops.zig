@@ -99,17 +99,17 @@ pub fn fields(dg: *const DeclGen) Error![]const Field {
 /// `m.bound_step`, independent of any operator).
 pub fn genCoreFields(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     for (dg.op_sites, 0..) |s, k| {
-        try dg.print(w, " o{d}: F.zOf(S, 0x{x}),", .{ k, dg.live.masks[@backingInt(s.call)] });
+        try dg.print(w, " o{d}: F.zOf(S, 0x{f}),", .{ k, dg.live.mask(@backingInt(s.call)) });
         for (0..controls(s.kind)) |j| try dg.print(w, " o{d}c{d}: f64,", .{ k, j });
     }
-    if (dg.device.kernel.bound_step) |a| try dg.print(w, " bound_step: F.zOf(S, 0x{x}),", .{dg.live.masks[@backingInt(a)]});
+    if (dg.device.kernel.bound_step) |a| try dg.print(w, " bound_step: F.zOf(S, 0x{f}),", .{dg.live.mask(@backingInt(a))});
 }
 
 /// `core`'s locals the sites write, before the body.
 pub fn genDecls(dg: *DeclGen, w: *std.Io.Writer) Error!void {
     for (dg.op_sites, 0..) |s, k| {
-        const m = dg.live.masks[@backingInt(s.call)];
-        try dg.print(w, "\n    var o{0d}: F.zOf(S, 0x{1x}) = F.zTo(S, 0x{1x}, S.con(0.0)); _ = &o{0d};", .{ k, m });
+        const m = dg.live.mask(@backingInt(s.call));
+        try dg.print(w, "\n    var o{0d}: F.zOf(S, 0x{1f}) = F.zTo(S, 0x{1f}, S.con(0.0)); _ = &o{0d};", .{ k, m });
         for (0..controls(s.kind)) |j| try dg.print(w, "\n    var o{0d}c{1d}: f64 = 0.0; _ = &o{0d}c{1d};", .{ k, j });
     }
 }
@@ -131,7 +131,7 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, kind: Kind, args: []const Ref) Er
     const k = for (dg.op_sites, 0..) |s, k| {
         if (s.call == inst) break k;
     } else unreachable; // `plan` named every operator call
-    const m = dg.live.masks[@backingInt(inst)];
+    const m = dg.live.mask(@backingInt(inst));
     const event = events.of(kind);
     f.uses.inst = true;
     // §5.10.3.2 above() reads no analysis state.
@@ -142,7 +142,7 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, kind: Kind, args: []const Ref) Er
     // by `updateState` alone: the operands `Liveness` keeps are named here.
     if (event != null) for (args) |a| if (a.toIndex()) |ai| try f.print(" _ = &v{d};", .{@backingInt(ai)});
     if (core) {
-        try f.print(" o{d} = F.zTo(S, 0x{x}, ", .{ k, m });
+        try f.print(" o{d} = F.zTo(S, 0x{f}, ", .{ k, m });
         // An event's input (a timer's start_time) may be an integer.
         if (event != null) {
             try f.print("S.con(", .{});
@@ -158,7 +158,7 @@ pub fn gen(f: *Function, inst: Air.Inst.Index, kind: Kind, args: []const Ref) Er
     }
     if (kind == .absdelay) return delay.genEval(f, k, dg.op_sites[k].delay, args, m);
     if (event) |e| return events.genValue(f, k, e, args);
-    try f.print(" break :op{d} F.zLu(S, 0x{x}, K.ops.{s}(F.zL(S, 0x{x}), F.zLw(S, 0x{x}, ", .{
+    try f.print(" break :op{d} F.zLu(S, 0x{f}, K.ops.{s}(F.zL(S, 0x{f}), F.zLw(S, 0x{f}, ", .{
         k, m,
         switch (kind) {
             .transition => "zTransition",

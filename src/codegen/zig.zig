@@ -1,7 +1,7 @@
 //! The Zig backend (Zig's `codegen/c.zig`, named for the language it
-//! emits): one analysed device in, its Zig source out. `Liveness` first
-//! (the lanes and uses of every value), then `DeclGen` writes the file and
-//! `Function` the one body. Cites the clauses its files cite.
+//! emits): one analysed device in, its Zig source out. `DeclGen` numbers
+//! the unknowns, builds `Liveness` over them (the lanes and uses of every
+//! value), then writes the file, and `Function` the one body. Cites the clauses its files cite.
 //!
 //! Contents:
 //! - `pub const DeclGen`, `pub const Function`, `pub const Liveness`, `pub const Ident`
@@ -26,10 +26,6 @@ pub fn generate(gpa: Allocator, in: codegen.Input, options: codegen.Options) All
     var arena_state: std.heap.ArenaAllocator = .init(gpa);
     defer arena_state.deinit();
     const arena = arena_state.allocator();
-    const live = Liveness.init(arena, in.air.*, @intCast(in.device.nodes.len), null, in.device.arrays.items) catch |e| switch (e) {
-        error.OutOfMemory => return error.OutOfMemory,
-        error.TooManyUnknowns => return .{ .fail = try std.fmt.allocPrint(gpa, "more than {d} unknowns", .{Liveness.unknowns_max}) },
-    };
     var dg: DeclGen = .{
         .gpa = gpa,
         .arena = arena,
@@ -37,7 +33,7 @@ pub fn generate(gpa: Allocator, in: codegen.Input, options: codegen.Options) All
         .ip = in.ip,
         .device = in.device,
         .verdict = in.verdict,
-        .live = live,
+        .live = undefined, // `genFile` builds it once `U` is known
         .options = .{ .strict = options.strict },
     };
     var out: std.Io.Writer.Allocating = .init(gpa);

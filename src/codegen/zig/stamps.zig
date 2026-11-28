@@ -20,7 +20,6 @@ const Air = @import("air");
 const DeclGen = @import("DeclGen.zig");
 const Liveness = @import("Liveness.zig");
 const Device = Air.Device;
-const Mask = Liveness.Mask;
 /// What a stamp writes into its row.
 pub const Term = union(enum) {
     /// Contribution `k`'s resistive sum (`m.r<k>`), or 0 when it has none.
@@ -49,10 +48,19 @@ pub const QStamp = struct { row: u32, site: u32, sign: f64 };
 /// The plan, in the arena.
 pub const Plan = struct {
     stamps: []const Stamp,
-    /// Per row, the unknowns `eval`'s row may depend on (`jac_pattern`).
-    pattern: []const Mask,
+    /// Per row, the unknowns `eval`'s row may depend on (`jac_pattern`):
+    /// `mw` words a row, row `r` at `pattern[r * mw ..][0..mw]`.
+    pattern: []const u64,
+    /// Words per row mask (`Liveness.wordsOf(n_u)`).
+    mw: u32,
     /// Sorted by (row, site), no repeated pair, no zero sign.
     q: []const QStamp,
+
+    /// Row `r`'s mask.
+    pub fn row(p: Plan, r: u32) Liveness.Mask {
+        assert(r < p.pattern.len / p.mw);
+        return .{ .words = p.pattern[r * p.mw ..][0..p.mw] };
+    }
 };
 
 const none: u32 = std.math.maxInt(u32);
@@ -93,7 +101,8 @@ pub fn unknowns(dg: *DeclGen) DeclGen.Error!void {
         dg.branch_u[k] = found;
     }
     dg.u_names = names.items;
-    if (dg.u_names.len > Liveness.unknowns_max) return dg.fail("more than {d} unknowns", .{Liveness.unknowns_max});
+    // `contract.MaskOf(n_u)` is one `u<n_u>`, at most Zig's `u65535`.
+    if (dg.u_names.len > Liveness.unknowns_max) return dg.fail("limit-unknowns: more than {d} unknowns (a contract mask is one u{d})", .{ Liveness.unknowns_max, Liveness.unknowns_max });
     assert(dg.u_names.len >= d.nodes.len);
 }
 
@@ -109,8 +118,10 @@ pub fn plan(dg: *DeclGen) DeclGen.Error!Plan {
     const a = dg.arena;
     const n_u: u32 = @intCast(dg.u_names.len);
     var stamps: std.ArrayList(Stamp) = .empty;
-    const pattern = try a.alloc(Mask, n_u);
-    @memset(pattern, 0);
+    const mw = dg.live.mw;
+    assert(mw == Liveness.wordsOf(n_u));
+    const pattern: Pattern = .{ .words = try a.alloc(u64, n_u * mw), .mw = mw, .bit = try a.alloc(u64, mw) };
+    @memset(pattern.words, 0);
     // Each contribution's flow unknown, `none` for a flow contribution.
     const flows = try a.alloc(u32, d.contributions.len);
     for (flows, 0..) |*fl, k| {
@@ -125,7 +136,7 @@ pub fn plan(dg: *DeclGen) DeclGen.Error!Plan {
         const c = d.contributions.get(k);
         const hi = @backingInt(c.hi);
         const lo = @backingInt(c.lo);
-        const m = dg.live.masks[@backingInt(c.resist)];
+        const m = dg.live.mask(@backingInt(c.resist)).words;
         if (fl == none) {
             if (potentialOn(d, hi, lo)) return dg.fail("a flow contribution to a potential source's branch", .{});
             if (!dg.live.assigned[@backingInt(c.resist)]) continue; // a zero half stamps nothing
@@ -134,10 +145,9 @@ pub fn plan(dg: *DeclGen) DeclGen.Error!Plan {
             if (freeOf(dg, flows, hi, lo)) |u| try add(a, &stamps, pattern, u, .sub, .{ .resist = @intCast(k) }, m);
             continue;
         }
-        const bit = @as(Mask, 1) << @intCast(fl);
-        try add(a, &stamps, pattern, hi, .add, .{ .x = fl }, bit);
-        try add(a, &stamps, pattern, lo, .sub, .{ .x = fl }, bit);
-        try add(a, &stamps, pattern, fl, .set, .{ .branch = .{ .hi = hi, .lo = lo, .k = @intCast(k) } }, bits(hi) | bits(lo) | m);
+        try add(a, &stamps, pattern, hi, .add, .{ .x = fl }, pattern.bits(&.{fl}));
+        try add(a, &stamps, pattern, lo, .sub, .{ .x = fl }, pattern.bits(&.{fl}));
+        try add(a, &stamps, pattern, fl, .set, .{ .branch = .{ .hi = hi, .lo = lo, .k = @intCast(k) } }, pattern.bitsOr(&.{ hi, lo }, m));
     }
     // §5.4.2.1/§5.6.6 the flow unknowns no branch relation defines, in
     // unknown order: a sourced one closes `x[u] - Σ`, a probe is a short.
@@ -145,13 +155,12 @@ pub fn plan(dg: *DeclGen) DeclGen.Error!Plan {
         const u: u32 = @backingInt(un);
         if (kind != .branch or std.mem.findScalar(u32, flows, u) != null) continue;
         const ends = [2]u32{ @backingInt(hi), @backingInt(lo) };
-        const bit = @as(Mask, 1) << @intCast(u);
         if (sourced(dg, ends[0], ends[1])) {
-            try add(a, &stamps, pattern, u, .add, .{ .x = u }, bit);
+            try add(a, &stamps, pattern, u, .add, .{ .x = u }, pattern.bits(&.{u}));
         } else {
-            try add(a, &stamps, pattern, ends[0], .add, .{ .x = u }, bit);
-            try add(a, &stamps, pattern, ends[1], .sub, .{ .x = u }, bit);
-            try add(a, &stamps, pattern, u, .set, .{ .branch = .{ .hi = ends[0], .lo = ends[1], .k = none } }, bits(ends[0]) | bits(ends[1]));
+            try add(a, &stamps, pattern, ends[0], .add, .{ .x = u }, pattern.bits(&.{u}));
+            try add(a, &stamps, pattern, ends[1], .sub, .{ .x = u }, pattern.bits(&.{u}));
+            try add(a, &stamps, pattern, u, .set, .{ .branch = .{ .hi = ends[0], .lo = ends[1], .k = none } }, pattern.bits(&ends));
         }
     }
     // §5.4.3 a port probe reads the finished KCL row of its port.
@@ -159,22 +168,46 @@ pub fn plan(dg: *DeclGen) DeclGen.Error!Plan {
         if (kind != .port) continue;
         const u: u32 = @backingInt(un);
         const p: u32 = @backingInt(port);
-        try add(a, &stamps, pattern, u, .set, .{ .port = .{ .u = u, .p = p } }, (@as(Mask, 1) << @intCast(u)) | pattern[p]);
+        try add(a, &stamps, pattern, u, .set, .{ .port = .{ .u = u, .p = p } }, pattern.bitsOr(&.{u}, try a.dupe(u64, pattern.words[p * mw ..][0..mw])));
     }
-    return .{ .stamps = stamps.items, .pattern = pattern, .q = try qPlan(dg, flows) };
+    return .{ .stamps = stamps.items, .pattern = pattern.words, .mw = mw, .q = try qPlan(dg, flows) };
 }
 
 // ---- private ----
 
-fn add(a: std.mem.Allocator, stamps: *std.ArrayList(Stamp), pattern: []Mask, row: u32, op: Stamp.Op, term: Term, m: Mask) !void {
-    if (row == @backingInt(Device.Node.Index.ground)) return; // §1.3.1.1 ground has no equation
-    assert(row < pattern.len);
-    pattern[row] |= m;
-    try stamps.append(a, .{ .row = row, .op = op, .term = term });
-}
+/// The row masks `plan` fills, and one row of scratch (`bit`) for the
+/// mask a stamp adds.
+const Pattern = struct {
+    words: []u64,
+    mw: u32,
+    bit: []u64,
 
-fn bits(u: u32) Mask {
-    return if (u == @backingInt(Device.Node.Index.ground)) 0 else @as(Mask, 1) << @intCast(u);
+    /// The unknowns `us` (ground names none), in `bit`.
+    fn bits(p: Pattern, us: []const u32) []const u64 {
+        @memset(p.bit, 0);
+        for (us) |u| {
+            if (u == @backingInt(Device.Node.Index.ground)) continue;
+            assert(u / 64 < p.mw);
+            p.bit[u / 64] |= @as(u64, 1) << @intCast(u % 64);
+        }
+        return p.bit;
+    }
+
+    /// The unknowns `us` and `m`'s, in `bit`. `m` must not be `bit`.
+    fn bitsOr(p: Pattern, us: []const u32, m: []const u64) []const u64 {
+        assert(m.len == p.mw and m.ptr != p.bit.ptr);
+        _ = p.bits(us);
+        for (p.bit, m) |*x, y| x.* |= y;
+        return p.bit;
+    }
+};
+
+fn add(a: std.mem.Allocator, stamps: *std.ArrayList(Stamp), pattern: Pattern, row: u32, op: Stamp.Op, term: Term, m: []const u64) !void {
+    if (row == @backingInt(Device.Node.Index.ground)) return; // §1.3.1.1 ground has no equation
+    assert(m.len == pattern.mw);
+    assert(row < pattern.words.len / pattern.mw);
+    for (pattern.words[row * pattern.mw ..][0..pattern.mw], m) |*x, y| x.* |= y;
+    try stamps.append(a, .{ .row = row, .op = op, .term = term });
 }
 
 /// The reactive rows: each charge site at its contribution's rows, a port
